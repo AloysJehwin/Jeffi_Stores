@@ -186,9 +186,11 @@ export function PayablesTab({ initialData }: { initialData: any }) {
               {loading ? 'Loading…' : 'Refresh'}
             </button>
             {canWrite && (
-              <button className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>
-                + Add Bill
-              </button>
+              <span className="hidden md:contents">
+                <button className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>
+                  + Add Bill
+                </button>
+              </span>
             )}
           </div>
         </div>

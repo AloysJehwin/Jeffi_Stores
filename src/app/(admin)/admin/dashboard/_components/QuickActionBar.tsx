@@ -12,6 +12,11 @@ interface Action {
   primary?: boolean
 }
 
+function isCreatePath(path: string) {
+  const base = path.split('?')[0].replace(/\/$/, '')
+  return base.endsWith('/add') || base.endsWith('/new')
+}
+
 function fallbackIcon() {
   return (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -22,10 +27,11 @@ function fallbackIcon() {
 
 // A quick-action tile. Icon comes from the shared sidebar NAV_ICONS map.
 function Tile({ label, icon, path, primary, host }: Action & { host: string }) {
+  const display = isCreatePath(path) ? 'hidden md:flex' : 'flex'
   return (
     <Link
       href={ap(path, host)}
-      className="group flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated transition-colors duration-200"
+      className={`group ${display} flex-col items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated transition-colors duration-200`}
     >
       <span
         className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${primary ? 'bg-accent-500/10 text-accent-600 group-hover:bg-accent-500 group-hover:text-white' : 'bg-surface-secondary text-foreground-secondary group-hover:text-foreground'} [&_svg]:w-5 [&_svg]:h-5`}

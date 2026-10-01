@@ -1004,7 +1004,7 @@ export default function DelhiveryPageClient({
                                   setAddAwbFor(addAwbFor === req.id ? null : req.id)
                                   setAddAwbOrderId('')
                                 }}
-                                className="h-[34px] px-3 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors whitespace-nowrap"
+                                className="hidden md:inline-flex items-center justify-center h-[34px] px-3 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors whitespace-nowrap"
                               >
                                 + Add AWB
                               </button>

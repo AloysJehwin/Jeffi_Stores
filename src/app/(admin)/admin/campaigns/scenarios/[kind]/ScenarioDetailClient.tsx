@@ -140,7 +140,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
           <RequireWrite scope="campaigns:write">
             <Link
               href={ap(`/admin/campaigns/new?scenario=${scenario.kind}`)}
-              className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 shrink-0"
+              className="hidden md:inline-flex items-center px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 shrink-0"
             >
               + New campaign
             </Link>
@@ -180,7 +180,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
             <RequireWrite scope="campaigns:write">
               <Link
                 href={ap(`/admin/campaigns/new?scenario=${scenario.kind}`)}
-                className="inline-block px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
+                className="hidden md:inline-block px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
               >
                 Create the first one
               </Link>
