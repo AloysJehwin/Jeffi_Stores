@@ -1233,7 +1233,6 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                 quotations={sortedQuotations}
                 canWrite={canWrite}
                 sendingEmailId={sendingEmailId}
-                onEdit={openEdit}
                 onSendEmail={sendQuoteEmail}
                 onDelete={deleteQuote}
                 onConvert={startConvert}

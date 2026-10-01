@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, Pencil, Trash2, ExternalLink, Link as LinkIcon, ClipboardList } from 'lucide-react'
+import { Eye, Trash2, ExternalLink, Link as LinkIcon, ClipboardList } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -93,12 +93,6 @@ export default function ReviewFormsMobileList({ forms, backUrl, formsBase }: Pro
       },
     ]
     if (canWrite) {
-      actions.push({
-        key: 'edit',
-        label: 'Edit form',
-        icon: <Pencil className="w-4 h-4" />,
-        onSelect: () => router.push(ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(backUrl)}`)),
-      })
       actions.push({
         key: 'delete',
         label: 'Delete form',

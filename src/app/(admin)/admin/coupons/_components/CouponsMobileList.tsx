@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, Pencil, Trash2 } from 'lucide-react'
+import { Eye, Trash2 } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -78,12 +78,6 @@ export default function CouponsMobileList({ coupons, backUrl }: Props) {
       },
     ]
     if (canWrite) {
-      actions.push({
-        key: 'edit',
-        label: 'Edit coupon',
-        icon: <Pencil className="w-4 h-4" />,
-        onSelect: () => router.push(ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(backUrl)}`)),
-      })
       actions.push({
         key: 'delete',
         label: 'Delete coupon',

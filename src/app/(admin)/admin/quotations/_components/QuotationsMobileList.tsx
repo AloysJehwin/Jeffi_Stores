@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ExternalLink, Download, Mail, Pencil, Trash2, FileText } from 'lucide-react'
+import { ExternalLink, Download, Mail, Trash2, FileText } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
@@ -12,7 +12,6 @@ interface Props {
   quotations: Quotation[]
   canWrite: boolean
   sendingEmailId: string | null
-  onEdit: (id: string) => void
   onSendEmail: (id: string) => void
   onDelete: (id: string) => void
   onConvert: (q: Quotation) => void
@@ -45,7 +44,6 @@ export default function QuotationsMobileList({
   quotations,
   canWrite,
   sendingEmailId,
-  onEdit,
   onSendEmail,
   onDelete,
   onConvert,
@@ -68,14 +66,6 @@ export default function QuotationsMobileList({
         onSelect: () => window.open(`/api/admin/quotations/${q.id}/pdf`, '_blank', 'noopener,noreferrer'),
       },
     ]
-    if (q.status === 'draft' && !q.from_rfq && canWrite) {
-      actions.unshift({
-        key: 'edit',
-        label: 'Edit quotation',
-        icon: <Pencil className="w-4 h-4" />,
-        onSelect: () => onEdit(q.id),
-      })
-    }
     if (q.status === 'final' && q.consignee_email) {
       actions.push({
         key: 'email',

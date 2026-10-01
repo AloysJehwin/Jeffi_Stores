@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Eye, Pencil, Power, Trash2, ExternalLink } from 'lucide-react'
+import { Eye, Power, Trash2, ExternalLink } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -97,12 +97,6 @@ export default function BrandsMobileList({ brands, backUrl }: Props) {
       },
     ]
     if (canWrite) {
-      actions.push({
-        key: 'edit',
-        label: 'Edit brand',
-        icon: <Pencil className="w-4 h-4" />,
-        onSelect: () => router.push(ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(backUrl)}`)),
-      })
       actions.push({
         key: 'active',
         label: brand.is_active ? 'Deactivate' : 'Activate',
