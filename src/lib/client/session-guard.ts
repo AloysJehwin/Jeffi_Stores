@@ -10,7 +10,11 @@ const STORE = 'kv'
 const KEY_ID = 'k1'
 const REFRESH_MARGIN_MS = 60_000
 const IDLE_RECHECK_MS = 10 * 60_000
-const BIND_WAIT_MS = 3000
+// How long a page-load API call waits for the guard to (re)bind before going out anyway. On a fast
+// local loop the bind finishes in milliseconds; in production the POST to the bind endpoint can
+// exceed this, so calls go out before the cookie exists. NEXT_PUBLIC_BIND_WAIT_MS lets a dev shrink
+// it (e.g. 0) to reproduce that production race locally. Never set in production.
+const BIND_WAIT_MS = Number(process.env.NEXT_PUBLIC_BIND_WAIT_MS ?? 3000)
 const STATE_KEY = '_app_b'
 const AUTH_PATH = /(login|signin|sign-in|signup|otp|verify|google|callback|mfa|logout|\/auth\/)/i
 

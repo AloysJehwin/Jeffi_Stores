@@ -85,9 +85,11 @@ describe('signed proof', () => {
 
 describe('evaluateKeyBinding', () => {
   const base = { sessionId: 'sess-1', sidHash: SID_HASH, principalType: 'customer' as const }
+  // Default to a mutation: proof is only ever required for script-made mutations, so the
+  // proof-required paths are exercised with POST. Reads (GET/HEAD) are covered separately.
   const ctx = (over: Record<string, unknown>) => ({
     host: HOST,
-    method: 'GET',
+    method: 'POST',
     path: '/api/orders/1',
     bindCookies: {},
     proof: null,
@@ -107,7 +109,7 @@ describe('evaluateKeyBinding', () => {
     const attacker = await browserKey()
     vi.mocked(db.queryOne).mockResolvedValue({ public_jwk: victim.jwk, bind_host: HOST } as any)
     const cookie = mintBindCookie(SID_HASH, HOST).value
-    const proof = await attacker.sign('GET', '/api/orders/1')
+    const proof = await attacker.sign('POST', '/api/orders/1')
     const v = await evaluateKeyBinding({
       ...base,
       sessionId: 'sess-2',
@@ -124,7 +126,7 @@ describe('evaluateKeyBinding', () => {
       sessionId: 'sess-3',
       ctx: ctx({
         bindCookies: { customer: mintBindCookie(SID_HASH, HOST).value },
-        proof: await victim.sign('GET', '/api/orders/1'),
+        proof: await victim.sign('POST', '/api/orders/1'),
       }) as any,
     })
     expect(v).toEqual({ status: 'ok', reject: false })
@@ -157,19 +159,51 @@ describe('evaluateKeyBinding', () => {
     expect(v).toMatchObject({ status: 'violation', reason: 'cookie_missing', reject: false })
   })
 
-  it('a copied sid IS refused on an authenticated API call (proof-required)', async () => {
+  it('a read (GET) is never refused for a missing bind cookie, on any path (reload race)', async () => {
+    // The storefront/admin "logged out on reload": every portal fires a read on page load (/me,
+    // check-session, staff/me, ...) before the guard re-binds, so the call carries no bind cookie.
+    // A read must never reject regardless of path, or the client reads 200 {user:null} as logged
+    // out and tears the session down. This holds for probe routes AND any other GET, so a new
+    // portal's probe is safe without being added to any list.
     const { jwk } = await browserKey()
     vi.mocked(db.queryOne).mockResolvedValue({
       public_jwk: jwk,
       bind_host: HOST,
       created_at: new Date(Date.now() - 60_000),
     } as any)
-    const v = await evaluateKeyBinding({
-      ...base,
-      sessionId: 'sess-api',
-      ctx: ctx({ path: '/api/admin/products', fetchDest: 'empty' }) as any,
-    })
-    expect(v).toMatchObject({ status: 'violation', reject: true })
+    const reads = [
+      '/api/auth/me',
+      '/api/business/me',
+      '/api/ecom/auth/me',
+      '/api/staff/me',
+      '/api/admin/check-session',
+      '/api/orders/1',
+    ]
+    for (const path of reads) {
+      const v = await evaluateKeyBinding({
+        ...base,
+        sessionId: 'sess-read',
+        ctx: ctx({ method: 'GET', path, fetchDest: 'empty' }) as any,
+      })
+      expect(v, path).toMatchObject({ status: 'violation', reason: 'cookie_missing', reject: false })
+    }
+  })
+
+  it('a copied sid IS refused on an authenticated API mutation (proof-required)', async () => {
+    const { jwk } = await browserKey()
+    vi.mocked(db.queryOne).mockResolvedValue({
+      public_jwk: jwk,
+      bind_host: HOST,
+      created_at: new Date(Date.now() - 60_000),
+    } as any)
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      const v = await evaluateKeyBinding({
+        ...base,
+        sessionId: 'sess-api',
+        ctx: ctx({ method, path: '/api/admin/products', fetchDest: 'empty' }) as any,
+      })
+      expect(v, method).toMatchObject({ status: 'violation', reject: true })
+    }
   })
 
   it('requests already in flight when the key was registered are let through', async () => {
@@ -196,7 +230,7 @@ describe('evaluateKeyBinding', () => {
       sessionId: 'sess-grace-2',
       ctx: ctx({
         bindCookies: { customer: mintBindCookie(SID_HASH, HOST).value },
-        proof: await attacker.sign('GET', '/api/orders/1'),
+        proof: await attacker.sign('POST', '/api/orders/1'),
       }) as any,
     })
     expect(v).toMatchObject({ reason: 'proof_invalid', reject: true })
