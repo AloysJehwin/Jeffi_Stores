@@ -13,14 +13,17 @@ function buildQuoteNumber(now: Date, seq: number): string {
   return `QT/${fy}/${mon}/${seq}`
 }
 
-function parseAddress(raw: string | null): {
+function parseAddress(
+  raw: string | null,
+  fallbackState = ''
+): {
   addr1: string
   addr2: string | null
   city: string
   state: string
   pincode: string | null
 } {
-  if (!raw) return { addr1: '', addr2: null, city: '', state: 'Chhattisgarh', pincode: null }
+  if (!raw) return { addr1: '', addr2: null, city: '', state: fallbackState, pincode: null }
   const parts = raw
     .split(',')
     .map(s => s.trim())
@@ -29,7 +32,7 @@ function parseAddress(raw: string | null): {
   if (parts.length > 0 && /^\d{6}$/.test(parts[parts.length - 1])) {
     pincode = parts.pop()!
   }
-  const state = parts.pop() || 'Chhattisgarh'
+  const state = parts.pop() || fallbackState
   const city = parts.pop() || ''
   const addr1 = parts[0] || ''
   const addr2 = parts.slice(1).join(', ') || null
@@ -121,7 +124,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const seq = (parseInt(maxRow?.max_seq || '0') || 0) + 1
   const quoteNumber = buildQuoteNumber(now, seq)
 
-  const addr = parseAddress(rfq.business_address)
+  const { storeOrigin } = await import('@/lib/catalog/brand')
+  const addr = parseAddress(rfq.business_address, (await storeOrigin()).state)
   const consigneeName = rfq.company_name || `${rfq.first_name} ${rfq.last_name}`.trim()
 
   let subtotal = 0

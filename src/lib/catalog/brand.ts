@@ -194,6 +194,24 @@ export async function storeAddressLine(): Promise<string> {
 }
 
 /**
+ * The current store's own city/state (site_settings business_city/business_state), for
+ * consignee/return-address DEFAULTS that previously fell back to the flagship's Raipur/Chhattisgarh.
+ * Empty strings when unset — never another store's location.
+ */
+export async function storeOrigin(): Promise<{ city: string; state: string }> {
+  try {
+    const { queryMany } = await import('@/lib/shared/db')
+    const rows = await queryMany<{ key: string; value: string }>(
+      `SELECT key, value FROM site_settings WHERE key IN ('business_city', 'business_state')`
+    )
+    const m = Object.fromEntries((rows || []).map(r => [r.key, (r.value || '').trim()]))
+    return { city: m.business_city || '', state: m.business_state || '' }
+  } catch {
+    return { city: '', state: '' }
+  }
+}
+
+/**
  * A one-line store descriptor for AI system prompts. Replaces the hardcoded
  * "Jeffi Stores, an Indian hardware & tools store" that leaked the flagship's niche into
  * every tenant's AI output. Uses the tenant's own name and, when set, its onboarding

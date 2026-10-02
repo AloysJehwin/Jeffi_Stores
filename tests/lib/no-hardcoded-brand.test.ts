@@ -21,6 +21,22 @@ const SRC = join(ROOT, 'src')
 // space or quote/apostrophe, i.e. the human-readable name.
 const BRAND_RE = /Jeffi(?:\s|&amp;|'|’|")/
 
+// The flagship's home city/state. Hardcoding these as consignee/return-address defaults or inside
+// an LLM prompt/tool-schema leaks the flagship's location into a tenant's ops/AI. Resolve the
+// store's own location (storeOrigin() / site_settings business_city|business_state) instead.
+const LOCATION_RE = /\b(Chhattisgarh|Raipur)\b/
+// Only enforced on prompt + ops surfaces where a tenant store acts; platform-entity references
+// (legal docs, Amazon LMPC contact, pincode reference tables, GST-code hints) live elsewhere.
+const LOCATION_SCOPE_PREFIXES = [
+  'src/lib/admin-agent/',
+  'src/app/api/(admin)/',
+  'src/app/api/(public)/',
+]
+const LOCATION_ALLOW_FILES = new Set<string>([
+  'src/lib/admin-agent/tools/sales.ts', // description now neutral + default via storeOrigin(); keeps the word only in a comment
+  'src/app/api/(public)/orders/[id]/invoice/route.ts', // reads business_state (tenant), no literal
+])
+
 // Platform-only surfaces: Jeffi branding here is correct.
 const ALLOW_PREFIXES = [
   'src/app/(ecom)/',
@@ -97,6 +113,30 @@ describe('no hardcoded platform brand in tenant-facing code (#486)', () => {
       offenders.length
         ? `Hardcoded platform brand in tenant-facing code — resolve from store settings instead ` +
             `(see this test's header). If the surface is genuinely platform-only, add it to ALLOW_* here:\n${report}`
+        : ''
+    ).toHaveLength(0)
+  })
+
+  const locationOffenders: { file: string; line: number; text: string }[] = []
+  for (const full of files) {
+    const rel = relative(ROOT, full).split(sep).join('/')
+    if (!LOCATION_SCOPE_PREFIXES.some(p => rel.startsWith(p))) continue
+    if (LOCATION_ALLOW_FILES.has(rel)) continue
+    const src = readFileSync(full, 'utf8')
+    src.split('\n').forEach((line, i) => {
+      const trimmed = line.trim()
+      if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) return
+      if (LOCATION_RE.test(line)) locationOffenders.push({ file: rel, line: i + 1, text: trimmed })
+    })
+  }
+
+  it('has no hardcoded flagship city/state in a tenant prompt or ops surface', () => {
+    const report = locationOffenders.map(o => `  ${o.file}:${o.line}  ${o.text.slice(0, 100)}`).join('\n')
+    expect(
+      locationOffenders,
+      locationOffenders.length
+        ? `Hardcoded flagship location (Raipur/Chhattisgarh) in a tenant prompt/ops surface — use ` +
+            `storeOrigin() / the store's own address instead (see this test's header):\n${report}`
         : ''
     ).toHaveLength(0)
   })

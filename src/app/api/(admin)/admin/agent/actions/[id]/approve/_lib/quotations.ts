@@ -41,6 +41,8 @@ export async function createQuotation(action: AgentAction): Promise<ActionResult
     }[]
   }
   if (!Array.isArray(p.items) || p.items.length === 0) return { result: null, error: 'items missing' }
+  const { storeOrigin } = await import('@/lib/catalog/brand')
+  const storeState = (await storeOrigin()).state
   const subtotal = p.items.reduce((s, i) => s + i.amount, 0)
   const cgst = p.items.reduce((s, i) => s + (i.amount * i.gst_rate) / 200, 0)
   const sgst = cgst
@@ -84,7 +86,7 @@ export async function createQuotation(action: AgentAction): Promise<ActionResult
           p.consignee_addr1 || '',
           p.consignee_addr2 || null,
           p.consignee_city || '',
-          p.consignee_state || 'Chhattisgarh',
+          p.consignee_state || storeState,
           p.consignee_gstin || null,
           p.consignee_phone || null,
           p.consignee_pincode || null,
