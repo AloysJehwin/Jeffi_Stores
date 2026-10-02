@@ -92,7 +92,7 @@ async function BusinessRFQsStats() {
 
   return (
     <div className="animate-fade-in">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:h-56">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:min-h-56">
         <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white">
           <div>
             <p className="text-white/80 text-sm">Total RFQs</p>
