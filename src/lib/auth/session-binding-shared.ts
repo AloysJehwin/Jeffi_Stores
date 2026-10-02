@@ -28,6 +28,20 @@ export function normHost(host: string | null | undefined): string {
     .replace(/:\d+$/, '')
 }
 
+// The scope a key + bind cookie are valid across. The *_sid session cookies are set with
+// Domain=.jeffistores.in, so the browser sends one session to every subdomain; binding must cover
+// exactly those hosts and no wider. When the host is under the shared cookie domain we collapse to
+// that domain (apex + all subdomains share one bind); otherwise the host is returned unchanged, so
+// hosts that do NOT share a cookie stay host-pinned exactly as before — custom tenant domains, the
+// tenant-admin admin-{slug}. host (its own host-scoped admin_sid_t cookie), and localhost/non-prod
+// (cookieDomain undefined). cookieDomain is passed in to keep this file dependency-free.
+export function bindScope(host: string | null | undefined, cookieDomain?: string | null): string {
+  const h = normHost(host)
+  if (!cookieDomain) return h
+  const d = cookieDomain.replace(/^\./, '')
+  return h === d || h.endsWith('.' + d) ? d : h
+}
+
 export interface BindingContext {
   host: string
   method: string
