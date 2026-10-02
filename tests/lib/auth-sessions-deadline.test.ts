@@ -59,10 +59,10 @@ beforeEach(() => {
 })
 
 describe('deadline math', () => {
-  it('idle window: per-admin minutes, admin default, or the 24h cap for other principals', () => {
+  it('idle window: per-admin minutes, admin default, or the 30d cap for other principals', () => {
     expect(idleWindowMsFor('admin', 60)).toBe(60 * 60_000)
     expect(idleWindowMsFor('admin', null)).toBe(DEFAULT_ADMIN_IDLE_MINUTES * 60_000)
-    expect(idleWindowMsFor('customer', 60)).toBe(24 * 3600_000)
+    expect(idleWindowMsFor('customer', 60)).toBe(30 * 24 * 3600_000)
   })
 
   it('deadline is the earlier of absolute expiry and last activity plus idle window', () => {

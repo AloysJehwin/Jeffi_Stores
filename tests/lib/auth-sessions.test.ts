@@ -456,10 +456,10 @@ describe('resolveSession — extra edge paths', () => {
     expect(await resolveSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')).toBeNull()
   })
 
-  it('returns null for idle-expired row (last_seen > 24h ago)', async () => {
+  it('returns null for idle-expired row (last_seen past the 30d storefront cap)', async () => {
     mockQueryOne.mockResolvedValue({
       ...liveBase(),
-      last_seen_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+      last_seen_at: new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString(),
     })
     expect(await resolveSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')).toBeNull()
   })
