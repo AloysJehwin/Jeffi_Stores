@@ -3815,8 +3815,8 @@
     "semantic_hash": ""
   },
   "src/lib/import/columns.ts": {
-    "mtime": 1790931253.6960409,
-    "ast_hash": "4574e3247cbcfd570179c37c6101e3e4",
+    "mtime": 1790962298.1063523,
+    "ast_hash": "e91b191083f24e43648a983869672513",
     "semantic_hash": ""
   },
   "src/lib/import/jobs.ts": {
@@ -3835,8 +3835,8 @@
     "semantic_hash": ""
   },
   "src/lib/import/to-draft.ts": {
-    "mtime": 1790931253.715086,
-    "ast_hash": "7ccd575a93f3fbfd4ef7ea36956ca91e",
+    "mtime": 1790962472.5744765,
+    "ast_hash": "b219b758844d18f26eb263805f232bbe",
     "semantic_hash": ""
   },
   "src/lib/import/validate-row.ts": {
@@ -11610,8 +11610,8 @@
     "semantic_hash": ""
   },
   "src/lib/catalog/product-import.ts": {
-    "mtime": 1790931253.5518227,
-    "ast_hash": "b60b5ebecccb2b9a298bcf24d8055c2c",
+    "mtime": 1790962282.5978003,
+    "ast_hash": "2ed299f6d82f7f68ad69086c9c7b6b62",
     "semantic_hash": ""
   },
   "src/lib/catalog/product-label.ts": {
@@ -12542,6 +12542,11 @@
   "tests/lib/no-hardcoded-brand.test.ts": {
     "mtime": 1790948524.358701,
     "ast_hash": "c0f16786a5b4e26a61de1b5088095dcc",
+    "semantic_hash": ""
+  },
+  "tests/lib/import/to-draft-backfill.test.ts": {
+    "mtime": 1790962365.3582144,
+    "ast_hash": "ff12728e63d45e7db777a3d6316cc23a",
     "semantic_hash": ""
   }
 }
