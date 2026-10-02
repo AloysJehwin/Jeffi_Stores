@@ -8,6 +8,7 @@ import {
   buildVariants,
   buildSubVariants,
   hasSubVariants,
+  backfillBlankOptionalFields,
   type ResolvedIds,
   type DraftImage,
 } from '@/lib/import/to-draft'
@@ -85,11 +86,13 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
         continue
       }
 
-      const { productId, isNew } = await findOrCreateProduct(group)
+      const { productId, isNew, liveRow } = await findOrCreateProduct(group)
 
       const images = await fetchImages(group, imageProgress, rowResults)
 
-      await writeDraft(productId, buildFields(group, ids), buildVariants(group), images, [])
+      // Blank optional cells keep the existing product's values (not NULL) on re-import (#492).
+      const draftFields = backfillBlankOptionalFields(buildFields(group, ids), liveRow)
+      await writeDraft(productId, draftFields, buildVariants(group), images, [])
       await publishProductDraft(productId)
 
       // Phase 2: sub-variants AND variant images need real variant ids (only exist post-publish).
@@ -103,7 +106,7 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
         const subVariants = buildSubVariants(group, variantIdBySku)
         const variantImages = await buildVariantImages(group, variantIdBySku, imageProgress, rowResults)
         if (subVariants.length > 0 || variantImages.length > 0) {
-          await writeDraft(productId, buildFields(group, ids), buildVariants(group), images, subVariants, variantImages)
+          await writeDraft(productId, draftFields, buildVariants(group), images, subVariants, variantImages)
           await publishProductDraft(productId)
         }
       }
@@ -202,14 +205,17 @@ async function lookup(cache: Map<string, string | null>, name: string, sql: stri
 
 // Upsert by SKU: existing product -> update; new SKU -> skeleton row (publish then fills
 // every field). Mirrors the skeleton create in the products/draft route.
-async function findOrCreateProduct(group: ProductGroup): Promise<{ productId: string; isNew: boolean }> {
+async function findOrCreateProduct(
+  group: ProductGroup
+): Promise<{ productId: string; isNew: boolean; liveRow: Record<string, unknown> | null }> {
   // Dedup by SKU regardless of data_source: an existing product with this SKU (manual OR
   // sheet-sourced) is UPDATED, never duplicated. A found manual product is also promoted to
   // google_sheet so the sync owns it from now on (and can delete-sweep it when removed from the sheet).
-  const existing = await queryOne<{ id: string }>('SELECT id FROM products WHERE sku = $1 LIMIT 1', [group.sku])
+  // The full live row is returned so blank optional cells can preserve its values on re-import (#492).
+  const existing = await queryOne<Record<string, unknown>>('SELECT * FROM products WHERE sku = $1 LIMIT 1', [group.sku])
   if (existing) {
-    await query(`UPDATE products SET data_source = 'google_sheet' WHERE id = $1`, [existing.id])
-    return { productId: existing.id, isNew: false }
+    await query(`UPDATE products SET data_source = 'google_sheet' WHERE id = $1`, [existing.id as string])
+    return { productId: existing.id as string, isNew: false, liveRow: existing }
   }
 
   const slug =
@@ -225,7 +231,7 @@ async function findOrCreateProduct(group: ProductGroup): Promise<{ productId: st
     [group.name, slug, group.sku]
   )
   if (!created) throw new Error('failed to create product row')
-  return { productId: created.id, isNew: true }
+  return { productId: created.id, isNew: true, liveRow: null }
 }
 
 async function fetchImages(
