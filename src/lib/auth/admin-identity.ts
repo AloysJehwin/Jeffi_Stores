@@ -1,5 +1,6 @@
 import { queryOne, query } from '@/lib/shared/db'
 import { isPlatformOwner } from '@/lib/auth/scopes'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
 
 const PLATFORM_OWNER_EMAIL = (process.env.PLATFORM_OWNER_EMAIL || 'admin@jeffistores.in').toLowerCase()
 
@@ -37,9 +38,15 @@ export async function resolveAdminByEmail(email: string): Promise<ResolvedAdmin 
   if (!row) return null
   const resolved: ResolvedAdmin = { ...row, scopes: Array.isArray(row.scopes) ? (row.scopes as string[]) : [] }
 
+  // The 'administrator' role is PLATFORM-ONLY (sits above super_admin, bypasses every scope check).
+  // Promote the platform owner only off-tenant; on a tenant host the owner email stays super_admin,
+  // the top of the tenant hierarchy. Resolved via the x-tenant-slug header before any query (#488).
   if (resolved.email.toLowerCase() === PLATFORM_OWNER_EMAIL && resolved.role !== 'administrator') {
-    await query(`UPDATE admins SET role = 'administrator' WHERE id = $1`, [resolved.id]).catch(() => {})
-    resolved.role = 'administrator'
+    const onTenant = (await resolveTenant()) !== null
+    if (!onTenant) {
+      await query(`UPDATE admins SET role = 'administrator' WHERE id = $1`, [resolved.id]).catch(() => {})
+      resolved.role = 'administrator'
+    }
   }
 
   return resolved
