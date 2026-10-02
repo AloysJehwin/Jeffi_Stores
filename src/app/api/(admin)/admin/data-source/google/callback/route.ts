@@ -1,8 +1,10 @@
 import { NextRequest } from 'next/server'
 import { currentAdminBaseUrl, platformOAuthBaseUrl } from '@/lib/catalog/brand'
-import { saveIntegrationCredential, getIntegrationCredential } from '@/lib/tenant-registry'
+import { saveIntegrationCredential, getIntegrationCredential, getTenant } from '@/lib/tenant-registry'
 import { encryptToken, decryptToken } from '@/lib/crypto/token-cipher'
-import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
+import { verifyAdminState, returnToAdmin, safeReturnBase } from '@/lib/shared/oauth-state'
+
+const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +30,13 @@ export async function GET(request: NextRequest) {
   if (!state || state.provider !== 'google_sheets') {
     return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=bad_state`)
   }
-  if (state.returnBase) backTo = `${state.returnBase}/admin/data-source`
+  // Trust returnBase only when it matches the admin host the verified tenant actually resolves to,
+  // so a tampered or stale state can never redirect to another tenant's admin.
+  const tenant = await getTenant(state.tenantId)
+  if (tenant?.slug) {
+    const approved = safeReturnBase(state.returnBase, `https://admin-${tenant.slug}.${PLATFORM_DOMAIN}`)
+    if (approved) backTo = `${approved}/admin/data-source`
+  }
 
   try {
     const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
