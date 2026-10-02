@@ -1610,8 +1610,8 @@
     "semantic_hash": ""
   },
   "tests/api/auth/me.test.ts": {
-    "mtime": 1790931256.314402,
-    "ast_hash": "3934370faf991850c0dd6cf8507dfc31",
+    "mtime": 1790939621.6561365,
+    "ast_hash": "3f5b7517c0b2dff5b750b824f6483620",
     "semantic_hash": ""
   },
   "tests/api/auth/otp.test.ts": {
@@ -10685,8 +10685,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(public)/auth/me/route.ts": {
-    "mtime": 1790931251.500478,
-    "ast_hash": "f31f2bdbdc7c3d508b2c72032c36e7fc",
+    "mtime": 1790939643.5408595,
+    "ast_hash": "40c9b9b2d984b5e188bee4c12b067f48",
     "semantic_hash": ""
   },
   "src/app/api/(public)/auth/phone/send-otp/route.ts": {
