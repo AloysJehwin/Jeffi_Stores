@@ -19,6 +19,10 @@ const args = Object.fromEntries(
   })
 )
 
+// Owning tenant for the embeddings (#489). Default null = platform/flagship. --tenant=<uuid> or
+// TENANT_ID writes into one tenant's namespace so RAG reads stay isolated per tenant.
+const TENANT_ID = (args.tenant && args.tenant !== 'true' ? args.tenant : process.env.TENANT_ID) || null
+
 const RDS_URL = process.env.DATABASE_URL
 const RAZER_HOST = process.env.RAG_PG_HOST || '100.82.208.8'
 const RAZER_PASS = process.env.RAG_PG_PASSWORD
@@ -69,12 +73,12 @@ async function reEmbed(productId) {
   const lit = '[' + vec.join(',') + ']'
   const hash = crypto.createHash('sha256').update(content).digest('hex')
   await razer.query(
-    `INSERT INTO embeddings (source_table, source_id, content, content_hash, embedding, updated_at)
-     VALUES ('products', $1, $2, $3, $4::vector, NOW())
-     ON CONFLICT (source_table, source_id)
+    `INSERT INTO embeddings (tenant_id, source_table, source_id, content, content_hash, embedding, updated_at)
+     VALUES ($5, 'products', $1, $2, $3, $4::vector, NOW())
+     ON CONFLICT (tenant_id, source_table, source_id)
      DO UPDATE SET content = EXCLUDED.content, content_hash = EXCLUDED.content_hash,
                    embedding = EXCLUDED.embedding, updated_at = NOW()`,
-    [productId, content, hash, lit]
+    [productId, content, hash, lit, TENANT_ID]
   )
   return { ok: true }
 }

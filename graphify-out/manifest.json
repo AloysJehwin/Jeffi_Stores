@@ -955,8 +955,8 @@
     "semantic_hash": "cfebb2d32d53b8bb95f1182fbaf83b4b"
   },
   "database/ai.sql": {
-    "mtime": 1790931247.5978205,
-    "ast_hash": "44cd3792b84516f39118e51f7880dd21",
+    "mtime": 1790974313.4523869,
+    "ast_hash": "027c05026e1a9df1e17140431f933131",
     "semantic_hash": ""
   },
   "database/catalog.sql": {
@@ -2245,8 +2245,8 @@
     "semantic_hash": ""
   },
   "tests/lib/rag.test.ts": {
-    "mtime": 1790931257.4968073,
-    "ast_hash": "bda09a87d375445ba225b64134be2049",
+    "mtime": 1790976697.9790847,
+    "ast_hash": "a0dd28b7a49504c91ad22885594b166b",
     "semantic_hash": ""
   },
   "tests/lib/rate-limit.test.ts": {
@@ -5135,8 +5135,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/catalog-enrichment/[id]/approve/route.test.ts": {
-    "mtime": 1790931254.959991,
-    "ast_hash": "eeaa955aa1657c1669ac611891172c76",
+    "mtime": 1790976802.7121892,
+    "ast_hash": "771739c2eb36e6f54a54425b3b514fec",
     "semantic_hash": ""
   },
   "tests/api/admin/catalog-enrichment/[id]/reject/route.test.ts": {
@@ -9015,8 +9015,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/catalog-enrichment/[id]/approve/route.ts": {
-    "mtime": 1790931249.9628248,
-    "ast_hash": "bdafbef948fc1fc0a40be20f5af5dc2a",
+    "mtime": 1790975905.4179502,
+    "ast_hash": "2f50a0142d64cc6d0e38c7de22b02224",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/catalog-enrichment/[id]/reject/route.ts": {
@@ -9025,8 +9025,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/catalog-enrichment/bulk-approve/route.ts": {
-    "mtime": 1790931249.9724607,
-    "ast_hash": "a9364e64af9d48ec2647710925aefbc9",
+    "mtime": 1790975984.0825279,
+    "ast_hash": "2891cfa4e9cec994fee912a353c44483",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/catalog-enrichment/by-product/[productId]/route.ts": {
@@ -12070,8 +12070,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/rag.ts": {
-    "mtime": 1790931254.0273056,
-    "ast_hash": "99395b4743778de0d2ddeacd68df4ea6",
+    "mtime": 1790976740.4149222,
+    "ast_hash": "4a73b50b4eecd2c6915ab4fa3581f1b0",
     "semantic_hash": ""
   },
   "src/lib/shared/rate-limit.ts": {
@@ -12587,6 +12587,16 @@
   ".claude/plans/team-and-cert-487.md": {
     "mtime": 1790971196.1469388,
     "ast_hash": "b9c976808f612035069fb302d6d79c73",
+    "semantic_hash": ""
+  },
+  ".claude/plans/agent-ui-and-ocr.md": {
+    "mtime": 1790976423.600905,
+    "ast_hash": "61aca0dd5f6a0892906ccb9998756f8b",
+    "semantic_hash": ""
+  },
+  ".claude/plans/tenant-llm-489.md": {
+    "mtime": 1790974216.8263004,
+    "ast_hash": "79586359248f593bc67bde9f577f24cb",
     "semantic_hash": ""
   }
 }
