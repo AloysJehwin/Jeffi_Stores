@@ -76,7 +76,7 @@ beforeEach(() => {
 
 describe('GET /api/auth/me', () => {
   it('returns user:null when no token is provided', async () => {
-    vi.mocked(jwtLib.authenticateUser).mockResolvedValue(null)
+    vi.mocked(jwtLib.authenticateAnyUser).mockResolvedValue(null)
 
     const res = await GET(meRequest() as any)
     expect(res.status).toBe(200)
@@ -85,7 +85,7 @@ describe('GET /api/auth/me', () => {
   })
 
   it('returns user:null when token is invalid', async () => {
-    vi.mocked(jwtLib.authenticateUser).mockResolvedValue(null)
+    vi.mocked(jwtLib.authenticateAnyUser).mockResolvedValue(null)
 
     const res = await GET(meRequest('bad-token') as any)
     expect(res.status).toBe(200)
@@ -94,7 +94,7 @@ describe('GET /api/auth/me', () => {
   })
 
   it('returns user:null when user row not found in DB', async () => {
-    vi.mocked(jwtLib.authenticateUser).mockResolvedValue(USER_PAYLOAD)
+    vi.mocked(jwtLib.authenticateAnyUser).mockResolvedValue(USER_PAYLOAD)
     vi.mocked(db.queryOne).mockResolvedValue(null)
 
     const res = await GET(meRequest('valid-token') as any)
@@ -104,7 +104,7 @@ describe('GET /api/auth/me', () => {
   })
 
   it('returns 200 with full user object for valid token', async () => {
-    vi.mocked(jwtLib.authenticateUser).mockResolvedValue(USER_PAYLOAD)
+    vi.mocked(jwtLib.authenticateAnyUser).mockResolvedValue(USER_PAYLOAD)
     vi.mocked(db.queryOne).mockResolvedValue(USER_ROW)
 
     const res = await GET(meRequest('valid-token') as any)
@@ -118,7 +118,7 @@ describe('GET /api/auth/me', () => {
   })
 
   it('sets requiresPolicyAcceptance:false when version matches', async () => {
-    vi.mocked(jwtLib.authenticateUser).mockResolvedValue(USER_PAYLOAD)
+    vi.mocked(jwtLib.authenticateAnyUser).mockResolvedValue(USER_PAYLOAD)
     vi.mocked(db.queryOne).mockResolvedValue(USER_ROW)
 
     const res = await GET(meRequest('valid-token') as any)
@@ -128,7 +128,7 @@ describe('GET /api/auth/me', () => {
   })
 
   it('sets requiresPolicyAcceptance:true when version is outdated', async () => {
-    vi.mocked(jwtLib.authenticateUser).mockResolvedValue(USER_PAYLOAD)
+    vi.mocked(jwtLib.authenticateAnyUser).mockResolvedValue(USER_PAYLOAD)
     vi.mocked(db.queryOne).mockResolvedValue({ ...USER_ROW, policies_accepted_version: 'v0' })
 
     const res = await GET(meRequest('valid-token') as any)
@@ -137,11 +137,40 @@ describe('GET /api/auth/me', () => {
   })
 
   it('queries DB with correct userId from token', async () => {
-    vi.mocked(jwtLib.authenticateUser).mockResolvedValue(USER_PAYLOAD)
+    vi.mocked(jwtLib.authenticateAnyUser).mockResolvedValue(USER_PAYLOAD)
     vi.mocked(db.queryOne).mockResolvedValue(USER_ROW)
 
     await GET(meRequest('valid-token') as any)
     expect(db.queryOne).toHaveBeenCalledWith(expect.stringContaining('FROM users'), ['user-1'])
+  })
+
+  // Regression: a business user browsing the storefront authenticates on business_sid via
+  // authenticateAnyUser. /me must return them (not user:null), or /account bounces to /login on
+  // reload. The DB query must no longer exclude user_type='business'.
+  it('returns the user for a business session and flags isBusiness', async () => {
+    vi.mocked(jwtLib.authenticateAnyUser).mockResolvedValue({
+      userId: 'biz-1',
+      email: 'biz@example.com',
+      isBusiness: true,
+    } as any)
+    vi.mocked(db.queryOne).mockResolvedValue({ ...USER_ROW, id: 'biz-1', user_type: 'business' })
+
+    const res = await GET(meRequest('biz-token') as any)
+    const body = await res.json()
+    expect(body.user).not.toBeNull()
+    expect(body.user.id).toBe('biz-1')
+    expect(body.user.isBusiness).toBe(true)
+    // The row lookup must not filter business users out.
+    expect(db.queryOne).toHaveBeenCalledWith(expect.not.stringContaining("!= 'business'"), ['biz-1'])
+  })
+
+  it('flags isBusiness:false for a customer session', async () => {
+    vi.mocked(jwtLib.authenticateAnyUser).mockResolvedValue(USER_PAYLOAD)
+    vi.mocked(db.queryOne).mockResolvedValue({ ...USER_ROW, user_type: 'customer' })
+
+    const res = await GET(meRequest('valid-token') as any)
+    const body = await res.json()
+    expect(body.user.isBusiness).toBe(false)
   })
 })
 
