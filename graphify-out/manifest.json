@@ -1,7 +1,7 @@
 {
   "src/app/layout.tsx": {
-    "mtime": 1790931252.1623774,
-    "ast_hash": "48d0df5095d73be0cc5c89e4915c321b",
+    "mtime": 1790977651.674594,
+    "ast_hash": "34f1b79306b285d89fc4215e9fd4f718",
     "semantic_hash": ""
   },
   "src/components/ConditionalLayout.tsx": {
@@ -2620,8 +2620,8 @@
     "semantic_hash": ""
   },
   "src/lib/on-device/runtime.ts": {
-    "mtime": 1790931253.7616923,
-    "ast_hash": "102163e71bda269d5c0a49c8c66a0f8f",
+    "mtime": 1790977366.4988182,
+    "ast_hash": "7641428cf90996d973c040526b3b0eff",
     "semantic_hash": ""
   },
   "src/lib/on-device/session-signals.ts": {
@@ -2630,8 +2630,8 @@
     "semantic_hash": ""
   },
   "src/lib/on-device/summary.worker.ts": {
-    "mtime": 1790931253.7633662,
-    "ast_hash": "46e50f0a16a9d8f6ee01b30f5ee3a501",
+    "mtime": 1790977309.6471949,
+    "ast_hash": "63f9695d3fac80ed6def655e0feeb071",
     "semantic_hash": ""
   },
   "public/ort/ort-wasm-simd-threaded.asyncify.mjs": {
@@ -2875,8 +2875,8 @@
     "semantic_hash": ""
   },
   "src/lib/on-device/fine-tune.worker.ts": {
-    "mtime": 1790931253.760754,
-    "ast_hash": "5d044e377f0c6eed89e6a500c0ac7401",
+    "mtime": 1790977243.7879283,
+    "ast_hash": "528b1a6a42361cbabac93ba36c76be99",
     "semantic_hash": ""
   },
   "src/lib/on-device/user-profile.ts": {
@@ -2975,8 +2975,8 @@
     "semantic_hash": ""
   },
   "tests/lib/on-device/runtime.test.ts": {
-    "mtime": 1790931257.380115,
-    "ast_hash": "85b9f8ac1a34c9bdfd9b2045ff83cf4b",
+    "mtime": 1790978010.6627862,
+    "ast_hash": "b0bf8e9ed9c8e3ecc564262adabadcfd",
     "semantic_hash": ""
   },
   "tests/lib/on-device/session-signals.test.ts": {
@@ -3200,8 +3200,8 @@
     "semantic_hash": ""
   },
   "src/contexts/StoreConfigContext.tsx": {
-    "mtime": 1790931253.2829516,
-    "ast_hash": "ff018ba8f93f4dbf719588100fd57759",
+    "mtime": 1790977751.5066016,
+    "ast_hash": "b64e0b04311ac2e651d2748c75e37968",
     "semantic_hash": ""
   },
   "src/lib/campaigns/whatsapp-dispatch.ts": {
@@ -11265,8 +11265,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(public)/store-config/route.ts": {
-    "mtime": 1790931252.0571554,
-    "ast_hash": "33371387a6832ec32472988252302ead",
+    "mtime": 1790977466.825919,
+    "ast_hash": "2cb673991c2ab0601d60302b595ef4aa",
     "semantic_hash": ""
   },
   "src/app/api/(public)/store-settings/route.ts": {
@@ -12597,6 +12597,21 @@
   ".claude/plans/tenant-llm-489.md": {
     "mtime": 1790974216.8263004,
     "ast_hash": "79586359248f593bc67bde9f577f24cb",
+    "semantic_hash": ""
+  },
+  "src/lib/on-device/keys.ts": {
+    "mtime": 1790977165.7215178,
+    "ast_hash": "6fb6195534958ecd7bdd66c88c73e389",
+    "semantic_hash": ""
+  },
+  "tests/lib/on-device-keys.test.ts": {
+    "mtime": 1790977706.9728036,
+    "ast_hash": "8c1371a82f820bb57c8ee35c8074be64",
+    "semantic_hash": ""
+  },
+  "docs/TENANT_AI_LAYER.md": {
+    "mtime": 1790978087.830502,
+    "ast_hash": "c534434f07a0dbe3d008eee81e002f9e",
     "semantic_hash": ""
   }
 }
