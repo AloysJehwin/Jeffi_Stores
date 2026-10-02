@@ -3,11 +3,13 @@ import { resolveSession, type PrincipalType } from '@/lib/auth/auth-sessions'
 import { queryOne } from '@/lib/shared/db'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { adminCookieNameForHost } from '@/lib/auth/admin-cookie'
+import { cookieDomainOption, getCookieDomain } from '@/lib/auth/cookie-domain'
 import {
   BIND_COOKIE,
   BIND_ENDPOINT,
   BIND_TTL_S,
   PROOF_HEADER,
+  bindScope,
   bindingMode,
   normHost,
   parsePublicJwk,
@@ -90,7 +92,11 @@ export async function POST(request: NextRequest) {
       staleClock = true
       continue
     }
-    if (key.host !== host) {
+    // Compare on bind SCOPE, not the raw host: a key registered on the apex is valid across every
+    // subdomain the *_sid is sent to. A legacy row whose bind_host is a full host collapses to the
+    // same scope, so a rollout does not invalidate live sessions.
+    const cookieDomain = getCookieDomain()
+    if (bindScope(key.host, cookieDomain) !== bindScope(host, cookieDomain)) {
       logBinding({
         sessionId,
         principalType: type,
@@ -119,9 +125,13 @@ export async function POST(request: NextRequest) {
     { ok: bound > 0 || !staleClock, now, exp, bound, types },
     { status: bound === 0 && staleClock ? 409 : 200 }
   )
-  // Host-only on purpose (no Domain): the key lives in one origin, so the cookie it earns must too.
-  // Lax, not strict: arriving from an emailed link must still present it, or every such visit
-  // would detour through the re-bind step.
+  // Scope the bind cookie to the SAME domain the *_sid session cookie spans (.jeffistores.in), so a
+  // single bind earned on any one host is presented across the apex and every subdomain — mirroring
+  // the session cookie it protects. Hosts not under the shared cookie domain (custom tenant domains,
+  // the host-scoped tenant-admin cookie, localhost) get no Domain and stay host-only, unchanged.
+  // Lax, not strict: arriving from an emailed link must still present it, or every such visit would
+  // detour through the re-bind step.
+  const bindCookieDomain = bindScope(host, getCookieDomain()) !== normHost(host) ? cookieDomainOption() : {}
   for (const c of minted) {
     res.cookies.set(c.name, c.value, {
       httpOnly: true,
@@ -129,6 +139,7 @@ export async function POST(request: NextRequest) {
       sameSite: 'lax',
       maxAge: BIND_TTL_S,
       path: '/',
+      ...bindCookieDomain,
     })
   }
   return res

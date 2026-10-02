@@ -1,13 +1,21 @@
 import crypto from 'crypto'
 import { query, queryOne } from '@/lib/shared/db'
 import type { PrincipalType } from '@/lib/auth/auth-sessions'
-import { BIND_ENDPOINT, BIND_TTL_S, PROOF_EXEMPT_PATHS, normHost, type BindingContext } from '@/lib/auth/session-binding-shared'
+import { getCookieDomain } from '@/lib/auth/cookie-domain'
+import {
+  BIND_ENDPOINT,
+  BIND_TTL_S,
+  PROOF_EXEMPT_PATHS,
+  bindScope,
+  type BindingContext,
+} from '@/lib/auth/session-binding-shared'
 
 export {
   BIND_ENDPOINT,
   PROOF_HEADER,
   BIND_TTL_S,
   BIND_COOKIE,
+  bindScope,
   normHost,
   type BindingContext,
 } from '@/lib/auth/session-binding-shared'
@@ -55,6 +63,16 @@ export function canRegisterKey(sessionCreatedAtMs: number | null | undefined): b
   return typeof sessionCreatedAtMs === 'number' && Date.now() - sessionCreatedAtMs <= REGISTRATION_WINDOW_MS
 }
 
+// A stored key's host matches a request when the request's bind scope equals what was stored. Also
+// accept a legacy row whose bind_host is a full host under the scope (keys registered before binding
+// moved to domain scope) — so a rollout does not invalidate every live session. Both sides are
+// collapsed to the shared cookie domain where applicable (see bindScope).
+function hostInScope(storedHost: string, requestHost: string): boolean {
+  const cookieDomain = getCookieDomain()
+  const scope = bindScope(requestHost, cookieDomain)
+  return bindScope(storedHost, cookieDomain) === scope
+}
+
 function macKey(): Buffer {
   return crypto
     .createHash('sha256')
@@ -67,10 +85,11 @@ function mac(sidHash: string, exp: number, host: string): string {
 }
 
 // Stateless: verifying it needs no database read, and it only verifies next to the exact *_sid
-// and host it was minted for.
+// and the bind SCOPE it was minted for (the shared cookie domain, so one cookie covers apex + every
+// subdomain the *_sid is sent to; see bindScope).
 export function mintBindCookie(sidHash: string, host: string): { value: string; exp: number } {
   const exp = Math.floor(Date.now() / 1000) + BIND_TTL_S
-  return { value: `${exp.toString(36)}.${mac(sidHash, exp, normHost(host))}`, exp }
+  return { value: `${exp.toString(36)}.${mac(sidHash, exp, bindScope(host, getCookieDomain()))}`, exp }
 }
 
 export function verifyBindCookie(value: string | null | undefined, sidHash: string, host: string): boolean {
@@ -79,7 +98,7 @@ export function verifyBindCookie(value: string | null | undefined, sidHash: stri
   if (dot < 1) return false
   const exp = parseInt(value.slice(0, dot), 36)
   if (!Number.isFinite(exp) || exp * 1000 < Date.now()) return false
-  const expected = Buffer.from(mac(sidHash, exp, normHost(host)))
+  const expected = Buffer.from(mac(sidHash, exp, bindScope(host, getCookieDomain())))
   const given = Buffer.from(value.slice(dot + 1))
   return expected.length === given.length && crypto.timingSafeEqual(expected, given)
 }
@@ -156,7 +175,7 @@ export async function registerSessionKey(sessionId: string, jwk: PublicJwk, host
   await query(
     `INSERT INTO auth_session_keys (session_id, public_jwk, bind_host) VALUES ($1, $2, $3)
      ON CONFLICT (session_id) DO NOTHING`,
-    [sessionId, JSON.stringify(jwk), normHost(host)]
+    [sessionId, JSON.stringify(jwk), bindScope(host, getCookieDomain())]
   )
   keyCache.delete(sessionId)
   const stored = await loadSessionKey(sessionId)
@@ -245,7 +264,7 @@ export async function evaluateKeyBinding(args: {
     })
     return { status: 'unbound', reject: expired }
   }
-  if (key.host !== ctx.host) reason = 'host_mismatch'
+  if (!hostInScope(key.host, ctx.host)) reason = 'host_mismatch'
 
   // abs(): a key timestamp in the future (clock skew) must not read as a grace that never ends.
   const inGrace =
