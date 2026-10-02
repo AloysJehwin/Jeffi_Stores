@@ -206,8 +206,14 @@ export async function evaluateKeyBinding(args: {
   if (mode === 'off' || ctx.path === BIND_ENDPOINT) return { status: 'skipped', reject: false }
 
   const cookieVal = ctx.bindCookies[principalType] ?? null
-  // A navigation cannot carry a header, so only script-made API calls owe a signed proof.
-  const proofRequired = ctx.path.startsWith('/api/') && ctx.fetchDest === 'empty' && !PROOF_EXEMPT_PATHS.has(ctx.path)
+  // Only script-made mutations owe a proof. Reads (every portal's page-load /me probe) must never
+  // reject, or the reload loses the bind race and logs the user out.
+  const isRead = ctx.method === 'GET' || ctx.method === 'HEAD'
+  const proofRequired =
+    ctx.path.startsWith('/api/') &&
+    ctx.fetchDest === 'empty' &&
+    !isRead &&
+    !PROOF_EXEMPT_PATHS.has(ctx.path)
 
   let reason: string | null = null
   let key: StoredKey | null | 'unavailable' | undefined
