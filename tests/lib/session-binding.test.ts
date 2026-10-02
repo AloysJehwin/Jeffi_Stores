@@ -138,7 +138,11 @@ describe('evaluateKeyBinding', () => {
     expect(v).toMatchObject({ status: 'violation', reject: false })
   })
 
-  it('a page load with a copied sid is refused too, not just API calls', async () => {
+  it('a page load with a missing bind cookie is a violation but is NOT rejected', async () => {
+    // A document navigation is judged before any page JS can (re)bind, and the bind cookie is
+    // short-lived (BIND_TTL_S). Rejecting it logged active users out on reload. The violation is
+    // still recorded, but reject must be false for a document navigation — the copied-cookie
+    // protection lives on authenticated API calls (asserted in the next test).
     const { jwk } = await browserKey()
     vi.mocked(db.queryOne).mockResolvedValue({
       public_jwk: jwk,
@@ -150,7 +154,22 @@ describe('evaluateKeyBinding', () => {
       sessionId: 'sess-page',
       ctx: ctx({ path: '/admin/products', fetchDest: 'document' }) as any,
     })
-    expect(v).toMatchObject({ status: 'violation', reason: 'cookie_missing', reject: true })
+    expect(v).toMatchObject({ status: 'violation', reason: 'cookie_missing', reject: false })
+  })
+
+  it('a copied sid IS refused on an authenticated API call (proof-required)', async () => {
+    const { jwk } = await browserKey()
+    vi.mocked(db.queryOne).mockResolvedValue({
+      public_jwk: jwk,
+      bind_host: HOST,
+      created_at: new Date(Date.now() - 60_000),
+    } as any)
+    const v = await evaluateKeyBinding({
+      ...base,
+      sessionId: 'sess-api',
+      ctx: ctx({ path: '/api/admin/products', fetchDest: 'empty' }) as any,
+    })
+    expect(v).toMatchObject({ status: 'violation', reject: true })
   })
 
   it('requests already in flight when the key was registered are let through', async () => {

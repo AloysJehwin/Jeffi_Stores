@@ -224,9 +224,12 @@ export async function evaluateKeyBinding(args: {
   if (key === undefined) key = await loadSessionKey(sessionId)
   if (key === 'unavailable') return { status: 'skipped', reject: false }
   if (!key) {
-    // No key yet: a login that has not bound since, or a session older than this feature. Past
-    // the registration window it can never be bound, so under enforcement it has to sign in again.
-    const expired = mode === 'enforce' && !canRegisterKey(args.sessionCreatedAt)
+    // No key yet: a login that has not bound since, or a session older than this feature. Only a
+    // proof-required request (a script-made API call) is rejected under enforcement. A top-level
+    // document navigation is NEVER rejected here: its request is judged before any page JS can
+    // (re)bind, and the bind cookie is short-lived (BIND_TTL_S), so rejecting a reload logged
+    // active storefront users out. Binding guards authenticated API mutations, not page views.
+    const expired = mode === 'enforce' && proofRequired && !canRegisterKey(args.sessionCreatedAt)
     logBinding({
       sessionId,
       principalType,
@@ -253,5 +256,10 @@ export async function evaluateKeyBinding(args: {
     boundHost: key.host,
     fetchDest: ctx.fetchDest,
   })
-  return { status: 'violation', reason, reject: mode === 'enforce' }
+  // Reject ONLY proof-required script API calls. A document navigation / page load with a missing,
+  // stale or wrong bind cookie must pass: the reload's document request is evaluated before the
+  // client can re-bind, and the cookie expires every BIND_TTL_S, so rejecting here is exactly what
+  // logged active users out on reload. A copied cookie is still blocked the moment it attempts an
+  // authenticated API mutation (proofRequired), which is binding's actual purpose.
+  return { status: 'violation', reason, reject: mode === 'enforce' && proofRequired }
 }

@@ -10,7 +10,7 @@ import { query, queryOne, queryMany } from '@/lib/shared/db'
 
 export type PrincipalType = 'admin' | 'customer' | 'business' | 'owner'
 
-export const IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000 // 24h of inactivity ends a session (non-admin cap)
+export const IDLE_TIMEOUT_MS = 30 * 24 * 60 * 60 * 1000 // 30d of inactivity ends a storefront session (non-admin cap). Was 24h, which logged returning shoppers out on their next reload; admins keep their own shorter per-account window via idleWindowMsFor.
 export const DEFAULT_ADMIN_IDLE_MINUTES = 8 * 60 // admins with no per-account timeout set
 // Allowed per-admin idle timeouts (minutes). Shared with the team-section toggle + the PATCH guard.
 export const ADMIN_IDLE_TIMEOUT_CHOICES = [60, 120, 240, 480, 1440] as const
