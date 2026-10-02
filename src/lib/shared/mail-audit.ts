@@ -34,7 +34,14 @@ export interface SendAuditedMailOptions {
   redactBody?: boolean
 }
 
-const DEFAULT_FROM = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL || 'noreply@jeffistores.in'}>`
+async function resolveDefaultFrom(): Promise<string> {
+  try {
+    const { customerMailFromAsync } = await import('@/lib/catalog/brand')
+    return await customerMailFromAsync()
+  } catch {
+    return `noreply@${process.env.PLATFORM_DOMAIN || 'jeffistores.in'}`
+  }
+}
 
 let transporter: nodemailer.Transporter | null = null
 function getTransporter(): nodemailer.Transporter {
@@ -106,7 +113,9 @@ async function logMail(opts: {
 }
 
 export async function sendAuditedMail(o: SendAuditedMailOptions): Promise<{ messageId?: string }> {
-  const from = o.from || DEFAULT_FROM
+  // No explicit from → use the CURRENT store's customer sender (tenant on a tenant host, platform
+  // off-tenant) instead of a hardcoded "Jeffi Store's", which leaked into tenant-facing mail.
+  const from = o.from || (await resolveDefaultFrom())
   const to = Array.isArray(o.to) ? o.to.join(', ') : o.to
   const cc = joinAddrs(o.cc)
   const bcc = joinAddrs(o.bcc)

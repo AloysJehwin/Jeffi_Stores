@@ -105,7 +105,12 @@ function longestMatch(text: string, orders: SupportOrder[]): SupportOrder | null
 const CANCELLABLE = ['pending', 'confirmed', 'processing']
 const RETURNABLE = ['delivered']
 
-export function getBotPayload(msg: string, orders: SupportOrder[], history: HistoryMessage[] = []): BotPayload {
+export function getBotPayload(
+  msg: string,
+  orders: SupportOrder[],
+  history: HistoryMessage[] = [],
+  botName = 'the assistant'
+): BotPayload {
   const m = msg.toLowerCase()
   const latest = orders[0]
   // Order the user just picked (named in this message) wins; else one referenced
@@ -405,7 +410,7 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
   if (m.includes('hello') || m.includes('hi') || m.includes('hey') || m.includes('hiya')) {
     return {
       type: 'chips',
-      text: "hey! i'm Jeffi. what can i help you with today?",
+      text: `hey! i'm ${botName}. what can i help you with today?`,
       chips: [
         { label: 'Track my order', query: 'track my order' },
         { label: 'My orders', query: 'all my orders' },

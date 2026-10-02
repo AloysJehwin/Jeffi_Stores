@@ -2,12 +2,14 @@ import { cookies, headers } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 import { queryMany } from '@/lib/shared/db'
 import PackingSlipsClient from './PackingSlipsClient'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export const metadata = {
-  title: 'Packing Slips — Jeffi Admin',
+export async function generateMetadata() {
+  const { name } = await getStoreIdentity()
+  return { title: `Packing Slips — ${name} Admin` }
 }
 
 async function getInitialOrders() {
