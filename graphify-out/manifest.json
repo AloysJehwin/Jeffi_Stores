@@ -1255,8 +1255,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/certificates/download/route.test.ts": {
-    "mtime": 1790931255.06701,
-    "ast_hash": "e409bb2cce01d6cc8048d4871fe330f9",
+    "mtime": 1790972610.5789275,
+    "ast_hash": "709bd1ea75568baee4148142310c22d3",
     "semantic_hash": ""
   },
   "tests/api/admin/check-session/route.test.ts": {
@@ -1600,8 +1600,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/users/route.test.ts": {
-    "mtime": 1790931256.2878392,
-    "ast_hash": "c9f40b192e3f02cde86c8990f3353dc1",
+    "mtime": 1790972937.5048482,
+    "ast_hash": "0f62ad778ea8773acaca602e06e55eb2",
     "semantic_hash": ""
   },
   "tests/api/auth/google/route.test.ts": {
@@ -2090,8 +2090,8 @@
     "semantic_hash": ""
   },
   "tests/lib/email.test.ts": {
-    "mtime": 1790931257.247537,
-    "ast_hash": "5794f7fa750a66a477b5e3b3d6f662b9",
+    "mtime": 1790973280.790163,
+    "ast_hash": "2e8f39a9b9e4d1cabaea176338e02603",
     "semantic_hash": ""
   },
   "tests/lib/ewaybill.test.ts": {
@@ -5635,8 +5635,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/users/[id]/resend-certificate/route.test.ts": {
-    "mtime": 1790931256.2776356,
-    "ast_hash": "b32a9b9d942fb500c8a1821717243c4d",
+    "mtime": 1790972693.4843957,
+    "ast_hash": "ae3218f8350438ecada96250952388ed",
     "semantic_hash": ""
   },
   "tests/api/admin/users/[id]/route.test.ts": {
@@ -6160,8 +6160,8 @@
     "semantic_hash": ""
   },
   "src/lib/email/certificates.ts": {
-    "mtime": 1790931253.654791,
-    "ast_hash": "4d34e058205f9931c8d5223c054eefd6",
+    "mtime": 1790972171.340172,
+    "ast_hash": "b0c0f1b58718bc180c8a136bbd264d64",
     "semantic_hash": ""
   },
   "src/lib/email/fulfilment.ts": {
@@ -9065,8 +9065,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/certificates/download/route.ts": {
-    "mtime": 1790931250.0145419,
-    "ast_hash": "72c4337bc801732020c56b9106cf6da0",
+    "mtime": 1790972503.822357,
+    "ast_hash": "f0cb5f756e2430e470ae1afd4a03b0c1",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/check-session/route.ts": {
@@ -10435,8 +10435,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/users/[id]/resend-certificate/route.ts": {
-    "mtime": 1790931251.279945,
-    "ast_hash": "72459ceeceefc9a0fff8066f3cad8af7",
+    "mtime": 1790972464.8533847,
+    "ast_hash": "c4eb7288b17230362bb6940c31582671",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/users/[id]/revoke-sessions/route.ts": {
@@ -10450,8 +10450,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/users/route.ts": {
-    "mtime": 1790931251.2932055,
-    "ast_hash": "40cfb4d0e33295b7a6dd40e5b05235b8",
+    "mtime": 1790972384.3162794,
+    "ast_hash": "4cea603e069b308c45f2293dee8d0835",
     "semantic_hash": ""
   },
   "src/app/api/(ecom)/ecom/auth/google/route.ts": {
@@ -12190,8 +12190,8 @@
     "semantic_hash": ""
   },
   "src/lib/tenancy/cert-delivery.ts": {
-    "mtime": 1790931254.097708,
-    "ast_hash": "61b91af25aa2cd227584fccc35b3a729",
+    "mtime": 1790972417.8785727,
+    "ast_hash": "78b8f0da86c1e411c264b0cca669c719",
     "semantic_hash": ""
   },
   "src/lib/tenancy/certificates.ts": {
@@ -12582,6 +12582,11 @@
   ".claude/plans/dependabot-508.md": {
     "mtime": 1790968337.4312131,
     "ast_hash": "9e17f1933c2f486c4b252258921087d5",
+    "semantic_hash": ""
+  },
+  ".claude/plans/team-and-cert-487.md": {
+    "mtime": 1790971196.1469388,
+    "ast_hash": "b9c976808f612035069fb302d6d79c73",
     "semantic_hash": ""
   }
 }
