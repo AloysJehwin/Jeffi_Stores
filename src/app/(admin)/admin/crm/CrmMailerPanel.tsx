@@ -100,7 +100,7 @@ const QUICK_TEMPLATES: Record<string, QuickTemplate[]> = {
   new: [
     {
       label: 'Welcome',
-      subject: "Welcome to Jeffi Store's!",
+      subject: 'Welcome to {store_name}!',
       headline: 'Welcome to the family!',
       body: "We're thrilled to have you with us. Here's everything you need to know to get started, plus a special first-order offer.",
     },
@@ -154,7 +154,7 @@ const DEFAULT_TEMPLATES: QuickTemplate[] = [
   },
   {
     label: 'Announcement',
-    subject: "Important update from Jeffi Store's",
+    subject: 'Important update from {store_name}',
     headline: 'Exciting news!',
     body: 'We have some great news to share with you. Read on to find out more.',
   },

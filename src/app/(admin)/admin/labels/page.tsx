@@ -8,9 +8,11 @@ import LabelsClient from './LabelsClient'
 import { LABEL_SIZES } from '@/lib/documents/label-pdf'
 import { getAllCategories } from '@/lib/queries'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
-export const metadata = {
-  title: 'Label Generator — Jeffi Admin',
+export async function generateMetadata() {
+  const { name } = await getStoreIdentity()
+  return { title: `Label Generator — ${name} Admin` }
 }
 
 export default async function LabelsPage() {

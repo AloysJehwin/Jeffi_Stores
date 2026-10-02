@@ -5,6 +5,7 @@ import { logActivity } from '@/lib/shared/activity'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 import { fetchUserOrders, getBotReply } from '@/lib/shared/support-bot'
+import { currentBrandNameAsync } from '@/lib/catalog/brand'
 
 const postSchema = z.object({
   message: zNonEmpty.max(2000),
@@ -64,9 +65,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       if (!hasReply) {
         const orders = await fetchUserOrders(authUser.userId)
         const userMsg = last?.message ?? ''
+        const botName = await currentBrandNameAsync()
         const replyText = userMsg
           ? getBotReply(userMsg, orders, messagesWithMeta)
-          : "hey! i'm Jeffi. looks like you're waiting for a support agent — they'll be with you shortly. in the meantime, what can i help you with?"
+          : `hey! i'm ${botName}. looks like you're waiting for a support agent — they'll be with you shortly. in the meantime, what can i help you with?`
         const botMsg = await queryOne(
           `INSERT INTO support_messages (session_id, sender, message)
            VALUES ($1, 'bot', $2)

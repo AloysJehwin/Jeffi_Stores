@@ -3,6 +3,7 @@ import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import { buildVarMap, substituteVars } from '@/lib/shared/template-vars'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
+import { platformBrandName } from '@/lib/catalog/brand'
 import { mailShell } from '@/lib/shared/mail-template'
 
 const transporter = nodemailer.createTransport({
@@ -40,10 +41,12 @@ export function renderCampaignEmail(
   templateKey: string,
   data: TemplateData,
   recipientName?: string,
-  baseUrl?: string
+  baseUrl?: string,
+  storeName?: string
 ): { subject: string; html: string; ampHtml?: string } {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
   const url = baseUrl || BASE_URL
+  const brand = storeName?.trim() || platformBrandName()
 
   switch (templateKey) {
     case 'review_request': {
@@ -228,7 +231,7 @@ export function renderCampaignEmail(
     }
 
     case 'announcement': {
-      const subject = data.subject || data.headline || "An update from Jeffi Store's"
+      const subject = data.subject || data.headline || `An update from ${brand}`
       const html = baseLayout(
         subject,
         `
@@ -243,7 +246,7 @@ export function renderCampaignEmail(
     }
 
     case 'custom': {
-      const subject = data.subject || "Message from Jeffi Store's"
+      const subject = data.subject || `Message from ${brand}`
       const body = data.htmlBody || ''
       const isFullDoc = /<html[\s>]/i.test(body) || /<!DOCTYPE/i.test(body)
       const html = isFullDoc
@@ -386,7 +389,8 @@ export async function sendCampaign(
             campaign.template_key,
             templateData,
             recipient.first_name || undefined,
-            baseUrl
+            baseUrl,
+            store.name
           )
           const vars = buildVarMap({
             recipient: { email: recipient.email, first_name: recipient.first_name },

@@ -4,10 +4,6 @@ import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
-const SELLER_NAME = process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores'
-const SELLER_ADD =
-  process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
-const SELLER_PHONE = process.env.DELHIVERY_SELLER_PHONE || '07713585374'
 
 export interface PincodeServiceability {
   serviceable: boolean

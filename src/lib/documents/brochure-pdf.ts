@@ -1,5 +1,7 @@
 import 'server-only'
 import { queryMany } from '@/lib/shared/db'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
+import { tenantLogoBuffer } from '@/lib/documents/store-logo'
 import path from 'path'
 import fs from 'fs'
 
@@ -42,15 +44,16 @@ export async function loadBrochureStore(): Promise<BrochureStore> {
   const rows = await queryMany("SELECT key, value FROM site_settings WHERE key LIKE 'business_%'", [])
   const s: Record<string, string> = {}
   for (const row of rows || []) s[row.key] = row.value || ''
+  const identity = await getStoreIdentity()
 
   return {
-    name: s.business_trade_name || s.business_legal_name || 'JEFFI STORES',
+    name: s.business_trade_name || s.business_legal_name || identity.name,
     address: s.business_address || '',
     city: s.business_state || '',
     phone: s.business_phone || '',
     email: s.business_email || '',
     gstin: s.business_gstin || '',
-    web: 'jeffistores.in',
+    web: s.business_web || identity.web,
   }
 }
 
@@ -179,15 +182,16 @@ async function buildQRCodes(products: BrochureProductInput[], web: string): Prom
   )
 }
 
-function drawHeader(doc: any, store: BrochureStore, title: string, heading?: string) {
+function drawHeader(doc: any, store: BrochureStore, title: string, heading?: string, logo?: Buffer | null) {
   box(doc, 0, 0, PAGE_W, HEADER_H, GREEN_DARK)
 
   const LOGO_SIZE = 52
-  const LOGO_PATH = path.join(process.cwd(), 'public', 'images', 'store-logo.png')
-  try {
-    doc.image(LOGO_PATH, ML, Math.floor((HEADER_H - LOGO_SIZE) / 2), { width: LOGO_SIZE, height: LOGO_SIZE })
-  } catch {
-    /* logo missing — skip */
+  if (logo) {
+    try {
+      doc.image(logo, ML, Math.floor((HEADER_H - LOGO_SIZE) / 2), { width: LOGO_SIZE, height: LOGO_SIZE })
+    } catch {
+      /* unreadable tenant logo — store name text stands in */
+    }
   }
 
   const textX = ML + LOGO_SIZE + 12
@@ -349,6 +353,7 @@ export async function generateBrochurePDF(products: BrochureProductInput[], opts
 
   const { representatives, rest } = splitFamilies(products)
   const coverImg = loadCoverImage()
+  const logoBuf = await tenantLogoBuffer()
 
   const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true })
   const chunks: Buffer[] = []
@@ -371,17 +376,17 @@ export async function generateBrochurePDF(products: BrochureProductInput[], opts
   const newPage = (heading: string) => {
     if (pageStarted) doc.addPage({ size: 'A4', margin: 0 })
     pageStarted = true
-    drawHeader(doc, store, title, heading)
+    drawHeader(doc, store, title, heading, logoBuf)
     return HEADER_H + 14
   }
 
   // ── Page 1: advertising cover ──
-  drawCover(doc, store, title, promo, coverImg)
+  drawCover(doc, store, title, promo, coverImg, logoBuf)
   pageStarted = true
 
   // ── Page 2: index (families → page numbers) ──
   doc.addPage({ size: 'A4', margin: 0 })
-  drawIndex(doc, store, title, familyPages, rest.length > 0)
+  drawIndex(doc, store, title, familyPages, rest.length > 0, logoBuf)
 
   if (products.length === 0) {
     newPage('')
@@ -456,7 +461,14 @@ function loadCoverImage(): string | null {
  * hero if present; otherwise paints a branded green gradient. Overlaid: logo,
  * store name, brochure title, optional promo line, contact/GST, generated date.
  */
-function drawCover(doc: any, store: BrochureStore, title: string, promo: string, coverImg: string | null) {
+function drawCover(
+  doc: any,
+  store: BrochureStore,
+  title: string,
+  promo: string,
+  coverImg: string | null,
+  logo?: Buffer | null
+) {
   // Background
   if (coverImg) {
     try {
@@ -477,13 +489,14 @@ function drawCover(doc: any, store: BrochureStore, title: string, promo: string,
   doc.restore()
 
   const cx = PAGE_W / 2
-  // Logo (centered, upper third)
+  // Logo (centered, upper third) — tenant logo only; the store name below stands in when absent.
   const LOGO = 96
-  const logoPath = path.join(process.cwd(), 'public', 'images', 'store-logo.png')
-  try {
-    doc.image(logoPath, cx - LOGO / 2, 150, { width: LOGO, height: LOGO })
-  } catch {
-    /* skip */
+  if (logo) {
+    try {
+      doc.image(logo, cx - LOGO / 2, 150, { width: LOGO, height: LOGO })
+    } catch {
+      /* skip */
+    }
   }
 
   doc.fillColor('#ffffff')
@@ -548,9 +561,10 @@ function drawIndex(
   store: BrochureStore,
   title: string,
   familyPages: { name: string; page: number }[],
-  hasList: boolean
+  hasList: boolean,
+  logo?: Buffer | null
 ) {
-  drawHeader(doc, store, title, 'Index')
+  drawHeader(doc, store, title, 'Index', logo)
   let y = HEADER_H + 24
   doc.font('Helvetica-Bold').fontSize(14).fillColor(GREEN_DARK)
   doc.text('Index', ML, y, { lineBreak: false })
@@ -565,7 +579,7 @@ function drawIndex(
   for (const { name, page } of familyPages) {
     if (y + 16 > bottomLimit) {
       doc.addPage({ size: 'A4', margin: 0 })
-      drawHeader(doc, store, title, 'Index')
+      drawHeader(doc, store, title, 'Index', logo)
       y = HEADER_H + 24
     }
     doc.font('Helvetica').fontSize(9.5).fillColor(TEXT_DARK)

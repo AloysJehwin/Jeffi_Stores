@@ -2,6 +2,8 @@ import 'server-only'
 import path from 'path'
 import type { Policy, Section } from '@/lib/legals/policies'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
+import { storeAddressLine } from '@/lib/catalog/brand'
+import { tenantLogoBuffer } from '@/lib/documents/store-logo'
 
 const PDFDocument = eval('require')('pdfkit')
 
@@ -17,25 +19,26 @@ const COLOR_MUTED = '#666666'
 const COLOR_RULE = '#dddddd'
 const COLOR_ACCENT = '#7cb900'
 
-const STORE_ADDR = 'SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092'
-
 interface StoreHeading {
   name: string
   phone: string
   email: string
   web: string
+  address: string
 }
 
 function drawHeader(doc: any, store: StoreHeading, logo?: string | Buffer) {
   doc.rect(0, 0, PAGE_W, 80).fillColor(COLOR_DARK).fill()
-  const logoSrc = logo ?? path.join(process.cwd(), 'public', 'images', 'store-logo.png')
-  try {
-    doc.image(logoSrc, ML, 14, { width: 52, height: 52 })
-  } catch {}
+  // Tenant logo only (passed in). No platform-logo fallback: the store name text below stands in.
+  if (logo) {
+    try {
+      doc.image(logo, ML, 14, { width: 52, height: 52 })
+    } catch {}
+  }
   doc.font('Helvetica-Bold').fontSize(20).fillColor('#ffffff')
   doc.text(store.name.toUpperCase(), ML + 64, 22, { lineBreak: false })
   doc.font('Helvetica').fontSize(8).fillColor('#cfe1c5')
-  doc.text(STORE_ADDR, ML + 64, 46, { width: CW - 64, lineBreak: false })
+  if (store.address) doc.text(store.address, ML + 64, 46, { width: CW - 64, lineBreak: false })
   doc.text([store.phone, store.email, store.web].filter(Boolean).join('  |  '), ML + 64, 58, {
     width: CW - 64,
     lineBreak: false,
@@ -120,11 +123,13 @@ export async function generatePolicyPDF(
   branding?: { logo?: string | Buffer; seal?: string | Buffer }
 ): Promise<Buffer> {
   const identity = await getStoreIdentity()
+  const logo = branding?.logo ?? (await tenantLogoBuffer()) ?? undefined
   const store: StoreHeading = {
     name: identity.name,
     phone: identity.phone,
     email: identity.email,
     web: identity.web,
+    address: await storeAddressLine(),
   }
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 0, autoFirstPage: false, bufferPages: true })
@@ -133,7 +138,7 @@ export async function generatePolicyPDF(
     doc.on('end', () => resolve(Buffer.concat(chunks)))
     doc.on('error', reject)
 
-    const drawHeaderFn = () => drawHeader(doc, store, branding?.logo)
+    const drawHeaderFn = () => drawHeader(doc, store, logo)
 
     doc.addPage()
     drawHeaderFn()
