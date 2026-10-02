@@ -15,6 +15,7 @@ import {
   BIND_COOKIE,
   canRegisterKey,
 } from '@/lib/auth/session-binding'
+import { isUnderCookieDomain } from '@/lib/auth/session-binding-shared'
 
 const b64url = (b: ArrayBuffer) => Buffer.from(b).toString('base64url')
 
@@ -316,6 +317,19 @@ describe('bind scope across subdomains (shared cookie domain)', () => {
   it('a bare host under the shared domain scopes to it, not the exact host', () => {
     expect(bindScope('admin.jeffistores.in', '.jeffistores.in')).toBe('jeffistores.in')
     expect(bindScope('jeffistores.in', '.jeffistores.in')).toBe('jeffistores.in')
+    restore()
+  })
+
+  // The apex is under the shared cookie domain, so /rt must stamp Domain=.jeffistores.in on the
+  // bind cookie there too — the old "bindScope(host) !== host" guard returned false at the apex
+  // (scope equals host) and minted a host-only bind, so the apex logged out on reload.
+  it('isUnderCookieDomain is true for the apex AND subdomains, false otherwise', () => {
+    expect(isUnderCookieDomain(APEX, '.jeffistores.in')).toBe(true)
+    expect(isUnderCookieDomain(SUB, '.jeffistores.in')).toBe(true)
+    expect(isUnderCookieDomain('admin.jeffistores.in', '.jeffistores.in')).toBe(true)
+    expect(isUnderCookieDomain(OTHER_SITE, '.jeffistores.in')).toBe(false)
+    expect(isUnderCookieDomain('notjeffistores.in', '.jeffistores.in')).toBe(false)
+    expect(isUnderCookieDomain(APEX, undefined)).toBe(false)
     restore()
   })
 
