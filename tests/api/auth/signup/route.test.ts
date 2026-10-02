@@ -24,7 +24,7 @@ vi.mock('@/lib/shared/db', () => ({
 // Mocking issueUserToken avoids exercising createSession's DB INSERT.
 vi.mock('@/lib/auth/issue-session', () => ({
   issueUserToken: vi.fn().mockResolvedValue({ sid: 'user-sid' }),
-  USER_SESSION_TTL_S: 7 * 24 * 60 * 60,
+  USER_SESSION_TTL_S: 30 * 24 * 60 * 60,
 }))
 
 vi.mock('@/lib/email', () => ({
