@@ -21,8 +21,7 @@ interface LogRow {
 async function reEmbed(productId: string): Promise<boolean> {
   try {
     const { embed } = await import('@/lib/shared/rag')
-    const { Pool } = await import('pg')
-    const { queryOne } = await import('@/lib/shared/db')
+    const { queryOne, query } = await import('@/lib/shared/db')
 
     const product = await queryOne<{
       name: string
@@ -66,24 +65,19 @@ async function reEmbed(productId: string): Promise<boolean> {
     const crypto = await import('node:crypto')
     const hash = crypto.createHash('sha256').update(content).digest('hex')
 
-    const pool = new Pool({
-      host: process.env.RAG_PG_HOST || '100.82.208.8',
-      port: parseInt(process.env.RAG_PG_PORT || '5432', 10),
-      user: process.env.RAG_PG_USER || 'postgres',
-      password: process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD,
-      database: process.env.RAG_PG_DB || 'jeffi_dev',
-      max: 2,
-      connectionTimeoutMillis: 4000,
-    })
-    await pool.query(
-      `INSERT INTO embeddings (source_table, source_id, content, content_hash, embedding, updated_at)
-       VALUES ('products', $1, $2, $3, $4::vector, NOW())
-       ON CONFLICT (source_table, source_id)
+    // Write into the CURRENT store's OWN database (tenant pool via db.ts) so the admin agent's
+    // product search finds it; each tenant's vectors live only in that tenant's DB (#489). tenant_id
+    // is stamped for cross-store consistency; within a tenant DB every row is that tenant's.
+    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+    const tenantId = await resolveTenantId()
+    await query(
+      `INSERT INTO embeddings (tenant_id, source_table, source_id, content, content_hash, embedding, updated_at)
+       VALUES ($5, 'products', $1, $2, $3, $4::vector, NOW())
+       ON CONFLICT (tenant_id, source_table, source_id)
        DO UPDATE SET content = EXCLUDED.content, content_hash = EXCLUDED.content_hash,
                      embedding = EXCLUDED.embedding, updated_at = NOW()`,
-      [productId, content, hash, vecLit]
+      [productId, content, hash, vecLit, tenantId]
     )
-    await pool.end()
     return true
   } catch (err) {
     console.error('[route]', err)
