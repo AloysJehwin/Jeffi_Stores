@@ -157,6 +157,27 @@ describe('evaluateKeyBinding', () => {
     expect(v).toMatchObject({ status: 'violation', reason: 'cookie_missing', reject: false })
   })
 
+  it('the session check /api/auth/me is never refused for a missing bind cookie (reload race)', async () => {
+    // Reproduces the storefront "logged out on reload": AuthContext fires /api/auth/me on page load
+    // before the guard has re-bound (bind wait is capped), so the call carries no bind cookie.
+    // The route is a read-only session check and answers 200 {user:null} on refusal, which the
+    // client reads as logged out. It is proof-exempt, so a missing cookie must not reject it.
+    const { jwk } = await browserKey()
+    vi.mocked(db.queryOne).mockResolvedValue({
+      public_jwk: jwk,
+      bind_host: HOST,
+      created_at: new Date(Date.now() - 60_000),
+    } as any)
+    for (const path of ['/api/auth/me', '/api/business/me', '/api/ecom/auth/me']) {
+      const v = await evaluateKeyBinding({
+        ...base,
+        sessionId: 'sess-me',
+        ctx: ctx({ path, fetchDest: 'empty' }) as any,
+      })
+      expect(v, path).toMatchObject({ status: 'violation', reason: 'cookie_missing', reject: false })
+    }
+  })
+
   it('a copied sid IS refused on an authenticated API call (proof-required)', async () => {
     const { jwk } = await browserKey()
     vi.mocked(db.queryOne).mockResolvedValue({
