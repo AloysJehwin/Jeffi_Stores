@@ -15,9 +15,9 @@ export const BIND_COOKIE: Record<PrincipalType, string> = {
   owner: '_vo',
 }
 
-// Script-made API calls that cannot carry a header: EventSource and sendBeacon have no way to set
-// one. They still need the short-lived cookie. Matched by exact path, never by a request header,
-// because a header is the caller's to fake and would switch the proof off for any endpoint.
+// EventSource and sendBeacon cannot set a header but still need the short-lived cookie. Matched by
+// exact path, never by a request header. Read probes (/me, check-session) are not listed here: they
+// are exempt by method (reads never require a proof) in evaluateKeyBinding.
 export const PROOF_EXEMPT_PATHS: ReadonlySet<string> = new Set(['/api/admin/events', '/api/track'])
 
 export function normHost(host: string | null | undefined): string {
