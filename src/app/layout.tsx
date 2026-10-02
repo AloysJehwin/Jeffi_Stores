@@ -53,7 +53,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // flash on price/GST. Mirrors the /api/store-config payload shape.
   const c = await getSiteControls()
   const aiStorefrontEnabled = await storefrontAiAllowed().catch(() => false)
+  const { resolveTenant } = await import('@/lib/tenancy/tenant-context')
+  const storeSlug = (await resolveTenant().catch(() => null))?.slug ?? null
   const initialStoreConfig: StoreConfig = {
+    slug: storeSlug,
     identity: {
       name: c.identity.name,
       email: c.identity.email,

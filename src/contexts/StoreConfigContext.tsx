@@ -3,6 +3,8 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
 export interface StoreConfig {
+  /** Tenant slug, or null on the platform/flagship host. Used to namespace on-device AI (#489). */
+  slug: string | null
   identity: {
     name: string
     email: string
@@ -39,6 +41,7 @@ export interface StoreConfig {
 // same leak the identity block above already guards against. Neutral defaults only; gst
 // stays on so prices render inclusive (a price-flash guard, not a platform value).
 const DEFAULT_CONFIG: StoreConfig = {
+  slug: null,
   identity: {
     // Blank, not the platform's: this shows for the instant before the server config
     // arrives, and a tenant must never flash another business's contact details.
@@ -92,8 +95,12 @@ export function StoreConfigProvider({ children, initialConfig }: { children: Rea
       .then(r => (r.ok ? r.json() : null))
       .then(data => {
         if (!active || !data) return
+        // Namespace on-device AI (LoRA adapter) to this tenant (#489). Lazy import so the worker
+        // runtime isn't pulled into every page bundle; best-effort.
+        import('@/lib/on-device/runtime').then(m => m.setOnDeviceStore(data.slug ?? null)).catch(() => {})
         setConfig(prev => {
           const next: StoreConfig = {
+            slug: data.slug ?? prev.slug,
             identity: { ...prev.identity, ...(data.identity || {}) },
             flags: { ...prev.flags, ...(data.flags || {}) },
             orderAutoCancelMinutes: data.orderAutoCancelMinutes ?? prev.orderAutoCancelMinutes,
