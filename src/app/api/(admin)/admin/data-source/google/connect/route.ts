@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { platformOAuthBaseUrl, currentAdminBaseUrl } from '@/lib/catalog/brand'
+import { platformOAuthBaseUrl, currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
 import { signAdminState } from '@/lib/shared/oauth-state'
 import { extractSpreadsheetId } from '@/lib/import/google-sync'
 import { resolveImportTenantId } from '@/lib/import/jobs'
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     tenantId,
     provider: 'google_sheets',
     nonce: crypto.randomBytes(8).toString('hex'),
-    returnBase: currentAdminBaseUrl(),
+    returnBase: await currentAdminBaseUrlAsync(),
     ...(spreadsheetId ? { spreadsheetId } : {}),
   })
 

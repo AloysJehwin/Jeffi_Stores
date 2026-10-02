@@ -1,0 +1,57 @@
+import { describe, it, expect, beforeAll } from 'vitest'
+import { signAdminState, verifyAdminState, safeReturnBase } from '@/lib/shared/oauth-state'
+
+beforeAll(() => {
+  process.env.CRON_SECRET = 'test-cron-secret-at-least-32-bytes!!!!'
+})
+
+describe('signAdminState / verifyAdminState', () => {
+  it('round-trips the tenant returnBase through the signed state', () => {
+    const state = signAdminState({
+      tenantId: 't_123',
+      provider: 'google_sheets',
+      nonce: 'abcd',
+      returnBase: 'https://admin-acme.jeffistores.in',
+    })
+    const parsed = verifyAdminState(state)
+    expect(parsed?.tenantId).toBe('t_123')
+    expect(parsed?.returnBase).toBe('https://admin-acme.jeffistores.in')
+  })
+
+  it('rejects a tampered payload', () => {
+    const state = signAdminState({ tenantId: 't_123', provider: 'google_sheets', nonce: 'abcd' })
+    const [payload, sig] = state.split('.')
+    const forged = Buffer.from(
+      JSON.stringify({ tenantId: 'other', provider: 'google_sheets', nonce: 'abcd' })
+    ).toString('base64url')
+    expect(verifyAdminState(`${forged}.${sig}`)).toBeNull()
+    expect(verifyAdminState(`${payload}.deadbeef`)).toBeNull()
+  })
+})
+
+describe('safeReturnBase', () => {
+  const tenantAdmin = 'https://admin-acme.jeffistores.in'
+
+  it('returns the origin when returnBase matches the tenant admin host', () => {
+    expect(safeReturnBase('https://admin-acme.jeffistores.in', tenantAdmin)).toBe(
+      'https://admin-acme.jeffistores.in'
+    )
+  })
+
+  it('rejects a different tenant admin host (no cross-tenant redirect)', () => {
+    expect(safeReturnBase('https://admin-evil.jeffistores.in', tenantAdmin)).toBeNull()
+  })
+
+  it('rejects the platform admin host when the tenant is a tenant', () => {
+    expect(safeReturnBase('https://admin.jeffistores.in', tenantAdmin)).toBeNull()
+  })
+
+  it('rejects non-https schemes', () => {
+    expect(safeReturnBase('http://admin-acme.jeffistores.in', tenantAdmin)).toBeNull()
+  })
+
+  it('rejects a malformed or missing returnBase', () => {
+    expect(safeReturnBase(undefined, tenantAdmin)).toBeNull()
+    expect(safeReturnBase('not a url', tenantAdmin)).toBeNull()
+  })
+})
