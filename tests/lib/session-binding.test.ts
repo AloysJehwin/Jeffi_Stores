@@ -11,6 +11,7 @@ import {
   parsePublicJwk,
   evaluateKeyBinding,
   bindingMode,
+  bindScope,
   BIND_COOKIE,
   canRegisterKey,
 } from '@/lib/auth/session-binding'
@@ -277,5 +278,107 @@ describe('evaluateKeyBinding', () => {
 
   it('uses plain cookie names', () => {
     expect(Object.values(BIND_COOKIE).every(n => !/sid|sess|auth|token/i.test(n))).toBe(true)
+  })
+})
+
+// The *_sid session cookie is set with Domain=.jeffistores.in, so one session is sent to the apex
+// and every subdomain. Binding must span exactly that domain, or a session bound on one host reads
+// as host_mismatch on the next and the user is logged out on reload (the live bug). These assert the
+// scope collapses to the shared cookie domain in production, and stays host-pinned elsewhere.
+describe('bind scope across subdomains (shared cookie domain)', () => {
+  const APEX = 'jeffistores.in'
+  const SUB = 'business.jeffistores.in'
+  const OTHER_SITE = 'tenant-shop.com'
+  let savedNodeEnv: string | undefined
+  let savedCookieDomain: string | undefined
+
+  beforeEach(() => {
+    savedNodeEnv = process.env.NODE_ENV
+    savedCookieDomain = process.env.COOKIE_DOMAIN
+    ;(process.env as Record<string, string>).NODE_ENV = 'production'
+    process.env.COOKIE_DOMAIN = '.jeffistores.in'
+  })
+
+  const restore = () => {
+    if (savedNodeEnv === undefined) delete (process.env as Record<string, string>).NODE_ENV
+    else (process.env as Record<string, string>).NODE_ENV = savedNodeEnv
+    if (savedCookieDomain === undefined) delete process.env.COOKIE_DOMAIN
+    else process.env.COOKIE_DOMAIN = savedCookieDomain
+  }
+
+  it('a cookie minted on the apex verifies on a subdomain (the reload-logout regression)', () => {
+    const { value } = mintBindCookie(SID_HASH, APEX)
+    expect(verifyBindCookie(value, SID_HASH, SUB)).toBe(true)
+    expect(verifyBindCookie(value, SID_HASH, APEX)).toBe(true)
+    restore()
+  })
+
+  it('a bare host under the shared domain scopes to it, not the exact host', () => {
+    expect(bindScope('admin.jeffistores.in', '.jeffistores.in')).toBe('jeffistores.in')
+    expect(bindScope('jeffistores.in', '.jeffistores.in')).toBe('jeffistores.in')
+    restore()
+  })
+
+  it('a host NOT under the shared domain (custom tenant domain) stays host-pinned', () => {
+    const { value } = mintBindCookie(SID_HASH, OTHER_SITE)
+    expect(verifyBindCookie(value, SID_HASH, OTHER_SITE)).toBe(true)
+    expect(verifyBindCookie(value, SID_HASH, 'other.tenant-shop.com')).toBe(false)
+    expect(bindScope(OTHER_SITE, '.jeffistores.in')).toBe(OTHER_SITE)
+    restore()
+  })
+
+  it('no shared cookie domain (non-prod/localhost) → scope is the host, unchanged behavior', () => {
+    expect(bindScope('shop.example.com', undefined)).toBe('shop.example.com')
+    expect(bindScope('shop.example.com', null)).toBe('shop.example.com')
+    restore()
+  })
+
+  it('the real browser passes across subdomains: key registered on apex, request on subdomain', async () => {
+    const victim = await browserKey()
+    // Legacy/new rows both collapse to the shared scope; here bind_host is the apex host.
+    vi.mocked(db.queryOne).mockResolvedValue({
+      public_jwk: victim.jwk,
+      bind_host: APEX,
+      created_at: new Date(Date.now() - 60_000),
+    } as any)
+    const v = await evaluateKeyBinding({
+      sessionId: 'sess-sub',
+      sidHash: SID_HASH,
+      principalType: 'customer',
+      ctx: {
+        host: SUB,
+        method: 'POST',
+        path: '/api/orders/1',
+        bindCookies: { customer: mintBindCookie(SID_HASH, SUB).value },
+        proof: await victim.sign('POST', '/api/orders/1'),
+        fetchDest: 'empty',
+      } as any,
+    })
+    expect(v).toEqual({ status: 'ok', reject: false })
+    restore()
+  })
+
+  it('a legacy key row pinned to a full subdomain host still matches after rollout', async () => {
+    const victim = await browserKey()
+    vi.mocked(db.queryOne).mockResolvedValue({
+      public_jwk: victim.jwk,
+      bind_host: 'admin.jeffistores.in', // registered before scope change
+      created_at: new Date(Date.now() - 60_000),
+    } as any)
+    const v = await evaluateKeyBinding({
+      sessionId: 'sess-legacy',
+      sidHash: SID_HASH,
+      principalType: 'customer',
+      ctx: {
+        host: APEX,
+        method: 'POST',
+        path: '/api/orders/1',
+        bindCookies: { customer: mintBindCookie(SID_HASH, APEX).value },
+        proof: await victim.sign('POST', '/api/orders/1'),
+        fetchDest: 'empty',
+      } as any,
+    })
+    expect(v).toEqual({ status: 'ok', reject: false })
+    restore()
   })
 })
