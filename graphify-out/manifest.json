@@ -6435,8 +6435,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/business/rfqs/page.tsx": {
-    "mtime": 1790931247.8602123,
-    "ast_hash": "9f98c2a17e7169c60060e34caddda717",
+    "mtime": 1790949439.0254912,
+    "ast_hash": "94ae988ece50f544594fed68b1594d44",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/CampaignsListClient.tsx": {
