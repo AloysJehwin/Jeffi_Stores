@@ -36,6 +36,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const SELLER_NAME = bv.sellerName
     const SELLER_ADD = bv.sellerAddress
     const SELLER_PHONE = bv.sellerPhone
+    const { storeOrigin } = await import('@/lib/catalog/brand')
+    const RETURN_ORIGIN = await storeOrigin()
 
     const order = await queryOne<any>(
       `
@@ -162,10 +164,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           order: invoiceRef,
           payment_mode: deliveryPaymentMode,
           return_pin: ORIGIN_PIN,
-          return_city: 'Raipur',
+          return_city: RETURN_ORIGIN.city,
           return_phone: SELLER_PHONE,
           return_add: SELLER_ADD,
-          return_state: 'Chhattisgarh',
+          return_state: RETURN_ORIGIN.state,
           return_country: 'India',
           products_desc: productDesc,
           hsn_code: '7318',

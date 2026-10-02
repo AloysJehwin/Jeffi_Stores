@@ -752,7 +752,7 @@ const propose_create_quotation: ToolDef = {
       consigneeAddr1: { type: 'string', description: 'Address line 1.' },
       consigneeAddr2: { type: 'string', description: 'Address line 2.' },
       consigneeCity: { type: 'string', description: 'City.' },
-      consigneeState: { type: 'string', description: 'State, defaults to Chhattisgarh.' },
+      consigneeState: { type: 'string', description: "State; defaults to the store's own state when omitted." },
       consigneeGstin: { type: 'string', description: 'GSTIN of consignee.' },
       consigneePincode: { type: 'string', description: 'Pincode.' },
       buyerSame: { type: 'boolean', description: 'Whether buyer is same as consignee. Defaults true.' },
@@ -952,6 +952,10 @@ const propose_create_quotation: ToolDef = {
     const sgst = cgst
     const total = round2(subtotal + cgst + sgst)
 
+    // Fallback consignee state is the store's own state (site_settings), never a flagship default.
+    const { storeOrigin } = await import('@/lib/catalog/brand')
+    const storeState = (await storeOrigin()).state
+
     const payload = {
       consignee_email: email,
       consignee_name: consigneeNameResolved,
@@ -963,7 +967,7 @@ const propose_create_quotation: ToolDef = {
       consignee_addr1: consigneeAddr1 || addrToUse?.address_line1 || customer?.business_address || '',
       consignee_addr2: consigneeAddr2 || addrToUse?.address_line2 || null,
       consignee_city: consigneeCity || addrToUse?.city || '',
-      consignee_state: consigneeState || addrToUse?.state || 'Chhattisgarh',
+      consignee_state: consigneeState || addrToUse?.state || storeState,
       consignee_gstin: consigneeGstin || customer?.gst_number || null,
       consignee_pincode: consigneePincode || addrToUse?.postal_code || null,
       buyer_same: buyerSame !== false,
