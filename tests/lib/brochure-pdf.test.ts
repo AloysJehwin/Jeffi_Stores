@@ -9,6 +9,18 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
+// #486: loadBrochureStore now falls back to the CURRENT store's identity (tenant-aware), not a
+// hardcoded 'JEFFI STORES'. Mock it to the platform default for determinism.
+vi.mock('@/lib/catalog/site-controls', () => ({
+  getStoreIdentity: vi.fn().mockResolvedValue({
+    name: 'Jeffi Stores',
+    email: '',
+    phone: '',
+    web: 'jeffistores.in',
+    logoUrl: '',
+  }),
+}))
+
 // pdfkit is loaded via eval('require')('pdfkit'); vi.mock intercepts the
 // require cache. Mocking it keeps generateBrochurePDF fast and side-effect free
 // (real pdfkit image decoding of fetched buffers is slow), while still driving
@@ -273,19 +285,19 @@ describe('loadBrochureStore', () => {
 
     vi.mocked(queryMany).mockResolvedValue([] as any)
     const s2 = await loadBrochureStore()
-    expect(s2.name).toBe('JEFFI STORES')
+    expect(s2.name).toBe('Jeffi Stores') // getStoreIdentity fallback (#486)
     expect(s2.address).toBe('')
   })
 
   it('handles null rows and null values defensively', async () => {
     vi.mocked(queryMany).mockResolvedValue(null as any)
     const s = await loadBrochureStore()
-    expect(s.name).toBe('JEFFI STORES')
+    expect(s.name).toBe('Jeffi Stores') // getStoreIdentity fallback (#486)
 
     vi.mocked(queryMany).mockResolvedValue([{ key: 'business_trade_name', value: null }] as any)
     const s2 = await loadBrochureStore()
-    // null value coerces to '' → falls through to JEFFI STORES
-    expect(s2.name).toBe('JEFFI STORES')
+    // null value coerces to '' → falls through to the getStoreIdentity default (#486)
+    expect(s2.name).toBe('Jeffi Stores')
   })
 })
 

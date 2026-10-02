@@ -43,8 +43,11 @@ async function resolveDefaultFrom(): Promise<string> {
   }
 }
 
-let transporter: nodemailer.Transporter | null = null
-function getTransporter(): nodemailer.Transporter {
+// nodemailer v10 no longer exposes a `Transporter` namespace type; createTransport returns a Mail
+// instance, so derive the type from the function's return.
+type MailTransport = ReturnType<typeof nodemailer.createTransport>
+let transporter: MailTransport | null = null
+function getTransporter(): MailTransport {
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: 'email-smtp.us-east-1.amazonaws.com',

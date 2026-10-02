@@ -720,8 +720,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1790964253.9011593,
-    "ast_hash": "798e73bc9a029d4123501b3cb569b67e",
+    "mtime": 1790968804.3153253,
+    "ast_hash": "5ed512a11cb52c509fecfd34764c8e9a",
     "semantic_hash": ""
   },
   "postcss.config.js": {
@@ -2215,8 +2215,8 @@
     "semantic_hash": ""
   },
   "tests/lib/packing-slip-pdf.test.ts": {
-    "mtime": 1790931257.4062827,
-    "ast_hash": "aaeebd8848bdf8039e9a5a1ab1f764cf",
+    "mtime": 1790969232.2131724,
+    "ast_hash": "eeef6fdf603ddf9ce00b5f02cda79070",
     "semantic_hash": ""
   },
   "tests/lib/po-pdf.test.ts": {
@@ -2560,8 +2560,8 @@
     "semantic_hash": ""
   },
   "tests/lib/brochure-pdf.test.ts": {
-    "mtime": 1790931257.1223943,
-    "ast_hash": "fedee2d4dc44837291691b6ede338c94",
+    "mtime": 1790969358.7056973,
+    "ast_hash": "070c8e28692f6c43a8d95a950bbbed20",
     "semantic_hash": ""
   },
   "public/images/brochure-cover.png": {
@@ -12035,8 +12035,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/mail-audit.ts": {
-    "mtime": 1790947105.3431275,
-    "ast_hash": "b624d65792337d8c29fe1294a28ef40a",
+    "mtime": 1790968996.967027,
+    "ast_hash": "74e8f7db7fc2dc07b4d653f3d142395a",
     "semantic_hash": ""
   },
   "src/lib/shared/mail-template.ts": {
@@ -12577,6 +12577,11 @@
   "integration-tests/README.md": {
     "mtime": 1790964202.971062,
     "ast_hash": "3938b02e30abf8725a5c75f7a36d07f6",
+    "semantic_hash": ""
+  },
+  ".claude/plans/dependabot-508.md": {
+    "mtime": 1790968337.4312131,
+    "ast_hash": "9e17f1933c2f486c4b252258921087d5",
     "semantic_hash": ""
   }
 }
