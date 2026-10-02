@@ -16,6 +16,7 @@ export {
   BIND_TTL_S,
   BIND_COOKIE,
   bindScope,
+  isUnderCookieDomain,
   normHost,
   type BindingContext,
 } from '@/lib/auth/session-binding-shared'

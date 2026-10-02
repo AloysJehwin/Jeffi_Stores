@@ -10,6 +10,7 @@ import {
   BIND_TTL_S,
   PROOF_HEADER,
   bindScope,
+  isUnderCookieDomain,
   bindingMode,
   normHost,
   parsePublicJwk,
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
   // the host-scoped tenant-admin cookie, localhost) get no Domain and stay host-only, unchanged.
   // Lax, not strict: arriving from an emailed link must still present it, or every such visit would
   // detour through the re-bind step.
-  const bindCookieDomain = bindScope(host, getCookieDomain()) !== normHost(host) ? cookieDomainOption() : {}
+  const bindCookieDomain = isUnderCookieDomain(host, getCookieDomain()) ? cookieDomainOption() : {}
   for (const c of minted) {
     res.cookies.set(c.name, c.value, {
       httpOnly: true,
