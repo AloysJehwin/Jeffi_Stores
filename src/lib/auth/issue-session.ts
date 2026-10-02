@@ -2,7 +2,7 @@ import { createSession } from '@/lib/auth/auth-sessions'
 import { resolveRequestTenantId } from '@/lib/tenancy/request-tenant'
 
 // Absolute TTL for customer + business sessions (was 30d; shortened to 7d).
-export const USER_SESSION_TTL_S = 7 * 24 * 60 * 60
+export const USER_SESSION_TTL_S = 30 * 24 * 60 * 60 // 30d absolute cap for customer + business sessions (was 7d). Paired with the 30d idle window so returning shoppers are not logged out on reload after a day or more away.
 
 // Shared issuer for customer + business sessions. Creates the opaque server-side session
 // and returns its id (the cookie value) — NO JWT. Callers set cookie = sid and keep their
