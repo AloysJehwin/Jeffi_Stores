@@ -4,6 +4,10 @@ vi.mock('@/lib/shared/db', () => ({ query: vi.fn().mockResolvedValue(undefined) 
 vi.mock('@/lib/campaigns/scenarios/_registry', () => ({
   listScenarios: vi.fn(),
 }))
+// Keep this a pure test of the seeder's SQL shape — not coupled to template content.
+vi.mock('@/lib/campaigns/template-validation', () => ({
+  validateCampaignBodyTemplate: vi.fn().mockReturnValue({ ok: true }),
+}))
 
 import { ensureBuiltinCampaignRows } from '@/lib/campaigns/ensure-builtin-campaigns'
 import { query } from '@/lib/shared/db'
