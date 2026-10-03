@@ -229,3 +229,62 @@ CREATE TABLE public.offer_display_settings (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_by uuid
 );
+
+
+--
+-- Name: loyalty_accounts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.loyalty_accounts (
+    user_id uuid NOT NULL,
+    points integer DEFAULT 0 NOT NULL,
+    tier character varying(20) DEFAULT 'bronze'::character varying NOT NULL,
+    tier_updated_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: loyalty_ledger; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.loyalty_ledger (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    delta integer NOT NULL,
+    reason character varying(40) NOT NULL,
+    order_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: referrals; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.referrals (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    referrer_user_id uuid NOT NULL,
+    referred_email character varying(255),
+    referred_user_id uuid,
+    referral_code character varying(32) NOT NULL,
+    status character varying(20) DEFAULT 'invited'::character varying NOT NULL,
+    invited_at timestamp with time zone DEFAULT now() NOT NULL,
+    converted_at timestamp with time zone
+);
+
+
+--
+-- Name: subscriptions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.subscriptions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    status character varying(20) DEFAULT 'active'::character varying NOT NULL,
+    interval_minutes integer NOT NULL,
+    next_renewal_at timestamp with time zone NOT NULL,
+    last_renewed_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
