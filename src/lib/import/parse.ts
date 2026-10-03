@@ -106,7 +106,7 @@ function coerceRow(
   const errors: string[] = []
   for (const col of columnsForSheet(sheet)) {
     if (STRUCTURE_KEYS.has(col.key) || !col.rowTypes.includes(rowType)) continue
-    const r = coerceCell(cell(col.header), col.coerce)
+    const r = coerceCell(cell(col.header), col.coerce, !col.required)
     if (r.error) errors.push(`${col.header}: ${r.error}`)
     else if (r.value !== undefined) values[col.key] = r.value
   }
@@ -257,7 +257,7 @@ function parseFlat(ws: XLSX.WorkSheet): ParseResult {
     for (const col of ALL_COLUMNS) {
       if (STRUCTURE_KEYS.has(col.key)) continue
       if (!col.rowTypes.includes(rowType)) continue
-      const r = coerceCell(cell(col.header), col.coerce)
+      const r = coerceCell(cell(col.header), col.coerce, !col.required)
       if (r.error) errors.push(`${col.header}: ${r.error}`)
       else if (r.value !== undefined) values[col.key] = r.value
     }

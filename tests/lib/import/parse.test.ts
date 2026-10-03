@@ -106,6 +106,29 @@ describe('multi-sheet template', () => {
     expect(parsed.rows[1].values.sku).toBe('B2-S')
   })
 
+  it('coerces blank optional cells to safe defaults instead of dropping them', () => {
+    const buf = valuesToWorkbookBuffer({
+      Products: [
+        ['sku', 'name', 'base_price'],
+        ['B3', 'Blank-safe', '25'],
+      ],
+      'Product · Shipping': [
+        ['sku', 'weight_grams', 'fragile'],
+        ['B3', '', ''],
+      ],
+      'Product · SEO & Audience': [
+        ['sku', 'meta_keywords'],
+        ['B3', ''],
+      ],
+    })
+    const parsed = parseWorkbook(buf)
+    expect(parsed.fatal).toBeUndefined()
+    const product = parsed.rows.find(r => r.sheet === 'Products')!
+    expect(product.values.weight_grams).toBe(0)
+    expect(product.values.fragile).toBe(false)
+    expect(product.values.meta_keywords).toEqual([])
+  })
+
   it('reports a template with nothing filled in as fatal', () => {
     const buf = valuesToWorkbookBuffer({ Products: [['sku', 'name']], Variants: [['parent_sku', 'variant.sku']] })
     expect(parseWorkbook(buf).fatal).toMatch(/No data rows/)

@@ -9,12 +9,13 @@ const TRUE_SET = new Set(['true', '1', 'yes', 'y', 't'])
 const FALSE_SET = new Set(['false', '0', 'no', 'n', 'f', ''])
 
 // Turn a raw cell (string | number | boolean | null from the sheet parser) into the
-// shape the product_drafts JSONB expects. Blank cells return { value: undefined } so
-// the caller can omit the key entirely (publish then leaves the live value or default).
-export function coerceCell(raw: unknown, coerce: Coercer): CoerceResult {
-  if (raw === null || raw === undefined) return { value: undefined }
+// shape the product_drafts JSONB expects. Blank required cells are left undefined so the
+// row-level validation can reject them; blank optional cells fall back to a safe default so
+// imports don't corrupt or stall on empty values.
+export function coerceCell(raw: unknown, coerce: Coercer, blankIsDefault = false): CoerceResult {
+  if (raw === null || raw === undefined) return blankIsDefault ? defaultValueForType(coerce) : { value: undefined }
   const s = String(raw).trim()
-  if (s === '') return { value: undefined }
+  if (s === '') return blankIsDefault ? defaultValueForType(coerce) : { value: undefined }
 
   switch (coerce) {
     case 'text':
@@ -56,6 +57,26 @@ export function coerceCell(raw: unknown, coerce: Coercer): CoerceResult {
     }
     default:
       return { value: s }
+  }
+}
+
+function defaultValueForType(coerce: Coercer): CoerceResult {
+  switch (coerce) {
+    case 'text':
+      return { value: '' }
+    case 'number':
+    case 'int':
+      return { value: 0 }
+    case 'bool':
+      return { value: false }
+    case 'csv':
+      return { value: [] }
+    case 'json':
+      return { value: null }
+    case 'date':
+      return { value: null }
+    default:
+      return { value: '' }
   }
 }
 
