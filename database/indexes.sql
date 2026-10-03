@@ -1970,3 +1970,38 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_product_serials_instock_global ON public.
 --
 
 CREATE INDEX idx_offer_display_settings_visible ON public.offer_display_settings USING btree (is_visible, display_order);
+
+
+--
+-- Name: idx_loyalty_ledger_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_loyalty_ledger_user ON public.loyalty_ledger USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: idx_loyalty_accounts_tier; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_loyalty_accounts_tier ON public.loyalty_accounts USING btree (tier, tier_updated_at DESC);
+
+
+--
+-- Name: idx_referrals_referrer; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_referrals_referrer ON public.referrals USING btree (referrer_user_id, status);
+
+
+--
+-- Name: idx_subscriptions_renewal; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_subscriptions_renewal ON public.subscriptions USING btree (status, next_renewal_at);
+
+
+--
+-- Name: idx_subscriptions_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_subscriptions_user ON public.subscriptions USING btree (user_id, status);
