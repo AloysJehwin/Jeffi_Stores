@@ -9,6 +9,7 @@ interface Params extends Record<string, unknown> {
   maxRecipientsPerSweep: number
   maxItemsPerEmail: number
   secondEmailDelayHours: number
+  highValueFloor: number
   whatsappEnabled: boolean
 }
 
@@ -28,6 +29,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     maxRecipientsPerSweep: 50,
     maxItemsPerEmail: 5,
     secondEmailDelayHours: hours(48),
+    highValueFloor: 5000,
     whatsappEnabled: false,
   },
   paramSchema: {
@@ -60,6 +62,14 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       recommendedUnit: 'hours',
       label: 'Second email delay',
       description: 'Send follow-up email this long after first email if cart still not checked out',
+    },
+    highValueFloor: {
+      type: 'integer',
+      min: 0,
+      max: 1000000,
+      label: 'High-value handoff floor',
+      description:
+        'Carts at or above this subtotal are handled by the High-Value Cart campaign instead (0 disables the handoff)',
     },
     whatsappEnabled: {
       type: 'boolean',
@@ -94,9 +104,22 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
             AND ecs.user_id = ci.user_id
             AND ecs.sent_at > NOW() - ($4::text || ' minutes')::interval
         )
+        -- High-value handoff: carts at/above the floor belong to high_value_cart (mutual exclusion).
+        AND ($6 <= 0 OR (
+          SELECT COALESCE(SUM(ci2.price_at_addition * ci2.quantity), 0)
+          FROM cart_items ci2
+          WHERE ci2.user_id = ci.user_id AND ci2.saved_for_later = FALSE
+        ) < $6)
       LIMIT $5
     `,
-      [campaign.kind, campaign.delay_hours, String(lookbackMin), String(cooldownMin), params.maxRecipientsPerSweep]
+      [
+        campaign.kind,
+        campaign.delay_hours,
+        String(lookbackMin),
+        String(cooldownMin),
+        params.maxRecipientsPerSweep,
+        params.highValueFloor ?? 0,
+      ]
     )
 
     // Sequence 2: got seq=1, no seq=2 yet, secondEmailDelayHours passed, cart still active
@@ -132,6 +155,12 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
             AND o.status NOT IN ('cancelled', 'refunded')
             AND o.created_at > ecs1.sent_at
         )
+        -- High-value handoff: carts at/above the floor belong to high_value_cart (mutual exclusion).
+        AND ($6 <= 0 OR (
+          SELECT COALESCE(SUM(ci2.price_at_addition * ci2.quantity), 0)
+          FROM cart_items ci2
+          WHERE ci2.user_id = ci.user_id AND ci2.saved_for_later = FALSE
+        ) < $6)
       LIMIT $4
     `,
       [
@@ -140,6 +169,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         String(cooldownMin),
         params.maxRecipientsPerSweep,
         String(secondEmailDelayMin),
+        params.highValueFloor ?? 0,
       ]
     )
 
