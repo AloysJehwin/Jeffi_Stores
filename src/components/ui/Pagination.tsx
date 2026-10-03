@@ -16,6 +16,7 @@ export default function Pagination({ page, totalPages, buildHref }: PaginationPr
     <div className="flex items-center justify-between mt-8 mb-4 gap-2">
       <Link
         href={buildHref(page - 1)}
+        scroll={false}
         className={`${btnCls} ${page <= 1 ? 'opacity-40 pointer-events-none' : ''}`}
         aria-disabled={page <= 1}
       >
@@ -26,6 +27,7 @@ export default function Pagination({ page, totalPages, buildHref }: PaginationPr
       </span>
       <Link
         href={buildHref(page + 1)}
+        scroll={false}
         className={`${btnCls} ${page >= totalPages ? 'opacity-40 pointer-events-none' : ''}`}
         aria-disabled={page >= totalPages}
       >
