@@ -50,6 +50,17 @@ export const years = (n: number) => toMinutes(n, 'years')
 
 type ParamBag = Record<string, unknown>
 
+// The per-user cooldown in canonical MINUTES. Reads the new `sendCooldown` (minutes/{value,unit}) or the
+// legacy `sendCooldownDays` integer; defaults to 1 day so a missing value can never go unbounded.
+export function cooldownMinutes(params: ParamBag): number {
+  return readDurationParam(params, 'sendCooldown', { key: 'sendCooldownDays', unit: 'days' }) ?? days(1)
+}
+
+// The cooldown expressed in whole days (>= 1) for sendCampaignWhatsApp, which windows its dedup in days.
+export function cooldownDays(params: ParamBag): number {
+  return Math.max(1, Math.round(fromMinutes(cooldownMinutes(params), 'days')))
+}
+
 export function readDurationParam(
   params: ParamBag,
   key: string,

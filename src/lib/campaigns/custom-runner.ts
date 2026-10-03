@@ -4,6 +4,7 @@ import { storeBaseUrlAsync } from '@/lib/catalog/brand'
 import type { Campaign, CampaignKind } from '@/lib/shared/marketing'
 import type { SweepResult } from './types'
 import { validateScenarioSql } from './sql-safety'
+import { cooldownDays as resolveCooldownDays } from './duration'
 
 const STATEMENT_TIMEOUT_MS = 10000
 
@@ -40,7 +41,9 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
   }
 
   const params = (campaign as any).parameters || {}
-  const cooldownDays = typeof params.sendCooldownDays === 'number' ? params.sendCooldownDays : 7
+  // Custom audience SQL binds $2 as a cooldown in DAYS (enforced by sql-safety). Resolve from the
+  // canonical sendCooldown (minutes) or the legacy sendCooldownDays integer.
+  const cooldownDays = resolveCooldownDays(params)
   const maxRecipients = typeof params.maxRecipientsPerSweep === 'number' ? params.maxRecipientsPerSweep : 50
 
   let userIds: string[] = []

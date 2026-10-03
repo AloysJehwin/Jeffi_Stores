@@ -165,8 +165,9 @@ describe('abandonedCart scenario', () => {
 
   it('has all required defaultParams', () => {
     const p = abandonedCart.defaultParams
+    // lookbackDays/secondEmailDelayHours now hold canonical minutes; the cooldown is injected universally.
     expect(typeof p.lookbackDays).toBe('number')
-    expect(typeof p.sendCooldownDays).toBe('number')
+    expect(typeof p.secondEmailDelayHours).toBe('number')
     expect(typeof p.maxRecipientsPerSweep).toBe('number')
     expect(typeof p.maxItemsPerEmail).toBe('number')
   })
@@ -174,7 +175,7 @@ describe('abandonedCart scenario', () => {
   it('defaultParams have sensible bounds', () => {
     const p = abandonedCart.defaultParams
     expect(p.lookbackDays).toBeGreaterThan(0)
-    expect(p.sendCooldownDays).toBeGreaterThan(0)
+    expect(p.secondEmailDelayHours).toBeGreaterThan(0)
     expect(p.maxRecipientsPerSweep).toBeGreaterThan(0)
     expect(p.maxItemsPerEmail).toBeGreaterThan(0)
   })
@@ -232,10 +233,10 @@ describe('abandonedCart scenario', () => {
     const [sql, args] = mockQueryMany.mock.calls[0]
     expect(typeof sql).toBe('string')
     expect(args).toContain('abandoned_cart')
-    // delay_hours
+    // delay_hours (passed raw, not a scenario duration param)
     expect(args).toContain(2)
-    // lookbackDays
-    expect(args).toContain(abandonedCart.defaultParams.lookbackDays)
+    // lookbackDays — now canonical minutes, bound to SQL as a String
+    expect(args).toContain(String(abandonedCart.defaultParams.lookbackDays))
   })
 
   // --- send — no items → ok: false ---
@@ -792,7 +793,7 @@ describe('reviewReminder scenario', () => {
     const [sql, args] = mockQueryMany.mock.calls[0]
     expect(typeof sql).toBe('string')
     expect(args).toContain('review_reminder')
-    expect(args).toContain(reviewReminder.defaultParams.lookbackDays)
+    expect(args).toContain(String(reviewReminder.defaultParams.lookbackDays))
   })
 
   it('findEligible returns rows from queryMany', async () => {
@@ -964,7 +965,7 @@ describe('reviewRequest scenario', () => {
     expect(typeof sql).toBe('string')
     expect(args).toContain('review_request')
     expect(args).toContain(24)
-    expect(args).toContain(reviewRequest.defaultParams.lookbackDays)
+    expect(args).toContain(String(reviewRequest.defaultParams.lookbackDays))
     expect(args).toContain(reviewRequest.defaultParams.maxRecipientsPerSweep)
   })
 

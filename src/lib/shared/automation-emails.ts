@@ -12,6 +12,7 @@ import {
   wrapWithTracking,
 } from '@/lib/shared/marketing'
 import { baseLayout, ctaButton } from '@/lib/shared/email-campaigns'
+import { cooldownDays } from '@/lib/campaigns/duration'
 import { queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import { businessBaseUrl } from '@/lib/shared/business-path'
@@ -27,9 +28,16 @@ interface UserContext {
 
 // The campaign's send cooldown in days, read from its JSONB parameters (not on the Campaign type).
 // Used to window the per-reference "already sent" check so recurring campaigns resend each cycle.
+// Reads the canonical `sendCooldown` (minutes) or the legacy `sendCooldownDays` integer.
 function campaignCooldownDays(campaign: Campaign): number | null {
-  const v = (campaign as unknown as { parameters?: { sendCooldownDays?: unknown } }).parameters?.sendCooldownDays
-  return typeof v === 'number' && v > 0 ? v : null
+  const params = (campaign as unknown as { parameters?: Record<string, unknown> }).parameters
+  if (!params) return null
+  const hasCooldown =
+    params.sendCooldown !== undefined && params.sendCooldown !== null
+      ? true
+      : typeof params.sendCooldownDays === 'number' && params.sendCooldownDays > 0
+  if (!hasCooldown) return null
+  return cooldownDays(params)
 }
 
 export async function sendCampaignEmail(params: {

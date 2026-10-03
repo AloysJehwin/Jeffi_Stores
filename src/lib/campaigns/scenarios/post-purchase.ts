@@ -1,6 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { days, readDurationParam } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -22,16 +23,17 @@ export const postPurchase: ScenarioModule<Params, Row> = {
   trigger:
     "Fires after an order is marked delivered and at least the campaign's delay (in hours) has passed. One send per delivered order. Used for thank-you and follow-up offers.",
   defaultParams: {
-    lookbackDays: 7,
+    lookbackDays: days(7),
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
   },
   paramSchema: {
     lookbackDays: {
-      type: 'integer',
-      min: 1,
-      max: 30,
-      label: 'Lookback (days)',
+      type: 'duration',
+      min: days(1),
+      max: days(90),
+      recommendedUnit: 'days',
+      label: 'Lookback',
       description: 'Only consider orders delivered in the last N days',
     },
     maxRecipientsPerSweep: {
@@ -49,6 +51,7 @@ export const postPurchase: ScenarioModule<Params, Row> = {
   },
 
   async findEligible({ campaign, params }) {
+    const lookbackMin = readDurationParam(params, 'lookbackDays') ?? days(7)
     return queryMany<Row>(
       `
       SELECT o.id, o.user_id, o.order_number
@@ -57,7 +60,7 @@ export const postPurchase: ScenarioModule<Params, Row> = {
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE o.status = 'delivered'
         AND o.delivered_at < NOW() - ($2 || ' hours')::interval
-        AND o.delivered_at > NOW() - ($3 || ' days')::interval
+        AND o.delivered_at > NOW() - ($3 || ' minutes')::interval
         AND u.marketing_opt_out = FALSE AND u.is_active = TRUE
         AND (bp.user_id IS NULL OR bp.approval_status != 'approved')
         AND NOT EXISTS (
@@ -67,7 +70,7 @@ export const postPurchase: ScenarioModule<Params, Row> = {
         )
       LIMIT $4
     `,
-      [campaign.kind, campaign.delay_hours, params.lookbackDays, params.maxRecipientsPerSweep]
+      [campaign.kind, campaign.delay_hours, String(lookbackMin), params.maxRecipientsPerSweep]
     )
   },
 

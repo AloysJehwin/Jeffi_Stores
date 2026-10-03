@@ -14,6 +14,7 @@ vi.mock('@/lib/shared/automation-emails', () => ({
 }))
 
 import { buildWinbackScenario } from '@/lib/campaigns/scenarios/_winback-base'
+import { days } from '@/lib/campaigns/duration'
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared/automation-emails'
 
@@ -28,11 +29,10 @@ const defaultOpts = {
   description: 'Test winback',
   trigger: 'Test trigger',
   defaults: {
-    minDaysSinceOrder: 60,
-    maxDaysSinceOrder: 150,
+    minDaysSinceOrder: days(60),
+    maxDaysSinceOrder: days(150),
     healthScoreMin: 25,
     healthScoreMax: 50,
-    sendCooldownDays: 60,
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
   },
@@ -61,23 +61,24 @@ describe('buildWinbackScenario', () => {
     expect(scenario.trigger).toBe('Test trigger')
   })
 
-  it('defaultParams match provided defaults', () => {
+  it('defaultParams match provided defaults (canonical minutes)', () => {
     const scenario = buildWinbackScenario(defaultOpts)
-    expect(scenario.defaultParams.minDaysSinceOrder).toBe(60)
-    expect(scenario.defaultParams.maxDaysSinceOrder).toBe(150)
-    expect(scenario.defaultParams.sendCooldownDays).toBe(60)
+    expect(scenario.defaultParams.minDaysSinceOrder).toBe(days(60))
+    expect(scenario.defaultParams.maxDaysSinceOrder).toBe(days(150))
     expect(scenario.defaultParams.maxRecipientsPerSweep).toBe(50)
   })
 
-  it('paramSchema has all required fields', () => {
+  it('paramSchema has all required fields with duration windows', () => {
     const scenario = buildWinbackScenario(defaultOpts)
     const fields = Object.keys(scenario.paramSchema)
     expect(fields).toContain('minDaysSinceOrder')
     expect(fields).toContain('maxDaysSinceOrder')
     expect(fields).toContain('healthScoreMin')
     expect(fields).toContain('healthScoreMax')
-    expect(fields).toContain('sendCooldownDays')
     expect(fields).toContain('maxRecipientsPerSweep')
+    expect(fields).not.toContain('sendCooldownDays')
+    expect(scenario.paramSchema.minDaysSinceOrder.type).toBe('duration')
+    expect(scenario.paramSchema.maxDaysSinceOrder.type).toBe('duration')
   })
 
   describe('findEligible', () => {

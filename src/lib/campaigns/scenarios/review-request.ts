@@ -3,6 +3,7 @@ import { generateReviewToken } from '@/lib/auth/jwt'
 import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/lib/shared/automation-emails'
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { days, readDurationParam } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -23,16 +24,17 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
   description: 'Sent after delivery with per-product star links that open a pre-filled review form',
   trigger: 'Fires after delivery + campaign delay, once per order, only if no review has been left yet',
   defaultParams: {
-    lookbackDays: 30,
+    lookbackDays: days(30),
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
   },
   paramSchema: {
     lookbackDays: {
-      type: 'integer',
-      min: 1,
-      max: 90,
-      label: 'Lookback (days)',
+      type: 'duration',
+      min: days(1),
+      max: days(90),
+      recommendedUnit: 'days',
+      label: 'Lookback',
       description: 'Only consider orders delivered in the last N days',
     },
     maxRecipientsPerSweep: {
@@ -50,6 +52,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
   },
 
   async findEligible({ campaign, params }) {
+    const lookbackMin = readDurationParam(params, 'lookbackDays') ?? days(30)
     return queryMany<Row>(
       `
       SELECT o.id, o.user_id, o.order_number
@@ -58,7 +61,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE o.status = 'delivered'
         AND o.delivered_at < NOW() - ($2 || ' hours')::interval
-        AND o.delivered_at > NOW() - ($3 || ' days')::interval
+        AND o.delivered_at > NOW() - ($3 || ' minutes')::interval
         AND u.marketing_opt_out = FALSE AND u.is_active = TRUE
         AND (bp.user_id IS NULL OR bp.approval_status != 'approved')
         AND NOT EXISTS (
@@ -73,7 +76,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
         )
       LIMIT $4
     `,
-      [campaign.kind, campaign.delay_hours, params.lookbackDays, params.maxRecipientsPerSweep]
+      [campaign.kind, campaign.delay_hours, String(lookbackMin), params.maxRecipientsPerSweep]
     )
   },
 
