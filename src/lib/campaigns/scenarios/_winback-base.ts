@@ -1,6 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { days, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule, ParamSchema } from '../types'
 
 export interface WinbackParams extends Record<string, unknown> {
@@ -8,7 +9,6 @@ export interface WinbackParams extends Record<string, unknown> {
   maxDaysSinceOrder: number
   healthScoreMin: number
   healthScoreMax: number
-  sendCooldownDays: number
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
 }
@@ -19,17 +19,19 @@ interface Row {
 
 const winbackSchema: ParamSchema<WinbackParams> = {
   minDaysSinceOrder: {
-    type: 'integer',
-    min: 1,
-    max: 730,
-    label: 'Min days since last order',
+    type: 'duration',
+    min: days(1),
+    max: days(730),
+    recommendedUnit: 'days',
+    label: 'Min since last order',
     description: 'Lower bound of the dormant window',
   },
   maxDaysSinceOrder: {
-    type: 'integer',
-    min: 1,
-    max: 730,
-    label: 'Max days since last order',
+    type: 'duration',
+    min: days(1),
+    max: days(730),
+    recommendedUnit: 'days',
+    label: 'Max since last order',
     description: 'Upper bound of the dormant window',
   },
   healthScoreMin: {
@@ -45,13 +47,6 @@ const winbackSchema: ParamSchema<WinbackParams> = {
     max: 100,
     label: 'Health score max',
     description: 'Customer health upper bound (exclusive)',
-  },
-  sendCooldownDays: {
-    type: 'integer',
-    min: 1,
-    max: 365,
-    label: 'Per-user cooldown (days)',
-    description: 'Skip users sent this campaign within N days',
   },
   maxRecipientsPerSweep: {
     type: 'integer',
@@ -83,6 +78,9 @@ export function buildWinbackScenario(opts: {
     paramSchema: winbackSchema,
 
     async findEligible({ campaign, params }) {
+      const minSinceMin = readDurationParam(params, 'minDaysSinceOrder') ?? days(60)
+      const maxSinceMin = readDurationParam(params, 'maxDaysSinceOrder') ?? days(365)
+      const cooldownMin = cooldownMinutes(params)
       return queryMany<Row>(
         `
         SELECT u.id
@@ -95,24 +93,24 @@ export function buildWinbackScenario(opts: {
             SELECT 1 FROM orders o
             WHERE o.user_id = u.id AND o.payment_status = 'paid'
             GROUP BY o.user_id
-            HAVING MAX(o.created_at) BETWEEN NOW() - ($3 || ' days')::interval AND NOW() - ($2 || ' days')::interval
+            HAVING MAX(o.created_at) BETWEEN NOW() - ($3 || ' minutes')::interval AND NOW() - ($2 || ' minutes')::interval
           )
           AND (ch.score IS NULL OR (ch.score >= $4 AND ch.score < $5))
           AND NOT EXISTS (
             SELECT 1 FROM email_campaigns_sent ecs
             WHERE ecs.campaign_kind = $1
               AND ecs.user_id = u.id
-              AND ecs.sent_at > NOW() - ($6 || ' days')::interval
+              AND ecs.sent_at > NOW() - ($6 || ' minutes')::interval
           )
         LIMIT $7
       `,
         [
           campaign.kind,
-          params.minDaysSinceOrder,
-          params.maxDaysSinceOrder,
+          String(minSinceMin),
+          String(maxSinceMin),
           params.healthScoreMin,
           params.healthScoreMax,
-          params.sendCooldownDays,
+          String(cooldownMin),
           params.maxRecipientsPerSweep,
         ]
       )

@@ -42,14 +42,13 @@ describe('abandonedCheckout scenario', () => {
   it('has defaultParams with expected values', () => {
     expect(defaultParams.minMinutesAfterCancel).toBe(15)
     expect(defaultParams.autoCancelMaxMinutes).toBe(15)
-    expect(defaultParams.sendCooldownDays).toBe(1)
     expect(defaultParams.maxRecipientsPerSweep).toBe(50)
   })
 
-  it('has a paramSchema', () => {
+  it('has a paramSchema with duration-typed time fields', () => {
     expect(abandonedCheckout.paramSchema).toBeDefined()
     expect(abandonedCheckout.paramSchema.minMinutesAfterCancel).toBeDefined()
-    expect(abandonedCheckout.paramSchema.sendCooldownDays).toBeDefined()
+    expect(abandonedCheckout.paramSchema.minMinutesAfterCancel.type).toBe('duration')
   })
 
   describe('findEligible', () => {

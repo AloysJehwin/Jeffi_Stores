@@ -6,7 +6,7 @@ import {
   renderItemRows,
 } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, hours, fromMinutes, readDurationParam } from '../duration'
+import { days, hours, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -86,7 +86,7 @@ export const viewedProduct: ScenarioModule<Params, Row> = {
   async findEligible({ campaign, params }) {
     const lookbackMin = readDurationParam(params, 'lookback') ?? days(14)
     const settleMin = readDurationParam(params, 'viewSettle') ?? hours(6)
-    const cooldownMin = readDurationParam(params, 'sendCooldown') ?? days(7)
+    const cooldownMin = cooldownMinutes(params)
 
     return queryMany<Row>(
       `
@@ -130,7 +130,7 @@ export const viewedProduct: ScenarioModule<Params, Row> = {
   async findSuppressed({ campaign, params }) {
     const lookbackMin = readDurationParam(params, 'lookback') ?? days(14)
     const settleMin = readDurationParam(params, 'viewSettle') ?? hours(6)
-    const cooldownMin = readDurationParam(params, 'sendCooldown') ?? days(7)
+    const cooldownMin = cooldownMinutes(params)
 
     const rows = await queryMany<{
       user_id: string
@@ -238,9 +238,7 @@ export const viewedProduct: ScenarioModule<Params, Row> = {
     })
 
     if (params.whatsappEnabled) {
-      const cooldownMin = readDurationParam(params, 'sendCooldown') ?? days(7)
-      const cooldownDays = Math.max(1, Math.round(fromMinutes(cooldownMin, 'days')))
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: primary.name }, cooldownDays).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: primary.name }, cooldownDays(params)).catch(() => {})
     }
     return emailResult
   },

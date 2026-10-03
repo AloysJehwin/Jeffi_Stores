@@ -1,11 +1,11 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { days, hours, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
   lookbackDays: number
-  sendCooldownDays: number
   maxRecipientsPerSweep: number
   maxItemsPerEmail: number
   secondEmailDelayHours: number
@@ -24,27 +24,20 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
   trigger:
     "Fires when a logged-in customer adds items to their cart, then leaves the cart untouched for at least the campaign's delay (in hours). Sends at most once per cooldown window per user. Skipped if cart is empty or if user opted out of marketing.",
   defaultParams: {
-    lookbackDays: 30,
-    sendCooldownDays: 7,
+    lookbackDays: days(30),
     maxRecipientsPerSweep: 50,
     maxItemsPerEmail: 5,
-    secondEmailDelayHours: 48,
+    secondEmailDelayHours: hours(48),
     whatsappEnabled: false,
   },
   paramSchema: {
     lookbackDays: {
-      type: 'integer',
-      min: 1,
-      max: 90,
-      label: 'Lookback (days)',
-      description: 'Only consider carts updated in the last N days',
-    },
-    sendCooldownDays: {
-      type: 'integer',
-      min: 1,
-      max: 30,
-      label: 'Per-user cooldown (days)',
-      description: 'Skip users sent this campaign within N days',
+      type: 'duration',
+      min: days(1),
+      max: days(90),
+      recommendedUnit: 'days',
+      label: 'Lookback',
+      description: 'Only consider carts updated within this window',
     },
     maxRecipientsPerSweep: {
       type: 'integer',
@@ -61,11 +54,12 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       description: 'Cap on cart items rendered in the email body',
     },
     secondEmailDelayHours: {
-      type: 'integer',
-      min: 24,
-      max: 168,
-      label: 'Second email delay (hours)',
-      description: 'Send follow-up email N hours after first email if cart still not checked out',
+      type: 'duration',
+      min: hours(24),
+      max: hours(168),
+      recommendedUnit: 'hours',
+      label: 'Second email delay',
+      description: 'Send follow-up email this long after first email if cart still not checked out',
     },
     whatsappEnabled: {
       type: 'boolean',
@@ -75,6 +69,9 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
   },
 
   async findEligible({ campaign, params }) {
+    const lookbackMin = readDurationParam(params, 'lookbackDays') ?? days(30)
+    const secondEmailDelayMin = readDurationParam(params, 'secondEmailDelayHours') ?? hours(48)
+    const cooldownMin = cooldownMinutes(params)
     // Sequence 1: users who haven't received ANY email in cooldown window
     // Sequence 2: users who received seq=1 but NOT seq=2, cart still active,
     //             and secondEmailDelayHours have passed since seq=1
@@ -86,7 +83,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE ci.saved_for_later = FALSE
         AND ci.updated_at < NOW() - ($2::text || ' hours')::interval
-        AND ci.updated_at > NOW() - ($3::text || ' days')::interval
+        AND ci.updated_at > NOW() - ($3::text || ' minutes')::interval
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
         AND u.marketing_opt_out = FALSE
@@ -95,11 +92,11 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
             AND ecs.user_id = ci.user_id
-            AND ecs.sent_at > NOW() - ($4::text || ' days')::interval
+            AND ecs.sent_at > NOW() - ($4::text || ' minutes')::interval
         )
       LIMIT $5
     `,
-      [campaign.kind, campaign.delay_hours, params.lookbackDays, params.sendCooldownDays, params.maxRecipientsPerSweep]
+      [campaign.kind, campaign.delay_hours, String(lookbackMin), String(cooldownMin), params.maxRecipientsPerSweep]
     )
 
     // Sequence 2: got seq=1, no seq=2 yet, secondEmailDelayHours passed, cart still active
@@ -113,10 +110,10 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       JOIN email_campaigns_sent ecs1 ON ecs1.user_id = ci.user_id
         AND ecs1.campaign_kind = $1
         AND (ecs1.metadata->>'sequence')::int = 1
-        AND ecs1.sent_at < NOW() - ($5::text || ' hours')::interval
-        AND ecs1.sent_at > NOW() - ($3::text || ' days')::interval
+        AND ecs1.sent_at < NOW() - ($5::text || ' minutes')::interval
+        AND ecs1.sent_at > NOW() - ($3::text || ' minutes')::interval
       WHERE ci.saved_for_later = FALSE
-        AND ci.updated_at > NOW() - ($2::text || ' days')::interval
+        AND ci.updated_at > NOW() - ($2::text || ' minutes')::interval
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
         AND u.marketing_opt_out = FALSE
@@ -139,10 +136,10 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     `,
       [
         campaign.kind,
-        params.lookbackDays,
-        params.sendCooldownDays,
+        String(lookbackMin),
+        String(cooldownMin),
         params.maxRecipientsPerSweep,
-        params.secondEmailDelayHours,
+        String(secondEmailDelayMin),
       ]
     )
 
@@ -153,6 +150,8 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
   },
 
   async findSuppressed({ campaign, params }) {
+    const lookbackMin = readDurationParam(params, 'lookbackDays') ?? days(30)
+    const cooldownMin = cooldownMinutes(params)
     const rows = await queryMany<{
       user_id: string
       reason: string
@@ -165,7 +164,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         FROM cart_items ci
         WHERE ci.saved_for_later = FALSE
           AND ci.updated_at < NOW() - ($2::text || ' hours')::interval
-          AND ci.updated_at > NOW() - ($3::text || ' days')::interval
+          AND ci.updated_at > NOW() - ($3::text || ' minutes')::interval
       )
       SELECT
         ec.user_id::text,
@@ -184,7 +183,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
           ELSE NULL
         END AS reason_detail,
         CASE
-          WHEN ecs.sent_at IS NOT NULL THEN (ecs.sent_at + ($4::text || ' days')::interval)::text
+          WHEN ecs.sent_at IS NOT NULL THEN (ecs.sent_at + ($4::text || ' minutes')::interval)::text
           ELSE NULL
         END AS blocked_until
       FROM eligible_carts ec
@@ -193,13 +192,13 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         SELECT sent_at FROM email_campaigns_sent
          WHERE campaign_kind = $1
            AND user_id = ec.user_id
-           AND sent_at > NOW() - ($4::text || ' days')::interval
+           AND sent_at > NOW() - ($4::text || ' minutes')::interval
          ORDER BY sent_at DESC LIMIT 1
       ) ecs ON TRUE
       WHERE u.is_active = FALSE OR u.is_guest = TRUE OR u.marketing_opt_out = TRUE OR ecs.sent_at IS NOT NULL
       LIMIT 200
     `,
-      [campaign.kind, campaign.delay_hours, params.lookbackDays, params.sendCooldownDays]
+      [campaign.kind, campaign.delay_hours, String(lookbackMin), String(cooldownMin)]
     )
     return rows.map(r => ({
       user_id: r.user_id,
@@ -273,7 +272,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       const names = items.map(i => i.name)
       const summary = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
       // Pass the cooldown so WhatsApp dedups per user within the window (stops the resend storm).
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, params.sendCooldownDays).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, cooldownDays(params)).catch(() => {})
     }
     return emailResult
   },
