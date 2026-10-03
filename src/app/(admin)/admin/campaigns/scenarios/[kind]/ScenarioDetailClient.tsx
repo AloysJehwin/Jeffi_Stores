@@ -5,14 +5,18 @@ import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
 import AdminSelect from '@/components/admin/AdminSelect'
+import DurationField from '@/components/admin/campaigns/DurationField'
+import type { DurationUnit } from '@/lib/campaigns/duration'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface ParamDef {
-  type: 'integer' | 'number' | 'boolean'
+  type: 'integer' | 'number' | 'boolean' | 'duration'
   label: string
   description?: string
   min?: number
   max?: number
+  recommendedUnit?: DurationUnit
+  allowedUnits?: DurationUnit[]
 }
 
 interface Scenario {
@@ -285,6 +289,16 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                                   { value: 'false', label: 'false' },
                                 ]}
                               />
+                            ) : def.type === 'duration' ? (
+                              <DurationField
+                                canonicalMinutes={typeof overrideVal === 'number' ? overrideVal : undefined}
+                                defaultMinutes={typeof defaultVal === 'number' ? defaultVal : undefined}
+                                recommendedUnit={def.recommendedUnit || 'days'}
+                                allowedUnits={def.allowedUnits}
+                                min={def.min}
+                                max={def.max}
+                                onChange={m => setOverrideValue(c.kind, key, m === undefined ? null : m)}
+                              />
                             ) : (
                               <input
                                 type="number"
@@ -308,7 +322,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                             {def.description && (
                               <p className="text-[10px] text-foreground-muted mt-1">{def.description}</p>
                             )}
-                            {(def.min !== undefined || def.max !== undefined) && (
+                            {def.type !== 'duration' && (def.min !== undefined || def.max !== undefined) && (
                               <p className="text-[10px] text-foreground-muted mt-0.5">
                                 Range: {def.min ?? '-∞'} to {def.max ?? '∞'}
                               </p>
