@@ -79,8 +79,10 @@ describe('GET /api/admin/campaigns', () => {
     vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryMany).mockResolvedValue([{ kind: 'welcome', name: 'Welcome', total_sent: 100 }] as any)
     vi.mocked(queryOne).mockResolvedValue({ total: '1' } as any)
-    // GET now seeds built-in campaign rows via query(); it must resolve a promise.
+    // GET now seeds built-in campaign rows via query(); it must resolve a promise, and the seeder
+    // validates each default template before insert.
     vi.mocked(query).mockResolvedValue(undefined as any)
+    vi.mocked(validateCampaignBodyTemplate).mockReturnValue({ ok: true } as any)
   })
 
   it('returns campaigns list with total', async () => {

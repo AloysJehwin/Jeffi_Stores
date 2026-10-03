@@ -1,5 +1,7 @@
 import { query } from '@/lib/shared/db'
 import { listScenarios } from './scenarios/_registry'
+import { getBuiltinTemplate } from './default-templates'
+import { validateCampaignBodyTemplate } from './template-validation'
 
 // The /admin/campaigns list renders rows from the `campaigns` table, but built-in scenarios live in the
 // code registry. This upserts a `scenarios` registry row (campaigns.scenario_kind FKs to it) and then a
@@ -28,13 +30,21 @@ export async function ensureBuiltinCampaignRows(): Promise<void> {
     scenParams
   ).catch(() => null)
 
-  // 2. a disabled campaign row per scenario.
+  // 2. a disabled campaign row per scenario, with its rich default template (images + coupon where
+  //    relevant). Fall back to a minimal valid body for any kind without a BUILTIN_TEMPLATES entry.
   const values: string[] = []
   const params: unknown[] = []
   let i = 1
   for (const s of scenarios) {
-    const subject = `${s.name} — a note for {firstName}`
-    const body = `<p>Hi {firstName},</p><p>${s.description || s.name}</p>`
+    const tpl = getBuiltinTemplate(s.kind)
+    let subject = tpl?.subject || `${s.name} — a note for {firstName}`
+    let body = tpl?.body || `<p>Hi {firstName},</p><p>${s.description || s.name}</p>`
+    // Guard: if a template's tokens don't satisfy this kind's validation, fall back to a safe body so the
+    // seed can never insert an invalid template.
+    if (!validateCampaignBodyTemplate(body, { kind: s.kind, scenarioKind: s.kind }).ok) {
+      subject = `${s.name} — a note for {firstName}`
+      body = `<p style="font-size:16px;color:#333;margin:0 0 12px;">Hi {firstName},</p><p style="color:#555;line-height:1.6;">${s.description || s.name}</p><p style="margin:20px 0 0;"><a href="{ctaUrl}">Visit the store</a></p>`
+    }
     values.push(`($${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, false)`)
     params.push(s.kind, s.name, s.description || null, s.kind, subject, body)
   }
