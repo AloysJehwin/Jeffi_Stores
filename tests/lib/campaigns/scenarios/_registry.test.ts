@@ -14,7 +14,7 @@ vi.mock('@/lib/shared/automation-emails', () => ({
 import { SCENARIOS, getScenario, listScenarios } from '@/lib/campaigns/scenarios/_registry'
 
 describe('_registry', () => {
-  it('SCENARIOS contains all 9 expected scenario kinds', () => {
+  it('SCENARIOS contains all 10 expected scenario kinds', () => {
     const kinds = Object.keys(SCENARIOS)
     expect(kinds).toContain('abandoned_cart')
     expect(kinds).toContain('abandoned_checkout')
@@ -25,7 +25,8 @@ describe('_registry', () => {
     expect(kinds).toContain('winback_180')
     expect(kinds).toContain('restock')
     expect(kinds).toContain('price_drop')
-    expect(kinds).toHaveLength(9)
+    expect(kinds).toContain('viewed_product')
+    expect(kinds).toHaveLength(10)
   })
 
   it('each scenario has the required shape', () => {
@@ -59,7 +60,7 @@ describe('_registry', () => {
     it('returns an array of all scenario modules', () => {
       const list = listScenarios()
       expect(Array.isArray(list)).toBe(true)
-      expect(list).toHaveLength(9)
+      expect(list).toHaveLength(10)
     })
 
     it('each item in list is a valid scenario module', () => {
