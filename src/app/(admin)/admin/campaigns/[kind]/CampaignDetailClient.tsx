@@ -7,6 +7,8 @@ import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { MessageCircle, ChevronDown } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
+import DurationField from '@/components/admin/campaigns/DurationField'
+import type { DurationUnit } from '@/lib/campaigns/duration'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 
 // Collapsible card used for the recipient/predicted/history sections — collapsed by default so the
@@ -90,11 +92,13 @@ interface Campaign {
 }
 
 interface ParamDef {
-  type: 'integer' | 'float' | 'boolean'
+  type: 'integer' | 'float' | 'number' | 'boolean' | 'duration'
   min?: number
   max?: number
   label: string
   description?: string
+  recommendedUnit?: DurationUnit
+  allowedUnits?: DurationUnit[]
 }
 
 interface ScenarioOption {
@@ -871,6 +875,21 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                             { value: 'false', label: 'false' },
                           ]}
                         />
+                      ) : def.type === 'duration' ? (
+                        <DurationField
+                          canonicalMinutes={typeof overrideVal === 'number' ? overrideVal : undefined}
+                          defaultMinutes={typeof defaultVal === 'number' ? defaultVal : undefined}
+                          recommendedUnit={(def as any).recommendedUnit}
+                          allowedUnits={(def as any).allowedUnits}
+                          min={def.min}
+                          max={def.max}
+                          onChange={m => {
+                            const next = { ...form.parameters }
+                            if (m === undefined) delete next[key]
+                            else next[key] = m
+                            setForm({ ...form, parameters: next })
+                          }}
+                        />
                       ) : (
                         <input
                           type="number"
@@ -895,7 +914,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                         />
                       )}
                       {def.description && <p className="text-[10px] text-foreground-muted mt-1">{def.description}</p>}
-                      {(def.min !== undefined || def.max !== undefined) && (
+                      {def.type !== 'duration' && (def.min !== undefined || def.max !== undefined) && (
                         <p className="text-[10px] text-foreground-muted mt-0.5">
                           Range: {def.min ?? '-∞'} to {def.max ?? '∞'}
                         </p>
