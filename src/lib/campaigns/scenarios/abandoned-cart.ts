@@ -272,7 +272,8 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     if ((params as any).whatsappEnabled) {
       const names = items.map(i => i.name)
       const summary = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }).catch(() => {})
+      // Pass the cooldown so WhatsApp dedups per user within the window (stops the resend storm).
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, params.sendCooldownDays).catch(() => {})
     }
     return emailResult
   },

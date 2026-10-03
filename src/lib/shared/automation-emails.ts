@@ -25,6 +25,13 @@ interface UserContext {
   baseUrl: string
 }
 
+// The campaign's send cooldown in days, read from its JSONB parameters (not on the Campaign type).
+// Used to window the per-reference "already sent" check so recurring campaigns resend each cycle.
+function campaignCooldownDays(campaign: Campaign): number | null {
+  const v = (campaign as unknown as { parameters?: { sendCooldownDays?: unknown } }).parameters?.sendCooldownDays
+  return typeof v === 'number' && v > 0 ? v : null
+}
+
 export async function sendCampaignEmail(params: {
   campaign: Campaign
   user: UserContext
@@ -37,7 +44,10 @@ export async function sendCampaignEmail(params: {
   const eligibility = await canSendMarketing(user.id, campaign.kind as CampaignKind)
   if (!eligibility.ok) return { ok: false, reason: eligibility.reason }
 
-  if (await alreadySentForReference(campaign.kind as CampaignKind, user.id, referenceId)) {
+  // Honor the campaign's cooldown for keyed references so a recurring campaign resends after the
+  // window instead of being blocked forever (abandoned_cart day-2 was never sending). (#campaign)
+  const cooldownDays = campaignCooldownDays(campaign)
+  if (await alreadySentForReference(campaign.kind as CampaignKind, user.id, referenceId, cooldownDays)) {
     return { ok: false, reason: 'already_sent' }
   }
 
@@ -93,7 +103,8 @@ export async function sendCampaignEmailRendered(params: {
   const eligibility = await canSendMarketing(user.id, campaign.kind as CampaignKind)
   if (!eligibility.ok) return { ok: false, reason: eligibility.reason }
 
-  if (await alreadySentForReference(campaign.kind as CampaignKind, user.id, referenceId)) {
+  const cooldownDays = campaignCooldownDays(campaign)
+  if (await alreadySentForReference(campaign.kind as CampaignKind, user.id, referenceId, cooldownDays)) {
     return { ok: false, reason: 'already_sent' }
   }
 

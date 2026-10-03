@@ -53,6 +53,51 @@ async function sendSMS(to: string | null | undefined, body: string, kind: string
   }
 }
 
+// Marketing/campaign SMS — paired with the WhatsApp send so a campaign targeting a mobile reaches
+// the customer on BOTH channels. Tagged with the campaign entity so the campaign detail page can
+// show a per-campaign SMS log. Best-effort; shares the campaign's dedup with the WhatsApp send.
+export async function sendCampaignSMS(params: {
+  phone?: string | null
+  body: string
+  kind: string
+  userId?: string | null
+}): Promise<boolean> {
+  const normalized = normalizePhone(params.phone)
+  if (!normalized || DISABLED) return false
+  const client = getClient()
+  if (!client) return false
+  try {
+    const msg = await client.messages.create({ from: FROM_NUMBER, to: normalized, body: params.body })
+    logMessage({
+      channel: 'sms',
+      to: normalized,
+      from: FROM_NUMBER,
+      body: params.body,
+      kind: params.kind,
+      status: 'sent',
+      providerSid: msg.sid,
+      userId: params.userId ?? null,
+      entityType: 'campaign',
+      entityId: params.kind,
+    })
+    return true
+  } catch (err: any) {
+    logMessage({
+      channel: 'sms',
+      to: normalized,
+      from: FROM_NUMBER,
+      body: params.body,
+      kind: params.kind,
+      status: 'failed',
+      error: err?.message,
+      userId: params.userId ?? null,
+      entityType: 'campaign',
+      entityId: params.kind,
+    })
+    return false
+  }
+}
+
 // ── Notification templates ────────────────────────────────────────────────────
 
 export async function sendOrderConfirmedSMS(params: {

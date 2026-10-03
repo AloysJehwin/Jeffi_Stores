@@ -3,25 +3,31 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
-vi.mock('@/lib/shared/marketing', () => ({ canSendMarketing: vi.fn() }))
+vi.mock('@/lib/shared/marketing', () => ({
+  canSendMarketing: vi.fn(),
+  alreadySentForReference: vi.fn().mockResolvedValue(false),
+  recordSent: vi.fn().mockResolvedValue('sent-1'),
+}))
 vi.mock('@/lib/shared/whatsapp', () => ({
   sendAbandonedCartWhatsApp: vi.fn(),
   sendBackInStockWhatsApp: vi.fn(),
   sendPromoOfferWhatsApp: vi.fn(),
   sendFeedbackRequestWhatsApp: vi.fn(),
 }))
+vi.mock('@/lib/shared/sms', () => ({ sendCampaignSMS: vi.fn().mockResolvedValue(true) }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { sendCampaignWhatsApp, campaignSupportsWhatsApp, CAMPAIGN_WA_KINDS } from '@/lib/campaigns/whatsapp-dispatch'
 import { queryOne } from '@/lib/shared/db'
-import { canSendMarketing } from '@/lib/shared/marketing'
+import { canSendMarketing, alreadySentForReference, recordSent } from '@/lib/shared/marketing'
 import {
   sendAbandonedCartWhatsApp,
   sendBackInStockWhatsApp,
   sendPromoOfferWhatsApp,
   sendFeedbackRequestWhatsApp,
 } from '@/lib/shared/whatsapp'
+import { sendCampaignSMS } from '@/lib/shared/sms'
 
 const mockQueryOne = vi.mocked(queryOne)
 const mockCanSend = vi.mocked(canSendMarketing)
@@ -29,15 +35,21 @@ const mockAbandonedCart = vi.mocked(sendAbandonedCartWhatsApp)
 const mockBackInStock = vi.mocked(sendBackInStockWhatsApp)
 const mockPromoOffer = vi.mocked(sendPromoOfferWhatsApp)
 const mockFeedback = vi.mocked(sendFeedbackRequestWhatsApp)
+const mockAlreadySent = vi.mocked(alreadySentForReference)
+const mockRecordSent = vi.mocked(recordSent)
+const mockSendSMS = vi.mocked(sendCampaignSMS)
 
-// Default happy-path setup: phone on file + marketing allowed + sender succeeds.
+// Default happy-path setup: phone on file + marketing allowed + not in cooldown + sender succeeds.
 function allowAndSend() {
   mockQueryOne.mockResolvedValue({ phone: '+919876543210' } as any)
   mockCanSend.mockResolvedValue({ ok: true } as any)
+  mockAlreadySent.mockResolvedValue(false)
+  mockRecordSent.mockResolvedValue('sent-1')
   mockAbandonedCart.mockResolvedValue(true)
   mockBackInStock.mockResolvedValue(true)
   mockPromoOffer.mockResolvedValue(true)
   mockFeedback.mockResolvedValue(true)
+  mockSendSMS.mockResolvedValue(true)
 }
 
 beforeEach(() => {
@@ -207,5 +219,43 @@ describe('sendCampaignWhatsApp missing vars', () => {
     mockAbandonedCart.mockResolvedValue(false)
     const result = await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt' })
     expect(result).toEqual({ ok: false, reason: 'send_failed' })
+  })
+
+  // #campaign over-send: a per-user cooldown dedup stops the resend storm (55k msgs for ~155 carts).
+  describe('cooldown dedup', () => {
+    it('refuses to resend when already sent within the window', async () => {
+      allowAndSend()
+      mockAlreadySent.mockResolvedValue(true)
+      const result = await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt' }, 1)
+      expect(result).toEqual({ ok: false, reason: 'cooldown' })
+      expect(mockAbandonedCart).not.toHaveBeenCalled() // never dispatched
+      expect(mockSendSMS).not.toHaveBeenCalled()
+    })
+
+    it('records the send BEFORE dispatching (crash cannot cause a resend storm)', async () => {
+      allowAndSend()
+      await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt' }, 1)
+      expect(mockRecordSent).toHaveBeenCalledWith(
+        expect.objectContaining({ campaignKind: 'abandoned_cart', userId: 'user-1', referenceId: 'wa:abandoned_cart' })
+      )
+    })
+
+    it('defaults to a 1-day window when no cooldown is passed (never unbounded)', async () => {
+      allowAndSend()
+      await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt' })
+      // alreadySentForReference called with a positive window, not undefined/0.
+      const call = mockAlreadySent.mock.calls.at(-1)!
+      expect(call[3]).toBe(1)
+    })
+  })
+
+  // #campaign SMS+WhatsApp together: a mobile target gets BOTH channels under one dedup.
+  it('also sends an SMS alongside WhatsApp (both channels on one send)', async () => {
+    allowAndSend()
+    await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt, Nut' }, 1)
+    expect(mockAbandonedCart).toHaveBeenCalled()
+    expect(mockSendSMS).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: '+919876543210', kind: 'abandoned_cart', userId: 'user-1' })
+    )
   })
 })

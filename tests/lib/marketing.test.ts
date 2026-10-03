@@ -259,12 +259,22 @@ describe('alreadySentForReference', () => {
     expect(sql).toContain('sent_at')
   })
 
-  it('does not add time filter when referenceId is non-null', async () => {
+  it('does not add a time filter for a non-null reference when NO cooldown is given (one-shot)', async () => {
     mockQueryOne.mockResolvedValue(null)
     await alreadySentForReference('abandoned_cart', 'user-2', 'ref-abc')
     const [sql] = mockQueryOne.mock.calls[0]
-    // No extra time filter — the timeFilter string is empty
+    // No extra time filter — the timeFilter string is empty (blocks forever for one-shot refs)
     expect(sql).not.toContain('sent_at > NOW()')
+  })
+
+  // #campaign: a recurring campaign passes its cooldown so the SAME reference re-qualifies after the
+  // window — fixing abandoned_cart day-2 never sending.
+  it('windows a non-null reference by cooldownDays when provided (recurring resend)', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    await alreadySentForReference('abandoned_cart', 'user-2', 'seq1', 1)
+    const [sql] = mockQueryOne.mock.calls[0]
+    expect(sql).toContain('days')
+    expect(sql).toContain('sent_at > NOW()')
   })
 })
 
