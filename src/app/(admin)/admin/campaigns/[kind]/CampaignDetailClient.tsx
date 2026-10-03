@@ -5,9 +5,54 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, ChevronDown } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
+
+// Collapsible card used for the recipient/predicted/history sections — collapsed by default so the
+// page isn't a wall of long lists; the admin expands the one they need.
+function CollapsibleCard({
+  title,
+  subtitle,
+  count,
+  defaultOpen = false,
+  icon,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  count?: number
+  defaultOpen?: boolean
+  icon?: React.ReactNode
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="w-full px-5 py-3 border-b border-border-default flex items-center justify-between gap-2 text-left hover:bg-surface-secondary/40 transition-colors"
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          {icon}
+          <span className="min-w-0">
+            <span className="text-sm font-semibold text-foreground">
+              {title}
+              {typeof count === 'number' ? ` (${count})` : ''}
+            </span>
+            {subtitle ? <span className="block text-[11px] text-foreground-muted mt-0.5">{subtitle}</span> : null}
+          </span>
+        </span>
+        <ChevronDown
+          className={`w-4 h-4 text-foreground-muted shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open ? children : null}
+    </div>
+  )
+}
 
 interface EligibleRecipient {
   reference_id: string
@@ -150,6 +195,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [sendsOffset, setSendsOffset] = useState(0)
   const [sendsTotal, setSendsTotal] = useState(0)
   const SENDS_LIMIT = 20
+  // WhatsApp log is paginated client-side (the API returns the recent batch) — Next reloads only
+  // this component, never the page.
+  const [waPage, setWaPage] = useState(0)
+  const WA_LIMIT = 10
   const [eligible, setEligible] = useState<EligibleRecipient[] | null>(null)
   const [eligibleTotal, setEligibleTotal] = useState(0)
   const [suppressed, setSuppressed] = useState<SuppressedRecipient[] | null>(null)
@@ -207,6 +256,25 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Paginate the Recent-sends list WITHOUT reloading the whole page: fetch only the sends slice and
+  // update just that component's state (previously called load() which refetched campaign + coupons
+  // + scenarios + both logs — the "whole page reloads on Next" bug).
+  const [sendsLoading, setSendsLoading] = useState(false)
+  async function loadSendsPage(o: number) {
+    setSendsOffset(o)
+    setSendsLoading(true)
+    try {
+      const res = await fetch(`/api/admin/campaigns/${kind}?offset=${o}`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setRecentSends(data.recentSends || [])
+        setSendsTotal(data.total || 0)
+      }
+    } finally {
+      setSendsLoading(false)
     }
   }
 
@@ -680,7 +748,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                 type="button"
                 onClick={save}
                 disabled={saving}
-                className="h-10 inline-flex items-center justify-center px-4 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                className="h-10 ml-auto inline-flex items-center justify-center px-4 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
               >
                 {saving ? 'Saving…' : 'Save Draft'}
               </button>
@@ -692,7 +760,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Preview</h3>
           {tplWarning && (
             <div className="mb-3 p-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
-              <span className="font-semibold">⚠</span>
+              <span className="font-semibold">Warning:</span>
               <span>{tplWarning}</span>
             </div>
           )}
@@ -905,13 +973,11 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       </div>
 
       {suppressed && suppressed.length > 0 && (
-        <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-          <div className="px-5 py-3 border-b border-border-default">
-            <h3 className="text-sm font-semibold text-foreground">Suppressed ({suppressedTotal})</h3>
-            <p className="text-[11px] text-foreground-muted mt-0.5">
-              Customers who would otherwise qualify but are blocked from receiving this campaign right now.
-            </p>
-          </div>
+        <CollapsibleCard
+          title="Suppressed"
+          count={suppressedTotal}
+          subtitle="Customers who would otherwise qualify but are blocked from receiving this campaign right now."
+        >
           <div className="divide-y divide-border-default max-h-96 overflow-y-auto">
             {suppressed.map((r, i) => {
               const reasonColor =
@@ -954,142 +1020,164 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               )
             })}
           </div>
-        </div>
+        </CollapsibleCard>
       )}
 
-      <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-        <div className="px-5 py-3 border-b border-border-default">
-          <h3 className="text-sm font-semibold text-foreground">Recent sends ({sendsTotal})</h3>
-        </div>
-        {recentSends.length === 0 ? (
-          <p className="p-8 text-sm text-foreground-muted text-center">No sends yet</p>
-        ) : (
-          <>
-            <div className="grid grid-cols-[1fr_140px_80px_80px] px-5 py-2 border-b border-border-default bg-surface-secondary/40">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Customer</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Sent at</span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-center">
-                Total sends
-              </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-right">
-                Status
-              </span>
-            </div>
-            <div className="divide-y divide-border-default">
-              {recentSends.map(s => {
-                const st = status(s)
-                return (
-                  <div
-                    key={s.id}
-                    className="grid grid-cols-[1fr_140px_80px_80px] items-center px-5 py-3 hover:bg-surface-secondary/50"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm text-foreground truncate">{s.user_name || s.user_email}</p>
-                      <p className="text-[10px] text-foreground-muted truncate">{s.user_email}</p>
-                    </div>
-                    <p className="text-xs text-foreground-muted">
-                      {new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                    </p>
-                    <p className="text-sm font-semibold text-foreground text-center">{Number(s.send_count)}</p>
-                    <div className="flex justify-end">
-                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>
-                        {st.label}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            {sendsTotal > SENDS_LIMIT && (
-              <div className="px-5 py-3 border-t border-border-default flex items-center justify-between text-sm text-foreground-muted">
-                <span>
-                  Showing {sendsOffset + 1}–{Math.min(sendsOffset + SENDS_LIMIT, sendsTotal)} of {sendsTotal}
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    disabled={sendsOffset === 0}
-                    onClick={() => {
-                      const o = sendsOffset - SENDS_LIMIT
-                      setSendsOffset(o)
-                      load(o)
-                    }}
-                    className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    disabled={sendsOffset + SENDS_LIMIT >= sendsTotal}
-                    onClick={() => {
-                      const o = sendsOffset + SENDS_LIMIT
-                      setSendsOffset(o)
-                      load(o)
-                    }}
-                    className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {campaignSupportsWhatsApp(kind) && (
-        <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-          <div className="px-5 py-3 border-b border-border-default flex items-center gap-2">
-            <MessageCircle className="w-4 h-4 text-foreground-muted" />
-            <h3 className="text-sm font-semibold text-foreground">WhatsApp Log ({whatsappLogs.length})</h3>
-          </div>
-          {whatsappLogs.length === 0 ? (
-            <p className="p-8 text-sm text-foreground-muted text-center">No WhatsApp messages sent yet.</p>
+      {/* Mail (Recent sends) + WhatsApp history side-by-side on wide screens; stacked on mobile.
+          Both collapsed by default with their own per-component pagination. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <CollapsibleCard title="Recent sends" count={sendsTotal}>
+          {recentSends.length === 0 ? (
+            <p className="p-8 text-sm text-foreground-muted text-center">No sends yet</p>
           ) : (
-            <>
-              <div className="grid grid-cols-[140px_1fr_140px_80px] px-5 py-2 border-b border-border-default bg-surface-secondary/40">
+            <div className={sendsLoading ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
+              <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-5 py-2 border-b border-border-default bg-surface-secondary/40">
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
-                  Recipient
+                  Customer
                 </span>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Message</span>
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Sent at</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-center">
+                  Sends
+                </span>
                 <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-right">
                   Status
                 </span>
               </div>
               <div className="divide-y divide-border-default">
-                {whatsappLogs.map((w, i) => {
-                  const sent = w.status === 'sent'
+                {recentSends.map(s => {
+                  const st = status(s)
                   return (
                     <div
-                      key={`${w.to_number}-${w.sent_at}-${i}`}
-                      className="grid grid-cols-[140px_1fr_140px_80px] items-center px-5 py-3 hover:bg-surface-secondary/50"
+                      key={s.id}
+                      className="grid grid-cols-[1fr_auto_auto] gap-3 items-center px-5 py-3 hover:bg-surface-secondary/50"
                     >
-                      <p className="text-xs font-mono text-foreground truncate">{maskNumber(w.to_number)}</p>
-                      <p className="text-xs text-foreground-muted truncate" title={w.body}>
-                        {w.body}
-                      </p>
-                      <p className="text-xs text-foreground-muted">
-                        {new Date(w.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                      </p>
+                      <div className="min-w-0">
+                        <p className="text-sm text-foreground truncate">{s.user_name || s.user_email}</p>
+                        <p className="text-[10px] text-foreground-muted truncate">
+                          {s.user_email}
+                          {' · '}
+                          {new Date(s.sent_at).toLocaleDateString('en-IN', { dateStyle: 'medium' })}
+                        </p>
+                      </div>
+                      <p className="text-sm font-semibold text-foreground text-center">{Number(s.send_count)}</p>
                       <div className="flex justify-end">
-                        <span
-                          className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
-                            sent
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                              : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-                          }`}
-                          title={!sent && w.error ? w.error : undefined}
-                        >
-                          {sent ? '✓ Sent' : '✕ Failed'}
+                        <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>
+                          {st.label}
                         </span>
                       </div>
                     </div>
                   )
                 })}
               </div>
-            </>
+              {sendsTotal > SENDS_LIMIT && (
+                <div className="px-5 py-3 border-t border-border-default flex items-center justify-between text-xs text-foreground-muted">
+                  <span>
+                    {sendsOffset + 1}–{Math.min(sendsOffset + SENDS_LIMIT, sendsTotal)} of {sendsTotal}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={sendsOffset === 0 || sendsLoading}
+                      onClick={() => loadSendsPage(Math.max(0, sendsOffset - SENDS_LIMIT))}
+                      className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      disabled={sendsOffset + SENDS_LIMIT >= sendsTotal || sendsLoading}
+                      onClick={() => loadSendsPage(sendsOffset + SENDS_LIMIT)}
+                      className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
-        </div>
-      )}
+        </CollapsibleCard>
+
+        {campaignSupportsWhatsApp(kind) && (
+          <CollapsibleCard
+            title="WhatsApp Log"
+            count={whatsappLogs.length}
+            icon={<MessageCircle className="w-4 h-4 text-foreground-muted" />}
+          >
+            {whatsappLogs.length === 0 ? (
+              <p className="p-8 text-sm text-foreground-muted text-center">No WhatsApp messages sent yet.</p>
+            ) : (
+              <>
+                <div className="grid grid-cols-[120px_1fr_auto] gap-3 px-5 py-2 border-b border-border-default bg-surface-secondary/40">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
+                    Recipient
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">
+                    Message
+                  </span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-right">
+                    Status
+                  </span>
+                </div>
+                <div className="divide-y divide-border-default">
+                  {whatsappLogs.slice(waPage * WA_LIMIT, waPage * WA_LIMIT + WA_LIMIT).map((w, i) => {
+                    const sent = w.status === 'sent'
+                    return (
+                      <div
+                        key={`${w.to_number}-${w.sent_at}-${i}`}
+                        className="grid grid-cols-[120px_1fr_auto] gap-3 items-center px-5 py-3 hover:bg-surface-secondary/50"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-mono text-foreground truncate">{maskNumber(w.to_number)}</p>
+                          <p className="text-[10px] text-foreground-muted">
+                            {new Date(w.sent_at).toLocaleDateString('en-IN', { dateStyle: 'medium' })}
+                          </p>
+                        </div>
+                        <p className="text-xs text-foreground-muted truncate" title={w.body}>
+                          {w.body}
+                        </p>
+                        <div className="flex justify-end">
+                          <span
+                            className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                              sent
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                                : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                            }`}
+                            title={!sent && w.error ? w.error : undefined}
+                          >
+                            {sent ? 'Sent' : 'Failed'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+                {whatsappLogs.length > WA_LIMIT && (
+                  <div className="px-5 py-3 border-t border-border-default flex items-center justify-between text-xs text-foreground-muted">
+                    <span>
+                      {waPage * WA_LIMIT + 1}–{Math.min(waPage * WA_LIMIT + WA_LIMIT, whatsappLogs.length)} of{' '}
+                      {whatsappLogs.length}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        disabled={waPage === 0}
+                        onClick={() => setWaPage(p => Math.max(0, p - 1))}
+                        className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        disabled={(waPage + 1) * WA_LIMIT >= whatsappLogs.length}
+                        onClick={() => setWaPage(p => p + 1)}
+                        className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CollapsibleCard>
+        )}
+      </div>
     </div>
   )
 }
