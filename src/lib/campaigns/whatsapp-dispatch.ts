@@ -1,5 +1,5 @@
 import { queryOne } from '@/lib/shared/db'
-import { canSendMarketing } from '@/lib/shared/marketing'
+import { canSendMarketing, alreadySentForReference, recordSent } from '@/lib/shared/marketing'
 import type { CampaignKind } from '@/lib/shared/marketing'
 import { CAMPAIGN_WA_KINDS, campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import {
@@ -68,7 +68,11 @@ async function dispatch(
 export async function sendCampaignWhatsApp(
   kind: string,
   userId: string,
-  vars: CampaignWaVars
+  vars: CampaignWaVars,
+  // Per-user cooldown (days). Without this, the campaign re-sent WhatsApp every cron run to every
+  // still-eligible user — 55k messages / 192-per-number-per-day for ~155 carts. The WhatsApp send
+  // now records its own dedup marker and refuses to resend within the window. (#campaign over-send)
+  cooldownDays?: number | null
 ): Promise<CampaignWaResult> {
   try {
     if (!campaignSupportsWhatsApp(kind)) return { ok: false, reason: 'unsupported_kind' }
@@ -80,9 +84,53 @@ export async function sendCampaignWhatsApp(
     const gate = await canSendMarketing(userId, kind as CampaignKind)
     if (!gate.ok) return { ok: false, reason: gate.reason || 'opted_out' }
 
+    // Dedup the WhatsApp send independently of email: a 'wa:<kind>' reference in email_campaigns_sent,
+    // windowed by the campaign cooldown. Default to 1 day when unknown so a bug can never fan out
+    // unbounded again. Record BEFORE sending so a crash mid-send can't cause a resend storm.
+    const waRef = `wa:${kind}`
+    const window = typeof cooldownDays === 'number' && cooldownDays > 0 ? cooldownDays : 1
+    if (await alreadySentForReference(kind as CampaignKind, userId, waRef, window)) {
+      return { ok: false, reason: 'cooldown' }
+    }
+    await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: waRef }).catch(() => null)
+
     const ok = await dispatch(kind, user.phone, vars, { entityType: 'campaign', entityId: kind })
+
+    // Mobile = both channels: fire a plain-text SMS alongside WhatsApp so a customer reached on
+    // mobile gets it even if WhatsApp isn't delivered. Shares the one dedup above (no extra gate),
+    // best-effort. (#campaign SMS+WhatsApp together)
+    const smsBody = campaignSmsBody(kind, vars)
+    if (smsBody) {
+      const { sendCampaignSMS } = await import('@/lib/shared/sms')
+      sendCampaignSMS({ phone: user.phone, body: smsBody, kind, userId }).catch(() => {})
+    }
+
     return { ok, reason: ok ? undefined : 'send_failed' }
   } catch {
     return { ok: false, reason: 'error' }
+  }
+}
+
+// A short SMS line per campaign kind, built from the same vars as the WhatsApp template. Returns ''
+// to skip SMS for kinds without a sensible short form.
+function campaignSmsBody(kind: string, vars: CampaignWaVars): string {
+  switch (kind) {
+    case 'abandoned_cart':
+    case 'abandoned_checkout':
+      return vars.items ? `You left ${vars.items} in your cart. Complete your order before it's gone.` : ''
+    case 'restock':
+      return vars.product ? `${vars.product} is back in stock. Grab it before it sells out.` : ''
+    case 'winback_90':
+    case 'winback_180':
+    case 'price_drop':
+      return vars.code
+        ? `${vars.headline || 'A special offer for you'} — use code ${vars.code}${vars.discount ? ` for ${vars.discount}` : ''}.`
+        : vars.headline || ''
+    case 'review_request':
+    case 'review_reminder':
+    case 'post_purchase':
+      return vars.orderNumber && vars.url ? `How was order ${vars.orderNumber}? Share a quick review: ${vars.url}` : ''
+    default:
+      return ''
   }
 }
