@@ -1,9 +1,19 @@
 import type { Campaign, CampaignKind } from '@/lib/shared/marketing'
+import type { DurationUnit } from './duration'
 
 export type ParamDef =
   | { type: 'integer'; min?: number; max?: number; label: string; description?: string }
   | { type: 'number'; min?: number; max?: number; label: string; description?: string }
   | { type: 'boolean'; label: string; description?: string }
+  | {
+      type: 'duration'
+      min?: number
+      max?: number
+      label: string
+      description?: string
+      recommendedUnit: DurationUnit
+      allowedUnits?: DurationUnit[]
+    }
 
 export type ParamSchema<P> = { [K in keyof P]: ParamDef }
 
