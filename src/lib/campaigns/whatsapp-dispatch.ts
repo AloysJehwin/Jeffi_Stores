@@ -40,6 +40,7 @@ async function dispatch(
   switch (kind) {
     case 'abandoned_cart':
     case 'abandoned_checkout':
+    case 'viewed_product':
       if (!vars.items) return false
       return sendAbandonedCartWhatsApp({ phone, items: vars.items, entity })
     case 'restock':
@@ -118,6 +119,8 @@ function campaignSmsBody(kind: string, vars: CampaignWaVars): string {
     case 'abandoned_cart':
     case 'abandoned_checkout':
       return vars.items ? `You left ${vars.items} in your cart. Complete your order before it's gone.` : ''
+    case 'viewed_product':
+      return vars.items ? `Still thinking about ${vars.items}? Take another look before it's gone.` : ''
     case 'restock':
       return vars.product ? `${vars.product} is back in stock. Grab it before it sells out.` : ''
     case 'winback_90':

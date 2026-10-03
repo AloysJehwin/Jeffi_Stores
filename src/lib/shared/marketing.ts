@@ -10,6 +10,7 @@ export type CampaignKind =
   | 'winback_180'
   | 'restock'
   | 'price_drop'
+  | 'viewed_product'
   | string
 
 export interface Campaign {

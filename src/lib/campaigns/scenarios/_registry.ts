@@ -8,6 +8,7 @@ import { winback90 } from './winback-90'
 import { winback180 } from './winback-180'
 import { restock } from './restock'
 import { priceDrop } from './price-drop'
+import { viewedProduct } from './viewed-product'
 
 export const SCENARIOS: Record<string, AnyScenarioModule> = {
   [abandonedCart.kind]: abandonedCart as unknown as AnyScenarioModule,
@@ -19,6 +20,7 @@ export const SCENARIOS: Record<string, AnyScenarioModule> = {
   [winback180.kind]: winback180 as unknown as AnyScenarioModule,
   [restock.kind]: restock as unknown as AnyScenarioModule,
   [priceDrop.kind]: priceDrop as unknown as AnyScenarioModule,
+  [viewedProduct.kind]: viewedProduct as unknown as AnyScenarioModule,
 }
 
 export function getScenario(kind: string): AnyScenarioModule | null {

@@ -9,6 +9,7 @@ export const CAMPAIGN_WA_KINDS = [
   'winback_90',
   'winback_180',
   'price_drop',
+  'viewed_product',
   'review_request',
   'review_reminder',
   'post_purchase',
