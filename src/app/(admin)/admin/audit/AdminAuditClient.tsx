@@ -736,7 +736,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
         <h1 className="text-xl font-bold text-foreground">Admin Audit Log</h1>
       </div>
 
-      <div className="flex items-center gap-1 border-b border-border-default mb-5">
+      <div className="flex items-center gap-1 border-b border-border-default mb-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {[
           { id: 'audit' as const, label: 'Audit Events', icon: ScrollText, show: true },
           { id: 'mail_log' as const, label: 'Mail Log', icon: Mail, show: true },
@@ -751,7 +751,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               key={id}
               type="button"
               onClick={() => setPageTab(id)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors -mb-px ${
+              className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors -mb-px ${
                 pageTab === id
                   ? 'text-accent-600 dark:text-accent-400 border-accent-500'
                   : 'text-foreground-muted hover:text-foreground border-transparent'
