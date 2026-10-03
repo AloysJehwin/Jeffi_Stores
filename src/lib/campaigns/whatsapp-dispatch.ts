@@ -41,14 +41,28 @@ async function dispatch(
     case 'abandoned_cart':
     case 'abandoned_checkout':
     case 'viewed_product':
+    case 'viewed_category':
+    case 'high_value_cart':
+    case 'cart_price_drop':
+    case 'wishlist_reminder':
+    case 'replenishment':
+    case 'subscription_renewal':
       if (!vars.items) return false
       return sendAbandonedCartWhatsApp({ phone, items: vars.items, entity })
     case 'restock':
+    case 'review_photo_followup':
+    case 'back_in_stock_wishlist':
       if (!vars.product) return false
       return sendBackInStockWhatsApp({ phone, product: vars.product, entity })
     case 'winback_90':
     case 'winback_180':
     case 'price_drop':
+    case 'first_purchase_nudge':
+    case 'second_purchase_nudge':
+    case 'signup_anniversary':
+    case 'loyalty_tier_upgrade':
+    case 'referral_invite':
+    case 'birthday':
       return sendPromoOfferWhatsApp({
         phone,
         headline: vars.headline || 'A special offer for you',
@@ -118,14 +132,31 @@ function campaignSmsBody(kind: string, vars: CampaignWaVars): string {
   switch (kind) {
     case 'abandoned_cart':
     case 'abandoned_checkout':
+    case 'high_value_cart':
       return vars.items ? `You left ${vars.items} in your cart. Complete your order before it's gone.` : ''
     case 'viewed_product':
+    case 'viewed_category':
+    case 'wishlist_reminder':
       return vars.items ? `Still thinking about ${vars.items}? Take another look before it's gone.` : ''
+    case 'cart_price_drop':
+      return vars.items ? `Good news — ${vars.items} in your cart just dropped in price.` : ''
+    case 'replenishment':
+    case 'subscription_renewal':
+      return vars.items ? `Running low on ${vars.items}? Reorder in a tap.` : ''
     case 'restock':
+    case 'back_in_stock_wishlist':
       return vars.product ? `${vars.product} is back in stock. Grab it before it sells out.` : ''
+    case 'review_photo_followup':
+      return vars.product ? `Add a photo to your ${vars.product} review and help other shoppers.` : ''
     case 'winback_90':
     case 'winback_180':
     case 'price_drop':
+    case 'first_purchase_nudge':
+    case 'second_purchase_nudge':
+    case 'signup_anniversary':
+    case 'loyalty_tier_upgrade':
+    case 'referral_invite':
+    case 'birthday':
       return vars.code
         ? `${vars.headline || 'A special offer for you'} — use code ${vars.code}${vars.discount ? ` for ${vars.discount}` : ''}.`
         : vars.headline || ''

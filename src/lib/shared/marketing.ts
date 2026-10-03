@@ -11,6 +11,20 @@ export type CampaignKind =
   | 'restock'
   | 'price_drop'
   | 'viewed_product'
+  | 'viewed_category'
+  | 'high_value_cart'
+  | 'cart_price_drop'
+  | 'wishlist_reminder'
+  | 'review_photo_followup'
+  | 'back_in_stock_wishlist'
+  | 'first_purchase_nudge'
+  | 'second_purchase_nudge'
+  | 'signup_anniversary'
+  | 'replenishment'
+  | 'subscription_renewal'
+  | 'loyalty_tier_upgrade'
+  | 'referral_invite'
+  | 'birthday'
   | string
 
 export interface Campaign {

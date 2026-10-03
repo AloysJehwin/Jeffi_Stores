@@ -7,26 +7,45 @@ vi.mock('@/lib/shared/automation-emails', () => ({
   fetchUserContext: vi.fn(),
   resolveCoupon: vi.fn(),
   sendCampaignEmail: vi.fn(),
+  sendCampaignEmailRendered: vi.fn(),
   renderItemRows: vi.fn().mockReturnValue(''),
   renderHeroProduct: vi.fn().mockReturnValue(''),
+  fetchProductImageUrl: vi.fn(),
 }))
 
 import { SCENARIOS, getScenario, listScenarios } from '@/lib/campaigns/scenarios/_registry'
 
 describe('_registry', () => {
-  it('SCENARIOS contains all 10 expected scenario kinds', () => {
+  it('SCENARIOS contains all 24 expected scenario kinds', () => {
     const kinds = Object.keys(SCENARIOS)
-    expect(kinds).toContain('abandoned_cart')
-    expect(kinds).toContain('abandoned_checkout')
-    expect(kinds).toContain('post_purchase')
-    expect(kinds).toContain('review_reminder')
-    expect(kinds).toContain('review_request')
-    expect(kinds).toContain('winback_90')
-    expect(kinds).toContain('winback_180')
-    expect(kinds).toContain('restock')
-    expect(kinds).toContain('price_drop')
-    expect(kinds).toContain('viewed_product')
-    expect(kinds).toHaveLength(10)
+    const expected = [
+      'abandoned_cart',
+      'abandoned_checkout',
+      'post_purchase',
+      'review_reminder',
+      'review_request',
+      'winback_90',
+      'winback_180',
+      'restock',
+      'price_drop',
+      'viewed_product',
+      'viewed_category',
+      'high_value_cart',
+      'cart_price_drop',
+      'wishlist_reminder',
+      'review_photo_followup',
+      'back_in_stock_wishlist',
+      'first_purchase_nudge',
+      'second_purchase_nudge',
+      'signup_anniversary',
+      'replenishment',
+      'subscription_renewal',
+      'loyalty_tier_upgrade',
+      'referral_invite',
+      'birthday',
+    ]
+    for (const k of expected) expect(kinds).toContain(k)
+    expect(kinds).toHaveLength(expected.length)
   })
 
   it('each scenario has the required shape', () => {
@@ -60,7 +79,7 @@ describe('_registry', () => {
     it('returns an array of all scenario modules', () => {
       const list = listScenarios()
       expect(Array.isArray(list)).toBe(true)
-      expect(list).toHaveLength(10)
+      expect(list).toHaveLength(24)
     })
 
     it('each item in list is a valid scenario module', () => {
