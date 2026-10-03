@@ -170,7 +170,9 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
       </div>
 
       {/* Stats + trend stream above the filters while the shell stays mounted */}
-      <Suspense fallback={<AdminStatsSkeleton cards={6} gridClass="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" banner />}>
+      <Suspense
+        fallback={<AdminStatsSkeleton cards={6} gridClass="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" banner />}
+      >
         <BusinessRFQsStats />
       </Suspense>
 
@@ -373,6 +375,7 @@ async function BusinessRFQsListContent({ resolvedSearchParams, host }: { resolve
             {page > 1 && (
               <Link
                 href={buildUrl(page - 1)}
+                scroll={false}
                 className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
               >
                 Previous
@@ -384,6 +387,7 @@ async function BusinessRFQsListContent({ resolvedSearchParams, host }: { resolve
             {page < totalPages && (
               <Link
                 href={buildUrl(page + 1)}
+                scroll={false}
                 className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
               >
                 Next
