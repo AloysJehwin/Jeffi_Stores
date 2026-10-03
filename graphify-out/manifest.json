@@ -6445,8 +6445,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/CampaignDetailClient.tsx": {
-    "mtime": 1790931247.8703442,
-    "ast_hash": "00e6ee209605a4cc70cfb05c32bac5f8",
+    "mtime": 1790994098.5046728,
+    "ast_hash": "ed1181794938dca1616bfcc9b7cf4c13",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/loading.tsx": {
