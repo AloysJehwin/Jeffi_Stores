@@ -3,23 +3,39 @@ import { getCampaign } from '@/lib/shared/marketing'
 import type { AnyScenarioModule, ScenarioModule, SweepResult } from './types'
 import { resolveParams } from './types'
 
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 export async function runScenario<P extends Record<string, unknown>, Row>(
   scenario: ScenarioModule<P, Row>,
   campaignKind: string
 ): Promise<SweepResult> {
   const result: SweepResult = { campaign: campaignKind, attempted: 0, sent: 0, skipped: 0 }
 
-  const campaign = await getCampaign(campaignKind)
-  if (!campaign?.enabled) return result
+  // A throwing scenario must not abort the rest of the sweep.
+  try {
+    const campaign = await getCampaign(campaignKind)
+    if (!campaign?.enabled) return result
 
-  const params = resolveParams(scenario.defaultParams, (campaign as any).parameters)
-  const rows = await scenario.findEligible({ campaign, params })
-  result.attempted = rows.length
+    const params = resolveParams(scenario.defaultParams, (campaign as any).parameters)
+    const rows = await scenario.findEligible({ campaign, params })
+    result.attempted = rows.length
 
-  for (const row of rows) {
-    const r = await scenario.send(row, { campaign, params })
-    if (r.ok) result.sent++
-    else result.skipped++
+    for (const row of rows) {
+      try {
+        const r = await scenario.send(row, { campaign, params })
+        if (r.ok) result.sent++
+        else result.skipped++
+      } catch (err) {
+        result.skipped++
+        if (!result.error) result.error = errorMessage(err)
+        console.error('[campaigns]', campaignKind, 'send failed', err)
+      }
+    }
+  } catch (err) {
+    result.error = errorMessage(err)
+    console.error('[campaigns]', campaignKind, err)
   }
 
   if (result.attempted > 0) {

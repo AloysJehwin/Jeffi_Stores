@@ -118,4 +118,67 @@ describe('GET /api/cron/run-campaigns', () => {
     const json = await res.json()
     expect(json.error).toBe('scenario error')
   })
+
+  it('keeps running the remaining campaigns after one throws', async () => {
+    mockQueryMany.mockResolvedValueOnce([
+      { kind: 'birthday', scenario_kind: null, enabled: true },
+      { kind: 'winback_90', scenario_kind: null, enabled: true },
+      { kind: 'abandoned_cart', scenario_kind: null, enabled: true },
+    ])
+    mockGetScenario.mockReturnValue({ kind: 'any' } as any)
+    mockRunScenario
+      .mockRejectedValueOnce(new Error('column u.date_of_birth does not exist'))
+      .mockResolvedValueOnce({ campaign: 'winback_90', attempted: 4, sent: 4, skipped: 0 } as any)
+      .mockResolvedValueOnce({ campaign: 'abandoned_cart', attempted: 2, sent: 1, skipped: 1 } as any)
+
+    const res = await GET(makeRequest('Bearer test-cron-secret') as any)
+    expect(mockRunScenario).toHaveBeenCalledTimes(3)
+    expect(res.status).toBe(500)
+    const json = await res.json()
+    expect(json.success).toBe(false)
+    expect(json.failed).toBe(1)
+    expect(json.totalSent).toBe(5)
+    expect(json.results).toHaveLength(3)
+    expect(json.results[0]).toMatchObject({
+      campaign: 'birthday',
+      sent: 0,
+      error: 'column u.date_of_birth does not exist',
+    })
+  })
+
+  it('reports a failure that a scenario recorded on its own result', async () => {
+    mockQueryMany.mockResolvedValueOnce([
+      { kind: 'birthday', scenario_kind: null, enabled: true },
+      { kind: 'winback_90', scenario_kind: null, enabled: true },
+    ])
+    mockGetScenario.mockReturnValue({ kind: 'any' } as any)
+    mockRunScenario
+      .mockResolvedValueOnce({ campaign: 'birthday', attempted: 0, sent: 0, skipped: 0, error: 'boom' } as any)
+      .mockResolvedValueOnce({ campaign: 'winback_90', attempted: 1, sent: 1, skipped: 0 } as any)
+
+    const res = await GET(makeRequest('Bearer test-cron-secret') as any)
+    expect(res.status).toBe(500)
+    const json = await res.json()
+    expect(json.error).toBe('boom')
+    expect(json.totalSent).toBe(1)
+  })
+
+  it('isolates a throwing custom scenario too', async () => {
+    mockQueryMany.mockResolvedValueOnce([
+      { kind: 'promo', scenario_kind: 'custom_promo', enabled: true },
+      { kind: 'winback_90', scenario_kind: null, enabled: true },
+    ])
+    mockGetScenario.mockReturnValueOnce(null).mockReturnValueOnce({ kind: 'winback_90' } as any)
+    mockQueryOne.mockResolvedValueOnce({ enabled: true })
+    mockGetCampaign.mockResolvedValueOnce({ id: 'camp1' } as any)
+    mockRunCustom.mockRejectedValueOnce(new Error('custom sql failed'))
+    mockRunScenario.mockResolvedValueOnce({ campaign: 'winback_90', attempted: 2, sent: 2, skipped: 0 } as any)
+
+    const res = await GET(makeRequest('Bearer test-cron-secret') as any)
+    const json = await res.json()
+    expect(mockRunScenario).toHaveBeenCalledTimes(1)
+    expect(json.totalSent).toBe(2)
+    expect(json.failed).toBe(1)
+    expect(json.results[0]).toMatchObject({ campaign: 'promo', error: 'custom sql failed' })
+  })
 })
