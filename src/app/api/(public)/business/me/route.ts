@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { authenticateBusiness } from '@/lib/auth/jwt'
 import { POLICY_VERSION } from '@/lib/legals/policies'
+import { formatDob } from '@/lib/shared/format'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,8 +10,8 @@ export async function GET(request: NextRequest) {
     if (!payload) return NextResponse.json({ user: null })
 
     const user = await queryOne<any>(
-      `SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.created_at, u.avatar_url,
-              u.policies_accepted_version,
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.phone_verified, u.date_of_birth,
+              u.created_at, u.avatar_url, u.policies_accepted_version,
               bp.approval_status, bp.company_name
        FROM users u
        LEFT JOIN business_profiles bp ON bp.user_id = u.id
@@ -35,6 +36,8 @@ export async function GET(request: NextRequest) {
         firstName: user.first_name,
         lastName: user.last_name,
         phone: user.phone,
+        phoneVerified: user.phone_verified ?? false,
+        dateOfBirth: formatDob(user.date_of_birth),
         createdAt: user.created_at,
         avatarUrl: user.avatar_url || null,
         isBusiness: true,

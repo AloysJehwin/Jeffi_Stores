@@ -5,66 +5,17 @@ import { queryOne, query } from '@/lib/shared/db'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/shared/activity'
 import { cookieDomainOption } from '@/lib/auth/cookie-domain'
+import { verifyGoogleCredential } from '@/lib/auth/google-verify'
 
 if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
-
-interface GoogleTokenPayload {
-  sub: string
-  email: string
-  given_name?: string
-  family_name?: string
-  name?: string
-  picture?: string
-  aud?: string | string[]
-}
-
-async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload | null> {
-  try {
-    const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`)
-    if (!res.ok) return null
-    const data = await res.json()
-    if (!data.sub || !data.email) return null
-    if (GOOGLE_CLIENT_ID) {
-      const aud = Array.isArray(data.aud) ? data.aud : [data.aud]
-      if (!aud.includes(GOOGLE_CLIENT_ID)) return null
-    }
-    return data as GoogleTokenPayload
-  } catch (err) {
-    console.error('[route]', err)
-    return null
-  }
-}
-
-async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleTokenPayload | null> {
-  try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    if (!data.sub || !data.email || data.email_verified === false) return null
-    return {
-      sub: data.sub,
-      email: data.email,
-      given_name: data.given_name,
-      family_name: data.family_name,
-      name: data.name,
-      picture: data.picture,
-    }
-  } catch (err) {
-    console.error('[route]', err)
-    return null
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
-    const { idToken, accessToken, companyName, gstNumber, businessAddress, industry } = await request.json()
+    const { idToken, accessToken } = await request.json()
     if (!idToken && !accessToken)
       return NextResponse.json({ error: 'idToken or accessToken required' }, { status: 400 })
 
-    const googlePayload = idToken ? await verifyGoogleToken(idToken) : await verifyGoogleAccessToken(accessToken)
+    const googlePayload = await verifyGoogleCredential(idToken, accessToken)
     if (!googlePayload) return NextResponse.json({ error: 'Invalid Google token' }, { status: 401 })
 
     const email = googlePayload.email.toLowerCase()
@@ -80,29 +31,11 @@ export async function POST(request: NextRequest) {
     )
 
     if (!user) {
-      // New business Google sign-in: if business profile fields not provided, ask frontend to collect them
-      if (!companyName || !gstNumber || !businessAddress || !industry) {
-        return NextResponse.json({ needsBusinessProfile: true, email, firstName, lastName })
-      }
-
-      user = await queryOne<any>(
-        `INSERT INTO users (email, first_name, last_name, is_active, auth_provider, google_id, user_type, last_login)
-         VALUES ($1, $2, $3, true, 'google', $4, 'business', NOW())
-         RETURNING *`,
-        [email, firstName, lastName, googleId]
-      )
-      if (!user) return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
-
-      await query(
-        `INSERT INTO business_profiles (user_id, company_name, gst_number, business_address, industry) VALUES ($1, $2, $3, $4, $5)`,
-        [user.id, companyName.trim(), gstNumber.trim().toUpperCase(), businessAddress.trim(), industry.trim()]
-      )
-      logActivity({
-        userId: user.id,
-        kind: 'signup',
-        summary: 'Business account created via Google',
-        metadata: { provider: 'google' },
-      }).catch(() => {})
+      // No account is created here; /api/business/google/complete does that once the details are supplied.
+      return NextResponse.json({
+        newUser: true,
+        profile: { email, firstName, lastName },
+      })
     } else {
       if (!user.is_active) return NextResponse.json({ error: 'Account is inactive' }, { status: 403 })
       if (!user.google_id)

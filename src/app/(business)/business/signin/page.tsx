@@ -68,6 +68,17 @@ function BusinessSignInPage() {
     return () => clearTimeout(t)
   }, [resendCooldown])
 
+  // The token rides via sessionStorage, never the URL.
+  function goToBusinessGoogleSignup(
+    accessToken: string,
+    profile: { email: string; firstName: string; lastName: string }
+  ) {
+    try {
+      sessionStorage.setItem('business_google_signup', JSON.stringify({ accessToken, profile }))
+    } catch {}
+    router.push(`${bp('/business/signup')}?google=1`)
+  }
+
   // Hash fallback: popup blocked → callback redirects back here with access_token in hash.
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -88,8 +99,8 @@ function BusinessSignInPage() {
       .then(async res => {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Google sign-in failed')
-        if (data.needsBusinessProfile) {
-          router.push(`${bp('/business/signup')}?google=1&token=${accessToken}`)
+        if (data.newUser) {
+          goToBusinessGoogleSignup(accessToken, data.profile)
           return
         }
         if (data.approvalStatus === 'pending') {
@@ -261,8 +272,8 @@ function BusinessSignInPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Google sign-in failed')
 
-      if (data.needsBusinessProfile) {
-        router.push(`${bp('/business/signup')}?google=1&token=${result.accessToken}`)
+      if (data.newUser) {
+        goToBusinessGoogleSignup(result.accessToken, data.profile)
         return
       }
       if (data.approvalStatus === 'pending') {
