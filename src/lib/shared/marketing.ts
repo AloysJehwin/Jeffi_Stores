@@ -1,5 +1,6 @@
 import { query, queryOne } from '@/lib/shared/db'
 import { currentBrandName } from '@/lib/catalog/brand'
+import { FREQUENCY_CAP_HOURS } from '@/lib/campaigns/duration'
 
 export type CampaignKind =
   | 'abandoned_cart'
@@ -39,8 +40,6 @@ export interface Campaign {
   body_template: string
   last_run_at: string | null
 }
-
-const FREQUENCY_CAP_HOURS = 72
 
 function resolveAppUrl(): string {
   const isLocalhost = (v: string | undefined) =>

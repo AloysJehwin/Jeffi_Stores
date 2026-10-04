@@ -17,7 +17,6 @@ import { backInStockWishlist } from '@/lib/campaigns/scenarios/back-in-stock-wis
 import { queryMany, query } from '@/lib/shared/db'
 import { fetchUserContext, sendCampaignEmail } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days } from '@/lib/campaigns/duration'
 
 const mockQueryMany = queryMany as ReturnType<typeof vi.fn>
 const mockQuery = query as ReturnType<typeof vi.fn>
@@ -36,7 +35,13 @@ const campaign = {
 } as any
 
 const defaultParams = backInStockWishlist.defaultParams as any
-const row = { user_id: 'u1', product_id: 'p1', product_name: 'Widget', product_slug: 'widget' }
+const row = {
+  user_id: 'u1',
+  product_id: 'p1',
+  product_name: 'Widget',
+  product_slug: 'widget',
+  out_of_stock_since: '1700000000',
+}
 
 describe('backInStockWishlist scenario', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -46,16 +51,43 @@ describe('backInStockWishlist scenario', () => {
   })
 
   describe('findEligible', () => {
-    it('scans snapshot_in_stock=FALSE now in stock, cooldown as minutes', async () => {
+    it('scans rows snapshotted out of stock whose product is in stock again by status', async () => {
       mockQueryMany.mockResolvedValue([row])
       const rows = await backInStockWishlist.findEligible({ campaign, params: defaultParams })
       expect(rows).toHaveLength(1)
       const [sql, args] = mockQueryMany.mock.calls[0]
       expect(sql).toContain('wi.snapshot_in_stock = FALSE')
-      expect(sql).toContain('p.inventory_quantity > 0')
-      // [kind, cooldown, maxWatches]
-      expect(args[1]).toBe(String(days(1)))
-      expect(args[2]).toBe(defaultParams.maxWatchesPerSweep)
+      expect(sql).toContain("stock_status IS DISTINCT FROM 'Out of Stock'")
+      expect(sql).not.toContain('inventory_quantity')
+      expect(sql).toContain('p.is_active = TRUE')
+      expect(args).toEqual(['back_in_stock_wishlist', defaultParams.maxWatchesPerSweep])
+    })
+
+    it('syncs the wishlist snapshots first', async () => {
+      mockQueryMany.mockResolvedValue([])
+      await backInStockWishlist.findEligible({ campaign, params: defaultParams })
+      const updates = mockQuery.mock.calls.filter(c => String(c[0]).includes('UPDATE wishlist_items'))
+      expect(updates).toHaveLength(2)
+      expect(mockQuery.mock.invocationCallOrder[0]).toBeLessThan(mockQueryMany.mock.invocationCallOrder[0])
+    })
+
+    it('skips users inside the 72 hour cap and takes the oldest snapshots first', async () => {
+      mockQueryMany.mockResolvedValue([])
+      await backInStockWishlist.findEligible({ campaign, params: defaultParams })
+      const sql = String(mockQueryMany.mock.calls[0][0])
+      expect(sql).toContain("INTERVAL '72 hours'")
+      expect(sql).toContain('ORDER BY wi.snapshot_taken_at ASC')
+    })
+  })
+
+  describe('findSuppressed', () => {
+    it('runs without bind parameters and uses the status-based stock check', async () => {
+      mockQueryMany.mockResolvedValue([])
+      await backInStockWishlist.findSuppressed!({ campaign, params: defaultParams })
+      const call = mockQueryMany.mock.calls[0]
+      expect(call).toHaveLength(1)
+      expect(String(call[0])).not.toContain('inventory_quantity')
+      expect(String(call[0])).not.toMatch(/\$\d/)
     })
   })
 
@@ -64,14 +96,20 @@ describe('backInStockWishlist scenario', () => {
       mockFetchUser.mockResolvedValue({ first_name: 'Sam', baseUrl: 'https://shop.test', unsubscribe_token: 't' })
     })
 
-    it('emails with product_id reference and flips the snapshot to in-stock', async () => {
+    it('emails with a per-restock reference and refreshes the snapshot', async () => {
       const res = await backInStockWishlist.send(row, { campaign, params: defaultParams })
       expect(res.ok).toBe(true)
-      expect(mockSendEmail.mock.calls[0][0].referenceId).toBe('p1')
-      // UPDATE wishlist snapshot ran
+      expect(mockSendEmail.mock.calls[0][0].referenceId).toBe('p1:1700000000')
       const updateCall = mockQuery.mock.calls.find(c => String(c[0]).includes('UPDATE wishlist_items'))
       expect(updateCall).toBeTruthy()
       expect(updateCall![1]).toEqual(['u1', 'p1'])
+    })
+
+    it('keeps the snapshot when the email hit the frequency cap, so the restock is retried', async () => {
+      mockSendEmail.mockResolvedValueOnce({ ok: false, reason: 'frequency_cap' })
+      const res = await backInStockWishlist.send(row, { campaign, params: defaultParams })
+      expect(res).toEqual({ ok: false, reason: 'frequency_cap' })
+      expect(mockQuery).not.toHaveBeenCalled()
     })
 
     it('sends WhatsApp with cooldown days when enabled', async () => {

@@ -14,9 +14,9 @@ export interface WishlistBadges {
 }
 
 /**
- * The wishlist snapshot is written by the price-drop / restock campaigns from the product's
- * GST-inclusive base_price and inventory_quantity > 0, so both checks compare those same fields.
- * Variant products are skipped: their card price is the variant minimum, not base_price.
+ * The wishlist snapshot is stamped when a product is saved, and refreshed by the price-drop / restock
+ * campaigns, from the product's GST-inclusive base_price and its stock status, so both checks compare
+ * those same fields. Variant products are skipped for price: their card price is the variant minimum.
  */
 export function wishlistBadges(i: WishlistBadgeInput): WishlistBadges {
   const backInStock = i.snapshotInStock === false && i.inventoryInStock === true && i.shownInStock

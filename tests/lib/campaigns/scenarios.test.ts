@@ -451,8 +451,7 @@ describe('priceDrop scenario', () => {
 
     const [, args] = mockQueryMany.mock.calls[0]
     // factor = (100 - 10) / 100 = 0.9
-    expect(args).toContain(0.9)
-    expect(args).toContain(100)
+    expect(args).toEqual(['price_drop', 0.9, 100])
   })
 
   it('findEligible returns rows unchanged', async () => {
@@ -464,7 +463,6 @@ describe('priceDrop scenario', () => {
         product_slug: 'drill',
         snapshot_price: '500',
         current_price: '400',
-        current_in_stock: true,
       },
     ]
     mockQueryMany.mockReset()
@@ -489,7 +487,6 @@ describe('priceDrop scenario', () => {
         product_slug: 'drill',
         snapshot_price: '500',
         current_price: '400',
-        current_in_stock: true,
       },
       { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
     )
@@ -506,7 +503,6 @@ describe('priceDrop scenario', () => {
       product_slug: 'drill',
       snapshot_price: '500.00',
       current_price: '399.99',
-      current_in_stock: true,
     }
 
     await priceDrop.send(row, {
@@ -520,7 +516,7 @@ describe('priceDrop scenario', () => {
     expect(payload.vars.newPrice).toBe('400')
     expect(payload.vars.productName).toBe('Drill')
     expect(payload.vars.ctaUrl).toContain('/products/drill')
-    expect(payload.referenceId).toBe('p1')
+    expect(payload.referenceId).toBe('p1:500.00')
   })
 
   it('send calls renderHeroProduct with name, imageUrl, productUrl, oldPrice, newPrice', async () => {
@@ -531,7 +527,6 @@ describe('priceDrop scenario', () => {
       product_slug: 'drill',
       snapshot_price: '500',
       current_price: '400',
-      current_in_stock: true,
     }
 
     await priceDrop.send(row, {
@@ -557,7 +552,6 @@ describe('priceDrop scenario', () => {
       product_slug: 'drill',
       snapshot_price: '500',
       current_price: '400',
-      current_in_stock: true,
     }
 
     await priceDrop.send(row, {
@@ -580,7 +574,6 @@ describe('priceDrop scenario', () => {
       product_slug: 'drill',
       snapshot_price: '500',
       current_price: '400',
-      current_in_stock: true,
     }
 
     const result = await priceDrop.send(row, {
@@ -588,8 +581,94 @@ describe('priceDrop scenario', () => {
       params: priceDrop.defaultParams,
     })
 
-    // The catch(() => {}) in source means the update error is swallowed
     expect(result.ok).toBe(true)
+  })
+
+  it('findEligible syncs the wishlist snapshots before looking for rows', async () => {
+    const order: string[] = []
+    mockQuery.mockImplementation(async () => {
+      order.push('sync')
+      return { rows: [], rowCount: 0 } as any
+    })
+    mockQueryMany.mockImplementation(async () => {
+      order.push('select')
+      return []
+    })
+
+    await priceDrop.findEligible({
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
+
+    expect(order).toEqual(['sync', 'sync', 'select'])
+    expect(String(mockQuery.mock.calls[0][0])).toContain('snapshot_taken_at IS NULL')
+    expect(String(mockQuery.mock.calls[1][0])).toContain('snapshot_in_stock = FALSE')
+  })
+
+  it('findEligible judges stock by status, not inventory quantity', async () => {
+    await priceDrop.findEligible({
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
+
+    const sql = String(mockQueryMany.mock.calls[0][0])
+    expect(sql).toContain("stock_status IS DISTINCT FROM 'Out of Stock'")
+    expect(sql).not.toContain('inventory_quantity')
+    expect(sql).toContain('p.is_active = TRUE')
+  })
+
+  it('findEligible skips users inside the 72 hour cap and takes the oldest snapshots first', async () => {
+    await priceDrop.findEligible({
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
+
+    const sql = String(mockQueryMany.mock.calls[0][0])
+    expect(sql).toContain("INTERVAL '72 hours'")
+    expect(sql).toContain('ORDER BY wi.snapshot_taken_at ASC')
+  })
+
+  it('send keeps the snapshot when the email hit the frequency cap, so the event is retried', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: false, reason: 'frequency_cap' } as any)
+
+    const result = await priceDrop.send(
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Drill',
+        product_slug: 'drill',
+        snapshot_price: '500',
+        current_price: '400',
+      },
+      {
+        campaign: makeCampaign({ kind: 'price_drop' }) as any,
+        params: priceDrop.defaultParams,
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'frequency_cap' })
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('send refreshes the snapshot when this event was already emailed', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: false, reason: 'already_sent' } as any)
+
+    await priceDrop.send(
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Drill',
+        product_slug: 'drill',
+        snapshot_price: '500',
+        current_price: '400',
+      },
+      {
+        campaign: makeCampaign({ kind: 'price_drop' }) as any,
+        params: priceDrop.defaultParams,
+      }
+    )
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE wishlist_items'), ['u1', 'p1'])
   })
 })
 
@@ -620,7 +699,7 @@ describe('restock scenario', () => {
     expect(typeof restock.send).toBe('function')
   })
 
-  it('findEligible passes maxWatchesPerSweep as $1 arg', async () => {
+  it('findEligible passes the campaign kind and the row limit', async () => {
     mockQueryMany.mockResolvedValueOnce([])
     const params = { maxWatchesPerSweep: 200, whatsappEnabled: false }
 
@@ -630,7 +709,7 @@ describe('restock scenario', () => {
     })
 
     const [, args] = mockQueryMany.mock.calls[0]
-    expect(args).toContain(200)
+    expect(args).toEqual(['restock', 200])
   })
 
   it('findEligible returns rows from queryMany', async () => {
@@ -640,8 +719,7 @@ describe('restock scenario', () => {
         product_id: 'p1',
         product_name: 'Bolt',
         product_slug: 'bolt',
-        current_price: '50',
-        current_in_stock: true,
+        out_of_stock_since: '1700000000',
       },
     ]
     mockQueryMany.mockReset()
@@ -664,8 +742,7 @@ describe('restock scenario', () => {
         product_id: 'p1',
         product_name: 'Bolt',
         product_slug: 'bolt',
-        current_price: '50',
-        current_in_stock: true,
+        out_of_stock_since: '1700000000',
       },
       { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams }
     )
@@ -680,8 +757,7 @@ describe('restock scenario', () => {
       product_id: 'p1',
       product_name: 'Bolt',
       product_slug: 'bolt',
-      current_price: '50',
-      current_in_stock: true,
+      out_of_stock_since: '1700000000',
     }
 
     await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
@@ -703,8 +779,7 @@ describe('restock scenario', () => {
       product_id: 'p1',
       product_name: 'Bolt',
       product_slug: 'bolt',
-      current_price: '50',
-      current_in_stock: true,
+      out_of_stock_since: '1700000000',
     }
 
     await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
@@ -712,7 +787,7 @@ describe('restock scenario', () => {
     const [payload] = mockSendEmail.mock.calls[0]
     expect(payload.vars.productName).toBe('Bolt')
     expect(payload.vars.ctaUrl).toContain('/products/bolt')
-    expect(payload.referenceId).toBe('p1')
+    expect(payload.referenceId).toBe('p1:1700000000')
   })
 
   it('send updates wishlist snapshot after sending', async () => {
@@ -721,8 +796,7 @@ describe('restock scenario', () => {
       product_id: 'p1',
       product_name: 'Bolt',
       product_slug: 'bolt',
-      current_price: '50',
-      current_in_stock: true,
+      out_of_stock_since: '1700000000',
     }
 
     await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
@@ -740,8 +814,7 @@ describe('restock scenario', () => {
       product_id: 'p1',
       product_name: 'Bolt',
       product_slug: 'bolt',
-      current_price: '50',
-      current_in_stock: true,
+      out_of_stock_since: '1700000000',
     }
 
     const result = await restock.send(row, {
@@ -750,6 +823,91 @@ describe('restock scenario', () => {
     })
 
     expect(result.ok).toBe(true)
+  })
+
+  it('findEligible syncs the wishlist snapshots before looking for rows', async () => {
+    const order: string[] = []
+    mockQuery.mockImplementation(async () => {
+      order.push('sync')
+      return { rows: [], rowCount: 0 } as any
+    })
+    mockQueryMany.mockImplementation(async () => {
+      order.push('select')
+      return []
+    })
+
+    await restock.findEligible({
+      campaign: makeCampaign({ kind: 'restock' }) as any,
+      params: restock.defaultParams,
+    })
+
+    expect(order).toEqual(['sync', 'sync', 'select'])
+    expect(String(mockQuery.mock.calls[0][0])).toContain('snapshot_taken_at IS NULL')
+    expect(String(mockQuery.mock.calls[1][0])).toContain('snapshot_in_stock = FALSE')
+  })
+
+  it('findEligible judges stock by status, not inventory quantity', async () => {
+    await restock.findEligible({
+      campaign: makeCampaign({ kind: 'restock' }) as any,
+      params: restock.defaultParams,
+    })
+
+    const sql = String(mockQueryMany.mock.calls[0][0])
+    expect(sql).toContain("stock_status IS DISTINCT FROM 'Out of Stock'")
+    expect(sql).not.toContain('inventory_quantity')
+    expect(sql).toContain('p.is_active = TRUE')
+  })
+
+  it('findEligible skips users inside the 72 hour cap and takes the oldest snapshots first', async () => {
+    await restock.findEligible({
+      campaign: makeCampaign({ kind: 'restock' }) as any,
+      params: restock.defaultParams,
+    })
+
+    const sql = String(mockQueryMany.mock.calls[0][0])
+    expect(sql).toContain("INTERVAL '72 hours'")
+    expect(sql).toContain('ORDER BY wi.snapshot_taken_at ASC')
+  })
+
+  it('send keeps the snapshot when the email hit the frequency cap, so the event is retried', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: false, reason: 'frequency_cap' } as any)
+
+    const result = await restock.send(
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Bolt',
+        product_slug: 'bolt',
+        out_of_stock_since: '1700000000',
+      },
+      {
+        campaign: makeCampaign({ kind: 'restock' }) as any,
+        params: restock.defaultParams,
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'frequency_cap' })
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('send refreshes the snapshot when this event was already emailed', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: false, reason: 'already_sent' } as any)
+
+    await restock.send(
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Bolt',
+        product_slug: 'bolt',
+        out_of_stock_since: '1700000000',
+      },
+      {
+        campaign: makeCampaign({ kind: 'restock' }) as any,
+        params: restock.defaultParams,
+      }
+    )
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE wishlist_items'), ['u1', 'p1'])
   })
 })
 
@@ -889,7 +1047,6 @@ describe('priceDrop scenario — branch coverage', () => {
       product_slug: 'drill',
       snapshot_price: '500',
       current_price: '400',
-      current_in_stock: true,
     }
 
     await priceDrop.send(row, {
@@ -913,8 +1070,7 @@ describe('restock scenario — branch coverage', () => {
       product_id: 'p1',
       product_name: 'Bolt',
       product_slug: 'bolt',
-      current_price: '50',
-      current_in_stock: true,
+      out_of_stock_since: '1700000000',
     }
 
     await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })

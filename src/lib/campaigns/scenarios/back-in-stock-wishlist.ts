@@ -1,4 +1,5 @@
-import { queryMany, query } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
+import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
 import {
   fetchUserContext,
   resolveCoupon,
@@ -7,7 +8,8 @@ import {
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { cooldownMinutes, cooldownDays } from '../duration'
+import { cooldownDays } from '../duration'
+import { NOT_RECENTLY_EMAILED_SQL, settleWishlistEvent, syncWishlistSnapshots } from './_wishlist-base'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -20,6 +22,7 @@ interface Row {
   product_id: string
   product_name: string
   product_slug: string | null
+  out_of_stock_since: string
 }
 
 export const backInStockWishlist: ScenarioModule<Params, Row> = {
@@ -27,7 +30,7 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
   name: 'Back in Stock (Wishlist)',
   description: 'A wishlisted product went from out-of-stock to in-stock',
   trigger:
-    'Fires when a wishlisted product transitions from out-of-stock (snapshot_in_stock = FALSE) to in-stock. Dedup is per product. The snapshot is updated to in-stock after sending so it only fires once per transition. Skipped for guests, inactive accounts, and marketing opt-outs.',
+    'Fires when a wishlisted product goes from Out of Stock back to in stock (by stock status, not inventory quantity). The snapshot is refreshed once the email is sent, so it fires once per transition. Skipped for guests, inactive accounts, and marketing opt-outs.',
   defaultParams: {
     maxWatchesPerSweep: 100,
     whatsappEnabled: false,
@@ -48,35 +51,32 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
   },
 
   async findEligible({ campaign, params }) {
-    const cooldownMin = cooldownMinutes(params)
+    await syncWishlistSnapshots()
     return queryMany<Row>(
       `
-      SELECT wi.user_id::text, wi.product_id::text, p.name AS product_name, p.slug AS product_slug
+      SELECT wi.user_id::text, wi.product_id::text, p.name AS product_name, p.slug AS product_slug,
+             EXTRACT(EPOCH FROM wi.snapshot_taken_at)::bigint::text AS out_of_stock_since
       FROM wishlist_items wi
       JOIN users u ON u.id = wi.user_id
       JOIN products p ON p.id = wi.product_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE wi.user_id IS NOT NULL
         AND wi.snapshot_in_stock = FALSE
-        AND p.inventory_quantity > 0
+        AND p.is_active = TRUE
+        AND ${PRODUCT_IN_STOCK_SQL}
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
         AND u.marketing_opt_out = FALSE
         AND (bp.user_id IS NULL OR bp.approval_status != 'approved')
-        AND NOT EXISTS (
-          SELECT 1 FROM email_campaigns_sent ecs
-          WHERE ecs.campaign_kind = $1
-            AND ecs.user_id = wi.user_id
-            AND ecs.reference_id = wi.product_id::text
-            AND ecs.sent_at > NOW() - ($2::text || ' minutes')::interval
-        )
-      LIMIT $3
+        AND ${NOT_RECENTLY_EMAILED_SQL}
+      ORDER BY wi.snapshot_taken_at ASC
+      LIMIT $2
     `,
-      [campaign.kind, String(cooldownMin), params.maxWatchesPerSweep]
+      [campaign.kind, params.maxWatchesPerSweep]
     )
   },
 
-  async findSuppressed({ campaign }) {
+  async findSuppressed() {
     const rows = await queryMany<{
       user_id: string
       reason: string
@@ -102,11 +102,11 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
       JOIN users u ON u.id = wi.user_id
       JOIN products p ON p.id = wi.product_id
       WHERE wi.snapshot_in_stock = FALSE
-        AND p.inventory_quantity > 0
+        AND p.is_active = TRUE
+        AND ${PRODUCT_IN_STOCK_SQL}
         AND (u.is_active = FALSE OR u.is_guest = TRUE OR u.marketing_opt_out = TRUE)
       LIMIT 200
-    `,
-      [campaign.kind]
+    `
     )
     return rows.map(r => ({
       user_id: r.user_id,
@@ -128,7 +128,7 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
     const emailResult = await sendCampaignEmail({
       campaign,
       user,
-      referenceId: row.product_id,
+      referenceId: `${row.product_id}:${row.out_of_stock_since}`,
       vars: {
         firstName: user.first_name || 'there',
         productName: row.product_name,
@@ -139,11 +139,7 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
       },
     })
 
-    await query(
-      `UPDATE wishlist_items SET snapshot_in_stock = TRUE, snapshot_taken_at = NOW()
-       WHERE user_id = $1 AND product_id = $2`,
-      [row.user_id, row.product_id]
-    ).catch(() => {})
+    await settleWishlistEvent(emailResult, row.user_id, row.product_id)
 
     if (params.whatsappEnabled) {
       sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }, cooldownDays(params)).catch(

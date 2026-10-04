@@ -9,6 +9,7 @@ import {
   VARIANT_MIN_PRICE_EX_GST_SQL,
   VARIANT_MIN_MRP_SQL,
   VARIANT_STOCK_TOTAL_SQL,
+  PRODUCT_IN_STOCK_SQL,
 } from '@/lib/queries'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { logActivity } from '@/lib/shared/activity'
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
       SELECT
         wi.id, wi.product_id, wi.created_at,
         wi.snapshot_price, wi.snapshot_in_stock,
-        (p.inventory_quantity > 0) AS inventory_in_stock,
+        ${PRODUCT_IN_STOCK_SQL} AS inventory_in_stock,
         json_build_object(
           'id', p.id, 'name', p.name, 'slug', p.slug,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
@@ -90,7 +91,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Item already in wishlist' })
     }
 
-    await query('INSERT INTO wishlist_items (user_id, product_id) VALUES ($1, $2)', [userId, productId])
+    const inserted = await query(
+      `INSERT INTO wishlist_items (user_id, product_id, snapshot_price, snapshot_in_stock, snapshot_taken_at)
+       SELECT $1::uuid, p.id, p.base_price, ${PRODUCT_IN_STOCK_SQL}, NOW()
+       FROM products p WHERE p.id = $2`,
+      [userId, productId]
+    )
+    if (!inserted.rowCount) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
 
     const auth = await authenticateUser(request)
     if (auth?.userId) {

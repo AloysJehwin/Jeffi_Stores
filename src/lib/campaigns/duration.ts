@@ -11,6 +11,9 @@ export const UNIT_MINUTES: Record<DurationUnit, number> = {
   years: 525600,
 }
 
+// Minimum gap between two sends of one campaign kind to the same user; canSendMarketing enforces it.
+export const FREQUENCY_CAP_HOURS = 72
+
 export const UNIT_LABEL: Record<DurationUnit, string> = {
   minutes: 'min',
   hours: 'hr',
