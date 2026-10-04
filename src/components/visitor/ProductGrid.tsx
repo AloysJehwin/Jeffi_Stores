@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ProductCard from './ProductCard'
 import SortDropdown from './SortDropdown'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
+import { bp } from '@/lib/shared/business-path'
 
 interface ProductItem {
   id: string
@@ -61,6 +62,7 @@ interface Props {
   end?: number
   filterSlot?: React.ReactNode
   promoSlot?: React.ReactNode
+  portal?: 'storefront' | 'business'
 }
 
 type ViewMode = 'grid' | 'table'
@@ -114,10 +116,14 @@ function CategoryBannerRow({
   banners,
   gstEnabled,
   slot = 0,
+  productBase,
+  categoryBase,
 }: {
   banners: CategoryBanner[]
   gstEnabled: boolean
   slot?: number
+  productBase: string
+  categoryBase: string
 }) {
   const visible = banners.slice(0, 4)
   if (visible.length === 0) return null
@@ -132,7 +138,7 @@ function CategoryBannerRow({
             <h3 className="text-lg font-black text-foreground tracking-tight">Top Categories</h3>
           </div>
           <Link
-            href="/categories"
+            href={categoryBase}
             className="flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold transition-colors"
           >
             All categories
@@ -149,13 +155,13 @@ function CategoryBannerRow({
             >
               <div className="px-3 pt-3 pb-2 flex items-center justify-between">
                 <Link
-                  href={`/categories/${cat.slug}`}
+                  href={`${categoryBase}/${cat.slug}`}
                   className="font-bold text-foreground hover:text-accent-500 transition-colors text-sm leading-tight truncate"
                 >
                   {cat.name}
                 </Link>
                 <Link
-                  href={`/categories/${cat.slug}`}
+                  href={`${categoryBase}/${cat.slug}`}
                   className="text-[10px] text-accent-500 hover:text-accent-400 font-semibold whitespace-nowrap ml-2 shrink-0"
                 >
                   See all
@@ -178,7 +184,7 @@ function CategoryBannerRow({
                   return (
                     <Link
                       key={p.id}
-                      href={`/products/${p.slug}`}
+                      href={`${productBase}/${p.slug}`}
                       className="group bg-surface-secondary rounded-lg p-2 flex flex-col gap-1 hover:bg-surface transition-colors"
                     >
                       <div className="aspect-square overflow-hidden rounded-md bg-surface flex items-center justify-center">
@@ -206,14 +212,24 @@ function CategoryBannerRow({
   )
 }
 
-function TableRow({ product, gstEnabled, stripe }: { product: ProductItem; gstEnabled: boolean; stripe: boolean }) {
+function TableRow({
+  product,
+  gstEnabled,
+  stripe,
+  productBase,
+}: {
+  product: ProductItem
+  gstEnabled: boolean
+  stripe: boolean
+  productBase: string
+}) {
   const { displayPrice, effectiveStock, mrp, mrpDiscount } = resolve(product, gstEnabled)
   const img = product.product_images?.find(i => i.is_primary) || product.product_images?.[0]
   const specs = [product.grade, product.material, product.finish].filter(Boolean) as string[]
 
   return (
     <a
-      href={`/products/${product.slug}`}
+      href={`${productBase}/${product.slug}`}
       className={`flex items-center gap-3 px-4 py-3 hover:bg-accent-50 dark:hover:bg-accent-900/10 transition-colors border-b border-border-default last:border-0 group ${stripe ? 'bg-surface-secondary/30' : ''}`}
     >
       <div className="w-10 h-10 shrink-0 rounded-lg bg-surface-secondary border border-border-default overflow-hidden">
@@ -289,10 +305,20 @@ const BANNER_EVERY = 9
 // so the full-width promo never leaves a hole in the row above it.
 const PROMO_AFTER = 6
 
-export default function ProductGrid({ products, gstEnabled, categoryBanners = [], filterSlot, promoSlot }: Props) {
+export default function ProductGrid({
+  products,
+  gstEnabled,
+  categoryBanners = [],
+  filterSlot,
+  promoSlot,
+  portal = 'storefront',
+}: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const router = useRouter()
   const searchParams = useSearchParams()
+  const isBusiness = portal === 'business'
+  const productBase = isBusiness ? bp('/business/products') : '/products'
+  const categoryBase = isBusiness ? bp('/business/categories') : '/categories'
 
   // grouped = server sorted by category (sort=category param)
   const grouped = searchParams.get('sort') === 'category'
@@ -407,7 +433,13 @@ export default function ProductGrid({ products, gstEnabled, categoryBanners = []
             <div className="shrink-0 w-3.5" />
           </div>
           {products.map((product, idx) => (
-            <TableRow key={product.id} product={product} gstEnabled={gstEnabled} stripe={idx % 2 !== 0} />
+            <TableRow
+              key={product.id}
+              product={product}
+              gstEnabled={gstEnabled}
+              stripe={idx % 2 !== 0}
+              productBase={productBase}
+            />
           ))}
         </div>
       ) : (
@@ -418,7 +450,7 @@ export default function ProductGrid({ products, gstEnabled, categoryBanners = []
               {grouped && group.name && (
                 <div className="flex items-center gap-3 mb-4">
                   <Link
-                    href={group.slug ? `/categories/${group.slug}` : '/products'}
+                    href={group.slug ? `${categoryBase}/${group.slug}` : productBase}
                     className="text-sm font-bold text-foreground hover:text-accent-500 transition-colors whitespace-nowrap"
                   >
                     {group.name}
@@ -451,7 +483,13 @@ export default function ProductGrid({ products, gstEnabled, categoryBanners = []
                     <Fragment key={product.id}>
                       {showPromo && <div className="col-span-full">{promoSlot}</div>}
                       {showBanner && rotatedBanners.length > 0 && (
-                        <CategoryBannerRow banners={rotatedBanners} gstEnabled={gstEnabled} slot={bannerSlot} />
+                        <CategoryBannerRow
+                          banners={rotatedBanners}
+                          gstEnabled={gstEnabled}
+                          slot={bannerSlot}
+                          productBase={productBase}
+                          categoryBase={categoryBase}
+                        />
                       )}
                       <div className="relative group">
                         <ProductCard
@@ -466,12 +504,14 @@ export default function ProductGrid({ products, gstEnabled, categoryBanners = []
                           primaryImage={primaryImage}
                           brandName={product.brands?.name ?? null}
                           categoryName={product.categories?.name ?? null}
+                          categoryId={product.categories?.id ?? null}
                           discountPct={Number(product.discount_pct ?? 0)}
                           extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
                           handlingDays={Number(product.handling_days ?? 2)}
                           fragile={product.fragile}
                           hazardous={product.hazardous}
                           flammable={product.flammable}
+                          portal={portal}
                         />
                         {specs.length > 0 && (
                           <div className="absolute bottom-0 left-0 right-0 pointer-events-none overflow-hidden rounded-b-lg">
