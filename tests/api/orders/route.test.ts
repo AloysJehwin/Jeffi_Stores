@@ -117,3 +117,80 @@ describe('GET /api/orders', () => {
     expect(res.status).toBe(500)
   })
 })
+
+describe('GET /api/orders — identity boundary (user_id + email/phone, source-scoped)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  // Pull the SQL string the route passed to queryMany, plus the params.
+  function capturedQuery() {
+    const call = vi.mocked(db.queryMany).mock.calls[0]
+    return { sql: String(call[0]), params: call[1] as any[] }
+  }
+  function capturedCount() {
+    const call = vi.mocked(db.queryCount).mock.calls[0]
+    return { sql: String(call[0]), params: call[1] as any[] }
+  }
+
+  it('looks up the account email+phone for a regular customer', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ email: 'me@example.com', phone: '9000000000' })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([])
+    vi.mocked(db.queryCount).mockResolvedValueOnce(0)
+    await GET(makeRequest() as any)
+    expect(db.queryOne).toHaveBeenCalledWith(expect.stringContaining('SELECT email, phone FROM users'), ['user-1'])
+  })
+
+  it('customer query matches user_id OR email+phone, but EXCLUDES business-source', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ email: 'me@example.com', phone: '9000000000' })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([])
+    vi.mocked(db.queryCount).mockResolvedValueOnce(0)
+    await GET(makeRequest() as any)
+
+    const { sql, params } = capturedQuery()
+    // own orders by user_id
+    expect(sql).toContain('o.user_id = $1')
+    // email+phone fallback, both required
+    expect(sql).toContain('o.customer_email = $2')
+    expect(sql).toContain('o.customer_phone = $3')
+    expect(sql).toContain('$3::text IS NOT NULL')
+    // the fallback must be scoped away from business-source orders (null-safe)
+    expect(sql).toContain("o.source IS DISTINCT FROM 'business'")
+    // params carry id, email, phone (then limit, offset)
+    expect(params.slice(0, 3)).toEqual(['user-1', 'me@example.com', '9000000000'])
+
+    // the count query enforces the same boundary
+    expect(capturedCount().sql).toContain("o.source IS DISTINCT FROM 'business'")
+  })
+
+  it('business query matches user_id OR email+phone and does NOT exclude business-source', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(BIZ_USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ email: 'biz@example.com', phone: '9111111111' })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([])
+    vi.mocked(db.queryCount).mockResolvedValueOnce(0)
+    await GET(makeRequest() as any)
+
+    const { sql, params } = capturedQuery()
+    expect(sql).toContain('o.user_id = $1')
+    expect(sql).toContain('o.customer_email = $2')
+    expect(sql).toContain('o.customer_phone = $3')
+    // business portal must NOT carry the customer-only source exclusion
+    expect(sql).not.toContain("o.source IS DISTINCT FROM 'business'")
+    expect(params.slice(0, 3)).toEqual(['biz-user-1', 'biz@example.com', '9111111111'])
+  })
+
+  it('email+phone fallback requires BOTH (null phone cannot match via the $3 IS NOT NULL guard)', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ email: 'me@example.com', phone: null })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([])
+    vi.mocked(db.queryCount).mockResolvedValueOnce(0)
+    await GET(makeRequest() as any)
+
+    const { sql, params } = capturedQuery()
+    // the SQL always guards on $3 IS NOT NULL, so a null phone param neutralises the fallback
+    expect(sql).toContain('$3::text IS NOT NULL')
+    expect(params[2]).toBeNull()
+  })
+})
