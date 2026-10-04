@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/shared/db'
 import { authenticateUser } from '@/lib/auth/jwt'
 import { POLICY_VERSION } from '@/lib/legals/policies'
+import { formatDob } from '@/lib/shared/format'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,11 +10,13 @@ export async function GET(request: NextRequest) {
     if (!userPayload) return NextResponse.json({ user: null })
 
     const user = await queryOne<any>(
-      `SELECT id, email, first_name, last_name, phone, phone_verified, created_at, avatar_url, policies_accepted_version
+      `SELECT id, email, first_name, last_name, phone, phone_verified, date_of_birth, created_at, avatar_url, policies_accepted_version
        FROM users WHERE id = $1 AND user_type != 'business'`,
       [userPayload.userId]
     )
     if (!user) return NextResponse.json({ user: null })
+
+    const dateOfBirth = formatDob(user.date_of_birth)
 
     return NextResponse.json({
       user: {
@@ -23,6 +26,8 @@ export async function GET(request: NextRequest) {
         lastName: user.last_name,
         phone: user.phone,
         phoneVerified: user.phone_verified,
+        dateOfBirth,
+        requiresDob: dateOfBirth === null,
         createdAt: user.created_at,
         avatarUrl: user.avatar_url || null,
         policiesAcceptedVersion: user.policies_accepted_version,

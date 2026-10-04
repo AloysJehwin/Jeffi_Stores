@@ -10,6 +10,7 @@ interface User {
   lastName: string | null
   phone: string | null
   phoneVerified?: boolean
+  dateOfBirth?: string | null
   createdAt: string
   avatarUrl: string | null
   isBusiness?: boolean
@@ -18,7 +19,24 @@ interface User {
   businessDiscountMap?: Record<string, number>
   policiesAcceptedVersion?: string | null
   requiresPolicyAcceptance?: boolean
+  requiresDob?: boolean
   policyVersion?: string
+}
+
+export interface GoogleProfile {
+  email: string
+  firstName: string
+  lastName: string
+}
+
+export type GoogleAuthResult = { newUser: true; profile: GoogleProfile } | { newUser: false; user: User }
+
+interface GoogleSignupArgs {
+  accessToken: string
+  firstName: string
+  lastName?: string
+  phone: string
+  dateOfBirth: string
 }
 
 interface AuthContextType {
@@ -26,7 +44,8 @@ interface AuthContextType {
   isLoading: boolean
   login: (email: string, otp: string, policiesAccepted?: boolean) => Promise<void>
   googleLogin: (idToken: string) => Promise<void>
-  googleLoginWithAccessToken: (accessToken: string) => Promise<User>
+  googleLoginWithAccessToken: (accessToken: string) => Promise<GoogleAuthResult>
+  googleSignupComplete: (args: GoogleSignupArgs) => Promise<User>
   signup: (data: SignupData) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
@@ -38,6 +57,7 @@ interface SignupData {
   firstName: string
   lastName?: string
   phone?: string
+  dateOfBirth?: string
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -108,7 +128,7 @@ export function AuthProvider({ children, meEndpoint = '/api/auth/me' }: { childr
     setUser(data.user)
   }
 
-  const googleLoginWithAccessToken = async (accessToken: string): Promise<User> => {
+  const googleLoginWithAccessToken = async (accessToken: string): Promise<GoogleAuthResult> => {
     const response = await fetch('/api/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -117,6 +137,25 @@ export function AuthProvider({ children, meEndpoint = '/api/auth/me' }: { childr
     if (!response.ok) {
       const data = await response.json()
       throw new Error(data.error || 'Google login failed')
+    }
+    const data = await response.json()
+    if (data.newUser) {
+      return { newUser: true, profile: data.profile as GoogleProfile }
+    }
+    setUser(data.user)
+    return { newUser: false, user: data.user as User }
+  }
+
+  const googleSignupComplete = async (args: GoogleSignupArgs): Promise<User> => {
+    const response = await fetch('/api/auth/google/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(args),
+    })
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || 'Failed to create account')
     }
     const data = await response.json()
     setUser(data.user)
@@ -152,7 +191,17 @@ export function AuthProvider({ children, meEndpoint = '/api/auth/me' }: { childr
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, login, googleLogin, googleLoginWithAccessToken, signup, logout, refreshUser }}
+      value={{
+        user,
+        isLoading,
+        login,
+        googleLogin,
+        googleLoginWithAccessToken,
+        googleSignupComplete,
+        signup,
+        logout,
+        refreshUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

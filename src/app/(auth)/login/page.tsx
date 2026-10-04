@@ -70,8 +70,13 @@ function LoginPage() {
     setError('')
     setGoogleLoading(true)
     googleLoginWithAccessToken(accessToken)
-      .then(async loggedInUser => {
+      .then(async result => {
+        if (result.newUser) {
+          goToGoogleSignup(accessToken, result.profile)
+          return
+        }
         await refreshCart()
+        const loggedInUser = result.user
         const needsPhone = !loggedInUser?.phone || !loggedInUser?.phoneVerified
         const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
         if (needsPhone || needsPolicy) {
@@ -107,8 +112,13 @@ function LoginPage() {
       return
     }
     try {
-      const loggedInUser = await googleLoginWithAccessToken(result.accessToken)
+      const authResult = await googleLoginWithAccessToken(result.accessToken)
+      if (authResult.newUser) {
+        goToGoogleSignup(result.accessToken, authResult.profile)
+        return
+      }
       await refreshCart()
+      const loggedInUser = authResult.user
       const needsPhone = !loggedInUser?.phone || !loggedInUser?.phoneVerified
       const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
       if (needsPhone || needsPolicy) {
@@ -125,6 +135,14 @@ function LoginPage() {
   }
 
   const identifierIsPhone = /^\d/.test(identifier.trim())
+
+  // The token rides via sessionStorage, never the URL.
+  function goToGoogleSignup(accessToken: string, profile: { email: string; firstName: string; lastName: string }) {
+    try {
+      sessionStorage.setItem('google_signup', JSON.stringify({ accessToken, profile }))
+    } catch {}
+    router.push(`/signup?google=1&from=login${redirect !== '/' ? `&redirect=${encodeURIComponent(redirect)}` : ''}`)
+  }
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()

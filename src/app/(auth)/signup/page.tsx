@@ -10,6 +10,8 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { Suspense } from 'react'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
+import DatePicker from '@/components/ui/DatePicker'
+import { isValidDob } from '@/lib/shared/format'
 
 export default function SignupPageWrapper() {
   return (
@@ -68,6 +70,7 @@ function SignupPage() {
   const searchParams = useSearchParams()
   const fromLogin = searchParams.get('from') === 'login'
   const prefillEmail = searchParams.get('email') || ''
+  const isGoogleMode = searchParams.get('google') === '1'
   const rawRedirectTo = searchParams.get('redirect') || '/'
 
   const [smsEnabled, setSmsEnabled] = useState(process.env.NEXT_PUBLIC_SMS_DISABLED !== 'true')
@@ -88,7 +91,7 @@ function SignupPage() {
   )
   const redirectTo = ['/login', '/signup'].some(p => rawRedirectTo.startsWith(p)) ? '/' : rawRedirectTo
 
-  const { signup, googleLoginWithAccessToken, logout } = useAuth()
+  const { signup, googleLoginWithAccessToken, googleSignupComplete, logout } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
   const config = useStoreConfig()
@@ -99,6 +102,7 @@ function SignupPage() {
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
+  const [dob, setDob] = useState('')
   const [channel, setChannel] = useState<Channel>('email')
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -106,15 +110,70 @@ function SignupPage() {
   const [error, setError] = useState('')
   const [policyAccepted, setPolicyAccepted] = useState(false)
   const [phoneRequiresPolicy, setPhoneRequiresPolicy] = useState(false)
+  const [phoneRequiresDob, setPhoneRequiresDob] = useState(false)
   const [showPhoneVerify, setShowPhoneVerify] = useState(false)
   const otpInputRef = useRef<HTMLInputElement>(null)
   const submittedOtpRef = useRef<string>('')
+
+  const [googleMode, setGoogleMode] = useState(isGoogleMode)
+  const [googleAccessToken, setGoogleAccessToken] = useState('')
+  const googleHydratedRef = useRef(false)
+
+  useEffect(() => {
+    if (!isGoogleMode || googleHydratedRef.current) return
+    googleHydratedRef.current = true
+    // Not removed here: Strict Mode runs this effect twice in dev. Cleared once the account is created.
+    try {
+      const raw = sessionStorage.getItem('google_signup')
+      if (!raw) {
+        setError('Google sign-up session expired. Please try again.')
+        setGoogleMode(false)
+        return
+      }
+      const { accessToken, profile } = JSON.parse(raw)
+      setGoogleAccessToken(accessToken)
+      setEmail(profile.email || '')
+      setFirstName(profile.firstName || '')
+      setLastName(profile.lastName || '')
+      setGoogleMode(true)
+    } catch {
+      setError('Google sign-up session expired. Please try again.')
+      setGoogleMode(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (resendCooldown <= 0) return
     const t = setTimeout(() => setResendCooldown(c => c - 1), 1000)
     return () => clearTimeout(t)
   }, [resendCooldown])
+
+  async function handleGoogleResult(accessToken: string) {
+    const result = await googleLoginWithAccessToken(accessToken)
+    if (result.newUser) {
+      setGoogleAccessToken(accessToken)
+      setEmail(result.profile.email || '')
+      setFirstName(result.profile.firstName || '')
+      setLastName(result.profile.lastName || '')
+      setGoogleMode(true)
+      setStep('details')
+      return
+    }
+    await refreshCart()
+    const loggedInUser = result.user
+    const needsPhone = !loggedInUser?.phone || !loggedInUser?.phoneVerified
+    const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
+    const needsDob = !loggedInUser?.dateOfBirth
+    if (needsPhone || needsPolicy || needsDob) {
+      setPhoneRequiresPolicy(needsPolicy)
+      setPhoneRequiresDob(needsDob)
+      setPolicyAccepted(false)
+      setShowPhoneVerify(true)
+    } else {
+      router.push(redirectTo)
+    }
+  }
 
   // Hash fallback: popup blocked → callback redirects back here with access_token in hash.
   useEffect(() => {
@@ -127,17 +186,7 @@ function SignupPage() {
     window.history.replaceState(null, '', window.location.pathname + window.location.search)
     setError('')
     setGoogleLoading(true)
-    googleLoginWithAccessToken(accessToken)
-      .then(async loggedInUser => {
-        await refreshCart()
-        const needsPhone = !loggedInUser?.phone || !loggedInUser?.phoneVerified
-        const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
-        if (needsPhone || needsPolicy) {
-          setPhoneRequiresPolicy(needsPolicy)
-          setPolicyAccepted(false)
-          setShowPhoneVerify(true)
-        } else router.push(redirectTo)
-      })
+    handleGoogleResult(accessToken)
       .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
       .finally(() => setGoogleLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,21 +216,53 @@ function SignupPage() {
       return
     }
     try {
-      const loggedInUser = await googleLoginWithAccessToken(result.accessToken)
-      await refreshCart()
-      const needsPhone = !loggedInUser?.phone || !loggedInUser?.phoneVerified
-      const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
-      if (needsPhone || needsPolicy) {
-        setPhoneRequiresPolicy(needsPolicy)
-        setPolicyAccepted(false)
-        setShowPhoneVerify(true)
-      } else {
-        router.push(redirectTo)
-      }
+      await handleGoogleResult(result.accessToken)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setGoogleLoading(false)
+    }
+  }
+
+  const handleGoogleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    if (!firstName.trim()) {
+      setError('First name is required')
+      return
+    }
+    if (phone.length !== 10) {
+      setError('Enter a valid 10-digit mobile number')
+      return
+    }
+    if (!isValidDob(dob)) {
+      setError('Enter a valid date of birth')
+      return
+    }
+    if (!policyAccepted) {
+      setError('Please accept the Privacy Policy and Terms & Conditions')
+      return
+    }
+    setIsLoading(true)
+    try {
+      await googleSignupComplete({
+        accessToken: googleAccessToken,
+        firstName,
+        lastName: lastName || undefined,
+        phone: `+91${phone}`,
+        dateOfBirth: dob,
+      })
+      try {
+        sessionStorage.removeItem('google_signup')
+      } catch {}
+      await refreshCart()
+      setPhoneRequiresPolicy(false)
+      setPhoneRequiresDob(false)
+      setShowPhoneVerify(true)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -195,6 +276,10 @@ function SignupPage() {
     }
     if (phone.length > 0 && phone.length !== 10) {
       setError('Enter a valid 10-digit mobile number')
+      return
+    }
+    if (!isValidDob(dob)) {
+      setError('Enter a valid date of birth')
       return
     }
     setIsLoading(true)
@@ -247,6 +332,7 @@ function SignupPage() {
         firstName,
         lastName: lastName || undefined,
         phone: phone.length === 10 ? `+91${phone}` : undefined,
+        dateOfBirth: dob,
       })
       await refreshCart()
       router.push(redirectTo)
@@ -315,7 +401,16 @@ function SignupPage() {
             <p className="mt-2 text-sm text-foreground-secondary">Join {config.identity.name} for exclusive deals</p>
           </div>
 
-          {fromLogin && step === 'details' && (
+          {googleMode && step === 'details' && (
+            <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                No account found for <strong>{email}</strong>. Confirm your details and add a mobile number and date of
+                birth to finish signing up.
+              </p>
+            </div>
+          )}
+
+          {fromLogin && !googleMode && step === 'details' && (
             <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <p className="text-sm text-blue-800 dark:text-blue-300">
                 No account found for <strong>{prefillEmail}</strong>. Create one to continue.
@@ -330,7 +425,7 @@ function SignupPage() {
           )}
 
           {/* Google OAuth — shown on details step only */}
-          {step === 'details' && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+          {step === 'details' && !googleMode && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
             <>
               <button
                 type="button"
@@ -374,7 +469,7 @@ function SignupPage() {
           )}
 
           {/* Step 1: collect all details */}
-          {step === 'details' && (
+          {step === 'details' && !googleMode && (
             <form onSubmit={handleSendOTP} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -447,6 +542,22 @@ function SignupPage() {
                 )}
               </div>
 
+              <div>
+                <label htmlFor="dob" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Date of Birth *
+                </label>
+                <DatePicker
+                  value={dob}
+                  onChange={setDob}
+                  max={new Date().toISOString().slice(0, 10)}
+                  placeholder="dd/mm/yyyy"
+                  className="w-full"
+                />
+                {dob.length > 0 && !isValidDob(dob) && (
+                  <p className="mt-1 text-xs text-red-500">Enter a valid date of birth</p>
+                )}
+              </div>
+
               {/* OTP channel selector */}
               <div>
                 <p className="text-sm font-medium text-foreground-secondary mb-2">
@@ -490,6 +601,140 @@ function SignupPage() {
                   </>
                 ) : (
                   'Send Verification Code'
+                )}
+              </button>
+            </form>
+          )}
+
+          {step === 'details' && googleMode && (
+            <form onSubmit={handleGoogleSubmit} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="g-firstName" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    First Name *
+                  </label>
+                  <input
+                    id="g-firstName"
+                    type="text"
+                    required
+                    value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
+                    className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    placeholder="John"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="g-lastName" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    id="g-lastName"
+                    type="text"
+                    value={lastName}
+                    onChange={e => setLastName(e.target.value)}
+                    className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    placeholder="Doe"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="g-email" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Email Address
+                </label>
+                <input
+                  id="g-email"
+                  type="email"
+                  value={email}
+                  readOnly
+                  disabled
+                  className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="g-phone" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Mobile Number *
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
+                    +91
+                  </span>
+                  <input
+                    id="g-phone"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    value={phone}
+                    required
+                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    placeholder="00000 00000"
+                  />
+                </div>
+                {phone.length > 0 && phone.length !== 10 && (
+                  <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="g-dob" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Date of Birth *
+                </label>
+                <DatePicker
+                  value={dob}
+                  onChange={setDob}
+                  max={new Date().toISOString().slice(0, 10)}
+                  placeholder="dd/mm/yyyy"
+                  className="w-full"
+                />
+                {dob.length > 0 && !isValidDob(dob) && (
+                  <p className="mt-1 text-xs text-red-500">Enter a valid date of birth</p>
+                )}
+              </div>
+
+              <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={policyAccepted}
+                  onChange={e => setPolicyAccepted(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-accent-500 cursor-pointer"
+                />
+                <span>
+                  I agree to the{' '}
+                  <a
+                    href="/legal/privacy-policy"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-accent-500 hover:underline font-medium"
+                  >
+                    Privacy Policy
+                  </a>{' '}
+                  and{' '}
+                  <a
+                    href="/legal/terms-and-conditions"
+                    target="_blank"
+                    rel="noopener"
+                    className="text-accent-500 hover:underline font-medium"
+                  >
+                    Terms &amp; Conditions
+                  </a>
+                  .
+                </span>
+              </label>
+
+              <button
+                type="submit"
+                disabled={isLoading || phone.length !== 10 || !isValidDob(dob) || !policyAccepted}
+                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    Creating Account...
+                  </>
+                ) : (
+                  'Continue'
                 )}
               </button>
             </form>
@@ -605,7 +850,16 @@ function SignupPage() {
       {showPhoneVerify && (
         <PhoneVerifyModal
           requiresPolicy={phoneRequiresPolicy}
-          title={phoneRequiresPolicy ? 'Almost there' : undefined}
+          requiresDob={phoneRequiresDob}
+          initialPhone={googleMode ? phone : ''}
+          abandonOnCancel={googleMode}
+          title={
+            googleMode
+              ? 'Verify your mobile number'
+              : phoneRequiresPolicy || phoneRequiresDob
+                ? 'Almost there'
+                : undefined
+          }
           onVerified={() => {
             setShowPhoneVerify(false)
             router.push(redirectTo)

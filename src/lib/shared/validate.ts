@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
+import { normalizeDob } from '@/lib/shared/format'
 
 const DEV_LOG_START = Date.now()
 const DEV_LOG_WINDOW = 15 * 60 * 1000
@@ -20,6 +21,11 @@ export const zNonEmpty = z.string().trim().min(1, 'Must not be empty')
 export const zCurrency = z.coerce.number().min(0)
 
 export const zPhone = z.string().regex(/^[6-9]\d{9}$/, 'Must be a 10-digit Indian mobile number')
+
+export const zDob = z
+  .string()
+  .transform(v => normalizeDob(v))
+  .refine((v): v is string => v !== null, { message: 'Enter a valid date of birth' })
 
 type ParseOk<T> = { ok: true; data: T }
 type ParseFail = { ok: false; response: NextResponse }

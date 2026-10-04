@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { queryOne } from '@/lib/shared/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { logActivity } from '@/lib/shared/activity'
-import { parseBody, zNonEmpty, zPhone } from '@/lib/shared/validate'
+import { parseBody, zNonEmpty, zPhone, zDob } from '@/lib/shared/validate'
+import { formatDob } from '@/lib/shared/format'
 
 const UpdateUserSchema = z
   .object({
@@ -11,13 +12,15 @@ const UpdateUserSchema = z
     lastName: zNonEmpty.optional(),
     phone: zPhone.optional(),
     notificationChannel: z.enum(['email', 'sms', 'whatsapp']).optional(),
+    dateOfBirth: zDob.optional(),
   })
   .refine(
     d =>
       d.firstName !== undefined ||
       d.lastName !== undefined ||
       d.phone !== undefined ||
-      d.notificationChannel !== undefined,
+      d.notificationChannel !== undefined ||
+      d.dateOfBirth !== undefined,
     { message: 'At least one field must be provided' }
   )
 
@@ -32,10 +35,10 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const parsed = parseBody(UpdateUserSchema, body)
     if (!parsed.ok) return parsed.response
-    const { firstName, lastName, phone, notificationChannel } = parsed.data
+    const { firstName, lastName, phone, notificationChannel, dateOfBirth } = parsed.data
 
     const existing = await queryOne(
-      'SELECT first_name, last_name, phone, notification_channel FROM users WHERE id = $1',
+      'SELECT first_name, last_name, phone, notification_channel, date_of_birth FROM users WHERE id = $1',
       [userId]
     )
     if (!existing) {
@@ -60,12 +63,14 @@ export async function PATCH(request: NextRequest) {
     }
 
     const resolvedChannel = notificationChannel !== undefined ? notificationChannel : existing.notification_channel
+    const resolvedDob = dateOfBirth !== undefined ? dateOfBirth : formatDob(existing.date_of_birth)
 
     const updatedUser = await queryOne(
-      `UPDATE users SET first_name = $1, last_name = $2, phone = $3, notification_channel = $4, updated_at = NOW()
-       WHERE id = $5
+      `UPDATE users SET first_name = $1, last_name = $2, phone = $3, notification_channel = $4,
+                        date_of_birth = $5, updated_at = NOW()
+       WHERE id = $6
        RETURNING *`,
-      [resolvedFirstName, resolvedLastName || null, normalizedPhone, resolvedChannel, userId]
+      [resolvedFirstName, resolvedLastName || null, normalizedPhone, resolvedChannel, resolvedDob, userId]
     )
 
     if (!updatedUser) {
@@ -77,7 +82,9 @@ export async function PATCH(request: NextRequest) {
       kind: 'profile_updated',
       summary: 'Updated profile',
       metadata: {
-        fields: ['firstName', 'lastName', 'phone', 'notificationChannel'].filter(f => body[f] !== undefined),
+        fields: ['firstName', 'lastName', 'phone', 'notificationChannel', 'dateOfBirth'].filter(
+          f => body[f] !== undefined
+        ),
       },
     }).catch(() => {})
 
@@ -88,6 +95,7 @@ export async function PATCH(request: NextRequest) {
       lastName: updatedUser.last_name,
       phone: updatedUser.phone,
       notificationChannel: updatedUser.notification_channel,
+      dateOfBirth: formatDob(updatedUser.date_of_birth),
       createdAt: updatedUser.created_at,
     }
 
