@@ -45,6 +45,7 @@ export interface SweepResult {
   attempted: number
   sent: number
   skipped: number
+  error?: string
 }
 
 export function resolveParams<P extends Record<string, unknown>>(defaults: P, override: unknown): P {

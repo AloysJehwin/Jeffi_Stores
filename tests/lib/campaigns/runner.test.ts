@@ -120,6 +120,50 @@ describe('runScenario', () => {
     const ctx = findEligible.mock.calls[0][0]
     expect(ctx.params.sendCooldownDays).toBe(30)
   })
+
+  it('records the error instead of throwing when findEligible throws', async () => {
+    mockGetCampaign.mockResolvedValue(makeCampaign())
+    const send = vi.fn()
+    const scenario = makeScenario({
+      findEligible: vi.fn().mockRejectedValue(new Error('column u.date_of_birth does not exist')),
+      send,
+    })
+    const result = await runScenario(scenario, 'birthday')
+    expect(result).toEqual({
+      campaign: 'birthday',
+      attempted: 0,
+      sent: 0,
+      skipped: 0,
+      error: 'column u.date_of_birth does not exist',
+    })
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('records the error instead of throwing when getCampaign throws', async () => {
+    mockGetCampaign.mockRejectedValue(new Error('db down'))
+    const result = await runScenario(makeScenario(), 'abandoned_checkout')
+    expect(result.error).toBe('db down')
+    expect(result.attempted).toBe(0)
+  })
+
+  it('keeps sending to the remaining rows after one send throws', async () => {
+    mockGetCampaign.mockResolvedValue(makeCampaign())
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true })
+      .mockRejectedValueOnce(new Error('coupon lookup failed'))
+      .mockResolvedValueOnce({ ok: true })
+    const scenario = makeScenario({
+      findEligible: vi.fn().mockResolvedValue([{ id: '1' }, { id: '2' }, { id: '3' }]),
+      send,
+    })
+    const result = await runScenario(scenario, 'abandoned_checkout')
+    expect(send).toHaveBeenCalledTimes(3)
+    expect(result.attempted).toBe(3)
+    expect(result.sent).toBe(2)
+    expect(result.skipped).toBe(1)
+    expect(result.error).toBe('coupon lookup failed')
+  })
 })
 
 describe('runScenarioForAllCampaigns', () => {

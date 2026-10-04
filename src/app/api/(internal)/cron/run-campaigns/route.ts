@@ -34,8 +34,8 @@ export async function GET(req: NextRequest) {
   }
 
   const results: SweepResult[] = []
-  try {
-    for (const t of targets) {
+  for (const t of targets) {
+    try {
       const builtin = getScenario(t.scenarioKind)
       if (builtin) {
         results.push(await runScenario(builtin, t.campaignKind))
@@ -50,10 +50,26 @@ export async function GET(req: NextRequest) {
           results.push(await runCustomScenario(t.scenarioKind, campaign))
         }
       }
+    } catch (err: any) {
+      console.error('[run-campaigns]', t.campaignKind, err)
+      results.push({
+        campaign: t.campaignKind,
+        attempted: 0,
+        sent: 0,
+        skipped: 0,
+        error: err?.message || 'Sweep failed',
+      })
     }
-    const totalSent = results.reduce((s, r) => s + r.sent, 0)
-    return NextResponse.json({ success: true, totalSent, results })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Sweep failed' }, { status: 500 })
   }
+
+  const totalSent = results.reduce((s, r) => s + r.sent, 0)
+  const failed = results.filter(r => r.error)
+  // The whole sweep always runs; a non-2xx afterwards keeps a failed campaign visible to the scheduler.
+  if (failed.length > 0) {
+    return NextResponse.json(
+      { success: false, error: failed[0].error, totalSent, failed: failed.length, results },
+      { status: 500 }
+    )
+  }
+  return NextResponse.json({ success: true, totalSent, results })
 }
