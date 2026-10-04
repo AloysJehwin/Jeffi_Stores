@@ -610,13 +610,13 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/price-drop.ts": {
-    "mtime": 1790931253.4586847,
-    "ast_hash": "933cfdebdfe8bbcf4eb85d617d379d33",
+    "mtime": 1791135956.4867013,
+    "ast_hash": "56cf2ba37692c4dc7f6c2504c8085ba0",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/restock.ts": {
-    "mtime": 1790931253.4610016,
-    "ast_hash": "53386bc607331fd2e27e8206400103ee",
+    "mtime": 1791135956.4907286,
+    "ast_hash": "5ecc9505fdff1aa63623e6a2d80bd5d5",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/review-reminder.ts": {
@@ -1980,8 +1980,8 @@
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios.test.ts": {
-    "mtime": 1791049730.0319054,
-    "ast_hash": "3008b5ab1dcf0922ec9c104a1aeb94bf",
+    "mtime": 1791136123.1913445,
+    "ast_hash": "545ff6d4c2472f5329003662c67ab269",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/_registry.test.ts": {
@@ -4440,8 +4440,8 @@
     "semantic_hash": ""
   },
   "src/components/visitor/account/wishlist-badges.ts": {
-    "mtime": 1790931253.1493237,
-    "ast_hash": "aed498d3c5a4fae028381b75ca8a7a42",
+    "mtime": 1791136024.4344263,
+    "ast_hash": "fe261bf7bbe45689a320906744af4b1d",
     "semantic_hash": ""
   },
   "src/components/visitor/cart/CartUpsellRow.tsx": {
@@ -6015,8 +6015,8 @@
     "semantic_hash": ""
   },
   "tests/api/wishlist/route.test.ts": {
-    "mtime": 1790931256.9515214,
-    "ast_hash": "82b39df5bf01c4673ea2b1c1c78e7fd1",
+    "mtime": 1791136202.8473754,
+    "ast_hash": "02b696aa4950ba9efc9bc38a6fc5780e",
     "semantic_hash": ""
   },
   "tests/helpers/pdf-mocks.ts": {
@@ -6225,8 +6225,8 @@
     "semantic_hash": ""
   },
   "src/lib/queries/index.ts": {
-    "mtime": 1790931253.866409,
-    "ast_hash": "0f83809db387c6a9ae1f8162c455f46c",
+    "mtime": 1791135909.897647,
+    "ast_hash": "799fa67e3e567c5d1ff557f82365ac2f",
     "semantic_hash": ""
   },
   "src/lib/queries/orders.ts": {
@@ -6235,8 +6235,8 @@
     "semantic_hash": ""
   },
   "src/lib/queries/shared.ts": {
-    "mtime": 1790931253.8749402,
-    "ast_hash": "4c66aa820264d724ffa45ea69dbac625",
+    "mtime": 1791136251.2159798,
+    "ast_hash": "87a5e812fa4856b1cc3608d1f0a55ff4",
     "semantic_hash": ""
   },
   "src/lib/tenant-registry/custom-domains.ts": {
@@ -11365,8 +11365,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(public)/wishlist/route.ts": {
-    "mtime": 1790931252.1437633,
-    "ast_hash": "12c70c01466f1b1ad3143b29b9299ffa",
+    "mtime": 1791136021.6806734,
+    "ast_hash": "edce0cab3390577926320104d5678914",
     "semantic_hash": ""
   },
   "src/lib/auth/admin-auth.ts": {
@@ -12045,8 +12045,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/marketing.ts": {
-    "mtime": 1791050359.3135781,
-    "ast_hash": "7fb2e14e9c9db227104e44546b3d75c5",
+    "mtime": 1791136069.3723965,
+    "ast_hash": "b08696455d517375363fc26a6bc15d47",
     "semantic_hash": ""
   },
   "src/lib/shared/message-log.ts": {
@@ -12635,8 +12635,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/duration.ts": {
-    "mtime": 1791046951.1840515,
-    "ast_hash": "50b90dc190a902acbacd805aa6454828",
+    "mtime": 1791136069.357764,
+    "ast_hash": "3ecbd9acb10dd3223c3234962ce4f222",
     "semantic_hash": ""
   },
   "src/lib/campaigns/ensure-builtin-campaigns.ts": {
@@ -12650,8 +12650,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/back-in-stock-wishlist.ts": {
-    "mtime": 1791050126.4451077,
-    "ast_hash": "8426d3393ef101dd244a06e7e10a8774",
+    "mtime": 1791135956.4947588,
+    "ast_hash": "614ad2cc3581db8d863b836110677023",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/birthday.ts": {
@@ -12745,8 +12745,8 @@
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/back-in-stock-wishlist.test.ts": {
-    "mtime": 1791050193.4279175,
-    "ast_hash": "eef4c47f17492d0bd6c413894386d536",
+    "mtime": 1791136156.814745,
+    "ast_hash": "010e3f85d710aa349545c25fd7b43323",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/birthday.test.ts": {
@@ -12887,6 +12887,16 @@
   "tests/api/auth/google/complete/route.test.ts": {
     "mtime": 1791133402.890082,
     "ast_hash": "879ffd37bb6c2b718e35e553a91572b6",
+    "semantic_hash": ""
+  },
+  "src/lib/campaigns/scenarios/_wishlist-base.ts": {
+    "mtime": 1791136069.3727336,
+    "ast_hash": "7d65fca0867339509beadc13fcad01bb",
+    "semantic_hash": ""
+  },
+  "tests/lib/campaigns/scenarios/wishlist-base.test.ts": {
+    "mtime": 1791136171.3382206,
+    "ast_hash": "1f08cfbda7699f02487f5b651120b9d4",
     "semantic_hash": ""
   }
 }
