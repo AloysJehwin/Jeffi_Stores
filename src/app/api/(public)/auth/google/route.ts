@@ -6,60 +6,11 @@ import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/shared/activity'
 import { uploadAvatarImage } from '@/lib/shared/s3'
 import { cookieDomainOption } from '@/lib/auth/cookie-domain'
+import { verifyGoogleCredential } from '@/lib/auth/google-verify'
+import { formatDob } from '@/lib/shared/format'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
-}
-
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''
-
-interface GoogleTokenPayload {
-  sub: string
-  email: string
-  given_name?: string
-  family_name?: string
-  name?: string
-  picture?: string
-  aud?: string | string[]
-}
-
-async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload | null> {
-  try {
-    const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`)
-    if (!res.ok) return null
-    const data = await res.json()
-    if (!data.sub || !data.email) return null
-    if (GOOGLE_CLIENT_ID) {
-      const aud = Array.isArray(data.aud) ? data.aud : [data.aud]
-      if (!aud.includes(GOOGLE_CLIENT_ID)) return null
-    }
-    return data as GoogleTokenPayload
-  } catch (err) {
-    console.error('[route]', err)
-    return null
-  }
-}
-
-async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleTokenPayload | null> {
-  try {
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    if (!data.sub || !data.email || data.email_verified === false) return null
-    return {
-      sub: data.sub,
-      email: data.email,
-      given_name: data.given_name,
-      family_name: data.family_name,
-      name: data.name,
-      picture: data.picture,
-    }
-  } catch (err) {
-    console.error('[route]', err)
-    return null
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -69,7 +20,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'idToken or accessToken required' }, { status: 400 })
     }
 
-    const payload = idToken ? await verifyGoogleToken(idToken) : await verifyGoogleAccessToken(accessToken)
+    const payload = await verifyGoogleCredential(idToken, accessToken)
     if (!payload) return NextResponse.json({ error: 'Invalid Google token' }, { status: 401 })
 
     const email = payload.email.toLowerCase()
@@ -111,20 +62,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (!user) {
-      user = await queryOne<any>(
-        `INSERT INTO users (email, first_name, last_name, is_active, auth_provider, google_id, last_login)
-         VALUES ($1, $2, $3, true, 'google', $4, NOW())
-         RETURNING *`,
-        [email, firstName, lastName, googleId]
-      )
-      if (user) {
-        logActivity({
-          userId: user.id,
-          kind: 'signup',
-          summary: 'Signed up via Google',
-          metadata: { provider: 'google' },
-        }).catch(() => {})
-      }
+      // No account is created here; /api/auth/google/complete does that once mobile and DOB are supplied.
+      return NextResponse.json({
+        newUser: true,
+        profile: { email, firstName, lastName },
+      })
     } else {
       if (!user.google_id) {
         await query('UPDATE users SET google_id = $1, auth_provider = $2 WHERE id = $3', [googleId, 'google', user.id])
@@ -140,8 +82,6 @@ export async function POST(request: NextRequest) {
         metadata: { provider: 'google' },
       }).catch(() => {})
     }
-
-    if (!user) return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
 
     if (payload.picture) {
       try {
@@ -207,6 +147,7 @@ export async function POST(request: NextRequest) {
         lastName: user.last_name,
         phone: user.phone,
         phoneVerified: user.phone_verified ?? false,
+        dateOfBirth: formatDob(user.date_of_birth),
       },
     })
   } catch (err: any) {

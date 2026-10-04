@@ -7,6 +7,7 @@ import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { logActivity } from '@/lib/shared/activity'
 import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 import { POLICY_VERSION } from '@/lib/legals/policies'
+import { normalizeDob } from '@/lib/shared/format'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -15,7 +16,7 @@ if (!process.env.JWT_SECRET) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, firstName, lastName, phone, channel } = body
+    const { email, firstName, lastName, phone, channel, dateOfBirth } = body
 
     if (!email || !firstName) {
       return NextResponse.json({ error: 'Email and first name are required' }, { status: 400 })
@@ -23,6 +24,11 @@ export async function POST(request: NextRequest) {
 
     if (!phone) {
       return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 })
+    }
+
+    const normalizedDob = normalizeDob(dateOfBirth)
+    if (!normalizedDob) {
+      return NextResponse.json({ error: 'Enter a valid date of birth' }, { status: 400 })
     }
 
     const otpValid = await isOTPVerified(email)
@@ -51,10 +57,19 @@ export async function POST(request: NextRequest) {
 
     const newUser = await queryOne(
       `INSERT INTO users (email, first_name, last_name, phone, is_active, last_login,
-                         policies_accepted_version, policies_accepted_at, notification_channel)
-       VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW(), $7)
+                         policies_accepted_version, policies_accepted_at, notification_channel, date_of_birth)
+       VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW(), $7, $8)
        RETURNING *`,
-      [email.toLowerCase(), firstName, lastName || null, normalizedPhone, true, POLICY_VERSION, channel || 'email']
+      [
+        email.toLowerCase(),
+        firstName,
+        lastName || null,
+        normalizedPhone,
+        true,
+        POLICY_VERSION,
+        channel || 'email',
+        normalizedDob,
+      ]
     )
 
     if (!newUser) {

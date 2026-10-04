@@ -2,19 +2,25 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
+import DatePicker from '@/components/ui/DatePicker'
+import { isValidDob } from '@/lib/shared/format'
 
 interface PhoneVerifyModalProps {
   requiresPolicy?: boolean
+  requiresDob?: boolean
   title?: string
   initialPhone?: string
+  abandonOnCancel?: boolean
   onVerified: () => void
   onCancel: () => void
 }
 
 export default function PhoneVerifyModal({
   requiresPolicy = false,
+  requiresDob = false,
   title,
   initialPhone = '',
+  abandonOnCancel = false,
   onVerified,
   onCancel,
 }: PhoneVerifyModalProps) {
@@ -22,6 +28,7 @@ export default function PhoneVerifyModal({
   const [stage, setStage] = useState<'phone' | 'otp'>('phone')
   const [phone, setPhone] = useState(initialPhone.replace(/\D/g, '').slice(-10))
   const [otp, setOtp] = useState('')
+  const [dob, setDob] = useState('')
   const [policyAccepted, setPolicyAccepted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -33,6 +40,15 @@ export default function PhoneVerifyModal({
     return () => clearTimeout(t)
   }, [cooldown])
 
+  async function handleCancel() {
+    if (abandonOnCancel) {
+      try {
+        await fetch('/api/auth/abandon-signup', { method: 'POST', credentials: 'include' })
+      } catch {}
+    }
+    onCancel()
+  }
+
   async function sendOtp(e?: React.FormEvent) {
     e?.preventDefault()
     setError('')
@@ -42,6 +58,10 @@ export default function PhoneVerifyModal({
     }
     if (requiresPolicy && !policyAccepted) {
       setError('Please accept the Privacy Policy and Terms & Conditions')
+      return
+    }
+    if (requiresDob && !isValidDob(dob)) {
+      setError('Enter a valid date of birth')
       return
     }
     setLoading(true)
@@ -91,6 +111,19 @@ export default function PhoneVerifyModal({
           credentials: 'include',
           body: JSON.stringify({}),
         }).catch(() => {})
+      }
+
+      if (requiresDob) {
+        const dobRes = await fetch('/api/user/update', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ dateOfBirth: dob }),
+        })
+        if (!dobRes.ok) {
+          const dobData = await dobRes.json().catch(() => ({}))
+          throw new Error(dobData.error || 'Failed to save date of birth')
+        }
       }
 
       await refreshUser()
@@ -148,6 +181,24 @@ export default function PhoneVerifyModal({
               )}
             </div>
 
+            {requiresDob && (
+              <div>
+                <label htmlFor="pv-dob" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Date of Birth *
+                </label>
+                <DatePicker
+                  value={dob}
+                  onChange={setDob}
+                  max={new Date().toISOString().slice(0, 10)}
+                  placeholder="dd/mm/yyyy"
+                  className="w-full"
+                />
+                {dob.length > 0 && !isValidDob(dob) && (
+                  <p className="mt-1 text-xs text-red-500">Enter a valid date of birth</p>
+                )}
+              </div>
+            )}
+
             {requiresPolicy && (
               <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
                 <input
@@ -182,7 +233,12 @@ export default function PhoneVerifyModal({
 
             <button
               type="submit"
-              disabled={loading || phone.length !== 10 || (requiresPolicy && !policyAccepted)}
+              disabled={
+                loading ||
+                phone.length !== 10 ||
+                (requiresPolicy && !policyAccepted) ||
+                (requiresDob && !isValidDob(dob))
+              }
               className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
@@ -255,7 +311,7 @@ export default function PhoneVerifyModal({
 
         <button
           type="button"
-          onClick={onCancel}
+          onClick={handleCancel}
           disabled={loading}
           className="w-full mt-4 text-sm text-foreground-muted hover:text-foreground"
         >

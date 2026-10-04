@@ -25,6 +25,49 @@ export function formatDate(s: string, empty = '—'): string {
   return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+export const MIN_AGE_YEARS = 3
+export const MAX_AGE_YEARS = 120
+
+// Compared in UTC so there is no drift against the DB date column.
+export function normalizeDob(input: unknown): string | null {
+  if (typeof input !== 'string') return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input.trim())
+  if (!m) return null
+  const [, ys, ms, ds] = m
+  const year = Number(ys)
+  const month = Number(ms)
+  const day = Number(ds)
+  const dob = new Date(Date.UTC(year, month - 1, day))
+  if (dob.getUTCFullYear() !== year || dob.getUTCMonth() !== month - 1 || dob.getUTCDate() !== day) return null
+
+  const now = new Date()
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  if (dob.getTime() > today.getTime()) return null
+
+  let age = today.getUTCFullYear() - year
+  if (today.getUTCMonth() < month - 1 || (today.getUTCMonth() === month - 1 && today.getUTCDate() < day)) age--
+  if (age < MIN_AGE_YEARS || age > MAX_AGE_YEARS) return null
+
+  return `${ys}-${ms}-${ds}`
+}
+
+export function isValidDob(value: string): boolean {
+  return normalizeDob(value) !== null
+}
+
+// pg returns a DATE column as a Date at local midnight, so it is read with local getters, never toISOString().
+export function formatDob(value: unknown): string | null {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null
+    const year = String(value.getFullYear()).padStart(4, '0')
+    const month = String(value.getMonth() + 1).padStart(2, '0')
+    const day = String(value.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  if (typeof value !== 'string') return null
+  return /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) ? value.trim() : null
+}
+
 export function numberToWords(num: number): string {
   if (num === 0) return 'Zero'
   const ones = [

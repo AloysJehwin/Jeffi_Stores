@@ -8,6 +8,8 @@ import Link from 'next/link'
 import { AccountMobileTabBar } from '@/components/visitor/AccountMobileHeader'
 import BuyAgainRow from '@/components/visitor/account/BuyAgainRow'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
+import DatePicker from '@/components/ui/DatePicker'
+import { isValidDob } from '@/lib/shared/format'
 // AccountNavBar is rendered by layout.tsx for all /account/* pages
 
 interface DashboardData {
@@ -68,7 +70,8 @@ export default function AccountPage() {
   const router = useRouter()
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState({ firstName: '', lastName: '', phone: '' })
+  const [formData, setFormData] = useState({ firstName: '', lastName: '', phone: '', dob: '' })
+  const [dobNudgeDismissed, setDobNudgeDismissed] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [showPhoneVerify, setShowPhoneVerify] = useState(false)
@@ -102,7 +105,11 @@ export default function AccountPage() {
         firstName: user.firstName,
         lastName: user.lastName || '',
         phone: (user.phone || '').replace(/^\+91/, ''),
+        dob: user.dateOfBirth || '',
       })
+      try {
+        setDobNudgeDismissed(localStorage.getItem('dobNudgeDismissed') === '1')
+      } catch {}
       fetch('/api/user/dashboard')
         .then(r => r.json())
         .then(setDashboard)
@@ -116,6 +123,10 @@ export default function AccountPage() {
       setMessage('Enter a valid 10-digit mobile number')
       return
     }
+    if (formData.dob && !isValidDob(formData.dob)) {
+      setMessage('Enter a valid date of birth')
+      return
+    }
     const currentPhone = (user?.phone || '').replace(/^\+91/, '')
     const phoneChanged = formData.phone !== currentPhone
     const phoneNeedsVerify = !!formData.phone && (phoneChanged || !user?.phoneVerified)
@@ -123,12 +134,14 @@ export default function AccountPage() {
     setIsSaving(true)
     setMessage('')
     try {
-      // Name always saves directly; a new/changed mobile number is verified via OTP
+      // Name and date of birth save directly; a new/changed mobile number is verified via OTP
       // (the verify route persists it), so it is not sent through the plain update.
+      const payload: Record<string, unknown> = { firstName: formData.firstName, lastName: formData.lastName }
+      if (formData.dob && formData.dob !== (user?.dateOfBirth || '')) payload.dateOfBirth = formData.dob
       const response = await fetch('/api/user/update', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName: formData.firstName, lastName: formData.lastName }),
+        body: JSON.stringify(payload),
       })
       if (!response.ok) throw new Error()
 
@@ -493,6 +506,26 @@ export default function AccountPage() {
                 )}
               </div>
 
+              {!isEditing && user && !user.dateOfBirth && !dobNudgeDismissed && (
+                <div className="mb-3 p-2.5 rounded-lg text-xs bg-accent-50 dark:bg-accent-950/20 border border-accent-200 dark:border-accent-800 flex items-start justify-between gap-2">
+                  <button onClick={() => setIsEditing(true)} className="text-left text-accent-700 dark:text-accent-300">
+                    Add your date of birth so we can send you a birthday treat.
+                  </button>
+                  <button
+                    onClick={() => {
+                      setDobNudgeDismissed(true)
+                      try {
+                        localStorage.setItem('dobNudgeDismissed', '1')
+                      } catch {}
+                    }}
+                    aria-label="Dismiss"
+                    className="text-accent-500 hover:text-accent-700 font-medium shrink-0"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
               {message && (
                 <div
                   className={`mb-3 p-2.5 rounded-lg text-xs ${message.includes('success') ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300'}`}
@@ -553,6 +586,19 @@ export default function AccountPage() {
                       </span>
                     </div>
                     <div className="flex justify-between">
+                      <span className="text-xs text-foreground-muted">Date of Birth</span>
+                      <span className="text-xs font-medium text-foreground">
+                        {user.dateOfBirth
+                          ? new Date(user.dateOfBirth).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                              timeZone: 'UTC',
+                            })
+                          : '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
                       <span className="text-xs text-foreground-muted">Member since</span>
                       <span className="text-xs font-medium text-foreground">
                         {new Date(user.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}
@@ -600,6 +646,19 @@ export default function AccountPage() {
                       />
                     </div>
                   </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground-secondary mb-1">Date of Birth</label>
+                    <DatePicker
+                      value={formData.dob}
+                      onChange={val => setFormData({ ...formData, dob: val })}
+                      max={new Date().toISOString().slice(0, 10)}
+                      placeholder="dd/mm/yyyy"
+                      className="w-full"
+                    />
+                    {formData.dob.length > 0 && !isValidDob(formData.dob) && (
+                      <p className="mt-1 text-xs text-red-500">Enter a valid date of birth</p>
+                    )}
+                  </div>
                   <div className="flex gap-2 pt-1">
                     <button
                       type="submit"
@@ -624,6 +683,7 @@ export default function AccountPage() {
                           firstName: user.firstName,
                           lastName: user.lastName || '',
                           phone: (user.phone || '').replace(/^\+91/, ''),
+                          dob: user.dateOfBirth || '',
                         })
                       }}
                       className="flex-1 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-semibold text-xs transition-colors disabled:opacity-50"
