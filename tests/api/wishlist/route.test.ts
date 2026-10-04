@@ -44,6 +44,7 @@ vi.mock('@/lib/queries', () => ({
   VARIANT_MIN_PRICE_EX_GST_SQL: `(SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id)`,
   VARIANT_MIN_MRP_SQL: `(SELECT MIN(pv.mrp) FROM product_variants pv WHERE pv.product_id = p.id)`,
   VARIANT_STOCK_TOTAL_SQL: `(SELECT COALESCE(SUM(pv.inventory_quantity),0) FROM product_variants pv WHERE pv.product_id = p.id)`,
+  PRODUCT_IN_STOCK_SQL: `(p.stock_status IS DISTINCT FROM 'Out of Stock')`,
 }))
 vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({
@@ -124,7 +125,8 @@ describe('GET /api/wishlist', () => {
     const [sql, params] = vi.mocked(queryMany).mock.calls[0]
     expect(sql).toContain('wi.snapshot_price')
     expect(sql).toContain('wi.snapshot_in_stock')
-    expect(sql).toContain('(p.inventory_quantity > 0) AS inventory_in_stock')
+    expect(sql).toContain("(p.stock_status IS DISTINCT FROM 'Out of Stock') AS inventory_in_stock")
+    expect(sql).not.toContain('p.inventory_quantity > 0')
     expect(sql).toContain("'base_price', p.base_price")
     expect(sql).not.toContain('wi.*')
     expect(params).toEqual([USER_ID])
@@ -134,8 +136,10 @@ describe('GET /api/wishlist', () => {
 describe('POST /api/wishlist — add item', () => {
   beforeEach(() => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
-    // No existing wishlist entry
-    vi.mocked(query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+    vi.mocked(query).mockReset()
+    vi.mocked(query)
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 } as any) // no existing wishlist entry
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as any) // insert
     vi.mocked(queryOne).mockResolvedValue({ name: 'Bolt Set' } as any)
   })
 
@@ -160,7 +164,7 @@ describe('POST /api/wishlist — add item', () => {
   })
 
   it('returns idempotent message when item already in wishlist', async () => {
-    // Simulate existing row returned by the SELECT check
+    vi.mocked(query).mockReset()
     vi.mocked(query).mockResolvedValue({ rows: [{ id: 'wi-existing' }], rowCount: 1 } as any)
     const req = makeRequest('POST', 'http://localhost/api/wishlist', {
       productId: PRODUCT_ID,
@@ -169,6 +173,29 @@ describe('POST /api/wishlist — add item', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.message).toBe('Item already in wishlist')
+  })
+
+  it('stamps the price and stock snapshot on the new row', async () => {
+    const res = await POST(makeRequest('POST', 'http://localhost/api/wishlist', { productId: PRODUCT_ID }) as any)
+    expect(res.status).toBe(200)
+
+    const insert = vi.mocked(query).mock.calls.find(c => String(c[0]).includes('INSERT INTO wishlist_items'))
+    expect(insert).toBeTruthy()
+    const sql = String(insert![0])
+    expect(sql).toContain('snapshot_price, snapshot_in_stock, snapshot_taken_at')
+    expect(sql).toContain('p.base_price')
+    expect(sql).toContain("(p.stock_status IS DISTINCT FROM 'Out of Stock')")
+    expect(sql).toContain('FROM products p WHERE p.id = $2')
+    expect(insert![1]).toEqual([USER_ID, PRODUCT_ID])
+  })
+
+  it('returns 404 when the product does not exist', async () => {
+    vi.mocked(query).mockReset()
+    vi.mocked(query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await POST(makeRequest('POST', 'http://localhost/api/wishlist', { productId: PRODUCT_ID }) as any)
+    expect(res.status).toBe(404)
+    expect((await res.json()).error).toBe('Product not found')
   })
 
   it('returns 400 when productId is missing', async () => {
@@ -183,6 +210,7 @@ describe('POST /api/wishlist — add item', () => {
 describe('DELETE /api/wishlist', () => {
   beforeEach(() => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
+    vi.mocked(query).mockReset()
     vi.mocked(query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
     vi.mocked(queryOne).mockResolvedValue({ name: 'Bolt Set' } as any)
   })

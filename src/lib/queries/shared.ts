@@ -94,4 +94,12 @@ export const EFFECTIVE_STOCK_SQL = `
   END
 `
 
+// Availability as the storefront shows it: stock_status, never inventory_quantity (often left at 0).
+export const PRODUCT_IN_STOCK_SQL = `
+  (CASE
+    WHEN p.has_variants = true THEN ${VARIANT_STOCK_TOTAL_SQL} > 0
+    ELSE p.stock_status IS DISTINCT FROM 'Out of Stock'
+  END)
+`
+
 export const EFFECTIVE_PRICE_SQL = `COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price, 0)`
