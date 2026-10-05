@@ -13,7 +13,7 @@ export function eligibleCustomerSql(alias: string): string {
     ))`
 }
 
-const KEPT_AND_PAID_SQL = `(o.status IN ('delivered', 'return_rejected') AND o.payment_status IN ('paid', 'cod_collected'))`
+const KEPT_AND_PAID_SQL = `(o.source = 'online' AND o.status IN ('delivered', 'return_rejected') AND o.payment_status IN ('paid', 'cod_collected'))`
 // Never updated_at: it moves whenever an order is touched, which would restart the wait.
 const SETTLED_AT_SQL = `COALESCE(o.delivered_at, o.created_at)`
 
@@ -63,8 +63,7 @@ export function orderStatesCte(scoped: boolean): string {
       ORDER BY u.created_at ASC
       LIMIT 1
     ) matched ON TRUE
-    WHERE o.source IS DISTINCT FROM 'business'
-      AND (${KEPT_AND_PAID_SQL} OR l.order_id IS NOT NULL)
+    WHERE ${KEPT_AND_PAID_SQL} OR l.order_id IS NOT NULL
       ${scope}
   ),
   states AS (
