@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useToast } from '@/contexts/ToastContext'
-import { navItems } from '@/components/visitor/AccountSidebar'
+import { useAccountNavItems } from '@/components/visitor/AccountSidebar'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
@@ -207,6 +207,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const avatarUrl = user?.avatarUrl ?? null
   const router = useRouter()
   const pathname = usePathname()
+  const navItems = useAccountNavItems()
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccountSearch } from '@/contexts/AccountSearchContext'
 import AccountSearch from '@/components/visitor/AccountSearch'
+import { useLoyaltyEnabled } from '@/hooks/useLoyaltyEnabled'
 
 const navItems = [
   {
@@ -101,7 +102,29 @@ const businessNavItem = {
   ),
 }
 
+const rewardsNavItem = {
+  href: '/account/rewards',
+  label: 'Rewards',
+  exact: false,
+  icon: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
+      />
+    </svg>
+  ),
+}
+
 export { navItems }
+
+export function useAccountNavItems() {
+  const { user } = useAuth()
+  const loyaltyEnabled = useLoyaltyEnabled()
+  return loyaltyEnabled && !user?.isBusiness ? [...navItems, rewardsNavItem] : navItems
+}
 
 const accountBackLinkMap: Array<{ pattern: RegExp; label: string; href: string }> = [
   { pattern: /^\/account\/orders\/.+/, label: 'My Orders', href: '/account/orders' },
@@ -112,11 +135,11 @@ export function AccountNavBar() {
   const pathname = usePathname()
   const { user } = useAuth()
   const { query, suggestions, placeholder, setQuery } = useAccountSearch()
-  const items = user?.isBusiness && user.approvalStatus === 'approved' ? [...navItems, businessNavItem] : navItems
+  const baseItems = useAccountNavItems()
+  const items = user?.isBusiness && user.approvalStatus === 'approved' ? [...baseItems, businessNavItem] : baseItems
 
   const activeLabel = (() => {
-    const all = user?.isBusiness && user.approvalStatus === 'approved' ? [...navItems, businessNavItem] : navItems
-    const match = all
+    const match = items
       .slice()
       .reverse()
       .find(item => (item.exact ? pathname === item.href : pathname.startsWith(item.href)))
@@ -177,7 +200,8 @@ export function AccountNavBar() {
 export default function AccountSidebar() {
   const pathname = usePathname()
   const { user } = useAuth()
-  const items = user?.isBusiness && user.approvalStatus === 'approved' ? [...navItems, businessNavItem] : navItems
+  const baseItems = useAccountNavItems()
+  const items = user?.isBusiness && user.approvalStatus === 'approved' ? [...baseItems, businessNavItem] : baseItems
 
   return (
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">
