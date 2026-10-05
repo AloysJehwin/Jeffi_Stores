@@ -16,6 +16,7 @@ import CustomerTimeline from '@/app/(admin)/admin/customers/[id]/_components/Cus
 import CustomerAiSummary from '@/app/(admin)/admin/customers/[id]/_components/CustomerAiSummary'
 import CustomerConversations from '@/app/(admin)/admin/customers/[id]/_components/CustomerConversations'
 import HealthScoreCard from '@/app/(admin)/admin/customers/[id]/_components/HealthScoreCard'
+import CustomerLoyaltyCard from '@/app/(admin)/admin/customers/[id]/_components/CustomerLoyaltyCard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -347,6 +348,8 @@ export default async function CustomerDetailPage({
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <CustomerTasks customerId={customer.id} canWrite={canWrite} />
           </div>
+
+          <CustomerLoyaltyCard customerId={customer.id} canWrite={canWrite} />
 
           {/* Business details (customer_profiles) */}
           {(customer.company_name || customer.gst_number || customer.credit_limit) && (
