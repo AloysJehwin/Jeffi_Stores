@@ -40,16 +40,15 @@ export function AccountMobileTabBar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors border-b-2 ${
+                aria-label={item.label}
+                title={item.label}
+                className={`flex-1 flex items-center justify-center py-3.5 transition-colors border-b-2 [&_svg]:w-5 [&_svg]:h-5 ${
                   isActive
                     ? 'text-accent-600 border-accent-500 dark:text-accent-400'
                     : 'text-foreground-muted border-transparent'
                 }`}
               >
                 <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
-                <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
-                  {item.label}
-                </span>
               </Link>
             )
           })}
@@ -100,16 +99,15 @@ export default function AccountMobileHeader() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors border-b-2 ${
+                  aria-label={item.label}
+                  title={item.label}
+                  className={`flex-1 flex items-center justify-center py-3.5 transition-colors border-b-2 [&_svg]:w-5 [&_svg]:h-5 ${
                     isActive
                       ? 'text-accent-600 border-accent-500 dark:text-accent-400'
                       : 'text-foreground-muted border-transparent'
                   }`}
                 >
                   <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
-                  <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
-                    {item.label}
-                  </span>
                 </Link>
               )
             })}
