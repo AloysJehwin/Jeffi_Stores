@@ -1980,6 +1980,20 @@ CREATE INDEX idx_loyalty_ledger_user ON public.loyalty_ledger USING btree (user_
 
 
 --
+-- Name: idx_loyalty_ledger_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_loyalty_ledger_order ON public.loyalty_ledger USING btree (order_id) WHERE (order_id IS NOT NULL);
+
+
+--
+-- Name: idx_loyalty_ledger_coupon; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_loyalty_ledger_coupon ON public.loyalty_ledger USING btree (coupon_id) WHERE (coupon_id IS NOT NULL);
+
+
+--
 -- Name: idx_loyalty_accounts_tier; Type: INDEX; Schema: public; Owner: -
 --
 

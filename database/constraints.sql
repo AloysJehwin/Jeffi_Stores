@@ -2042,6 +2042,14 @@ ALTER TABLE ONLY public.loyalty_ledger
 
 
 --
+-- Name: loyalty_ledger loyalty_ledger_coupon_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.loyalty_ledger
+    ADD CONSTRAINT loyalty_ledger_coupon_id_fkey FOREIGN KEY (coupon_id) REFERENCES public.coupons(id) ON DELETE SET NULL;
+
+
+--
 -- Name: referrals referrals_referrer_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3049,6 +3057,10 @@ ALTER TABLE ONLY public.loyalty_accounts
 
 ALTER TABLE ONLY public.loyalty_ledger
     ADD CONSTRAINT loyalty_ledger_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.loyalty_ledger
+    ADD CONSTRAINT loyalty_ledger_reason_check
+    CHECK (reason::text = ANY (ARRAY['order_earn'::text, 'order_reversal'::text, 'redeem'::text, 'redeem_refund'::text, 'adjustment'::text]));
 
 
 --
