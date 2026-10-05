@@ -42,7 +42,12 @@ describe('/api/admin/customers/[id]/loyalty', () => {
     mockSettings.mockResolvedValue({ enabled: true })
     mockEligible.mockResolvedValue(true)
     mockAccount.mockResolvedValue({ points: 150, lifetimePoints: 420, tier: 'silver', tierUpdatedAt: null })
-    mockLedger.mockResolvedValue([{ id: 'l1', delta: 42, reason: 'order_earn', note: null }])
+    mockLedger.mockResolvedValue({
+      items: [{ id: 'l1', delta: 42, reason: 'order_earn', note: null }],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+    })
     mockAdjust.mockResolvedValue({ ok: true, points: 200, lifetimePoints: 470, tier: 'silver' })
   })
 
@@ -65,7 +70,7 @@ describe('/api/admin/customers/[id]/loyalty', () => {
       expect(body).toMatchObject({ enabled: true, eligible: true })
       expect(body.account).toMatchObject({ points: 150, lifetimePoints: 420, tier: 'silver', tierName: 'Silver' })
       expect(body.ledger).toHaveLength(1)
-      expect(mockLedger).toHaveBeenCalledWith(CUSTOMER, 20)
+      expect(mockLedger).toHaveBeenCalledWith(CUSTOMER, 1, 20)
     })
   })
 

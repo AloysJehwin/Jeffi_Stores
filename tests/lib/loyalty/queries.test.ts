@@ -41,33 +41,47 @@ describe('loyalty read models', () => {
 
   it('lists history newest first and leaves out zero-point bookkeeping rows', async () => {
     mockQueryMany.mockResolvedValue([ledgerRow])
-    const entries = await listLoyaltyLedger('u1', 20)
+    mockQueryOne.mockResolvedValue({ total: 1 })
+    const result = await listLoyaltyLedger('u1', 1, 10)
     const [sql, args] = mockQueryMany.mock.calls[0]
     expect(String(sql)).toContain('l.delta <> 0')
     expect(String(sql)).toContain('ORDER BY l.created_at DESC')
-    expect(args).toEqual(['u1', 20])
-    expect(entries[0]).toMatchObject({ id: 'l1', delta: 42, orderNumber: 'ORD-1', note: 'internal note' })
+    expect(args).toEqual(['u1', 10, 0])
+    expect(result.total).toBe(1)
+    expect(result.page).toBe(1)
+    expect(result.items[0]).toMatchObject({ id: 'l1', delta: 42, orderNumber: 'ORD-1', note: 'internal note' })
+  })
+
+  it('pages history with limit and offset', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryOne.mockResolvedValue({ total: 45 })
+    const result = await listLoyaltyLedger('u1', 3, 10)
+    expect(mockQueryMany.mock.calls[0][1]).toEqual(['u1', 10, 20])
+    expect(result.total).toBe(45)
   })
 
   it('lists only this customer unused reward coupons', async () => {
     mockQueryMany.mockResolvedValue([
       { code: 'RWD-AAAA2222', value: '200.00', min_purchase: '200.00', created_at: '2026-10-01' },
     ])
-    const coupons = await listRewardCoupons('u1')
+    mockQueryOne.mockResolvedValue({ total: 1 })
+    const result = await listRewardCoupons('u1', 1, 6)
     const [sql, args] = mockQueryMany.mock.calls[0]
     expect(String(sql)).toContain('c.generated_for_user_id = $1')
     expect(String(sql)).toContain('c.times_used < COALESCE(c.usage_limit, 1)')
-    expect(args).toEqual(['u1', 'loyalty_reward'])
-    expect(coupons[0]).toMatchObject({ code: 'RWD-AAAA2222', value: 200, minPurchase: 200 })
+    expect(args).toEqual(['u1', 'loyalty_reward', 6, 0])
+    expect(result.total).toBe(1)
+    expect(result.items[0]).toMatchObject({ code: 'RWD-AAAA2222', value: 200, minPurchase: 200 })
   })
 
   describe('getLoyaltySummary', () => {
     function account(row: { points: number; lifetime_points: number; tier: string }) {
-      mockQueryOne.mockImplementation(async (sql: string) =>
-        String(sql).includes('FROM states')
-          ? { points: 30, next_credit_at: '2026-10-09T00:00:00.000Z' }
-          : { ...row, tier_updated_at: null }
-      )
+      mockQueryOne.mockImplementation(async (sql: string) => {
+        const text = String(sql)
+        if (text.includes('FROM states')) return { points: 30, next_credit_at: '2026-10-09T00:00:00.000Z' }
+        if (text.includes('COUNT(*)')) return { total: 1 }
+        return { ...row, tier_updated_at: null }
+      })
       mockQueryMany.mockImplementation(async (sql: string) =>
         String(sql).includes('FROM loyalty_ledger') ? [ledgerRow] : []
       )
@@ -85,8 +99,15 @@ describe('loyalty read models', () => {
     it('never shows the store internal note to the customer', async () => {
       account({ points: 150, lifetime_points: 420, tier: 'silver' })
       const summary = await getLoyaltySummary('u1', settings)
-      expect(summary.history).toHaveLength(1)
-      expect(summary.history[0]).not.toHaveProperty('note')
+      expect(summary.history.items).toHaveLength(1)
+      expect(summary.history.items[0]).not.toHaveProperty('note')
+    })
+
+    it('passes the requested page through to the history and coupon lists', async () => {
+      account({ points: 150, lifetime_points: 420, tier: 'silver' })
+      const summary = await getLoyaltySummary('u1', settings, { historyPage: 2, couponPage: 3 })
+      expect(summary.history.page).toBe(2)
+      expect(summary.coupons.page).toBe(3)
     })
 
     it('has no next tier at the top', async () => {
