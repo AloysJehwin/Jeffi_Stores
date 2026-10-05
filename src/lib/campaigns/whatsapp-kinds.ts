@@ -22,6 +22,7 @@ export const CAMPAIGN_WA_KINDS = [
   'replenishment',
   'subscription_renewal',
   'loyalty_tier_upgrade',
+  'loyalty_points_reminder',
   'referral_invite',
   'birthday',
   'review_request',

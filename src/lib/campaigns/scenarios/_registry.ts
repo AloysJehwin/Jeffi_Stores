@@ -21,6 +21,7 @@ import { signupAnniversary } from './signup-anniversary'
 import { replenishment } from './replenishment'
 import { subscriptionRenewal } from './subscription-renewal'
 import { loyaltyTierUpgrade } from './loyalty-tier-upgrade'
+import { loyaltyPointsReminder } from './loyalty-points-reminder'
 import { referralInvite } from './referral-invite'
 import { birthday } from './birthday'
 
@@ -47,6 +48,7 @@ export const SCENARIOS: Record<string, AnyScenarioModule> = {
   [replenishment.kind]: replenishment as unknown as AnyScenarioModule,
   [subscriptionRenewal.kind]: subscriptionRenewal as unknown as AnyScenarioModule,
   [loyaltyTierUpgrade.kind]: loyaltyTierUpgrade as unknown as AnyScenarioModule,
+  [loyaltyPointsReminder.kind]: loyaltyPointsReminder as unknown as AnyScenarioModule,
   [referralInvite.kind]: referralInvite as unknown as AnyScenarioModule,
   [birthday.kind]: birthday as unknown as AnyScenarioModule,
 }

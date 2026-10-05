@@ -24,6 +24,7 @@ export type CampaignKind =
   | 'replenishment'
   | 'subscription_renewal'
   | 'loyalty_tier_upgrade'
+  | 'loyalty_points_reminder'
   | 'referral_invite'
   | 'birthday'
   | string
