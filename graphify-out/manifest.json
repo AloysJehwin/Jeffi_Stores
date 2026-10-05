@@ -355,8 +355,8 @@
     "semantic_hash": ""
   },
   "src/components/visitor/AccountMobileHeader.tsx": {
-    "mtime": 1791170883.1202388,
-    "ast_hash": "cdfa687c193eb61f7858f18ef366b79a",
+    "mtime": 1791228481.084095,
+    "ast_hash": "80c6421264d0689e58befe4178a66097",
     "semantic_hash": ""
   },
   "src/components/visitor/AccountSearch.tsx": {
@@ -585,8 +585,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/_registry.ts": {
-    "mtime": 1791050351.3152742,
-    "ast_hash": "6057b9a694100a5090ac66f14479faa6",
+    "mtime": 1791228384.6248713,
+    "ast_hash": "5e61a0970dae29f918e6b23069eb57cb",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/_winback-base.ts": {
@@ -1985,8 +1985,8 @@
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/_registry.test.ts": {
-    "mtime": 1791050467.8217466,
-    "ast_hash": "52164996ee3c65ee7c07cc7d57740cb9",
+    "mtime": 1791228602.5810275,
+    "ast_hash": "5bdb904617c59bc5d716b0fe9305d36e",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/_winback-base.test.ts": {
@@ -3210,8 +3210,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/whatsapp-kinds.ts": {
-    "mtime": 1791050393.7662053,
-    "ast_hash": "a8e884944d38f580f1015274abb757ce",
+    "mtime": 1791228396.0609598,
+    "ast_hash": "a85e72e88c716bca9229e709fac194a2",
     "semantic_hash": ""
   },
   "src/lib/provisioning/aws-provider.ts": {
@@ -12045,8 +12045,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/marketing.ts": {
-    "mtime": 1791136069.3723965,
-    "ast_hash": "b08696455d517375363fc26a6bc15d47",
+    "mtime": 1791228391.1451964,
+    "ast_hash": "d6a41a01afb973bbac97b489fd71cf8e",
     "semantic_hash": ""
   },
   "src/lib/shared/message-log.ts": {
@@ -12630,8 +12630,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/default-templates.ts": {
-    "mtime": 1791051610.8983374,
-    "ast_hash": "793117530ecc8820f0dad610df7cadd1",
+    "mtime": 1791228410.186716,
+    "ast_hash": "6a0d58768058fcf4c90dc1316bb4c658",
     "semantic_hash": ""
   },
   "src/lib/campaigns/duration.ts": {
@@ -12920,8 +12920,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/customers/[id]/loyalty/route.ts": {
-    "mtime": 1791171096.4136004,
-    "ast_hash": "1e42a4668a10c3899007500cb874e9d1",
+    "mtime": 1791228098.124771,
+    "ast_hash": "53d3868e1d02af752f34b362f4940bf2",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/loyalty/recalculate/route.ts": {
@@ -12945,13 +12945,13 @@
     "semantic_hash": ""
   },
   "src/app/api/(public)/user/loyalty/route.ts": {
-    "mtime": 1791170834.284519,
-    "ast_hash": "cb43c9e7582a225dc8f85d281fb1998d",
+    "mtime": 1791228105.3955283,
+    "ast_hash": "50d0d721b26347eed5ed29b91c21bd4f",
     "semantic_hash": ""
   },
   "src/components/visitor/AccountRewards.tsx": {
-    "mtime": 1791170981.5097382,
-    "ast_hash": "05e9772fcf39db61d2bfa043cb2c7b3d",
+    "mtime": 1791228171.0721834,
+    "ast_hash": "3ea778e8a77f8060c38e4e153604cc3d",
     "semantic_hash": ""
   },
   "src/hooks/useLoyaltyEnabled.ts": {
@@ -12960,13 +12960,13 @@
     "semantic_hash": ""
   },
   "src/lib/loyalty/queries.ts": {
-    "mtime": 1791170754.6973646,
-    "ast_hash": "915c4418f5b008a6126623c28608653a",
+    "mtime": 1791227843.3770237,
+    "ast_hash": "c991555834a216b75da4705af054977f",
     "semantic_hash": ""
   },
   "src/lib/loyalty/reconcile.ts": {
-    "mtime": 1791173696.0942676,
-    "ast_hash": "f3a4281f2ee8394eeea1399485f26991",
+    "mtime": 1791228750.9175725,
+    "ast_hash": "f16fbbedf3768afb353ea0da4a3da788",
     "semantic_hash": ""
   },
   "src/lib/loyalty/redeem.ts": {
@@ -12985,8 +12985,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/customers/[id]/loyalty/route.test.ts": {
-    "mtime": 1791171694.0330477,
-    "ast_hash": "d3dc66d52c107b07ee46aa4a356793d8",
+    "mtime": 1791228286.9246266,
+    "ast_hash": "e264937135586b8e3166c80b34c77248",
     "semantic_hash": ""
   },
   "tests/api/admin/loyalty/recalculate/route.test.ts": {
@@ -13020,13 +13020,13 @@
     "semantic_hash": ""
   },
   "tests/lib/loyalty/queries.test.ts": {
-    "mtime": 1791171600.9738722,
-    "ast_hash": "ba7ba76e33989664198ac38406d94ee7",
+    "mtime": 1791228256.3318348,
+    "ast_hash": "413dcc982dac7cce0a3c098532b22f24",
     "semantic_hash": ""
   },
   "tests/lib/loyalty/reconcile.test.ts": {
-    "mtime": 1791174000.091688,
-    "ast_hash": "42b98c53dfdf96886db45ac2e1c563f9",
+    "mtime": 1791228760.167601,
+    "ast_hash": "ee2c78f42af3037fccc40a158ac68342",
     "semantic_hash": ""
   },
   "tests/lib/loyalty/redeem.test.ts": {
@@ -13047,6 +13047,16 @@
   "tests/components/address-form-modal.test.tsx": {
     "mtime": 1791175009.2519588,
     "ast_hash": "afe3f8f98a377e4615dd1310e6471681",
+    "semantic_hash": ""
+  },
+  "src/lib/campaigns/scenarios/loyalty-points-reminder.ts": {
+    "mtime": 1791228525.345069,
+    "ast_hash": "b112c2d3d3ffcd42f601e2234611818b",
+    "semantic_hash": ""
+  },
+  "tests/lib/campaigns/scenarios/loyalty-points-reminder.test.ts": {
+    "mtime": 1791228634.6756537,
+    "ast_hash": "9c4a0f6c6a43f33b7581e08a191edd97",
     "semantic_hash": ""
   }
 }
