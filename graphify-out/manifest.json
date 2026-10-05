@@ -370,8 +370,8 @@
     "semantic_hash": ""
   },
   "src/components/visitor/AddressFormModal.tsx": {
-    "mtime": 1790931252.9287097,
-    "ast_hash": "92459b508c6f469f3305760168cad2f4",
+    "mtime": 1791174468.233768,
+    "ast_hash": "522eefbcfc9180088992b53eeda70c94",
     "semantic_hash": ""
   },
   "src/components/visitor/AiAssistantButton.tsx": {
@@ -13042,6 +13042,11 @@
   "tests/lib/loyalty/tiers.test.ts": {
     "mtime": 1791171459.2215333,
     "ast_hash": "96e909d53e628bb80dc7e5e9bd289ff3",
+    "semantic_hash": ""
+  },
+  "tests/components/address-form-modal.test.tsx": {
+    "mtime": 1791175009.2519588,
+    "ast_hash": "afe3f8f98a377e4615dd1310e6471681",
     "semantic_hash": ""
   }
 }
