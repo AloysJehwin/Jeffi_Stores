@@ -159,6 +159,17 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'customers:read',
   },
   {
+    id: 'loyalty_reconcile',
+    name: 'Loyalty points',
+    path: '/api/cron/loyalty-reconcile',
+    method: 'GET',
+    intervalMs: 30 * MIN,
+    intervalLabel: 'every 30 min',
+    startDelayMs: 165 * SEC,
+    lockTtlMs: 30 * MIN - 30 * SEC,
+    tenantScope: 'campaigns:read',
+  },
+  {
     id: 'sweep_idle_sessions',
     name: 'Sweep idle admin sessions',
     path: '/api/cron/sweep-sessions',

@@ -238,6 +238,7 @@ CREATE TABLE public.offer_display_settings (
 CREATE TABLE public.loyalty_accounts (
     user_id uuid NOT NULL,
     points integer DEFAULT 0 NOT NULL,
+    lifetime_points integer DEFAULT 0 NOT NULL,
     tier character varying(20) DEFAULT 'bronze'::character varying NOT NULL,
     tier_updated_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
@@ -254,6 +255,10 @@ CREATE TABLE public.loyalty_ledger (
     delta integer NOT NULL,
     reason character varying(40) NOT NULL,
     order_id uuid,
+    coupon_id uuid,
+    base_amount numeric(12,2),
+    note text,
+    created_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
