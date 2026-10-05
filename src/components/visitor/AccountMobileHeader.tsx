@@ -3,15 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { navItems } from '@/components/visitor/AccountSidebar'
+import { useAccountNavItems } from '@/components/visitor/AccountSidebar'
 
 export function AccountMobileTabBar() {
   const pathname = usePathname()
   const { user } = useAuth()
+  const baseItems = useAccountNavItems()
   const items =
     user?.isBusiness && user.approvalStatus === 'approved'
       ? [
-          ...navItems,
+          ...baseItems,
           {
             href: '/account/quotes',
             label: 'My Quotes',
@@ -28,7 +29,7 @@ export function AccountMobileTabBar() {
             ),
           },
         ]
-      : navItems
+      : baseItems
   return (
     <div className="lg:hidden mx-3 mt-3 mb-4">
       <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
@@ -61,6 +62,7 @@ export function AccountMobileTabBar() {
 export default function AccountMobileHeader() {
   const { user } = useAuth()
   const pathname = usePathname()
+  const items = useAccountNavItems()
 
   if (!user) return null
 
@@ -92,7 +94,7 @@ export default function AccountMobileHeader() {
       <div className="lg:hidden relative z-10 mx-4 -mt-8 mb-4">
         <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
           <div className="flex">
-            {navItems.map(item => {
+            {items.map(item => {
               const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
               return (
                 <Link
