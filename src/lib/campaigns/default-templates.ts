@@ -77,6 +77,10 @@ export const BUILTIN_TEMPLATES: Record<string, BuiltinTemplate> = {
     subject: 'You reached {tier}, {firstName}!',
     body: greeting + h2('Welcome to {tier}') + p('You now have {points} points. Enjoy your new perks — starting with this.') + couponBox + cta('See your perks'),
   },
+  loyalty_points_reminder: {
+    subject: 'You have {points} points waiting, {firstName}',
+    body: greeting + h2('Your points are ready to spend') + p('You have {points} points — turn them into a coupon worth up to {pointsWorth} off your next order.') + couponBox + cta('Redeem your points'),
+  },
 }
 
 export function getBuiltinTemplate(kind: string): BuiltinTemplate | null {
