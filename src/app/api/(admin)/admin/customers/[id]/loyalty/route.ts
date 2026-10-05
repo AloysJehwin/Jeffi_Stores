@@ -27,9 +27,14 @@ async function loadView(userId: string) {
     getLoyaltySettings(),
     isLoyaltyEligible(userId),
     getLoyaltyAccount(userId),
-    listLoyaltyLedger(userId, 20),
+    listLoyaltyLedger(userId, 1, 20),
   ])
-  return { enabled: settings.enabled, eligible, account: { ...account, tierName: tierName(account.tier) }, ledger }
+  return {
+    enabled: settings.enabled,
+    eligible,
+    account: { ...account, tierName: tierName(account.tier) },
+    ledger: ledger.items,
+  }
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

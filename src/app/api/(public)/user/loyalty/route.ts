@@ -19,7 +19,9 @@ export async function GET(request: NextRequest) {
     await reconcileLoyalty({ userId: authUser.userId }).catch(err => {
       console.error('[loyalty] on-view reconcile failed', err)
     })
-    const summary = await getLoyaltySummary(authUser.userId, settings)
+    const historyPage = Number(request.nextUrl.searchParams.get('historyPage')) || 1
+    const couponPage = Number(request.nextUrl.searchParams.get('couponPage')) || 1
+    const summary = await getLoyaltySummary(authUser.userId, settings, { historyPage, couponPage })
     return NextResponse.json({
       enabled: true,
       eligible: true,

@@ -41,54 +41,101 @@ export async function getLoyaltyAccount(userId: string): Promise<LoyaltyAccount>
   }
 }
 
-export async function listLoyaltyLedger(userId: string, limit: number): Promise<LoyaltyLedgerEntry[]> {
-  const rows = await queryMany<{
-    id: string
-    delta: number
-    reason: string
-    order_number: string | null
-    coupon_code: string | null
-    note: string | null
-    created_at: string
-  }>(
-    `SELECT l.id::text AS id, l.delta, l.reason, o.order_number, c.code AS coupon_code, l.note, l.created_at
-     FROM loyalty_ledger l
-     LEFT JOIN orders o ON o.id = l.order_id
-     LEFT JOIN coupons c ON c.id = l.coupon_id
-     WHERE l.user_id = $1 AND l.delta <> 0
-     ORDER BY l.created_at DESC, l.id DESC
-     LIMIT $2`,
-    [userId, limit]
-  )
-  return rows.map(row => ({
-    id: row.id,
-    delta: row.delta,
-    reason: row.reason,
-    orderNumber: row.order_number,
-    couponCode: row.coupon_code,
-    note: row.note,
-    createdAt: row.created_at,
-  }))
+export interface Paginated<T> {
+  items: T[]
+  total: number
+  page: number
+  pageSize: number
 }
 
-export async function listRewardCoupons(userId: string): Promise<RewardCoupon[]> {
-  const rows = await queryMany<{ code: string; value: string; min_purchase: string | null; created_at: string }>(
-    `SELECT c.code, c.discount_value AS value, c.min_purchase_amount AS min_purchase, c.created_at
-     FROM coupons c
-     WHERE c.generated_for_user_id = $1
-       AND c.generated_for_campaign = $2
-       AND c.is_active = TRUE
-       AND (c.valid_until IS NULL OR c.valid_until > NOW())
-       AND c.times_used < COALESCE(c.usage_limit, 1)
-     ORDER BY c.created_at DESC`,
-    [userId, REWARD_COUPON_CAMPAIGN]
-  )
-  return rows.map(row => ({
-    code: row.code,
-    value: Number(row.value),
-    minPurchase: Number(row.min_purchase ?? 0),
-    createdAt: row.created_at,
-  }))
+export async function listLoyaltyLedger(
+  userId: string,
+  page: number,
+  pageSize: number
+): Promise<Paginated<LoyaltyLedgerEntry>> {
+  const safePage = Math.max(1, Math.floor(page) || 1)
+  const safeSize = Math.min(100, Math.max(1, Math.floor(pageSize) || 1))
+  const [rows, count] = await Promise.all([
+    queryMany<{
+      id: string
+      delta: number
+      reason: string
+      order_number: string | null
+      coupon_code: string | null
+      note: string | null
+      created_at: string
+    }>(
+      `SELECT l.id::text AS id, l.delta, l.reason, o.order_number, c.code AS coupon_code, l.note, l.created_at
+       FROM loyalty_ledger l
+       LEFT JOIN orders o ON o.id = l.order_id
+       LEFT JOIN coupons c ON c.id = l.coupon_id
+       WHERE l.user_id = $1 AND l.delta <> 0
+       ORDER BY l.created_at DESC, l.id DESC
+       LIMIT $2 OFFSET $3`,
+      [userId, safeSize, (safePage - 1) * safeSize]
+    ),
+    queryOne<{ total: number }>(
+      `SELECT COUNT(*)::int AS total FROM loyalty_ledger WHERE user_id = $1 AND delta <> 0`,
+      [userId]
+    ),
+  ])
+  return {
+    items: rows.map(row => ({
+      id: row.id,
+      delta: row.delta,
+      reason: row.reason,
+      orderNumber: row.order_number,
+      couponCode: row.coupon_code,
+      note: row.note,
+      createdAt: row.created_at,
+    })),
+    total: count?.total ?? 0,
+    page: safePage,
+    pageSize: safeSize,
+  }
+}
+
+export async function listRewardCoupons(
+  userId: string,
+  page = 1,
+  pageSize = 100
+): Promise<Paginated<RewardCoupon>> {
+  const safePage = Math.max(1, Math.floor(page) || 1)
+  const safeSize = Math.min(100, Math.max(1, Math.floor(pageSize) || 1))
+  const [rows, count] = await Promise.all([
+    queryMany<{ code: string; value: string; min_purchase: string | null; created_at: string }>(
+      `SELECT c.code, c.discount_value AS value, c.min_purchase_amount AS min_purchase, c.created_at
+       FROM coupons c
+       WHERE c.generated_for_user_id = $1
+         AND c.generated_for_campaign = $2
+         AND c.is_active = TRUE
+         AND (c.valid_until IS NULL OR c.valid_until > NOW())
+         AND c.times_used < COALESCE(c.usage_limit, 1)
+       ORDER BY c.created_at DESC
+       LIMIT $3 OFFSET $4`,
+      [userId, REWARD_COUPON_CAMPAIGN, safeSize, (safePage - 1) * safeSize]
+    ),
+    queryOne<{ total: number }>(
+      `SELECT COUNT(*)::int AS total FROM coupons c
+       WHERE c.generated_for_user_id = $1
+         AND c.generated_for_campaign = $2
+         AND c.is_active = TRUE
+         AND (c.valid_until IS NULL OR c.valid_until > NOW())
+         AND c.times_used < COALESCE(c.usage_limit, 1)`,
+      [userId, REWARD_COUPON_CAMPAIGN]
+    ),
+  ])
+  return {
+    items: rows.map(row => ({
+      code: row.code,
+      value: Number(row.value),
+      minPurchase: Number(row.min_purchase ?? 0),
+      createdAt: row.created_at,
+    })),
+    total: count?.total ?? 0,
+    page: safePage,
+    pageSize: safeSize,
+  }
 }
 
 export async function getPendingPoints(
@@ -110,16 +157,23 @@ export interface LoyaltySummary {
   points: number
   lifetimePoints: number
   pending: { points: number; nextCreditAt: string | null }
-  history: Omit<LoyaltyLedgerEntry, 'note'>[]
-  coupons: RewardCoupon[]
+  history: Paginated<Omit<LoyaltyLedgerEntry, 'note'>>
+  coupons: Paginated<RewardCoupon>
 }
 
-export async function getLoyaltySummary(userId: string, settings: LoyaltySettings): Promise<LoyaltySummary> {
+const HISTORY_PAGE_SIZE = 10
+const COUPON_PAGE_SIZE = 6
+
+export async function getLoyaltySummary(
+  userId: string,
+  settings: LoyaltySettings,
+  pages: { historyPage?: number; couponPage?: number } = {}
+): Promise<LoyaltySummary> {
   const [account, pending, ledger, coupons] = await Promise.all([
     getLoyaltyAccount(userId),
     getPendingPoints(userId, settings),
-    listLoyaltyLedger(userId, 50),
-    listRewardCoupons(userId),
+    listLoyaltyLedger(userId, pages.historyPage ?? 1, HISTORY_PAGE_SIZE),
+    listRewardCoupons(userId, pages.couponPage ?? 1, COUPON_PAGE_SIZE),
   ])
   const next = nextTierAfter(account.tier, settings.tiers)
   return {
@@ -135,7 +189,7 @@ export async function getLoyaltySummary(userId: string, settings: LoyaltySetting
     points: account.points,
     lifetimePoints: account.lifetimePoints,
     pending,
-    history: ledger.map(({ note: _note, ...entry }) => entry),
+    history: { ...ledger, items: ledger.items.map(({ note: _note, ...entry }) => entry) },
     coupons,
   }
 }
