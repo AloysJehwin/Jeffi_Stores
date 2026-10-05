@@ -274,10 +274,14 @@ describe('loyalty reconcile', () => {
   describe('order rules in SQL', () => {
     const sql = orderStatesCte(false)
 
-    it('counts only orders the customer kept and paid for, never business orders', () => {
-      expect(sql).toContain("o.status IN ('delivered', 'return_rejected')")
+    it('counts only online orders the customer kept and paid for, never offline or business orders', () => {
+      expect(sql).toContain("o.source = 'online' AND o.status IN ('delivered', 'return_rejected')")
       expect(sql).toContain("o.payment_status IN ('paid', 'cod_collected')")
-      expect(sql).toContain("o.source IS DISTINCT FROM 'business'")
+    })
+
+    it('keeps an order with a ledger row visible so a now-ineligible order can be reversed', () => {
+      expect(sql).toContain('l.order_id IS NOT NULL')
+      expect(sql).not.toMatch(/WHERE o\.source = 'online'\s+AND/)
     })
 
     it('works points out from goods value after discounts', () => {
