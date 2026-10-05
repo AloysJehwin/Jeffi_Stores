@@ -1,7 +1,9 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { getLoyaltySettings } from '@/lib/loyalty/settings'
+import { tierName } from '@/lib/loyalty/tiers'
+import { days, readDurationParam, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -51,8 +53,8 @@ export const loyaltyTierUpgrade: ScenarioModule<Params, Row> = {
   },
 
   async findEligible({ campaign, params }) {
+    if (!(await getLoyaltySettings()).enabled) return []
     const recentMin = readDurationParam(params, 'recentWindow') ?? days(7)
-    const cooldownMin = cooldownMinutes(params)
 
     return queryMany<Row>(
       `
@@ -62,6 +64,7 @@ export const loyaltyTierUpgrade: ScenarioModule<Params, Row> = {
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE la.tier_updated_at IS NOT NULL
         AND la.tier_updated_at > NOW() - ($2::text || ' minutes')::interval
+        AND la.tier <> 'bronze'
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
         AND u.marketing_opt_out = FALSE
@@ -71,17 +74,17 @@ export const loyaltyTierUpgrade: ScenarioModule<Params, Row> = {
           WHERE ecs.campaign_kind = $1
             AND ecs.user_id = la.user_id
             AND ecs.reference_id = la.tier
-            AND ecs.sent_at > NOW() - ($3::text || ' minutes')::interval
         )
-      LIMIT $4
+      ORDER BY la.tier_updated_at ASC
+      LIMIT $3
     `,
-      [campaign.kind, String(recentMin), String(cooldownMin), params.maxRecipientsPerSweep]
+      [campaign.kind, String(recentMin), params.maxRecipientsPerSweep]
     )
   },
 
   async findSuppressed({ campaign, params }) {
+    if (!(await getLoyaltySettings()).enabled) return []
     const recentMin = readDurationParam(params, 'recentWindow') ?? days(7)
-    const cooldownMin = cooldownMinutes(params)
 
     const rows = await queryMany<{
       user_id: string
@@ -105,24 +108,21 @@ export const loyaltyTierUpgrade: ScenarioModule<Params, Row> = {
           WHEN NOT u.is_active THEN 'Account inactive'
           ELSE NULL
         END AS reason_detail,
-        CASE
-          WHEN ecs.sent_at IS NOT NULL THEN (ecs.sent_at + ($3::text || ' minutes')::interval)::text
-          ELSE NULL
-        END AS blocked_until
+        NULL::text AS blocked_until
       FROM loyalty_accounts la
       JOIN users u ON u.id = la.user_id
       LEFT JOIN LATERAL (
         SELECT sent_at FROM email_campaigns_sent
          WHERE campaign_kind = $1 AND user_id = la.user_id AND reference_id = la.tier
-           AND sent_at > NOW() - ($3::text || ' minutes')::interval
          ORDER BY sent_at DESC LIMIT 1
       ) ecs ON TRUE
       WHERE la.tier_updated_at IS NOT NULL
         AND la.tier_updated_at > NOW() - ($2::text || ' minutes')::interval
+        AND la.tier <> 'bronze'
         AND (u.is_active = FALSE OR u.is_guest = TRUE OR u.marketing_opt_out = TRUE OR ecs.sent_at IS NOT NULL)
       LIMIT 200
     `,
-      [campaign.kind, String(recentMin), String(cooldownMin)]
+      [campaign.kind, String(recentMin)]
     )
     return rows.map(r => ({
       user_id: r.user_id,
@@ -137,6 +137,7 @@ export const loyaltyTierUpgrade: ScenarioModule<Params, Row> = {
     if (!user) return { ok: false, reason: 'no_user' }
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
+    const tier = tierName(row.tier)
 
     const emailResult = await sendCampaignEmail({
       campaign,
@@ -144,7 +145,7 @@ export const loyaltyTierUpgrade: ScenarioModule<Params, Row> = {
       referenceId: row.tier,
       vars: {
         firstName: user.first_name || 'there',
-        tier: row.tier,
+        tier,
         points: row.points,
         couponCode,
         discountPercent,
@@ -156,7 +157,7 @@ export const loyaltyTierUpgrade: ScenarioModule<Params, Row> = {
       sendCampaignWhatsApp(
         campaign.kind,
         row.user_id,
-        { headline: `You reached ${row.tier}!`, code: couponCode || '', discount: discountPercent ? String(discountPercent) : '' },
+        { headline: `You reached ${tier}!`, code: couponCode || '', discount: discountPercent ? String(discountPercent) : '' },
         cooldownDays(params)
       ).catch(() => {})
     }
