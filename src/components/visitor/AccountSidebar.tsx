@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useAccountSearch } from '@/contexts/AccountSearchContext'
 import AccountSearch from '@/components/visitor/AccountSearch'
 import { useLoyaltyEnabled } from '@/hooks/useLoyaltyEnabled'
+import { useReferralEnabled } from '@/hooks/useReferralEnabled'
 
 const navItems = [
   {
@@ -118,12 +119,30 @@ const rewardsNavItem = {
   ),
 }
 
+const referralsNavItem = {
+  href: '/account/referrals',
+  label: 'Refer & Earn',
+  exact: false,
+  icon: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+      />
+    </svg>
+  ),
+}
+
 export { navItems }
 
 export function useAccountNavItems() {
   const { user } = useAuth()
   const loyaltyEnabled = useLoyaltyEnabled()
-  return loyaltyEnabled && !user?.isBusiness ? [...navItems, rewardsNavItem] : navItems
+  const referralEnabled = useReferralEnabled()
+  if (!loyaltyEnabled || user?.isBusiness) return navItems
+  return referralEnabled ? [...navItems, rewardsNavItem, referralsNavItem] : [...navItems, rewardsNavItem]
 }
 
 const accountBackLinkMap: Array<{ pattern: RegExp; label: string; href: string }> = [
