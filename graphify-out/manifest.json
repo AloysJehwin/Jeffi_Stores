@@ -6805,8 +6805,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/crm/page.tsx": {
-    "mtime": 1791311642.506028,
-    "ast_hash": "1a76c647277eb987639c5c071311851a",
+    "mtime": 1791312316.3585215,
+    "ast_hash": "23ca65831f00067168407014ea220720",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/customers/[id]/_components/CustomerActionButton.tsx": {
@@ -7185,8 +7185,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/layout.tsx": {
-    "mtime": 1791311642.5074651,
-    "ast_hash": "371feb4f6a7bf45eaa25b4fd2969e76b",
+    "mtime": 1791312381.2256427,
+    "ast_hash": "60e555d1f0cd9182ed9da7995398c8eb",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/loading.tsx": {
@@ -7680,8 +7680,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/settings/site-controls/page.tsx": {
-    "mtime": 1791311675.0251906,
-    "ast_hash": "4c74db13785c7de6ea2376745232b8eb",
+    "mtime": 1791312371.449432,
+    "ast_hash": "665111190010008cc5c8e90d19e2e8b7",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/shelving/ShelvingClient.tsx": {
@@ -11460,8 +11460,8 @@
     "semantic_hash": ""
   },
   "src/lib/auth/scopes.ts": {
-    "mtime": 1791307921.720439,
-    "ast_hash": "f9bcf47e928ff80be30fb0b769d4b2d2",
+    "mtime": 1791312381.2264261,
+    "ast_hash": "c54e415905f8221ce1b0731915796ca3",
     "semantic_hash": ""
   },
   "src/lib/auth/session-binding-gate.ts": {
@@ -12840,8 +12840,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/loyalty/page.tsx": {
-    "mtime": 1791311642.5065029,
-    "ast_hash": "6e657870ca2ba02708c67626300bc8af",
+    "mtime": 1791312371.4459832,
+    "ast_hash": "0a4a61c58360da507ec118aa760e661f",
     "semantic_hash": ""
   },
   "src/app/(storefront)/account/rewards/page.tsx": {
@@ -12990,13 +12990,13 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/customers/[id]/_components/CustomerReferralsCard.tsx": {
-    "mtime": 1791311675.0262036,
-    "ast_hash": "8c7f1f32f37cf3548a37177d292f6a2b",
+    "mtime": 1791312371.4470317,
+    "ast_hash": "df1167d2bf17229d5b1a34f8adb9607c",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/referrals/page.tsx": {
-    "mtime": 1791311642.5069985,
-    "ast_hash": "2b0e11e538b4a1955096577ba92fe6bf",
+    "mtime": 1791312371.4463387,
+    "ast_hash": "bb58f54c9192ef95f7406a908b533fa8",
     "semantic_hash": ""
   },
   "src/app/(storefront)/account/referrals/page.tsx": {
@@ -13139,36 +13139,6 @@
     "ast_hash": "138fd3d4fff76dbfda2c8ee71c2449bf",
     "semantic_hash": ""
   },
-  "src/app/(admin)/admin/crm/programs/BirthdayProgram.tsx": {
-    "mtime": 1791311625.6112792,
-    "ast_hash": "9be93128c9132fb6c4584548344be0fe",
-    "semantic_hash": ""
-  },
-  "src/app/(admin)/admin/crm/programs/LoyaltyProgram.tsx": {
-    "mtime": 1791311588.0904331,
-    "ast_hash": "5b5528a3cdae438f6f5ec8bf77c04a31",
-    "semantic_hash": ""
-  },
-  "src/app/(admin)/admin/crm/programs/LoyaltySettingsForm.tsx": {
-    "mtime": 1791311505.1853032,
-    "ast_hash": "b3cedc08155827f2cd004754b09e1922",
-    "semantic_hash": ""
-  },
-  "src/app/(admin)/admin/crm/programs/ProgramSection.tsx": {
-    "mtime": 1791311561.8555245,
-    "ast_hash": "3e02f7c91ae42f5c7530fef3749b63c5",
-    "semantic_hash": ""
-  },
-  "src/app/(admin)/admin/crm/programs/ReferralProgram.tsx": {
-    "mtime": 1791311625.6040258,
-    "ast_hash": "1eb08909baaf14313304bad2fdb18149",
-    "semantic_hash": ""
-  },
-  "src/app/(admin)/admin/crm/programs/ReferralSettingsForm.tsx": {
-    "mtime": 1791311505.4484768,
-    "ast_hash": "a7bef3346f4384e52d7008339429dec9",
-    "semantic_hash": ""
-  },
   "src/contexts/WishlistContext.tsx": {
     "mtime": 1791310829.997227,
     "ast_hash": "c5999419122a30b5c01c5e013bb3b9b8",
@@ -13177,6 +13147,41 @@
   "src/lib/campaigns/birthday-stats.ts": {
     "mtime": 1791311538.491683,
     "ast_hash": "f6c0b2df583424125e2bb634700cc245",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/customer-programs/_components/BirthdayProgram.tsx": {
+    "mtime": 1791312339.6464238,
+    "ast_hash": "0f8c26ee4680f9006e0b1509413037f2",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/customer-programs/_components/LoyaltyProgram.tsx": {
+    "mtime": 1791312339.645574,
+    "ast_hash": "646e5bb3768290c78f1ad29e89c3bb25",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/customer-programs/_components/LoyaltySettingsForm.tsx": {
+    "mtime": 1791311505.1853032,
+    "ast_hash": "b3cedc08155827f2cd004754b09e1922",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/customer-programs/_components/ProgramSection.tsx": {
+    "mtime": 1791312339.6450527,
+    "ast_hash": "93473de2b95820368a4cdb4c7f845a39",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/customer-programs/_components/ReferralProgram.tsx": {
+    "mtime": 1791312339.645987,
+    "ast_hash": "d95207d4b6c405f152c5dbee1ca9c018",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/customer-programs/_components/ReferralSettingsForm.tsx": {
+    "mtime": 1791311505.4484768,
+    "ast_hash": "a7bef3346f4384e52d7008339429dec9",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/customer-programs/page.tsx": {
+    "mtime": 1791312371.4060445,
+    "ast_hash": "9aa3958f3262937217dd149154322370",
     "semantic_hash": ""
   }
 }
