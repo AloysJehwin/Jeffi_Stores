@@ -8,6 +8,8 @@ const greeting = `<p style="font-size:16px;color:#333;margin:0 0 12px;">Hi {firs
 const h2 = (t: string) => `<h2 style="font-size:22px;color:#1a3a4a;margin:0 0 12px;">${t}</h2>`
 const p = (t: string) => `<p style="color:#555;line-height:1.6;margin:0 0 12px;">${t}</p>`
 const couponBox = `<p style="background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;">{couponCode}</p>`
+// Same look as the coupon box, for templates that hand out a link instead of a code.
+const linkBox = `<p style="background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:15px;color:#1a3a4a;font-weight:700;word-break:break-all;">{shareUrl}</p>`
 const cta = (label: string) =>
   `<p style="margin:20px 0 0;"><a href="{ctaUrl}" style="display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;">${label}</a></p>`
 
@@ -74,8 +76,13 @@ export const BUILTIN_TEMPLATES: Record<string, BuiltinTemplate> = {
     body: greeting + h2('Let us celebrate with you') + p('Tell us your birthday and we will send you a treat every year. It takes one tap, and no sign-in is needed.') + cta('Add my birthday'),
   },
   referral_invite: {
-    subject: 'Share the love, {firstName} — you both save',
-    body: greeting + h2('Refer a friend') + p('Invite a friend and you both get a reward on your next order.') + couponBox + cta('Refer a friend'),
+    subject: 'Refer a friend, earn {rewardPoints} points',
+    body:
+      greeting +
+      h2('Know someone who would love us?') +
+      p('Share your personal link. When a friend signs up with it and their first order is delivered, you get {rewardPoints} points.') +
+      linkBox +
+      cta('Share your link'),
   },
   loyalty_tier_upgrade: {
     subject: 'You reached {tier}, {firstName}!',
@@ -85,6 +92,23 @@ export const BUILTIN_TEMPLATES: Record<string, BuiltinTemplate> = {
     subject: 'You have {points} points waiting, {firstName}',
     body: greeting + h2('Your points are ready to spend') + p('You have {points} points — turn them into a coupon worth up to {pointsWorth} off your next order.') + couponBox + cta('Redeem your points'),
   },
+}
+
+// Defaults that shipped earlier and were later replaced. A stored campaign whose subject and body still
+// match one of these exactly was never edited, so it is safe to move it onto the current default.
+export const RETIRED_BUILTIN_TEMPLATES: Record<string, BuiltinTemplate[]> = {
+  // Promised a coupon "you both" get; the referral program pays the referrer in points instead.
+  referral_invite: [
+    {
+      subject: 'Share the love, {firstName} — you both save',
+      body:
+        greeting +
+        h2('Refer a friend') +
+        p('Invite a friend and you both get a reward on your next order.') +
+        couponBox +
+        cta('Refer a friend'),
+    },
+  ],
 }
 
 export function getBuiltinTemplate(kind: string): BuiltinTemplate | null {
