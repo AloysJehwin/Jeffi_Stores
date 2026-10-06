@@ -6,6 +6,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useWishlist } from '@/contexts/WishlistContext'
 import { AccountNavBar } from '@/components/visitor/AccountSidebar'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import { AccountSearchProvider } from '@/contexts/AccountSearchContext'
@@ -56,6 +57,7 @@ function WishlistInner() {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const { user } = useAuth()
+  const { remove: removeFromWishlist } = useWishlist()
   const [addingToCart, setAddingToCart] = useState<Set<string>>(new Set())
   const [filterStock, setFilterStock] = useState<'all' | 'in' | 'out'>('all')
 
@@ -95,15 +97,10 @@ function WishlistInner() {
       variant: 'danger',
     })
     if (!ok) return
-    try {
-      const response = await fetch(`/api/wishlist?productId=${productId}`, {
-        method: 'DELETE',
-      })
-      if (response.ok) {
-        await fetchWishlist()
-        showToast('Item removed from wishlist', 'success')
-      }
-    } catch (error) {
+    if (await removeFromWishlist(productId)) {
+      setWishlistItems(prev => prev.filter(item => item.product_id !== productId))
+      showToast('Item removed from wishlist', 'success')
+    } else {
       showToast('Failed to remove item', 'error')
     }
   }
@@ -112,7 +109,13 @@ function WishlistInner() {
     setAddingToCart(prev => new Set(prev).add(productId))
     try {
       await addToCart(productId, 1)
-      showToast('Item added to cart!', 'success')
+      // Moving it to the cart takes it off the wishlist, the way a "move to cart" should.
+      if (await removeFromWishlist(productId)) {
+        setWishlistItems(prev => prev.filter(item => item.product_id !== productId))
+        showToast('Moved to cart', 'success')
+      } else {
+        showToast('Item added to cart!', 'success')
+      }
     } catch (error: any) {
       showToast(error.message || 'Failed to add to cart', 'error')
     } finally {

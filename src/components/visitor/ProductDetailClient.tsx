@@ -10,6 +10,7 @@ import BusinessPriceBadge from './BusinessPriceBadge'
 import RazorpayOffers from './RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useWishlist } from '@/contexts/WishlistContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { useRouter } from 'next/navigation'
@@ -529,7 +530,8 @@ export default function ProductDetailClient({
   reviewSummary,
 }: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
-  const [isInWishlist, setIsInWishlist] = useState(false)
+  const { has: inWishlist, toggle: toggleWishlist } = useWishlist()
+  const isInWishlist = inWishlist(product.id)
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [selectedUnit, setSelectedUnit] = useState<{
     key: string
@@ -652,31 +654,12 @@ export default function ProductDetailClient({
       return
     }
     setWishlistLoading(true)
-    try {
-      if (isInWishlist) {
-        const res = await fetch(`/api/wishlist?productId=${product.id}`, { method: 'DELETE', credentials: 'include' })
-        if (res.ok) {
-          setIsInWishlist(false)
-          showToast('Removed from wishlist', 'success')
-        }
-      } else {
-        const res = await fetch('/api/wishlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId: product.id }),
-          credentials: 'include',
-        })
-        if (res.ok) {
-          setIsInWishlist(true)
-          showToast('Added to wishlist!', 'success')
-        }
-      }
-    } catch {
-      showToast('Failed to update wishlist', 'error')
-    } finally {
-      setWishlistLoading(false)
-    }
-  }, [user, isInWishlist, product.id, product.slug])
+    const result = await toggleWishlist(product.id)
+    setWishlistLoading(false)
+    if (result === 'added') showToast('Added to wishlist!', 'success')
+    else if (result === 'removed') showToast('Removed from wishlist', 'success')
+    else showToast('Failed to update wishlist', 'error')
+  }, [user, product.id, product.slug, toggleWishlist])
 
   const handleShare = useCallback(async () => {
     const url = window.location.href

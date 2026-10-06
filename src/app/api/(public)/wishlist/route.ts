@@ -35,6 +35,17 @@ export async function GET(request: NextRequest) {
   try {
     const userId = await resolveUserId(request)
 
+    // ?ids=1: just the saved product ids, for the hearts and header count on every page.
+    if (new URL(request.url).searchParams.get('ids') === '1') {
+      const rows = await queryMany<{ product_id: string }>(
+        `SELECT wi.product_id::text AS product_id
+         FROM wishlist_items wi JOIN products p ON p.id = wi.product_id AND p.is_active = true
+         WHERE wi.user_id = $1`,
+        [userId]
+      )
+      return NextResponse.json({ productIds: rows.map(row => row.product_id) })
+    }
+
     const { gstEnabled } = await getFeatureFlags()
     const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
 
