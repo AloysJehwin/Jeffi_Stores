@@ -12,6 +12,7 @@ import type { ScenarioModule } from '../types'
 interface Params extends Record<string, unknown> {
   idleFor: number
   maxItemsPerEmail: number
+  maxRecipientsPerSweep: number
   whatsappEnabled: boolean
 }
 
@@ -28,6 +29,7 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
   defaultParams: {
     idleFor: days(14),
     maxItemsPerEmail: 4,
+    maxRecipientsPerSweep: 100,
     whatsappEnabled: false,
   },
   paramSchema: {
@@ -45,6 +47,13 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
       max: 10,
       label: 'Items shown in email',
       description: 'Cap on wishlist items rendered in the email body',
+    },
+    maxRecipientsPerSweep: {
+      type: 'integer',
+      min: 1,
+      max: 500,
+      label: 'Max recipients per run',
+      description: 'Hard limit per sweep',
     },
     whatsappEnabled: {
       type: 'boolean',
