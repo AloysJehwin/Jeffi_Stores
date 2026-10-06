@@ -81,6 +81,11 @@ describe('reviewPhotoFollowup scenario', () => {
       expect(mockSendEmail.mock.calls[0][0].vars.productName).toBe('Widget')
     })
 
+    it("links straight to the customer's own review, opened for adding a photo", async () => {
+      await reviewPhotoFollowup.send(row, { campaign, params: defaultParams })
+      expect(mockSendEmail.mock.calls[0][0].vars.ctaUrl).toBe('https://shop.test/products/widget?review=edit')
+    })
+
     it('does not send WhatsApp when disabled', async () => {
       await reviewPhotoFollowup.send(row, { campaign, params: defaultParams })
       expect(mockSendWa).not.toHaveBeenCalled()
