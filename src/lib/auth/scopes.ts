@@ -340,14 +340,14 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'campaigns:read',
     label: 'Campaigns (Read)',
     description: 'View marketing campaigns',
-    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/loyalty', '/admin/referrals'],
+    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/customer-programs', '/admin/loyalty', '/admin/referrals'],
     group: 'Marketing',
   },
   {
     key: 'campaigns:write',
     label: 'Campaigns (Write)',
     description: 'Create and manage marketing campaigns',
-    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/loyalty', '/admin/referrals'],
+    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/customer-programs', '/admin/loyalty', '/admin/referrals'],
     group: 'Marketing',
   },
   // Traffic analytics — previously piggybacked on dashboard:read. Dedicated key.

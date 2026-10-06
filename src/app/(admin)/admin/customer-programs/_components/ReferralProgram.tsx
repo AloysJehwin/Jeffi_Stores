@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import AdminSelect from '@/components/admin/AdminSelect'
 import Pagination from '@/components/admin/Pagination'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getReferralStats, listReferralSignups, type ReferralStats, type ReferralStatus } from '@/lib/referrals/queries'
@@ -6,7 +7,7 @@ import { getReferralSettings } from '@/lib/referrals/settings'
 import { ap } from '@/lib/shared/admin-path'
 import { queryOne } from '@/lib/shared/db'
 import ReferralSettingsForm from './ReferralSettingsForm'
-import ProgramSection, { Stat, filterButtonClass, filterInputClass } from './ProgramSection'
+import ProgramSection, { PROGRAMS_PATH, Stat, filterButtonClass, filterInputClass } from './ProgramSection'
 
 const PAGE_SIZE = 25
 const NO_STATS: ReferralStats = {
@@ -52,20 +53,18 @@ export default async function ReferralProgram({ host, query }: { host: string; q
   ])
   const live = settings.enabled && loyalty.enabled
 
-  const basePath = ap('/admin/crm', host)
+  const basePath = ap(PROGRAMS_PATH, host)
   const buildUrl = (target: number) => {
-    const params = new URLSearchParams()
-    if (status) params.set('rstatus', status)
-    if (search) params.set('rsearch', search)
-    if (target > 1) params.set('rpage', String(target))
-    const text = params.toString()
-    return `${basePath}${text ? `?${text}` : ''}#referrals`
+    const params = new URLSearchParams({ tab: 'referrals' })
+    if (status) params.set('status', status)
+    if (search) params.set('search', search)
+    if (target > 1) params.set('page', String(target))
+    return `${basePath}?${params}`
   }
   const number = (value: number) => value.toLocaleString('en-IN')
 
   return (
     <ProgramSection
-      id="referrals"
       title="Refer & Earn"
       description="Customers share a personal link and earn loyalty points when a friend's first order is delivered."
       on={live}
@@ -103,22 +102,25 @@ export default async function ReferralProgram({ host, query }: { host: string; q
       <div className="bg-surface-elevated rounded-lg border border-border-default">
         <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border-default">
           <h3 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Referrals</h3>
-          <form method="get" action={`${basePath}#referrals`} className="flex flex-wrap items-center gap-2">
+          <form method="get" action={basePath} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="tab" value="referrals" />
             <input
               type="search"
-              name="rsearch"
+              name="search"
               defaultValue={search}
               placeholder="Name or email"
               className={`${filterInputClass} min-w-0 flex-1 sm:flex-none`}
             />
-            <select name="rstatus" defaultValue={status} className={filterInputClass}>
-              <option value="">All statuses</option>
-              {(Object.keys(STATUS) as ReferralStatus[]).map(key => (
-                <option key={key} value={key}>
-                  {STATUS[key].label}
-                </option>
-              ))}
-            </select>
+            <AdminSelect
+              name="status"
+              defaultValue={status}
+              sm
+              className="w-40"
+              options={[
+                { value: '', label: 'All statuses' },
+                ...(Object.keys(STATUS) as ReferralStatus[]).map(key => ({ value: key, label: STATUS[key].label })),
+              ]}
+            />
             <button type="submit" className={filterButtonClass}>
               Filter
             </button>

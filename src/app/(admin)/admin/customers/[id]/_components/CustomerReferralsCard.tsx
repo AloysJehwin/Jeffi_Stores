@@ -79,7 +79,7 @@ export default async function CustomerReferralsCard({
           </ul>
           {count > friends.length && (
             <Link
-              href={`${ap('/admin/crm', host)}?rsearch=${encodeURIComponent(email)}#referrals`}
+              href={`${ap('/admin/customer-programs', host)}?tab=referrals&search=${encodeURIComponent(email)}`}
               className="mt-2 inline-block text-xs text-accent-600 hover:text-accent-700"
             >
               See all in Referrals

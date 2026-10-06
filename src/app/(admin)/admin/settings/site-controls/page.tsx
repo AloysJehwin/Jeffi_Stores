@@ -291,7 +291,7 @@ export default async function SiteControlsPage() {
               <ToggleControl
                 settingKey="loyalty_enabled"
                 label="Loyalty"
-                hint="Customers earn points on delivered online orders, climb tiers and redeem points for coupons from a Rewards page. The first time it's switched on, past orders are counted without emailing anyone. Settings are on the CRM page."
+                hint="Customers earn points on delivered online orders, climb tiers and redeem points for coupons from a Rewards page. The first time it's switched on, past orders are counted without emailing anyone. Settings are under Marketing > Customer Programs."
                 initial={loyalty.enabled}
                 refreshOnSave
               />
@@ -300,7 +300,7 @@ export default async function SiteControlsPage() {
               <ToggleControl
                 settingKey="referral_enabled"
                 label="Refer & Earn"
-                hint="Customers get a personal link and earn loyalty points when a friend's first order is delivered. Reward size and yearly limit are on the CRM page."
+                hint="Customers get a personal link and earn loyalty points when a friend's first order is delivered. Reward size and yearly limit are under Marketing > Customer Programs."
                 initial={referral.enabled}
                 locked={!loyalty.enabled && !referral.enabled}
                 lockedHint="Turn on Loyalty first. Referral rewards are paid in loyalty points."
@@ -310,7 +310,7 @@ export default async function SiteControlsPage() {
               <ToggleControl
                 settingKey="feature_birthday_enabled"
                 label="Birthday rewards"
-                hint="Shows the 'add your birthday' prompt and the birthday link page, and lets the Birthday and Birthday Collection campaigns run. Each campaign is still switched on in Marketing > Campaigns; coverage is on the CRM page."
+                hint="Shows the 'add your birthday' prompt and the birthday link page, and lets the Birthday and Birthday Collection campaigns run. Each campaign is still switched on in Marketing > Campaigns; coverage is under Marketing > Customer Programs."
                 initial={c.flags.birthdayEnabled}
               />
             </FullSpan>

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import AdminSelect from '@/components/admin/AdminSelect'
 import Pagination from '@/components/admin/Pagination'
 import { getLoyaltyStats, listLoyaltyMembers, type LoyaltyStats } from '@/lib/loyalty/queries'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
@@ -6,7 +7,7 @@ import { TIER_KEYS, TIER_NAMES, tierName } from '@/lib/loyalty/tiers'
 import { ap } from '@/lib/shared/admin-path'
 import { queryOne } from '@/lib/shared/db'
 import LoyaltySettingsForm from './LoyaltySettingsForm'
-import ProgramSection, { Stat, filterButtonClass, filterInputClass } from './ProgramSection'
+import ProgramSection, { PROGRAMS_PATH, Stat, filterButtonClass, filterInputClass } from './ProgramSection'
 
 const PAGE_SIZE = 25
 const NO_STATS: LoyaltyStats = { members: 0, outstandingPoints: 0, redeemedPoints: 0, byTier: {} }
@@ -35,21 +36,19 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
     ),
   ])
 
-  const basePath = ap('/admin/crm', host)
+  const basePath = ap(PROGRAMS_PATH, host)
   const buildUrl = (target: number) => {
-    const params = new URLSearchParams()
-    if (tier) params.set('ltier', tier)
-    if (search) params.set('lsearch', search)
-    if (target > 1) params.set('lpage', String(target))
-    const text = params.toString()
-    return `${basePath}${text ? `?${text}` : ''}#loyalty`
+    const params = new URLSearchParams({ tab: 'loyalty' })
+    if (tier) params.set('tier', tier)
+    if (search) params.set('search', search)
+    if (target > 1) params.set('page', String(target))
+    return `${basePath}?${params}`
   }
   const number = (value: number) => value.toLocaleString('en-IN')
   const outstandingValue = Math.max(0, stats.outstandingPoints) * settings.pointValue
 
   return (
     <ProgramSection
-      id="loyalty"
       title="Loyalty"
       description="Points on delivered online orders, tiers, and reward coupons customers redeem from their account."
       on={settings.enabled}
@@ -87,22 +86,22 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
       <div className="bg-surface-elevated rounded-lg border border-border-default">
         <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border-default">
           <h3 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Members</h3>
-          <form method="get" action={`${basePath}#loyalty`} className="flex flex-wrap items-center gap-2">
+          <form method="get" action={basePath} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="tab" value="loyalty" />
             <input
               type="search"
-              name="lsearch"
+              name="search"
               defaultValue={search}
               placeholder="Name, email or phone"
               className={`${filterInputClass} min-w-0 flex-1 sm:flex-none`}
             />
-            <select name="ltier" defaultValue={tier} className={filterInputClass}>
-              <option value="">All tiers</option>
-              {TIER_KEYS.map(key => (
-                <option key={key} value={key}>
-                  {TIER_NAMES[key]}
-                </option>
-              ))}
-            </select>
+            <AdminSelect
+              name="tier"
+              defaultValue={tier}
+              sm
+              className="w-36"
+              options={[{ value: '', label: 'All tiers' }, ...TIER_KEYS.map(key => ({ value: key, label: TIER_NAMES[key] }))]}
+            />
             <button type="submit" className={filterButtonClass}>
               Filter
             </button>

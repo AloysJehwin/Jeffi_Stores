@@ -13,13 +13,13 @@ export function Stat({ label, value, hint }: { label: string; value: string; hin
 
 export const filterInputClass =
   'px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500'
+export const PROGRAMS_PATH = '/admin/customer-programs'
 export const filterButtonClass =
   'px-4 py-1.5 text-sm font-medium border border-border-secondary rounded-lg text-foreground hover:bg-surface-secondary'
 
-// One customer program on the CRM page. A program switched off in Site Controls stays visible but
-// greyed out, so admins can see it exists (and still set it up) without mistaking it for live.
+// One customer program tab. A program switched off in Site Controls stays visible but greyed out,
+// so admins can see it exists (and still set it up) without mistaking it for live.
 export default function ProgramSection({
-  id,
   title,
   description,
   on,
@@ -27,7 +27,6 @@ export default function ProgramSection({
   siteControlsHref,
   children,
 }: {
-  id: string
   title: string
   description: string
   on: boolean
@@ -36,22 +35,8 @@ export default function ProgramSection({
   children: ReactNode
 }) {
   return (
-    <section id={id} className="scroll-mt-20 space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-          <p className="text-sm text-foreground-secondary">{description}</p>
-        </div>
-        <span
-          className={`self-start shrink-0 px-3 py-1 rounded-full text-xs font-semibold ${
-            on
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-              : 'bg-surface-secondary text-foreground-secondary'
-          }`}
-        >
-          {on ? 'On' : 'Off'}
-        </span>
-      </div>
+    <section className="space-y-4">
+      <p className="text-sm text-foreground-secondary">{description}</p>
 
       {!on && (
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-dashed border-border-secondary bg-surface-secondary px-4 py-3 text-sm text-foreground-secondary">
