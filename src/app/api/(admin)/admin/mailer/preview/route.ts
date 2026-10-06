@@ -1,3 +1,4 @@
+import { storeBaseUrlAsync } from '@/lib/catalog/brand'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -21,10 +22,12 @@ export async function POST(request: NextRequest) {
   }
   const subbedSubject = substituteVars(subject || '', sampleVars)
 
+  // Same base the real send uses, so a tenant's preview shows its own store's links.
   const { html } = renderCampaignEmail(
     template_key,
     { ...subbedData, subject: subbedSubject },
-    sampleVars.customer_first_name
+    sampleVars.customer_first_name,
+    await storeBaseUrlAsync()
   )
   const subbedHtml = substituteVars(html, sampleVars)
   return NextResponse.json({ html: subbedHtml })
