@@ -2066,6 +2066,38 @@ ALTER TABLE ONLY public.referrals
 
 
 --
+-- Name: referral_signups referral_signups_referral_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referral_signups
+    ADD CONSTRAINT referral_signups_referral_id_fkey FOREIGN KEY (referral_id) REFERENCES public.referrals(id) ON DELETE CASCADE;
+
+
+--
+-- Name: referral_signups referral_signups_referrer_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referral_signups
+    ADD CONSTRAINT referral_signups_referrer_user_id_fkey FOREIGN KEY (referrer_user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: referral_signups referral_signups_referred_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referral_signups
+    ADD CONSTRAINT referral_signups_referred_user_id_fkey FOREIGN KEY (referred_user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: referral_signups referral_signups_qualifying_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referral_signups
+    ADD CONSTRAINT referral_signups_qualifying_order_id_fkey FOREIGN KEY (qualifying_order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+
+
+--
 -- Name: subscriptions subscriptions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3060,7 +3092,7 @@ ALTER TABLE ONLY public.loyalty_ledger
 
 ALTER TABLE ONLY public.loyalty_ledger
     ADD CONSTRAINT loyalty_ledger_reason_check
-    CHECK (reason::text = ANY (ARRAY['order_earn'::text, 'order_reversal'::text, 'redeem'::text, 'redeem_refund'::text, 'adjustment'::text]));
+    CHECK (reason::text = ANY (ARRAY['order_earn'::text, 'order_reversal'::text, 'redeem'::text, 'redeem_refund'::text, 'adjustment'::text, 'referral'::text, 'referral_reversal'::text]));
 
 
 --
@@ -3077,6 +3109,39 @@ ALTER TABLE ONLY public.referrals
 
 ALTER TABLE ONLY public.referrals
     ADD CONSTRAINT referrals_code_key UNIQUE (referral_code);
+
+
+--
+-- Name: referrals referrals_referrer_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referrals
+    ADD CONSTRAINT referrals_referrer_unique UNIQUE (referrer_user_id);
+
+
+--
+-- Name: referral_signups referral_signups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referral_signups
+    ADD CONSTRAINT referral_signups_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: referral_signups referral_signups_referred_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referral_signups
+    ADD CONSTRAINT referral_signups_referred_unique UNIQUE (referred_user_id);
+
+
+--
+-- Name: referral_signups referral_signups_status_check; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.referral_signups
+    ADD CONSTRAINT referral_signups_status_check
+    CHECK (status::text = ANY (ARRAY['joined'::text, 'rewarded'::text, 'reversed'::text, 'capped'::text, 'rejected'::text]));
 
 
 --
