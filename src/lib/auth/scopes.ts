@@ -340,14 +340,14 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'campaigns:read',
     label: 'Campaigns (Read)',
     description: 'View marketing campaigns',
-    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/loyalty'],
+    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/loyalty', '/admin/referrals'],
     group: 'Marketing',
   },
   {
     key: 'campaigns:write',
     label: 'Campaigns (Write)',
     description: 'Create and manage marketing campaigns',
-    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/loyalty'],
+    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/loyalty', '/admin/referrals'],
     group: 'Marketing',
   },
   // Traffic analytics — previously piggybacked on dashboard:read. Dedicated key.
@@ -675,6 +675,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/traffic')) return 'traffic:read'
   if (pathname.startsWith('/api/admin/campaigns')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/loyalty')) return 'campaigns:read'
+  if (pathname.startsWith('/api/admin/referrals')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/agent')) return 'agent:read'
   if (pathname.startsWith('/api/admin/catalog-enrichment')) return 'catalog_enrichment:read'
   if (pathname.startsWith('/api/admin/audit')) return 'audit:read'
