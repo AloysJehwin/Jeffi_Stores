@@ -9,6 +9,7 @@ vi.mock('@/lib/catalog/brand', () => ({
   adminMailFrom: () => '"Jeffi Stores" <admin@jeffistores.in>',
   currentBrandNameAsync: async () => 'Jeffi Stores',
   currentAdminBaseUrl: () => 'https://admin.jeffistores.in/admin',
+  currentAdminBaseUrlAsync: async () => 'https://admin.jeffistores.in/admin',
 }))
 vi.mock('@/lib/shared/customer-notes', () => ({
   ownerAdminEmails: (...a: unknown[]) => mockOwnerAdminEmails(...a),

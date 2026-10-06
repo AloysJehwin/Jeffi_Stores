@@ -7,7 +7,7 @@ import {
   customerMailFromAsync,
   adminMailFrom,
   currentBrandNameAsync,
-  currentAdminBaseUrl,
+  currentAdminBaseUrlAsync,
   platformAdminEmail,
   storeContactLine,
   storeAddressLine,
@@ -93,7 +93,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
         </div>
 
         <div class="cta">
-          <a href="${currentAdminBaseUrl()}/reviews" class="button" style="color:#ffffff;">
+          <a href="${await currentAdminBaseUrlAsync()}/reviews" class="button" style="color:#ffffff;">
             Approve / Reject Review
           </a>
         </div>
@@ -180,7 +180,7 @@ export async function sendPaymentFailedAdminNotification(
         </div>
 
         <div class="cta">
-          <a href="${currentAdminBaseUrl()}/orders/${order.id}" class="button">
+          <a href="${await currentAdminBaseUrlAsync()}/orders/${order.id}" class="button">
             View Order in Admin Panel
           </a>
         </div>
@@ -256,7 +256,7 @@ export async function sendSupportEscalationEmail(
   // Three things were wrong here: the link went to the platform's admin panel, which a
   // tenant's certificate cannot open; the sender was the platform's; and the fallback
   // recipient was a personal Gmail, so a tenant's support request reached an individual.
-  const chatLink = `${currentAdminBaseUrl()}/customers/${customerId}?chat=true`
+  const chatLink = `${await currentAdminBaseUrlAsync()}/customers/${customerId}?chat=true`
   const recipients = adminEmails.length > 0 ? adminEmails : [platformAdminEmail()]
   const brand = await currentBrandNameAsync()
 

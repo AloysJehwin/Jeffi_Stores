@@ -73,3 +73,12 @@ export function documentHostForSlug(app: DocumentApp, slug: string | null): stri
 export function documentHostForHost(app: DocumentApp, hostname: string): string {
   return documentHostForSlug(app, slugFromHostname(hostname))
 }
+
+/**
+ * Business-portal host for the tenant of the given host: `business.` (platform) or
+ * `{slug}.business.` (tenant). Business customers only exist on plans that get this host.
+ */
+export function businessHostForHost(hostname: string): string {
+  const slug = slugFromHostname(hostname)
+  return slug ? `${slug}.business.${ROOT_DOMAIN}` : `business.${ROOT_DOMAIN}`
+}

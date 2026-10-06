@@ -3,6 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+vi.mock('@/lib/shared/customer-links', () => ({
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+}))
 vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
@@ -272,6 +275,8 @@ describe('PATCH /api/admin/orders/[id]', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
+    const mail = mockSendAuditedMail.mock.calls.at(-1)![0] as any
+    expect(mail.html).toContain('href="https://acme.jeffistores.in/account/orders/order-1"')
   })
 
   it('returns ok on EDD update when order has no email (skips mail)', async () => {

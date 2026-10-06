@@ -642,6 +642,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (userEmail && userName) {
           sendReturnStatusEmail(userEmail, userName, order.order_number, orderId, 'replacement_created', {
             replacementOrderNumber: newOrderNumber!,
+            replacementOrderId: newOrderId!,
           }).catch(() => {})
         }
 

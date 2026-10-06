@@ -7,7 +7,8 @@ import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import { restoreOrderStock } from '@/lib/orders/order-stock'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
-import { storeContactLine, currentBrandNameAsync } from '@/lib/catalog/brand'
+import { storeContactLine, currentBrandNameAsync, customerMailFromAsync } from '@/lib/catalog/brand'
+import { orderUrlById } from '@/lib/shared/customer-links'
 import { mailShell } from '@/lib/shared/mail-template'
 
 export const dynamic = 'force-dynamic'
@@ -186,7 +187,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           day: 'numeric',
           month: 'short',
         })
-        const from = `"${brand}" <${process.env.SES_FROM_EMAIL}>`
+        // The store's own sender and order page (business portal for a business customer).
+        const from = await customerMailFromAsync()
+        const orderLink = await orderUrlById(id)
         const subject = `Your delivery date has been updated — Order #${order.order_number}`
         const html = mailShell({
           brand,
@@ -200,6 +203,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             <p style="margin:6px 0 0;font-size:22px;font-weight:700;color:#15803d;">${readableDate}</p>
           </div>
           <p>Our team is working hard to deliver your order as soon as possible. We appreciate your patience.</p>
+          <div class="cta"><a href="${orderLink}" class="button" style="color:#ffffff;">View Your Order</a></div>
           <p style="margin:24px 0 0;color:#666;">Thank you for shopping with us,<br>The ${brand} team</p>`,
           footerLines: [storeName !== brand ? storeName : '', contactLine],
         })

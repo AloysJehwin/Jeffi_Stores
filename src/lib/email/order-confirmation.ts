@@ -7,13 +7,15 @@ import {
   customerMailFromAsync,
   adminMailFrom,
   currentBrandNameAsync,
-  currentAdminBaseUrl,
+  currentAdminBaseUrlAsync,
   storeContactLine,
   storeAddressLine,
 } from './shared'
+import { orderUrlById } from '@/lib/shared/customer-links'
 
 export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[]) {
   const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
+  const orderLink = order?.id ? await orderUrlById(String(order.id)) : null
   const from = await customerMailFromAsync()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
@@ -95,6 +97,8 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
         <h4 style="margin-top: 0;">What happens next?</h4>
         <p style="margin: 5px 0;">Your payment has been received. We're now preparing your order for dispatch. You'll receive another email once your order is on its way.</p>
       </div>
+
+      ${orderLink ? `<div class="cta"><a href="${orderLink}" class="button" style="color:#ffffff;">View Your Order</a></div>` : ''}
 
       <p>If you have any questions, feel free to contact us:</p>
       ${contactLine}
@@ -199,7 +203,7 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
       </div>
 
       <div class="cta">
-        <a href="${currentAdminBaseUrl()}/orders/${order.id}" class="button">
+        <a href="${await currentAdminBaseUrlAsync()}/orders/${order.id}" class="button">
           View Order in Admin Panel
         </a>
       </div>

@@ -11,6 +11,7 @@ import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { queryMany } from '@/lib/shared/db'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
+import { orderUrlById } from '@/lib/shared/customer-links'
 
 export const dynamic = 'force-dynamic'
 
@@ -175,7 +176,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
 
     // Notify the customer: email always + preferred SMS/WhatsApp with the order link.
-    const orderUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}`
+    // The order's own page on this store (business portal for a business customer), for email, SMS and WhatsApp.
+    const orderUrl = await orderUrlById(orderId)
     const custEmail = order.user_email || order.customer_email
     const custName = order.first_name
       ? `${order.first_name} ${order.last_name || ''}`.trim()

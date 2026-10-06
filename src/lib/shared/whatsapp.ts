@@ -1,6 +1,7 @@
 import twilio from 'twilio'
 import { logMessage } from '@/lib/shared/message-log'
-import { storeSignature } from '@/lib/catalog/brand'
+import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
+import { orderUrlByNumber } from '@/lib/shared/customer-links'
 
 // WhatsApp notifications via Twilio (Meta BSP).
 // Business-initiated WhatsApp messages must use approved Content Templates
@@ -158,7 +159,11 @@ export async function sendOrderShippedWhatsApp(params: {
   trackingId?: string | null
 }): Promise<boolean> {
   const courier = params.courier || 'courier'
-  const tracking = params.trackingId || 'jeffistores.in/orders'
+  // No AWB yet: the order's own page, where tracking appears once it has one.
+  const tracking =
+    params.trackingId ||
+    (await orderUrlByNumber(params.orderNumber)) ||
+    `${await storeBaseUrlAsync()}/account/orders`
   const { name: STORE } = await storeSignature()
   return sendTemplate(
     params.phone,

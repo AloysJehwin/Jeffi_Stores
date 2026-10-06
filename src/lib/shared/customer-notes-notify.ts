@@ -1,5 +1,5 @@
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
-import { adminMailFrom, currentBrandNameAsync, currentAdminBaseUrl } from '@/lib/catalog/brand'
+import { adminMailFrom, currentBrandNameAsync, currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
 import { ownerAdminEmails, listNotesSince, type CustomerNote } from '@/lib/shared/customer-notes'
 import { mailShell } from '@/lib/shared/mail-template'
 
@@ -85,7 +85,7 @@ export async function notifyOwnersOfNote(
     const recipients = await ownerAdminEmails(actor.email)
     if (recipients.length === 0) return
     const brand = await currentBrandNameAsync()
-    const adminBase = currentAdminBaseUrl()
+    const adminBase = await currentAdminBaseUrlAsync()
     const subject = `New customer note${note.title ? ` - ${note.title}` : ''} - ${brand}`
     const html = shell(
       brand,
@@ -121,7 +121,7 @@ export async function sendNotesDigest(hours = 24): Promise<number> {
   const recipients = await ownerAdminEmails(null)
   if (recipients.length === 0) return 0
   const brand = await currentBrandNameAsync()
-  const adminBase = currentAdminBaseUrl()
+  const adminBase = await currentAdminBaseUrlAsync()
   const count = `${notes.length} customer note${notes.length === 1 ? '' : 's'}`
   const html = shell(
     brand,

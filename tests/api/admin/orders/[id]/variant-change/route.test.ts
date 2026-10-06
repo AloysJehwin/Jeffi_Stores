@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/shared/customer-links', () => ({
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+}))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn() }))
@@ -213,6 +216,9 @@ describe('POST variant-change', () => {
     expect(body.preview.settlementType).toBe('collect')
     expect(email.sendVariantChangeRequestedEmail).toHaveBeenCalled()
     expect(notify.notifyVariantChangeRequested).toHaveBeenCalled()
+    // SMS/WhatsApp get this store's order page, never NEXT_PUBLIC_BASE_URL or localhost.
+    const orderUrl = vi.mocked(notify.notifyVariantChangeRequested).mock.calls[0][2]
+    expect(orderUrl).toMatch(/^https:\/\/acme\.jeffistores\.in\/account\/orders\//)
   })
 
   it('COD order maps collect → cod_adjust', async () => {
