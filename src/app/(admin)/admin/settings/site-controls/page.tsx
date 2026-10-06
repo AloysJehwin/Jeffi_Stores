@@ -291,7 +291,7 @@ export default async function SiteControlsPage() {
               <ToggleControl
                 settingKey="loyalty_enabled"
                 label="Loyalty"
-                hint="Customers earn points on delivered online orders, climb tiers and redeem points for coupons from a Rewards page. The first time it's switched on, past orders are counted without emailing anyone. Settings are under Marketing > Customer Programs."
+                hint="Customers earn points on delivered online orders, climb tiers and redeem points for coupons from a Rewards page. The first time it's switched on, past orders are counted without emailing anyone and tier-upgrade emails are switched on. Settings are under Marketing > Customer Programs."
                 initial={loyalty.enabled}
                 refreshOnSave
               />

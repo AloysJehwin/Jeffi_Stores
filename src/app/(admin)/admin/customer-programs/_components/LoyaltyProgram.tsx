@@ -70,16 +70,31 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
         />
       </div>
 
-      <p className="text-sm text-foreground-secondary">
-        Tier-upgrade emails are sent by the Loyalty Tier Upgrade campaign, which is{' '}
-        <span className="font-medium text-foreground">{campaign?.enabled ? 'on' : 'off'}</span>.{' '}
-        <Link
-          href={ap('/admin/campaigns/loyalty_tier_upgrade', host)}
-          className="text-accent-600 hover:text-accent-700 dark:text-accent-400"
-        >
-          Open the campaign
-        </Link>
-      </p>
+      {settings.enabled && !campaign?.enabled ? (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          <span className="flex-1">
+            Tier-upgrade emails are off, so customers who move up a tier aren&apos;t told. They&apos;re sent by the
+            Loyalty Tier Upgrade campaign.
+          </span>
+          <Link
+            href={ap('/admin/campaigns/loyalty_tier_upgrade', host)}
+            className="font-medium text-amber-900 underline hover:no-underline dark:text-amber-200"
+          >
+            Turn it on
+          </Link>
+        </div>
+      ) : (
+        <p className="text-sm text-foreground-secondary">
+          Tier-upgrade emails are sent by the Loyalty Tier Upgrade campaign, which is{' '}
+          <span className="font-medium text-foreground">{campaign?.enabled ? 'on' : 'off'}</span>.{' '}
+          <Link
+            href={ap('/admin/campaigns/loyalty_tier_upgrade', host)}
+            className="text-accent-600 hover:text-accent-700 dark:text-accent-400"
+          >
+            Open the campaign
+          </Link>
+        </p>
+      )}
 
       <LoyaltySettingsForm initial={settings} />
 
