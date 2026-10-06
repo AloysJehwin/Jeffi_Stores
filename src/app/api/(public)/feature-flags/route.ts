@@ -13,6 +13,7 @@ export async function GET() {
     smsEnabled: flags.smsEnabled,
     whatsappEnabled: flags.whatsappEnabled,
     loyaltyEnabled: loyalty.enabled,
+    birthdayEnabled: flags.birthdayEnabled,
     // Rewards are loyalty points, so referrals only show while loyalty is on too.
     referralEnabled: referral.enabled && loyalty.enabled,
   })

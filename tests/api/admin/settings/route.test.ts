@@ -5,12 +5,14 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn() }))
 vi.mock('@/lib/shipping/delivery-settings', () => ({ invalidateDeliverySettingsCache: vi.fn() }))
+vi.mock('@/lib/loyalty/settings', () => ({ getLoyaltySettings: vi.fn() }))
 
 import { PATCH } from '@/app/api/(admin)/admin/settings/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'
 import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
+import { getLoyaltySettings } from '@/lib/loyalty/settings'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -117,5 +119,37 @@ describe('PATCH /api/admin/settings', () => {
     const res = await PATCH(makeRequest({ key: 'min_order_amount', value: '100' }))
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/failed to update/i)
+  })
+
+  describe('customer program switches', () => {
+    beforeEach(() => {
+      mockAuth.mockResolvedValue(admin as any)
+      mockHasScope.mockReturnValue(true)
+      mockQuery.mockResolvedValue(undefined as any)
+    })
+
+    it('refuses to switch Refer & Earn on while loyalty is off, in single and batch mode', async () => {
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: false } as any)
+      const single = await PATCH(makeRequest({ key: 'referral_enabled', value: 'true' }))
+      expect(single.status).toBe(400)
+      expect((await single.json()).error).toMatch(/loyalty program first/)
+      const batch = await PATCH(makeRequest({ updates: [{ key: 'referral_enabled', value: 'true' }] }))
+      expect(batch.status).toBe(400)
+      expect(mockQuery).not.toHaveBeenCalled()
+    })
+
+    it('lets Refer & Earn be switched on with loyalty on, and off at any time', async () => {
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: true } as any)
+      expect((await PATCH(makeRequest({ key: 'referral_enabled', value: 'true' }))).status).toBe(200)
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: false } as any)
+      expect((await PATCH(makeRequest({ key: 'referral_enabled', value: 'false' }))).status).toBe(200)
+      expect(mockQuery).toHaveBeenCalledTimes(2)
+    })
+
+    it('saves the Birthday rewards switch without needing loyalty', async () => {
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: false } as any)
+      expect((await PATCH(makeRequest({ key: 'feature_birthday_enabled', value: 'false' }))).status).toBe(200)
+      expect(mockQuery.mock.calls[0][1]).toEqual(['feature_birthday_enabled', 'false'])
+    })
   })
 })

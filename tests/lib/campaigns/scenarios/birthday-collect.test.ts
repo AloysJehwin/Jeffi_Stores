@@ -1,5 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
+vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), query: vi.fn() }))
 vi.mock('@/lib/shared/automation-emails', () => ({
   fetchUserContext: vi.fn(),
@@ -10,6 +11,7 @@ vi.mock('@/lib/auth/jwt', () => ({ generateBirthdayToken: vi.fn().mockResolvedVa
 import { birthdayCollect } from '@/lib/campaigns/scenarios/birthday-collect'
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, sendCampaignEmail } from '@/lib/shared/automation-emails'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { days } from '@/lib/campaigns/duration'
 
 const mockQueryMany = queryMany as ReturnType<typeof vi.fn>
@@ -21,6 +23,7 @@ const defaultParams = birthdayCollect.defaultParams as any
 
 describe('birthdayCollect scenario', () => {
   beforeEach(() => {
+    vi.mocked(getFeatureFlags).mockResolvedValue({ birthdayEnabled: true } as any)
     vi.clearAllMocks()
     mockQueryMany.mockResolvedValue([])
   })
@@ -31,6 +34,14 @@ describe('birthdayCollect scenario', () => {
   })
 
   describe('findEligible', () => {
+    it('finds nobody, and reports no one suppressed, while Birthday rewards are off', async () => {
+      vi.mocked(getFeatureFlags).mockResolvedValue({ birthdayEnabled: false } as any)
+      const params = birthdayCollect.defaultParams as any
+      expect(await birthdayCollect.findEligible({ campaign, params })).toEqual([])
+      expect(await birthdayCollect.findSuppressed!({ campaign, params })).toEqual([])
+      expect(mockQueryMany).not.toHaveBeenCalled()
+    })
+
     it('targets retail customers with no birthday and an email', async () => {
       await birthdayCollect.findEligible({ campaign, params: defaultParams })
       const sql = String(mockQueryMany.mock.calls[0][0])

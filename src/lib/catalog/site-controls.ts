@@ -41,6 +41,9 @@ export interface FeatureFlags {
   ondeviceSummaryDesktopEnabled: boolean
   ondeviceFinetuneMobileEnabled: boolean
   ondeviceFinetuneDesktopEnabled: boolean
+  // Birthday feature: the "add your birthday" prompt, the /birthday link page and the Birthday /
+  // Birthday Collection campaigns. On by default so existing stores keep their behaviour.
+  birthdayEnabled: boolean
 }
 
 export interface BusinessValues {
@@ -128,6 +131,7 @@ const DEFAULTS: SiteControls = {
     inventoryValidationEnabled: true,
     smsEnabled: process.env.SMS_DISABLED !== 'true',
     whatsappEnabled: process.env.WHATSAPP_DISABLED !== 'true',
+    birthdayEnabled: true,
     ondeviceSummaryEnabled:
       envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) ||
       process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
@@ -217,6 +221,7 @@ const KEYS = [
   'feature_inventory_validation_enabled',
   'feature_sms_enabled',
   'feature_whatsapp_enabled',
+  'feature_birthday_enabled',
   'feature_ondevice_summary_enabled',
   'feature_ondevice_finetune_enabled',
   'feature_ondevice_summary_mobile_enabled',
@@ -391,6 +396,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         inventoryValidationEnabled: bool('feature_inventory_validation_enabled', d.flags.inventoryValidationEnabled),
         smsEnabled: bool('feature_sms_enabled', d.flags.smsEnabled),
         whatsappEnabled: bool('feature_whatsapp_enabled', d.flags.whatsappEnabled),
+        birthdayEnabled: bool('feature_birthday_enabled', d.flags.birthdayEnabled),
         ondeviceSummaryEnabled: bool('feature_ondevice_summary_enabled', d.flags.ondeviceSummaryEnabled),
         ondeviceFinetuneEnabled: bool('feature_ondevice_finetune_enabled', d.flags.ondeviceFinetuneEnabled),
         ondeviceSummaryMobileEnabled: bool(
