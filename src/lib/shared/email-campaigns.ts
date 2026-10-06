@@ -51,15 +51,24 @@ export function renderCampaignEmail(
   switch (templateKey) {
     case 'review_request': {
       const subject = data.subject || 'How was your order? Share your thoughts ⭐'
-      const items: Array<{ name: string; imageUrl: string | null; starLinks: string[]; productUrl?: string }> =
-        JSON.parse(data.itemsJson || '[]')
+      const items: Array<{
+        name: string
+        imageUrl: string | null
+        starLinks: string[]
+        reviewUrl?: string
+        productUrl?: string
+      }> = JSON.parse(data.itemsJson || '[]')
       const appUrl = url
       const ampBaseUrl = url
+      // The AMP form posts to the sending store's API, so a tenant's reviews reach its own database.
+      const apiBase = data.apiBaseUrl || url
 
-      // Fallback HTML: one link per product to its detail page (non-Gmail clients)
+      // Fallback HTML (non-Gmail clients): each product opens its own review page.
       const fallbackLinks = items
         .map(item => {
-          const url = item.productUrl || item.starLinks[4] || `${appUrl}/products`
+          // Older item data has no reviewUrl: use its review link without a preselected rating.
+          const legacyReview = item.starLinks?.find(Boolean)?.replace(/&rating=\d+$/, '')
+          const url = item.reviewUrl || legacyReview || item.productUrl || `${appUrl}/products`
           const img = item.imageUrl
             ? `<img src="${item.imageUrl}" width="48" height="48" style="object-fit:cover;border-radius:6px;display:inline-block;vertical-align:middle;margin-right:10px;" alt="">`
             : ''
@@ -83,7 +92,7 @@ export function renderCampaignEmail(
         `
         <p style="font-size:16px;color:#333;margin:0 0 12px;">Hi ${data.firstName || 'there'},</p>
         <h2 style="font-size:22px;color:#1a3a4a;margin:0 0 8px;">How did we do?</h2>
-        <p style="color:#555;line-height:1.6;margin:0 0 20px;">We hope you love your recent purchase! Tap a product below to leave a quick review.</p>
+        <p style="color:#555;line-height:1.6;margin:0 0 20px;">We hope you love your recent purchase! Tap a product below to review it.</p>
         <table cellpadding="0" cellspacing="0" width="100%">${fallbackLinks}</table>
         ${couponBlock}
       `,
@@ -104,7 +113,7 @@ export function renderCampaignEmail(
             <td style="vertical-align:top;">
               <p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1a3a4a;">${item.name}</p>
               <form method="POST"
-                action-xhr="https://jeffistores.in/api/reviews/amp"
+                action-xhr="${apiBase}/api/reviews/amp"
                 id="review-form-${idx}">
                 <input type="hidden" name="token" value="${token}">
                 <div style="margin-bottom:10px;">
@@ -127,7 +136,7 @@ export function renderCampaignEmail(
                   <template type="amp-mustache"><p style="color:#22863a;font-size:14px;font-weight:600;margin:8px 0;">Thanks for your review!</p></template>
                 </div>
                 <div submit-error>
-                  <template type="amp-mustache">Something went wrong. <a href="${item.productUrl || ampBaseUrl + '/products'}">Open in browser</a></template>
+                  <template type="amp-mustache">Something went wrong. <a href="${item.reviewUrl || item.productUrl || ampBaseUrl + '/products'}">Open in browser</a></template>
                 </div>
               </form>
             </td>

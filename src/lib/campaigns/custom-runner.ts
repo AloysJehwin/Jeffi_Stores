@@ -1,6 +1,5 @@
 import { getClient, queryOne } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
-import { storeBaseUrlAsync } from '@/lib/catalog/brand'
 import type { Campaign, CampaignKind } from '@/lib/shared/marketing'
 import type { SweepResult } from './types'
 import { validateScenarioSql } from './sql-safety'
@@ -92,19 +91,24 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
 
   result.attempted = userIds.length
 
-  const baseUrl = await storeBaseUrlAsync()
-
-  const itemsHtml =
-    products.length > 0
-      ? renderItemRows(
-          products.map(p => ({
-            name: p.name,
-            price: p.price ?? undefined,
-            imageUrl: p.image_url,
-            productUrl: p.slug ? `${baseUrl}/products/${p.slug}` : null,
-          }))
-        )
-      : ''
+  // Product links follow each recipient's own base (store, or business portal), like the CTA.
+  const itemsByBase = new Map<string, string>()
+  const itemsHtmlFor = (baseUrl: string): string => {
+    if (products.length === 0) return ''
+    let html = itemsByBase.get(baseUrl)
+    if (html === undefined) {
+      html = renderItemRows(
+        products.map(p => ({
+          name: p.name,
+          price: p.price ?? undefined,
+          imageUrl: p.image_url,
+          productUrl: p.slug ? `${baseUrl}/products/${encodeURIComponent(p.slug)}` : null,
+        }))
+      )
+      itemsByBase.set(baseUrl, html)
+    }
+    return html
+  }
 
   for (const userId of userIds) {
     const user = await fetchUserContext(userId)
@@ -123,7 +127,7 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
         firstName: user.first_name || 'there',
         couponCode,
         discountPercent,
-        itemsHtml,
+        itemsHtml: itemsHtmlFor(user.baseUrl),
         ctaUrl: `${user.baseUrl}/products`,
       },
     })

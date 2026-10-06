@@ -1,4 +1,6 @@
 import { queryMany } from '@/lib/shared/db'
+import { generateReviewToken } from '@/lib/auth/jwt'
+import { apiBaseUrl } from '@/lib/shared/customer-links'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { days, readDurationParam } from '../duration'
@@ -102,17 +104,25 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
       [row.id]
     )
 
+    // Each item opens its own review page (storefront only), signed for this order and customer.
+    const storeBase = await apiBaseUrl()
     const itemsHtml = renderItemRows(
-      items.map(i => ({
-        name: i.name,
-        imageUrl: i.image_url,
-        productUrl: i.product_slug ? `${user.baseUrl}/products/${i.product_slug}?review=1` : null,
-      }))
+      await Promise.all(
+        items.map(async i => ({
+          name: i.name,
+          imageUrl: i.image_url,
+          productUrl: i.product_id
+            ? `${storeBase}/review?token=${encodeURIComponent(
+                await generateReviewToken({ orderId: row.id, productId: i.product_id, userId: row.user_id })
+              )}`
+            : null,
+        }))
+      )
     )
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 
-    const ctaUrl = `${user.baseUrl}/account/orders/${row.id}`
+    const ctaUrl = `${user.baseUrl}/account/orders/${encodeURIComponent(row.id)}`
     const emailResult = await sendCampaignEmail({
       campaign,
       user,

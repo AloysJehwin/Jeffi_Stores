@@ -2,6 +2,7 @@ import { queryMany } from '@/lib/shared/db'
 import { generateReviewToken } from '@/lib/auth/jwt'
 import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/lib/shared/automation-emails'
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
+import { apiBaseUrl } from '@/lib/shared/customer-links'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { days, readDurationParam } from '../duration'
 import type { ScenarioModule } from '../types'
@@ -98,15 +99,16 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       [row.id]
     )
 
+    // The review page and its API live on the storefront host only (never the business portal).
+    const storeBase = await apiBaseUrl()
     const itemsWithLinks = await Promise.all(
       items.map(async item => {
         const token = await generateReviewToken({ orderId: row.id, productId: item.product_id, userId: row.user_id })
+        const reviewUrl = `${storeBase}/review?token=${encodeURIComponent(token)}`
         const starLinks: string[] = []
-        for (let rating = 1; rating <= 5; rating++) {
-          starLinks.push(`${user.baseUrl}/review?token=${token}&rating=${rating}`)
-        }
-        const productUrl = item.slug ? `${user.baseUrl}/products/${item.slug}` : null
-        return { name: item.name, imageUrl: item.image_url, starLinks, productUrl, token }
+        for (let rating = 1; rating <= 5; rating++) starLinks.push(`${reviewUrl}&rating=${rating}`)
+        const productUrl = item.slug ? `${user.baseUrl}/products/${encodeURIComponent(item.slug)}` : null
+        return { name: item.name, imageUrl: item.image_url, starLinks, reviewUrl, productUrl, token }
       })
     )
 
@@ -118,7 +120,8 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       itemsJson: JSON.stringify(itemsWithLinks),
       couponCode: couponCode ?? '',
       discountPercent: discountPercent ? String(discountPercent) : '',
-    })
+      apiBaseUrl: storeBase,
+    }, undefined, user.baseUrl)
 
     const emailResult = await sendCampaignEmailRendered({
       campaign,
@@ -130,9 +133,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
     })
     if ((params as any).whatsappEnabled) {
       // Reuse the same token-based review link the email uses as the feedback URL.
-      const feedbackUrl = itemsWithLinks[0]?.token
-        ? `${user.baseUrl}/review?token=${itemsWithLinks[0].token}`
-        : `${user.baseUrl}/account/orders/${row.id}`
+      const feedbackUrl = itemsWithLinks[0]?.reviewUrl ?? `${user.baseUrl}/account/orders/${encodeURIComponent(row.id)}`
       sendCampaignWhatsApp(campaign.kind, row.user_id, {
         orderNumber: row.order_number,
         url: feedbackUrl,
