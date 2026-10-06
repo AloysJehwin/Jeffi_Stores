@@ -22,6 +22,9 @@ vi.mock('@/lib/auth/issue-session', () => ({
 vi.mock('@/lib/auth/session-signals-request', () => ({
   extractSessionSignals: vi.fn().mockReturnValue({}),
 }))
+vi.mock('@/lib/referrals/attribute', () => ({
+  attributeReferral: vi.fn().mockResolvedValue({ status: 'joined', referrerUserId: 'ref' }),
+}))
 vi.mock('@/lib/auth/google-verify', () => ({
   verifyGoogleCredential: vi.fn(),
 }))
@@ -114,6 +117,21 @@ describe('POST /api/auth/google/complete', () => {
     const insert = insertCall()
     expect(String(insert?.[0])).toContain('date_of_birth')
     expect(insert?.[1]).toEqual(['jane@example.com', 'Jane', 'Doe', '9876543210', 'g-1', 'v1', VALID_DOB])
+  })
+
+  it('credits the referrer named in the ref_code cookie and clears it', async () => {
+    const { attributeReferral } = await import('@/lib/referrals/attribute')
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_USER)
+    const { NextRequest } = await import('next/server')
+    const req = new NextRequest('http://localhost/api/auth/google/complete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken: 't', ...PROFILE }),
+    })
+    req.cookies.set('ref_code', 'ASHA7K2Q')
+    expect((await POST(req as any)).status).toBe(200)
+    expect(attributeReferral).toHaveBeenCalledWith(expect.objectContaining({ newUserId: 'u-new', code: 'ASHA7K2Q' }))
+    expect(mockCookieStore.set).toHaveBeenCalledWith('ref_code', '', expect.objectContaining({ maxAge: 0 }))
   })
 
   it('returns the new user with an unverified phone and starts a session', async () => {

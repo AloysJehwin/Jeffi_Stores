@@ -9,6 +9,8 @@ import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 import { POLICY_VERSION } from '@/lib/legals/policies'
 import { verifyGoogleCredential } from '@/lib/auth/google-verify'
 import { normalizeDob, formatDob } from '@/lib/shared/format'
+import { attributeReferral } from '@/lib/referrals/attribute'
+import { clearReferralCookie, readReferralCookie } from '@/lib/referrals/cookie'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -99,6 +101,12 @@ export async function POST(request: NextRequest) {
     }
 
     const signals = extractSessionSignals(request)
+    const referralCode = readReferralCookie(request)
+    if (referralCode) {
+      await attributeReferral({ newUserId: user.id, code: referralCode, fpHash: signals.fpHash })
+      clearReferralCookie(cookieStore)
+    }
+
     const { sid } = await issueUserToken({
       userId: user.id,
       email: user.email,

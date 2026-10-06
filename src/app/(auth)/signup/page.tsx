@@ -86,6 +86,15 @@ function SignupPage() {
       .catch(() => {})
   }, [])
 
+  // Set when the visitor arrived through a friend's referral link (/r/<code>).
+  const [invitedBy, setInvitedBy] = useState<string | null>(null)
+  useEffect(() => {
+    fetch('/api/referrals/lookup')
+      .then(r => r.json())
+      .then(d => setInvitedBy(typeof d.firstName === 'string' && d.firstName ? d.firstName : null))
+      .catch(() => {})
+  }, [])
+
   const channelOptions = ALL_CHANNEL_OPTIONS.filter(
     o => o.id === 'email' || (o.id === 'sms' && smsEnabled) || (o.id === 'whatsapp' && whatsappEnabled)
   )
@@ -400,6 +409,12 @@ function SignupPage() {
             <h2 className="text-3xl font-bold text-foreground">Create Account</h2>
             <p className="mt-2 text-sm text-foreground-secondary">Join {config.identity.name} for exclusive deals</p>
           </div>
+
+          {invitedBy && (
+            <div className="mb-6 rounded-lg border border-accent-200 dark:border-accent-800 bg-accent-50 dark:bg-accent-950/20 p-3 text-center text-sm text-accent-700 dark:text-accent-300">
+              {invitedBy} invited you to {config.identity.name}.
+            </div>
+          )}
 
           {googleMode && step === 'details' && (
             <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">

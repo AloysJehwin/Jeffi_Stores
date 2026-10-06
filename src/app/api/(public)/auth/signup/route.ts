@@ -8,6 +8,8 @@ import { logActivity } from '@/lib/shared/activity'
 import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 import { POLICY_VERSION } from '@/lib/legals/policies'
 import { normalizeDob } from '@/lib/shared/format'
+import { attributeReferral } from '@/lib/referrals/attribute'
+import { clearReferralCookie, readReferralCookie } from '@/lib/referrals/cookie'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -86,6 +88,9 @@ export async function POST(request: NextRequest) {
     }).catch(() => {})
 
     const signals = extractSessionSignals(request)
+    const referralCode = readReferralCookie(request)
+    if (referralCode) await attributeReferral({ newUserId: newUser.id, code: referralCode, fpHash: signals.fpHash })
+
     const { sid } = await issueUserToken({
       userId: newUser.id,
       email: newUser.email,
@@ -120,6 +125,7 @@ export async function POST(request: NextRequest) {
     })
     res.cookies.set('user_sid', sid, cookieOpts)
     res.cookies.set('session_id', newUser.id, cookieOpts)
+    if (referralCode) clearReferralCookie(res.cookies)
     return res
   } catch {
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
