@@ -1955,8 +1955,8 @@
     "semantic_hash": ""
   },
   "tests/lib/automation-emails.test.ts": {
-    "mtime": 1790931257.1127965,
-    "ast_hash": "ba33109bc602b5648b79717d70e5f1ea",
+    "mtime": 1791309377.7202203,
+    "ast_hash": "2ca9315ffc3a4010dbf96a8e79f5fa19",
     "semantic_hash": ""
   },
   "tests/lib/business-discount.test.ts": {
@@ -11885,8 +11885,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/automation-emails.ts": {
-    "mtime": 1791047167.7614849,
-    "ast_hash": "c1ff1f703096ffbddb99643d3060421f",
+    "mtime": 1791309310.2771697,
+    "ast_hash": "1ddc9bffee43f1ce426f8b5c88d52acf",
     "semantic_hash": ""
   },
   "src/lib/shared/aws-signing.ts": {
@@ -12595,8 +12595,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/default-templates.ts": {
-    "mtime": 1791308224.9748209,
-    "ast_hash": "74095bdc269e70f691747708cb5bf3d7",
+    "mtime": 1791309325.850518,
+    "ast_hash": "208c534c2e78ff71ea05bdebd8c4458f",
     "semantic_hash": ""
   },
   "src/lib/campaigns/duration.ts": {
@@ -12895,8 +12895,8 @@
     "semantic_hash": ""
   },
   "src/lib/loyalty/queries.ts": {
-    "mtime": 1791227843.3770237,
-    "ast_hash": "c991555834a216b75da4705af054977f",
+    "mtime": 1791309035.9779391,
+    "ast_hash": "c2feec1c17928835b5fc7b1db8100201",
     "semantic_hash": ""
   },
   "src/lib/loyalty/reconcile.ts": {
@@ -12955,8 +12955,8 @@
     "semantic_hash": ""
   },
   "tests/lib/loyalty/queries.test.ts": {
-    "mtime": 1791228256.3318348,
-    "ast_hash": "413dcc982dac7cce0a3c098532b22f24",
+    "mtime": 1791309035.978976,
+    "ast_hash": "ae9a462bbc21b43c6dcc4dd0079608c6",
     "semantic_hash": ""
   },
   "tests/lib/loyalty/reconcile.test.ts": {
