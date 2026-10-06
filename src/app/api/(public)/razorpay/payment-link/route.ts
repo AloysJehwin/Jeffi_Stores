@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryOne, resolveRequestTenant } from '@/lib/shared/db'
 import { getRazorpayInstanceFor } from '@/lib/payments/razorpay'
-import { storeBaseUrlAsync } from '@/lib/catalog/brand'
+import { orderUrlById } from '@/lib/shared/customer-links'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +43,9 @@ export async function POST(request: NextRequest) {
 
     const rzp = rzpBase as any
     const expiresAt = Math.floor(Date.now() / 1000) + expiryHours * 60 * 60
-    const storeBaseUrl = await storeBaseUrlAsync()
+    // After paying, Razorpay sends the customer here. The order page shows the paid state once the
+    // payment_link.paid webhook settles it; there is no separate callback route to land on.
+    const orderPage = await orderUrlById(orderId)
 
     const link = await rzp.paymentLink.create({
       amount: Math.round(parseFloat(order.total_amount) * 100),
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest) {
         ...(tenant?.slug ? { tenant_slug: tenant.slug } : {}),
       },
       expire_by: expiresAt,
-      callback_url: `${storeBaseUrl}/api/razorpay/payment-link/callback`,
+      callback_url: orderPage,
       callback_method: 'get',
     })
 

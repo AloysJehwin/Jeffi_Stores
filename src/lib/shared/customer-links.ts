@@ -34,6 +34,23 @@ export async function orderUrl(orderId: string, userId?: string | null): Promise
   return `${await customerBaseUrl(userId)}/account/orders/${encodeURIComponent(orderId)}`
 }
 
+async function orderCustomerId(orderId: string): Promise<string | null> {
+  const order = await queryOne<{ user_id: string | null }>(`SELECT user_id::text FROM orders WHERE id = $1`, [
+    orderId,
+  ]).catch(() => null)
+  return order?.user_id ?? null
+}
+
+/** Base URL for the customer who placed this order (store, or business portal). */
+export async function customerBaseUrlForOrder(orderId: string): Promise<string> {
+  return customerBaseUrl(await orderCustomerId(orderId))
+}
+
+/** Order page for an order known by id, on its own customer's base (looks the customer up). */
+export async function orderUrlById(orderId: string): Promise<string> {
+  return orderUrl(orderId, await orderCustomerId(orderId))
+}
+
 /** Order page for an order known only by its number (SMS/WhatsApp senders get just the number). */
 export async function orderUrlByNumber(orderNumber: string): Promise<string | null> {
   const order = await queryOne<{ id: string; user_id: string | null }>(

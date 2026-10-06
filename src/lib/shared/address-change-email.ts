@@ -1,5 +1,6 @@
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
-import { customerMailFromAsync, currentBrandNameAsync, storeBaseUrlAsync } from '@/lib/catalog/brand'
+import { customerMailFromAsync, currentBrandNameAsync } from '@/lib/catalog/brand'
+import { orderUrlById } from '@/lib/shared/customer-links'
 import { mailShell } from '@/lib/shared/mail-template'
 import type { AddressSnapshot } from '@/lib/orders/address-change'
 
@@ -34,7 +35,7 @@ export async function sendAddressChangeDecisionEmail(params: {
   const approved = params.decision === 'approved'
   const from = await customerMailFromAsync()
   const brand = await currentBrandNameAsync()
-  const orderUrl = `${await storeBaseUrlAsync()}/account/orders/${params.orderId}`
+  const orderUrl = await orderUrlById(params.orderId)
   const subject = approved
     ? `Delivery address updated for order ${params.orderNumber}`
     : `Address change declined for order ${params.orderNumber}`

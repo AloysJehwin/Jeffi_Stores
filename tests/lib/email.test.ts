@@ -11,6 +11,13 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
+// Customer links resolve the order's own page (business-aware); stubbed to a fixed host here.
+vi.mock('@/lib/shared/customer-links', () => ({
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+  orderUrlByNumber: vi.fn(async (n: string) => `https://acme.jeffistores.in/account/orders/by-number-${n}`),
+  customerBaseUrlForOrder: vi.fn(async () => 'https://acme.jeffistores.in'),
+}))
+
 vi.mock('nodemailer', () => ({
   default: {
     createTransport: vi.fn(() => ({ sendMail: vi.fn() })),
@@ -144,6 +151,13 @@ describe('email.ts', () => {
       const opts = mockSendAuditedMail.mock.calls[0][0]
       expect(opts.to).toBe('cust@example.com')
       expect(opts.subject).toContain('ORD-001')
+    })
+
+    it("links the customer's order page", async () => {
+      await sendOrderConfirmationEmail('cust@example.com', mockOrder, mockOrderItems)
+      expect(mockSendAuditedMail.mock.calls[0][0].html).toContain(
+        `href="https://acme.jeffistores.in/account/orders/${mockOrder.id}"`
+      )
     })
 
     it('includes order items in html', async () => {
@@ -860,12 +874,20 @@ describe('email.ts', () => {
       expect(opts.to).toContain('a@b.com')
     })
 
-    it('uses extra.appUrl when provided', async () => {
-      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'approved', {
-        appUrl: 'https://custom.example.com',
+    it("links the order's own page", async () => {
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'approved')
+      const { html } = mockSendAuditedMail.mock.calls[0][0]
+      expect(html).toContain('href="https://acme.jeffistores.in/account/orders/id-10"')
+    })
+
+    it('links the new replacement order, and the original as a secondary link', async () => {
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'replacement_created', {
+        replacementOrderNumber: 'ORD-011',
+        replacementOrderId: 'id-11',
       })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
-      expect(html).toContain('custom.example.com')
+      expect(html).toContain('href="https://acme.jeffistores.in/account/orders/id-11"')
+      expect(html).toContain('href="https://acme.jeffistores.in/account/orders/id-10"')
     })
 
     it('returns error on failure', async () => {
@@ -877,21 +899,29 @@ describe('email.ts', () => {
 
   describe('sendPaymentRetryEmail', () => {
     it('sends payment retry email', async () => {
-      const result = await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 1500)
+      const result = await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 1500, 'id-20')
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       // sendPaymentRetryEmail returns { success: true } without messageId
       expect(result).toEqual({ success: true })
     })
 
     it('includes formatted amount in html', async () => {
-      await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 2500)
+      await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 2500, 'id-20')
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('2,500')
     })
 
+    it('sends the customer to the order page, where Retry Payment is', async () => {
+      await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 2500, 'id-20')
+      const { html, entityId } = mockSendAuditedMail.mock.calls[0][0]
+      expect(html).toContain('href="https://acme.jeffistores.in/account/orders/id-20"')
+      expect(html).not.toContain('/products"')
+      expect(entityId).toBe('id-20')
+    })
+
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
-      const result = await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 1000)
+      const result = await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 1000, 'id-20')
       expect(result).toEqual({ success: false, error: expect.any(Error) })
     })
   })
@@ -1172,6 +1202,11 @@ describe('email.ts', () => {
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Return to Cart')
     })
 
+    it("sends the customer back to the cart or product on their own store", async () => {
+      await sendOrderAutoCancelledEmail('cust@example.com', 'Alice', 'ORD-053', 'id-53', 'direct', 900, '/products/m12-bolt')
+      expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('href="https://acme.jeffistores.in/products/m12-bolt"')
+    })
+
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
       const result = await sendOrderAutoCancelledEmail(
@@ -1244,6 +1279,19 @@ describe('email.ts', () => {
       })
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
+    })
+
+    it('links the delayed order itself, in the html and the text', async () => {
+      await sendOrderDelayNotification({
+        toEmail: 'cust@example.com',
+        customerName: 'Alice',
+        orderNumber: 'ORD-071',
+        delayDays: 2,
+        reason: 'Courier backlog',
+      })
+      const { html, text } = mockSendAuditedMail.mock.calls[0][0]
+      expect(html).toContain('href="https://acme.jeffistores.in/account/orders/by-number-ORD-071"')
+      expect(text).toContain('https://acme.jeffistores.in/account/orders/by-number-ORD-071')
     })
 
     it('uses plural days label for multiple days', async () => {
