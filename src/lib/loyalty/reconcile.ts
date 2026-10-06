@@ -1,6 +1,8 @@
 import type { PoolClient } from 'pg'
 import { queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { getLoyaltySettings, markLoyaltyLaunched, type LoyaltySettings } from './settings'
+import { getReferralSettings } from '@/lib/referrals/settings'
+import { sendReferralRewardEmail } from '@/lib/email/referral'
 import { tierForPoints, tierRank } from './tiers'
 
 const LOCK_NAMESPACE = 7001
@@ -104,6 +106,39 @@ function refundsDueSql(userFilter: string): string {
       SELECT 1 FROM loyalty_ledger x WHERE x.reason = 'redeem_refund' AND x.coupon_id = r.coupon_id)`
 }
 
+// One row per referral that needs a ledger change. A referral earns once the friend has a kept, paid,
+// online order placed within the qualify window (no credit delay: the user chose payment on delivery),
+// and gives the points back when no such order remains. Like order points, only the order's state can
+// take a reward back. Earning stops while the program is off ($earn false); give-backs never do.
+// $qualify is the window in days, $earn a boolean; userFilter narrows to one referrer.
+function referralDueSql(userFilter: string, qualify: string, earn: string): string {
+  return `
+  SELECT * FROM (
+    SELECT s.id::text AS signup_id, s.referrer_user_id::text AS user_id, q.order_id::text AS order_id,
+           COALESCE(n.net, 0)::int AS net,
+           CASE
+             WHEN q.order_id IS NOT NULL AND COALESCE(n.net, 0) = 0 AND s.status IN ('joined', 'reversed') AND ${earn}
+                  AND EXISTS (SELECT 1 FROM users ru WHERE ru.id = s.referrer_user_id AND ${eligibleCustomerSql('ru')})
+               THEN 'earn'
+             WHEN q.order_id IS NULL AND COALESCE(n.net, 0) > 0 THEN 'reverse'
+           END AS action
+    FROM referral_signups s
+    LEFT JOIN LATERAL (
+      SELECT o.id AS order_id FROM orders o
+      WHERE o.user_id = s.referred_user_id AND ${KEPT_AND_PAID_SQL}
+        AND o.created_at <= s.signed_up_at + (${qualify} * INTERVAL '1 day')
+      ORDER BY o.created_at ASC
+      LIMIT 1
+    ) q ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT SUM(l.delta)::int AS net FROM loyalty_ledger l JOIN orders lo ON lo.id = l.order_id
+      WHERE l.user_id = s.referrer_user_id AND l.reason IN ('referral', 'referral_reversal')
+        AND lo.user_id = s.referred_user_id
+    ) n ON TRUE
+    WHERE s.status IN ('joined', 'rewarded', 'reversed') ${userFilter}
+  ) due WHERE due.action IS NOT NULL`
+}
+
 // Thresholds are bound as three consecutive parameters starting at $first: silver, gold, platinum.
 function tierLagSql(first: number): string {
   return `
@@ -127,8 +162,18 @@ export interface ReconcileResult {
   reversed: number
   refunded: number
   upgrades: number
+  referralRewards: number
+  referralReversals: number
   failures: number
   more: boolean
+}
+
+// What the referral step needs from referral settings; earn is false while the program is off.
+interface ReferralContext {
+  earn: boolean
+  rewardPoints: number
+  yearlyCap: number
+  qualifyDays: number
 }
 
 interface UserOutcome {
@@ -136,6 +181,25 @@ interface UserOutcome {
   reversed: number
   refunded: number
   upgraded: boolean
+  referralRewards: number[]
+  referralReversals: number
+}
+
+interface ReferralAction {
+  signup_id: string
+  order_id: string | null
+  net: number
+  action: 'earn' | 'reverse'
+}
+
+async function referralContext(): Promise<ReferralContext> {
+  const settings = await getReferralSettings()
+  return {
+    earn: settings.enabled,
+    rewardPoints: settings.rewardPoints,
+    yearlyCap: settings.yearlyCap,
+    qualifyDays: settings.qualifyDays,
+  }
 }
 
 interface OrderAction {
@@ -191,7 +255,59 @@ export async function refreshLoyaltyAccount(
   return { points: sums.points, lifetimePoints: sums.lifetime, tier, upgraded }
 }
 
-async function reconcileUser(userId: string, settings: LoyaltySettings): Promise<UserOutcome> {
+// Runs inside the referrer's locked transaction. The yearly cap counts rewards still standing over the
+// last 12 months, so a reward that was taken back frees its slot. A referral that arrives over the
+// cap is marked capped for good rather than waiting to be paid later.
+async function applyReferralActions(
+  client: PoolClient,
+  userId: string,
+  actions: ReferralAction[],
+  referral: ReferralContext,
+  outcome: UserOutcome
+): Promise<void> {
+  if (actions.length === 0) return
+  let standing = (
+    await client.query<{ n: number }>(
+      `SELECT COUNT(*)::int AS n FROM referral_signups
+       WHERE referrer_user_id = $1 AND status = 'rewarded' AND rewarded_at > NOW() - INTERVAL '365 days'`,
+      [userId]
+    )
+  ).rows[0].n
+
+  for (const action of actions) {
+    if (action.action === 'reverse') {
+      await client.query(
+        `INSERT INTO loyalty_ledger (user_id, delta, reason, order_id)
+         SELECT $1, $2, 'referral_reversal', qualifying_order_id FROM referral_signups WHERE id = $3`,
+        [userId, -action.net, action.signup_id]
+      )
+      await client.query(`UPDATE referral_signups SET status = 'reversed' WHERE id = $1`, [action.signup_id])
+      outcome.referralReversals += 1
+      continue
+    }
+    if (standing >= referral.yearlyCap) {
+      await client.query(`UPDATE referral_signups SET status = 'capped', qualifying_order_id = $2 WHERE id = $1`, [
+        action.signup_id,
+        action.order_id,
+      ])
+      continue
+    }
+    await client.query(
+      `INSERT INTO loyalty_ledger (user_id, delta, reason, order_id) VALUES ($1, $2, 'referral', $3)`,
+      [userId, referral.rewardPoints, action.order_id]
+    )
+    await client.query(
+      `UPDATE referral_signups
+       SET status = 'rewarded', qualifying_order_id = $2, points = $3, rewarded_at = NOW()
+       WHERE id = $1`,
+      [action.signup_id, action.order_id, referral.rewardPoints]
+    )
+    standing += 1
+    outcome.referralRewards.push(referral.rewardPoints)
+  }
+}
+
+async function reconcileUser(userId: string, settings: LoyaltySettings, referral: ReferralContext): Promise<UserOutcome> {
   return withTransaction(async client => {
     await lockLoyaltyUser(client, userId)
     const actions = (
@@ -205,10 +321,24 @@ async function reconcileUser(userId: string, settings: LoyaltySettings): Promise
     const refunds = (
       await client.query<{ coupon_id: string; points: number }>(refundsDueSql('AND r.user_id = $1::uuid'), [userId])
     ).rows
+    const referralActions = (
+      await client.query<ReferralAction>(referralDueSql('AND s.referrer_user_id = $1::uuid', '$2::int', '$3::boolean'), [
+        userId,
+        referral.qualifyDays,
+        referral.earn,
+      ])
+    ).rows
     const hasAccount =
       (await client.query(`SELECT 1 FROM loyalty_accounts WHERE user_id = $1`, [userId])).rows.length > 0
-    const outcome: UserOutcome = { earned: 0, reversed: 0, refunded: 0, upgraded: false }
-    if (!hasAccount && actions.length === 0 && refunds.length === 0) return outcome
+    const outcome: UserOutcome = {
+      earned: 0,
+      reversed: 0,
+      refunded: 0,
+      upgraded: false,
+      referralRewards: [],
+      referralReversals: 0,
+    }
+    if (!hasAccount && actions.length === 0 && refunds.length === 0 && referralActions.length === 0) return outcome
 
     await ensureLoyaltyAccount(client, userId)
     for (const action of actions) {
@@ -234,25 +364,27 @@ async function reconcileUser(userId: string, settings: LoyaltySettings): Promise
       )
       outcome.refunded += refund.points
     }
+    await applyReferralActions(client, userId, referralActions, referral, outcome)
     outcome.upgraded = (await refreshLoyaltyAccount(client, userId, settings)).upgraded
     return outcome
   })
 }
 
-async function userHasWork(userId: string, settings: LoyaltySettings): Promise<boolean> {
+async function userHasWork(userId: string, settings: LoyaltySettings, referral: ReferralContext): Promise<boolean> {
   const row = await queryOne<{ pending: boolean }>(
     `${orderStatesCte(true)}
      SELECT (
        EXISTS (SELECT 1 FROM states WHERE owner_id = $5::uuid AND state IN ('earn', 'reverse'))
        OR EXISTS (${refundsDueSql('AND r.user_id = $5::uuid')})
        OR EXISTS (SELECT 1 FROM loyalty_accounts la WHERE la.user_id = $5::uuid AND ${tierLagSql(6)})
+       OR EXISTS (${referralDueSql('AND s.referrer_user_id = $5::uuid', '$9::int', '$10::boolean')})
      ) AS pending`,
-    [...orderStateParams(settings), userId, ...thresholdParams(settings)]
+    [...orderStateParams(settings), userId, ...thresholdParams(settings), referral.qualifyDays, referral.earn]
   )
   return row?.pending === true
 }
 
-async function findUsersWithWork(settings: LoyaltySettings, limit: number): Promise<string[]> {
+async function findUsersWithWork(settings: LoyaltySettings, referral: ReferralContext, limit: number): Promise<string[]> {
   const rows = await queryMany<{ user_id: string }>(
     `${orderStatesCte(false)}
      SELECT user_id FROM (
@@ -261,10 +393,12 @@ async function findUsersWithWork(settings: LoyaltySettings, limit: number): Prom
        SELECT due.user_id FROM (${refundsDueSql('')}) due
        UNION
        SELECT la.user_id::text FROM loyalty_accounts la WHERE ${tierLagSql(5)}
+       UNION
+       SELECT due.user_id FROM (${referralDueSql('', '$9::int', '$10::boolean')}) due
      ) pending
      ORDER BY user_id
      LIMIT $8::int`,
-    [...orderStateParams(settings), ...thresholdParams(settings), limit]
+    [...orderStateParams(settings), ...thresholdParams(settings), limit, referral.qualifyDays, referral.earn]
   )
   return rows.map(row => row.user_id)
 }
@@ -280,29 +414,40 @@ export async function reconcileLoyalty(opts: { userId?: string; maxUsers?: numbe
     reversed: 0,
     refunded: 0,
     upgrades: 0,
+    referralRewards: 0,
+    referralReversals: 0,
     failures: 0,
     more: false,
   }
   if (!settings.enabled) return result
+  const referral = await referralContext()
 
   let userIds: string[]
   if (opts.userId) {
-    userIds = (await userHasWork(opts.userId, settings)) ? [opts.userId] : []
+    userIds = (await userHasWork(opts.userId, settings, referral)) ? [opts.userId] : []
   } else {
     const limit = opts.maxUsers ?? DEFAULT_MAX_USERS
-    const found = await findUsersWithWork(settings, limit + 1)
+    const found = await findUsersWithWork(settings, referral, limit + 1)
     result.more = found.length > limit
     userIds = found.slice(0, limit)
   }
 
   for (const userId of userIds) {
     try {
-      const outcome = await reconcileUser(userId, settings)
+      const outcome = await reconcileUser(userId, settings, referral)
       result.users += 1
       result.earned += outcome.earned
       result.reversed += outcome.reversed
       result.refunded += outcome.refunded
+      result.referralRewards += outcome.referralRewards.length
+      result.referralReversals += outcome.referralReversals
       if (outcome.upgraded) result.upgrades += 1
+      // Emailed after the transaction commits, and never during the silent first pass.
+      if (!silent) {
+        for (const points of outcome.referralRewards) {
+          sendReferralRewardEmail(userId, points).catch(err => console.error('[referrals] reward email failed', err))
+        }
+      }
     } catch (err) {
       result.failures += 1
       console.error('[loyalty] reconcile failed for user', userId, err)
@@ -323,6 +468,8 @@ export async function reconcileLoyaltyUntilDone(budgetMs = 20_000): Promise<Reco
     total.reversed += next.reversed
     total.refunded += next.refunded
     total.upgrades += next.upgrades
+    total.referralRewards += next.referralRewards
+    total.referralReversals += next.referralReversals
     total.failures += next.failures
     total.more = next.more
     if (next.users === 0) break

@@ -2,6 +2,8 @@ import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn(), withTransaction: vi.fn() }))
 vi.mock('@/lib/loyalty/settings', () => ({ getLoyaltySettings: vi.fn(), markLoyaltyLaunched: vi.fn() }))
+vi.mock('@/lib/referrals/settings', () => ({ getReferralSettings: vi.fn() }))
+vi.mock('@/lib/email/referral', () => ({ sendReferralRewardEmail: vi.fn().mockResolvedValue({ success: true }) }))
 
 import {
   orderStateParams,
@@ -12,12 +14,17 @@ import {
 import { queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { getLoyaltySettings, markLoyaltyLaunched, type LoyaltySettings } from '@/lib/loyalty/settings'
 import { BASE_TIER } from '@/lib/loyalty/tiers'
+import { getReferralSettings } from '@/lib/referrals/settings'
+import { sendReferralRewardEmail } from '@/lib/email/referral'
 
 const mockQueryMany = queryMany as ReturnType<typeof vi.fn>
 const mockQueryOne = queryOne as ReturnType<typeof vi.fn>
 const mockWithTransaction = withTransaction as ReturnType<typeof vi.fn>
 const mockSettings = getLoyaltySettings as ReturnType<typeof vi.fn>
 const mockMarkLaunched = markLoyaltyLaunched as ReturnType<typeof vi.fn>
+const mockReferralSettings = getReferralSettings as ReturnType<typeof vi.fn>
+const mockRewardEmail = sendReferralRewardEmail as ReturnType<typeof vi.fn>
+const referralsOn = { enabled: true, rewardPoints: 100, yearlyCap: 10, qualifyDays: 90 }
 
 const launched: LoyaltySettings = {
   enabled: true,
@@ -40,6 +47,8 @@ interface Fixture {
   refunds?: Array<{ coupon_id: string; points: number }>
   account?: { points: number; lifetime_points: number; tier: string } | null
   sums?: { points: number; lifetime: number }
+  referrals?: Array<{ signup_id: string; order_id: string | null; net: number; action: 'earn' | 'reverse' }>
+  standing?: number
   fail?: boolean
 }
 
@@ -55,6 +64,8 @@ function useFixtures(fixtures: Record<string, Fixture>) {
         if (fixture.fail) throw new Error('lock failed')
         return { rows: [] }
       }
+      if (text.includes('AS n FROM referral_signups')) return { rows: [{ n: fixture.standing ?? 0 }] }
+      if (text.includes('FROM referral_signups s')) return { rows: fixture.referrals ?? [] }
       if (text.includes('FROM states')) return { rows: fixture.actions ?? [] }
       if (text.includes("r.reason = 'redeem'")) return { rows: fixture.refunds ?? [] }
       if (text.includes('SELECT 1 FROM loyalty_accounts')) return { rows: fixture.account === null ? [] : [{}] }
@@ -85,6 +96,7 @@ describe('loyalty reconcile', () => {
     vi.clearAllMocks()
     statements = []
     mockSettings.mockResolvedValue(launched)
+    mockReferralSettings.mockResolvedValue(referralsOn)
     mockQueryMany.mockResolvedValue([])
     mockQueryOne.mockResolvedValue({ pending: false })
     vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -209,7 +221,8 @@ describe('loyalty reconcile', () => {
     const result = await reconcileLoyalty({ maxUsers: 2 })
     expect(result).toMatchObject({ users: 2, more: true })
     expect(mockWithTransaction).toHaveBeenCalledTimes(2)
-    expect(mockQueryMany.mock.calls[0][1].at(-1)).toBe(3)
+    // $8 is the batch limit; $9/$10 are the referral window and the earning switch.
+    expect(mockQueryMany.mock.calls[0][1].slice(7)).toEqual([3, 90, true])
     expect(mockMarkLaunched).not.toHaveBeenCalled()
   })
 
@@ -255,7 +268,7 @@ describe('loyalty reconcile', () => {
       const result = await reconcileLoyalty({ userId: 'u1' })
       expect(result).toMatchObject({ users: 1, earned: 9 })
       expect(mockMarkLaunched).not.toHaveBeenCalled()
-      expect(mockQueryOne.mock.calls[0][1]).toEqual([7, null, 100, expect.any(String), 'u1', 100, 500, 1500])
+      expect(mockQueryOne.mock.calls[0][1]).toEqual([7, null, 100, expect.any(String), 'u1', 100, 500, 1500, 90, true])
     })
   })
 
@@ -321,6 +334,95 @@ describe('loyalty reconcile', () => {
       const params = orderStateParams({ ...launched, countFrom: '2026-01-01' })
       expect(params.slice(0, 3)).toEqual([7, '2026-01-01', 100])
       expect(JSON.parse(params[3] as string)).toEqual({ bronze: 1, silver: 1.25, gold: 1.5, platinum: 2 })
+    })
+  })
+
+  describe('referral rewards', () => {
+    it('pays the referrer as soon as the friend\'s first order is delivered, and emails them', async () => {
+      pendingUsers('u1')
+      useFixtures({ u1: { referrals: [{ signup_id: 's1', order_id: 'o9', net: 0, action: 'earn' }] } })
+      const result = await reconcileLoyalty()
+      expect(result).toMatchObject({ referralRewards: 1, referralReversals: 0, failures: 0 })
+      expect(ledgerInsert('referral')[0].params).toEqual(['u1', 100, 'o9'])
+      const update = find("SET status = 'rewarded'")[0]
+      expect(update.params).toEqual(['s1', 'o9', 100])
+      expect(mockRewardEmail).toHaveBeenCalledWith('u1', 100)
+    })
+
+    it('takes the reward back when that order is returned', async () => {
+      pendingUsers('u1')
+      useFixtures({ u1: { referrals: [{ signup_id: 's1', order_id: null, net: 100, action: 'reverse' }] } })
+      const result = await reconcileLoyalty()
+      expect(result.referralReversals).toBe(1)
+      const reversal = ledgerInsert('referral_reversal')[0]
+      expect(reversal.params).toEqual(['u1', -100, 's1'])
+      expect(reversal.sql).toContain('qualifying_order_id FROM referral_signups')
+      expect(find("SET status = 'reversed'")[0].params).toEqual(['s1'])
+      expect(mockRewardEmail).not.toHaveBeenCalled()
+    })
+
+    it('marks a referral over the yearly limit as capped and pays nothing', async () => {
+      pendingUsers('u1')
+      useFixtures({ u1: { standing: 10, referrals: [{ signup_id: 's1', order_id: 'o9', net: 0, action: 'earn' }] } })
+      const result = await reconcileLoyalty()
+      expect(result.referralRewards).toBe(0)
+      expect(ledgerInsert('referral')).toHaveLength(0)
+      expect(find("SET status = 'capped'")[0].params).toEqual(['s1', 'o9'])
+    })
+
+    it('counts rewards paid earlier in the same run toward the limit', async () => {
+      pendingUsers('u1')
+      useFixtures({
+        u1: {
+          standing: 9,
+          referrals: [
+            { signup_id: 's1', order_id: 'o1', net: 0, action: 'earn' },
+            { signup_id: 's2', order_id: 'o2', net: 0, action: 'earn' },
+          ],
+        },
+      })
+      const result = await reconcileLoyalty()
+      expect(result.referralRewards).toBe(1)
+      expect(find("SET status = 'capped'")[0].params).toEqual(['s2', 'o2'])
+    })
+
+    it('binds the window and stops earning, but not giving back, while referrals are off', async () => {
+      mockReferralSettings.mockResolvedValue({ ...referralsOn, enabled: false })
+      pendingUsers('u1')
+      useFixtures({ u1: {} })
+      await reconcileLoyalty()
+      const due = find('FROM referral_signups s')[0]
+      expect(due.params).toEqual(['u1', 90, false])
+      expect(due.sql).toMatch(/AND \$3::boolean/)
+      expect(due.sql).toContain("WHEN q.order_id IS NULL AND COALESCE(n.net, 0) > 0 THEN 'reverse'")
+    })
+
+    it('qualifies only a kept, paid, online order placed within the window', async () => {
+      pendingUsers('u1')
+      useFixtures({ u1: {} })
+      await reconcileLoyalty()
+      const sql = find('FROM referral_signups s')[0].sql
+      expect(sql).toContain("o.source = 'online' AND o.status IN ('delivered', 'return_rejected')")
+      expect(sql).toContain("o.created_at <= s.signed_up_at + ($2::int * INTERVAL '1 day')")
+      expect(sql).toContain("s.status IN ('joined', 'reversed')")
+    })
+
+    it('sends no reward email during the silent first pass', async () => {
+      mockSettings.mockResolvedValue({ ...launched, launchedAt: null })
+      pendingUsers('u1')
+      useFixtures({ u1: { referrals: [{ signup_id: 's1', order_id: 'o9', net: 0, action: 'earn' }] } })
+      await reconcileLoyalty()
+      expect(ledgerInsert('referral')).toHaveLength(1)
+      expect(mockRewardEmail).not.toHaveBeenCalled()
+    })
+
+    it('keeps referral points spendable only: they never count toward lifetime points or tier', async () => {
+      pendingUsers('u1')
+      useFixtures({ u1: { referrals: [{ signup_id: 's1', order_id: 'o9', net: 0, action: 'earn' }] } })
+      await reconcileLoyalty()
+      const lifetime = find('AS lifetime')[0].sql
+      expect(lifetime).toContain("reason IN ('order_earn', 'order_reversal', 'adjustment')")
+      expect(lifetime).not.toContain("'referral'")
     })
   })
 })
