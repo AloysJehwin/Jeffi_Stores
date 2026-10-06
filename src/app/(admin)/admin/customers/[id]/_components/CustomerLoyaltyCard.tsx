@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 
 interface LedgerEntry {
@@ -45,7 +46,8 @@ function entryLabel(entry: LedgerEntry): string {
   }
 }
 
-export default function CustomerLoyaltyCard({ customerId, canWrite }: { customerId: string; canWrite: boolean }) {
+export default function CustomerLoyaltyCard({ customerId }: { customerId: string }) {
+  const canWrite = useCanWrite('customers')
   const { showToast } = useToast()
   const [view, setView] = useState<LoyaltyView | null>(null)
   const [delta, setDelta] = useState('')

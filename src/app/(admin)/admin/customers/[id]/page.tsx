@@ -350,7 +350,7 @@ export default async function CustomerDetailPage({
             <CustomerTasks customerId={customer.id} canWrite={canWrite} />
           </div>
 
-          <CustomerLoyaltyCard customerId={customer.id} canWrite={canWrite} />
+          <CustomerLoyaltyCard customerId={customer.id} />
 
           <CustomerReferralsCard customerId={customer.id} email={customer.email} host={host} />
 
