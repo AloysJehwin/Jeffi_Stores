@@ -33,7 +33,7 @@ const campaign = {
   parameters: {},
 } as any
 
-const defaultParams = { ...wishlistReminder.defaultParams, maxRecipientsPerSweep: 50 } as any
+const defaultParams = wishlistReminder.defaultParams as any
 
 describe('wishlistReminder scenario', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -57,7 +57,12 @@ describe('wishlistReminder scenario', () => {
       // [kind, idle, cooldown, maxRecipients]
       expect(args[1]).toBe(String(days(14)))
       expect(args[2]).toBe(String(days(1)))
-      expect(args[3]).toBe(50)
+      expect(args[3]).toBe(100)
+    })
+
+    it('ships a real per-sweep cap so the LIMIT is never NULL', () => {
+      expect(wishlistReminder.defaultParams.maxRecipientsPerSweep).toBe(100)
+      expect(wishlistReminder.paramSchema.maxRecipientsPerSweep.type).toBe('integer')
     })
 
     it('honors an overridden {value,unit} idleFor', async () => {
