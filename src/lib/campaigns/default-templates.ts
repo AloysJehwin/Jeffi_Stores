@@ -90,7 +90,7 @@ export const BUILTIN_TEMPLATES: Record<string, BuiltinTemplate> = {
   },
   loyalty_points_reminder: {
     subject: 'You have {points} points waiting, {firstName}',
-    body: greeting + h2('Your points are ready to spend') + p('You have {points} points — turn them into a coupon worth up to {pointsWorth} off your next order.') + couponBox + cta('Redeem your points'),
+    body: greeting + h2('Your points are ready to spend') + p('You have {points} points — turn them into a coupon worth up to ₹{pointsWorth} off your next order.') + cta('Redeem your points'),
   },
 }
 
@@ -107,6 +107,18 @@ export const RETIRED_BUILTIN_TEMPLATES: Record<string, BuiltinTemplate[]> = {
         p('Invite a friend and you both get a reward on your next order.') +
         couponBox +
         cta('Refer a friend'),
+    },
+  ],
+  // Showed an empty coupon box (the points are the reward) and dropped the rupee sign.
+  loyalty_points_reminder: [
+    {
+      subject: 'You have {points} points waiting, {firstName}',
+      body:
+        greeting +
+        h2('Your points are ready to spend') +
+        p('You have {points} points — turn them into a coupon worth up to {pointsWorth} off your next order.') +
+        couponBox +
+        cta('Redeem your points'),
     },
   ],
 }
