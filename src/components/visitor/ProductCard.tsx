@@ -5,6 +5,7 @@ import Link from 'next/link'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useWishlist } from '@/contexts/WishlistContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useRouter } from 'next/navigation'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
@@ -62,7 +63,8 @@ export default function ProductCard({
   const { showToast, showConfirm } = useToast()
   const gstEnabled = useStoreConfig().flags.gstEnabled
   const router = useRouter()
-  const [isInWishlist, setIsInWishlist] = useState(false)
+  const { has: inWishlist, toggle: toggleWishlist } = useWishlist()
+  const isInWishlist = inWishlist(id)
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [quickAddSignal, setQuickAddSignal] = useState(0)
   const [edd, setEdd] = useState<string | null>(null)
@@ -113,32 +115,13 @@ export default function ProductCard({
         return
       }
       setWishlistLoading(true)
-      try {
-        if (isInWishlist) {
-          const res = await fetch(`/api/wishlist?productId=${id}`, { method: 'DELETE', credentials: 'include' })
-          if (res.ok) {
-            setIsInWishlist(false)
-            showToast('Removed from wishlist', 'success')
-          }
-        } else {
-          const res = await fetch('/api/wishlist', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productId: id }),
-            credentials: 'include',
-          })
-          if (res.ok) {
-            setIsInWishlist(true)
-            showToast('Added to wishlist!', 'success')
-          }
-        }
-      } catch {
-        showToast('Failed to update wishlist', 'error')
-      } finally {
-        setWishlistLoading(false)
-      }
+      const result = await toggleWishlist(id)
+      setWishlistLoading(false)
+      if (result === 'added') showToast('Added to wishlist!', 'success')
+      else if (result === 'removed') showToast('Removed from wishlist', 'success')
+      else showToast('Failed to update wishlist', 'error')
     },
-    [id, slug, isInWishlist, user]
+    [id, slug, user, toggleWishlist]
   )
 
   const handleShare = useCallback(
@@ -263,7 +246,7 @@ export default function ProductCard({
                   discountPct={bizDiscountPct > 0 ? shownMrpDiscount : (discountPct ?? mrpDiscount)}
                   openSignal={quickAddSignal}
                 />
-                <div className="hidden sm:flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5">
                   {!isBusiness && (
                     <button
                       onClick={handleWishlist}
@@ -290,7 +273,7 @@ export default function ProductCard({
                   <button
                     onClick={handleShare}
                     aria-label="Share product"
-                    className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
+                    className="hidden sm:flex w-7 h-7 rounded-full bg-surface-secondary border border-border-default items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path

@@ -95,6 +95,15 @@ describe('GET /api/wishlist', () => {
     expect(body.items[0].product_id).toBe(PRODUCT_ID)
   })
 
+  it('returns only the saved product ids for ?ids=1, skipping inactive products', async () => {
+    vi.mocked(queryMany).mockResolvedValue([{ product_id: PRODUCT_ID }])
+    const res = await GET(makeRequest('GET', 'http://localhost/api/wishlist?ids=1') as any)
+    expect(await res.json()).toEqual({ productIds: [PRODUCT_ID] })
+    const [sql, params] = vi.mocked(queryMany).mock.calls[0]
+    expect(String(sql)).toContain('p.is_active = true')
+    expect(params).toEqual([USER_ID])
+  })
+
   it('returns empty items array when wishlist is empty', async () => {
     vi.mocked(queryMany).mockResolvedValue([])
     const req = makeRequest('GET', 'http://localhost/api/wishlist')
