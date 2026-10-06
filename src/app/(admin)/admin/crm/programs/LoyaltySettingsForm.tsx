@@ -30,7 +30,6 @@ export default function LoyaltySettingsForm({ initial }: { initial: LoyaltySetti
   const router = useRouter()
   const { showToast } = useToast()
   const canWrite = useCanWrite('campaigns')
-  const [enabled, setEnabled] = useState(initial.enabled)
   const [rupeesPerPoint, setRupeesPerPoint] = useState(String(initial.rupeesPerPoint))
   const [pointValue, setPointValue] = useState(String(initial.pointValue))
   const [creditDelayDays, setCreditDelayDays] = useState(String(initial.creditDelayDays))
@@ -61,7 +60,6 @@ export default function LoyaltySettingsForm({ initial }: { initial: LoyaltySetti
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          enabled,
           rupeesPerPoint: Number(rupeesPerPoint),
           pointValue: Number(pointValue),
           creditDelayDays: Number(creditDelayDays),
@@ -79,13 +77,7 @@ export default function LoyaltySettingsForm({ initial }: { initial: LoyaltySetti
         showToast(firstFieldError(body), 'error')
         return
       }
-      const first = body?.firstPass
-      showToast(
-        first
-          ? `Saved. Past orders counted for ${first.users} customers (${first.earned} points), without emails.`
-          : 'Loyalty settings saved',
-        'success'
-      )
+      showToast('Loyalty settings saved', 'success')
       router.refresh()
     } catch {
       showToast('Could not save the settings', 'error')
@@ -119,23 +111,7 @@ export default function LoyaltySettingsForm({ initial }: { initial: LoyaltySetti
   return (
     <form onSubmit={save} className="space-y-6">
       <div className={cardClass}>
-        <h2 className={headingClass}>Program</h2>
-        <label className="flex items-start gap-3">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={e => setEnabled(e.target.checked)}
-            disabled={!canWrite}
-            className="mt-1 h-4 w-4 rounded border-border-secondary text-accent-500 focus:ring-accent-500"
-          />
-          <span>
-            <span className="block text-sm font-medium text-foreground">Loyalty program is on</span>
-            <span className="block text-xs text-foreground-muted">
-              Customers see a Rewards page in their account and earn points on delivered orders. The first time this
-              is switched on, past orders are counted without emailing anyone.
-            </span>
-          </span>
-        </label>
+        <h2 className={headingClass}>Earning and redeeming</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <div>
             <label className={labelClass}>Rupees per point</label>

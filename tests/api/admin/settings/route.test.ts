@@ -6,6 +6,7 @@ vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn() }))
 vi.mock('@/lib/shipping/delivery-settings', () => ({ invalidateDeliverySettingsCache: vi.fn() }))
 vi.mock('@/lib/loyalty/settings', () => ({ getLoyaltySettings: vi.fn() }))
+vi.mock('@/lib/loyalty/reconcile', () => ({ reconcileLoyaltyUntilDone: vi.fn() }))
 
 import { PATCH } from '@/app/api/(admin)/admin/settings/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -13,6 +14,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'
 import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
+import { reconcileLoyaltyUntilDone } from '@/lib/loyalty/reconcile'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -144,6 +146,25 @@ describe('PATCH /api/admin/settings', () => {
       vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: false } as any)
       expect((await PATCH(makeRequest({ key: 'referral_enabled', value: 'false' }))).status).toBe(200)
       expect(mockQuery).toHaveBeenCalledTimes(2)
+    })
+
+    it('counts past orders silently the first time Loyalty is switched on', async () => {
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: true, launchedAt: null } as any)
+      vi.mocked(reconcileLoyaltyUntilDone).mockResolvedValue({ users: 40, earned: 9645 } as any)
+      const res = await PATCH(makeRequest({ key: 'loyalty_enabled', value: true }))
+      expect(res.status).toBe(200)
+      expect(mockQuery.mock.calls[0][1]).toEqual(['loyalty_enabled', 'true'])
+      expect(mockQuery.mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(reconcileLoyaltyUntilDone).mock.invocationCallOrder[0]
+      )
+      expect((await res.json()).firstPass).toMatchObject({ users: 40, earned: 9645 })
+    })
+
+    it('does not rerun the first pass once launched, nor when Loyalty is switched off', async () => {
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: true, launchedAt: '2026-10-01' } as any)
+      expect((await (await PATCH(makeRequest({ key: 'loyalty_enabled', value: 'true' }))).json()).firstPass).toBeNull()
+      await PATCH(makeRequest({ updates: [{ key: 'loyalty_enabled', value: 'false' }] }))
+      expect(reconcileLoyaltyUntilDone).not.toHaveBeenCalled()
     })
 
     it('saves the Birthday rewards switch without needing loyalty', async () => {

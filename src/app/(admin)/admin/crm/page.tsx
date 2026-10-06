@@ -14,13 +14,31 @@ import RecentNotesCard from './RecentNotesCard'
 import RecentTagsCard from './RecentTagsCard'
 import RecentSignupsCard from './RecentSignupsCard'
 import SegmentsCard from './SegmentsCard'
+import LoyaltyProgram from './programs/LoyaltyProgram'
+import ReferralProgram from './programs/ReferralProgram'
+import BirthdayProgram from './programs/BirthdayProgram'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CrmDashboardPage() {
+function pageNumber(value: string | undefined): number {
+  return Math.max(1, parseInt(value || '1', 10) || 1)
+}
+
+const PROGRAM_LINKS = [
+  { id: 'loyalty', label: 'Loyalty' },
+  { id: 'referrals', label: 'Refer & Earn' },
+  { id: 'birthday', label: 'Birthday rewards' },
+]
+
+export default async function CrmDashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
+  const params = await searchParams
   const host = await getHost()
   const cookieStore = await cookies()
   const token = cookieStore.get(await adminCookieName())?.value
@@ -153,6 +171,38 @@ export default async function CrmDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <RecentTagsCard items={data.recentTags} />
         <RecentSignupsCard items={data.recentSignups} />
+      </div>
+
+      {/* Customer programs. Each is switched on or off in Site Controls; an off program stays here, greyed out. */}
+      <div className="pt-4 border-t border-border-default space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-foreground">Customer programs</h2>
+            <p className="text-sm text-foreground-secondary">
+              Rewards that keep customers coming back. Switch them on or off in Site Controls.
+            </p>
+          </div>
+          <nav className="flex flex-wrap gap-2">
+            {PROGRAM_LINKS.map(link => (
+              <a
+                key={link.id}
+                href={`#${link.id}`}
+                className="px-3 py-1 rounded-full border border-border-default text-xs font-medium text-foreground-secondary hover:bg-surface-secondary"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+        </div>
+        <LoyaltyProgram
+          host={host}
+          query={{ page: pageNumber(params.lpage), tier: params.ltier || '', search: params.lsearch || '' }}
+        />
+        <ReferralProgram
+          host={host}
+          query={{ page: pageNumber(params.rpage), status: params.rstatus || '', search: params.rsearch || '' }}
+        />
+        <BirthdayProgram host={host} />
       </div>
     </div>
   )

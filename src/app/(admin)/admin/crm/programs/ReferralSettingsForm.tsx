@@ -18,17 +18,10 @@ function firstFieldError(body: { error?: string; fields?: Record<string, string>
   return field || body?.error || 'Could not save the settings'
 }
 
-export default function ReferralSettingsForm({
-  initial,
-  loyaltyEnabled,
-}: {
-  initial: ReferralSettings
-  loyaltyEnabled: boolean
-}) {
+export default function ReferralSettingsForm({ initial }: { initial: ReferralSettings }) {
   const router = useRouter()
   const { showToast } = useToast()
   const canWrite = useCanWrite('campaigns')
-  const [enabled, setEnabled] = useState(initial.enabled)
   const [rewardPoints, setRewardPoints] = useState(String(initial.rewardPoints))
   const [yearlyCap, setYearlyCap] = useState(String(initial.yearlyCap))
   const [qualifyDays, setQualifyDays] = useState(String(initial.qualifyDays))
@@ -43,7 +36,6 @@ export default function ReferralSettingsForm({
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          enabled,
           rewardPoints: Number(rewardPoints),
           yearlyCap: Number(yearlyCap),
           qualifyDays: Number(qualifyDays),
@@ -66,24 +58,7 @@ export default function ReferralSettingsForm({
   return (
     <form onSubmit={save} className="space-y-6">
       <div className={cardClass}>
-        <h2 className={headingClass}>Program</h2>
-        <label className="flex items-start gap-3">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={e => setEnabled(e.target.checked)}
-            disabled={!canWrite || (!loyaltyEnabled && !enabled)}
-            className="mt-1 h-4 w-4 rounded border-border-secondary text-accent-500 focus:ring-accent-500"
-          />
-          <span>
-            <span className="block text-sm font-medium text-foreground">Referral program is on</span>
-            <span className="block text-xs text-foreground-muted">
-              {loyaltyEnabled
-                ? 'Customers see a Refer & Earn page with a personal link, and earn loyalty points when a friend they invite gets their first order delivered.'
-                : 'Turn on the loyalty program first. Referral rewards are paid in loyalty points.'}
-            </span>
-          </span>
-        </label>
+        <h2 className={headingClass}>Rewards</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           <div>
             <label htmlFor="referral-points" className={labelClass}>

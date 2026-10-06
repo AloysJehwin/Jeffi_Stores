@@ -51,6 +51,9 @@ export const LoyaltySettingsInputSchema = z.object({
 
 export type LoyaltySettingsInput = z.infer<typeof LoyaltySettingsInputSchema>
 
+// What the CRM settings form edits. On/off lives in Site Controls, so a stale form can't flip it.
+export const LoyaltySettingsFormSchema = LoyaltySettingsInputSchema.omit({ enabled: true })
+
 const KEY = {
   enabled: 'loyalty_enabled',
   rupeesPerPoint: 'loyalty_rupees_per_point',

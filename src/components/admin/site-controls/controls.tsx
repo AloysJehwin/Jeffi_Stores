@@ -2,6 +2,7 @@
 
 import { useState, ReactNode, useEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import Toggle from '@/components/ui/Toggle'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -269,6 +270,7 @@ export function ToggleControl({
   initial,
   locked,
   lockedHint,
+  refreshOnSave,
 }: {
   settingKey: string
   label: string
@@ -276,7 +278,10 @@ export function ToggleControl({
   initial: boolean
   locked?: boolean
   lockedHint?: string
+  /** Re-render the page after a save, for toggles that lock or unlock others. */
+  refreshOnSave?: boolean
 }) {
+  const router = useRouter()
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [checked, setChecked] = useState(initial)
@@ -291,7 +296,10 @@ export function ToggleControl({
     if (!ok) {
       setChecked(!next)
       showToast('Failed to save', 'error')
-    } else showToast('Saved', 'success')
+    } else {
+      showToast('Saved', 'success')
+      if (refreshOnSave) router.refresh()
+    }
   }
 
   return (

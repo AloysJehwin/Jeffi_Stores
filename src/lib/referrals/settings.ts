@@ -18,6 +18,9 @@ export const ReferralSettingsInputSchema = z.object({
 
 export type ReferralSettingsInput = z.infer<typeof ReferralSettingsInputSchema>
 
+// What the CRM settings form edits. On/off lives in Site Controls, so a stale form can't flip it.
+export const ReferralSettingsFormSchema = ReferralSettingsInputSchema.omit({ enabled: true })
+
 const KEY = {
   enabled: 'referral_enabled',
   rewardPoints: 'referral_reward_points',

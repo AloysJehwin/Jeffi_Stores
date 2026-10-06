@@ -3,7 +3,6 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/loyalty/settings', () => ({ getLoyaltySettings: vi.fn() }))
 vi.mock('@/lib/referrals/queries', () => ({ getReferralStats: vi.fn() }))
 vi.mock('@/lib/referrals/settings', async () => {
   const actual = await vi.importActual<typeof import('@/lib/referrals/settings')>('@/lib/referrals/settings')
@@ -13,7 +12,6 @@ vi.mock('@/lib/referrals/settings', async () => {
 import { GET, PUT } from '@/app/api/(admin)/admin/referrals/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getReferralStats } from '@/lib/referrals/queries'
 import { getReferralSettings, saveReferralSettings } from '@/lib/referrals/settings'
 
@@ -27,7 +25,6 @@ describe('/api/admin/referrals', () => {
     vi.clearAllMocks()
     vi.mocked(authenticateAdmin).mockResolvedValue({ adminId: 'a1', role: 'admin', scopes: [] } as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: true } as any)
     vi.mocked(getReferralSettings).mockResolvedValue(settings)
     vi.mocked(getReferralStats).mockResolvedValue({ signups: 0 } as any)
   })
@@ -58,12 +55,9 @@ describe('/api/admin/referrals', () => {
     expect(saveReferralSettings).not.toHaveBeenCalled()
   })
 
-  it('refuses to switch referrals on while loyalty is off, but allows turning them off', async () => {
-    vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: false } as any)
-    const res = await put(settings)
-    expect(res.status).toBe(400)
-    expect((await res.json()).error).toMatch(/loyalty program first/)
-    expect(saveReferralSettings).not.toHaveBeenCalled()
-    expect((await put({ ...settings, enabled: false })).status).toBe(200)
+  it('keeps the stored on/off, which belongs to Site Controls', async () => {
+    vi.mocked(getReferralSettings).mockResolvedValue({ ...settings, enabled: false })
+    expect((await put({ ...settings, enabled: true, rewardPoints: 120 })).status).toBe(200)
+    expect(saveReferralSettings).toHaveBeenCalledWith({ ...settings, enabled: false, rewardPoints: 120 })
   })
 })
