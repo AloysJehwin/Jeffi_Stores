@@ -26,9 +26,9 @@ describe('winback180 scenario', () => {
     expect(winback180.defaultParams.maxDaysSinceOrder).toBe(days(365))
   })
 
-  it('defaultParams use low health score range', () => {
+  it('has no health-score cut by default: the old under-25 cut matched nobody', () => {
     expect(winback180.defaultParams.healthScoreMin).toBe(0)
-    expect(winback180.defaultParams.healthScoreMax).toBe(25)
+    expect(winback180.defaultParams.healthScoreMax).toBe(100)
   })
 
   it('has findEligible function', () => {

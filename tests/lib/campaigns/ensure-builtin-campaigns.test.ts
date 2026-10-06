@@ -68,4 +68,14 @@ describe('ensureBuiltinCampaignRows', () => {
     expect(old.subject).toContain('you both')
     expect(current.subject).not.toContain('you both')
   })
+
+  it("moves winback_180's saved health cut off the retired 25, and only that exact value", async () => {
+    mockList.mockReturnValue([
+      { kind: 'winback_180', name: 'Win-back', description: 'd', defaultParams: { healthScoreMax: 100 } },
+    ])
+    await ensureBuiltinCampaignRows()
+    const upgrade = mockQuery.mock.calls.find(c => String(c[0]).includes('jsonb_set(parameters'))!
+    expect(String(upgrade[0])).toContain('(parameters->>$2)::numeric = $4')
+    expect(upgrade[1]).toEqual(['winback_180', 'healthScoreMax', 100, 25])
+  })
 })

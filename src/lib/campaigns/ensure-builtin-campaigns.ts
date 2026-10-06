@@ -70,4 +70,22 @@ export async function ensureBuiltinCampaignRows(): Promise<void> {
       ).catch(() => null)
     }
   }
+
+  // 4. Same idea for parameters: a saved value equal to a retired default moves to the current
+  //    default. Only that exact value is touched; anything an admin chose differently stays.
+  for (const { kind, key, retired } of RETIRED_BUILTIN_PARAMS) {
+    const current = scenarios.find(s => s.kind === kind)?.defaultParams?.[key]
+    if (current === undefined) continue
+    await query(
+      `UPDATE campaigns SET parameters = jsonb_set(parameters, ARRAY[$2::text], to_jsonb($3::numeric)), updated_at = NOW()
+       WHERE kind = $1 AND parameters ? $2 AND (parameters->>$2)::numeric = $4`,
+      [kind, key, current, retired]
+    ).catch(() => null)
+  }
 }
+
+// winback_180's health cut of "under 25" could never match: the score doesn't go below ~29 for
+// anyone who has ordered. Its default is now no cut.
+const RETIRED_BUILTIN_PARAMS: { kind: string; key: string; retired: number }[] = [
+  { kind: 'winback_180', key: 'healthScoreMax', retired: 25 },
+]
