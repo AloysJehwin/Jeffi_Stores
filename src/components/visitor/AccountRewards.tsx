@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
+import Pagination from '@/components/visitor/ListPagination'
 
 interface Tier {
   key: string
@@ -96,56 +97,14 @@ function historyLabel(entry: HistoryEntry): string {
       return entry.couponCode ? `Redeemed for coupon ${entry.couponCode}` : 'Redeemed for a coupon'
     case 'redeem_refund':
       return entry.couponCode ? `Points returned for coupon ${entry.couponCode}` : 'Points returned'
+    // The linked order is the friend's, so its number is never shown to the referrer.
+    case 'referral':
+      return 'Reward for referring a friend'
+    case 'referral_reversal':
+      return "Referral reward taken back (your friend's order was returned)"
     default:
       return 'Adjustment by the store'
   }
-}
-
-function Pagination({
-  page,
-  total,
-  pageSize,
-  onChange,
-  busy,
-}: {
-  page: number
-  total: number
-  pageSize: number
-  onChange: (page: number) => void
-  busy?: boolean
-}) {
-  const pages = Math.max(1, Math.ceil(total / pageSize))
-  if (pages <= 1) return null
-  const from = (page - 1) * pageSize + 1
-  const to = Math.min(total, page * pageSize)
-  return (
-    <div className="mt-4 flex items-center justify-between gap-3 border-t border-border-default pt-3">
-      <p className="text-xs text-foreground-muted">
-        {from.toLocaleString('en-IN')}–{to.toLocaleString('en-IN')} of {total.toLocaleString('en-IN')}
-      </p>
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onChange(page - 1)}
-          disabled={page <= 1 || busy}
-          className="px-3 py-1.5 rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Prev
-        </button>
-        <span className="text-xs text-foreground-muted tabular-nums">
-          {page} / {pages}
-        </span>
-        <button
-          type="button"
-          onClick={() => onChange(page + 1)}
-          disabled={page >= pages || busy}
-          className="px-3 py-1.5 rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          Next
-        </button>
-      </div>
-    </div>
-  )
 }
 
 function TierCard({ data }: { data: RewardsData }) {

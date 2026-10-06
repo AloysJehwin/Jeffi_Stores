@@ -34,6 +34,12 @@ function entryLabel(entry: LedgerEntry): string {
       return `Redeemed ${entry.couponCode ?? 'for a coupon'}`
     case 'redeem_refund':
       return `Points returned for ${entry.couponCode ?? 'a coupon'}`
+    case 'referral':
+      return entry.orderNumber ? `Referral reward (friend's order ${entry.orderNumber})` : 'Referral reward'
+    case 'referral_reversal':
+      return entry.orderNumber
+        ? `Referral reward taken back (friend's order ${entry.orderNumber} returned)`
+        : 'Referral reward taken back'
     default:
       return entry.note || 'Adjustment'
   }
