@@ -12,6 +12,7 @@ import {
   wrapWithTracking,
 } from '@/lib/shared/marketing'
 import { baseLayout, ctaButton } from '@/lib/shared/email-campaigns'
+import { substituteVars } from '@/lib/shared/template-vars'
 import { cooldownDays } from '@/lib/campaigns/duration'
 import { queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
@@ -38,6 +39,17 @@ function campaignCooldownDays(campaign: Campaign): number | null {
       : typeof params.sendCooldownDays === 'number' && params.sendCooldownDays > 0
   if (!hasCooldown) return null
   return cooldownDays(params)
+}
+
+// baseLayout leaves {store_name} / {store_web} for the caller to fill. The automation path never did,
+// so every campaign email went out with the raw tokens in its header and footer. Filled per store,
+// from the brand name and the customer's own store URL, so a tenant never shows another store's name.
+function withStoreVars(html: string, storeName: string, baseUrl: string): string {
+  let web = baseUrl
+  try {
+    web = new URL(baseUrl).host
+  } catch {}
+  return substituteVars(html, { store_name: storeName, store_web: web })
 }
 
 export async function sendCampaignEmail(params: {
@@ -73,7 +85,7 @@ export async function sendCampaignEmail(params: {
   const [fromAddr, storeName] = await Promise.all([campaignMailFromAsync(), currentBrandNameAsync()])
   const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind, user.baseUrl)
   const tracked = wrapWithTracking(renderedBody, sentId, unsubscribeUrl, user.baseUrl, storeName)
-  const html = baseLayout(subject, tracked)
+  const html = withStoreVars(baseLayout(subject, tracked, user.baseUrl), storeName, user.baseUrl)
 
   try {
     await sendAuditedMail({
@@ -489,14 +501,27 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
     oldPrice: '999',
     newPrice: '799',
     ctaUrl: `${baseUrl}/products`,
+    // Loyalty, referral and birthday campaigns.
+    tier: 'Gold',
+    points: 250,
+    pointsWorth: 250,
+    rewardPoints: 100,
+    referralCode: 'SAMPLE7K2Q',
+    shareUrl: `${baseUrl}/r/SAMPLE7K2Q`,
   }
 
   const subject = `[TEST] ${renderTemplate(campaign.subject_template, sampleVars)}`
   const body = renderTemplate(campaign.body_template, sampleVars)
-  const html = baseLayout(
-    subject,
-    body +
-      `<p style="margin-top:24px;color:#999;font-size:12px;">— This is a test send. Tracking pixel and unsubscribe footer omitted.</p>`
+  const { currentBrandNameAsync } = await import('@/lib/catalog/brand')
+  const html = withStoreVars(
+    baseLayout(
+      subject,
+      body +
+        `<p style="margin-top:24px;color:#999;font-size:12px;">— This is a test send. Tracking pixel and unsubscribe footer omitted.</p>`,
+      baseUrl
+    ),
+    await currentBrandNameAsync(),
+    baseUrl
   )
 
   try {
