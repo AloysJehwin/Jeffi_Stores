@@ -17,6 +17,7 @@ import CustomerAiSummary from '@/app/(admin)/admin/customers/[id]/_components/Cu
 import CustomerConversations from '@/app/(admin)/admin/customers/[id]/_components/CustomerConversations'
 import HealthScoreCard from '@/app/(admin)/admin/customers/[id]/_components/HealthScoreCard'
 import CustomerLoyaltyCard from '@/app/(admin)/admin/customers/[id]/_components/CustomerLoyaltyCard'
+import CustomerReferralsCard from '@/app/(admin)/admin/customers/[id]/_components/CustomerReferralsCard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -350,6 +351,8 @@ export default async function CustomerDetailPage({
           </div>
 
           <CustomerLoyaltyCard customerId={customer.id} canWrite={canWrite} />
+
+          <CustomerReferralsCard customerId={customer.id} email={customer.email} host={host} />
 
           {/* Business details (customer_profiles) */}
           {(customer.company_name || customer.gst_number || customer.credit_limit) && (
