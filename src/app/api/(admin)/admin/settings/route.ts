@@ -114,11 +114,16 @@ async function referralNeedsLoyalty(updates: Array<{ key: string; value: unknown
 }
 const REFERRAL_NEEDS_LOYALTY = 'Turn on the loyalty program first. Referral rewards are paid in loyalty points.'
 
-// The first time loyalty is switched on, past delivered orders are counted without emailing anyone.
+// The first time loyalty is switched on, past delivered orders are counted without emailing anyone,
+// then the tier-upgrade email is switched on so members hear about the upgrades that follow. The
+// silent pass stamps no upgrades, so this can't email anyone about tiers they already had.
 async function loyaltyFirstPass(updates: Array<{ key: string; value: unknown }>): Promise<ReconcileResult | null> {
   if (!updates.some(u => u.key === 'loyalty_enabled' && String(u.value) === 'true')) return null
   const settings = await getLoyaltySettings()
-  return settings.enabled && !settings.launchedAt ? reconcileLoyaltyUntilDone() : null
+  if (!settings.enabled || settings.launchedAt) return null
+  const result = await reconcileLoyaltyUntilDone()
+  await query(`UPDATE campaigns SET enabled = TRUE, updated_at = NOW() WHERE kind = 'loyalty_tier_upgrade'`)
+  return result
 }
 
 function invalidateFor(keys: string[]) {

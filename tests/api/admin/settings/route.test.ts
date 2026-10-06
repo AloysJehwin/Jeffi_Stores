@@ -158,6 +158,12 @@ describe('PATCH /api/admin/settings', () => {
         vi.mocked(reconcileLoyaltyUntilDone).mock.invocationCallOrder[0]
       )
       expect((await res.json()).firstPass).toMatchObject({ users: 40, earned: 9645 })
+      // ...and only then switches on the tier-upgrade email.
+      const enable = mockQuery.mock.calls.findIndex(c => String(c[0]).includes("kind = 'loyalty_tier_upgrade'"))
+      expect(enable).toBeGreaterThan(0)
+      expect(mockQuery.mock.invocationCallOrder[enable]).toBeGreaterThan(
+        vi.mocked(reconcileLoyaltyUntilDone).mock.invocationCallOrder[0]
+      )
     })
 
     it('does not rerun the first pass once launched, nor when Loyalty is switched off', async () => {
@@ -165,6 +171,8 @@ describe('PATCH /api/admin/settings', () => {
       expect((await (await PATCH(makeRequest({ key: 'loyalty_enabled', value: 'true' }))).json()).firstPass).toBeNull()
       await PATCH(makeRequest({ updates: [{ key: 'loyalty_enabled', value: 'false' }] }))
       expect(reconcileLoyaltyUntilDone).not.toHaveBeenCalled()
+      // An admin who switched the tier email off keeps it off when loyalty is toggled again.
+      expect(mockQuery.mock.calls.some(c => String(c[0]).includes('loyalty_tier_upgrade'))).toBe(false)
     })
 
     it('saves the Birthday rewards switch without needing loyalty', async () => {
