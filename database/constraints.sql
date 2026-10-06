@@ -366,6 +366,15 @@ ALTER TABLE ONLY public.categories
 
 
 --
+-- Name: categories categories_reorder_interval_days_check; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.categories
+    ADD CONSTRAINT categories_reorder_interval_days_check CHECK (reorder_interval_days IS NULL OR (reorder_interval_days >= 1 AND reorder_interval_days <= 365));
+
+
+
+--
 -- Name: coupon_eligible_users coupon_eligible_users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 

@@ -17,7 +17,9 @@ interface CandidateRow {
   product_id: string
   product_slug: string | null
   product_name: string
+  is_subscription: boolean
   subscription_interval: string | null
+  reorder_interval_days: number | null
   last_purchase_at: string
 }
 
@@ -41,12 +43,22 @@ function intervalToMinutes(interval: string | null): number {
   }
 }
 
+// A subscription product keeps its own interval; anything else uses its category's reorder interval
+// (Replenishment campaign page), falling back to the parent category's.
+const CATEGORY_INTERVAL_SQL = `COALESCE(c.reorder_interval_days, pc.reorder_interval_days)`
+const REORDERABLE_SQL = `(p.is_subscription = TRUE OR ${CATEGORY_INTERVAL_SQL} IS NOT NULL)`
+
+function candidateIntervalMinutes(c: CandidateRow): number {
+  if (c.is_subscription || c.reorder_interval_days == null) return intervalToMinutes(c.subscription_interval)
+  return days(c.reorder_interval_days)
+}
+
 export const replenishment: ScenarioModule<Params, Row> = {
   kind: 'replenishment',
   name: 'Replenishment Reminder',
   description: 'Customer is due to reorder a consumable or subscription product',
   trigger:
-    "Fires when a customer's last paid purchase of a subscription/consumable product is older than the product's reorder interval times the configured multiplier, minus a lookahead so the reminder lands just before they run out. Sends at most once per cooldown window per user. Skipped for guests, inactive accounts, and marketing opt-outs.",
+    "Fires when a customer's last paid purchase of a consumable is older than its reorder interval times the configured multiplier, minus a lookahead so the reminder lands just before they run out. Consumables are subscription products, plus products in a category given a reorder interval on this campaign's page (a subcategory without one uses its parent's). Skipped if the product is already in their cart, and for guests, inactive accounts and marketing opt-outs. Sends at most once per cooldown window per user.",
   defaultParams: {
     intervalMultiplier: 1.0,
     lookahead: days(3),
@@ -105,14 +117,19 @@ export const replenishment: ScenarioModule<Params, Row> = {
              p.id::text AS product_id,
              p.slug AS product_slug,
              p.name AS product_name,
+             p.is_subscription,
              p.subscription_interval,
+             ${CATEGORY_INTERVAL_SQL} AS reorder_interval_days,
              MAX(o.created_at)::text AS last_purchase_at
       FROM order_items oi
       JOIN orders o ON o.id = oi.order_id
       JOIN products p ON p.id = oi.product_id
+      LEFT JOIN categories c ON c.id = p.category_id
+      LEFT JOIN categories pc ON pc.id = c.parent_category_id
       JOIN users u ON u.id = o.user_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
-      WHERE p.is_subscription = TRUE
+      WHERE ${REORDERABLE_SQL}
+        AND p.is_active = TRUE
         AND o.payment_status = 'paid'
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
@@ -128,7 +145,7 @@ export const replenishment: ScenarioModule<Params, Row> = {
             AND ecs.user_id = u.id
             AND ecs.sent_at > NOW() - ($2::text || ' minutes')::interval
         )
-      GROUP BY u.id, p.id, p.slug, p.name, p.subscription_interval
+      GROUP BY u.id, p.id, p.slug, p.name, p.is_subscription, p.subscription_interval, ${CATEGORY_INTERVAL_SQL}
       ORDER BY MAX(o.created_at) ASC
       LIMIT $3
     `,
@@ -138,7 +155,7 @@ export const replenishment: ScenarioModule<Params, Row> = {
     const now = Date.now()
     return candidates
       .filter(c => {
-        const thresholdMin = intervalToMinutes(c.subscription_interval) * multiplier - lookaheadMin
+        const thresholdMin = candidateIntervalMinutes(c) * multiplier - lookaheadMin
         const elapsedMin = (now - new Date(c.last_purchase_at).getTime()) / 60000
         return elapsedMin >= thresholdMin
       })
@@ -159,7 +176,9 @@ export const replenishment: ScenarioModule<Params, Row> = {
         FROM order_items oi
         JOIN orders o ON o.id = oi.order_id
         JOIN products p ON p.id = oi.product_id
-        WHERE p.is_subscription = TRUE AND o.payment_status = 'paid'
+        LEFT JOIN categories c ON c.id = p.category_id
+        LEFT JOIN categories pc ON pc.id = c.parent_category_id
+        WHERE ${REORDERABLE_SQL} AND o.payment_status = 'paid'
       )
       SELECT
         b.user_id::text,

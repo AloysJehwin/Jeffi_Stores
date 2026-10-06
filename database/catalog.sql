@@ -60,7 +60,8 @@ CREATE TABLE public.categories (
     replacement_window_days integer DEFAULT 7,
     hero_image_mobile text,
     hero_image_desktop text,
-    is_draft boolean DEFAULT false NOT NULL
+    is_draft boolean DEFAULT false NOT NULL,
+    reorder_interval_days integer
 );
 
 

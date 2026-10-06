@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import CampaignDetailClient from './CampaignDetailClient'
+import ReorderIntervalsPanel from './ReorderIntervalsPanel'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 
@@ -19,6 +20,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
         <span className="text-foreground capitalize">{kind.replace(/_/g, ' ')}</span>
       </div>
       <CampaignDetailClient kind={kind} />
+      {kind === 'replenishment' && <ReorderIntervalsPanel />}
     </div>
   )
 }
