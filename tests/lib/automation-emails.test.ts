@@ -372,6 +372,26 @@ describe('sendCampaignEmail', () => {
     expect(mockSendAuditedMail).toHaveBeenCalledOnce()
   })
 
+  it("fills the layout's store name and web placeholders for the customer's own store", async () => {
+    mockCanSendMarketing.mockResolvedValue({ ok: true })
+    mockAlreadySentForReference.mockResolvedValue(false)
+    mockRecordSent.mockResolvedValue('sent-id-1')
+    mockRenderTemplate.mockReturnValue('rendered')
+    mockBuildUnsubscribeUrl.mockReturnValue('https://example.com/unsub')
+    mockWrapWithTracking.mockReturnValue('<tracked>rendered</tracked>')
+    mockBaseLayout.mockReturnValue('<h1>{store_name}</h1><footer>© {store_name} • {store_web} {keep_me}</footer>')
+    mockSendAuditedMail.mockResolvedValue({ messageId: 'msg-1' })
+
+    const user = { ...mockUser, baseUrl: 'https://shop.example.in' }
+    await sendCampaignEmail({ ...baseParams, user })
+    expect(mockBaseLayout).toHaveBeenCalledWith(expect.any(String), '<tracked>rendered</tracked>', 'https://shop.example.in')
+    const html = mockSendAuditedMail.mock.calls[0][0].html as string
+    expect(html).not.toContain('{store_name}')
+    expect(html).not.toContain('{store_web}')
+    expect(html).toContain('• shop.example.in')
+    expect(html).toContain('{keep_me}') // unrelated tokens are left alone
+  })
+
   it('returns ok:false with send_failed when sendAuditedMail throws', async () => {
     mockCanSendMarketing.mockResolvedValue({ ok: true })
     mockAlreadySentForReference.mockResolvedValue(false)
