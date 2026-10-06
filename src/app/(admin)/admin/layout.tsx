@@ -67,6 +67,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms:read', group: 'Marketing' },
     { href: '/admin/mailer', label: 'Mailer', scope: 'mailer:read', group: 'Marketing' },
     { href: '/admin/campaigns', label: 'Campaigns', scope: 'campaigns:read', group: 'Marketing' },
+    { href: '/admin/customer-programs', label: 'Customer Programs', scope: 'campaigns:read', group: 'Marketing' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews:read', group: 'Marketing' },
     { href: '/admin/agent', label: 'AI Agent', scope: 'agent:read', group: 'AI', exactMatch: true },
     { href: '/admin/agent/logs', label: 'Agent Logs', scope: 'agent:read', group: 'AI' },

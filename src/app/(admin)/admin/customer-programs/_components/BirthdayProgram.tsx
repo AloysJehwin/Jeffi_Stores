@@ -30,7 +30,6 @@ export default async function BirthdayProgram({ host }: { host: string }) {
 
   return (
     <ProgramSection
-      id="birthday"
       title="Birthday rewards"
       description="Collects customers' birthdays and sends a treat on the day."
       on={flags.birthdayEnabled}
