@@ -69,6 +69,10 @@ export const BUILTIN_TEMPLATES: Record<string, BuiltinTemplate> = {
     subject: 'Happy birthday, {firstName}!',
     body: greeting + h2('Happy birthday from all of us') + p('Celebrate with a little gift from us — {discountPercent}% off your next order.') + couponBox + cta('Claim your gift'),
   },
+  birthday_collect: {
+    subject: "When's your birthday, {firstName}?",
+    body: greeting + h2('Let us celebrate with you') + p('Tell us your birthday and we will send you a treat every year. It takes one tap, and no sign-in is needed.') + cta('Add my birthday'),
+  },
   referral_invite: {
     subject: 'Share the love, {firstName} — you both save',
     body: greeting + h2('Refer a friend') + p('Invite a friend and you both get a reward on your next order.') + couponBox + cta('Refer a friend'),

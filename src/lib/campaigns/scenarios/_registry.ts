@@ -24,6 +24,7 @@ import { loyaltyTierUpgrade } from './loyalty-tier-upgrade'
 import { loyaltyPointsReminder } from './loyalty-points-reminder'
 import { referralInvite } from './referral-invite'
 import { birthday } from './birthday'
+import { birthdayCollect } from './birthday-collect'
 
 export const SCENARIOS: Record<string, AnyScenarioModule> = {
   [abandonedCart.kind]: abandonedCart as unknown as AnyScenarioModule,
@@ -51,6 +52,7 @@ export const SCENARIOS: Record<string, AnyScenarioModule> = {
   [loyaltyPointsReminder.kind]: loyaltyPointsReminder as unknown as AnyScenarioModule,
   [referralInvite.kind]: referralInvite as unknown as AnyScenarioModule,
   [birthday.kind]: birthday as unknown as AnyScenarioModule,
+  [birthdayCollect.kind]: birthdayCollect as unknown as AnyScenarioModule,
 }
 
 export function getScenario(kind: string): AnyScenarioModule | null {

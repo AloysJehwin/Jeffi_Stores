@@ -27,6 +27,7 @@ export type CampaignKind =
   | 'loyalty_points_reminder'
   | 'referral_invite'
   | 'birthday'
+  | 'birthday_collect'
   | string
 
 export interface Campaign {
