@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
@@ -119,9 +119,11 @@ function RatingBar({
 }
 
 export default function ProductReviews({ productId, productName }: ProductReviewsProps) {
-  const { user } = useAuth()
+  const { user, isLoading: authLoading } = useAuth()
   const { showToast } = useToast()
   const router = useRouter()
+  const editLinkHandled = useRef(false)
+  const rootRef = useRef<HTMLDivElement>(null)
   const portalHeaders: Record<string, string> = user?.isBusiness ? { 'X-Auth-Portal': 'business' } : {}
   const [reviews, setReviews] = useState<Review[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -205,6 +207,28 @@ export default function ProductReviews({ productId, productName }: ProductReview
   useEffect(() => {
     fetchReviews()
   }, [productId])
+
+  // ?review=edit (the "add a photo" email link) opens the customer's own review for editing,
+  // after sending them through sign-in if needed.
+  useEffect(() => {
+    if (editLinkHandled.current || authLoading || isLoading) return
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('review') !== 'edit') return
+    editLinkHandled.current = true
+    if (!user) {
+      router.push(`/login?redirect=${encodeURIComponent(url.pathname + url.search)}`)
+      return
+    }
+    url.searchParams.delete('review')
+    window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+    const ownReview = reviews.find(r => r.user_id === user.id)
+    if (!ownReview) {
+      showToast("We couldn't find your review of this product", 'info')
+      return
+    }
+    rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    openEdit(ownReview)
+  }, [authLoading, isLoading, user, reviews])
 
   function handleImageChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || []).slice(0, 3)
@@ -434,7 +458,7 @@ export default function ProductReviews({ productId, productName }: ProductReview
   const hasMore = sortedReviews.length > visibleCount
 
   return (
-    <div className="mt-10 sm:mt-14">
+    <div ref={rootRef} id="reviews" className="mt-10 sm:mt-14 scroll-mt-20">
       {/* Section title — always on top, sticky */}
       <div className="sticky top-16 lg:top-[80px] z-10 bg-surface py-3 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
         <div>

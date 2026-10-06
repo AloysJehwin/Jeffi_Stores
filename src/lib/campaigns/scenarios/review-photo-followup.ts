@@ -151,6 +151,8 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
     const imageUrl = await fetchProductImageUrl(row.product_id)
     const productUrl = row.product_slug ? `${user.baseUrl}/products/${row.product_slug}` : `${user.baseUrl}/products`
+    // Opens the customer's own review ready for a photo (sign-in first if needed).
+    const addPhotoUrl = row.product_slug ? `${user.baseUrl}/products/${row.product_slug}?review=edit` : productUrl
     const productCard = renderHeroProduct({ name: row.product_name, imageUrl, productUrl })
 
     const emailResult = await sendCampaignEmail({
@@ -163,7 +165,7 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
         productCard,
         couponCode,
         discountPercent,
-        ctaUrl: productUrl,
+        ctaUrl: addPhotoUrl,
       },
     })
 
