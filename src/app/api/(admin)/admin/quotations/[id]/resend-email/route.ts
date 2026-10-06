@@ -1,3 +1,4 @@
+import { documentUrl } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (!qt.consignee_email) return NextResponse.json({ error: 'No email address on file' }, { status: 400 })
 
-    const viewUrl = `https://quotation.jeffistores.in/${qt.view_token}`
+    const viewUrl = await documentUrl('quotation', qt.view_token)
 
     await sendQuotationFinalizedEmail(
       qt.consignee_email,

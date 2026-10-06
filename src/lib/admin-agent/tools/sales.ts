@@ -1,3 +1,4 @@
+import { documentUrl } from '@/lib/shared/customer-links'
 import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { round2 } from '@/lib/catalog/gst'
 import { lineItemExGst } from '@/lib/catalog/pricing'
@@ -1124,7 +1125,7 @@ const propose_send_quotation_email: ToolDef = {
         },
         {
           type: 'text',
-          value: `Customer will receive the public link https://quotation.jeffistores.in/${q.view_token}.`,
+          value: `Customer will receive the public link ${await documentUrl('quotation', q.view_token)}.`,
           weight: 'muted',
         },
       ],

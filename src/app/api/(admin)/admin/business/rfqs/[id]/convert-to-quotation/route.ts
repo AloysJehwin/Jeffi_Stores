@@ -1,3 +1,4 @@
+import { documentUrl } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { queryOne, queryMany, query } from '@/lib/shared/db'
@@ -290,7 +291,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   // Notify business user
   if (rfq.email && qt?.view_token) {
-    const viewUrl = `https://quotation.jeffistores.in/${qt.view_token}`
+    const viewUrl = await documentUrl('quotation', qt.view_token)
     sendRfqConvertedToQuotationEmail(
       rfq.email,
       rfq.company_name || `${rfq.first_name} ${rfq.last_name}`.trim() || rfq.email,

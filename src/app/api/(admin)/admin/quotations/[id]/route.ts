@@ -1,3 +1,4 @@
+import { documentUrl } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -222,7 +223,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (fields.status === 'final' && qt?.consignee_email) {
       try {
-        const viewUrl = `https://quotation.jeffistores.in/${qt.view_token}`
+        const viewUrl = await documentUrl('quotation', qt.view_token)
         await sendQuotationFinalizedEmail(
           qt.consignee_email,
           qt.consignee_name || 'Customer',

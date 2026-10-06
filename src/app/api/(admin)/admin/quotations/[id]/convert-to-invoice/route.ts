@@ -1,3 +1,4 @@
+import { documentUrl, orderUrlById } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { productLabel } from '@/lib/catalog/product-label'
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -397,13 +398,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!result.saveAsDraft && result.invoice_number) {
       if (customerEmail) {
         // Fetch the view_token so the invoice link is correct.
-        // The middleware rewrites invoice.jeffistores.in/<token> → /invoice/<token>.
+        // The store's invoice host serves /<token> (invoice-{slug}. on a tenant). Without a token,
+        // the order's own page on the customer's portal.
         const orderRow = await queryOne<{ view_token: string }>(`SELECT view_token FROM orders WHERE id = $1`, [
           result.id,
         ])
         const invoiceViewUrl = orderRow?.view_token
-          ? `https://invoice.jeffistores.in/${orderRow.view_token}`
-          : `https://jeffistores.in/account/orders`
+          ? await documentUrl('invoice', orderRow.view_token)
+          : await orderUrlById(result.id)
 
         // B2B (came from an RFQ) → business-specific email; regular → standard invoice email.
         // Never send both — the customer would receive two identical emails.

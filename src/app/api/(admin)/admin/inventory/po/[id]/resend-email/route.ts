@@ -1,3 +1,4 @@
+import { documentUrl } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -36,7 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       [id]
     )
 
-    const viewUrl = `https://purchaseorder.jeffistores.in/${po.view_token}`
+    const viewUrl = await documentUrl('purchaseorder', po.view_token)
 
     await sendPurchaseOrderEmail(
       po.supplier_email,

@@ -1,3 +1,4 @@
+import { invoiceUrlForOrder } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -90,7 +91,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             order.customer_name,
             result.invoiceNumber,
             Number(order.total_amount),
-            order.order_number
+            order.order_number,
+            await invoiceUrlForOrder(id)
           )
         } catch (_) {}
       }

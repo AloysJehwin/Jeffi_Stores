@@ -5,6 +5,11 @@ import { NextRequest } from 'next/server'
 // Mocks — declared before any import of the module under test
 // ---------------------------------------------------------------------------
 
+vi.mock('@/lib/shared/customer-links', () => ({
+  documentUrl: vi.fn(async (app: string, token: string) => `https://${app}-acme.jeffistores.in/${token}`),
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+  invoiceUrlForOrder: vi.fn(async () => 'https://invoice-acme.jeffistores.in/TOKEN'),
+}))
 vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
@@ -278,7 +283,9 @@ describe('PATCH /api/admin/invoices/[id]', () => {
       'test@example.com',
       'Test Customer',
       'JS/24-25/APR/1',
-      expect.any(Number)
+      expect.any(Number),
+      undefined,
+      'https://invoice-acme.jeffistores.in/TOKEN'
     )
   })
 

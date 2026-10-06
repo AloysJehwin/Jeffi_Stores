@@ -3,6 +3,11 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks (must be before imports) ────────────────────────────────────────────
 
+vi.mock('@/lib/shared/customer-links', () => ({
+  documentUrl: vi.fn(async (app: string, token: string) => `https://${app}-acme.jeffistores.in/${token}`),
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+  invoiceUrlForOrder: vi.fn(async () => 'https://invoice-acme.jeffistores.in/TOKEN'),
+}))
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({
@@ -436,7 +441,14 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     mockSendEmail.mockResolvedValueOnce(undefined as any)
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
     expect(res.status).toBe(200)
-    expect(mockSendEmail).toHaveBeenCalledWith('alice@example.com', 'Alice', 'JS/2024-25/0001', 1200, 'ORD-001')
+    expect(mockSendEmail).toHaveBeenCalledWith(
+      'alice@example.com',
+      'Alice',
+      'JS/2024-25/0001',
+      1200,
+      'ORD-001',
+      'https://invoice-acme.jeffistores.in/TOKEN'
+    )
   })
 
   it('does not propagate email errors (draft+GST)', async () => {

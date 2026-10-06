@@ -69,3 +69,11 @@ export async function documentUrl(app: DocumentApp, token: string): Promise<stri
   const tenant = await resolveCurrentTenant()
   return `https://${documentHostForSlug(app, tenant?.slug ?? null)}/${encodeURIComponent(token)}`
 }
+
+/** Public invoice page for an order (its view token on the invoice host), if it has one. */
+export async function invoiceUrlForOrder(orderId: string): Promise<string | undefined> {
+  const row = await queryOne<{ view_token: string | null }>(`SELECT view_token FROM orders WHERE id = $1`, [
+    orderId,
+  ]).catch(() => null)
+  return row?.view_token ? documentUrl('invoice', row.view_token) : undefined
+}

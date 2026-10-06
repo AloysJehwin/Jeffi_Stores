@@ -1,3 +1,4 @@
+import { invoiceUrlForOrder } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { productLabel } from '@/lib/catalog/product-label'
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -413,7 +414,8 @@ export async function POST(request: NextRequest) {
           customerName,
           result.invoiceNumber,
           round2(totalAmount),
-          result.orderNumber
+          result.orderNumber,
+          await invoiceUrlForOrder(result.orderId)
         )
       } catch (_) {}
     }

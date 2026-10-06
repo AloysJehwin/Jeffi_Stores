@@ -93,7 +93,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   )
   const displayName = [userProfile?.first_name, userProfile?.last_name].filter(Boolean).join(' ') || user.email
 
-  sendRfqSubmittedEmail(user.email, displayName, newRfq!.rfq_number).catch(() => {})
+  sendRfqSubmittedEmail(user.email, displayName, newRfq!.rfq_number, newRfq!.id).catch(() => {})
 
   return NextResponse.json({ rfq: newRfq }, { status: 201 })
 }
