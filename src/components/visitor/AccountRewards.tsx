@@ -446,7 +446,7 @@ export default function AccountRewards() {
           </div>
         ) : (
           <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
-            <div className="space-y-4 lg:col-span-2">
+            <div className="min-w-0 space-y-4 lg:col-span-2">
               <TierCard data={data} />
               <RedeemCard data={data} onRedeemed={() => load({ historyPage, couponPage })} />
               <CouponList
@@ -460,7 +460,7 @@ export default function AccountRewards() {
                 onPage={hp => load({ historyPage: hp, couponPage, silent: true })}
               />
             </div>
-            <div className="lg:sticky lg:top-4">
+            <div className="min-w-0 lg:sticky lg:top-4">
               <HowItWorks program={data.program} />
             </div>
           </div>
