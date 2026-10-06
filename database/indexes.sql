@@ -2008,6 +2008,13 @@ CREATE INDEX idx_referrals_referrer ON public.referrals USING btree (referrer_us
 
 
 --
+-- Name: idx_referral_signups_referrer; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_referral_signups_referrer ON public.referral_signups USING btree (referrer_user_id, status);
+
+
+--
 -- Name: idx_subscriptions_renewal; Type: INDEX; Schema: public; Owner: -
 --
 

@@ -280,6 +280,24 @@ CREATE TABLE public.referrals (
 
 
 --
+-- Name: referral_signups; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.referral_signups (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    referral_id uuid NOT NULL,
+    referrer_user_id uuid NOT NULL,
+    referred_user_id uuid NOT NULL,
+    status character varying(20) DEFAULT 'joined'::character varying NOT NULL,
+    reject_reason character varying(40),
+    qualifying_order_id uuid,
+    points integer,
+    signed_up_at timestamp with time zone DEFAULT now() NOT NULL,
+    rewarded_at timestamp with time zone
+);
+
+
+--
 -- Name: subscriptions; Type: TABLE; Schema: public; Owner: -
 --
 
