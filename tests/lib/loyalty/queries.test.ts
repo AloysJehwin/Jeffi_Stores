@@ -103,6 +103,18 @@ describe('loyalty read models', () => {
       expect(summary.history.items[0]).not.toHaveProperty('note')
     })
 
+    it("never shows a referral reward's order number, which belongs to the friend", async () => {
+      account({ points: 100, lifetime_points: 0, tier: 'bronze' })
+      mockQueryMany.mockImplementation(async (sql: string) =>
+        String(sql).includes('FROM loyalty_ledger')
+          ? [{ ...ledgerRow, reason: 'referral', order_number: 'FRIEND-ORDER' }, ledgerRow]
+          : []
+      )
+      const { items } = (await getLoyaltySummary('u1', settings)).history
+      expect(items[0]).toMatchObject({ reason: 'referral', orderNumber: null })
+      expect(items[1]).toMatchObject({ reason: 'order_earn', orderNumber: 'ORD-1' })
+    })
+
     it('passes the requested page through to the history and coupon lists', async () => {
       account({ points: 150, lifetime_points: 420, tier: 'silver' })
       const summary = await getLoyaltySummary('u1', settings, { historyPage: 2, couponPage: 3 })
