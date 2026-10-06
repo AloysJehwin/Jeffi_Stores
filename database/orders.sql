@@ -33,7 +33,10 @@ CREATE TABLE public.cart_items (
     buy_unit character varying(10),
     sub_variant_id uuid,
     saved_for_later boolean DEFAULT false NOT NULL,
-    saved_at timestamp with time zone
+    saved_at timestamp with time zone,
+    snapshot_price numeric(12,2),
+    snapshot_in_stock boolean,
+    snapshot_taken_at timestamp with time zone
 );
 
 

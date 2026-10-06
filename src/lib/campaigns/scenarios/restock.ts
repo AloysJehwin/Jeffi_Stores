@@ -8,7 +8,12 @@ import {
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { NOT_RECENTLY_EMAILED_SQL, settleWishlistEvent, syncWishlistSnapshots } from './_wishlist-base'
+import {
+  NOT_RECENTLY_EMAILED_SQL,
+  SAVED_ITEMS_SQL,
+  settleWishlistEvent,
+  syncWishlistSnapshots,
+} from './_wishlist-base'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -52,7 +57,7 @@ export const restock: ScenarioModule<Params, Row> = {
       `
       SELECT wi.user_id, wi.product_id, p.name AS product_name, p.slug AS product_slug,
              EXTRACT(EPOCH FROM wi.snapshot_taken_at)::bigint::text AS out_of_stock_since
-      FROM wishlist_items wi
+      FROM ${SAVED_ITEMS_SQL} wi
       JOIN products p ON p.id = wi.product_id
       JOIN users u ON u.id = wi.user_id
       WHERE u.marketing_opt_out = FALSE AND u.is_active = TRUE AND u.is_guest = FALSE

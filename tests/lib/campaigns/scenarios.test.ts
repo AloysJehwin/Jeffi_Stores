@@ -600,9 +600,12 @@ describe('priceDrop scenario', () => {
       params: priceDrop.defaultParams,
     })
 
-    expect(order).toEqual(['sync', 'sync', 'select'])
-    expect(String(mockQuery.mock.calls[0][0])).toContain('snapshot_taken_at IS NULL')
-    expect(String(mockQuery.mock.calls[1][0])).toContain('snapshot_in_stock = FALSE')
+    expect(order).toEqual(['sync', 'sync', 'sync', 'sync', 'sync', 'select'])
+    const syncSql = mockQuery.mock.calls.map(c => String(c[0]))
+    expect(syncSql.some(sql => sql.includes('snapshot_taken_at IS NULL'))).toBe(true)
+    expect(syncSql.some(sql => sql.includes('snapshot_in_stock = FALSE'))).toBe(true)
+    // Reads the saved set (wishlist + saved-for-later cart items), not the wishlist table alone.
+    expect(String(mockQueryMany.mock.calls[0][0])).toContain('saved_for_later = TRUE')
   })
 
   it('findEligible judges stock by status, not inventory quantity', async () => {
@@ -841,9 +844,12 @@ describe('restock scenario', () => {
       params: restock.defaultParams,
     })
 
-    expect(order).toEqual(['sync', 'sync', 'select'])
-    expect(String(mockQuery.mock.calls[0][0])).toContain('snapshot_taken_at IS NULL')
-    expect(String(mockQuery.mock.calls[1][0])).toContain('snapshot_in_stock = FALSE')
+    expect(order).toEqual(['sync', 'sync', 'sync', 'sync', 'sync', 'select'])
+    const syncSql = mockQuery.mock.calls.map(c => String(c[0]))
+    expect(syncSql.some(sql => sql.includes('snapshot_taken_at IS NULL'))).toBe(true)
+    expect(syncSql.some(sql => sql.includes('snapshot_in_stock = FALSE'))).toBe(true)
+    // Reads the saved set (wishlist + saved-for-later cart items), not the wishlist table alone.
+    expect(String(mockQueryMany.mock.calls[0][0])).toContain('saved_for_later = TRUE')
   })
 
   it('findEligible judges stock by status, not inventory quantity', async () => {

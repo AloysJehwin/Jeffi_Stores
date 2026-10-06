@@ -80,7 +80,7 @@ describe('wishlistReminder scenario', () => {
     beforeEach(() => {
       mockFetchUser.mockResolvedValue({ first_name: 'Sam', baseUrl: 'https://shop.test', unsubscribe_token: 't' })
       mockQueryMany.mockResolvedValue([
-        { product_id: 'p1', product_slug: 'widget', name: 'Widget', price: 100, image_url: 'img.jpg' },
+        { product_id: 'p1', product_slug: 'widget', name: 'Widget', source: 'wishlist', price: 100, image_url: 'img.jpg' },
       ])
     })
 
@@ -89,6 +89,14 @@ describe('wishlistReminder scenario', () => {
       expect(res.ok).toBe(true)
       expect(mockSendEmail).toHaveBeenCalledOnce()
       expect(mockSendEmail.mock.calls[0][0].vars.ctaUrl).toContain('/wishlist')
+    })
+
+    it('points to the cart when every item was saved for later there', async () => {
+      mockQueryMany.mockResolvedValue([
+        { product_id: 'p1', product_slug: 'widget', name: 'Widget', source: 'cart', price: 100, image_url: null },
+      ])
+      await wishlistReminder.send({ user_id: 'u1' }, { campaign, params: defaultParams })
+      expect(mockSendEmail.mock.calls[0][0].vars.ctaUrl).toMatch(/\/cart$/)
     })
 
     it('does not send WhatsApp when disabled', async () => {

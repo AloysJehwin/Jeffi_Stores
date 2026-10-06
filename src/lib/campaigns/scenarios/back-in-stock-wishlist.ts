@@ -9,7 +9,12 @@ import {
 } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { cooldownDays } from '../duration'
-import { NOT_RECENTLY_EMAILED_SQL, settleWishlistEvent, syncWishlistSnapshots } from './_wishlist-base'
+import {
+  NOT_RECENTLY_EMAILED_SQL,
+  SAVED_ITEMS_SQL,
+  settleWishlistEvent,
+  syncWishlistSnapshots,
+} from './_wishlist-base'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -56,7 +61,7 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
       `
       SELECT wi.user_id::text, wi.product_id::text, p.name AS product_name, p.slug AS product_slug,
              EXTRACT(EPOCH FROM wi.snapshot_taken_at)::bigint::text AS out_of_stock_since
-      FROM wishlist_items wi
+      FROM ${SAVED_ITEMS_SQL} wi
       JOIN users u ON u.id = wi.user_id
       JOIN products p ON p.id = wi.product_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
@@ -98,7 +103,7 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
           ELSE NULL
         END AS reason_detail,
         NULL::text AS blocked_until
-      FROM wishlist_items wi
+      FROM ${SAVED_ITEMS_SQL} wi
       JOIN users u ON u.id = wi.user_id
       JOIN products p ON p.id = wi.product_id
       WHERE wi.snapshot_in_stock = FALSE

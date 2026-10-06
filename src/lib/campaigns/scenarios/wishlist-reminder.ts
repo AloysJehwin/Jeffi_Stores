@@ -5,6 +5,8 @@ import {
   sendCampaignEmail,
   renderItemRows,
 } from '@/lib/shared/automation-emails'
+import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
+import { SAVED_ITEMS_SQL } from './_wishlist-base'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { days, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
@@ -23,9 +25,9 @@ interface Row {
 export const wishlistReminder: ScenarioModule<Params, Row> = {
   kind: 'wishlist_reminder',
   name: 'Wishlist Reminder',
-  description: 'Customer has an untouched, in-stock wishlist item they never ordered',
+  description: 'Customer has an untouched, in-stock saved item they never ordered',
   trigger:
-    'Fires when a product has sat on the wishlist, untouched, for at least the idle window, is still in stock, and was never ordered by the user. Sends at most once per cooldown window per user. Skipped for guests, inactive accounts, and marketing opt-outs.',
+    'Fires when a product has sat on the wishlist or in the cart\'s Saved for later, untouched, for at least the idle window, is still in stock, and was never ordered by the user. Sends at most once per cooldown window per user. Skipped for guests, inactive accounts, and marketing opt-outs.',
   defaultParams: {
     idleFor: days(14),
     maxItemsPerEmail: 4,
@@ -69,13 +71,14 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
     return queryMany<Row>(
       `
       SELECT DISTINCT wi.user_id::text
-      FROM wishlist_items wi
+      FROM ${SAVED_ITEMS_SQL} wi
       JOIN users u ON u.id = wi.user_id
       JOIN products p ON p.id = wi.product_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE wi.user_id IS NOT NULL
-        AND wi.created_at < NOW() - ($2::text || ' minutes')::interval
-        AND p.inventory_quantity > 0
+        AND wi.saved_at < NOW() - ($2::text || ' minutes')::interval
+        AND p.is_active = TRUE
+        AND ${PRODUCT_IN_STOCK_SQL}
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
         AND u.marketing_opt_out = FALSE
@@ -112,9 +115,9 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
       `
       WITH wishers AS (
         SELECT DISTINCT wi.user_id
-        FROM wishlist_items wi
+        FROM ${SAVED_ITEMS_SQL} wi
         WHERE wi.user_id IS NOT NULL
-          AND wi.created_at < NOW() - ($2::text || ' minutes')::interval
+          AND wi.saved_at < NOW() - ($2::text || ' minutes')::interval
       )
       SELECT
         w.user_id::text,
@@ -164,17 +167,18 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
       product_id: string
       product_slug: string | null
       name: string
+      source: 'wishlist' | 'cart'
       price: number
       image_url: string | null
     }>(
       `
-      SELECT p.id::text AS product_id, p.slug AS product_slug, p.name,
+      SELECT p.id::text AS product_id, p.slug AS product_slug, p.name, wi.source,
              p.base_price::float AS price,
              (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY display_order ASC LIMIT 1) AS image_url
-      FROM wishlist_items wi
+      FROM ${SAVED_ITEMS_SQL} wi
       JOIN products p ON p.id = wi.product_id
-      WHERE wi.user_id = $1 AND p.inventory_quantity > 0
-      ORDER BY wi.created_at ASC
+      WHERE wi.user_id = $1 AND p.is_active = TRUE AND ${PRODUCT_IN_STOCK_SQL}
+      ORDER BY wi.saved_at ASC
       LIMIT $2
     `,
       [row.user_id, params.maxItemsPerEmail]
@@ -205,7 +209,8 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
         cartItems: itemsHtml,
         couponCode,
         discountPercent,
-        ctaUrl: `${user.baseUrl}/wishlist`,
+        // Saved-for-later items live on the cart page, so send them there when nothing is on the wishlist.
+        ctaUrl: `${user.baseUrl}/${items.some(i => i.source === 'wishlist') ? 'wishlist' : 'cart'}`,
       },
     })
 
