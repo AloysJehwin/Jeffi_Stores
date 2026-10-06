@@ -7,7 +7,12 @@ import {
   sendCampaignEmail,
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
-import { NOT_RECENTLY_EMAILED_SQL, settleWishlistEvent, syncWishlistSnapshots } from './_wishlist-base'
+import {
+  NOT_RECENTLY_EMAILED_SQL,
+  SAVED_ITEMS_SQL,
+  settleWishlistEvent,
+  syncWishlistSnapshots,
+} from './_wishlist-base'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -27,9 +32,9 @@ interface Row {
 export const priceDrop: ScenarioModule<Params, Row> = {
   kind: 'price_drop',
   name: 'Price Drop',
-  description: 'Wishlisted product price dropped',
+  description: 'Saved product price dropped',
   trigger:
-    "Fires when a wishlisted product's base_price drops by at least the configured threshold % below the snapshot price. Only for active products that are in stock. The wishlist snapshot is refreshed once the email is sent, so a further drop notifies again.",
+    "Fires when a product on the wishlist or saved for later in the cart has a base_price drops by at least the configured threshold % below the snapshot price. Only for active products that are in stock. The wishlist snapshot is refreshed once the email is sent, so a further drop notifies again.",
   defaultParams: { priceDropThresholdPct: 5, maxWatchesPerSweep: 100 },
   paramSchema: {
     priceDropThresholdPct: {
@@ -56,7 +61,7 @@ export const priceDrop: ScenarioModule<Params, Row> = {
       SELECT wi.user_id, wi.product_id, p.name AS product_name, p.slug AS product_slug,
              wi.snapshot_price::text AS snapshot_price,
              p.base_price::text AS current_price
-      FROM wishlist_items wi
+      FROM ${SAVED_ITEMS_SQL} wi
       JOIN products p ON p.id = wi.product_id
       JOIN users u ON u.id = wi.user_id
       WHERE u.marketing_opt_out = FALSE AND u.is_active = TRUE AND u.is_guest = FALSE
