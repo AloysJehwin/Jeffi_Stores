@@ -49,6 +49,21 @@ describe('GET /api/reviews/from-token', () => {
     expect(res.status).toBe(404)
   })
 
+  it('reads the image from the real product_images columns', async () => {
+    vi.mocked(queryOne).mockResolvedValueOnce({ id: 'prod-1', name: 'Widget', image_url: 'a.jpg' } as any)
+    await GET(makeGetReq('valid-token'))
+    const sql = String(vi.mocked(queryOne).mock.calls[0][0])
+    expect(sql).toContain('SELECT image_url FROM product_images')
+    expect(sql).toContain('ORDER BY display_order')
+    expect(sql).not.toMatch(/\bposition\b/)
+  })
+
+  it('answers 500 instead of throwing when the database fails', async () => {
+    vi.mocked(queryOne).mockRejectedValueOnce(new Error('column "url" does not exist'))
+    const res = await GET(makeGetReq('valid-token'))
+    expect(res.status).toBe(500)
+  })
+
   it('returns product info and alreadyReviewed=false', async () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: 'prod-1', name: 'Widget', image_url: null } as any)
@@ -111,6 +126,32 @@ describe('POST /api/reviews/from-token', () => {
     const res = await POST(makePostReq({ token: 't', rating: 5, comment: 'great' }))
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/not delivered/)
+  })
+
+  it('stores tags as JSON text and links the review to its order', async () => {
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce(null as any)
+      .mockResolvedValueOnce({ id: 'ord-1' } as any)
+      .mockResolvedValueOnce({ id: 'rev-1' } as any)
+    await POST(makePostReq({ token: 't', rating: 4, comment: ' solid ', tags: ['Quality', 42, 'Value'] }))
+    const [sql, params] = vi.mocked(queryOne).mock.calls[2]
+    expect(String(sql)).toContain('order_id')
+    expect(params).toEqual(['prod-1', 'user-1', 'ord-1', 4, null, 'solid', JSON.stringify(['Quality', 'Value'])])
+  })
+
+  it('stores an empty tag list as a JSON array, not an object', async () => {
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce(null as any)
+      .mockResolvedValueOnce({ id: 'ord-1' } as any)
+      .mockResolvedValueOnce({ id: 'rev-1' } as any)
+    await POST(makePostReq({ token: 't', rating: 5, comment: 'great' }))
+    expect(vi.mocked(queryOne).mock.calls[2][1]?.[6]).toBe('[]')
+  })
+
+  it('rejects a blank comment and answers 500 when saving fails', async () => {
+    expect((await POST(makePostReq({ token: 't', rating: 5, comment: '   ' }))).status).toBe(400)
+    vi.mocked(queryOne).mockRejectedValueOnce(new Error('db down'))
+    expect((await POST(makePostReq({ token: 't', rating: 5, comment: 'ok' }))).status).toBe(500)
   })
 
   it('submits review on happy path', async () => {
