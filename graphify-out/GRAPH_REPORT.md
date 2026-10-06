@@ -1,16 +1,16 @@
 # Graph Report - Jeffi_Storess_Site  (2026-10-06)
 
 ## Corpus Check
-- 2509 files · ~5,786,783 words
+- 2527 files · ~5,788,168 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 18556 nodes · 46865 edges · 722 communities (679 shown, 43 thin omitted)
-- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 2155 edges (avg confidence: 0.8)
+- 18562 nodes · 47229 edges · 690 communities (648 shown, 42 thin omitted)
+- Extraction: 95% EXTRACTED · 5% INFERRED · 0% AMBIGUOUS · INFERRED: 2184 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0772910a`
+- Built from commit: `39b617b1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -517,84 +517,52 @@
 - [[_COMMUNITY_Community 642|Community 642]]
 - [[_COMMUNITY_Community 643|Community 643]]
 - [[_COMMUNITY_Community 644|Community 644]]
-- [[_COMMUNITY_Community 645|Community 645]]
 - [[_COMMUNITY_Community 646|Community 646]]
-- [[_COMMUNITY_Community 647|Community 647]]
 - [[_COMMUNITY_Community 648|Community 648]]
 - [[_COMMUNITY_Community 649|Community 649]]
 - [[_COMMUNITY_Community 650|Community 650]]
-- [[_COMMUNITY_Community 651|Community 651]]
 - [[_COMMUNITY_Community 652|Community 652]]
 - [[_COMMUNITY_Community 653|Community 653]]
 - [[_COMMUNITY_Community 654|Community 654]]
-- [[_COMMUNITY_Community 655|Community 655]]
 - [[_COMMUNITY_Community 656|Community 656]]
 - [[_COMMUNITY_Community 657|Community 657]]
 - [[_COMMUNITY_Community 658|Community 658]]
-- [[_COMMUNITY_Community 660|Community 660]]
 - [[_COMMUNITY_Community 661|Community 661]]
-- [[_COMMUNITY_Community 662|Community 662]]
-- [[_COMMUNITY_Community 663|Community 663]]
 - [[_COMMUNITY_Community 666|Community 666]]
 - [[_COMMUNITY_Community 668|Community 668]]
-- [[_COMMUNITY_Community 669|Community 669]]
-- [[_COMMUNITY_Community 670|Community 670]]
-- [[_COMMUNITY_Community 671|Community 671]]
-- [[_COMMUNITY_Community 672|Community 672]]
-- [[_COMMUNITY_Community 673|Community 673]]
 - [[_COMMUNITY_Community 674|Community 674]]
 - [[_COMMUNITY_Community 675|Community 675]]
 - [[_COMMUNITY_Community 678|Community 678]]
 - [[_COMMUNITY_Community 679|Community 679]]
 - [[_COMMUNITY_Community 680|Community 680]]
 - [[_COMMUNITY_Community 682|Community 682]]
-- [[_COMMUNITY_Community 683|Community 683]]
-- [[_COMMUNITY_Community 684|Community 684]]
-- [[_COMMUNITY_Community 685|Community 685]]
 - [[_COMMUNITY_Community 686|Community 686]]
 - [[_COMMUNITY_Community 687|Community 687]]
-- [[_COMMUNITY_Community 688|Community 688]]
 - [[_COMMUNITY_Community 691|Community 691]]
-- [[_COMMUNITY_Community 692|Community 692]]
-- [[_COMMUNITY_Community 693|Community 693]]
-- [[_COMMUNITY_Community 694|Community 694]]
 - [[_COMMUNITY_Community 695|Community 695]]
-- [[_COMMUNITY_Community 697|Community 697]]
-- [[_COMMUNITY_Community 698|Community 698]]
-- [[_COMMUNITY_Community 699|Community 699]]
 - [[_COMMUNITY_Community 702|Community 702]]
-- [[_COMMUNITY_Community 708|Community 708]]
 - [[_COMMUNITY_Community 709|Community 709]]
 - [[_COMMUNITY_Community 710|Community 710]]
-- [[_COMMUNITY_Community 712|Community 712]]
 - [[_COMMUNITY_Community 713|Community 713]]
-- [[_COMMUNITY_Community 717|Community 717]]
 - [[_COMMUNITY_Community 719|Community 719]]
 - [[_COMMUNITY_Community 722|Community 722]]
 - [[_COMMUNITY_Community 726|Community 726]]
-- [[_COMMUNITY_Community 727|Community 727]]
 - [[_COMMUNITY_Community 729|Community 729]]
-- [[_COMMUNITY_Community 730|Community 730]]
 - [[_COMMUNITY_Community 732|Community 732]]
-- [[_COMMUNITY_Community 734|Community 734]]
 - [[_COMMUNITY_Community 736|Community 736]]
-- [[_COMMUNITY_Community 738|Community 738]]
-- [[_COMMUNITY_Community 739|Community 739]]
-- [[_COMMUNITY_Community 740|Community 740]]
 - [[_COMMUNITY_Community 744|Community 744]]
-- [[_COMMUNITY_Community 745|Community 745]]
 - [[_COMMUNITY_Community 746|Community 746]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `authenticateAdmin()` - 994 edges
-2. `hasScope()` - 948 edges
-3. `queryOne()` - 645 edges
-4. `queryMany()` - 624 edges
-5. `query()` - 505 edges
-6. `ap()` - 303 edges
-7. `useToast()` - 222 edges
+1. `authenticateAdmin()` - 998 edges
+2. `hasScope()` - 952 edges
+3. `queryOne()` - 662 edges
+4. `queryMany()` - 635 edges
+5. `query()` - 508 edges
+6. `ap()` - 307 edges
+7. `useToast()` - 226 edges
 8. `controlPlanePool()` - 181 edges
-9. `parseBody()` - 170 edges
+9. `parseBody()` - 172 edges
 10. `withTransaction()` - 150 edges
 
 ## Surprising Connections (you probably didn't know these)
@@ -604,122 +572,122 @@
   public/ort/ort.jspi.bundle.min.mjs → tests/lib/brochure-pdf.test.ts
 - `run()` --calls--> `bp()`  [INFERRED]
   public/ort/ort.min.mjs → src/lib/shared/business-path.ts
-- `verifyWebhookSignature()` --calls--> `require`  [INFERRED]
-  src/lib/payments/razorpay-subscriptions.ts → public/ort/ort.node.min.mjs
-- `getProvisioningProvider()` --calls--> `require`  [INFERRED]
-  src/lib/provisioning/index.ts → public/ort/ort.node.min.mjs
+- `getRedisClient()` --calls--> `require`  [INFERRED]
+  src/lib/shared/redis.ts → public/ort/ort.node.min.mjs
+- `RevenueTrendChart()` --calls--> `X()`  [INFERRED]
+  src/components/admin/RevenueTrendChart.tsx → public/ort/ort.webgl.min.mjs
 
 ## Import Cycles
-- 2-file cycle: `src/lib/auth/auth-sessions.ts -> src/lib/shared/db.ts -> src/lib/auth/auth-sessions.ts`
 - 2-file cycle: `src/lib/auth/auth-sessions.ts -> src/lib/auth/session-binding.ts -> src/lib/auth/auth-sessions.ts`
+- 2-file cycle: `src/lib/auth/auth-sessions.ts -> src/lib/shared/db.ts -> src/lib/auth/auth-sessions.ts`
 - 3-file cycle: `src/lib/queries/dashboard.ts -> src/lib/shared/dashboard-insights.ts -> src/lib/queries/index.ts -> src/lib/queries/dashboard.ts`
 - 3-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/host-resolution.ts -> src/lib/tenancy/tenant-context.ts`
 - 3-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
-- 3-file cycle: `src/lib/auth/auth-sessions.ts -> src/lib/auth/session-binding.ts -> src/lib/shared/db.ts -> src/lib/auth/auth-sessions.ts`
 - 3-file cycle: `src/lib/auth/auth-sessions.ts -> src/lib/auth/session-binding.ts -> src/lib/auth/session-binding-shared.ts -> src/lib/auth/auth-sessions.ts`
-- 4-file cycle: `src/lib/integrations/resolve.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/lifecycle.ts -> src/lib/shipping/delhivery.ts -> src/lib/integrations/resolve.ts`
-- 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/integrations.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
+- 3-file cycle: `src/lib/auth/auth-sessions.ts -> src/lib/auth/session-binding.ts -> src/lib/shared/db.ts -> src/lib/auth/auth-sessions.ts`
 - 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/custom-domains.ts -> src/lib/tenant-registry/host-resolution.ts -> src/lib/tenancy/tenant-context.ts`
 - 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/custom-domains.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
 - 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/host-resolution.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
+- 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/integrations.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
 - 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/kyc.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
+- 4-file cycle: `src/lib/catalog/site-controls.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/lifecycle.ts -> src/lib/shipping/delhivery.ts -> src/lib/catalog/site-controls.ts`
+- 4-file cycle: `src/lib/integrations/resolve.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/lifecycle.ts -> src/lib/shipping/delhivery.ts -> src/lib/integrations/resolve.ts`
+- 4-file cycle: `src/lib/payments/wallet.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/lifecycle.ts -> src/lib/shipping/delhivery.ts -> src/lib/payments/wallet.ts`
+- 4-file cycle: `src/lib/shared/db.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/lifecycle.ts -> src/lib/shipping/delhivery.ts -> src/lib/shared/db.ts`
 - 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/lifecycle.ts -> src/lib/tenant-registry/host-resolution.ts -> src/lib/tenancy/tenant-context.ts`
 - 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/lifecycle.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
 - 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/owners.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
 - 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/provisioning.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
-- 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/social.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
-- 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/tenants.ts -> src/lib/tenant-registry/host-resolution.ts -> src/lib/tenancy/tenant-context.ts`
-- 4-file cycle: `src/lib/tenancy/tenant-context.ts -> src/lib/tenant-registry/index.ts -> src/lib/tenant-registry/tenants.ts -> src/lib/tenant-registry/shared.ts -> src/lib/tenancy/tenant-context.ts`
 
-## Communities (722 total, 43 thin omitted)
+## Communities (690 total, 42 thin omitted)
 
 ### Community 0 - "API Routes Hub"
 Cohesion: 0.01
-Nodes (233): addActionId(), addArgs(), addArgType(), addAttributes(), addDataType(), addDenotation(), addDim(), addDimParam() (+225 more)
+Nodes (237): addActionId(), addArgs(), addArgType(), addAttributes(), addDataType(), addDenotation(), addDim(), addDimParam() (+229 more)
 
 ### Community 1 - "Enrichment & Campaigns API"
-Cohesion: 0.06
-Nodes (28): AgentToolAction, AgentToolDisplayHints, AgentToolMatchStatus, AgentToolResult, AgentToolResultErr, AgentToolResultOk, err(), isAgentToolResult() (+20 more)
+Cohesion: 0.05
+Nodes (34): AgentToolAction, AgentToolDisplayHints, AgentToolMatchStatus, AgentToolResult, AgentToolResultErr, AgentToolResultOk, err(), isAgentToolResult() (+26 more)
 
 ### Community 2 - "Brands & Listing API"
-Cohesion: 0.05
-Nodes (37): Transaction, TYPE_COLORS, TYPE_LABELS, formatINR(), PO, Props, PurchaseOrdersMobileList(), CashSaleDetailClient() (+29 more)
+Cohesion: 0.07
+Nodes (32): POST(), mockResolve, params, getFeatureFlags(), IntentSchema, POST(), BuyNowIntentPayload, CartIntentPayload (+24 more)
 
 ### Community 3 - "Customer Action Components"
 Cohesion: 0.09
-Nodes (61): configNumber(), sectionCopyDefaults(), AboutEditor(), STAT_KEYS, BackInStockEditor(), BenefitsEditor(), KEYS, BlogTeaserEditor() (+53 more)
+Nodes (60): sectionCopyDefaults(), AboutEditor(), STAT_KEYS, BackInStockEditor(), BenefitsEditor(), KEYS, BlogTeaserEditor(), KEYS (+52 more)
 
 ### Community 4 - "Admin Add Pages"
-Cohesion: 0.12
-Nodes (43): GET(), adminPayload, mockAuth, mockHasScope, mockInsights, getCrmAttention(), buildCohorts(), buildEconomics() (+35 more)
+Cohesion: 0.11
+Nodes (45): GET(), adminPayload, mockAuth, mockHasScope, mockInsights, AnalyticsRange, getCrmAttention(), buildCohorts() (+37 more)
 
 ### Community 6 - "Product CRUD + Merchant Sync"
 Cohesion: 0.08
 Nodes (27): ADMIN, GET(), admin, mockAuth, mockGetCashflow, mockHasScope, mockQueryMany, mockQueryOne (+19 more)
 
 ### Community 7 - "Auth & Layout Routing"
-Cohesion: 0.14
-Nodes (35): AnalyticsDashboardClient(), DashboardMetrics, RANGES, GrowthInsights(), SOURCE_LABELS, OpsInsights(), ProductInsights(), B2bCard() (+27 more)
+Cohesion: 0.13
+Nodes (36): AnalyticsDashboardClient(), DashboardMetrics, RANGES, GrowthInsights(), SOURCE_LABELS, OpsInsights(), ProductInsights(), B2bCard() (+28 more)
 
 ### Community 8 - "Cash Sale & Audit"
 Cohesion: 0.09
-Nodes (51): mockAlreadySentForReference, mockBaseLayout, mockBuildUnsubscribeUrl, mockCampaign, mockCanSendMarketing, mockGenerateCouponForCampaign, mockGetAssignedCouponCode, mockGetCampaign (+43 more)
+Nodes (51): campaignMailFromAsync(), mockAlreadySentForReference, mockBaseLayout, mockBuildUnsubscribeUrl, mockCampaign, mockCanSendMarketing, mockGenerateCouponForCampaign, mockGetAssignedCouponCode (+43 more)
 
 ### Community 9 - "Admin Filters & Tables"
-Cohesion: 0.21
-Nodes (28): dispatch(), storeSignature(), getClient(), normalizePhone(), sendAbandonedCartWhatsApp(), sendBackInStockWhatsApp(), sendFeedbackRequestWhatsApp(), sendFestiveGreetingWhatsApp() (+20 more)
+Cohesion: 0.06
+Nodes (61): dispatch(), storeSignature(), mockQuery, loadSms(), messagesCreate, mockLog, loadWa(), messagesCreate (+53 more)
 
 ### Community 10 - "Business Account Pages"
 Cohesion: 0.04
 Nodes (86): addFieldFloat64(), addFloat32(), addFloat64(), addInt32(), addInt64(), addInt8(), addOffset(), capacity() (+78 more)
 
 ### Community 11 - "Address & Email API"
-Cohesion: 0.07
-Nodes (18): alloc(), byteLength(), Cn(), decode(), finishInferenceSessionBuffer(), finishSizePrefixed(), finishSizePrefixedInferenceSessionBuffer(), from() (+10 more)
+Cohesion: 0.06
+Nodes (18): alloc(), Cn(), decode(), finishInferenceSessionBuffer(), finishSizePrefixed(), finishSizePrefixedInferenceSessionBuffer(), Fr(), from() (+10 more)
 
 ### Community 13 - "Admin Agent Block UI"
-Cohesion: 0.07
-Nodes (37): d(), Ao(), computeTexture(), computeTextureWH(), createObjList(), createScalarList(), dl(), e() (+29 more)
+Cohesion: 0.24
+Nodes (10): d(), Fs(), Ht(), Le(), Nt(), Or(), fromImage(), fromMLTensor() (+2 more)
 
 ### Community 14 - "Admin Typeahead Search"
-Cohesion: 0.02
-Nodes (101): ADMIN, jsonReq(), patchReq(), SAMPLE_COUPON, ADMIN, ADMIN, jsonReq(), patchReq() (+93 more)
+Cohesion: 0.01
+Nodes (196): GET(), adminPayload, mockAuth, mockHasScope, mockQueryMany, sampleEvents, ADMIN, jsonReq() (+188 more)
 
 ### Community 15 - "Admin Audit & Financial"
-Cohesion: 0.10
-Nodes (36): CashflowTab(), CodOrder, CodRemittanceMobileList(), Props, statusClass(), statusLabel(), CodRemittanceTab(), PayablesPayModal() (+28 more)
+Cohesion: 0.06
+Nodes (49): BrandStatusToggle(), Props, CashflowTab(), CodOrder, CodRemittanceMobileList(), Props, statusClass(), statusLabel() (+41 more)
 
 ### Community 16 - "Activity & Cookie Domain"
 Cohesion: 0.04
 Nodes (86): addFieldFloat64(), addFloat32(), addFloat64(), addInt32(), addInt64(), addInt8(), addOffset(), capacity() (+78 more)
 
 ### Community 17 - "Label PDF & JWT API"
-Cohesion: 0.12
-Nodes (15): DefaultWarehouse, DelhiveryPageClient(), DeliveryMode, EligibleOrder, PickupRequest, STATUS_OPTIONS, STATUS_STYLES, todayIST() (+7 more)
+Cohesion: 0.06
+Nodes (34): bA(), color(), fA(), fi(), Ft(), gA(), jA(), KA() (+26 more)
 
 ### Community 18 - "Visitor Product Cards"
-Cohesion: 0.09
-Nodes (53): POST(), reschedule(), resolveDeliveryMode(), POST(), POST(), buildTenantPolicies(), TenantLegalInfo, generateTenantLegals() (+45 more)
+Cohesion: 0.06
+Nodes (85): POST(), reschedule(), POST(), POST(), BASE_RVP_PARAMS, mockGetBusinessValues, { mockQuery, mockFetch }, require (+77 more)
 
 ### Community 19 - "Razorpay Order Checkout"
 Cohesion: 0.01
-Nodes (150): ampResponse(), OPTIONS(), POST(), PAYLOAD, ENRICHMENT_ROW, PRODUCT_ROW, proposedTool, regularAdminPayload (+142 more)
+Nodes (123): ampResponse(), OPTIONS(), POST(), PAYLOAD, verifyReviewToken(), ADMIN, BATCHES, GET() (+115 more)
 
 ### Community 20 - "At-Risk Customers Card"
-Cohesion: 0.04
-Nodes (62): resolveOwnerSession(), BillingClient(), Interval, Plan, SUB_STATUS_LABEL, BillingPage(), getKycDocumentStream(), getS3Client() (+54 more)
+Cohesion: 0.05
+Nodes (68): issueOwnerSession(), ownerCookieOptions(), resolveOwnerSession(), setOwnerCookie(), bindingContext(), extractSessionSignals(), readCookie(), SignalRequest (+60 more)
 
 ### Community 21 - "Brand Components"
-Cohesion: 0.05
-Nodes (50): am(), arraysEqual(), bcastIndex(), bcastMatmulIndex(), binaryVecFunctions(), coordsToOffset(), copyVec(), decodeFloat32() (+42 more)
+Cohesion: 0.04
+Nodes (70): am(), Ao(), arraysEqual(), bcastIndex(), bcastMatmulIndex(), binaryVecFunctions(), computeTexture(), computeTextureWH() (+62 more)
 
 ### Community 22 - "Admin Auth & Session/MFA"
 Cohesion: 0.03
 Nodes (142): a(), actionId(), args(), argsLength(), argType(), attributes(), attributesLength(), buildGraphFromOrtFormat() (+134 more)
 
 ### Community 23 - "Business Header & Login"
-Cohesion: 0.01
-Nodes (151): addItemToPoll(), adjustPadAndReturnShape(), adjustPadsBasedOnAutoPad(), Ai(), areEqual(), Au(), bcastIndex(), bcastMatmulIndex() (+143 more)
+Cohesion: 0.06
+Nodes (32): bcastIndex(), bcastMatmulIndex(), binaryVecFunctions(), coordsToOffset(), copyVec(), decodeFloat32(), encodeFloat32(), getColorAsFloat() (+24 more)
 
 ### Community 24 - "Product Deactivation"
 Cohesion: 0.03
@@ -730,20 +698,20 @@ Cohesion: 0.03
 Nodes (140): a(), actionId(), args(), argsLength(), argType(), attributes(), attributesLength(), buildGraphFromOrtFormat() (+132 more)
 
 ### Community 26 - "Add Product Page"
-Cohesion: 0.05
-Nodes (43): areEqual(), au(), Bo(), calc(), calcMatMulShape(), calcShape(), calculateReshapedDims(), cI() (+35 more)
+Cohesion: 0.04
+Nodes (51): areEqual(), au(), Bo(), calc(), calcMatMulShape(), calcShape(), calculateReshapedDims(), cI() (+43 more)
 
 ### Community 27 - "Labels & Barcode PDF"
-Cohesion: 0.07
-Nodes (46): heroSlideHref(), buildProductRowSql(), getConfiguredSections(), planDataNeeds(), planProductRows(), ProductRowQueryDeps, SourceClause, loadSectionExtras() (+38 more)
+Cohesion: 0.05
+Nodes (67): buildProductRowSql(), getConfiguredSections(), ProductRowQueryDeps, SourceClause, categoryTree(), getBackInStock(), getBundles(), getCategoryTabs() (+59 more)
 
 ### Community 28 - "Agent Actions & Mail Audit"
-Cohesion: 0.01
-Nodes (260): DELETE(), loadOwnedOrder(), POST(), mockResolve, params, cashSaleItemSchema, cashSaleSchema, POST() (+252 more)
+Cohesion: 0.03
+Nodes (91): cashSaleItemSchema, cashSaleSchema, POST(), VALID_BODY, VALID_PAYMENT_MODES, calculateGST(), generateInvoiceNumber(), getNextInvoiceSequence() (+83 more)
 
 ### Community 29 - "GST & Invoice PDF"
-Cohesion: 0.03
-Nodes (85): AdminStatsSkeletonProps, GRID_COLS, VIEWS, MobileCard(), MobileCardProps, VIEWS, PAD, PERIODS (+77 more)
+Cohesion: 0.04
+Nodes (63): AdminStatsSkeletonProps, GRID_COLS, BrochureButton(), VIEWS, Category, Product, VIEWS, PAD (+55 more)
 
 ### Community 30 - "Admin Agent Tooling"
 Cohesion: 0.18
@@ -753,97 +721,93 @@ Nodes (21): box(), buildQRCodes(), clip1(), discountPct(), drawColumnHeader(), d
 Cohesion: 0.05
 Nodes (43): dependencies, @aws-sdk/client-apigatewaymanagementapi, @aws-sdk/client-rds, @aws-sdk/client-s3, @aws-sdk/client-secrets-manager, @aws-sdk/rds-signer, bcrypt, blurhash (+35 more)
 
-### Community 32 - "Stock Adjust & Shelf"
-Cohesion: 0.03
-Nodes (31): AwsProvisioningProvider, isAlreadyExists(), AppInstanceArgs, CreateDbInstanceArgs, ProvisioningProvider, delhivery, legals, poolAuto (+23 more)
-
 ### Community 33 - "Traffic Analytics"
 Cohesion: 0.06
 Nodes (22): BROWSER_COLORS_HEX, BrowserRow, ConversionLaggardRow, DayRow, DAYS_OPTIONS, DEVICE_COLORS, DEVICE_ICONS, DeviceRow (+14 more)
 
 ### Community 34 - "Direct Order API"
-Cohesion: 0.05
-Nodes (46): Props, GET(), mockSettings, mockQueryMany, nullDims, defaultSettings, mockApplyRules, mockCheckServiceability (+38 more)
+Cohesion: 0.04
+Nodes (59): Props, BusinessValues, GET(), mockSettings, ENUMS, PACKAGE_TYPES, mockQueryMany, nullDims (+51 more)
 
 ### Community 35 - "Guest User & Return Email"
-Cohesion: 0.13
-Nodes (21): AdminSurface(), CampaignView(), CouponView(), DashboardView(), DocsView(), HEALTH, OrderView(), Pill() (+13 more)
+Cohesion: 0.08
+Nodes (33): AdminSurface(), CampaignView(), CouponView(), DashboardView(), DocsView(), HEALTH, OrderView(), Pill() (+25 more)
 
 ### Community 36 - "Categories CRUD + Icons"
-Cohesion: 0.07
-Nodes (45): cooldownDays(), cooldownMinutes(), DURATION_UNITS, DurationUnit, fromMinutes(), hours(), minutes(), minutesToInterval() (+37 more)
+Cohesion: 0.06
+Nodes (59): generateBirthdayToken(), cooldownDays(), cooldownMinutes(), days(), DURATION_UNITS, DurationUnit, fromMinutes(), hours() (+51 more)
 
 ### Community 37 - "Abandoned Cart Emails"
-Cohesion: 0.08
-Nodes (29): ADMIN, mockAuth, mockGetClient, mockHasScope, mockQuery, mockQueryMany, mockQueryOne, mockWithTransaction (+21 more)
+Cohesion: 0.12
+Nodes (17): currentBrandName(), currentStoreUrl(), customerMailFrom(), platformAdminEmail(), platformBrandName(), resolveCurrentTenant(), tenantNoReplyAddress(), GET() (+9 more)
 
 ### Community 38 - "Admin Agent Mobile Nav"
-Cohesion: 0.07
-Nodes (30): RANGES, SEGMENT_LABEL, HealthFactorsCard(), scoreStr(), IntentCard(), ServiceCard(), WorkloadCard(), hoursStr() (+22 more)
+Cohesion: 0.08
+Nodes (29): RANGES, SEGMENT_LABEL, SEGMENT_LABEL, HealthFactorsCard(), scoreStr(), IntentCard(), ServiceCard(), WorkloadCard() (+21 more)
 
 ### Community 39 - "Vision OCR"
-Cohesion: 0.09
-Nodes (19): aggregateSignals(), clamp(), embeddingSignal(), extract_quotation_lines_from_attachment, get_cash_sale, get_invoice, get_quotation, haikuTiebreakerScore() (+11 more)
+Cohesion: 0.06
+Nodes (29): aggregateSignals(), clamp(), embeddingSignal(), extract_quotation_lines_from_attachment, get_cash_sale, get_invoice, get_quotation, haikuTiebreakerScore() (+21 more)
 
 ### Community 40 - "AWS Infrastructure"
 Cohesion: 0.06
 Nodes (36): Admin Panel, AWS S3, AWS SES, AWS CloudFront, database/migrations, Delhivery Shipping, Delhivery Status Sync (10min), deploy Directory (+28 more)
 
 ### Community 41 - "Product Search Ranking"
-Cohesion: 0.04
-Nodes (42): PH, BusinessAccountMobileHeader(), BusinessAccountMobileTabBar(), backLinkMap, BusinessAccountNavBar(), navItems, BusinessLandingPage(), generateMetadata() (+34 more)
+Cohesion: 0.10
+Nodes (25): secret(), verifyPortalToken(), GET(), BASIC, { mockQuery, mockQueryOne, mockGetTenantPlan, mockPool }, GET(), decryptPortalSecret(), encrypt() (+17 more)
 
 ### Community 43 - "Business Price Badge"
-Cohesion: 0.10
-Nodes (19): getCountdownDeal(), configId(), PreviewItem, resolveAboutStats(), KIND_LABEL, PreviewKind, PreviewResponse, aboutItems() (+11 more)
+Cohesion: 0.15
+Nodes (23): heroSlideHref(), planDataNeeds(), planProductRows(), loadSectionExtras(), defaultAboutCopy(), productRowKey(), resolveAboutStats(), listOffersByIds() (+15 more)
 
 ### Community 44 - "Misassigned Products Banner"
-Cohesion: 0.05
-Nodes (46): addDependency(), buildGraph(), buildGraphFromOnnxFormat(), checkIsAcyclic(), constructor(), createDefaultGeometry(), createVertexbuffer(), deleteNode() (+38 more)
+Cohesion: 0.09
+Nodes (22): buildGraph(), buildGraphFromOnnxFormat(), createScalarList(), ct(), e(), eo(), fromProto(), getValue() (+14 more)
 
 ### Community 45 - "Unit Rules Panel"
 Cohesion: 0.03
-Nodes (110): addSymbol(), build(), canReuseTensor(), captureBegin(), captureEnd(), cast(), clearActiveTextures(), compute() (+102 more)
+Nodes (83): addSymbol(), begin(), beginTimer(), build(), canReuseTensor(), captureBegin(), captureEnd(), clearActiveTextures() (+75 more)
 
 ### Community 46 - "Legal & Policy Pages"
-Cohesion: 0.15
-Nodes (52): POST(), adminMailFrom(), currentAdminBaseUrl(), currentBrandNameAsync(), customerMailFromAsync(), platformAdminEmail(), storeAddressLine(), storeBaseUrlAsync() (+44 more)
+Cohesion: 0.18
+Nodes (47): POST(), adminMailFrom(), currentAdminBaseUrl(), currentBrandNameAsync(), customerMailFromAsync(), storeAddressLine(), storeBaseUrlAsync(), storeContactLine() (+39 more)
 
 ### Community 47 - "Email Campaigns Marketing"
 Cohesion: 0.01
-Nodes (185): POST(), AUTH_USER, POST(), listActiveSessions(), revokeAllForPrincipal(), revokeSession(), authenticateBusiness(), authenticateUser() (+177 more)
+Nodes (197): adminPayload, { queryMock, queryOneMock, queryManyMock, queryCountMock, authenticateAdminMock }, sampleBrand, sampleBrandList, ENRICHMENT_ROW, PRODUCT_ROW, proposedTool, regularAdminPayload (+189 more)
 
 ### Community 48 - "Account Layout & Search"
-Cohesion: 0.13
-Nodes (34): PrincipalType, bindingMode, BindingVerdict, canRegisterKey(), consumeRefresh(), evaluateKeyBinding(), bindingGate(), INITIAL (+26 more)
+Cohesion: 0.06
+Nodes (56): adminCookieDomainForHost(), adminCookieNameForHost(), isTenantAdminHost(), PrincipalType, bindingMode, BindingVerdict, canRegisterKey(), consumeRefresh() (+48 more)
 
 ### Community 49 - "Customer Health API"
 Cohesion: 0.05
-Nodes (33): EditorImage, ImageGalleryEditor(), Props, SPINNER(), Brand, BRAND_PREFIX_MAP, BRAND_STOP, BsEntry (+25 more)
+Nodes (29): Brand, BRAND_PREFIX_MAP, BRAND_STOP, BsEntry, BsGrain, Category, generateSku(), getBrandPrefix() (+21 more)
 
 ### Community 50 - "Shelving & Stock Assignment"
-Cohesion: 0.06
-Nodes (36): mockAdmin, mockGetCampaign, mockGetClient, mockGetScenario, mockQuery, mockQueryMany, mockQueryOne, mockValidateScenarioSql (+28 more)
+Cohesion: 0.05
+Nodes (45): mockAdmin, mockGetCampaign, mockGetClient, mockGetScenario, mockQuery, mockQueryMany, mockQueryOne, mockValidateScenarioSql (+37 more)
 
 ### Community 51 - "MCP Server ADR"
 Cohesion: 0.08
 Nodes (27): ADR-0002 MCP Server, src/lib/ai-assistant.ts, AWS RDS, Claude Desktop Client, Cursor MCP Client, src/lib/db.ts, findSimilarProductIds Function, Live RDS Pool (+19 more)
 
 ### Community 52 - "Root Layout & Theme"
-Cohesion: 0.09
-Nodes (39): addSymbol(), canReuseTensor(), computeKernel(), createKernel(), createTemporaryTensor(), currentKernelCustomData(), destroy(), dispose() (+31 more)
+Cohesion: 0.08
+Nodes (43): ho(), addSymbol(), canReuseTensor(), computeKernel(), createKernel(), createTemporaryTensor(), currentKernelCustomData(), destroy() (+35 more)
 
 ### Community 53 - "Financial Client"
-Cohesion: 0.12
-Nodes (14): BusinessOrderDetailPage(), CONTINUOUS_UNITS, PH, statusLabel(), AddressChangeInfo, AddressLike, MATCH_FIELDS, Props (+6 more)
+Cohesion: 0.07
+Nodes (14): getBusinessDiscountMap(), getBusinessDiscountPct(), AUTH_USER, CREATED_ORDER, MOCK_USER, AUTH_USER, CREATED_ORDER, MOCK_USER (+6 more)
 
 ### Community 54 - "AI Client & Schema"
 Cohesion: 0.08
-Nodes (28): buildSystemPrompt(), formatProductList(), formatToolResult(), postSchema, ProductRow, resolveIntent(), sanitizeUserInput(), SELF_FORMATTING_TOOLS (+20 more)
+Nodes (27): buildSystemPrompt(), formatProductList(), formatToolResult(), postSchema, ProductRow, resolveIntent(), sanitizeUserInput(), SELF_FORMATTING_TOOLS (+19 more)
 
 ### Community 55 - "Packing Slip PDF"
-Cohesion: 0.08
-Nodes (33): fieldIsActive(), fieldParamNames(), Props, BaseUnitFormProps, BaseUnitRow(), BaseUnitRowProps, DIMENSIONS, ProductUnit (+25 more)
+Cohesion: 0.10
+Nodes (29): BaseUnitFormProps, BaseUnitRow(), BaseUnitRowProps, DIMENSIONS, ProductUnit, ProductUnitRule, FormMode, Props (+21 more)
 
 ### Community 56 - "Email Coupon Resolver"
 Cohesion: 0.07
@@ -862,24 +826,24 @@ Cohesion: 0.14
 Nodes (17): Admin Agent, admin_agent_actions Table, POST /api/admin/agent/actions/[id]/approve, POST /api/admin/agent/chat, admin_agent_messages Table, AdminAgentModal Component, src/lib/admin-agent/tools.ts, ADR-0003 Admin Agent (+9 more)
 
 ### Community 60 - "Custom Marketing Scenarios"
-Cohesion: 0.11
-Nodes (22): mockQuery, loadSms(), messagesCreate, mockLog, loadWa(), messagesCreate, mockLog, logMessage() (+14 more)
+Cohesion: 0.09
+Nodes (21): cache, FeatureFlags, invalidateSiteControlsCache(), KEYS, SiteControls, StorefrontContent, StoreIdentity, mockQueryMany (+13 more)
 
 ### Community 62 - "Email Campaigns Builder"
-Cohesion: 0.05
-Nodes (65): Mn(), II(), pn(), init(), allocate(), allocateTexture(), attachFramebuffer(), bindAttributes() (+57 more)
+Cohesion: 0.04
+Nodes (70): Mn(), II(), pn(), init(), allocate(), allocateTexture(), attachFramebuffer(), bindAttributes() (+62 more)
 
 ### Community 63 - "Search Vector Clauses"
 Cohesion: 0.06
-Nodes (29): generateReviewToken(), mockFetchProductImg, mockFetchUser, mockGenerateReviewToken, mockQuery, mockQueryMany, mockRenderCampaignEmail, mockRenderHeroProduct (+21 more)
+Nodes (38): generateReviewToken(), mockFetchProductImg, mockFetchUser, mockGenerateReviewToken, mockQuery, mockQueryMany, mockRenderCampaignEmail, mockRenderHeroProduct (+30 more)
 
 ### Community 64 - "Homepage & Categories"
 Cohesion: 0.02
-Nodes (148): POST(), AdminJWTPayload, ALLOWED, POST(), AUTH_USER, applyDraftPatch(), withHomepageDraft(), applyPct() (+140 more)
+Nodes (119): POST(), galleryImageUrl(), GET(), mockAuth, mockQueryMany, mockQueryOne, mockDelete, getStage() (+111 more)
 
 ### Community 65 - "Module: sql-safety.ts"
-Cohesion: 0.12
-Nodes (28): buildId(), generateLotNumber(), generateSerialNumber(), generateSerialRun(), idPrefix(), isStepMultiple(), num(), QtyValidationResult (+20 more)
+Cohesion: 0.16
+Nodes (18): buildId(), generateLotNumber(), generateSerialNumber(), generateSerialRun(), idPrefix(), isStepMultiple(), num(), QtyValidationResult (+10 more)
 
 ### Community 66 - "Module: call_admin_api Case"
 Cohesion: 0.12
@@ -890,8 +854,8 @@ Cohesion: 0.06
 Nodes (44): rP(), allocate(), allocateTexture(), attachFramebuffer(), begin(), beginTimer(), bindAttributes(), bindOutput() (+36 more)
 
 ### Community 68 - "Module: quotation-pdf.ts"
-Cohesion: 0.09
-Nodes (30): assignmentSchema, bodySchema, POST(), resolveGrainUnit(), serialSlotsForBaseQuantity(), adjustStock(), syncCentralInventory(), syncPerishableStock() (+22 more)
+Cohesion: 0.15
+Nodes (19): GET(), GET(), mockLive, mockResolve, mockAuth, mockLive, mockResolve, visit() (+11 more)
 
 ### Community 69 - "Module: shipping.ts"
 Cohesion: 0.10
@@ -899,7 +863,7 @@ Nodes (19): 1. Tenant Foundation (earlier sessions), 2. Live-Test Fixes (2026-08
 
 ### Community 70 - "Module: reEmbedProduct"
 Cohesion: 0.11
-Nodes (29): MOCK_VEC, mockAiEmbed, { mockClientQuery, mockClientRelease, mockPoolConnect, mockPoolOn }, { mockResolveTenantId }, semanticSearch(), mockEmbed, mockRunWithHnswTuning, mockStorefrontAiAllowed (+21 more)
+Nodes (30): MOCK_VEC, mockAiEmbed, { mockClientQuery, mockClientRelease, mockPoolConnect, mockPoolOn }, { mockResolveTenantId }, semanticSearch(), mockEmbed, mockRunWithHnswTuning, mockStorefrontAiAllowed (+22 more)
 
 ### Community 71 - "Module: auth.ts Library"
 Cohesion: 0.12
@@ -911,19 +875,19 @@ Nodes (24): AdminRecipient, GET(), mockCollect, mockNarrate, mockQuery, mockQuer
 
 ### Community 73 - "Module: getFilteredProducts"
 Cohesion: 0.06
-Nodes (20): alloc(), byteLength(), Ce(), Cr(), ct(), decode(), et(), from() (+12 more)
+Nodes (24): alloc(), byteLength(), Ce(), Cr(), decode(), et(), finishInferenceSessionBuffer(), finishSizePrefixed() (+16 more)
 
 ### Community 74 - "Module: rate-limit.ts"
-Cohesion: 0.15
-Nodes (22): OpenOrdersBlockError, buildVariantImages(), fetchImages(), findOrCreateProduct(), ImportOutcome, lookup(), ResolvedRefs, resolveRefs() (+14 more)
+Cohesion: 0.16
+Nodes (20): OpenOrdersBlockError, buildVariantImages(), fetchImages(), findOrCreateProduct(), ImportOutcome, lookup(), ResolvedRefs, resolveRefs() (+12 more)
 
 ### Community 75 - "Module: AdminTasksClient.tsx"
-Cohesion: 0.04
-Nodes (55): adminCookieDomainForHost(), adminCookieNameForHost(), isTenantAdminHost(), isPassiveAdminRequest(), PASSIVE_EXACT, PASSIVE_PREFIXES, getScopeForPath(), SPECIAL_CASED (+47 more)
+Cohesion: 0.05
+Nodes (45): isPassiveAdminRequest(), PASSIVE_EXACT, PASSIVE_PREFIXES, getScopeForPath(), SPECIAL_CASED, { mockQuery, mockGetCaCert }, ADMIN_PAYLOAD, BIZ_PAYLOAD (+37 more)
 
 ### Community 76 - "Module: AdminUserActions.tsx"
 Cohesion: 0.10
-Nodes (20): NO_STATS, TIER_BADGE, getLoyaltySummary(), listLoyaltyMembers(), listRewardCoupons(), LoyaltyAccount, LoyaltyLedgerEntry, LoyaltyMember (+12 more)
+Nodes (29): LoyaltyPage(), NO_STATS, TIER_BADGE, getLoyaltySummary(), listLoyaltyMembers(), listRewardCoupons(), LoyaltyAccount, LoyaltyLedgerEntry (+21 more)
 
 ### Community 77 - "Module: ai-assistant.ts"
 Cohesion: 0.19
@@ -931,7 +895,7 @@ Nodes (22): BATCH_SPEC, batchGen, bwipjs, clip(), drawPrice(), drawWarningIcons(
 
 ### Community 78 - "Module: page.tsx"
 Cohesion: 0.04
-Nodes (90): addFieldFloat64(), addFloat32(), addFloat64(), addInt32(), addInt64(), addInt8(), addOffset(), capacity() (+82 more)
+Nodes (86): addFieldFloat64(), addFloat32(), addFloat64(), addInt32(), addInt64(), addInt8(), addOffset(), capacity() (+78 more)
 
 ### Community 79 - "Module: Re-ranker A/B Test"
 Cohesion: 0.15
@@ -942,16 +906,16 @@ Cohesion: 0.21
 Nodes (14): actions/checkout@v4, actions/setup-node@v4, Jeffi Stores CI Pipeline, Next.js Build Job, Check Migrations Job, Lint Job, DB Migrations Job, Pipeline Summary Job (+6 more)
 
 ### Community 81 - "Module: CancelReview.tsx"
-Cohesion: 0.07
-Nodes (34): POST(), BASE_VCR, PARAMS, USER, handleLegacyOrderId(), AUTH_USER, MOCK_RAZORPAY_ORDER, RazorpayCreds (+26 more)
+Cohesion: 0.15
+Nodes (14): POST(), BASE_VCR, PARAMS, USER, applyVariantChange(), isRazorpayEnabled(), recordRefundSettlement(), reverseTransfersForRefund() (+6 more)
 
 ### Community 82 - "Module: DeliverySettingsForm.tsx"
 Cohesion: 0.11
 Nodes (27): Chapter, CHAPTERS, Flow, FLOW_CHAPTERS, FlowId, FLOWS, PRODUCTS, SEED_METRICS (+19 more)
 
 ### Community 83 - "Module: postSchema"
-Cohesion: 0.07
-Nodes (18): CartUpsellRow(), idKey(), Testimonial, CardProps, productCardProps(), BrandCarouselProps, CategoryGridProps, CategoryTabData (+10 more)
+Cohesion: 0.10
+Nodes (15): CartUpsellRow(), idKey(), CardProps, productCardProps(), BrandCarouselProps, CategoryTabData, CategoryTabsProps, CountdownDealBanner() (+7 more)
 
 ### Community 84 - "Module: DelhiveryTracking.tsx"
 Cohesion: 0.07
@@ -959,19 +923,19 @@ Nodes (32): cast(), computeStrides(), createObjectOffset(), createObjectOffsetLi
 
 ### Community 85 - "Module: route.ts"
 Cohesion: 0.10
-Nodes (24): ADMIN, irnResult, mockAuth, mockCancelIRN, mockGenerateIRN, mockHasScope, mockIsEInvoiceConfigured, mockQueryMany (+16 more)
+Nodes (26): DELETE(), POST(), ADMIN, irnResult, mockAuth, mockCancelIRN, mockGenerateIRN, mockHasScope (+18 more)
 
 ### Community 86 - "Module: FormsPreview.tsx"
 Cohesion: 0.03
 Nodes (36): du(), additionalImplementations(), adjustPadAndReturnShape(), adjustPadsBasedOnAutoPad(), alloc(), appendVariableUniforms(), calcMatMulShape(), calcShape() (+28 more)
 
 ### Community 87 - "Module: page.tsx"
-Cohesion: 0.08
-Nodes (26): mockQueryMany, NO_ORDERS, ONE_ORDER, TWO_ORDERS, BotAction, BotChip, BotNavLink, BotOrderCard (+18 more)
+Cohesion: 0.05
+Nodes (38): AdminSupportChat(), Message, Props, QUICK_REPLIES, renderBotText(), Session, GET(), AUTH_USER (+30 more)
 
 ### Community 88 - "Module: OrderDetailPage"
-Cohesion: 0.07
-Nodes (32): AdminAgentBlocks(), UiBlock, AdminAgentMessage(), Block, ENTITY_ROUTES, parseBlocks(), renderBold(), renderInline() (+24 more)
+Cohesion: 0.14
+Nodes (14): UiBlock, ChatTurn, AdminAgentPage(), ChatTurn, ConversationListItem, Picker, PickerOption, ProposedAction (+6 more)
 
 ### Community 89 - "Module: bootstrap.min.js"
 Cohesion: 0.08
@@ -987,43 +951,43 @@ Nodes (34): Admin Panel — `/admin`, App, Auth / JWT / OAuth, AWS, Branches & P
 
 ### Community 92 - "Module: ProductLabelModal.tsx"
 Cohesion: 0.09
-Nodes (30): debitWalletForAwb(), settleDelhiveryCostToWallet(), chargeableGrams(), fetchDelhiveryInvoiceCharges(), activityMap(), AMBIGUOUS_TOP, directMap(), isAdvancement() (+22 more)
+Nodes (20): mockAuth, mockQueryMany, mockQueryOne, SUPER_ADMIN, buildGSTR1CSV(), buildHsnSummary(), GET(), REGULAR_ADMIN (+12 more)
 
 ### Community 93 - "Module: ProductAnalyticsClient.tsx"
-Cohesion: 0.11
-Nodes (17): gt(), fromPinnedBuffer(), constructor(), initialize(), onRunStart(), processTerm(), setQueryType(), createInferenceSessionHandler() (+9 more)
+Cohesion: 0.25
+Nodes (8): gt(), fromPinnedBuffer(), constructor(), initialize(), onRunStart(), processTerm(), setQueryType(), fromPinnedBuffer()
 
 ### Community 94 - "Module: Approve Route Handler"
 Cohesion: 0.17
 Nodes (13): Approve Route Handler, adjust_inventory Case, send_quotation_email Case, Quotation Resend Email Endpoint, getClient Function, logStockMovement, query Function, queryMany Function (+5 more)
 
 ### Community 95 - "Module: FormsTopNav.tsx"
-Cohesion: 0.09
-Nodes (40): hasPlanScope(), isStaffDenied(), requireStaff(), StaffScope, claims, mockHasPlanScope, mockResolveAdminByEmail, mockResolveTenantId (+32 more)
+Cohesion: 0.13
+Nodes (29): hasPlanScope(), isStaffDenied(), requireStaff(), StaffScope, addAttachment(), attachmentKind(), AUDIO_TYPES, createNote() (+21 more)
 
 ### Community 96 - "Module: RFQDetailClient.tsx"
-Cohesion: 0.18
-Nodes (22): mockQueryOne, Channel, dispatch(), getRecipient(), notifyOrderCancelled(), notifyOrderConfirmed(), notifyOrderDelivered(), notifyOrderShipped() (+14 more)
+Cohesion: 0.22
+Nodes (16): ALL_ORDER_STATUSES, OrderPatchSchema, mockQueryOne, hasPendingAddressChange(), Channel, dispatch(), getRecipient(), notifyOrderCancelled() (+8 more)
 
 ### Community 97 - "Module: sendOTPEmail"
-Cohesion: 0.09
-Nodes (17): CardProps, GoogleOAuthPopupOptions, GoogleOAuthResult, openGoogleOAuthPopup(), AdminLogin(), Step, isValidDob(), ALL_CHANNEL_OPTIONS (+9 more)
+Cohesion: 0.18
+Nodes (15): POST(), CartLine, POST(), POST(), CartLine, POST(), CART, mockAiChat (+7 more)
 
 ### Community 98 - "Module: pricing-engine.ts"
-Cohesion: 0.10
-Nodes (31): checkSendOtpRateLimit(), checkSendPhoneOtpRateLimit(), generateOTP(), phoneKey(), recordSendOtp(), recordSendPhoneOtp(), RESEND_COOLDOWNS_SEC, storeOTP() (+23 more)
+Cohesion: 0.07
+Nodes (45): CertGateResult, enforceCertGate(), PLATFORM_OWNER_EMAIL, resolveAdminByEmail(), ResolvedAdmin, serialToHex(), issueMfaTicket(), checkSendOtpRateLimit() (+37 more)
 
 ### Community 99 - "Module: server.js"
-Cohesion: 0.18
-Nodes (23): matchWithBackoff(), CatalogMatch, deleteListingsItem(), extractSpecTokens(), getAccessToken(), getListingsItem(), getListingsRestrictions(), getMarketplaceId() (+15 more)
+Cohesion: 0.12
+Nodes (44): amazonConfigured(), CatalogMatch, deleteListingsItem(), extractSpecTokens(), getAccessToken(), getListingsItem(), getListingsRestrictions(), getMarketplaceId() (+36 more)
 
 ### Community 100 - "Module: page.tsx"
 Cohesion: 0.06
 Nodes (45): p(), Jy(), addDependency(), b0(), buildGraph(), buildGraphFromOnnxFormat(), checkIsAcyclic(), constructor() (+37 more)
 
 ### Community 102 - "Module: ChangePasswordForm.tsx"
-Cohesion: 0.10
-Nodes (24): backInStockWishlist, Params, Row, campaign, defaultParams, mockFetchUser, mockQuery, mockQueryMany (+16 more)
+Cohesion: 0.12
+Nodes (20): backInStockWishlist, Params, Row, campaign, defaultParams, mockFetchUser, mockQuery, mockQueryMany (+12 more)
 
 ### Community 103 - "Module: Razer Boot Chain"
 Cohesion: 0.15
@@ -1034,12 +998,12 @@ Cohesion: 0.20
 Nodes (12): EC2 EBS Volume 20GB, EC2 jeffi-stores-app, EC2 Security Group, Elastic IP 32.196.38.130, EventBridge Scheduler, Let's Encrypt SSL Certbot, RDS jeffi-stores-db, PostgreSQL 16.13 Engine (+4 more)
 
 ### Community 105 - "Module: BrandDetailPage"
-Cohesion: 0.09
-Nodes (72): asUint8Array(), bufferHasIdentifier(), dstArgIndex(), elemType(), getRootAsArgTypeAndIndex(), getRootAsAttribute(), getRootAsDeprecatedKernelCreateInfos(), getRootAsDeprecatedNodeIndexAndKernelDefHash() (+64 more)
+Cohesion: 0.08
+Nodes (73): asUint8Array(), bufferHasIdentifier(), dstArgIndex(), getRootAsArgTypeAndIndex(), getRootAsAttribute(), getRootAsDeprecatedKernelCreateInfos(), getRootAsDeprecatedNodeIndexAndKernelDefHash(), getRootAsDeprecatedSessionState() (+65 more)
 
 ### Community 106 - "Module: DateTimePicker.tsx"
-Cohesion: 0.09
-Nodes (30): buildDisplayCode(), createLocation(), createWarehouse(), decrementNonPerishableShelfStock(), deleteLocation(), getLocation(), getOrCreateOpenShelf(), getWarehouse() (+22 more)
+Cohesion: 0.02
+Nodes (124): ADMIN, grainUnitCache(), unitRunner, assignmentSchema, bodySchema, POST(), resolveGrainUnit(), serialCountForBaseQuantity() (+116 more)
 
 ### Community 107 - "Module: actions/github-script@v7"
 Cohesion: 0.18
@@ -1050,24 +1014,24 @@ Cohesion: 0.06
 Nodes (30): 0. What we have today (the honest starting point), 1.1 The tenant addressing collision (must decide first), 1.2 The four plans (feature tiering via the existing scope system), 1.3 Pricing model (AWS cost + 50%), 2.1 Tenant Registry (the new source of truth), 2.2 Request-scoped tenant context (the core code change), 2.3 Compute ladder (per the PDF), 2.4 CNAME, TLS & the S3 question (+22 more)
 
 ### Community 109 - "Module: CustomerMailerPanel.tsx"
-Cohesion: 0.08
-Nodes (73): asUint8Array(), bufferHasIdentifier(), dstArgIndex(), getRootAsArgTypeAndIndex(), getRootAsAttribute(), getRootAsDeprecatedKernelCreateInfos(), getRootAsDeprecatedNodeIndexAndKernelDefHash(), getRootAsDeprecatedSessionState() (+65 more)
+Cohesion: 0.09
+Nodes (72): asUint8Array(), bufferHasIdentifier(), dstArgIndex(), elemType(), getRootAsArgTypeAndIndex(), getRootAsAttribute(), getRootAsDeprecatedKernelCreateInfos(), getRootAsDeprecatedNodeIndexAndKernelDefHash() (+64 more)
 
 ### Community 110 - "Module: CustomerNotes.tsx"
-Cohesion: 0.11
-Nodes (24): GET(), querySchema, GET(), get(), buildProductCardSql(), CategoryTab, categoryTree(), CountdownDealData (+16 more)
+Cohesion: 0.23
+Nodes (10): GET(), querySchema, GET(), get(), buildProductCardSql(), alsoViewedWith(), frequentlyBoughtWith(), cardPropsFor() (+2 more)
 
 ### Community 111 - "Module: CustomerTimeline.tsx"
 Cohesion: 0.10
-Nodes (14): ProductOfferWithCount, offerHref(), ProductOffer, slugifyOffer(), PromoBannerProps, mockQueryMany, BlurhashCanvas(), HeroSlide (+6 more)
+Nodes (24): cast(), computeStrides(), createObjectOffset(), createObjectOffsetList(), createStructOffsetList(), createTextureData(), createTextureDataFromLayoutBindTensor(), createTextureDataFromTexture() (+16 more)
 
 ### Community 112 - "Module: route.ts"
-Cohesion: 0.27
-Nodes (9): MOCK_PAYLOAD, baseUrl(), EWayBillPayload, EWayBillResult, generateEWayBill(), getAuthToken(), isConfigured(), isEWayBillConfigured() (+1 more)
+Cohesion: 0.15
+Nodes (17): POST(), Schema, ADMIN, BASE_ORDER, EWB_RESULT, ORDER_ITEMS, PARAMS, SETTINGS_ROWS (+9 more)
 
 ### Community 113 - "Module: QuantityInput.tsx"
-Cohesion: 0.09
-Nodes (71): asUint8Array(), dstArgIndex(), getRootAsArgTypeAndIndex(), getRootAsAttribute(), getRootAsDeprecatedKernelCreateInfos(), getRootAsDeprecatedNodeIndexAndKernelDefHash(), getRootAsDeprecatedSessionState(), getRootAsDeprecatedSubGraphSessionState() (+63 more)
+Cohesion: 0.08
+Nodes (73): asUint8Array(), bufferHasIdentifier(), dstArgIndex(), getRootAsArgTypeAndIndex(), getRootAsAttribute(), getRootAsDeprecatedKernelCreateInfos(), getRootAsDeprecatedNodeIndexAndKernelDefHash(), getRootAsDeprecatedSessionState() (+65 more)
 
 ### Community 114 - "Module: ProductActions.tsx"
 Cohesion: 0.08
@@ -1078,24 +1042,24 @@ Cohesion: 0.20
 Nodes (10): callInternal Helper, create_pickup_request Case, pay_payable Case, Delhivery External API, Delhivery Pickup Request Endpoint, Pay Payable Endpoint, NEXT_PUBLIC_SITE_URL Env Var, delhivery_pickup_requests Table (+2 more)
 
 ### Community 116 - "Module: route.ts"
-Cohesion: 0.08
-Nodes (21): ConditionalLayout(), NumberInputWheelGuard(), AuthProvider(), CompareContext, CompareContextValue, CompareProduct, CompareProvider(), useCompare() (+13 more)
+Cohesion: 0.15
+Nodes (18): GET(), mockFlags, mockLoyalty, mockReferral, ReferralContext, PUT(), put(), boundedInt() (+10 more)
 
 ### Community 117 - "Module: financial.ts"
-Cohesion: 0.02
-Nodes (185): addActionId(), addArgs(), addArgType(), addAttributes(), addDataType(), addDenotation(), addDim(), addDimParam() (+177 more)
+Cohesion: 0.01
+Nodes (235): addActionId(), addArgs(), addArgType(), addAttributes(), addDataType(), addDenotation(), addDim(), addDimParam() (+227 more)
 
 ### Community 118 - "Module: decodePOLineItemId"
-Cohesion: 0.05
-Nodes (53): getActiveHeroSlides(), getAllHeroSlides(), HeroSlide, applyDraftOrder(), asArray(), asUuid(), canonical(), comparable() (+45 more)
+Cohesion: 0.03
+Nodes (84): AdminJWTPayload, applyDraftOrder(), applyDraftPatch(), asArray(), asUuid(), canonical(), comparable(), diffRows() (+76 more)
 
 ### Community 119 - "Module: index.ts"
-Cohesion: 0.09
-Nodes (20): Cert, STATUS_LABEL, STATUS_STYLE, StaffNotesEntry(), PortalDeviceContext, PortalDeviceProvider(), useIsMobile(), useStaffNoteDraft() (+12 more)
+Cohesion: 0.10
+Nodes (18): Cert, STATUS_LABEL, STATUS_STYLE, PortalDeviceContext, PortalDeviceProvider(), useIsMobile(), StaffNotesPage(), BrandPanelProps (+10 more)
 
 ### Community 120 - "Module: CustomerMailPanel.tsx"
-Cohesion: 0.12
-Nodes (25): BaseBlock, CalloutBlock, ChoicePickerBlock, CodeBlockType, CustomerListBlock, fmtINR(), fmtPriceOrAsk(), fmtStock() (+17 more)
+Cohesion: 0.13
+Nodes (21): BaseBlock, CalloutBlock, ChoicePickerBlock, CodeBlockType, CustomerListBlock, HeadingBlock, ImageCardBlock, INR_FORMATTER (+13 more)
 
 ### Community 121 - "Module: CA Certificate"
 Cohesion: 0.22
@@ -1106,12 +1070,16 @@ Cohesion: 0.39
 Nodes (9): Docker Compose Production, .env.production File, Google Service Account Key, /api/health Healthcheck, internal Bridge Network, App Service Container, Nginx Container, Redis Container (+1 more)
 
 ### Community 123 - "Module: BusinessOrderDetailPage"
-Cohesion: 0.26
-Nodes (10): ensureSubscriber(), local, publishSessionEvent(), realRedis(), refCounts, SessionEvent, SessionLogoutReason, subscribeSessionEvents() (+2 more)
+Cohesion: 0.12
+Nodes (17): Paginated, NO_STATS, ReferralsPage(), REJECT_REASON, STATUS, AdminReferralRow, listReferralSignups(), maskName() (+9 more)
+
+### Community 124 - "Module: fallbackShippingRate"
+Cohesion: 0.04
+Nodes (35): canReuseTensor(), create(), createInferenceSessionHandler(), createTemporaryTensor(), data(), destroy(), dispose(), download() (+27 more)
 
 ### Community 126 - "Module: page.tsx"
-Cohesion: 0.06
-Nodes (52): fireOwnerAdmin(), verifyPortalToken(), GET(), BASIC, { mockQuery, mockQueryOne, mockGetTenantPlan, mockPool }, signedAwsFetch(), SignedAwsRequest, authorizeSgIngress() (+44 more)
+Cohesion: 0.09
+Nodes (43): fireOwnerAdmin(), alertProvisioningFailure(), alertStuckJobs(), findStuckJobs(), StuckJob, signedAwsFetch(), SignedAwsRequest, authorizeSgIngress() (+35 more)
 
 ### Community 127 - "Module: ACM Cert jeffistores.in"
 Cohesion: 0.25
@@ -1130,28 +1098,28 @@ Cohesion: 0.25
 Nodes (8): create_product Case, set_product_featured Case, update_product Case, RDS jeffi_stores Database, Featured Products Limit Rule, _apply_all.sh Script, Schema Modules README, products Table
 
 ### Community 131 - "Module: PayableDetailPage"
-Cohesion: 0.18
-Nodes (13): admin, idParams, mockQuery, mockQueryMany, mockQueryOne, DELETE(), GET(), Params (+5 more)
+Cohesion: 0.14
+Nodes (16): RootLayout(), cacheKey(), getSiteControls(), identityDefaults(), tenantSlugFromHeaders(), GET(), client, pool (+8 more)
 
 ### Community 132 - "Module: ScenarioDetailPage"
 Cohesion: 0.08
 Nodes (23): Architecture, Backfill Script, Boot Chain (24/7 setup), Database, Disk filling up, Embeddings call hanging or returning errors, `embeddings` table, Idempotency (+15 more)
 
 ### Community 133 - "Module: AdminReplicationClient.tsx"
-Cohesion: 0.13
-Nodes (29): adjustInventory(), createBrand(), createCategory(), createCoupon(), createProduct(), generatePersonalizedCoupon(), setProductFeatured(), updateProduct() (+21 more)
+Cohesion: 0.15
+Nodes (24): adjustInventory(), createBrand(), createCategory(), createCoupon(), createProduct(), generatePersonalizedCoupon(), setProductFeatured(), updateProduct() (+16 more)
 
 ### Community 134 - "Module: index.js"
 Cohesion: 0.50
 Nodes (7): { ApiGatewayManagementApiClient, PostToConnectionCommand }, { Client }, closeSession(), connect(), disconnect(), getDb(), sendMessage()
 
 ### Community 135 - "Module: AiAssistantModal.tsx"
-Cohesion: 0.11
+Cohesion: 0.10
 Nodes (17): Feature, FEATURES, LandingFeatures(), Coin(), Dots(), Gear(), PhoneMock(), TrendUp() (+9 more)
 
 ### Community 136 - "Small Group 136"
-Cohesion: 0.11
-Nodes (39): SessionSignals, cookieDomainOption(), getCookieDomain(), GoogleTokenPayload, verifyGoogleAccessToken(), verifyGoogleCredential(), verifyGoogleToken(), issueUserToken() (+31 more)
+Cohesion: 0.08
+Nodes (51): cookieDomainOption(), getCookieDomain(), GoogleTokenPayload, verifyGoogleAccessToken(), verifyGoogleCredential(), verifyGoogleToken(), issueUserToken(), deleteOTP() (+43 more)
 
 ### Community 137 - "Small Group 137"
 Cohesion: 0.10
@@ -1166,16 +1134,16 @@ Cohesion: 0.29
 Nodes (7): brands Table, categories Table, database/schema.sql, orders Table, product_variants Table, products Table, users Table
 
 ### Community 140 - "Small Group 140"
-Cohesion: 0.08
-Nodes (40): CheckoutRecapSummary(), OrderItem, Props, ProductPitchLine(), Props, Source, buildAffirmationPrompt(), buildCartInsightPrompt() (+32 more)
+Cohesion: 0.20
+Nodes (15): buildAffirmationPrompt(), buildCartInsightPrompt(), buildProductPitchPrompt(), buildRecapPrompt(), CartLine, clampList(), serializeSignals(), SessionSignals (+7 more)
 
 ### Community 141 - "Small Group 141"
 Cohesion: 0.29
 Nodes (7): mark_invoice_paid Case, update_order_status Case, Order Status Flow, cash_sales paid-on-creation rule, cash_sales Table, orders Table, payments Table
 
 ### Community 142 - "Small Group 142"
-Cohesion: 0.13
-Nodes (24): AliasedColumn, HANDLING, ProductSpecifications(), ageRange(), buildSpecGroups(), countryName(), group(), HANDLING_FLAGS (+16 more)
+Cohesion: 0.12
+Nodes (26): HANDLING, ProductSpecifications(), ageRange(), buildSpecGroups(), countryName(), group(), HANDLING_FLAGS, HandlingFlag (+18 more)
 
 ### Community 143 - "Small Group 143"
 Cohesion: 0.33
@@ -1190,8 +1158,8 @@ Cohesion: 0.13
 Nodes (15): generatePurchaseOrderPDF(), PDFDocument, POBusinessSettings, POItem, mockBusiness, mockItems, mockPO, mockPO (+7 more)
 
 ### Community 146 - "Small Group 146"
-Cohesion: 0.04
-Nodes (68): PATCH(), isPlatformAdmin(), EcomBillingPage(), one(), SP, EcomCustomersPage(), one(), EcomHero() (+60 more)
+Cohesion: 0.02
+Nodes (112): PATCH(), PatchSchema, isPlatformAdmin(), BillingClient(), Interval, Plan, SUB_STATUS_LABEL, EcomBillingPage() (+104 more)
 
 ### Community 147 - "Small Group 147"
 Cohesion: 0.14
@@ -1199,43 +1167,43 @@ Nodes (20): isGraphInputOutputTypeSupported(), arraysEqual(), getOutputPacked2DC
 
 ### Community 148 - "Small Group 148"
 Cohesion: 0.09
-Nodes (15): Props, DOT, mockAttention, mockQueryMany, mockQueryOne, agoStr(), daysSince(), Person (+7 more)
+Nodes (14): Props, DOT, mockAttention, mockQueryMany, mockQueryOne, agoStr(), daysSince(), Person (+6 more)
 
 ### Community 149 - "Small Group 149"
-Cohesion: 0.05
-Nodes (50): ADMIN_IDLE_TIMEOUT_CHOICES, AuthSessionRow, BindingDecision, computeDeadline(), cookieMatch(), createSession(), deadlineOf(), DeadlineRow (+42 more)
+Cohesion: 0.04
+Nodes (76): adminCookieDomain(), readAdminSid(), ADMIN_IDLE_TIMEOUT_CHOICES, AuthSessionRow, BindingDecision, computeDeadline(), cookieMatch(), createSession() (+68 more)
 
 ### Community 150 - "Small Group 150"
 Cohesion: 0.33
 Nodes (6): docker/setup-buildx-action@v3, docker/build-push-action@v5, docker/login-action@v3, docker/metadata-action@v5, GitHub Container Registry, Docker Build Push Job
 
 ### Community 151 - "Small Group 151"
-Cohesion: 0.10
-Nodes (12): Draft, makeHomepageDraftDb(), Row, sectionRow(), slideRow(), Table, admin, fake (+4 more)
+Cohesion: 0.11
+Nodes (14): makeClient(), mockGetFeatureFlags, mockLogActivity, mockQueryOne, mockWithTransaction, runWith(), computeVariantChangePreview(), OrderRow (+6 more)
 
 ### Community 152 - "Small Group 152"
-Cohesion: 0.10
-Nodes (26): escapeXml(), GET(), buildAdditionalImages(), buildDetails(), buildHighlights(), buildOfferId(), buildShipping(), productToGmcItems() (+18 more)
+Cohesion: 0.17
+Nodes (15): escapeXml(), GET(), buildCustomLabels(), buildProductDetails(), buildProductHighlights(), buildProductType(), getGoogleProductCategory(), fetchAllProducts() (+7 more)
 
 ### Community 153 - "Small Group 153"
 Cohesion: 0.33
 Nodes (6): AWS EC2 t4g.micro, Certbot Renewal Cron, Daily Briefing Cron, Cron Merchant Sync Job, GHCR Docker Image, Nginx Reverse Proxy
 
 ### Community 154 - "Small Group 154"
-Cohesion: 0.10
-Nodes (19): isCustomScenario(), mockFetchUserContext, mockGetClient, mockQueryOne, mockResolveCoupon, mockSendCampaignEmail, mockValidateSql, ALLOWED_TABLES (+11 more)
+Cohesion: 0.13
+Nodes (3): AwsProvisioningProvider, isAlreadyExists(), currentPublicIp()
 
 ### Community 155 - "Small Group 155"
 Cohesion: 0.33
 Nodes (6): create_quotation Case, Admin Quotations Endpoint, QT/<FY>/<MON>/<seq> Quote Format, quotation_items Table, quotations Table, withTransaction
 
 ### Community 156 - "Small Group 156"
-Cohesion: 0.05
-Nodes (52): AdminUser, AdminUserActions(), IDLE_CHOICES, buildScopeGrid(), GROUP_ORDER, Props, ScopeGrid(), createAdminUser() (+44 more)
+Cohesion: 0.21
+Nodes (13): AdminUser, AdminUserActions(), IDLE_CHOICES, isPlatformOwner(), certStatus(), displayName(), Props, TeamMobileList() (+5 more)
 
 ### Community 157 - "Small Group 157"
-Cohesion: 0.18
-Nodes (19): adminPayload, mockRequireScope, mockSendApproved, mockSendRejected, userInfo, mockSendAuditedMail, adminEmail(), baseLayout() (+11 more)
+Cohesion: 0.11
+Nodes (27): adminPayload, mockRequireScope, mockSendApproved, mockSendRejected, userInfo, buildQuoteNumber(), parseAddress(), POST() (+19 more)
 
 ### Community 158 - "Small Group 158"
 Cohesion: 0.11
@@ -1258,12 +1226,12 @@ Cohesion: 0.40
 Nodes (4): RazorpayInstance, RazorpayOptions, RazorpayResponse, Window
 
 ### Community 163 - "Small Group 163"
-Cohesion: 0.07
-Nodes (11): data(), destroy(), dispose(), ensureValid(), getData(), gpuBuffer(), mlTensor(), onReleaseSession() (+3 more)
+Cohesion: 0.06
+Nodes (37): Pe(), canReuseTensor(), create(), createInferenceSessionHandler(), createTemporaryTensor(), data(), destroy(), dispose() (+29 more)
 
 ### Community 164 - "Small Group 164"
 Cohesion: 0.09
-Nodes (34): adminRow, mockBuildUrl, mockDecryptSecret, mockEncryptSecret, mockGenerateCodes, mockGenerateSecret, mockHashRecoveryCode, mockIssueAdminSession (+26 more)
+Nodes (35): adminRow, mockBuildUrl, mockDecryptSecret, mockEncryptSecret, mockGenerateCodes, mockGenerateSecret, mockHashRecoveryCode, mockIssueAdminSession (+27 more)
 
 ### Community 165 - "Small Group 165"
 Cohesion: 0.50
@@ -1291,23 +1259,23 @@ Nodes (3): ALLOWED_ORIGINS, CSP, nextConfig
 
 ### Community 171 - "Small Group 171"
 Cohesion: 0.03
-Nodes (96): addSymbol(), build(), canReuseTensor(), captureBegin(), captureEnd(), compute(), computeKernel(), create() (+88 more)
+Nodes (97): addSymbol(), build(), byteLength(), canReuseTensor(), captureBegin(), captureEnd(), compute(), computeKernel() (+89 more)
 
 ### Community 172 - "Small Group 172"
-Cohesion: 0.04
-Nodes (12): additionalImplementations(), appendVariableUniforms(), calcMatMulShape(), calcShape(), declareVariable(), getShapeOfGemmResult(), initialize(), isValidBroadcast() (+4 more)
+Cohesion: 0.03
+Nodes (51): yA(), Qc(), additionalImplementations(), adjustPadAndReturnShape(), adjustPadsBasedOnAutoPad(), appendVariableUniforms(), build(), calcMatMulShape() (+43 more)
 
 ### Community 173 - "Small Group 173"
-Cohesion: 0.13
-Nodes (19): addSymbol(), computeKernel(), createKernel(), currentKernelCustomData(), destroy(), dispose(), free(), get() (+11 more)
+Cohesion: 0.08
+Nodes (36): Ks(), addSymbol(), canReuseTensor(), computeKernel(), createKernel(), createTemporaryTensor(), currentKernelCustomData(), destroy() (+28 more)
 
 ### Community 174 - "Small Group 174"
 Cohesion: 0.12
 Nodes (16): 1. Generate Self-Signed Certificates (Development), 2. Install Client Certificate (Admin Users), 3. Production Setup (with Cloudflare/Nginx), Additional Resources, Certificate-Based Authentication (mTLS), Distribution to Admin Users, File Structure, Option A: Cloudflare mTLS (+8 more)
 
 ### Community 175 - "Small Group 175"
-Cohesion: 0.07
-Nodes (19): fromGpuBuffer(), run(), run(), from(), ht(), k(), mi(), Pt() (+11 more)
+Cohesion: 0.06
+Nodes (21): run(), clearActiveTextures(), decode(), dispose(), finishInferenceSessionBuffer(), finishSizePrefixed(), finishSizePrefixedInferenceSessionBuffer(), fn() (+13 more)
 
 ### Community 176 - "Small Group 176"
 Cohesion: 0.67
@@ -1315,7 +1283,7 @@ Nodes (3): GRAPH_REPORT.md, graphify-out Directory, Wiki Index
 
 ### Community 177 - "Small Group 177"
 Cohesion: 0.02
-Nodes (129): EnrichmentRow, reEmbedProduct(), POST(), ADMIN, mockAuth, mockHasScope, mockQuery, mockQueryOne (+121 more)
+Nodes (123): EnrichmentRow, reEmbedProduct(), POST(), ADMIN, mockAuth, mockHasScope, mockQuery, mockQueryOne (+115 more)
 
 ### Community 178 - "Small Group 178"
 Cohesion: 0.28
@@ -1326,8 +1294,8 @@ Cohesion: 0.60
 Nodes (4): fmt(), fmtDate(), InvoiceViewClient(), Props
 
 ### Community 180 - "Small Group 180"
-Cohesion: 0.10
-Nodes (24): CustomScenarioRow, runCustomScenario(), errorMessage(), runScenario(), runScenarioForAllCampaigns(), mockGetCampaign, mockQuery, AnyScenarioModule (+16 more)
+Cohesion: 0.07
+Nodes (31): CustomScenarioRow, isCustomScenario(), runCustomScenario(), mockFetchUserContext, mockGetClient, mockQueryOne, mockResolveCoupon, mockSendCampaignEmail (+23 more)
 
 ### Community 181 - "Small Group 181"
 Cohesion: 0.43
@@ -1335,7 +1303,7 @@ Nodes (4): fmt(), fmtDate(), Props, QuotationViewClient()
 
 ### Community 182 - "Small Group 182"
 Cohesion: 0.10
-Nodes (26): GET(), mockQuery, mockQueryMany, mockQueryOne, mockSendAuditedMail, mockAuth, mockHasScope, mockPreviewVarMap (+18 more)
+Nodes (25): mockAuth, mockHasScope, mockPreviewVarMap, mockRenderCampaignEmail, mockSubstituteVars, POST(), Schema, ADMIN (+17 more)
 
 ### Community 186 - "Small Group 186"
 Cohesion: 0.11
@@ -1366,64 +1334,64 @@ Cohesion: 0.13
 Nodes (13): BatchSerialLabels(), BARCODE_BARS, BatchPreviewData, BatchSerialPreview(), fmtPrice(), labelBase(), LabelPreview(), PreviewProduct (+5 more)
 
 ### Community 233 - "Small Group 233"
-Cohesion: 0.21
-Nodes (16): getPendingPoints(), eligibleCustomerSql(), findUsersWithWork(), OrderAction, orderStateParams(), orderStatesCte(), reconcileLoyalty(), ReconcileResult (+8 more)
+Cohesion: 0.25
+Nodes (14): getPendingPoints(), eligibleCustomerSql(), findUsersWithWork(), OrderAction, orderStateParams(), orderStatesCte(), ReconcileResult, ReferralAction (+6 more)
 
 ### Community 234 - "Small Group 234"
-Cohesion: 0.15
-Nodes (9): CustomerNotesProps, Props, StaffQrScanner(), Props, StaffVoiceMemo(), StaffNoteDraft, CustomerNote, NOTE_TAGS (+1 more)
+Cohesion: 0.14
+Nodes (11): CustomerNotesProps, StaffNotesEntry(), Props, StaffQrScanner(), Props, StaffVoiceMemo(), StaffNoteDraft, useStaffNoteDraft() (+3 more)
 
 ### Community 235 - "Small Group 235"
-Cohesion: 0.13
-Nodes (14): { queryOneMock }, getApprovedReviewSummary(), EMPTY_REVIEW_SUMMARY, ReviewSummary, toReviewSummary(), BusinessPriceBadge(), Props, PincodeCheckerProps (+6 more)
+Cohesion: 0.15
+Nodes (16): DELETE(), loadOwnedOrder(), ADDRESS_SNAPSHOT_COLUMNS, addressChangeBlockReason(), sameAddress(), snapshotAddress(), POST(), AdminNotification (+8 more)
 
 ### Community 236 - "Small Group 236"
 Cohesion: 0.16
 Nodes (16): getLoyaltyAccount(), listLoyaltyLedger(), adjustPoints(), isLoyaltyEligible(), AdjustSchema, FAILURES, loadView(), POST() (+8 more)
 
 ### Community 237 - "Small Group 237"
-Cohesion: 0.05
-Nodes (66): currentAdminBaseUrlAsync(), platformOAuthBaseUrl(), buildOAuthUrl(), exchangeCodeForToken(), getLongLivedToken(), getMetaConfig(), getPageAndIgAccounts(), graphGet() (+58 more)
+Cohesion: 0.08
+Nodes (49): currentAdminBaseUrlAsync(), platformOAuthBaseUrl(), buildOAuthUrl(), exchangeCodeForToken(), getLongLivedToken(), getMetaConfig(), getPageAndIgAccounts(), graphGet() (+41 more)
 
 ### Community 238 - "Small Group 238"
-Cohesion: 0.04
-Nodes (59): Color, COLOR_BADGE, COLOR_PREVIEW, COLORS, TagDef, ExtensionTokenCard(), generateMetadata(), generateMetadata() (+51 more)
+Cohesion: 0.16
+Nodes (9): ComparePage(), generateMetadata(), getDefaultCompareIds(), getProductsByIds(), SPEC_ROWS, CompareAddButtonProps, SearchResult, CompareChangeButtonProps (+1 more)
 
 ### Community 239 - "Small Group 239"
-Cohesion: 0.13
-Nodes (12): buildRfqNumber(), POST(), APPROVED_USER, mockAuthenticateBusiness, mockQuery, mockQueryOne, mockSendRfqSubmittedEmail, NEW_RFQ (+4 more)
+Cohesion: 0.06
+Nodes (24): POST(), AUTH_USER, authenticateBusiness(), getTokenFromRequest(), USER, buildRfqNumber(), POST(), APPROVED_USER (+16 more)
 
 ### Community 240 - "Small Group 240"
-Cohesion: 0.11
-Nodes (27): CertGateResult, enforceCertGate(), PLATFORM_OWNER_EMAIL, resolveAdminByEmail(), ResolvedAdmin, serialToHex(), issueMfaTicket(), staffOtpKey() (+19 more)
+Cohesion: 0.19
+Nodes (15): clearStaffCookie(), issueStaffToken(), secret(), setStaffCookie(), StaffSession, staffSessionFromRequest(), StaffTokenClaims, verifyStaffToken() (+7 more)
 
 ### Community 241 - "Small Group 241"
-Cohesion: 0.18
-Nodes (15): importStore(), s3Send, GET(), backupBucket(), BackupRef, deleteKeys(), deleteTenantBackups(), findLatestBackup() (+7 more)
+Cohesion: 0.19
+Nodes (14): importStore(), s3Send, backupBucket(), BackupRef, deleteKeys(), deleteTenantBackups(), findLatestBackup(), getS3Client() (+6 more)
 
 ### Community 242 - "Small Group 242"
-Cohesion: 0.12
-Nodes (20): GET(), mockFlags, mockLoyalty, boundedNumber(), DEFAULT_UPPER_TIERS, getLoyaltySettings(), isRealDate(), KEY (+12 more)
+Cohesion: 0.09
+Nodes (26): reconcileLoyalty(), reconcileUser(), mockReconcile, mockSummary, settings, boundedNumber(), DEFAULT_UPPER_TIERS, getLoyaltySettings() (+18 more)
 
 ### Community 243 - "Small Group 243"
-Cohesion: 0.03
-Nodes (51): adminPayload, mockAuth, mockQueryMany, mockSendMail, superAdmins, ADMIN, mockAuth, mockGetClient (+43 more)
+Cohesion: 0.04
+Nodes (38): ADMIN, mockAuth, mockGetClient, mockHasScope, mockQuery, mockQueryMany, mockQueryOne, mockWithTransaction (+30 more)
 
 ### Community 244 - "Small Group 244"
-Cohesion: 0.10
-Nodes (17): ensureBuiltinCampaignRows(), mockList, mockQuery, createCampaignSchema, GET(), POST(), ADMIN, validateCampaignBodyTemplate() (+9 more)
+Cohesion: 0.17
+Nodes (9): mockValidateTemplate, sampleCampaign, sampleSends, ADMIN, mockAuth, mockHasScope, mockQuery, mockQueryMany (+1 more)
 
 ### Community 245 - "Small Group 245"
 Cohesion: 0.11
 Nodes (17): #493 fix(admin): dark theme contrast refactor, #493 progress (COMPLETE, committed), #493 resolved (contrast computed, not eyeballed; WCAG AA), #494 fix(ui): dark theme flashes light on load, #495 refactor(ui): route inline status messages through the unified toast service, #496 feat(storefront): order-placed celebration + micro-animations, #497 feat(storefront): quick-add on product cards with variant + selling-unit picker, #498 fix(admin/mobile): finance page tabs overflow the viewport (+9 more)
 
 ### Community 246 - "Small Group 246"
-Cohesion: 0.20
-Nodes (20): verifyWebhookSignature(), baseHtml(), button(), detailTable(), FOOTER_LINES, notice(), PLATFORM_ADMIN, Row (+12 more)
+Cohesion: 0.17
+Nodes (23): tenantCampaignAddress(), Schema, baseHtml(), button(), detailTable(), FOOTER_LINES, notice(), PLATFORM_ADMIN (+15 more)
 
 ### Community 247 - "Small Group 247"
 Cohesion: 0.08
-Nodes (26): AboutPage(), CATEGORY_BRANDS, CATEGORY_COLORS, BusinessCategoriesPage(), CardCategory, CategoryMobileCardBody(), Props, BusinessCategoryDetailPage() (+18 more)
+Nodes (21): AboutPage(), PreviewItem, BusinessCategoriesPage(), CardCategory, CategoryMobileCardBody(), Props, CategoryGridProps, KIND_LABEL (+13 more)
 
 ### Community 249 - "Small Group 249"
 Cohesion: 0.11
@@ -1434,56 +1402,56 @@ Cohesion: 0.07
 Nodes (36): Al(), areEqual(), Bn(), calc(), calcMatMulShape(), calcShape(), calculateReshapedDims(), data() (+28 more)
 
 ### Community 251 - "Small Group 251"
-Cohesion: 0.31
-Nodes (9): extractionPrompt(), isVisionConfigured(), ocrImage(), ocrPdfPages(), mockAiVision, mockFetch, VISION_HOST, VisionResult (+1 more)
+Cohesion: 0.11
+Nodes (19): extractionPrompt(), isVisionConfigured(), ocrImage(), ocrPdfPages(), mockAiVision, mockFetch, VISION_HOST, VisionResult (+11 more)
 
 ### Community 252 - "Small Group 252"
-Cohesion: 0.03
-Nodes (68): AdminFilters(), AdminFiltersProps, FilterConfig, FilterOption, AdminTableSkeletonProps, BrandStatusToggle(), Props, BrochureButton() (+60 more)
+Cohesion: 0.06
+Nodes (30): AdminFilters(), AdminFiltersProps, FilterConfig, FilterOption, DeleteReviewFormButton(), FormRow, ReviewFormTableRow(), PortalTopNav() (+22 more)
 
 ### Community 253 - "Small Group 253"
-Cohesion: 0.05
-Nodes (24): ADMIN, mockAuth, mockGetClient, mockHasScope, mockQuery, mockQueryMany, mockQueryOne, mockWithTransaction (+16 more)
+Cohesion: 0.02
+Nodes (69): adminPayload, mockAuth, mockQueryMany, mockSendMail, superAdmins, ADMIN, mockAuth, mockGetClient (+61 more)
 
 ### Community 254 - "Small Group 254"
 Cohesion: 0.13
 Nodes (13): AdminOffer, fetchAccountOffers(), getAccountOffers(), getPublicOffers(), INTERNAL_TITLE_PATTERNS, ISSUER_NAMES, OfferSetting, OffersFetch (+5 more)
 
 ### Community 255 - "Small Group 255"
-Cohesion: 0.16
-Nodes (18): AttributeValue, Bind, buildAttributeFilterClauses(), FilterParams, first(), FLAGS, getAttributeValues(), isDate() (+10 more)
+Cohesion: 0.08
+Nodes (35): chipLabel(), fieldIsActive(), fieldParamNames(), Props, FilterValueHelp(), Props, ValueRow, AttributeValue (+27 more)
 
 ### Community 256 - "Small Group 256"
-Cohesion: 0.09
-Nodes (41): AsinBackfillReport, AsinBackfillRow, backfillAsins(), fetchTargets(), runPool(), amazonConfigured(), getSellerId(), AmazonListing (+33 more)
+Cohesion: 0.12
+Nodes (14): mockAmazonConfigured, mockDelete, mockFetchAll, mockFetchProduct, mockGetMarketplaceId, mockGetSellerId, mockMatchAsin, mockPatch (+6 more)
 
 ### Community 257 - "Small Group 257"
-Cohesion: 0.13
-Nodes (11): mockGetClient, mockGetOrCreateOpenShelf, mockGetStockLedger, mockGetStockValuation, mockLogAdminAudit, mockLogStockMovement, mockUpsertShelfStock, ADMIN (+3 more)
+Cohesion: 0.19
+Nodes (15): APPLY_ORDER, buildTenantSchemaSql(), DesiredColumn, DesiredTable, desiredTableColumns(), guardNonFkConstraints(), hoistForeignKeys(), makeCreatesIdempotent() (+7 more)
 
 ### Community 258 - "Small Group 258"
-Cohesion: 0.33
-Nodes (5): mockAmazonConfigured, mockGetSellerId, mockMatchAsin, mockQuery, mockQueryMany
+Cohesion: 0.19
+Nodes (11): AsinBackfillReport, AsinBackfillRow, backfillAsins(), fetchTargets(), matchWithBackoff(), runPool(), mockAmazonConfigured, mockGetSellerId (+3 more)
 
 ### Community 259 - "Small Group 259"
-Cohesion: 0.06
-Nodes (30): getPerUnitRate(), MODE_LABELS, ProductActions(), ProductActionsProps, ProductUnit, SubVariant, Variant, VariantImage (+22 more)
+Cohesion: 0.21
+Nodes (7): AreaInput(), AreaInputProps, DimStepper(), fmtQty(), LengthRuler(), QtyHint(), QuantityInputProps
 
 ### Community 260 - "Small Group 260"
 Cohesion: 0.11
 Nodes (14): ADMIN, mockAnnounce, mockAuth, mockDelay, mockGetClient, mockHasScope, mockQuery, mockQueryMany (+6 more)
 
 ### Community 261 - "Small Group 261"
-Cohesion: 0.15
-Nodes (9): PLAIN, Route, TRACKED, Client, fallbackLocation(), grainIsLeaf(), RestoreSkip, restoreTrackedLine() (+1 more)
+Cohesion: 0.25
+Nodes (3): PLAIN, Route, TRACKED
 
 ### Community 262 - "Small Group 262"
-Cohesion: 0.14
-Nodes (23): catalogFor(), SEED_CATALOGS, SEED_PROFILES, SeedCatalog, SeedItem, ONBOARDING_CATEGORIES, KNOWN_PROFILES, seedTenantData() (+15 more)
+Cohesion: 0.11
+Nodes (26): getKycDocumentStream(), getS3Client(), kycBucket(), uploadKycDocument(), GET(), buildTenantPolicies(), generateTenantLegals(), catalogFor() (+18 more)
 
 ### Community 263 - "Small Group 263"
-Cohesion: 0.02
-Nodes (86): bA(), cA(), color(), dA(), fA(), fi(), Ft(), gA() (+78 more)
+Cohesion: 0.05
+Nodes (37): vA(), canReuseTensor(), constructor(), create(), createInferenceSessionHandler(), createTemporaryTensor(), data(), destroy() (+29 more)
 
 ### Community 264 - "Small Group 264"
 Cohesion: 0.11
@@ -1499,171 +1467,171 @@ Nodes (14): ADR-0002: MCP server for Jeffi Stores agents, Architecture, Auth mod
 
 ### Community 267 - "Small Group 267"
 Cohesion: 0.12
-Nodes (13): mockAuth, mockAuthSA, mockHasScope, mockLogAudit, mockQueryCount, mockQueryMany, regularAdminPayload, saAuditScopePayload (+5 more)
+Nodes (14): DELETE(), Params, PATCH(), ADMIN, mockAuth, mockHasScope, mockQuery, mockQueryMany (+6 more)
 
 ### Community 268 - "Small Group 268"
-Cohesion: 0.33
-Nodes (11): ALIASED_SPEC_KEYS, canonicalSpecKey(), isJunkSpecValue(), JUNK_VALUES, readsAsLabel(), readSpecifications(), SpecEntry, specKeySql() (+3 more)
+Cohesion: 0.29
+Nodes (12): ALIASED_SPEC_KEYS, AliasedColumn, canonicalSpecKey(), isJunkSpecValue(), JUNK_VALUES, readsAsLabel(), readSpecifications(), SpecEntry (+4 more)
 
 ### Community 269 - "Small Group 269"
 Cohesion: 0.04
-Nodes (67): isGraphInputOutputTypeSupported(), arraysEqual(), bcastIndex(), bcastMatmulIndex(), binaryVecFunctions(), Br(), computeTexture(), computeTextureWH() (+59 more)
+Nodes (60): isGraphInputOutputTypeSupported(), arraysEqual(), bcastIndex(), bcastMatmulIndex(), binaryVecFunctions(), Br(), computeTexture(), computeTextureWH() (+52 more)
 
 ### Community 270 - "Small Group 270"
-Cohesion: 0.13
-Nodes (14): A. Make ProductCard portal-aware (one card, both portals), B. Make ProductGrid portal-aware, Business products page: parity with storefront (shared filters + one business-aware card), C. Rebuild the business products page on the storefront's data layer, Current state (confirmed from code), D. Verify FilterSidebar / facets work under business, Decisions (confirmed), Design (+6 more)
+Cohesion: 0.15
+Nodes (11): buildScopeGrid(), GROUP_ORDER, Props, ScopeGrid(), ADMIN_SCOPES, ALL_SCOPE_KEYS, assignableScopes(), ScopeDefinition (+3 more)
 
 ### Community 271 - "Small Group 271"
-Cohesion: 0.18
-Nodes (13): chipLabel(), FilterValueHelp(), Props, ValueRow, list(), ADMIN_PRODUCT_FILTER_FIELDS, AdvancedFilterFieldType, filterParamNames() (+5 more)
+Cohesion: 0.11
+Nodes (14): ADMIN, mockAnnounce, mockAuth, mockDelay, mockGetClient, mockHasScope, mockQuery, mockQueryMany (+6 more)
 
 ### Community 272 - "Small Group 272"
 Cohesion: 0.16
 Nodes (11): mockGetAnalytics, fakeCurrentCarts, fakeProduct, fakeTotals, mockQueryMany, mockQueryOne, getProductAnalyticsData(), GET() (+3 more)
 
 ### Community 273 - "Small Group 273"
-Cohesion: 0.14
-Nodes (9): BUILTIN_TEMPLATES, BuiltinTemplate, getBuiltinTemplate(), MULTI_PRODUCT_KINDS, SINGLE_PRODUCT_KINDS, TemplateValidation, TemplateValidationErr, TemplateValidationOk (+1 more)
+Cohesion: 0.11
+Nodes (18): BUILTIN_TEMPLATES, BuiltinTemplate, getBuiltinTemplate(), RETIRED_BUILTIN_TEMPLATES, ensureBuiltinCampaignRows(), mockList, mockQuery, MULTI_PRODUCT_KINDS (+10 more)
 
 ### Community 274 - "Small Group 274"
-Cohesion: 0.06
-Nodes (42): allocate(), allocateTexture(), attachFramebuffer(), begin(), beginTimer(), bindAttributes(), bindOutput(), bindTexture() (+34 more)
+Cohesion: 0.04
+Nodes (66): addDependency(), allocate(), allocateTexture(), attachFramebuffer(), bindAttributes(), bindOutput(), bindTexture(), bindTextureToUniform() (+58 more)
 
 ### Community 275 - "Small Group 275"
-Cohesion: 0.19
-Nodes (12): buildQRBuffer(), generateInvoicePDF(), InvoiceBusinessSettings, InvoiceBuyerAddress, InvoiceOrder, InvoiceOrderItem, generateReceiptPDF(), mockBusiness (+4 more)
+Cohesion: 0.04
+Nodes (64): getFinancialYear(), assignInvoiceNumber(), generateOrderInvoice(), buildQRBuffer(), drawRect(), generateInvoicePDF(), getStateCode(), InvoiceBusinessSettings (+56 more)
 
 ### Community 276 - "Small Group 276"
 Cohesion: 0.13
 Nodes (6): OrderCelebration(), OrderCelebrationProps, OrderDetails, OrderAffirmation(), Product, RecommendedProductsProps
 
 ### Community 277 - "Small Group 277"
-Cohesion: 0.38
-Nodes (4): CRON_JOB_IDS, CRON_JOBS, CronJob, register()
+Cohesion: 0.23
+Nodes (11): createAdminUser(), assignableScopeKeys(), { mockMkdtempSync, mockWriteFileSync, mockReadFileSync, mockRmSync, mockExecSync, mockExecFileSync }, DELETE(), PATCH(), CertificateResult, CERTS_DIR, generateClientCertificate() (+3 more)
 
 ### Community 278 - "Small Group 278"
 Cohesion: 0.16
 Nodes (8): CHANNEL_META, DIRECTION_BADGE, FAILED_STATUSES, FeedItem(), median(), relTime(), SummaryStrip(), toNoteAttachments()
 
 ### Community 279 - "Small Group 279"
-Cohesion: 0.17
-Nodes (13): DelhiveryTracking(), EXCEPTION_TYPES, HorizontalTimeline(), resolveDisplayType(), REVERSE_TIMELINE_STEPS, Scan, shipmentStatusToDisplayType(), statusBadge() (+5 more)
+Cohesion: 0.12
+Nodes (20): DelhiveryTracking(), EXCEPTION_TYPES, HorizontalTimeline(), resolveDisplayType(), REVERSE_TIMELINE_STEPS, Scan, shipmentStatusToDisplayType(), statusBadge() (+12 more)
 
 ### Community 280 - "Small Group 280"
-Cohesion: 0.22
-Nodes (7): mockBuild, mockQueryOne, params, admin, mockAuth, mockHasScope, mockQueryMany
+Cohesion: 0.02
+Nodes (88): mockGet, POST(), Recipient, admin, mockAuth, mockHasScope, mockQueryMany, sampleRecipients (+80 more)
 
 ### Community 281 - "Small Group 281"
-Cohesion: 0.07
-Nodes (29): checkReturnEligibility(), DEFAULT_POLICY, getOrderItemsPolicy(), OrderItemPolicy, ReturnPolicy, mockQueryMany, GET(), POST() (+21 more)
+Cohesion: 0.10
+Nodes (19): checkReturnEligibility(), DEFAULT_POLICY, getOrderItemsPolicy(), OrderItemPolicy, ReturnPolicy, mockQueryMany, GET(), MOCK_ITEMS_ELIGIBLE (+11 more)
 
 ### Community 282 - "Small Group 282"
-Cohesion: 0.13
+Cohesion: 0.12
 Nodes (14): AccountRewards(), CouponList(), formatDate(), formatMoney(), HistoryEntry, HowItWorks(), Page, RedeemCard() (+6 more)
 
 ### Community 283 - "Small Group 283"
 Cohesion: 0.03
-Nodes (88): POST(), CartLine, POST(), POST(), systemPrompt(), ADMIN, mockAiChat, mockAuth (+80 more)
+Nodes (65): POST(), systemPrompt(), ADMIN, mockAiChat, mockAuth, POST(), systemPrompt(), extractHtml() (+57 more)
 
 ### Community 284 - "Small Group 284"
 Cohesion: 0.18
 Nodes (7): capturedConfigs, clientQuery, clientRelease, importRegistry(), poolConnect, poolOn, poolQuery
 
 ### Community 285 - "Small Group 285"
-Cohesion: 0.22
+Cohesion: 0.21
 Nodes (12): sendAdminCertificateEmail(), sendCertInviteEmail(), storeName, POST(), mockAuth, mockQueryOne, mockSendInvite, params (+4 more)
 
 ### Community 286 - "Small Group 286"
-Cohesion: 0.13
-Nodes (19): getBatchesAtLocation(), getStockAtLocation(), getStockForProduct(), moveStock(), GET(), getInventoryQuantity(), getTotalShelfStock(), POST() (+11 more)
+Cohesion: 0.21
+Nodes (11): Props, Source, Props, SearchInsightBanner(), addFrequent(), DEFAULT_PROFILE, incrementSessionCount(), OrderSignal (+3 more)
 
 ### Community 287 - "Small Group 287"
-Cohesion: 0.06
-Nodes (29): GET(), POST(), mockAuth, mockAuthSA, mockHasScope, mockLogAudit, mockQueryCount, mockQueryMany (+21 more)
+Cohesion: 0.04
+Nodes (39): POST(), mockAuth, mockAuthSA, mockHasScope, mockLogAudit, mockQueryCount, mockQueryMany, regularAdminPayload (+31 more)
 
 ### Community 288 - "Small Group 288"
-Cohesion: 0.15
-Nodes (17): Qc(), build(), captureBegin(), captureEnd(), compute(), endComputePass(), flush(), getArtifact() (+9 more)
+Cohesion: 0.12
+Nodes (17): addItemToPoll(), begin(), beginTimer(), checkTimer(), createAndWaitForFence(), createFence(), end(), endProfiling() (+9 more)
 
 ### Community 289 - "Small Group 289"
-Cohesion: 0.16
-Nodes (11): deleteWarehouse(), updateWarehouse(), mockDeleteWarehouse, mockUpdateWarehouse, WAREHOUSE, DELETE(), PATCH(), ADMIN (+3 more)
+Cohesion: 0.21
+Nodes (14): cache, currentTenantPlanGate(), getCached(), getScopeMinPlan(), getTenantPlan(), isTenantHostRequest(), loadTenantScopes(), PLAN_TIERS (+6 more)
 
 ### Community 290 - "Small Group 290"
 Cohesion: 0.23
 Nodes (9): DateTimePicker(), DateTimePickerProps, DAYS, daysInMonth(), fmtDisplay(), HOUR_OPTIONS, MINUTE_OPTIONS, MONTHS (+1 more)
 
 ### Community 291 - "Small Group 291"
-Cohesion: 0.20
-Nodes (13): searchListingsItems(), AmazonPageParams, AmazonStatusRow, AmazonSummary, deriveStatus(), getAmazonSummary(), itemAsin(), itemTitle() (+5 more)
+Cohesion: 0.17
+Nodes (16): AmazonPageParams, AmazonStatusRow, AmazonSummary, deriveStatus(), getAmazonStatusPage(), getAmazonSummary(), itemAsin(), itemTitle() (+8 more)
 
 ### Community 292 - "Small Group 292"
-Cohesion: 0.15
-Nodes (9): Axis, DonutSplit(), inferBucket(), SERIES, SeriesDef, SeriesKey, TrendBucket, TrendChart() (+1 more)
+Cohesion: 0.17
+Nodes (8): Axis, inferBucket(), SERIES, SeriesDef, SeriesKey, TrendBucket, TrendChart(), TrendPoint
 
 ### Community 304 - "Small Group 304"
-Cohesion: 0.04
-Nodes (32): sampleExpense, samplePayments, POST(), mockQuery, admin, baseExpense, mockAuth, mockFetch (+24 more)
+Cohesion: 0.20
+Nodes (8): sampleExpense, samplePayments, admin, mockAuth, mockHasScope, mockQueryMany, mockQueryOne, params
 
 ### Community 310 - "Small Group 310"
-Cohesion: 0.08
-Nodes (19): mockEmbed, mockFetch, mockFindSimilarCustomers, mockFs, mockPgClient, mockPgPool, mockQuery, mockQueryMany (+11 more)
+Cohesion: 0.14
+Nodes (13): cA(), dA(), wA(), xA(), ed(), fromTexture(), ortWasmThreaded(), ortWasmThreaded() (+5 more)
 
 ### Community 312 - "Small Group 312"
 Cohesion: 0.12
-Nodes (16): 25-scenario catalog roadmap, A. Single source of truth for universal params, B. Duration type with canonical minutes + unit, Build order recommendation (historical — now all built), C. UI: unit dropdown next to duration fields, Campaign parameter standardization, time-unit dropdown, and a 25-scenario roadmap, Commit plan (small, local-only, on feature-release), D. Build the viewed-product retargeting scenario (+8 more)
+Nodes (9): commitOrder, createAutoTask, loadActiveCart, query, queryMany, queryOne, validateCouponForUser, verifyDraftToken (+1 more)
 
 ### Community 313 - "Small Group 313"
-Cohesion: 0.18
-Nodes (8): ATTRIBUTE_SHEETS, CORE_SHEETS, LINK_KEYS, PRODUCT_ATTR_SHEET, SHEET_ORDER, STRUCTURE_COLUMNS, SUB_VARIANT_COLUMNS, VARIANT_COLUMNS
+Cohesion: 0.16
+Nodes (12): AttributionResult, normalizeEmailIdentity(), Person, phoneDigits(), rejectionFor(), RejectReason, sameDevice(), friend (+4 more)
 
 ### Community 323 - "Community 323"
 Cohesion: 0.19
 Nodes (13): box(), bwipjs, fmtDate(), generateBarcodeBuffer(), generateQRBuffer(), hRule(), PackingSlipAddress, PackingSlipItem (+5 more)
 
 ### Community 324 - "Community 324"
-Cohesion: 0.13
-Nodes (12): mockCompleteAutoTask, mockCreateAutoTask, mockDeliveredSMS, mockInvoiceCharges, mockOfdSMS, mockQuery, mockQueryMany, mockResolveDelhiveryToken (+4 more)
+Cohesion: 0.14
+Nodes (10): ADMIN, confirmedOrder, draftOrder, mockAuth, mockGenerateInvoice, mockHasScope, mockQueryOne, mockSendEmail (+2 more)
 
 ### Community 325 - "Community 325"
 Cohesion: 0.18
-Nodes (9): renderBotText(), fmtAmt(), PDFDocument, ReceiptBusinessSettings, ReceiptItem, ReceiptOrder, mockBusiness, mockItems (+1 more)
+Nodes (10): fmt2(), resolveItemMrp(), resolveItemPrice(), resolveItemSellingPrice(), RFQ, RFQDetailClient(), RFQItem, RFQMessage (+2 more)
 
 ### Community 326 - "Community 326"
-Cohesion: 0.07
-Nodes (30): AGE_TONE, AL, Col, DataTable(), GrnView(), InventoryView(), Kv(), RfqView() (+22 more)
+Cohesion: 0.11
+Nodes (18): CAMPAIGN, CATEGORIES, COUPON, CUSTOMERS, DASHBOARD_BARS, DemoCampaign, DemoCustomer, INVOICE (+10 more)
 
 ### Community 327 - "Community 327"
-Cohesion: 0.17
-Nodes (10): find(), Fixture, launched, ledgerInsert(), mockMarkLaunched, mockQueryMany, mockQueryOne, mockSettings (+2 more)
+Cohesion: 0.14
+Nodes (12): find(), Fixture, launched, ledgerInsert(), mockMarkLaunched, mockQueryMany, mockQueryOne, mockReferralSettings (+4 more)
 
 ### Community 328 - "Community 328"
-Cohesion: 0.24
-Nodes (10): b64url(), bind(), BIND_WAIT_MS, idb(), installSessionGuard(), loadKey(), makeProof(), openDb() (+2 more)
+Cohesion: 0.22
+Nodes (8): Archive, dumpTenantDb(), gunzip, gzip, listTables(), quoteIdent(), restoreTenantDb(), TableDump
 
 ### Community 330 - "Community 330"
-Cohesion: 0.22
-Nodes (9): yA(), data(), ensureValid(), getData(), gpuBuffer(), mlTensor(), reshape(), texture() (+1 more)
+Cohesion: 0.29
+Nodes (9): disposeSummarizer(), clearSessionSignals(), getSearches(), getViewedProducts(), pushFront(), read(), trackSearch(), trackViewedProduct() (+1 more)
 
 ### Community 331 - "Community 331"
 Cohesion: 0.02
-Nodes (182): BusinessAboutPage(), createBrand(), createCategory(), createCoupon(), createProduct(), AddBrandPage(), AddCategoryPage(), AddCouponPage() (+174 more)
+Nodes (176): createBrand(), createCategory(), createCoupon(), AddBrandPage(), AddCategoryPage(), AddCouponPage(), AddProductPage(), AddReviewFormPage() (+168 more)
 
 ### Community 332 - "Community 332"
-Cohesion: 0.03
-Nodes (41): mockQuery, mockQueryOne, commitOrder, createAutoTask, loadActiveCart, query, queryMany, queryOne (+33 more)
+Cohesion: 0.02
+Nodes (116): POST(), ADMIN, MOCK_ORDER, PARAMS, mockQuery, mockQueryOne, Client, fallbackLocation() (+108 more)
 
 ### Community 334 - "Community 334"
-Cohesion: 0.14
-Nodes (13): A. Signup page — one page, two modes, Auth: unified signup + Google-returns-to-signup + mandatory mobile & DOB, B. Backend: split Google "login" from Google "signup", C. Login page — not-found → message → advance, Confirmed decisions, Current behaviour (established from code), D. Carrying Google state between pages, Design (+5 more)
+Cohesion: 0.13
+Nodes (12): campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa, viewedProduct, campaign, defaultOpts (+4 more)
 
 ### Community 335 - "Community 335"
-Cohesion: 0.24
-Nodes (11): clearPortalCookie(), issuePortalToken(), PortalSession, secret(), setPortalCookie(), GoogleIdentity, verifyGoogle(), verifyGoogleAccessToken() (+3 more)
+Cohesion: 0.33
+Nodes (8): clearPortalCookie(), issuePortalToken(), PortalSession, setPortalCookie(), POST(), POST(), POST(), otpKey()
 
 ### Community 336 - "Community 336"
 Cohesion: 0.14
-Nodes (20): GET(), POST(), adminPayload, mockAuth, mockConfigured, mockGet, mockHasScope, mockRefresh (+12 more)
+Nodes (17): adminPayload, mockAuth, mockConfigured, mockGet, mockHasScope, mockRefresh, AiCustomerSummary, buildProfilePrompt() (+9 more)
 
 ### Community 337 - "Community 337"
 Cohesion: 0.15
@@ -1671,7 +1639,7 @@ Nodes (12): ADR-0003: Admin agent in /admin, Architecture, Auth model, Context, 
 
 ### Community 338 - "Community 338"
 Cohesion: 0.15
-Nodes (16): flatBuffer(), groupFromFlat(), LIVE, NO_IDS, sheetsBuffer(), HEADER_ROW, PRODUCT_COLUMNS, BACKFILLABLE_PRODUCT_KEYS (+8 more)
+Nodes (17): flatBuffer(), groupFromFlat(), LIVE, NO_IDS, sheetsBuffer(), PRODUCT_COLUMNS, BACKFILLABLE_PRODUCT_KEYS, backfillBlankOptionalFields() (+9 more)
 
 ### Community 339 - "Community 339"
 Cohesion: 0.16
@@ -1679,59 +1647,59 @@ Nodes (12): AppIcon(), ICONS, APP_GROUPS, AppGroup, AppItem, findApp(), Resolved
 
 ### Community 340 - "Community 340"
 Cohesion: 0.03
-Nodes (58): Props, AIFillField, AIFillForm(), Props, Category, CategoryForm(), CategoryFormProps, ICON_OPTIONS (+50 more)
+Nodes (58): QuotationResolverBlockUI(), Props, AIFillField, AIFillForm(), Props, Category, CategoryForm(), CategoryFormProps (+50 more)
 
 ### Community 341 - "Community 341"
-Cohesion: 0.15
-Nodes (17): Ks(), canReuseTensor(), createTemporaryTensor(), ensureTensor(), getCachedTensor(), getMLContext(), getMLOpSupportLimits(), onRunEnd() (+9 more)
+Cohesion: 0.14
+Nodes (12): mockAuth, mockCert, mockCreateAdminUser, mockCreatedAdmin, mockGenerateCert, mockIssueTenantCert, mockQuery, mockResolveTenant (+4 more)
 
 ### Community 342 - "Community 342"
 Cohesion: 0.06
 Nodes (30): Admin Panel (`admin-{slug}.jeffistores.in`), AWS Provisioning Provider — SKELETON (needs live AWS), CNAMEs / Subdomains, COD Settlement — BUILT, Current implementation, Custom Domains (BYO CNAME) — BUILT, DB Scope Changes Applied, Ecom Onboarding Emails (`src/lib/ecom-emails.ts`) (+22 more)
 
 ### Community 343 - "Community 343"
-Cohesion: 0.09
-Nodes (34): adminPayload, mockList, buildConversationsSql(), CHANNEL_SQL, ConversationRow, conversationSummary(), derivePage(), ENTITIES (+26 more)
+Cohesion: 0.12
+Nodes (30): buildConversationsSql(), CHANNEL_SQL, ConversationRow, conversationSummary(), derivePage(), ENTITIES, ENTITY_DECODE, entityHref() (+22 more)
 
 ### Community 345 - "Community 345"
 Cohesion: 0.12
 Nodes (15): Batch details, Cleanup, ESLint (existing `eslint-plugin-import` via `eslint-config-next`, no new deps), Goal, Migration batches, Naming and formatting, Naming (new files; existing files renamed only where a batch says so), Open questions (+7 more)
 
 ### Community 346 - "Community 346"
-Cohesion: 0.15
-Nodes (17): ALL_COLUMNS, ImportColumn, sheetFor(), SheetName, ENUMS, PACKAGE_TYPES, buildDataSheet(), buildGuideSheet() (+9 more)
+Cohesion: 0.11
+Nodes (25): ALL_COLUMNS, ATTRIBUTE_SHEETS, columnsForSheet(), CORE_SHEETS, HEADER_ROW, ImportColumn, keyColumnsFor(), LINK_KEYS (+17 more)
 
 ### Community 349 - "Community 349"
-Cohesion: 0.18
-Nodes (18): Pe(), canReuseTensor(), createTemporaryTensor(), ensureTensor(), getCachedTensor(), getMLContext(), getMLOpSupportLimits(), onRunEnd() (+10 more)
+Cohesion: 0.15
+Nodes (6): BARS, LabelEntry, LabelPreview(), ProductLabelModal(), Props, QR_CELLS
 
 ### Community 350 - "Community 350"
-Cohesion: 0.10
-Nodes (12): data(), dispose(), ensureValid(), getData(), gpuBuffer(), init(), mlTensor(), release() (+4 more)
+Cohesion: 0.07
+Nodes (21): Ue(), Ze(), create(), createInferenceSessionHandler(), data(), dispose(), ensureValid(), fetchModelAndCopyToWasmMemory() (+13 more)
 
 ### Community 351 - "Community 351"
-Cohesion: 0.09
-Nodes (13): AccountAddressFormProps, AddressFormData, CheckoutReviewPage(), CheckoutReviewPageBusinessWrapper(), CheckoutReviewPageVisitorWrapper(), CouponResult, Address, AddressFormModal() (+5 more)
+Cohesion: 0.17
+Nodes (11): loyaltyPointsReminder, Params, Row, campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa (+3 more)
 
 ### Community 352 - "Community 352"
-Cohesion: 0.08
-Nodes (31): GET(), mockCompleteAutoTask, mockCreateAutoTask, mockGetHealth, mockQueryMany, mockRecomputeHealth, adminPayload, mockAuth (+23 more)
+Cohesion: 0.09
+Nodes (29): mockCompleteAutoTask, mockCreateAutoTask, mockGetHealth, mockQueryMany, mockRecomputeHealth, adminPayload, mockAuth, mockGetHealth (+21 more)
 
 ### Community 353 - "Community 353"
-Cohesion: 0.12
-Nodes (13): admin, mockAuth, mockGetClient, mockHasScope, mockLogStock, mockParseBody, mockPO, mockQueryMany (+5 more)
+Cohesion: 0.15
+Nodes (8): BrandFacet, CategoryItem, ColorFacet, DEFAULT_OPEN_SECTIONS, FacetValue, FilterSidebarProps, PRESERVED_PARAMS, PRICE_PRESETS
 
 ### Community 354 - "Community 354"
-Cohesion: 0.03
-Nodes (91): MIN_WIDTH_CLASS, MinWidth, ResponsiveListProps, BusinessCustomerItem, BusinessCustomersMobileList(), joined(), STATUS_STYLES, BusinessRfqsMobileList() (+83 more)
+Cohesion: 0.02
+Nodes (137): DraftConfirmModal(), Props, variantLabel(), BrandsMobileList(), Props, BusinessCustomerItem, BusinessCustomersMobileList(), joined() (+129 more)
 
 ### Community 355 - "Community 355"
 Cohesion: 0.15
 Nodes (12): 1. Host the model assets on the existing S3/CloudFront, 2. Make the model base URL configurable (code), 3. CSP — allow the CDN, 4. CI build-args (mirror the Razorpay flag exactly), 5. Ship + verify, Approval needed, Decision: host model on CDN, load by URL, flag via CI build-arg, Not doing (+4 more)
 
 ### Community 356 - "Community 356"
-Cohesion: 0.11
-Nodes (17): A. Shared validator & picker — already built, B. business/signup route (email flow) — add DOB, Business auth: parity with the new customer sign-up flow, C. business/google route — refactor + two-stage (no instant create), D. business/signup page — Google mode gets mobile + DOB + phone-verify, Decisions (confirmed), Design, E. business/me — expose dateOfBirth (+9 more)
+Cohesion: 0.17
+Nodes (8): CategoryBanner, ProductGrid(), ProductItem, Props, resolve(), TableRow(), ViewMode, SORT_OPTIONS
 
 ### Community 357 - "Community 357"
 Cohesion: 0.23
@@ -1766,16 +1734,16 @@ Cohesion: 0.04
 Nodes (35): canReuseTensor(), create(), createInferenceSessionHandler(), createTemporaryTensor(), data(), destroy(), dispose(), download() (+27 more)
 
 ### Community 365 - "Community 365"
-Cohesion: 0.03
-Nodes (55): AdminSelectProps, SelectOption, AssignOption, BulkAction, BulkKind, OfferProductPicker(), PickedProduct, SuggestItem (+47 more)
+Cohesion: 0.01
+Nodes (125): AdminIntegrationsPopup(), IntegrationRow, SocialRow, AdminSelectProps, AdminShortcutHandler(), Combo, Color, COLOR_BADGE (+117 more)
 
 ### Community 366 - "Community 366"
-Cohesion: 0.15
-Nodes (12): 1. Email signup, 2. Google signup completion, 3. Account page (self-service + existing-user nudge), Campaign fix 01 — Birthday: capture date_of_birth, Decisions (confirmed), Files touched, Not in this step, Schema / DB (+4 more)
+Cohesion: 0.17
+Nodes (11): AdminAgentBlocks(), AdminAgentModal(), ConversationListItem, Picker, PickerOption, ProposedAction, Props, SLASH_COMMANDS (+3 more)
 
 ### Community 367 - "Community 367"
-Cohesion: 0.15
-Nodes (12): A. Classify the new scenarios (template-validation.ts), B. Fix each new scenario's send() vars to match its template (the real gap), C. Author a default HTML body + subject per scenario (centralized), Commit plan (local, feature-release), D. Seeder uses the real templates (ensure-builtin-campaigns.ts), Default HTML templates, coupons, and product images for the 14 new campaigns, Design, E. Clean up the junk LOCAL rows from my earlier manual test (+4 more)
+Cohesion: 0.17
+Nodes (8): mockQueryCount, admin, mockAuth, mockHasScope, mockQuery, mockQueryMany, mockQueryOne, params
 
 ### Community 369 - "Community 369"
 Cohesion: 0.10
@@ -1790,36 +1758,36 @@ Cohesion: 0.11
 Nodes (19): devDependencies, @types/node, @types/pg, typescript, typescript, devDependencies, @types/node, typescript (+11 more)
 
 ### Community 372 - "Community 372"
-Cohesion: 0.14
-Nodes (10): builtinScenario, campaignRow, customScenarioRow, mockGetScenario, ADMIN, mockAuth, mockHasScope, mockQuery (+2 more)
+Cohesion: 0.17
+Nodes (9): mockSendAgentConnected, ADMIN, mockAuth, mockHasScope, mockLogActivity, mockQueryMany, mockQueryOne, OPEN_SESSION (+1 more)
 
 ### Community 373 - "Community 373"
 Cohesion: 0.26
 Nodes (12): mockListNotesSince, mockOwnerAdminEmails, mockSendAuditedMail, note, listNotesSince(), esc(), fmtDate(), noteCard() (+4 more)
 
 ### Community 374 - "Community 374"
-Cohesion: 0.18
-Nodes (10): POST(), sendInBackground(), adminPayload, draftCampaign, futureCampaign, mockAuth, mockHasScope, mockQuery (+2 more)
+Cohesion: 0.17
+Nodes (7): { compare }, Entry, FakeIntersectionObserver, inView, notReachedYet, props, scrolledPast
 
 ### Community 375 - "Community 375"
-Cohesion: 0.06
-Nodes (34): ValueStat, friendlyCount(), justLandedDays(), safeHref(), sectionLayout, ValueStatMetric, AboutSection(), AboutSectionProps (+26 more)
+Cohesion: 0.05
+Nodes (35): CategoryTab, CountdownDealData, Testimonial, AboutSection(), AboutSectionProps, BenefitItem, BenefitsProps, BlogTeaserItem (+27 more)
 
 ### Community 378 - "Community 378"
-Cohesion: 0.04
-Nodes (59): BrandFacetValue, buildProductFilterClauses(), ColorFacetValue, facetQuery(), FilterClauses, FilterFacets, FilterFacetValue, getFilterFacets() (+51 more)
+Cohesion: 0.05
+Nodes (52): BrandFacetValue, buildProductFilterClauses(), ColorFacetValue, facetQuery(), FilterClauses, FilterFacets, FilterFacetValue, getFilterFacets() (+44 more)
 
 ### Community 379 - "Community 379"
-Cohesion: 0.10
-Nodes (14): constructor(), create(), createInferenceSessionHandler(), data(), dispose(), ensureValid(), fetchModelAndCopyToWasmMemory(), getData() (+6 more)
+Cohesion: 0.07
+Nodes (23): createInferenceSessionHandler(), fetchModelAndCopyToWasmMemory(), init(), loadModel(), run(), constructor(), create(), createInferenceSessionHandler() (+15 more)
 
 ### Community 380 - "Community 380"
 Cohesion: 0.09
 Nodes (29): aggregateUserSignals(), bestSellerIds(), buildCardSelect(), cache, cacheGet(), cacheSet(), CandidateMeta, curate() (+21 more)
 
 ### Community 381 - "Community 381"
-Cohesion: 0.03
-Nodes (98): AdminTypeaheadProps, SuggestItem, BatchAssignment, BatchOption, BatchPickerItem, BatchPickerModal(), expiryColor(), initSelections() (+90 more)
+Cohesion: 0.02
+Nodes (108): AdminTypeaheadProps, SuggestItem, BatchAssignment, BatchOption, BatchPickerItem, BatchPickerModal(), expiryColor(), initSelections() (+100 more)
 
 ### Community 385 - "Community 385"
 Cohesion: 0.17
@@ -1830,12 +1798,12 @@ Cohesion: 0.16
 Nodes (10): progressForStage(), ShipmentMap(), ShipmentMapProps, Stage, STAGE_LABELS, stageIndex(), STAGES, STOPS (+2 more)
 
 ### Community 387 - "Community 387"
-Cohesion: 0.17
-Nodes (7): CustomField, FormClient(), ReviewForm, SuccessData, FormsTopNav(), CustomField, ReviewForm
+Cohesion: 0.22
+Nodes (8): escapeHtml(), MailShellOptions, POST(), Coupon, couponEmail(), CustomField, ReviewForm, transporter
 
 ### Community 388 - "Community 388"
-Cohesion: 0.09
-Nodes (26): ensureRoom(), generatePolicyPDF(), PDFDocument, renderSection(), StoreHeading, generateMetadata(), icons, applyReplacements() (+18 more)
+Cohesion: 0.08
+Nodes (27): ensureRoom(), generatePolicyPDF(), PDFDocument, renderSection(), StoreHeading, generateMetadata(), icons, applyReplacements() (+19 more)
 
 ### Community 389 - "Community 389"
 Cohesion: 0.14
@@ -1847,7 +1815,7 @@ Nodes (10): getPresetRange(), GSTPage(), GSTR3BData, GSTSummary, HsnRow, INR(), 
 
 ### Community 395 - "Community 395"
 Cohesion: 0.05
-Nodes (50): GET(), GET(), POST(), post(), REAL_ENV, runMigrationFanout, POST(), alreadyApplied() (+42 more)
+Nodes (47): GET(), GET(), POST(), mockQuery, mockQueryOne, GET(), POST(), post() (+39 more)
 
 ### Community 396 - "Community 396"
 Cohesion: 0.14
@@ -1858,20 +1826,20 @@ Cohesion: 0.17
 Nodes (17): createCategorizedLogger(), ctz32(), fromBits(), fromInt(), fromNumber(), fromString(), fromValue(), isLong() (+9 more)
 
 ### Community 399 - "Community 399"
-Cohesion: 0.14
-Nodes (11): mockCompleteAutoTask, mockCreateAutoTask, mockDeliveredSMS, mockInvoiceCharges, mockOfdSMS, mockQuery, mockQueryMany, mockResolveDelhiveryToken (+3 more)
+Cohesion: 0.22
+Nodes (8): build4RPDF(), GET(), ADMIN, mockAuth, mockHasScope, mockQueryMany, mockQueryOne, sampleOrder
 
 ### Community 400 - "Community 400"
 Cohesion: 0.17
 Nodes (17): createCategorizedLogger(), ctz32(), fromBits(), fromInt(), fromNumber(), fromString(), fromValue(), isLong() (+9 more)
 
 ### Community 402 - "Community 402"
-Cohesion: 0.14
-Nodes (11): mockCompleteAutoTask, mockCreateAutoTask, mockDeliveredSMS, mockInvoiceCharges, mockOfdSMS, mockQuery, mockQueryMany, mockResolveDelhiveryToken (+3 more)
+Cohesion: 0.20
+Nodes (8): ADMIN, mockAuth, mockGetClient, mockHasScope, mockQuery, mockQueryMany, mockQueryOne, mockWithTransaction
 
 ### Community 404 - "Community 404"
-Cohesion: 0.12
-Nodes (10): AdminOption, AdminTasksClient(), AssignSelect(), KIND_SEGMENT, PRIORITY_BADGE, PRIORITY_OPTIONS, SEGMENT_COLORS, SEGMENTS (+2 more)
+Cohesion: 0.27
+Nodes (6): GET(), POST(), ADMIN, ALL_COD, ORDERS, recordCodSettlement()
 
 ### Community 406 - "Community 406"
 Cohesion: 0.10
@@ -1882,20 +1850,20 @@ Cohesion: 0.12
 Nodes (15): ✅ aloys-store fully provisioned on dedicated infra (2026-08-17), Branch & Uncommitted State, COST WARNING, ⚠️ CRITICAL FINDING from the live test (blocks real end-to-end), Environment, Important File Paths, Key Decisions, Known Issues / Gotchas (+7 more)
 
 ### Community 408 - "Community 408"
-Cohesion: 0.08
-Nodes (31): addDependency(), buildGraph(), buildGraphFromOnnxFormat(), checkIsAcyclic(), constructor(), cT(), decode(), fn() (+23 more)
+Cohesion: 0.07
+Nodes (37): addDependency(), buildGraph(), buildGraphFromOnnxFormat(), checkIsAcyclic(), constructor(), createDefaultGeometry(), createVertexbuffer(), cT() (+29 more)
 
 ### Community 409 - "Community 409"
 Cohesion: 0.09
-Nodes (38): resolveGoogleMerchantCreds(), baseUrl(), customBatchUpsert(), deleteProduct(), deleteProductByOfferId(), getAccessToken(), getMerchantId(), gmcRequest() (+30 more)
+Nodes (39): resolveGoogleMerchantCreds(), baseUrl(), customBatchUpsert(), deleteProduct(), deleteProductByOfferId(), getAccessToken(), getMerchantId(), gmcRequest() (+31 more)
 
 ### Community 412 - "Community 412"
-Cohesion: 0.01
-Nodes (230): mockAuth, mockQueryMany, mockQueryOne, SUPER_ADMIN, adminPayload, { queryMock, queryOneMock, queryManyMock, queryCountMock, authenticateAdminMock }, sampleBrand, sampleBrandList (+222 more)
+Cohesion: 0.02
+Nodes (90): getBearerToken(), JWT_SECRET, ReviewTokenPayload, ServiceAccountPayload, UserJWTPayload, verifyExtensionToken(), ADMIN, CUSTOMER (+82 more)
 
 ### Community 413 - "Community 413"
-Cohesion: 0.04
-Nodes (37): QuotationResolverBlockUI(), Availability, Prefill, Props, TemplateEntry, ThreadMessage, CustomerEngagementChips(), Props (+29 more)
+Cohesion: 0.21
+Nodes (6): ActivityEvent, FilterKey, FILTERS, KIND_META, ActivityCategory, categoryFor()
 
 ### Community 414 - "Community 414"
 Cohesion: 0.05
@@ -1934,8 +1902,8 @@ Cohesion: 0.14
 Nodes (10): draftQt, finalQt, mockSendEmail, ADMIN, mockAuth, mockHasScope, mockQuery, mockQueryMany (+2 more)
 
 ### Community 426 - "Community 426"
-Cohesion: 0.17
-Nodes (8): ADMIN, mockAuth, mockGetClient, mockHasScope, mockQuery, mockQueryMany, mockQueryOne, mockWithTransaction
+Cohesion: 0.20
+Nodes (10): compareTensorDims(), getInputIndices(), getInputNames(), getValues(), inputNames(), normalizeAndValidateInputs(), onGraphInitialized(), reset() (+2 more)
 
 ### Community 427 - "Community 427"
 Cohesion: 0.24
@@ -1954,52 +1922,52 @@ Cohesion: 0.17
 Nodes (12): calculateTextureWidthAndHeight(), addItemToPoll(), checkTimer(), end(), endTimer(), eu(), getTimerResult(), _m() (+4 more)
 
 ### Community 432 - "Community 432"
-Cohesion: 0.13
-Nodes (21): coerceCell(), CoerceResult, FALSE_SET, parseImageUrls(), TRUE_SET, Coercer, columnByHeader(), columnsForSheet() (+13 more)
+Cohesion: 0.21
+Nodes (14): coerceCell(), parseImageUrls(), columnByHeader(), RowType, Cell, cellReader(), coerceRow(), ParsedRow (+6 more)
 
 ### Community 433 - "Community 433"
-Cohesion: 0.16
-Nodes (9): fO(), Ue(), cs(), create(), createInferenceSessionHandler(), fetchModelAndCopyToWasmMemory(), loadModel(), run() (+1 more)
+Cohesion: 0.22
+Nodes (8): abandonedCheckout, Params, Row, campaign, mockFetchUser, mockQueryMany, mockResolveCoupon, mockSendEmail
 
 ### Community 434 - "Community 434"
-Cohesion: 0.17
-Nodes (10): adminPayload, fakePdfBuffer, mockAuth, mockGeneratePDF, mockHasScope, mockQueryMany, mockQueryOne, sampleItems (+2 more)
+Cohesion: 0.39
+Nodes (6): verifyBirthdayToken(), GET(), loadUser(), POST(), mockQueryOne, mockVerify
 
 ### Community 435 - "Community 435"
-Cohesion: 0.18
-Nodes (6): ToolDef, OPERATIONS_TOOLS, PICKUP_EXCLUDE_STATUSES, mockQuery, mockQueryMany, mockQueryOne
+Cohesion: 0.33
+Nodes (4): AppInstanceArgs, CreateDbInstanceArgs, ProvisioningProvider, ARGS
 
 ### Community 436 - "Community 436"
 Cohesion: 0.18
 Nodes (10): AI Platform package (Tier 1) — HA on Razer via k8s, portable to cloud, App integration (full swap), Cloud portability, Constraints, Decisions (confirmed), Durability / never-lost, Goal, LLM cache layer (new) (+2 more)
 
 ### Community 437 - "Community 437"
-Cohesion: 0.04
-Nodes (110): BANK, DRAFT, KYC, OWNER, TENANT, Props, OnboardPage(), STEPS (+102 more)
+Cohesion: 0.06
+Nodes (59): BANK, DRAFT, KYC, OWNER, TENANT, BASE, { create, edit }, mockFetchTransfer (+51 more)
 
 ### Community 438 - "Community 438"
 Cohesion: 0.22
-Nodes (8): 1. Standardize the multi-capable block JSON (polish, not rewrite), 2. Works on tenants, 3. OCR "unable to process" bug (the concrete fix), Agent UI standardization + OCR-on-tenant fix, Constraints, Decisions needed, The three asks → real work, What already exists (don't rebuild)
+Nodes (5): delhivery, legals, poolAuto, reg, TENANT
 
 ### Community 439 - "Community 439"
 Cohesion: 0.20
 Nodes (8): Data, fmtDuration(), Job, PHASES, StepEvent, StepStage(), StepState, TERMINAL
 
 ### Community 440 - "Community 440"
-Cohesion: 0.22
-Nodes (8): #489 — tenant on-device LLM + fine-tuning + shared LLM layer, Confirmed findings (read, not assumed), Constraints, DECIDED, On-device, Per-tenant embeddings — exact code scope (what IS doable in code), Plan (scoped to verifiable, shippable, security-first), Tests
+Cohesion: 0.25
+Nodes (6): CompareProduct, EXTRA_SPEC_ROWS, FullProduct, PdpCompareSectionFullProps, PdpCompareSectionProps, SPEC_KEYS
 
 ### Community 441 - "Community 441"
 Cohesion: 0.20
 Nodes (8): ADMIN, input, mockGet, mockPasses, mockSave, mockStats, mockAuth, mockHasScope
 
 ### Community 442 - "Community 442"
-Cohesion: 0.17
-Nodes (10): SALES_TOOLS, mockAiChat, mockEmbed, mockOcrImage, mockOcrPdfPages, mockQuery, mockQueryMany, mockQueryManyReplica (+2 more)
+Cohesion: 0.46
+Nodes (4): createProduct(), generateProductSku(), generateVariantSku(), mockWithTransaction
 
 ### Community 443 - "Community 443"
-Cohesion: 0.07
-Nodes (24): ADMIN, mockAuth, mockFetch, mockHasScope, mockParseBody, mockQuery, mockQueryMany, mockQueryOne (+16 more)
+Cohesion: 0.08
+Nodes (28): round2(), applyPct(), deriveFromMrpEx(), GET(), sum(), applyPct(), deriveFromMrpEx(), discountAt() (+20 more)
 
 ### Community 445 - "Community 445"
 Cohesion: 0.25
@@ -2014,12 +1982,12 @@ Cohesion: 0.30
 Nodes (10): buildCard(), GET(), POST(), CardBrand, CardProduct, getFonts(), loadFont(), persistCardToBucket() (+2 more)
 
 ### Community 448 - "Community 448"
-Cohesion: 0.18
-Nodes (10): Decision, Edits (all host→scope at the coupled sites), Fix: reload-logout on `*.jeffistores.in` — scope session binding to the cookie's domain, Key invariant, Out of scope (flagged, not done), Rollout, Root cause (confirmed against live `_debug_log`), Scope helper (reuse the cookie-domain source of truth) (+2 more)
+Cohesion: 0.36
+Nodes (7): AdminAgentMessage(), Block, ENTITY_ROUTES, parseBlocks(), renderBold(), renderInline(), renderInlineText()
 
 ### Community 450 - "Community 450"
-Cohesion: 0.33
-Nodes (5): #508 — resolve open Dependabot alerts, Constraints, Sequence, Tier 1 — clean fixes (do these; low risk), Tier 2 — judgment calls (need owner decision)
+Cohesion: 0.32
+Nodes (6): hasAdminRole(), isSessionValid(), mockBcryptCompare, mockBcryptHash, mockQuery, mockQueryOne
 
 ### Community 452 - "Community 452"
 Cohesion: 0.35
@@ -2038,12 +2006,12 @@ Cohesion: 0.22
 Nodes (6): Category, GalleryImage, Props, ExistingImage, ImageUploadProps, LocalImage
 
 ### Community 456 - "Community 456"
-Cohesion: 0.06
-Nodes (56): POST(), DataSourcePage(), POST(), extractSpreadsheetId(), SheetMatrix, valuesToWorkbookBuffer(), cancelPendingSheetSyncs(), claimNextImportJob() (+48 more)
+Cohesion: 0.05
+Nodes (80): requireAdminScope(), DataSourcePage(), POST(), shipmentData(), extractSpreadsheetId(), SheetMatrix, valuesToWorkbookBuffer(), cancelPendingSheetSyncs() (+72 more)
 
 ### Community 457 - "Community 457"
-Cohesion: 0.04
-Nodes (36): getTatDays(), METRO_PINS_3, OrderDetailModal(), Props, resolveOrderEdd(), CustomerPopover(), OrdersTableRows(), paymentBadgeClass() (+28 more)
+Cohesion: 0.03
+Nodes (41): getTatDays(), METRO_PINS_3, OrderDetailModal(), Props, resolveOrderEdd(), CustomerPopover(), OrdersTableRows(), paymentBadgeClass() (+33 more)
 
 ### Community 458 - "Community 458"
 Cohesion: 0.29
@@ -2058,8 +2026,8 @@ Cohesion: 0.20
 Nodes (10): createMatmulProgramInfo(), getActivationSnippet(), getBiasForMatmul(), getChannels(), getCoordsDataType(), getGlChannels(), getVecChannels(), glslClip() (+2 more)
 
 ### Community 462 - "Community 462"
-Cohesion: 0.18
-Nodes (8): ADMIN, mockAuth, mockGetClient, mockHasScope, mockQuery, mockValidateSql, validAudienceValidation, validProductValidation
+Cohesion: 0.25
+Nodes (6): adminPayload, mockAuth, mockHasScope, mockQueryOne, sampleProduct, sampleVariant
 
 ### Community 463 - "Community 463"
 Cohesion: 0.20
@@ -2070,24 +2038,24 @@ Cohesion: 0.29
 Nodes (5): admin, mockAuth, mockGeneratePDF, mockGetByIds, mockHasScope
 
 ### Community 466 - "Community 466"
-Cohesion: 0.20
-Nodes (8): ADMIN, mockAuth, mockGetClient, mockHasScope, mockQuery, mockQueryMany, mockQueryOne, mockWithTransaction
+Cohesion: 0.32
+Nodes (8): deleteNode(), finalizeGraph(), fuseConvActivationNodes(), getFloat(), isActivation(), removeAllDropoutNodes(), removeAllIdentityNodes(), transformGraph()
 
 ### Community 467 - "Community 467"
-Cohesion: 0.10
-Nodes (50): POST(), Schema, AUTH_USER, CAPTURED_PAYMENT, MOCK_USER, VALID_BODY, CreateRazorpayOrderSchema, handleDraftToken() (+42 more)
+Cohesion: 0.08
+Nodes (55): POST(), Schema, AUTH_USER, CAPTURED_PAYMENT, MOCK_USER, VALID_BODY, CreateRazorpayOrderSchema, handleDraftToken() (+47 more)
 
 ### Community 468 - "Community 468"
-Cohesion: 0.20
-Nodes (8): ADMIN, mockAuth, mockGetClient, mockHasScope, mockQuery, mockQueryMany, mockQueryOne, mockWithTransaction
+Cohesion: 0.36
+Nodes (3): Ni(), Oo(), fromImage()
 
 ### Community 469 - "Community 469"
-Cohesion: 0.13
-Nodes (19): mockGet, getDashboardAnalytics(), num(), pctDelta(), rangeConfig(), DashboardInsights, getDashboardInsights(), nullable() (+11 more)
+Cohesion: 0.19
+Nodes (15): getDashboardAnalytics(), num(), pctDelta(), rangeConfig(), DashboardInsights, getDashboardInsights(), nullable(), num() (+7 more)
 
 ### Community 471 - "Community 471"
-Cohesion: 0.29
-Nodes (4): APPROVED_USER, mockCookieStore, NEW_BIZ_USER, VALID_SIGNUP_BODY
+Cohesion: 0.32
+Nodes (8): fromGpuBuffer(), run(), ht(), k(), Vr(), wt(), fromGpuBuffer(), run()
 
 ### Community 472 - "Community 472"
 Cohesion: 0.12
@@ -2098,8 +2066,8 @@ Cohesion: 0.17
 Nodes (11): A. Block at edit time (draft-units endpoints), B. Override UX (`UnitsManager.tsx`), C. Record intent on the draft, wipe on publish, Constraints, Current state (verified), Decisions (confirmed with user), Design, Files touched (+3 more)
 
 ### Community 474 - "Community 474"
-Cohesion: 0.24
-Nodes (5): drawRect(), getStateCode(), PDFDocument, QRCode, renderAddressBlock()
+Cohesion: 0.25
+Nodes (4): backupStore, reg, seedMod, TENANT
 
 ### Community 475 - "Community 475"
 Cohesion: 0.17
@@ -2126,8 +2094,8 @@ Cohesion: 0.20
 Nodes (9): Authorized JavaScript origins, Authorized redirect URIs, Authorized redirect URIs (the ones that actually gate this flow), Client A — Sign-in  (`GOOGLE_CLIENT_ID` / `NEXT_PUBLIC_GOOGLE_CLIENT_ID`), Client B — Google Sheets data-source sync  (`GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`), Google OAuth — URLs to register (copy-paste), Non-Google (for completeness — register in their own dashboards, NOT Google), Quick fault map (+1 more)
 
 ### Community 482 - "Community 482"
-Cohesion: 0.23
-Nodes (13): buildSystemPromptBody(), buildSystemPromptWithDynamic(), CORE_TOOLS, IncomingMessage, invokeAdminApiInternal(), parseItemLine(), parseQuotationRequest(), parseUiBlocks() (+5 more)
+Cohesion: 0.10
+Nodes (25): mockEmbed, mockFetch, mockFindSimilarCustomers, mockFs, mockPgClient, mockPgPool, mockQuery, mockQueryMany (+17 more)
 
 ### Community 483 - "Community 483"
 Cohesion: 0.33
@@ -2138,24 +2106,24 @@ Cohesion: 0.22
 Nodes (8): Admin overview pages — financial, inventory, RFQs, Batch 1 — Financial Overview tab, Batch 2 — Inventory Overview tab, Batch 3 — RFQs page, orders-style components, Constraints (all batches), Financial Overview (enrich), Inventory Overview (enrich), RICHER OVERVIEW (owner update): diagrams + graphs, not just KPI cards
 
 ### Community 485 - "Community 485"
-Cohesion: 0.20
-Nodes (10): compareTensorDims(), getInputIndices(), getInputNames(), getValues(), inputNames(), normalizeAndValidateInputs(), onGraphInitialized(), reset() (+2 more)
+Cohesion: 0.25
+Nodes (6): replenishment, campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa
 
 ### Community 486 - "Community 486"
 Cohesion: 0.20
 Nodes (10): compareTensorDims(), getInputIndices(), getInputNames(), getValues(), inputNames(), normalizeAndValidateInputs(), onGraphInitialized(), reset() (+2 more)
 
 ### Community 487 - "Community 487"
-Cohesion: 0.28
-Nodes (10): GET(), listProductStatuses(), deriveStatus(), getGmcStatusPage(), getGmcSummary(), GmcPageParams, GmcStatusRow, GmcSummary (+2 more)
+Cohesion: 0.25
+Nodes (11): GET(), deriveStatus(), getGmcStatusPage(), getGmcSummary(), GmcPageParams, GmcStatusRow, GmcSummary, refreshGmcStatusSnapshot() (+3 more)
 
 ### Community 488 - "Community 488"
 Cohesion: 0.22
 Nodes (5): ADMIN_USER, AUTH_USER, MOCK_ORDER, MOCK_ORDER_ITEMS, PARAMS
 
 ### Community 490 - "Community 490"
-Cohesion: 0.22
-Nodes (8): firstPurchaseNudge, Params, Row, campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa
+Cohesion: 0.29
+Nodes (6): firstPurchaseNudge, campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa
 
 ### Community 491 - "Community 491"
 Cohesion: 0.40
@@ -2174,8 +2142,8 @@ Cohesion: 0.40
 Nodes (4): ADR-0007: Delhivery as primary shipping carrier with PDF label generation, Consequences, Context, Decision
 
 ### Community 498 - "Community 498"
-Cohesion: 0.22
-Nodes (8): Params, referralInvite, Row, campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa
+Cohesion: 0.18
+Nodes (10): Params, referralInvite, Row, campaign, mockCode, mockFetchUser, mockLive, mockQueryMany (+2 more)
 
 ### Community 501 - "Community 501"
 Cohesion: 0.25
@@ -2190,16 +2158,16 @@ Cohesion: 0.40
 Nodes (3): mockAuthenticateBusiness, mockCookieStore, mockLogActivity
 
 ### Community 504 - "Community 504"
-Cohesion: 0.11
-Nodes (12): mockFetch, mockIssueUserToken, mockUploadAvatarImage, NEW_USER, mockCookieStore, mockQuery, mockQueryOne, PROFILE (+4 more)
+Cohesion: 0.18
+Nodes (8): mockFetch, mockIssueUserToken, mockUploadAvatarImage, NEW_USER, mockCookieStore, mockQuery, mockQueryOne, PROFILE
 
 ### Community 506 - "Community 506"
 Cohesion: 0.22
 Nodes (5): mockClientQuery, mockQueryMany, mockQueryOne, mockRecompute, mockWithTransaction
 
 ### Community 507 - "Community 507"
-Cohesion: 0.35
-Nodes (10): refreshLoyaltyAccount(), BASE_TIER, LoyaltyTier, multiplierFor(), nextTierAfter(), tiers, tierForPoints(), TierKey (+2 more)
+Cohesion: 0.46
+Nodes (7): deleteRecords(), deleteTenantDns(), route53(), targetIp(), upsert(), upsertTenantDns(), xmlEscape()
 
 ### Community 508 - "Community 508"
 Cohesion: 0.40
@@ -2210,8 +2178,8 @@ Cohesion: 0.20
 Nodes (9): Constraints, Part A — Gateway swap (all direct Ollama callers), Part B — Endpoint scope correctness, Part C — Tenant-safe prompts, Part D — UI: hide AI buttons by scope/plan, Route all AI through the gateway + correct scope/plan gating + tenant-safe prompts, Scope map (domain scope per AI action; already exists in plan_features, verified live), Three coupled goals (+1 more)
 
 ### Community 511 - "Community 511"
-Cohesion: 0.18
-Nodes (9): PUT(), ADMIN, mockAuth, mockHasScope, mockQuery, mockQueryMany, mockQueryOne, PARAMS (+1 more)
+Cohesion: 0.29
+Nodes (4): AI_ACTION_SCOPES, ADMIN_ONLY_OUTSIDE_ADMIN, ALLOWED_WITHOUT_WRITE_SCOPE, MUTATING_WITHOUT_SCOPE_OK
 
 ### Community 512 - "Community 512"
 Cohesion: 0.40
@@ -2219,7 +2187,7 @@ Nodes (5): assert(), generateShaderFuncNameFromInputSamplerName(), generateShade
 
 ### Community 513 - "Community 513"
 Cohesion: 0.01
-Nodes (402): GET(), adminPayload, mockAuth, mockHasScope, mockQueryMany, sampleEvents, ADMIN, GET() (+394 more)
+Nodes (267): getLastAmazonSyncStatus(), POST(), RANGES, isSameOriginRequest(), POST(), authenticateAdmin(), hasScope(), LEGACY_SCOPE_PARENTS (+259 more)
 
 ### Community 515 - "Community 515"
 Cohesion: 0.20
@@ -2238,8 +2206,8 @@ Cohesion: 0.40
 Nodes (5): assert(), generateShaderFuncNameFromInputSamplerName(), generateShaderFuncNameFromInputSamplerNameAtOutCoords(), parseAxisParam(), squeezeShape()
 
 ### Community 519 - "Community 519"
-Cohesion: 0.28
-Nodes (9): canReuseTensor(), createTemporaryTensor(), ensureTensor(), getCachedTensor(), getMLContext(), getMLOpSupportLimits(), registerMLTensor(), registerTensor() (+1 more)
+Cohesion: 0.29
+Nodes (4): adminPayload, mockList, mockAuth, mockHasScope
 
 ### Community 521 - "Community 521"
 Cohesion: 0.22
@@ -2254,8 +2222,8 @@ Cohesion: 0.22
 Nodes (7): ADMIN, mockEnforceCertGate, mockIssueMfaTicket, mockResolveAdminByEmail, mockFetch, mockLogActivity, mockQuery
 
 ### Community 529 - "Community 529"
-Cohesion: 0.09
-Nodes (23): { addToCartMock, showToastMock }, arrester, cover, current, soldOut, FrequentlyBoughtTogether(), FrequentlyBoughtTogetherProps, canAddDirectly() (+15 more)
+Cohesion: 0.05
+Nodes (45): CompareContext, CompareContextValue, CompareProduct, CompareProvider(), useCompare(), { addToCartMock, showToastMock }, arrester, cover (+37 more)
 
 ### Community 530 - "Community 530"
 Cohesion: 0.67
@@ -2267,7 +2235,7 @@ Nodes (4): ADMIN, mockAuth, mockGetPL, mockHasScope
 
 ### Community 532 - "Community 532"
 Cohesion: 0.01
-Nodes (187): PatchSchema, FAILURE_STATUS, notifyCustomer(), CreateAddressSchema, GET(), ADDRESS_ROW, AUTH_USER, VALID_ADDRESS_BODY (+179 more)
+Nodes (191): FAILURE_STATUS, notifyCustomer(), CreateAddressSchema, GET(), POST(), ADDRESS_ROW, AUTH_USER, VALID_ADDRESS_BODY (+183 more)
 
 ### Community 534 - "Community 534"
 Cohesion: 0.50
@@ -2290,20 +2258,16 @@ Cohesion: 0.20
 Nodes (13): FineTuneExample, loadLoraWeights(), openLoraDb(), runFineTune(), saveLoraWeights(), normalizeSlug(), onDeviceKeys, basePath (+5 more)
 
 ### Community 546 - "Community 546"
-Cohesion: 0.18
-Nodes (8): CONDITION_OPTIONS, customerName(), REASON_LABELS, ReplacementCard(), ReplacementRow, STATUS_COLORS, STATUS_LABELS, STATUS_TABS
+Cohesion: 0.29
+Nodes (5): claims, mockHasPlanScope, mockResolveAdminByEmail, mockResolveTenantId, mockStaffSessionFromRequest
 
 ### Community 547 - "Community 547"
 Cohesion: 0.15
 Nodes (12): compilerOptions, declaration, esModuleInterop, lib, module, moduleResolution, outDir, skipLibCheck (+4 more)
 
 ### Community 548 - "Community 548"
-Cohesion: 0.18
-Nodes (8): CONDITION_OPTIONS, customerName(), REASON_LABELS, ReturnCard(), ReturnRow, STATUS_COLORS, STATUS_LABELS, STATUS_TABS
-
-### Community 550 - "Community 550"
-Cohesion: 0.25
-Nodes (7): Explicitly NOT doing now, Files to add, Goal, Integration-test area (top-level `integration-tests/`, separate runner), Open choice to confirm at exit, Verification, Why a separate runner
+Cohesion: 0.29
+Nodes (7): addItemToPoll(), checkTimer(), end(), endTimer(), getTimerResult(), vl(), waitForQueryAndGetTime()
 
 ### Community 551 - "Community 551"
 Cohesion: 0.22
@@ -2354,12 +2318,12 @@ Cohesion: 0.20
 Nodes (9): Constraints, Sequencing, Tenant billing + settlement + RVP fixes, Verification, Workstream 1 — Remove tenant-controlled account cards from admin billing (DECIDED: remove), Workstream 2 — Settlement stuck "captured", no prepaid ledger (DIAGNOSED LIVE), Workstream 3 — RVP creation must enforce + debit wallet (>= Rs 500 floor), Workstream 4 — RVP delivery charge adjustable by admin in the shipment view (+1 more)
 
 ### Community 573 - "Community 573"
-Cohesion: 0.29
-Nodes (7): makeProduct(), makeVariantProduct(), mockBuildCustomLabels, mockBuildProductDetails, mockBuildProductHighlights, mockBuildProductType, mockGetGoogleProductCategory
+Cohesion: 0.20
+Nodes (13): buildAdditionalImages(), buildDetails(), buildHighlights(), buildOfferId(), buildShipping(), productToGmcItems(), makeProduct(), makeVariantProduct() (+5 more)
 
 ### Community 574 - "Community 574"
-Cohesion: 0.05
-Nodes (48): campaignSmsBody(), CampaignWaResult, CampaignWaVars, sendCampaignWhatsApp(), CAMPAIGN_WA_KINDS, campaignSupportsWhatsApp(), mockAbandonedCart, mockAlreadySent (+40 more)
+Cohesion: 0.04
+Nodes (52): campaignSmsBody(), CampaignWaResult, CampaignWaVars, sendCampaignWhatsApp(), CAMPAIGN_WA_KINDS, campaignSupportsWhatsApp(), mockAbandonedCart, mockAlreadySent (+44 more)
 
 ### Community 580 - "Community 580"
 Cohesion: 0.18
@@ -2370,20 +2334,20 @@ Cohesion: 0.18
 Nodes (10): loyaltyTierUpgrade, Params, Row, campaign, goldRow, mockFetchUser, mockQueryMany, mockSendEmail (+2 more)
 
 ### Community 589 - "Community 589"
-Cohesion: 0.25
-Nodes (8): getBigInt64Array(), getFloat32Array(), getInt32Array(), getSizeFromDimensionRange(), getUint16Array(), size(), sizeFromDimension(), sizeToDimension()
+Cohesion: 0.29
+Nodes (6): birthday, campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa
 
 ### Community 590 - "Community 590"
 Cohesion: 0.11
 Nodes (13): FlowTabs(), StageInner(), Stepper(), DemoProvider(), BrowserFrame(), BENEFITS, ProductsDemo(), rs() (+5 more)
 
 ### Community 592 - "Community 592"
-Cohesion: 0.20
-Nodes (7): admin, mockAuth, mockHasScope, mockQueryMany, mockQueryOne, mockWithTx, params
+Cohesion: 0.29
+Nodes (6): birthdayCollect, campaign, defaultParams, mockFetchUser, mockQueryMany, mockSendEmail
 
 ### Community 594 - "Community 594"
-Cohesion: 0.11
-Nodes (14): ADMIN, mockAnnounce, mockAuth, mockDelay, mockGetClient, mockHasScope, mockQuery, mockQueryMany (+6 more)
+Cohesion: 0.29
+Nodes (6): secondPurchaseNudge, campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa
 
 ### Community 595 - "Community 595"
 Cohesion: 0.25
@@ -2410,16 +2374,16 @@ Cohesion: 0.43
 Nodes (5): AuditContext, auditStore, getCurrentAuditAdminId(), runWithAuditContext(), setAuditAdminId()
 
 ### Community 606 - "Community 606"
-Cohesion: 0.18
-Nodes (8): mockRequireScope, sampleDiscounts, sampleRfq, adminPayload, mockQuery, mockQueryMany, mockQueryOne, sampleItems
+Cohesion: 0.43
+Nodes (4): fmt(), fmtDate(), Props, PurchaseOrderViewClient()
 
 ### Community 608 - "Community 608"
-Cohesion: 0.07
-Nodes (38): BASE, { create, edit }, mockFetchTransfer, mockReverse, BankDetails, BankVerifier, BankVerifyResult, StubBankVerifier (+30 more)
+Cohesion: 0.21
+Nodes (7): BankDetails, BankVerifier, BankVerifyResult, StubBankVerifier, validateBankFormat(), verifyBankAccountFAV(), saveBankVerification()
 
 ### Community 609 - "Community 609"
-Cohesion: 0.07
-Nodes (31): days(), ParamSchema, abandonedCart, campaign, mockFetchUser, mockQueryMany, mockResolveCoupon, mockSendEmail (+23 more)
+Cohesion: 0.25
+Nodes (7): abandonedCart, campaign, mockFetchUser, mockQueryMany, mockResolveCoupon, mockSendEmail, mockSendWhatsApp
 
 ### Community 611 - "Community 611"
 Cohesion: 0.40
@@ -2430,8 +2394,8 @@ Cohesion: 0.25
 Nodes (7): A. BUG (the reported crash) — `duplicate key ... uniq_product_units_one_base_product`, B. FEATURE — block a selling-unit CHANGE when stock exists, at all levels, Constraints honored, Files touched (only two), Selling-unit change: fix base-collision crash + enforce write-block on publish, Two problems, Verification (local only, when asked)
 
 ### Community 615 - "Community 615"
-Cohesion: 0.18
-Nodes (10): Params, reviewPhotoFollowup, Row, campaign, defaultParams, mockFetchUser, mockQueryMany, mockSendEmail (+2 more)
+Cohesion: 0.53
+Nodes (4): ExtensionTokenCard(), getAdminInfo(), getAllAdmins(), SettingsPage()
 
 ### Community 616 - "Community 616"
 Cohesion: 0.40
@@ -2442,16 +2406,12 @@ Cohesion: 0.29
 Nodes (5): AUTH_USER, DEFAULT_ADDRESS, RECENT_ORDERS, STATS, WISHLIST_COUNT
 
 ### Community 618 - "Community 618"
-Cohesion: 0.29
-Nodes (4): AUTH_USER, CART_ITEM, CREATED_ORDER, MOCK_USER
-
-### Community 624 - "Community 624"
-Cohesion: 0.29
-Nodes (4): AUTH_USER, CART_ITEM, CREATED_ORDER, MOCK_USER
+Cohesion: 0.04
+Nodes (46): MOCK_PRODUCT, MOCK_USER, USER, VALID_BODY, VALID_ITEM, AUTH_USER, MOCK_RAZORPAY_ORDER, AUTH_USER (+38 more)
 
 ### Community 625 - "Community 625"
-Cohesion: 0.33
-Nodes (5): fmt(), LEDGER_COLORS, STATUS_PILL, StoreDashboardTabs(), Tab
+Cohesion: 0.40
+Nodes (5): OrderItem, Props, canRunOnDeviceSummary(), generateAffirmation(), maybeRunFineTune()
 
 ### Community 626 - "Community 626"
 Cohesion: 0.13
@@ -2462,8 +2422,8 @@ Cohesion: 0.29
 Nodes (5): mockClientQuery, mockQueryMany, mockQueryOne, mockRecompute, mockWithTransaction
 
 ### Community 628 - "Community 628"
-Cohesion: 0.29
-Nodes (7): data(), ensureValid(), getData(), gpuBuffer(), mlTensor(), reshape(), texture()
+Cohesion: 0.33
+Nodes (4): mockCookieStore, mockQuery, mockQueryOne, PROFILE
 
 ### Community 629 - "Community 629"
 Cohesion: 0.22
@@ -2478,16 +2438,12 @@ Cohesion: 0.22
 Nodes (8): App wiring, Deploy (Razer, k3s), GPU guard (Razer only), @jeffi/ai-platform, LLM cache, Migrate to cloud, Never-lost, Shape
 
 ### Community 632 - "Community 632"
-Cohesion: 0.29
-Nodes (7): onRunEnd(), releaseTensor(), releaseTensorId(), setIsDataConverted(), upload(), uploadTensor(), write()
-
-### Community 633 - "Community 633"
-Cohesion: 0.29
-Nodes (6): highValueCart, campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa
+Cohesion: 0.50
+Nodes (4): EditorImage, ImageGalleryEditor(), Props, SPINNER()
 
 ### Community 634 - "Community 634"
-Cohesion: 0.17
-Nodes (9): AUTH_USER, DB_USER, EXISTING_SESSION, mockAuthenticateAnyUser, mockLogActivity, mockQuery, mockQueryOne, mockSendSupportEscalationEmail (+1 more)
+Cohesion: 0.04
+Nodes (51): authenticateAnyUser(), authenticateUser(), verifyPhoneOTP(), ALLOWED, POST(), AUTH_USER, AddCartSchema, DELETE() (+43 more)
 
 ### Community 635 - "Community 635"
 Cohesion: 0.33
@@ -2501,13 +2457,9 @@ Nodes (5): collectRaw(), ensureFingerprintCookie(), readCookie(), sha256Hex(), w
 Cohesion: 0.22
 Nodes (7): ALLOW_FILES, ALLOW_PREFIXES, LOCATION_ALLOW_FILES, LOCATION_SCOPE_PREFIXES, ROOT, SRC, walk()
 
-### Community 640 - "Community 640"
-Cohesion: 0.22
-Nodes (7): GET(), POST(), adminPayload, mockAuth, mockGenerateCodes, mockQuery, mockQueryOne
-
 ### Community 641 - "Community 641"
-Cohesion: 0.20
-Nodes (9): Params, Row, subscriptionRenewal, campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa (+1 more)
+Cohesion: 0.40
+Nodes (4): CoerceResult, FALSE_SET, TRUE_SET, Coercer
 
 ### Community 642 - "Community 642"
 Cohesion: 0.33
@@ -2518,16 +2470,8 @@ Cohesion: 0.25
 Nodes (7): Code style, Contributing, Database changes, Development setup, License of contributions, Pull requests, Reporting bugs and requesting features
 
 ### Community 644 - "Community 644"
-Cohesion: 0.40
-Nodes (4): CategoryMobileDetailBody(), DetailCategory, policyText(), Props
-
-### Community 645 - "Community 645"
-Cohesion: 0.33
-Nodes (4): MOCK_ADDRESS, MOCK_CART, USER, VALID_BODY
-
-### Community 647 - "Community 647"
-Cohesion: 0.20
-Nodes (3): AdminIntegrationsPopup(), IntegrationRow, SocialRow
+Cohesion: 0.67
+Nodes (4): fmtINR(), fmtPriceOrAsk(), fmtStock(), parseNumber()
 
 ### Community 649 - "Community 649"
 Cohesion: 0.67
@@ -2537,14 +2481,6 @@ Nodes (3): ALLOWED_WITHOUT_CLIENT_GATE, mutatingClientComponents(), ungatedMutat
 Cohesion: 0.25
 Nodes (7): Decisions (user), Ecom demo v3: full-bleed, six flows, map tracking, SVG products, Engine (extend src/app/ecom/demo/store.ts + data.ts), Real product facts (from survey) — flows mirror these, Six flows / chapters (each fills the stage, no scroll), UI, Verify
 
-### Community 651 - "Community 651"
-Cohesion: 0.29
-Nodes (6): #487 — team members page on tenants + certificate portal-only cutover, Constraints, Decisions needed (ExitPlanMode / AskUserQuestion), Findings (a lot is already built), Plan, Remaining gaps vs acceptance criteria
-
-### Community 655 - "Community 655"
-Cohesion: 0.33
-Nodes (4): ADMIN, MOCK_ORDER, PARAMS, USER
-
 ### Community 656 - "Community 656"
 Cohesion: 0.40
 Nodes (4): integration-tests, Layout, Playwright (follow-up, not yet set up), What belongs here
@@ -2553,49 +2489,25 @@ Nodes (4): integration-tests, Layout, Playwright (follow-up, not yet set up), Wh
 Cohesion: 0.25
 Nodes (7): 1. What runs today (verified against the repo, 2026-09-24), 2. Target architecture, 3. Ingress and egress dashboard, 4. Migration order, 5. Estimated cost, 6. Open decisions, Self-Managed Kubernetes Plan
 
-### Community 660 - "Community 660"
-Cohesion: 0.29
-Nodes (4): AUTH_USER, mockAuthenticateAnyUser, mockQueryMany, SAMPLE_ORDER
+### Community 658 - "Community 658"
+Cohesion: 0.13
+Nodes (9): requireUserScope(), verifyBusinessToken(), verifyUserToken(), ambientSessionSignals(), mockDbQueryOne, { mockSign, mockJwtVerify, mockResolveSession }, SignJWT, getAuthUser() (+1 more)
 
 ### Community 661 - "Community 661"
-Cohesion: 0.08
-Nodes (47): assertStagedUnitChangesAllowed(), openOrdersForProduct(), ProductDraft, publishProductDraft(), UnitChangeBlockedError, assertUnitChangeAllowed(), changedUnitFields(), validateSerializedUnitStep() (+39 more)
-
-### Community 662 - "Community 662"
-Cohesion: 0.20
-Nodes (7): mockWithTx, admin, mockAuth, mockHasScope, mockQueryMany, mockQueryOne, params
+Cohesion: 0.06
+Nodes (60): admin, idParams, mockQuery, mockQueryMany, mockQueryOne, assertStagedUnitChangesAllowed(), openOrdersForProduct(), ProductDraft (+52 more)
 
 ### Community 666 - "Community 666"
 Cohesion: 0.29
 Nodes (6): Attribution, Code of Conduct, Enforcement, Our pledge, Our standards, Scope
 
 ### Community 668 - "Community 668"
-Cohesion: 0.04
-Nodes (62): ProductCard(), ProductCardProps, PolicyProps, ProductDetailClient(), ProductDetailClientProps, ProductImage, SubVariant, Variant (+54 more)
-
-### Community 669 - "Community 669"
-Cohesion: 0.20
-Nodes (6): sampleForm, admin, mockAuth, mockHasScope, mockQueryMany, mockQueryOne
-
-### Community 670 - "Community 670"
-Cohesion: 0.33
-Nodes (4): mockQueryMany, mockQueryOne, params, mockPO
-
-### Community 671 - "Community 671"
-Cohesion: 0.40
-Nodes (4): Interval, Plan, PLAN_BLURB, PricingCards()
-
-### Community 672 - "Community 672"
-Cohesion: 0.20
-Nodes (8): baseOrder, mockGenerateInvoice, mockGenerateReceipt, mockItems, mockQueryMany, mockQueryOne, mockSettings, params
-
-### Community 673 - "Community 673"
-Cohesion: 0.40
-Nodes (3): MOCK_SHIPMENT_DATA, PARAMS, USER
+Cohesion: 0.02
+Nodes (121): BusinessAboutPage(), CATEGORY_BRANDS, CATEGORY_COLORS, CardProps, PH, generateMetadata(), BusinessAccountMobileHeader(), BusinessAccountMobileTabBar() (+113 more)
 
 ### Community 674 - "Community 674"
 Cohesion: 0.01
-Nodes (199): AdminImageProps, Brand, CustomerNotes(), DeactivateProductButton(), DeactivateProductButtonProps, DeleteBrandButton(), DeleteBrandButtonProps, DeleteCampaignButton() (+191 more)
+Nodes (153): AdminImageProps, SelectOption, Brand, BrandTableRow(), DeactivateProductButton(), DeactivateProductButtonProps, DeleteBrandButton(), DeleteBrandButtonProps (+145 more)
 
 ### Community 675 - "Community 675"
 Cohesion: 0.28
@@ -2606,28 +2518,16 @@ Cohesion: 0.29
 Nodes (6): cartPriceDrop, campaign, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa
 
 ### Community 679 - "Community 679"
-Cohesion: 0.05
-Nodes (26): mockSuggestIcon, UPDATED_CAT, ADMIN, mockAuth, mockHasScope, mockQuery, mockQueryOne, admin (+18 more)
+Cohesion: 0.01
+Nodes (108): deleteProductCascadeTx(), productHasHistory(), retireProduct(), PATCH(), adminPayload, mockAuth, mockHasScope, mockWithTransaction (+100 more)
 
 ### Community 680 - "Community 680"
-Cohesion: 0.04
-Nodes (61): AccountLayout(), PathnameClearer(), WishlistBadgeInput, wishlistBadges, AUTH_PAGES, AUTH_PAGES_SUBDOMAIN, BusinessLayout(), PolicyConsentGate() (+53 more)
+Cohesion: 0.03
+Nodes (58): CustomerNotes(), DeleteCampaignButton(), DraftRowActions(), Props, MfaStatus, TwoFactorCard(), Props, Tier (+50 more)
 
 ### Community 682 - "Community 682"
-Cohesion: 0.03
-Nodes (64): AdminSupportChat(), Message, Props, QUICK_REPLIES, Session, BusinessHeader(), ThemeToggle(), CartContext (+56 more)
-
-### Community 683 - "Community 683"
-Cohesion: 0.70
-Nodes (4): allText(), build(), rowsOf(), valueOf()
-
-### Community 684 - "Community 684"
-Cohesion: 0.20
-Nodes (7): admin, mockAuth, mockHasScope, mockQueryMany, mockQueryOne, mockWithTx, params
-
-### Community 685 - "Community 685"
-Cohesion: 0.29
-Nodes (6): Bug 1 — WhatsApp over-send (the incident), Bug 2 — mail not resending daily, Bug 3 — SMS + WhatsApp should fire together (feature), Campaign send bugs — diagnosis (live-data confirmed) + fixes, Live cleanup (NEEDS OWNER APPROVAL — do NOT run autonomously), Live evidence (read-only, SSM→RDS)
+Cohesion: 0.01
+Nodes (192): AccountLayout(), PathnameClearer(), WishlistBadgeInput, wishlistBadges, generateMetadata(), viewport, BirthdayPage(), Stage (+184 more)
 
 ### Community 687 - "Community 687"
 Cohesion: 0.40
@@ -2637,33 +2537,9 @@ Nodes (3): PARAMS, MOCK_SHIPMENT_DATA, USER
 Cohesion: 0.33
 Nodes (5): Coordinated disclosure, Handling of secrets, Reporting a vulnerability, Scope, Security Policy
 
-### Community 693 - "Community 693"
-Cohesion: 0.67
-Nodes (4): ho(), download(), downloadTensor(), read()
-
-### Community 694 - "Community 694"
-Cohesion: 0.50
-Nodes (4): create(), createInferenceSessionHandler(), fetchModelAndCopyToWasmMemory(), loadModel()
-
-### Community 697 - "Community 697"
-Cohesion: 0.28
-Nodes (7): Address, AddressChangeRequestView, AddressChangeReview(), fmtDate(), norm(), STATUS_LABEL, STATUS_STYLE
-
-### Community 698 - "Community 698"
-Cohesion: 0.67
-Nodes (3): destroy(), onReleaseSession(), releaseTensorsForSession()
-
-### Community 699 - "Community 699"
-Cohesion: 0.67
-Nodes (3): download(), downloadTensor(), read()
-
 ### Community 702 - "Community 702"
-Cohesion: 0.20
-Nodes (9): Params, Row, campaign, defaultParams, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa (+1 more)
-
-### Community 708 - "Community 708"
-Cohesion: 0.32
-Nodes (4): AdminShortcutHandler(), Combo, BUILTIN_SHORTCUT_SCOPES, KeyboardShortcuts
+Cohesion: 0.25
+Nodes (7): campaign, defaultParams, mockFetchUser, mockQueryMany, mockSendEmail, mockSendWa, wishlistReminder
 
 ### Community 709 - "Community 709"
 Cohesion: 0.25
@@ -2673,13 +2549,9 @@ Nodes (5): ADMIN, BASE_ORDER, BIZ_USER, PARAMS, USER
 Cohesion: 0.25
 Nodes (5): ADMIN, BASE_ORDER, BIZ_USER, PARAMS, USER
 
-### Community 712 - "Community 712"
-Cohesion: 0.25
-Nodes (6): mockReconcile, mockSummary, settings, mockAuth, mockEligible, mockSettings
-
 ### Community 713 - "Community 713"
-Cohesion: 0.09
-Nodes (25): fromMLTensor(), run(), ag(), calculateReshapedDims(), calculateTextureWidthAndHeight(), createObjList(), createScalarList(), Eu() (+17 more)
+Cohesion: 0.06
+Nodes (38): run(), ag(), Ai(), areEqual(), at(), calc(), calcMatMulShape(), calcShape() (+30 more)
 
 ### Community 719 - "Community 719"
 Cohesion: 0.20
@@ -2693,69 +2565,41 @@ Nodes (5): cluster, os, download(), downloadTensor(), read()
 Cohesion: 0.29
 Nodes (5): BASE_ORDER, BIZ_USER, USER, ADMIN, PARAMS
 
-### Community 727 - "Community 727"
-Cohesion: 0.29
-Nodes (4): ADMIN, MOCK_ORDER, PARAMS, USER
-
 ### Community 729 - "Community 729"
 Cohesion: 0.29
 Nodes (4): capturedConfigs, importRegistry(), poolOn, poolQuery
 
-### Community 730 - "Community 730"
-Cohesion: 0.40
-Nodes (5): adjustPadAndReturnShape(), adjustPadsBasedOnAutoPad(), computeConvOutputShape(), computePoolOutputShape(), computeShapeHelper()
-
 ### Community 732 - "Community 732"
 Cohesion: 0.09
-Nodes (22): checkFloat32Blend(), checkFloat32Download(), checkFloatTextureAttachableToFrameBuffer(), checkRenderFloat32(), clearActiveTextures(), compile(), compileShader(), createFramebuffer() (+14 more)
-
-### Community 734 - "Community 734"
-Cohesion: 0.48
-Nodes (3): GET(), POST(), unsubscribe()
-
-### Community 738 - "Community 738"
-Cohesion: 0.33
-Nodes (4): ADMIN, BASE, PARAMS, USER
-
-### Community 739 - "Community 739"
-Cohesion: 0.33
-Nodes (4): ADMIN, BASE, PARAMS, USER
-
-### Community 740 - "Community 740"
-Cohesion: 0.33
-Nodes (6): Ze(), create(), createInferenceSessionHandler(), fetchModelAndCopyToWasmMemory(), loadModel(), run()
+Nodes (25): Au(), checkFloat32Blend(), checkFloat32Download(), checkFloatTextureAttachableToFrameBuffer(), checkRenderFloat32(), compile(), compileShader(), createFramebuffer() (+17 more)
 
 ### Community 744 - "Community 744"
-Cohesion: 0.22
-Nodes (7): AUTH_USER, CancelOptions, cancelOrder(), CancelReason, CancelResult, POST(), PARAMS
-
-### Community 745 - "Community 745"
-Cohesion: 0.67
-Nodes (4): download(), downloadTensor(), es(), read()
+Cohesion: 0.14
+Nodes (12): AUTH_USER, mockClient, mockQuery, mockQueryMany, mockQueryOne, CANCELLABLE_STATUSES, CancelOptions, cancelOrder() (+4 more)
 
 ### Community 746 - "Community 746"
 Cohesion: 0.67
 Nodes (3): export_gstr1 Case, GSTR-1 Endpoint, super_admin Role
 
 ## Knowledge Gaps
-- **5190 isolated node(s):** `extends`, `import/no-restricted-paths`, `$schema`, `release-type`, `package-name` (+5185 more)
+- **5131 isolated node(s):** `extends`, `import/no-restricted-paths`, `$schema`, `release-type`, `package-name` (+5126 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **43 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **42 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `bp()` connect `Product Search Ranking` to `Module: sendOTPEmail`, `Small Group 259`, `Community 680`, `Community 682`, `Community 331`, `Community 460`, `Small Group 238`, `Financial Client`, `Small Group 247`, `Community 378`, `Community 668`, `Community 351`?**
-  _High betweenness centrality (0.119) - this node is a cross-community bridge._
-- **Why does `run()` connect `Community 460` to `Product Search Ranking`, `Small Group 171`, `Root Layout & Theme`, `Module: FormsPreview.tsx`?**
-  _High betweenness centrality (0.118) - this node is a cross-community bridge._
-- **Why does `p()` connect `Module: page.tsx` to `Community 745`, `Community 418`, `Unit Rules Panel`?**
-  _High betweenness centrality (0.086) - this node is a cross-community bridge._
-- **Are the 252 inferred relationships involving `authenticateAdmin()` (e.g. with `GET()` and `POST()`) actually correct?**
-  _`authenticateAdmin()` has 252 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 251 inferred relationships involving `hasScope()` (e.g. with `hasPlanScope()` and `GET()`) actually correct?**
-  _`hasScope()` has 251 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `bp()` connect `Community 668` to `Community 356`, `Community 680`, `Community 682`, `Community 460`, `Community 658`, `Small Group 247`, `Community 378`?**
+  _High betweenness centrality (0.122) - this node is a cross-community bridge._
+- **Why does `run()` connect `Community 460` to `Community 668`, `Small Group 171`, `Root Layout & Theme`, `Module: FormsPreview.tsx`?**
+  _High betweenness centrality (0.121) - this node is a cross-community bridge._
+- **Why does `p()` connect `Module: page.tsx` to `Community 418`, `Small Group 163`, `Small Group 263`?**
+  _High betweenness centrality (0.084) - this node is a cross-community bridge._
+- **Are the 254 inferred relationships involving `authenticateAdmin()` (e.g. with `GET()` and `POST()`) actually correct?**
+  _`authenticateAdmin()` has 254 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 253 inferred relationships involving `hasScope()` (e.g. with `hasPlanScope()` and `GET()`) actually correct?**
+  _`hasScope()` has 253 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `extends`, `import/no-restricted-paths`, `$schema` to the rest of the system?**
-  _5190 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _5131 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `API Routes Hub` be split into smaller, more focused modules?**
-  _Cohesion score 0.011944348889653327 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.011784888491086746 - nodes in this community are weakly interconnected._
