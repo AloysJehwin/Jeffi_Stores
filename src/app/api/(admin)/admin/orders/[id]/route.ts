@@ -129,6 +129,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (d.status !== undefined) {
       setClauses.push(`status = $${values.length + 1}`)
       values.push(d.status)
+      // Stamp the lifecycle timestamp that matches the new status, but never clobber an
+      // existing one (COALESCE) — the Delhivery sync may already have recorded the real
+      // moment. Without this, a manual status change leaves delivered_at/shipped_at null,
+      // which starves delivery-gated campaigns and the loyalty credit-delay clock.
+      const STATUS_STAMP: Record<string, string> = {
+        confirmed: 'confirmed_at',
+        shipped: 'shipped_at',
+        delivered: 'delivered_at',
+        cancelled: 'cancelled_at',
+      }
+      const stampColumn = STATUS_STAMP[d.status]
+      if (stampColumn) setClauses.push(`${stampColumn} = COALESCE(${stampColumn}, NOW())`)
     }
     if (d.awb_number !== undefined) {
       setClauses.push(`awb_number = $${values.length + 1}`)
