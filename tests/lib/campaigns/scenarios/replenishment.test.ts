@@ -72,6 +72,46 @@ describe('replenishment scenario', () => {
       expect(args[2]).toBe(defaultParams.maxRecipientsPerSweep)
     })
 
+    it("uses a consumable category's reorder interval (60 days, minus the 3-day lookahead)", async () => {
+      const row = (id: string, ago: number) => ({
+        user_id: id,
+        product_id: 'p-' + id,
+        product_slug: 'screws',
+        product_name: 'Machine screws',
+        is_subscription: false,
+        subscription_interval: null,
+        reorder_interval_days: 60,
+        last_purchase_at: daysAgo(ago),
+      })
+      mockQueryMany.mockResolvedValue([row('early', 50), row('due', 58)])
+      expect(await replenishment.findEligible({ campaign, params: defaultParams })).toEqual([
+        { user_id: 'due', product_id: 'p-due' },
+      ])
+      const [sql] = mockQueryMany.mock.calls[0]
+      expect(String(sql)).toContain('COALESCE(c.reorder_interval_days, pc.reorder_interval_days)')
+      expect(String(sql)).toContain('p.is_subscription = TRUE OR')
+      expect(String(sql)).toContain('p.is_active = TRUE')
+    })
+
+    it('keeps a subscription product on its own interval even inside a consumable category', async () => {
+      mockQueryMany.mockResolvedValue([
+        {
+          user_id: 'u3',
+          product_id: 'p3',
+          product_slug: 'oil',
+          product_name: 'Cutting oil',
+          is_subscription: true,
+          subscription_interval: 'weekly',
+          reorder_interval_days: 90,
+          last_purchase_at: daysAgo(6),
+        },
+      ])
+      // weekly (7d) - 3d lookahead = 4d; bought 6 days ago -> due, though the category says 90 days
+      expect(await replenishment.findEligible({ campaign, params: defaultParams })).toEqual([
+        { user_id: 'u3', product_id: 'p3' },
+      ])
+    })
+
     it('excludes a user who bought too recently to be due', async () => {
       // monthly (30d), bought 5 days ago -> elapsed(5d) < 27d threshold -> not eligible
       mockQueryMany.mockResolvedValue([
