@@ -7,7 +7,7 @@ import { useToast } from '@/contexts/ToastContext'
 import type { ReferralSettings } from '@/lib/referrals/settings'
 
 const inputClass =
-  'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent disabled:opacity-60'
+  'field-sm w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent disabled:opacity-60'
 const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 const hintClass = 'mt-1 text-xs text-foreground-muted'
 const cardClass = 'bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5'
@@ -109,7 +109,7 @@ export default function ReferralSettingsForm({ initial }: { initial: ReferralSet
         <button
           type="submit"
           disabled={saving}
-          className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-60"
+          className="control-sm bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors disabled:opacity-60"
         >
           {saving ? 'Saving' : 'Save settings'}
         </button>

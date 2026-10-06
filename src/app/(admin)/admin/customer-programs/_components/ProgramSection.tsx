@@ -12,10 +12,10 @@ export function Stat({ label, value, hint }: { label: string; value: string; hin
 }
 
 export const filterInputClass =
-  'px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500'
+  'field-sm border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500'
 export const PROGRAMS_PATH = '/admin/customer-programs'
 export const filterButtonClass =
-  'px-4 py-1.5 text-sm font-medium border border-border-secondary rounded-lg text-foreground hover:bg-surface-secondary'
+  'control-sm font-medium border border-border-secondary text-foreground hover:bg-surface-secondary'
 
 // One customer program tab. A program switched off in Site Controls stays visible but greyed out,
 // so admins can see it exists (and still set it up) without mistaking it for live.
