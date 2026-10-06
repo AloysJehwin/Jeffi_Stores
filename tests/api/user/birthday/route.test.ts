@@ -3,10 +3,12 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
 vi.mock('@/lib/auth/jwt', () => ({ verifyBirthdayToken: vi.fn() }))
+vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn() }))
 
 import { GET, POST } from '@/app/api/(public)/user/birthday/route'
 import { queryOne } from '@/lib/shared/db'
 import { verifyBirthdayToken } from '@/lib/auth/jwt'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 const mockQueryOne = queryOne as ReturnType<typeof vi.fn>
 const mockVerify = verifyBirthdayToken as ReturnType<typeof vi.fn>
@@ -19,7 +21,16 @@ describe('/api/user/birthday', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockVerify.mockResolvedValue({ userId: 'u1' })
+    vi.mocked(getFeatureFlags).mockResolvedValue({ birthdayEnabled: true } as any)
     mockQueryOne.mockResolvedValue({ id: 'u1', first_name: 'Sam', date_of_birth: null })
+  })
+
+  it('answers not available, without reading the token or writing, while Birthday rewards are off', async () => {
+    vi.mocked(getFeatureFlags).mockResolvedValue({ birthdayEnabled: false } as any)
+    expect((await GET(new NextRequest(`${URL}?token=t`))).status).toBe(404)
+    expect((await POST(post({ token: 't', dateOfBirth: '1990-05-17' }))).status).toBe(404)
+    expect(mockVerify).not.toHaveBeenCalled()
+    expect(mockQueryOne).not.toHaveBeenCalled()
   })
 
   describe('GET', () => {

@@ -10,6 +10,7 @@ import BuyAgainRow from '@/components/visitor/account/BuyAgainRow'
 import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
 import DatePicker from '@/components/ui/DatePicker'
 import { isValidDob } from '@/lib/shared/format'
+import { useStoreFlag } from '@/hooks/useStoreFlags'
 // AccountNavBar is rendered by layout.tsx for all /account/* pages
 
 interface DashboardData {
@@ -72,6 +73,7 @@ export default function AccountPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState({ firstName: '', lastName: '', phone: '', dob: '' })
   const [dobNudgeDismissed, setDobNudgeDismissed] = useState(false)
+  const birthdayEnabled = useStoreFlag('birthdayEnabled')
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [showPhoneVerify, setShowPhoneVerify] = useState(false)
@@ -506,7 +508,7 @@ export default function AccountPage() {
                 )}
               </div>
 
-              {!isEditing && user && !user.dateOfBirth && !dobNudgeDismissed && (
+              {birthdayEnabled && !isEditing && user && !user.dateOfBirth && !dobNudgeDismissed && (
                 <div className="mb-3 p-2.5 rounded-lg text-xs bg-accent-50 dark:bg-accent-950/20 border border-accent-200 dark:border-accent-800 flex items-start justify-between gap-2">
                   <button onClick={() => setIsEditing(true)} className="text-left text-accent-700 dark:text-accent-300">
                     Add your date of birth so we can send you a birthday treat.

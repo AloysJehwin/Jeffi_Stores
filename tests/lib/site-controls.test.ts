@@ -171,3 +171,15 @@ describe('site-controls tenant isolation', () => {
     expect(c.storefront.metaTagline).toBe('Fresh Groceries Daily')
   })
 })
+
+describe('site-controls birthday rewards flag', () => {
+  it('is on by default so existing stores keep the birthday prompt and campaigns', async () => {
+    mockQueryMany.mockResolvedValueOnce([] as any)
+    expect((await getFeatureFlags()).birthdayEnabled).toBe(true)
+  })
+
+  it('reads feature_birthday_enabled from the DB', async () => {
+    mockQueryMany.mockResolvedValueOnce(rows({ feature_birthday_enabled: 'false' }) as any)
+    expect((await getFeatureFlags()).birthdayEnabled).toBe(false)
+  })
+})

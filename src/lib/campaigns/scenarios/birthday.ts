@@ -3,6 +3,7 @@ import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { days, fromMinutes, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 interface Params extends Record<string, unknown> {
   windowBefore: number
@@ -49,6 +50,7 @@ export const birthday: ScenarioModule<Params, Row> = {
   },
 
   async findEligible({ campaign, params }) {
+    if (!(await getFeatureFlags()).birthdayEnabled) return []
     const windowMin = readDurationParam(params, 'windowBefore') ?? days(2)
     const windowDays = Math.max(0, Math.round(fromMinutes(windowMin, 'days')))
     const cooldownMin = cooldownMinutes(params)
@@ -80,6 +82,7 @@ export const birthday: ScenarioModule<Params, Row> = {
   },
 
   async findSuppressed({ campaign, params }) {
+    if (!(await getFeatureFlags()).birthdayEnabled) return []
     const windowMin = readDurationParam(params, 'windowBefore') ?? days(2)
     const windowDays = Math.max(0, Math.round(fromMinutes(windowMin, 'days')))
     const cooldownMin = cooldownMinutes(params)

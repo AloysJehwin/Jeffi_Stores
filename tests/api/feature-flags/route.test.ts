@@ -16,7 +16,7 @@ const mockReferral = getReferralSettings as ReturnType<typeof vi.fn>
 describe('GET /api/feature-flags', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockFlags.mockResolvedValue({ smsEnabled: true, whatsappEnabled: false, razorpayEnabled: true })
+    mockFlags.mockResolvedValue({ smsEnabled: true, whatsappEnabled: false, razorpayEnabled: true, birthdayEnabled: true })
     mockLoyalty.mockResolvedValue({ enabled: true, pointValue: 1 })
     mockReferral.mockResolvedValue({ enabled: false })
   })
@@ -26,6 +26,7 @@ describe('GET /api/feature-flags', () => {
       smsEnabled: true,
       whatsappEnabled: false,
       loyaltyEnabled: true,
+      birthdayEnabled: true,
       referralEnabled: false,
     })
   })

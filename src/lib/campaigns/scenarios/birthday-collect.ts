@@ -3,6 +3,7 @@ import { fetchUserContext, sendCampaignEmail } from '@/lib/shared/automation-ema
 import { generateBirthdayToken } from '@/lib/auth/jwt'
 import { days, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 interface Params extends Record<string, unknown> {
   askAgainAfter: number
@@ -48,6 +49,7 @@ export const birthdayCollect: ScenarioModule<Params, Row> = {
   },
 
   async findEligible({ campaign, params }) {
+    if (!(await getFeatureFlags()).birthdayEnabled) return []
     return queryMany<Row>(
       `
       SELECT u.id::text AS user_id
@@ -73,6 +75,7 @@ export const birthdayCollect: ScenarioModule<Params, Row> = {
   },
 
   async findSuppressed({ campaign, params }) {
+    if (!(await getFeatureFlags()).birthdayEnabled) return []
     const rows = await queryMany<{
       user_id: string
       reason: string

@@ -72,7 +72,7 @@ export default function BirthdayPage() {
       ) : stage === 'error' ? (
         <div className={CARD}>
           <p className="text-4xl">🎂</p>
-          <h1 className="mt-3 font-semibold text-foreground">This link has expired</h1>
+          <h1 className="mt-3 font-semibold text-foreground">This link can&apos;t be used</h1>
           <p className="mt-2 text-sm text-foreground-secondary">{error}</p>
           <Link href="/account" className="mt-5 inline-block text-sm font-medium text-accent-600 hover:text-accent-700">
             Add it from my account

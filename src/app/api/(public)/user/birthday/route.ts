@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/shared/db'
 import { verifyBirthdayToken } from '@/lib/auth/jwt'
 import { normalizeDob } from '@/lib/shared/format'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,6 +10,9 @@ export const dynamic = 'force-dynamic'
 // the link was sent to; it can only fill an empty date, never overwrite one already saved.
 
 async function loadUser(token: string | null) {
+  if (!(await getFeatureFlags()).birthdayEnabled) {
+    return { error: NextResponse.json({ error: 'Birthday rewards are not available right now.' }, { status: 404 }) }
+  }
   if (!token) return { error: NextResponse.json({ error: 'Missing link token' }, { status: 400 }) }
   const payload = await verifyBirthdayToken(token)
   if (!payload) {

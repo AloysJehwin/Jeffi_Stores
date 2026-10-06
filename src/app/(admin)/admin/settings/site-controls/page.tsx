@@ -20,6 +20,8 @@ import CustomShortcutsCard, { CustomShortcut } from '@/components/admin/site-con
 import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
 import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
 import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
+import { getLoyaltySettings } from '@/lib/loyalty/settings'
+import { getReferralSettings } from '@/lib/referrals/settings'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -97,7 +99,7 @@ export default async function SiteControlsPage() {
   }
 
   await seedBuiltinShortcuts()
-  const c = await getSiteControls()
+  const [c, loyalty, referral] = await Promise.all([getSiteControls(), getLoyaltySettings(), getReferralSettings()])
   const inv = await loadInvoiceKeys()
   const delivery = await getDeliverySettings()
   const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
@@ -278,6 +280,33 @@ export default async function SiteControlsPage() {
             </SectionCard>
           </div>
         )}
+
+        <div>
+          <SectionCard
+            title="Customer programs"
+            description="Switch customer-facing reward programs on or off for the whole store."
+            columns
+          >
+            <FullSpan>
+              <ToggleControl
+                settingKey="referral_enabled"
+                label="Refer & Earn"
+                hint="Customers get a personal link and earn loyalty points when a friend's first order is delivered. Reward size and yearly limit are under Marketing > Referrals."
+                initial={referral.enabled}
+                locked={!loyalty.enabled && !referral.enabled}
+                lockedHint="Turn on the loyalty program first (Marketing > Loyalty). Referral rewards are paid in loyalty points."
+              />
+            </FullSpan>
+            <FullSpan>
+              <ToggleControl
+                settingKey="feature_birthday_enabled"
+                label="Birthday rewards"
+                hint="Shows the 'add your birthday' prompt and the birthday link page, and lets the Birthday and Birthday Collection campaigns run. Each campaign is still switched on in Marketing > Campaigns."
+                initial={c.flags.birthdayEnabled}
+              />
+            </FullSpan>
+          </SectionCard>
+        </div>
 
         <div>
           <SectionCard

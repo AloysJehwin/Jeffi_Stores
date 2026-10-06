@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'
@@ -39,6 +40,9 @@ const EDITABLE_KEYS = [
   'feature_inventory_validation_enabled',
   'feature_sms_enabled',
   'feature_whatsapp_enabled',
+  'feature_birthday_enabled',
+  // Shared with Marketing > Referrals so the two switches can never disagree.
+  'referral_enabled',
   'feature_ondevice_summary_enabled',
   'feature_ondevice_finetune_enabled',
   'feature_ondevice_summary_mobile_enabled',
@@ -100,6 +104,14 @@ async function upsert(key: string, value: string) {
   )
 }
 
+// Referral rewards are loyalty points, so the program can't be switched on without loyalty.
+// Mirrors the rule on Marketing > Referrals; switching it off is always allowed.
+async function referralNeedsLoyalty(updates: Array<{ key: string; value: unknown }>): Promise<boolean> {
+  const enabling = updates.some(u => u.key === 'referral_enabled' && String(u.value) === 'true')
+  return enabling && !(await getLoyaltySettings()).enabled
+}
+const REFERRAL_NEEDS_LOYALTY = 'Turn on the loyalty program first. Referral rewards are paid in loyalty points.'
+
 function invalidateFor(keys: string[]) {
   if (keys.some(k => k.startsWith('delivery_'))) invalidateDeliverySettingsCache()
   // Any non-delivery key may be part of site-controls; invalidate broadly (cheap).
@@ -120,6 +132,7 @@ export async function PATCH(request: NextRequest) {
       const updates = body.updates as Array<{ key: string; value: unknown }>
       const bad = updates.find(u => !EDITABLE_SET.has(u.key))
       if (bad) return NextResponse.json({ error: `Setting not editable: ${bad.key}` }, { status: 400 })
+      if (await referralNeedsLoyalty(updates)) return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
       for (const u of updates) await upsert(u.key, String(u.value))
       invalidateFor(updates.map(u => u.key))
       return NextResponse.json({ success: true, count: updates.length })
@@ -129,6 +142,9 @@ export async function PATCH(request: NextRequest) {
     const { key, value } = body
     if (!EDITABLE_SET.has(key)) {
       return NextResponse.json({ error: 'Setting not editable via this endpoint' }, { status: 400 })
+    }
+    if (await referralNeedsLoyalty([{ key, value }])) {
+      return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
     }
     await upsert(key, String(value))
     invalidateFor([key])

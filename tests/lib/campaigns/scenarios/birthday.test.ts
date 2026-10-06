@@ -1,5 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
+vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), query: vi.fn() }))
 vi.mock('@/lib/shared/automation-emails', () => ({
   APP_URL: 'https://jeffistores.com',
@@ -15,6 +16,7 @@ import { birthday } from '@/lib/campaigns/scenarios/birthday'
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, sendCampaignEmail } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { days } from '@/lib/campaigns/duration'
 
 const mockQueryMany = queryMany as ReturnType<typeof vi.fn>
@@ -26,7 +28,10 @@ const campaign = { kind: 'birthday', enabled: true, name: 'Birthday', coupon_id:
 const defaultParams = birthday.defaultParams
 
 describe('birthday scenario', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(getFeatureFlags).mockResolvedValue({ birthdayEnabled: true } as any)
+  })
 
   it('has kind birthday', () => {
     expect(birthday.kind).toBe('birthday')
@@ -39,6 +44,14 @@ describe('birthday scenario', () => {
   })
 
   describe('findEligible', () => {
+    it('finds nobody, and reports no one suppressed, while Birthday rewards are off', async () => {
+      vi.mocked(getFeatureFlags).mockResolvedValue({ birthdayEnabled: false } as any)
+      const params = birthday.defaultParams as any
+      expect(await birthday.findEligible({ campaign, params })).toEqual([])
+      expect(await birthday.findSuppressed!({ campaign, params })).toEqual([])
+      expect(mockQueryMany).not.toHaveBeenCalled()
+    })
+
     it('passes the window as whole days (int) and cooldown as minutes', async () => {
       mockQueryMany.mockResolvedValue([{ user_id: 'u1' }])
       const rows = await birthday.findEligible({ campaign, params: defaultParams })

@@ -7,9 +7,10 @@ import { useEffect, useState } from 'react'
 export interface StoreFlags {
   loyaltyEnabled: boolean
   referralEnabled: boolean
+  birthdayEnabled: boolean
 }
 
-const OFF: StoreFlags = { loyaltyEnabled: false, referralEnabled: false }
+const OFF: StoreFlags = { loyaltyEnabled: false, referralEnabled: false, birthdayEnabled: false }
 
 let cached: StoreFlags | null = null
 let pending: Promise<StoreFlags> | null = null
@@ -20,7 +21,11 @@ function loadStoreFlags(): Promise<StoreFlags> {
     pending = fetch('/api/feature-flags')
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
-        cached = { loyaltyEnabled: data?.loyaltyEnabled === true, referralEnabled: data?.referralEnabled === true }
+        cached = {
+          loyaltyEnabled: data?.loyaltyEnabled === true,
+          referralEnabled: data?.referralEnabled === true,
+          birthdayEnabled: data?.birthdayEnabled === true,
+        }
         return cached
       })
       .catch(() => {
