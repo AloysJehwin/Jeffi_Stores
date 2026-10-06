@@ -13,6 +13,7 @@ import {
   publishInstagramReel,
 } from '@/lib/catalog/meta'
 import { queryOne } from '@/lib/shared/db'
+import { resolveCurrentTenant, storeBaseUrlAsync } from '@/lib/catalog/brand'
 import { generateSocialCaption } from './caption'
 import { withProductLink, productUrl } from './product-url'
 
@@ -69,6 +70,12 @@ async function getProductForCaption(
   )
 }
 
+// A tenant's posts link its own store; the platform keeps productUrl's configured default.
+async function tenantStoreBase(): Promise<string | undefined> {
+  const tenant = await resolveCurrentTenant()
+  return tenant?.slug ? storeBaseUrlAsync() : undefined
+}
+
 /**
  * Resolve the caption to publish: the admin's text if set, otherwise one generated from the
  * linked product. Either way the product link is appended, so a post always sends people to
@@ -76,14 +83,15 @@ async function getProductForCaption(
  */
 async function ensureCaption(
   post: ScheduledSocialPost,
-  product: { name: string; slug: string; description: string | null } | null
+  product: { name: string; slug: string; description: string | null } | null,
+  storeBase: string | undefined
 ): Promise<string> {
-  if (post.caption?.trim()) return withProductLink(post.caption, product?.slug)
+  if (post.caption?.trim()) return withProductLink(post.caption, product?.slug, storeBase)
   if (!product) return ''
 
   const generated = await generateSocialCaption({ productName: product.name, productDescription: product.description })
   if (!generated) return ''
-  const linked = withProductLink(generated, product.slug)
+  const linked = withProductLink(generated, product.slug, storeBase)
   await updateSocialPost(post.id, { caption: linked })
   return linked
 }
@@ -102,7 +110,8 @@ export async function publishScheduledPost(
     if (!creds) throw new Error('no connected social account / credentials for this post')
 
     const product = post.product_id ? await getProductForCaption(post.product_id) : null
-    const resolvedCaption = await ensureCaption(post, product)
+    const storeBase = await tenantStoreBase()
+    const resolvedCaption = await ensureCaption(post, product, storeBase)
     const caption = [resolvedCaption, post.hashtags].filter(Boolean).join('\n\n')
     const allImages = [post.image_url, ...(post.image_urls ?? [])].filter((u): u is string => !!u)
 
@@ -121,7 +130,7 @@ export async function publishScheduledPost(
               pageId: creds.pageId,
               message: caption,
               imageUrl: allImages[0],
-              link: product ? productUrl(product.slug) : null,
+              link: product ? productUrl(product.slug, storeBase) : null,
               accessToken: creds.accessToken,
             })
       postedId = r.id

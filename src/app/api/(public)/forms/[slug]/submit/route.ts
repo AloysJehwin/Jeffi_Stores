@@ -4,7 +4,7 @@ import { uploadGalleryImage } from '@/lib/shared/s3'
 import { PoolClient } from 'pg'
 import nodemailer from 'nodemailer'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
-import { currentBrandNameAsync } from '@/lib/catalog/brand'
+import { currentBrandNameAsync, customerMailFromAsync, storeBaseUrlAsync } from '@/lib/catalog/brand'
 import { mailShell } from '@/lib/shared/mail-template'
 
 interface CustomField {
@@ -37,10 +37,11 @@ const transporter = nodemailer.createTransport({
   auth: { user: process.env.SES_SMTP_USER, pass: process.env.SES_SMTP_PASSWORD },
 })
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
-
 async function couponEmail(coupon: Coupon, email: string) {
   const brand = await currentBrandNameAsync()
+  // This store's own site (the tenant's, on a tenant form), not a static platform URL.
+  const storeBase = await storeBaseUrlAsync()
+  const storeHost = new URL(storeBase).host
   const discountText =
     coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : `₹${coupon.discount_value} off`
   const validLine = coupon.valid_until
@@ -59,10 +60,10 @@ async function couponEmail(coupon: Coupon, email: string) {
         ${coupon.description ? `<p style="font-size:13px;color:#555;margin:8px 0 0;">${coupon.description}</p>` : ''}
         ${validLine}
       </div>
-      <div class="cta"><a href="${BASE_URL}/products" class="button">Shop Now at ${brand}</a></div>
+      <div class="cta"><a href="${storeBase}/products" class="button">Shop Now at ${brand}</a></div>
     `,
     footerLines: [
-      `&copy; ${new Date().getFullYear()} ${brand} &bull; <a href="${BASE_URL}" style="color:#666;">jeffistores.in</a>`,
+      `&copy; ${new Date().getFullYear()} ${brand} &bull; <a href="${storeBase}" style="color:#666;">${storeHost}</a>`,
     ],
     extraCss: `
       .coupon { background-color: white; border: 2px dashed #2563eb; border-radius: 8px; padding: 20px 24px; text-align: center; margin: 20px 0; }
@@ -168,7 +169,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (coupon) {
     try {
       const { subject, html } = await couponEmail(coupon, email)
-      const from = `"${await currentBrandNameAsync()}" <${process.env.SES_FROM_EMAIL}>`
+      const from = await customerMailFromAsync()
       await sendAuditedMail({ from, to: email, subject, html, kind: 'form_submission' })
     } catch (err) {
       console.error('[route]', err)

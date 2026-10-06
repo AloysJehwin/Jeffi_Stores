@@ -1,3 +1,4 @@
+import { catalogBaseUrl } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/shared/db'
 import { currentBrandNameAsync } from '@/lib/catalog/brand'
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
+  const baseUrl = await catalogBaseUrl()
 
   const products = await queryMany(`
     SELECT p.*,
