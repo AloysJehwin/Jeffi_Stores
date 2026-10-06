@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
+import { documentUrl } from '@/lib/shared/customer-links'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!order.customer_email) return NextResponse.json({ error: 'No email address on file' }, { status: 400 })
     if (!order.invoice_number) return NextResponse.json({ error: 'Invoice not yet finalized' }, { status: 400 })
 
-    const viewUrl = `https://invoice.jeffistores.in/${order.view_token}`
+    const viewUrl = await documentUrl('invoice', order.view_token)
 
     await sendInvoiceFinalizedEmail(
       order.customer_email,

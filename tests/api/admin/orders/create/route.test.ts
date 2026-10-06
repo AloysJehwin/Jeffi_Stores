@@ -3,6 +3,11 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+vi.mock('@/lib/shared/customer-links', () => ({
+  documentUrl: vi.fn(async (app: string, token: string) => `https://${app}-acme.jeffistores.in/${token}`),
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+  invoiceUrlForOrder: vi.fn(async () => 'https://invoice-acme.jeffistores.in/TOKEN'),
+}))
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({
@@ -360,7 +365,8 @@ describe('POST /api/admin/orders/create', () => {
       'John Doe',
       'JS/2024-25/0001',
       expect.any(Number),
-      'OFF-1234-ABCDE'
+      'OFF-1234-ABCDE',
+      'https://invoice-acme.jeffistores.in/TOKEN'
     )
     delete process.env.ENABLE_GST
   })

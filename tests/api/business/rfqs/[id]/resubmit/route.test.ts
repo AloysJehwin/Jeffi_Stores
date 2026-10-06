@@ -132,7 +132,7 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
     expect(res.status).toBe(201)
     const body = await res.json()
     expect(body.rfq.id).toBe('rfq-new-1')
-    expect(mockSendRfqSubmittedEmail).toHaveBeenCalledWith(APPROVED_USER.email, 'Biz Owner', NEW_RFQ.rfq_number)
+    expect(mockSendRfqSubmittedEmail).toHaveBeenCalledWith(APPROVED_USER.email, 'Biz Owner', NEW_RFQ.rfq_number, NEW_RFQ.id)
   })
 
   it('sets notes to "Resubmitted from ..." with original notes when no additional notes given', async () => {
@@ -181,7 +181,8 @@ describe('POST /api/business/rfqs/[id]/resubmit', () => {
     expect(mockSendRfqSubmittedEmail).toHaveBeenCalledWith(
       APPROVED_USER.email,
       APPROVED_USER.email, // fallback to email
-      NEW_RFQ.rfq_number
+      NEW_RFQ.rfq_number,
+      NEW_RFQ.id
     )
   })
 

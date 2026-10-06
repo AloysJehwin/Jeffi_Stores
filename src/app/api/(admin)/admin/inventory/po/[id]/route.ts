@@ -1,3 +1,4 @@
+import { documentUrl } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -152,7 +153,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               variant_name: it.variant_name,
               quantity: parseFloat(it.quantity),
               unit_cost: parseFloat(it.unit_cost),
-            }))
+            })),
+            po.view_token ? await documentUrl('purchaseorder', po.view_token) : undefined
           )
         }
       } catch (_) {}

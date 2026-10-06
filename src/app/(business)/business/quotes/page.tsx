@@ -7,6 +7,14 @@ import Link from 'next/link'
 import { BusinessAccountNavBar } from '@/components/business/AccountSidebar'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import { bp } from '@/lib/shared/business-path'
+import { documentHostForHost, type DocumentApp } from '@/lib/tenancy/forms-host'
+
+// Quote/invoice pages live on this store's own document host (quotation-{slug}. on a tenant).
+// Only rendered after the client has loaded the data, so reading the host here is hydration-safe.
+function documentLink(app: DocumentApp, token: string): string {
+  const host = typeof window !== 'undefined' ? window.location.hostname : ''
+  return `https://${documentHostForHost(app, host)}/${encodeURIComponent(token)}`
+}
 
 interface RFQ {
   id: string
@@ -279,7 +287,7 @@ export default function MyQuotesPage() {
                       </Link>
                       {rfq.status === 'converted' && rfq.quotation_view_token && (
                         <a
-                          href={`https://quotation.jeffistores.in/${rfq.quotation_view_token}`}
+                          href={documentLink('quotation', rfq.quotation_view_token)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-xs font-medium transition-colors"
@@ -305,7 +313,7 @@ export default function MyQuotesPage() {
                       )}
                       {rfq.order_id && rfq.invoice_view_token && rfq.order_status !== 'draft' && (
                         <a
-                          href={`https://invoice.jeffistores.in/${rfq.invoice_view_token}`}
+                          href={documentLink('invoice', rfq.invoice_view_token)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors"

@@ -1,3 +1,4 @@
+import { documentUrl } from '@/lib/shared/customer-links'
 import { withTransaction } from '@/lib/shared/db'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
 import type { AgentAction, ActionResult } from './shared'
@@ -157,7 +158,7 @@ export async function sendQuotationEmail(action: AgentAction): Promise<ActionRes
   }
   if (!toEmail || !quoteNumber) return { result: null, error: 'Missing recipient or quote number' }
   try {
-    const viewUrl = `https://quotation.jeffistores.in/${viewToken}`
+    const viewUrl = await documentUrl('quotation', viewToken)
     await sendQuotationFinalizedEmail(toEmail, consigneeName || '', quoteNumber, Number(totalAmount), viewUrl)
     return { result: { sentTo: toEmail, quoteNumber }, error: null }
   } catch (err: any) {

@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
   )
   const displayName = [userProfile?.first_name, userProfile?.last_name].filter(Boolean).join(' ') || user.email
 
-  sendRfqSubmittedEmail(user.email, displayName, rfq!.rfq_number).catch(() => {})
+  sendRfqSubmittedEmail(user.email, displayName, rfq!.rfq_number, rfq!.id).catch(() => {})
 
   createAdminNotification({
     type: 'rfq_submitted',
