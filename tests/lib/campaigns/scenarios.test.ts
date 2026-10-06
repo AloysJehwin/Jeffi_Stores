@@ -1001,32 +1001,27 @@ describe('reviewReminder scenario', () => {
     expect(payload.referenceId).toBe('ord-xyz')
   })
 
-  it('send appends ?review=1 to product URLs via renderItemRows', async () => {
+  it("links each item to its own signed review page, not the product page's dead ?review=1", async () => {
     const items = [{ name: 'Product A', product_id: 'p1', product_slug: 'product-a', image_url: null }]
     mockQueryMany.mockReset()
     mockQueryMany.mockResolvedValue(items as any)
+    mockGenerateReviewToken.mockResolvedValue('tok-1')
 
     await reviewReminder.send(
       { id: 'ord-1', user_id: 'usr-123', order_number: 'RR-1' },
       { campaign: makeCampaign({ kind: 'review_reminder' }) as any, params: reviewReminder.defaultParams }
     )
 
-    // renderItemRows should have been called with productUrl containing ?review=1
-    expect(mockRenderItemRows).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          productUrl: expect.stringContaining('?review=1'),
-        }),
-      ])
-    )
+    expect(mockGenerateReviewToken).toHaveBeenCalledWith({ orderId: 'ord-1', productId: 'p1', userId: 'usr-123' })
+    const [rows] = mockRenderItemRows.mock.calls.at(-1)!
+    expect(rows[0].productUrl).toMatch(/\/review\?token=tok-1$/)
+    expect(rows[0].productUrl).not.toContain('?review=1')
   })
 
-  it('send handles items with null product_slug (no review URL)', async () => {
-    // Explicitly override the default mock for this test so no slug-bearing
-    // data from a previous mockResolvedValueOnce can bleed through.
+  it('leaves an item with no product (deleted) unlinked', async () => {
     mockQueryMany.mockReset()
     mockQueryMany.mockResolvedValueOnce([
-      { name: 'Unknown', product_id: 'p1', product_slug: null, image_url: null },
+      { name: 'Unknown', product_id: null, product_slug: null, image_url: null },
     ] as any)
 
     await reviewReminder.send(

@@ -57,3 +57,19 @@ export function storeHostForSlug(slug: string | null): string {
 export function storeHostForHost(hostname: string): string {
   return storeHostForSlug(slugFromHostname(hostname))
 }
+
+/** Token-addressed document apps, each on its own host: `{app}.` (platform) or `{app}-{slug}.` (tenant). */
+export type DocumentApp = 'invoice' | 'quotation' | 'purchaseorder'
+
+/**
+ * Public host for a document app. Every plan that can create a document also gets its host
+ * (provisioning tenantHostnames): invoices from Basic, quotations and POs from Growth.
+ */
+export function documentHostForSlug(app: DocumentApp, slug: string | null): string {
+  return slug ? `${app}-${slug}.${ROOT_DOMAIN}` : `${app}.${ROOT_DOMAIN}`
+}
+
+/** Document host that preserves the tenant of the given request host. */
+export function documentHostForHost(app: DocumentApp, hostname: string): string {
+  return documentHostForSlug(app, slugFromHostname(hostname))
+}

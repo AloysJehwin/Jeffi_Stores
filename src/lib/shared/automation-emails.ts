@@ -16,7 +16,7 @@ import { substituteVars } from '@/lib/shared/template-vars'
 import { cooldownDays } from '@/lib/campaigns/duration'
 import { queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
-import { businessBaseUrl } from '@/lib/shared/business-path'
+import { apiBaseUrl } from '@/lib/shared/customer-links'
 
 interface UserContext {
   id: string
@@ -82,9 +82,11 @@ export async function sendCampaignEmail(params: {
   const subject = renderTemplate(campaign.subject_template, vars)
   const renderedBody = renderTemplate(campaign.body_template, vars)
   const { campaignMailFromAsync, currentBrandNameAsync } = await import('@/lib/catalog/brand')
-  const [fromAddr, storeName] = await Promise.all([campaignMailFromAsync(), currentBrandNameAsync()])
-  const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind, user.baseUrl)
-  const tracked = wrapWithTracking(renderedBody, sentId, unsubscribeUrl, user.baseUrl, storeName)
+  const [fromAddr, storeName, apiBase] = await Promise.all([campaignMailFromAsync(), currentBrandNameAsync(), apiBaseUrl()])
+  // Unsubscribe and tracking are API routes, so they use the store host even for a business
+  // customer, whose page base can end in /business (no API lives there).
+  const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind, apiBase)
+  const tracked = wrapWithTracking(renderedBody, sentId, unsubscribeUrl, apiBase, storeName)
   const html = withStoreVars(baseLayout(subject, tracked, user.baseUrl), storeName, user.baseUrl)
 
   try {
@@ -136,9 +138,11 @@ export async function sendCampaignEmailRendered(params: {
   if (!sentId) return { ok: false, reason: 'record_failed' }
 
   const { campaignMailFromAsync, currentBrandNameAsync } = await import('@/lib/catalog/brand')
-  const [fromAddr, storeName] = await Promise.all([campaignMailFromAsync(), currentBrandNameAsync()])
-  const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind, user.baseUrl)
-  const tracked = wrapWithTracking(html, sentId, unsubscribeUrl, user.baseUrl, storeName)
+  const [fromAddr, storeName, apiBase] = await Promise.all([campaignMailFromAsync(), currentBrandNameAsync(), apiBaseUrl()])
+  const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind, apiBase)
+  // The renderer leaves {store_name} / {store_web} for the sender to fill, as baseLayout does.
+  const tracked = withStoreVars(wrapWithTracking(html, sentId, unsubscribeUrl, apiBase, storeName), storeName, user.baseUrl)
+  const ampFilled = ampHtml ? withStoreVars(ampHtml, storeName, user.baseUrl) : undefined
 
   try {
     await sendAuditedMail({
@@ -146,7 +150,7 @@ export async function sendCampaignEmailRendered(params: {
       to: user.email,
       subject,
       html: tracked,
-      amp: ampHtml,
+      amp: ampFilled,
       headers: {
         'List-Unsubscribe': `<${unsubscribeUrl}>`,
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
@@ -181,8 +185,9 @@ export async function fetchUserContext(userId: string): Promise<UserContext | nu
     [userId]
   )
   if (!row) return null
-  const { storeBaseUrlAsync } = await import('@/lib/catalog/brand')
-  return { ...row, baseUrl: row.is_business ? businessBaseUrl() : await storeBaseUrlAsync() }
+  // Tenant-aware either way: a tenant store's customers get that store's host, never the platform's.
+  const { storeBaseUrlAsync, businessBaseUrlAsync } = await import('@/lib/catalog/brand')
+  return { ...row, baseUrl: row.is_business ? await businessBaseUrlAsync() : await storeBaseUrlAsync() }
 }
 
 export async function fetchProductImageUrl(productId: string): Promise<string> {

@@ -363,14 +363,37 @@ describe('email-campaigns', () => {
       expect(html).not.toContain('<img')
     })
 
-    it('renders review_request item without productUrl falls back to starLinks[4]', () => {
+    it("links each review_request item to its review page, preferring it over the product page", () => {
       const items = [
-        { name: 'Item', imageUrl: null, starLinks: ['', '', '', '', 'https://jeffistores.in/products/star'] },
+        {
+          name: 'Item',
+          imageUrl: null,
+          starLinks: ['https://acme.jeffistores.in/review?token=t1&rating=1'],
+          reviewUrl: 'https://acme.jeffistores.in/review?token=t1',
+          productUrl: 'https://acme.jeffistores.in/products/item',
+        },
       ]
-      const { html } = renderCampaignEmail('review_request', {
+      const { html } = renderCampaignEmail('review_request', { itemsJson: JSON.stringify(items) })
+      expect(html).toContain('href="https://acme.jeffistores.in/review?token=t1"')
+      expect(html).not.toContain('href="https://acme.jeffistores.in/products/item"')
+    })
+
+    it('falls back to the review link without a preselected rating for older item data', () => {
+      const items = [
+        { name: 'Item', imageUrl: null, starLinks: ['https://jeffistores.in/review?token=t2&rating=1'] },
+      ]
+      const { html } = renderCampaignEmail('review_request', { itemsJson: JSON.stringify(items) })
+      expect(html).toContain('href="https://jeffistores.in/review?token=t2"')
+    })
+
+    it("posts the AMP review form to the sending store's API, not a hardcoded platform host", () => {
+      const items = [{ name: 'Item', imageUrl: null, starLinks: ['https://acme.jeffistores.in/review?token=t3&rating=1'] }]
+      const { ampHtml } = renderCampaignEmail('review_request', {
         itemsJson: JSON.stringify(items),
+        apiBaseUrl: 'https://acme.jeffistores.in',
       })
-      expect(html).toContain('https://jeffistores.in/products/star')
+      expect(ampHtml).toContain('action-xhr="https://acme.jeffistores.in/api/reviews/amp"')
+      expect(ampHtml).not.toContain('https://jeffistores.in/api/reviews/amp')
     })
 
     it('renders review_request item without productUrl and no starLinks falls back to /products', () => {

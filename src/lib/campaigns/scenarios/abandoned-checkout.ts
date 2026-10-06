@@ -16,6 +16,7 @@ interface Row {
   user_id: string
   order_number: string
   total_amount: string
+  order_type?: string | null
 }
 
 export const abandonedCheckout: ScenarioModule<Params, Row> = {
@@ -69,7 +70,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     return queryMany<Row>(
       `
       SELECT DISTINCT ON (o.user_id)
-        o.id, o.user_id, o.order_number, o.total_amount::text
+        o.id, o.user_id, o.order_number, o.total_amount::text, o.order_type
       FROM orders o
       JOIN users u ON u.id = o.user_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
@@ -208,6 +209,14 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 
+    // Cancelling a cart order puts its items back in the cart; a "buy now" order's items never were
+    // in it, so that customer goes back to the product instead of an empty cart.
+    const firstSlug = items.find(i => i.product_slug)?.product_slug
+    const ctaUrl =
+      row.order_type === 'direct' && firstSlug
+        ? `${user.baseUrl}/products/${encodeURIComponent(firstSlug)}`
+        : `${user.baseUrl}/cart`
+
     const emailResult = await sendCampaignEmail({
       campaign,
       user,
@@ -219,7 +228,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         itemsHtml,
         couponCode,
         discountPercent,
-        ctaUrl: `${user.baseUrl}/cart`,
+        ctaUrl,
       },
     })
     if ((params as any).whatsappEnabled) {

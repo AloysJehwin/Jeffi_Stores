@@ -28,6 +28,10 @@ vi.mock('@/lib/shared/mail-audit', () => ({
   sendAuditedMail: vi.fn(),
 }))
 
+vi.mock('@/lib/shared/customer-links', () => ({
+  apiBaseUrl: vi.fn(),
+}))
+
 import {
   renderItemRows,
   renderHeroProduct,
@@ -50,6 +54,7 @@ import * as marketing from '@/lib/shared/marketing'
 import * as emailCampaigns from '@/lib/shared/email-campaigns'
 import * as db from '@/lib/shared/db'
 import * as mailAudit from '@/lib/shared/mail-audit'
+import * as customerLinks from '@/lib/shared/customer-links'
 
 const mockGetCampaign = vi.mocked(marketing.getCampaign)
 const mockCanSendMarketing = vi.mocked(marketing.canSendMarketing)
@@ -85,6 +90,7 @@ const mockUser = {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(customerLinks.apiBaseUrl).mockResolvedValue('https://acme.jeffistores.in')
 })
 
 // ---------------------------------------------------------------------------
@@ -355,6 +361,25 @@ describe('sendCampaignEmail', () => {
     mockRecordSent.mockResolvedValue(null)
     const result = await sendCampaignEmail(baseParams)
     expect(result).toEqual({ ok: false, reason: 'record_failed' })
+  })
+
+  it("keeps unsubscribe and tracking on the store host for a business customer's /business base", async () => {
+    mockCanSendMarketing.mockResolvedValue({ ok: true })
+    mockAlreadySentForReference.mockResolvedValue(false)
+    mockRecordSent.mockResolvedValue('sent-id-2')
+    mockRenderTemplate.mockReturnValue('rendered')
+    mockBuildUnsubscribeUrl.mockReturnValue('https://acme.jeffistores.in/api/unsubscribe?token=t')
+    mockWrapWithTracking.mockReturnValue('<tracked/>')
+    mockBaseLayout.mockReturnValue('<html/>')
+    mockSendAuditedMail.mockResolvedValue({ messageId: 'm' })
+    const business = { ...mockUser, baseUrl: 'https://acme.jeffistores.in/business', is_business: true }
+
+    await sendCampaignEmail({ ...baseParams, user: business })
+
+    expect(mockBuildUnsubscribeUrl).toHaveBeenCalledWith('token-abc', 'abandoned_cart', 'https://acme.jeffistores.in')
+    expect(mockWrapWithTracking.mock.calls[0][3]).toBe('https://acme.jeffistores.in')
+    // Page links (the layout) still use the customer's own base.
+    expect(mockBaseLayout.mock.calls[0][2]).toBe('https://acme.jeffistores.in/business')
   })
 
   it('sends mail and returns ok:true on success', async () => {
