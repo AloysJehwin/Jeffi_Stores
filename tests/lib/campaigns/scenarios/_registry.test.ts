@@ -16,7 +16,7 @@ vi.mock('@/lib/shared/automation-emails', () => ({
 import { SCENARIOS, getScenario, listScenarios } from '@/lib/campaigns/scenarios/_registry'
 
 describe('_registry', () => {
-  it('SCENARIOS contains all 25 expected scenario kinds', () => {
+  it('SCENARIOS contains all 26 expected scenario kinds', () => {
     const kinds = Object.keys(SCENARIOS)
     const expected = [
       'abandoned_cart',
@@ -44,6 +44,7 @@ describe('_registry', () => {
       'loyalty_points_reminder',
       'referral_invite',
       'birthday',
+      'birthday_collect',
     ]
     for (const k of expected) expect(kinds).toContain(k)
     expect(kinds).toHaveLength(expected.length)
@@ -80,7 +81,7 @@ describe('_registry', () => {
     it('returns an array of all scenario modules', () => {
       const list = listScenarios()
       expect(Array.isArray(list)).toBe(true)
-      expect(list).toHaveLength(25)
+      expect(list).toHaveLength(26)
     })
 
     it('each item in list is a valid scenario module', () => {

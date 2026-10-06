@@ -301,3 +301,23 @@ export async function verifyReviewToken(token: string): Promise<ReviewTokenPaylo
     return null
   }
 }
+
+// One job only: lets a customer set their own date of birth from an email link without
+// signing in. Scoped by `type` so it can't be replayed as a session or review token.
+export async function generateBirthdayToken(userId: string): Promise<string> {
+  return new SignJWT({ userId, type: 'birthday_token' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('30d')
+    .sign(JWT_SECRET)
+}
+
+export async function verifyBirthdayToken(token: string): Promise<{ userId: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET)
+    if (payload.type !== 'birthday_token' || typeof payload.userId !== 'string') return null
+    return { userId: payload.userId }
+  } catch {
+    return null
+  }
+}
