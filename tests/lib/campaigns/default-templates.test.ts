@@ -32,13 +32,20 @@ describe('BUILTIN_TEMPLATES', () => {
     for (const k of single) expect(BUILTIN_TEMPLATES[k].body, k).toContain('{productCard}')
   })
 
+  it('referral invite shares the personal link and points, with no coupon and no "you both"', () => {
+    const t = BUILTIN_TEMPLATES.referral_invite
+    expect(t.body).toContain('{shareUrl}')
+    expect(t.subject + t.body).toContain('{rewardPoints}')
+    expect(t.body).not.toContain('{couponCode}')
+    expect((t.subject + t.body).toLowerCase()).not.toContain('you both')
+  })
+
   it('incentive kinds include the coupon token', () => {
     for (const k of [
       'first_purchase_nudge',
       'second_purchase_nudge',
       'signup_anniversary',
       'birthday',
-      'referral_invite',
       'loyalty_tier_upgrade',
     ]) {
       expect(BUILTIN_TEMPLATES[k].body, k).toContain('{couponCode}')

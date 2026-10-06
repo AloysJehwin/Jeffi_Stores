@@ -12,6 +12,7 @@ vi.mock('@/lib/campaigns/template-validation', () => ({
 import { ensureBuiltinCampaignRows } from '@/lib/campaigns/ensure-builtin-campaigns'
 import { query } from '@/lib/shared/db'
 import { listScenarios } from '@/lib/campaigns/scenarios/_registry'
+import { RETIRED_BUILTIN_TEMPLATES, getBuiltinTemplate } from '@/lib/campaigns/default-templates'
 
 const mockQuery = query as ReturnType<typeof vi.fn>
 const mockList = listScenarios as ReturnType<typeof vi.fn>
@@ -30,7 +31,6 @@ describe('ensureBuiltinCampaignRows', () => {
       { kind: 'viewed_product', name: 'Viewed Product', description: 'd', defaultParams: { lookback: 1 } },
     ])
     await ensureBuiltinCampaignRows()
-    expect(mockQuery).toHaveBeenCalledTimes(2)
     const [scenSql] = mockQuery.mock.calls[0]
     const [campSql] = mockQuery.mock.calls[1]
     expect(scenSql).toMatch(/INSERT INTO scenarios/)
@@ -54,5 +54,18 @@ describe('ensureBuiltinCampaignRows', () => {
     mockList.mockReturnValue([{ kind: 'x', name: 'X', description: '', defaultParams: {} }])
     mockQuery.mockRejectedValue(new Error('db down'))
     await expect(ensureBuiltinCampaignRows()).resolves.toBeUndefined()
+  })
+
+  it('moves a row still on a retired default onto the current one, matching subject and body exactly', async () => {
+    mockList.mockReturnValue([{ kind: 'referral_invite', name: 'Referral', description: 'd', defaultParams: {} }])
+    await ensureBuiltinCampaignRows()
+    const upgrade = mockQuery.mock.calls.find(c => String(c[0]).startsWith('UPDATE campaigns'))!
+    expect(String(upgrade[0])).toContain('WHERE kind = $1 AND subject_template = $4 AND body_template = $5')
+    const old = RETIRED_BUILTIN_TEMPLATES.referral_invite[0]
+    const current = getBuiltinTemplate('referral_invite')!
+    expect(upgrade[1]).toEqual(['referral_invite', current.subject, current.body, old.subject, old.body])
+    // The retired copy is the one that promised a shared coupon.
+    expect(old.subject).toContain('you both')
+    expect(current.subject).not.toContain('you both')
   })
 })

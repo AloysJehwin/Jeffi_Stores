@@ -1,6 +1,6 @@
 import { query } from '@/lib/shared/db'
 import { listScenarios } from './scenarios/_registry'
-import { getBuiltinTemplate } from './default-templates'
+import { getBuiltinTemplate, RETIRED_BUILTIN_TEMPLATES } from './default-templates'
 import { validateCampaignBodyTemplate } from './template-validation'
 
 // The /admin/campaigns list renders rows from the `campaigns` table, but built-in scenarios live in the
@@ -56,4 +56,18 @@ export async function ensureBuiltinCampaignRows(): Promise<void> {
     `,
     params
   ).catch(() => null)
+
+  // 3. Move rows still on a retired default onto the current one. The exact-match guard means a
+  //    template an admin has edited, even slightly, is never touched.
+  for (const [kind, retired] of Object.entries(RETIRED_BUILTIN_TEMPLATES)) {
+    const current = getBuiltinTemplate(kind)
+    if (!current) continue
+    for (const old of retired) {
+      await query(
+        `UPDATE campaigns SET subject_template = $2, body_template = $3, updated_at = NOW()
+         WHERE kind = $1 AND subject_template = $4 AND body_template = $5`,
+        [kind, current.subject, current.body, old.subject, old.body]
+      ).catch(() => null)
+    }
+  }
 }

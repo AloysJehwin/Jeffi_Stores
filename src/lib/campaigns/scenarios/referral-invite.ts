@@ -1,6 +1,8 @@
 import { queryMany } from '@/lib/shared/db'
-import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared/automation-emails'
+import { fetchUserContext, sendCampaignEmail } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { getOrCreateReferralCode } from '@/lib/referrals/codes'
+import { getReferralSettings, isReferralLive } from '@/lib/referrals/settings'
 import { days, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
@@ -19,7 +21,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
   name: 'Referral Invite',
   description: 'Happy customer with a delivered order, invited to refer a friend',
   trigger:
-    'Fires for a customer whose order was delivered at least the configured delay ago and who has never been sent a referral invite. Asks them to refer a friend. One send per cooldown window per user.',
+    "Fires for a customer whose order was delivered at least the configured delay ago and who has not yet earned a referral reward. Emails their personal referral link and the points they earn when a friend's first order arrives. Only runs while the referral program is on. One send per cooldown window per user.",
   defaultParams: {
     sinceDelivered: days(3),
     maxRecipientsPerSweep: 50,
@@ -49,6 +51,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
   },
 
   async findEligible({ campaign, params }) {
+    if (!(await isReferralLive())) return []
     const sinceMin = readDurationParam(params, 'sinceDelivered') ?? days(3)
     const cooldownMin = cooldownMinutes(params)
 
@@ -65,7 +68,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
         AND u.marketing_opt_out = FALSE
         AND (bp.user_id IS NULL OR bp.approval_status != 'approved')
         AND NOT EXISTS (
-          SELECT 1 FROM referrals r WHERE r.referrer_user_id = u.id
+          SELECT 1 FROM referral_signups rs WHERE rs.referrer_user_id = u.id AND rs.status = 'rewarded'
         )
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
@@ -80,6 +83,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
   },
 
   async findSuppressed({ campaign, params }) {
+    if (!(await isReferralLive())) return []
     const sinceMin = readDurationParam(params, 'sinceDelivered') ?? days(3)
     const cooldownMin = cooldownMinutes(params)
 
@@ -102,12 +106,12 @@ export const referralInvite: ScenarioModule<Params, Row> = {
         CASE
           WHEN u.is_active = FALSE OR u.is_guest = TRUE THEN 'inactive'
           WHEN u.marketing_opt_out = TRUE THEN 'opted_out'
-          WHEN EXISTS (SELECT 1 FROM referrals r WHERE r.referrer_user_id = u.id) THEN 'other'
+          WHEN EXISTS (SELECT 1 FROM referral_signups rs WHERE rs.referrer_user_id = u.id AND rs.status = 'rewarded') THEN 'other'
           WHEN ecs.sent_at IS NOT NULL THEN 'cooldown'
           ELSE 'other'
         END AS reason,
         CASE
-          WHEN EXISTS (SELECT 1 FROM referrals r WHERE r.referrer_user_id = u.id) THEN 'Already has a referral'
+          WHEN EXISTS (SELECT 1 FROM referral_signups rs WHERE rs.referrer_user_id = u.id AND rs.status = 'rewarded') THEN 'Already earned a referral reward'
           WHEN ecs.sent_at IS NOT NULL THEN 'Sent ' || to_char(ecs.sent_at, 'DD Mon HH24:MI')
           WHEN u.marketing_opt_out THEN 'Marketing opt-out enabled'
           WHEN u.is_guest THEN 'Guest user'
@@ -128,7 +132,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
       ) ecs ON TRUE
       WHERE u.is_active = FALSE OR u.is_guest = TRUE OR u.marketing_opt_out = TRUE
          OR ecs.sent_at IS NOT NULL
-         OR EXISTS (SELECT 1 FROM referrals r WHERE r.referrer_user_id = u.id)
+         OR EXISTS (SELECT 1 FROM referral_signups rs WHERE rs.referrer_user_id = u.id AND rs.status = 'rewarded')
       LIMIT 200
     `,
       [campaign.kind, String(sinceMin), String(cooldownMin)]
@@ -145,7 +149,10 @@ export const referralInvite: ScenarioModule<Params, Row> = {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
-    const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
+    const [code, settings] = await Promise.all([getOrCreateReferralCode(row.user_id), getReferralSettings()])
+    if (!code) return { ok: false, reason: 'no_referral_code' }
+    const shareUrl = `${user.baseUrl}/r/${code}`
+    const rewardPoints = settings.rewardPoints
 
     const emailResult = await sendCampaignEmail({
       campaign,
@@ -153,17 +160,19 @@ export const referralInvite: ScenarioModule<Params, Row> = {
       referenceId: null,
       vars: {
         firstName: user.first_name || 'there',
-        couponCode,
-        discountPercent,
+        rewardPoints,
+        referralCode: code,
+        shareUrl,
         ctaUrl: `${user.baseUrl}/account/referrals`,
       },
     })
 
     if (params.whatsappEnabled) {
+      // No coupon: the promo template then sends just the headline, which carries the link.
       sendCampaignWhatsApp(
         campaign.kind,
         row.user_id,
-        { headline: 'Refer a friend and you both save', code: couponCode || '', discount: discountPercent ? String(discountPercent) : '' },
+        { headline: `Refer a friend and earn ${rewardPoints} points: ${shareUrl}`, code: '', discount: '' },
         cooldownDays(params)
       ).catch(() => {})
     }
