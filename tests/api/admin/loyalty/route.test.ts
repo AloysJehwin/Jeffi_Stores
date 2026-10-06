@@ -97,25 +97,19 @@ describe('/api/admin/loyalty', () => {
       expect(mockSave).not.toHaveBeenCalled()
     })
 
-    it('counts past orders silently the first time the program is switched on', async () => {
+    it('saves the form but keeps the stored on/off, which belongs to Site Controls', async () => {
+      mockGet.mockResolvedValue({ enabled: false, launchedAt: null })
       const res = await PUT(put(input))
       expect(res.status).toBe(200)
-      expect(mockSave).toHaveBeenCalledWith(input)
-      expect(mockPasses).toHaveBeenCalledTimes(1)
-      expect(mockSave.mock.invocationCallOrder[0]).toBeLessThan(mockPasses.mock.invocationCallOrder[0])
-      expect((await res.json()).firstPass).toMatchObject({ users: 40, earned: 9645 })
-    })
-
-    it('does not rerun the first pass once the program has launched', async () => {
-      mockGet.mockResolvedValue({ enabled: true, launchedAt: '2026-10-01T00:00:00.000Z' })
-      const res = await PUT(put(input))
-      expect(mockPasses).not.toHaveBeenCalled()
-      expect((await res.json()).firstPass).toBeNull()
-    })
-
-    it('does not count anything while the program stays off', async () => {
+      const { enabled: _ignored, ...form } = input
+      expect(mockSave).toHaveBeenCalledWith({ ...form, enabled: false })
+      mockGet.mockResolvedValue({ enabled: true, launchedAt: '2026-10-01' })
       await PUT(put({ ...input, enabled: false }))
-      expect(mockSave).toHaveBeenCalled()
+      expect(mockSave).toHaveBeenLastCalledWith({ ...form, enabled: true })
+    })
+
+    it('never runs the first pass from the settings form', async () => {
+      await PUT(put(input))
       expect(mockPasses).not.toHaveBeenCalled()
     })
 
