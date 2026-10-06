@@ -162,6 +162,7 @@ export interface LoyaltySummary {
 }
 
 const HISTORY_PAGE_SIZE = 10
+const REFERRAL_REASONS = new Set(['referral', 'referral_reversal'])
 const COUPON_PAGE_SIZE = 6
 
 export async function getLoyaltySummary(
@@ -189,7 +190,13 @@ export async function getLoyaltySummary(
     points: account.points,
     lifetimePoints: account.lifetimePoints,
     pending,
-    history: { ...ledger, items: ledger.items.map(({ note: _note, ...entry }) => entry) },
+    // A referral row is linked to the friend's order; its number must never reach the referrer.
+    history: {
+      ...ledger,
+      items: ledger.items.map(({ note: _note, ...entry }) =>
+        REFERRAL_REASONS.has(entry.reason) ? { ...entry, orderNumber: null } : entry
+      ),
+    },
     coupons,
   }
 }
