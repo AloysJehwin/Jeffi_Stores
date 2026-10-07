@@ -11,6 +11,7 @@ import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { settleDelhiveryCostToWallet } from '@/lib/payments/wallet'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
+import { applyCourierEdd, extractCourierEdd } from '@/lib/shipping/courier-edd'
 
 export const dynamic = 'force-dynamic'
 
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
 
         const rawType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
         const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
-        const delhiveryEdd: string | null = shipment.ExpectedDeliveryDate ?? null
+        const courierEdd = extractCourierEdd(shipment)
 
         const rawScans: any[] = shipment.Scans ?? []
         const scans = rawScans.map((s: any) => ({
@@ -175,15 +176,10 @@ export async function POST(request: NextRequest) {
           ]).catch(() => {})
         }
 
-        // Always update EDD when Delhivery provides one — independent of status
-        // transitions. COALESCE is intentionally NOT used here; Delhivery revises
-        // EDD as the shipment moves, and we want the latest estimate reflected.
-        if (delhiveryEdd) {
-          await query(`UPDATE orders SET estimated_delivery_date = $2::date, updated_at = NOW() WHERE id = $1`, [
-            order.id,
-            delhiveryEdd,
-          ]).catch(() => {})
-        }
+        // Courier EDD on every sync until delivered (rules in courier-edd.ts).
+        await applyCourierEdd(order.id, courierEdd, newShipmentStatus).catch(err =>
+          console.warn('[delhivery] courier EDD update failed', { awb, error: err?.message })
+        )
 
         // Persist charged weight and extra charge when Delhivery returns ChargedWeight.
         const chargedWeightKg: number | null = shipment.ChargedWeight != null ? Number(shipment.ChargedWeight) : null

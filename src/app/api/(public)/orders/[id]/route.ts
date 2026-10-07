@@ -252,6 +252,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           ? order.estimated_delivery_date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
           : String(order.estimated_delivery_date).slice(0, 10)
         : null,
+      courierEdd: order.courier_edd
+        ? order.courier_edd instanceof Date
+          ? order.courier_edd.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+          : String(order.courier_edd).slice(0, 10)
+        : null,
       originalOrderId: order.original_order_id || null,
       originalOrderNumber: order.original_order_number || null,
       orderType: order.order_type || 'cart',

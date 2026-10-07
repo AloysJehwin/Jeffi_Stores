@@ -214,6 +214,8 @@ CREATE TABLE public.orders (
     business_discount_amount numeric(12,2) DEFAULT 0 NOT NULL,
     shipment_status text,
     estimated_delivery_date date,
+    courier_edd date,
+    courier_edd_updated_at timestamp with time zone,
     cod_remitted_at timestamp with time zone,
     draft_of_id uuid,
     granted_at timestamp with time zone,
@@ -221,6 +223,10 @@ CREATE TABLE public.orders (
     subscription_cycle integer,
     CONSTRAINT orders_shipment_status_check CHECK (((shipment_status IS NULL) OR (shipment_status = ANY (ARRAY['created'::text, 'picked_up'::text, 'in_transit'::text, 'out_for_delivery'::text, 'delivery_attempted'::text, 'delivered'::text, 'rto_initiated'::text, 'rto_in_transit'::text, 'rto_out_for_return'::text, 'rto_delivered'::text]))))
 );
+
+COMMENT ON COLUMN public.orders.estimated_delivery_date IS 'Delivery date shown to customer and admin: our computed promise, replaced by the courier EDD whenever Delhivery revises it, or set manually by an admin.';
+
+COMMENT ON COLUMN public.orders.courier_edd IS 'Latest expected delivery date reported by Delhivery (ExpectedDeliveryDate, else PromisedDeliveryDate); frozen once delivered.';
 
 COMMENT ON COLUMN public.orders.shipment_status IS 'Stable internal shipment progress enum, resolved from Delhivery scan history. Set to created when AWB is assigned; updated on each track API call.';
 

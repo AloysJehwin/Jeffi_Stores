@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { computeEdd, transitDays } from '@/lib/shipping/edd'
+import {
+  computeEdd,
+  transitDays,
+  eddZone,
+  parseEddSettings,
+  EDD_DEFAULTS,
+  computeEddBreakdown,
+  METRO_PINS_3,
+} from '@/lib/shipping/edd'
 
 function daysFromToday(edd: string): number {
   const d = new Date(edd + 'T00:00:00Z')
@@ -60,5 +68,105 @@ describe('computeEdd', () => {
   })
   it('returns a YYYY-MM-DD string', () => {
     expect(computeEdd({ pin: '600001' })).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})
+
+// The pre-settings hard-coded rule, kept verbatim to prove the defaults change nothing.
+function legacyTransit(destPin: string, originPin?: string): number {
+  const p = String(destPin ?? '')
+  if (!/^\d{6}$/.test(p)) return 7
+  const o = String(originPin ?? '')
+  const own = /^\d{6}$/.test(o) ? p.slice(0, 2) === o.slice(0, 2) : p.startsWith('49')
+  if (own) return 7
+  if (METRO_PINS_3.has(p.slice(0, 3))) return 10
+  return 14
+}
+
+describe('eddZone', () => {
+  const origin = '492001' // Raipur
+  it('same city: first 3 digits match the origin', () => expect(eddZone('492013', origin)).toBe('same_city'))
+  it('same region: same 2-digit circle', () => expect(eddZone('495001', origin)).toBe('same_region'))
+  it('metro', () => expect(eddZone('600001', origin)).toBe('metro'))
+  it('rest of India', () => expect(eddZone('831001', origin)).toBe('rest'))
+  it('remote: North-East, J&K, Ladakh, Sikkim, Andaman, Lakshadweep', () => {
+    for (const p of ['781001', '795001', '190001', '180001', '194101', '737101', '744101', '682555']) {
+      expect(eddZone(p, origin)).toBe('remote')
+    }
+  })
+  it('Kerala outside Lakshadweep is not remote', () => expect(eddZone('682001', origin)).toBe('rest'))
+  it('a remote pin in the origin circle is same region', () => expect(eddZone('782001', '781001')).toBe('same_region'))
+  it('invalid dest → unknown', () => expect(eddZone('12', origin)).toBe('unknown'))
+})
+
+describe('EDD defaults reproduce the old hard-coded numbers', () => {
+  const pins = [
+    '',
+    '12',
+    '490001',
+    '492013',
+    '495001',
+    '600001',
+    '411001',
+    '831001',
+    '781001',
+    '190001',
+    '744101',
+    '110001',
+  ]
+  const origins = [undefined, '', '492001', '560001', '781001']
+  it('transitDays matches the legacy rule for every pin/origin pair', () => {
+    for (const o of origins) for (const p of pins) expect(transitDays(p, o)).toBe(legacyTransit(p, o))
+  })
+  it('an empty / garbage stored setting parses to the defaults', () => {
+    expect(parseEddSettings('')).toEqual(EDD_DEFAULTS)
+    expect(parseEddSettings('{not json')).toEqual(EDD_DEFAULTS)
+    expect(parseEddSettings(null)).toEqual(EDD_DEFAULTS)
+  })
+  it('store with no edd_settings = defaults with the store origin', () => {
+    expect(computeEdd({ pin: '560002', store: { delhiveryOriginPincode: '560001' } })).toBe(
+      computeEdd({ pin: '560002', originPin: '560001' })
+    )
+  })
+})
+
+describe('custom EDD settings', () => {
+  const s = parseEddSettings({
+    handlingDays: 1,
+    sameCityDays: 1,
+    sameRegionDays: 3,
+    metroDays: 4,
+    restDays: 6,
+    remoteDays: 12,
+    metroPrefixes: ['831', '831', 'abc'],
+    skipSundays: false,
+  })
+  it('drops invalid metro prefixes and dedupes', () => expect(s.metroPrefixes).toEqual(['831']))
+  it('uses the configured days per zone', () => {
+    expect(transitDays('492013', '492001', s)).toBe(1)
+    expect(transitDays('495001', '492001', s)).toBe(3)
+    expect(transitDays('831001', '492001', s)).toBe(4) // now metro via the custom list
+    expect(transitDays('600001', '492001', s)).toBe(6) // no longer metro
+    expect(transitDays('781001', '492001', s)).toBe(12)
+  })
+  it('store handling days is the floor; a larger product handling wins', () => {
+    expect(computeEddBreakdown({ pin: '492013', originPin: '492001', settings: s, handlingDays: 0 }).totalDays).toBe(2)
+    expect(computeEddBreakdown({ pin: '492013', originPin: '492001', settings: s, handlingDays: 5 }).totalDays).toBe(6)
+  })
+  it('reads settings from the store JSON', () => {
+    const b = computeEddBreakdown({
+      pin: '781001',
+      store: { delhiveryOriginPincode: '492001', eddSettingsJson: JSON.stringify({ remoteDays: 20 }) },
+    })
+    expect(b.zone).toBe('remote')
+    expect(b.totalDays).toBe(22)
+  })
+  it('skipSundays does not count Sundays', () => {
+    const from = new Date('2026-10-10T06:00:00Z') // Saturday
+    const sk = { ...EDD_DEFAULTS, handlingDays: 0, sameCityDays: 2, skipSundays: true }
+    // Sat + 2 delivery days, skipping Sunday → Tuesday
+    expect(computeEddBreakdown({ pin: '492013', originPin: '492001', settings: sk, from }).edd).toBe('2026-10-13')
+    expect(
+      computeEddBreakdown({ pin: '492013', originPin: '492001', settings: { ...sk, skipSundays: false }, from }).edd
+    ).toBe('2026-10-12')
   })
 })

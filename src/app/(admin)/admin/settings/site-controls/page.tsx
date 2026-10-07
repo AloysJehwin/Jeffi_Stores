@@ -20,6 +20,7 @@ import CustomShortcutsCard, { CustomShortcut } from '@/components/admin/site-con
 import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
 import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
 import TemplateVariablesPanel from '@/components/admin/site-controls/TemplateVariablesPanel'
+import DeliveryEstimateCard from '@/components/admin/site-controls/DeliveryEstimateCard'
 import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getReferralSettings } from '@/lib/referrals/settings'
@@ -520,6 +521,10 @@ export default async function SiteControlsPage() {
               initial={c.values.delhiveryOriginPincode}
             />
           </SectionCard>
+        </div>
+
+        <div>
+          <DeliveryEstimateCard />
         </div>
 
         <div>

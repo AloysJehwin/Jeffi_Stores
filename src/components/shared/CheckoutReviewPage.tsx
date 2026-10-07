@@ -132,6 +132,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     brandName: string | null
     imageUrl: string | null
     extraDeliveryDays: number
+    handlingDays: number | null
   } | null>(null)
 
   const storageKey = isBusiness ? 'rzp_pending_biz' : 'rzp_pending'
@@ -275,6 +276,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
             brandName: d.brandName || null,
             imageUrl: null,
             extraDeliveryDays: Number(d.extraDeliveryDays ?? 0),
+            handlingDays: d.handlingDays != null ? Number(d.handlingDays) : null,
           })
           if (d.businessDiscount != null && Number(d.businessDiscount) > 0) {
             setBusinessDiscountAmount(round2(Number(d.businessDiscount)))
@@ -472,23 +474,30 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       setEdd(null)
       return
     }
+    // Same inputs the order-commit path uses, so the preview equals the stored EDD.
+    const physical = cartItems.filter((i: any) => !isDigitalLine(i))
     const extraDays = isBuyNow
       ? (buyNowItem?.extraDeliveryDays ?? 0)
-      : Math.max(
-          0,
-          ...cartItems
-            .filter((i: any) => !isDigitalLine(i))
-            .map((i: any) => Number(i.products?.extra_delivery_days ?? 0))
-        )
+      : Math.max(0, ...physical.map((i: any) => Number(i.products?.extra_delivery_days ?? 0)))
+    const handlingDays = isBuyNow
+      ? (buyNowItem?.handlingDays ?? 0)
+      : Math.max(0, ...physical.map((i: any) => Number(i.products?.handling_days ?? 0)))
     setIsLoadingEdd(true)
-    fetch(`/api/products/edd?pin=${pin}&extraDays=${extraDays}`)
+    fetch(`/api/products/edd?pin=${pin}&extraDays=${extraDays}&handlingDays=${handlingDays}`)
       .then(r => (r.ok ? r.json() : null))
       .then(data => {
         if (data?.edd) setEdd(data.edd)
       })
       .catch(() => {})
       .finally(() => setIsLoadingEdd(false))
-  }, [selectedAddress?.postal_code, isBuyNow, buyNowItem?.extraDeliveryDays, cartItems, allDigital])
+  }, [
+    selectedAddress?.postal_code,
+    isBuyNow,
+    buyNowItem?.extraDeliveryDays,
+    buyNowItem?.handlingDays,
+    cartItems,
+    allDigital,
+  ])
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return

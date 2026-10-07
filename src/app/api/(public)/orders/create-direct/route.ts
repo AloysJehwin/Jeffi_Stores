@@ -260,11 +260,10 @@ export async function POST(request: NextRequest) {
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
     const _eddPin = String(destinationPin || '')
-    const _eddOrigin = (await getBusinessValues()).delhiveryOriginPincode
     const _edd = computeEdd({
       pin: _eddPin,
-      originPin: _eddOrigin,
-      handlingDays: Number(product.handling_days ?? 2),
+      store: await getBusinessValues(),
+      handlingDays: Number(product.handling_days ?? 0),
       extraDays: Number(product.extra_delivery_days ?? 0),
     })
 

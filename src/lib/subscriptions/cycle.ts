@@ -174,8 +174,8 @@ export async function commitCycle(input: CommitCycleInput): Promise<CommitCycleR
       ? null
       : computeEdd({
           pin: String(address.postal_code ?? ''),
-          originPin: bv.delhiveryOriginPincode,
-          handlingDays: Number(p.handling_days ?? 2),
+          store: bv,
+          handlingDays: Number(p.handling_days ?? 0),
           extraDays: Number(p.extra_delivery_days ?? 0),
         })
 

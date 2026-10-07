@@ -15,6 +15,7 @@ interface ProductDisplay {
   brand_name: string | null
   category_id: string | null
   extra_delivery_days: number | null
+  handling_days: number | null
   is_digital: boolean
   variant_name: string | null
   variant_sku: string | null
@@ -66,6 +67,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
        p.gst_percentage::float AS gst_percentage,
        p.category_id,
        p.extra_delivery_days,
+       p.handling_days,
        COALESCE(p.is_digital, FALSE) AS is_digital,
        b.name AS brand_name,
        pv.variant_name, pv.sku AS variant_sku, pv.mrp::float AS variant_mrp,
@@ -109,6 +111,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     gstPercentage: display?.gst_percentage ?? null,
     brandName: display?.brand_name || null,
     extraDeliveryDays: display?.extra_delivery_days ?? 0,
+    handlingDays: display?.handling_days ?? null,
     isDigital: display?.is_digital ?? false,
     businessDiscount,
   })

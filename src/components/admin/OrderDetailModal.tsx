@@ -8,61 +8,14 @@ import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { ap } from '@/lib/shared/admin-path'
 import CopySku from '@/components/ui/CopySku'
 
-const METRO_PINS_3 = new Set([
-  '110',
-  '111',
-  '112',
-  '400',
-  '401',
-  '402',
-  '403',
-  '410',
-  '421',
-  '560',
-  '561',
-  '562',
-  '563',
-  '600',
-  '601',
-  '602',
-  '603',
-  '500',
-  '501',
-  '502',
-  '503',
-  '700',
-  '711',
-  '712',
-  '411',
-  '412',
-  '413',
-  '380',
-  '382',
-  '383',
-])
-function getTatDays(pin: string): number {
-  if (pin.startsWith('49')) return 7
-  if (METRO_PINS_3.has(pin.slice(0, 3))) return 10
-  return 14
-}
+// The stored EDD is the only source: computeEdd at order time, then courier/admin updates.
 function resolveOrderEdd(o: any): string | null {
-  const isShipped = ['shipped', 'out_for_delivery', 'delivered'].includes(o.status)
-  if (isShipped && o.estimated_delivery_date) {
-    return new Date(o.estimated_delivery_date + 'T00:00:00').toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-    })
-  }
-  const pin: string = o.shipping_address?.postal_code ?? ''
-  if (!pin) return null
-  const maxExtra = (o.order_items ?? []).reduce((max: number, item: any) => {
-    const d = Number(item.products?.extra_delivery_days ?? 0)
-    return d > max ? d : max
-  }, 0)
-  const tat = (/^\d{6}$/.test(pin) ? getTatDays(pin) : 7) + maxExtra
-  const d = new Date(o.created_at)
-  d.setDate(d.getDate() + tat)
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  const raw = o.estimated_delivery_date
+  if (!raw) return null
+  return new Date(String(raw).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+  })
 }
 
 interface Props {

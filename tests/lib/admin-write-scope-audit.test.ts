@@ -57,6 +57,8 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'financial/payables/webhook',
   // Renders a preview; writes nothing.
   'orders/[id]/send-customer-mail/preview',
+  // Delivery-estimate preview: computes a date from posted draft settings; writes nothing.
+  'edd-settings/preview',
   // Pre-auth: proves identity before any session exists.
   'auth/google',
   // Mints a token whose scopes are filtered to a subset of the caller's own — cannot escalate.

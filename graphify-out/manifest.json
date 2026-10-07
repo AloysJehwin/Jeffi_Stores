@@ -205,8 +205,8 @@
     "semantic_hash": ""
   },
   "src/components/admin/OrderDetailModal.tsx": {
-    "mtime": 1791399412.5172288,
-    "ast_hash": "3f1536785f16373b16b5990b9f350553",
+    "mtime": 1791400794.9153886,
+    "ast_hash": "f2c7b76d64a6f380447e43caee9ac9d4",
     "semantic_hash": ""
   },
   "src/components/admin/OrdersTableRows.tsx": {
@@ -1010,8 +1010,8 @@
     "semantic_hash": ""
   },
   "database/orders.sql": {
-    "mtime": 1791355218.0572228,
-    "ast_hash": "31592d598ec55bfd9c2d155e8714d4dd",
+    "mtime": 1791400877.5853915,
+    "ast_hash": "bd6b0a382965cdac3df77af3903a7123",
     "semantic_hash": ""
   },
   "database/payments.sql": {
@@ -1090,8 +1090,8 @@
     "semantic_hash": ""
   },
   "src/components/shared/CheckoutReviewPage.tsx": {
-    "mtime": 1791367103.3318937,
-    "ast_hash": "6a75825b0666efdf01abed1a1d381f98",
+    "mtime": 1791400785.9863565,
+    "ast_hash": "af79831e5c4c1fb094dea1d2a98e1b6a",
     "semantic_hash": ""
   },
   "src/components/shared/ProductWarningBadges.tsx": {
@@ -1455,8 +1455,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/orders/[id]/track/route.test.ts": {
-    "mtime": 1790931255.8495083,
-    "ast_hash": "842ce40bbffae61eacc20c18e77c24e4",
+    "mtime": 1791401372.3023262,
+    "ast_hash": "803401c05c3ac90a9e0923d67ba7be11",
     "semantic_hash": ""
   },
   "tests/api/admin/orders/by-number/route.test.ts": {
@@ -2535,8 +2535,8 @@
     "semantic_hash": ""
   },
   "tests/lib/edd.test.ts": {
-    "mtime": 1790931257.234998,
-    "ast_hash": "3c663bc90c48708ebb957eb7e5d57aa5",
+    "mtime": 1791401648.6395812,
+    "ast_hash": "fc9bf350e9eaa0c4aa0ca9855cb2b0a3",
     "semantic_hash": ""
   },
   "tests/lib/shipment-status.test.ts": {
@@ -3655,8 +3655,8 @@
     "semantic_hash": ""
   },
   "tests/lib/admin-write-scope-audit.test.ts": {
-    "mtime": 1790931257.0678294,
-    "ast_hash": "8906eb756e4fd6da11cf4cc5dd1076c3",
+    "mtime": 1791401679.82385,
+    "ast_hash": "ea8664d29abbde1578b16069b2fde2d1",
     "semantic_hash": ""
   },
   "tests/lib/delhivery-pincode.test.ts": {
@@ -7365,8 +7365,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/orders/[id]/page.tsx": {
-    "mtime": 1791368910.1197565,
-    "ast_hash": "a08cc574668550c22484ecd5c544162a",
+    "mtime": 1791401028.8754947,
+    "ast_hash": "045122121e7d0b807487ced75dad9348",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/orders/loading.tsx": {
@@ -7680,8 +7680,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/settings/site-controls/page.tsx": {
-    "mtime": 1791395729.9988394,
-    "ast_hash": "f5433db08d117e1f5dfce57b675c159d",
+    "mtime": 1791401113.9738746,
+    "ast_hash": "d86688ba1cb1b34d42ba6a6e5d44a119",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/shelving/ShelvingClient.tsx": {
@@ -7855,8 +7855,8 @@
     "semantic_hash": ""
   },
   "src/app/(business)/business/account/orders/[id]/page.tsx": {
-    "mtime": 1791366468.2543254,
-    "ast_hash": "f6021b1a177a578bb9335d491dcb3582",
+    "mtime": 1791401679.8156183,
+    "ast_hash": "a6117a9df584f50bcb3b6d6d41de6208",
     "semantic_hash": ""
   },
   "src/app/(business)/business/account/orders/loading.tsx": {
@@ -8545,8 +8545,8 @@
     "semantic_hash": ""
   },
   "src/app/(storefront)/account/orders/[id]/page.tsx": {
-    "mtime": 1791366436.0792658,
-    "ast_hash": "912e9def2f78a7165828065290450235",
+    "mtime": 1791401679.8050563,
+    "ast_hash": "49a3e6e7507c9a425dc5ad345d436657",
     "semantic_hash": ""
   },
   "src/app/(storefront)/account/orders/confirmation/loading.tsx": {
@@ -9310,8 +9310,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/delhivery/sync-statuses/route.ts": {
-    "mtime": 1790931250.2305956,
-    "ast_hash": "896957fd0e8a378cc335139be2adb632",
+    "mtime": 1791400835.814626,
+    "ast_hash": "aa08dcfe386694fc882d430cfde9a12f",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/ecom/[tenantId]/account-mode/route.ts": {
@@ -9860,8 +9860,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/orders/[id]/create-shipment/route.ts": {
-    "mtime": 1791367027.4536943,
-    "ast_hash": "8f4d341c98bacfbd38065ca48a912493",
+    "mtime": 1791400867.2881274,
+    "ast_hash": "8f92161093214e547e0f10bedec98af7",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/orders/[id]/delivery-charge/route.ts": {
@@ -9935,8 +9935,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/orders/[id]/track/route.ts": {
-    "mtime": 1791366869.0559409,
-    "ast_hash": "a37e756eb3c87d57b0755aeb156ebf27",
+    "mtime": 1791400847.1168308,
+    "ast_hash": "cec105a82891d13d7c0ef288d5a66998",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/orders/[id]/update-shipment/route.ts": {
@@ -10825,8 +10825,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(public)/cart/route.ts": {
-    "mtime": 1791397799.1737716,
-    "ast_hash": "d44a09a5d782cd35f439a630a3a47125",
+    "mtime": 1791400785.864378,
+    "ast_hash": "d947cebd3dfd3516327ac5d7efe3fe47",
     "semantic_hash": ""
   },
   "src/app/api/(public)/categories/[id]/route.ts": {
@@ -10875,8 +10875,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(public)/checkout/intents/[token]/route.ts": {
-    "mtime": 1791367700.7253425,
-    "ast_hash": "8f1fcc95b921339252e29e3ad3e46a85",
+    "mtime": 1791400785.8833842,
+    "ast_hash": "34ae7d04aef892f2e2d48ffbc17fe9ae",
     "semantic_hash": ""
   },
   "src/app/api/(public)/checkout/intents/route.ts": {
@@ -11030,8 +11030,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(public)/orders/[id]/route.ts": {
-    "mtime": 1791397655.2395453,
-    "ast_hash": "7de1601c52a7ad98c18a1f4407ee4c39",
+    "mtime": 1791401021.1266751,
+    "ast_hash": "c5956cc47289b7db395de2367516644d",
     "semantic_hash": ""
   },
   "src/app/api/(public)/orders/[id]/track-rvp/route.ts": {
@@ -11040,8 +11040,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(public)/orders/[id]/track/route.ts": {
-    "mtime": 1790931251.8424876,
-    "ast_hash": "c9fb72bfa4cd96120e4302b9c63df9b1",
+    "mtime": 1791400847.129208,
+    "ast_hash": "75de4586c163859b8b68f61694599302",
     "semantic_hash": ""
   },
   "src/app/api/(public)/orders/[id]/variant-change/confirm/route.ts": {
@@ -11055,13 +11055,13 @@
     "semantic_hash": ""
   },
   "src/app/api/(public)/orders/create-direct/route.ts": {
-    "mtime": 1791366627.3157594,
-    "ast_hash": "29a00070121e888dd081f3cdc8b5c598",
+    "mtime": 1791401183.895974,
+    "ast_hash": "34bc598b41cb15576eb3bdacbeebdbb0",
     "semantic_hash": ""
   },
   "src/app/api/(public)/orders/create/route.ts": {
-    "mtime": 1791366614.2272785,
-    "ast_hash": "7adee7d6e411fbe721662af96cdbac2a",
+    "mtime": 1791401183.8512738,
+    "ast_hash": "5e742a8c06b77ca382e2a61346c5fb8a",
     "semantic_hash": ""
   },
   "src/app/api/(public)/orders/draft/route.ts": {
@@ -11105,8 +11105,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(public)/products/edd/route.ts": {
-    "mtime": 1790931251.8955693,
-    "ast_hash": "658bad1b59999b49c95c704b8c34aec4",
+    "mtime": 1791401211.5305855,
+    "ast_hash": "f95621c12244110e0d2be6d21a660747",
     "semantic_hash": ""
   },
   "src/app/api/(public)/products/route.ts": {
@@ -11660,8 +11660,8 @@
     "semantic_hash": ""
   },
   "src/lib/catalog/site-controls.ts": {
-    "mtime": 1791355921.1818056,
-    "ast_hash": "d0815071932b93a4a0de1f5e7390ca16",
+    "mtime": 1791400723.238317,
+    "ast_hash": "a1e48684057372b66118a04028d4719b",
     "semantic_hash": ""
   },
   "src/lib/catalog/sku.ts": {
@@ -11730,8 +11730,8 @@
     "semantic_hash": ""
   },
   "src/lib/orders/address-change.ts": {
-    "mtime": 1790931253.7689247,
-    "ast_hash": "bd0b6c9df50bb9f266b8d621cc3ac062",
+    "mtime": 1791400744.220924,
+    "ast_hash": "b56b8c8916d2cd84dacf0f517ba5e6b4",
     "semantic_hash": ""
   },
   "src/lib/orders/checkout-intent.ts": {
@@ -11750,8 +11750,8 @@
     "semantic_hash": ""
   },
   "src/lib/orders/order-commit.ts": {
-    "mtime": 1791397655.2379522,
-    "ast_hash": "92e157c59a1c8edeed0ab8f1c117f60e",
+    "mtime": 1791401183.9010022,
+    "ast_hash": "f00bf039d99b85b44fb8a7775e9c7b9d",
     "semantic_hash": ""
   },
   "src/lib/orders/order-draft.ts": {
@@ -12155,8 +12155,8 @@
     "semantic_hash": ""
   },
   "src/lib/shipping/edd.ts": {
-    "mtime": 1790931254.079196,
-    "ast_hash": "49bf0d9601a8ccbeed088067442a17fb",
+    "mtime": 1791401640.977582,
+    "ast_hash": "10f2f89454b548398fbb17d54e94eb88",
     "semantic_hash": ""
   },
   "src/lib/shipping/einvoice.ts": {
@@ -12170,8 +12170,8 @@
     "semantic_hash": ""
   },
   "src/lib/shipping/india-pincode-state.ts": {
-    "mtime": 1790931254.0799136,
-    "ast_hash": "f699ceec187272b5a6a4aeebb8727281",
+    "mtime": 1791400687.031877,
+    "ast_hash": "d2dce70a3f1dd69381163edb862d9902",
     "semantic_hash": ""
   },
   "src/lib/shipping/shipment-status.ts": {
@@ -13295,8 +13295,8 @@
     "semantic_hash": ""
   },
   "src/lib/subscriptions/cycle.ts": {
-    "mtime": 1791369262.083696,
-    "ast_hash": "73785ffd665280c55a9f3f4c5eb216be",
+    "mtime": 1791401679.820305,
+    "ast_hash": "946c01bd248832da4a02c79112fbcbce",
     "semantic_hash": ""
   },
   "src/lib/subscriptions/intervals.ts": {
@@ -13967,6 +13967,56 @@
   "integration-tests/README.md": {
     "mtime": 1790964202.971062,
     "ast_hash": "3938b02e30abf8725a5c75f7a36d07f6",
+    "semantic_hash": ""
+  },
+  "src/app/api/(admin)/admin/edd-settings/preview/route.ts": {
+    "mtime": 1791401068.1306198,
+    "ast_hash": "a5298e6bf963fb794505e74e1f06c5d6",
+    "semantic_hash": ""
+  },
+  "src/app/api/(admin)/admin/edd-settings/route.ts": {
+    "mtime": 1791401068.0586548,
+    "ast_hash": "cfd538b01c4d947de5c004f987370bb1",
+    "semantic_hash": ""
+  },
+  "src/components/admin/site-controls/DeliveryEstimateCard.tsx": {
+    "mtime": 1791401653.040226,
+    "ast_hash": "c5202a5aef3505d9f3890753ba3856ba",
+    "semantic_hash": ""
+  },
+  "src/lib/shipping/courier-edd.ts": {
+    "mtime": 1791400823.8437004,
+    "ast_hash": "5a603a95bd9784cddaf572b4d5971894",
+    "semantic_hash": ""
+  },
+  "src/lib/shipping/edd-settings.ts": {
+    "mtime": 1791401656.1376,
+    "ast_hash": "876f99d0a9ae8816d962976f32639a2b",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/delhivery/sync-statuses/route.courier-edd.test.ts": {
+    "mtime": 1791401657.894687,
+    "ast_hash": "0f7418088d8b4040fc7e9a3c8d497e4c",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/edd-settings/preview/route.test.ts": {
+    "mtime": 1791401352.1528318,
+    "ast_hash": "62b18653e0904e4458c84c7c4caf995b",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/edd-settings/route.test.ts": {
+    "mtime": 1791401352.147107,
+    "ast_hash": "05e05b5bcf7cf161ef5bf27a12298af2",
+    "semantic_hash": ""
+  },
+  "tests/lib/courier-edd.test.ts": {
+    "mtime": 1791401317.4801416,
+    "ast_hash": "435a8928771f66ba68ecc55fec6e8535",
+    "semantic_hash": ""
+  },
+  "tests/lib/edd-settings.test.ts": {
+    "mtime": 1791401317.489387,
+    "ast_hash": "78bc29e9c732ec3c5f4c49922e40e86f",
     "semantic_hash": ""
   }
 }

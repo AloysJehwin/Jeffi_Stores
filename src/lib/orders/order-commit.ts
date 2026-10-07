@@ -524,14 +524,14 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         : Number(input.product.extra_delivery_days ?? 0)
     const maxHandlingDays =
       input.mode === 'cart'
-        ? Math.max(2, ...physicalLines.map(i => Number(i.products.handling_days ?? 2)))
-        : Number(input.product.handling_days ?? 2)
+        ? Math.max(0, ...physicalLines.map(i => Number(i.products.handling_days ?? 0)))
+        : Number(input.product.handling_days ?? 0)
     const bv = await getBusinessValues()
     const estimatedDeliveryDate = allDigital
       ? null
       : computeEdd({
           pin,
-          originPin: bv.delhiveryOriginPincode,
+          store: bv,
           handlingDays: maxHandlingDays,
           extraDays: maxExtraDays,
         })
