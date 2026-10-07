@@ -13,7 +13,7 @@ if ! command -v tailscale >/dev/null; then
 fi
 systemctl enable --now tailscaled
 TSKEY=$(sec TS_AUTHKEY)
-[ -z "$TSKEY" ] || tailscale status >/dev/null 2>&1 || tailscale up --authkey "$TSKEY" --hostname jeffi-k8s-core
+[ -z "$TSKEY" ] || tailscale status >/dev/null 2>&1 || tailscale up --authkey "$TSKEY" --hostname jeffi-k8s-core --advertise-tags tag:server-prod
 
 TS_IP=$(tailscale ip -4 2>/dev/null | head -1 || true)
 PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $(curl -s -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')" http://169.254.169.254/latest/meta-data/public-ipv4)
