@@ -9,6 +9,7 @@ import { resolveTenantFromHost, appFromHost, slugFromHost, formsHostForSlug } fr
 import { runWithTenantContext } from './lib/tenancy/tenant-context'
 import { adminCookieNameForHost } from './lib/auth/admin-cookie'
 import { bindingGate } from './lib/auth/session-binding-gate'
+import { clientCertFromProxy, TRAEFIK_CERT_HEADER, TRAEFIK_CERT_INFO_HEADER } from './lib/tenancy/edge-client-cert'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
 // it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
@@ -137,6 +138,7 @@ export async function middleware(request: NextRequest) {
 
   // Strip any inbound x-user-* / x-service-account-* headers that clients could forge.
   // Middleware sets these itself below after verifying the token — they must not arrive untouched.
+  const proxyCert = clientCertFromProxy(request.headers)
   const stripped = new Headers(request.headers)
   stripped.delete('x-user-id')
   stripped.delete('x-username')
@@ -153,13 +155,13 @@ export async function middleware(request: NextRequest) {
   stripped.delete('x-client-cert')
   stripped.delete('x-client-cert-serial')
   stripped.delete('x-client-cert-cn')
-  // nginx sets these from the TLS handshake on the platform admin block, so restore its
+  stripped.delete(TRAEFIK_CERT_HEADER)
+  stripped.delete(TRAEFIK_CERT_INFO_HEADER)
+  // The edge proxy sets these from the TLS handshake on the platform admin host, so restore its
   // values after the strip — service-account mTLS auth reads them downstream.
   if (isAdminSubdomain && !isTenantAdminSubdomain) {
-    const ngSerial = request.headers.get('x-client-cert-serial')
-    const ngCn = request.headers.get('x-client-cert-cn')
-    if (ngSerial) stripped.set('x-client-cert-serial', ngSerial)
-    if (ngCn) stripped.set('x-client-cert-cn', ngCn)
+    if (proxyCert.serial) stripped.set('x-client-cert-serial', proxyCert.serial)
+    if (proxyCert.commonName) stripped.set('x-client-cert-cn', proxyCert.commonName)
   }
 
   // Multi-tenant SaaS: resolve the tenant from the Host header (cached ~60s in-process).
@@ -433,7 +435,7 @@ export async function middleware(request: NextRequest) {
   // however valid the cert was.
   if (isTenantAdminSubdomain && tenant && process.env.TENANT_MTLS_ENFORCED !== 'false') {
     const { decodeClientCertHeader, verifyTenantClientCert } = await import('./lib/tenancy/tenant-mtls')
-    const pem = decodeClientCertHeader(request.headers.get('x-client-cert'))
+    const pem = decodeClientCertHeader(proxyCert.pem)
     const v = await verifyTenantClientCert(pem, tenant.tenantId).catch(
       (): Awaited<ReturnType<typeof verifyTenantClientCert>> => ({ ok: false, reason: 'malformed' })
     )
@@ -570,7 +572,7 @@ export async function middleware(request: NextRequest) {
     // nginx passes $ssl_client_serial as X-Client-Cert-Serial. The edge runtime
     // cannot use pg (Node.js crypto), so we pass the request through and let the
     // route handler validate via authenticateServiceAccount() in jwt.ts.
-    const certSerial = request.headers.get('x-client-cert-serial') || ''
+    const certSerial = proxyCert.serial || ''
     if (certSerial) {
       return addSecurityHeaders(passThrough())
     }
@@ -587,7 +589,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    const certCN = request.headers.get('x-client-cert-cn') || ''
+    const certCN = proxyCert.commonName || ''
     const tokenCertCN = payload.authCertCN
     if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
       return NextResponse.json({ error: 'Certificate does not match authenticated user' }, { status: 403 })
@@ -646,7 +648,7 @@ export async function middleware(request: NextRequest) {
       return response
     }
 
-    const certCN = request.headers.get('x-client-cert-cn') || ''
+    const certCN = proxyCert.commonName || ''
     const tokenCertCN = payload.authCertCN
     if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')

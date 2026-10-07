@@ -187,3 +187,23 @@ export const CRON_JOB_IDS: readonly string[] = CRON_JOBS.map(j => j.id)
 export function isCronJobId(id: unknown): id is string {
   return typeof id === 'string' && CRON_JOB_IDS.includes(id)
 }
+
+// IN_PROCESS_CRON=false hands scheduling to Kubernetes CronJobs (deploy/k8s), so pods never self-schedule.
+export function inProcessCronEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.IN_PROCESS_CRON !== 'false'
+}
+
+// Daily jobs fire at a fixed IST time under k8s instead of a few minutes after every restart.
+const DAILY_AT_IST: Record<string, string> = { daily_briefing: '0 8', customer_notes_digest: '30 9' }
+
+// Cron expression (evaluated in Asia/Kolkata) for a job's k8s CronJob. Sub-minute jobs round up to 1m.
+export function cronSchedule(job: CronJob): string {
+  const mins = Math.max(1, Math.round(job.intervalMs / MIN))
+  if (mins >= 24 * 60) return `${DAILY_AT_IST[job.id] ?? '0 3'} * * *`
+  if (mins >= 60) {
+    const hours = Math.round(mins / 60)
+    const minute = Math.round(job.startDelayMs / MIN) % 60
+    return hours === 1 ? `${minute} * * * *` : `${minute} */${hours} * * *`
+  }
+  return mins === 1 ? '* * * * *' : `*/${mins} * * * *`
+}
