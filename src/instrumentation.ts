@@ -3,10 +3,11 @@
 // in the edge runtime and cause a module evaluation crash if imported at the
 // top level of instrumentation.ts (which Turbopack evaluates in both runtimes).
 
-import { CRON_JOBS } from '@/lib/shared/cron-jobs'
+import { CRON_JOBS, inProcessCronEnabled } from '@/lib/shared/cron-jobs'
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
+  if (!inProcessCronEnabled()) return
 
   const CRON_SECRET = process.env.CRON_SECRET
   const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL
