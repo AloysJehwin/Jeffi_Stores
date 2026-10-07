@@ -6,6 +6,7 @@ const RESERVED_LABELS = new Set([
   'quotation',
   'purchaseorder',
   'forms',
+  'vault',
   'business',
   'www',
   'app',
@@ -46,6 +47,16 @@ export function formsHostForSlug(slug: string | null): string {
 /** Forms host that preserves the tenant of the given request host. */
 export function formsHostForHost(hostname: string): string {
   return formsHostForSlug(slugFromHostname(hostname))
+}
+
+/** Vault host for a tenant slug; null (platform) → the platform vault host. */
+export function vaultHostForSlug(slug: string | null): string {
+  return slug ? `vault-${slug}.${ROOT_DOMAIN}` : `vault.${ROOT_DOMAIN}`
+}
+
+/** Vault host that preserves the tenant of the given request host. */
+export function vaultHostForHost(hostname: string): string {
+  return vaultHostForSlug(slugFromHostname(hostname))
 }
 
 /** Storefront host for a tenant slug; null (platform / custom domain) → the platform storefront host. */

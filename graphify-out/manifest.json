@@ -720,8 +720,8 @@
     "semantic_hash": ""
   },
   "package.json": {
-    "mtime": 1790968804.3153253,
-    "ast_hash": "5ed512a11cb52c509fecfd34764c8e9a",
+    "mtime": 1791362747.5867972,
+    "ast_hash": "791b016b56539d200106c26aa5034629",
     "semantic_hash": ""
   },
   "postcss.config.js": {
@@ -6245,8 +6245,8 @@
     "semantic_hash": ""
   },
   "src/lib/tenant-registry/host-resolution.ts": {
-    "mtime": 1790931254.1253114,
-    "ast_hash": "5282f2c5ae9735a1fe3485402e9fbfe4",
+    "mtime": 1791362872.3458357,
+    "ast_hash": "3851691aea88eeed0ff229436ba99f7d",
     "semantic_hash": ""
   },
   "src/lib/tenant-registry/index.ts": {
@@ -6280,8 +6280,8 @@
     "semantic_hash": ""
   },
   "src/lib/tenant-registry/shared.ts": {
-    "mtime": 1790931254.1484187,
-    "ast_hash": "22a5c8fb1d93bf8d41c25eca1ab8c90a",
+    "mtime": 1791362849.9443433,
+    "ast_hash": "056baf676310575e9ab98754538b3afe",
     "semantic_hash": ""
   },
   "src/lib/tenant-registry/social.ts": {
@@ -12200,8 +12200,8 @@
     "semantic_hash": ""
   },
   "src/lib/tenancy/forms-host.ts": {
-    "mtime": 1791317041.9767635,
-    "ast_hash": "348d3e4502d1ae8465d23c0df70a0fea",
+    "mtime": 1791362896.7055984,
+    "ast_hash": "b75cefefec4286f9a027c2a2921580a9",
     "semantic_hash": ""
   },
   "src/lib/tenancy/get-host.ts": {
@@ -13282,6 +13282,21 @@
   "tests/lib/digital.test.ts": {
     "mtime": 1791360262.9265237,
     "ast_hash": "50a26f3c264ff955665f15734f188c4b",
+    "semantic_hash": ""
+  },
+  "src/lib/vault/links.ts": {
+    "mtime": 1791362911.7605674,
+    "ast_hash": "a62f3b8787ff06617c7cd9d5b016d798",
+    "semantic_hash": ""
+  },
+  "src/lib/vault/storage.ts": {
+    "mtime": 1791362792.5004175,
+    "ast_hash": "6e816d6b94aedf3217f38150aaa84a04",
+    "semantic_hash": ""
+  },
+  "src/lib/vault/vault-storage-local.ts": {
+    "mtime": 1791362812.8241158,
+    "ast_hash": "33743ca07bf07178f3cf123b7009a66b",
     "semantic_hash": ""
   }
 }

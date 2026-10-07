@@ -23,6 +23,7 @@ export const RESERVED_LABELS = new Set([
   'admin',
   'business',
   'forms',
+  'vault',
   'www',
   'ecom',
   'invoice',

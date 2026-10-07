@@ -104,3 +104,4 @@ public/models/onboarding/ort/*.mjs
 
 # IDE state (holds local diff caches; never commit)
 .idea/
+.vault-store/
