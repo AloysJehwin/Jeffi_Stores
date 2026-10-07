@@ -9,6 +9,7 @@ import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { settleDelhiveryCostToWallet } from '@/lib/payments/wallet'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { applyCourierEdd, extractCourierEdd } from '@/lib/shipping/courier-edd'
 
 const STATUS_SYNC: Record<
   string,
@@ -83,6 +84,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       delhivery_oda_charge: number | null
       payment_mode: string | null
       dest_pin: string | null
+      courier_edd: string | null
     }>(
       `SELECT o.awb_number, o.status, o.shipment_status, o.order_number,
               o.shipping_amount, o.delhivery_quoted_weight_kg,
@@ -91,6 +93,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               o.delhivery_freight_charge, o.delhivery_cod_charge, o.delhivery_oda_charge,
               o.payment_mode,
               o.shipping_address_snapshot->>'postal_code' AS dest_pin,
+              to_char(o.courier_edd, 'YYYY-MM-DD') AS courier_edd,
               COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
               COALESCE(u.email, o.customer_email) AS customer_email
        FROM orders o
@@ -115,7 +118,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           statusDateTime: null,
           instructions: null,
           pickUpDate: null,
-          expectedDelivery: null,
+          expectedDelivery: order.courier_edd ?? null,
           origin: null,
           destination: null,
           scans: [],
@@ -210,6 +213,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       statusSynced = true
     }
 
+    const courierEdd = extractCourierEdd(shipment)
+    await applyCourierEdd(id, courierEdd, newShipmentStatus).catch(() => {})
+
     // Always advance shipment_status if the new value is further along
     let effectiveShipmentStatus = newShipmentStatus
     if (isAdvancement(order.shipment_status as any, newShipmentStatus)) {
@@ -299,7 +305,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         statusDateTime,
         instructions: shipment.Status?.Instructions ?? null,
         pickUpDate: shipment.PickUpDate ?? null,
-        expectedDelivery: shipment.ExpectedDeliveryDate ?? null,
+        expectedDelivery: courierEdd,
         origin: shipment.Origin ?? null,
         destination: shipment.Destination ?? null,
         scans,

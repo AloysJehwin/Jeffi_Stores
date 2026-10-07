@@ -255,10 +255,14 @@ export async function POST(request: NextRequest) {
     const appliedCodFee = !isCod ? 0 : quoteResolved ? quote.codFee : clientCodFee != null ? round2(clientCodFee) : 0
 
     const _eddPin = String(destinationPin || '')
-    const _eddHandling = Math.max(2, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 2)))
+    const _eddHandling = Math.max(0, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 0)))
     const _eddExtra = Math.max(0, ...cartItems.map((i: any) => Number(i.products?.extra_delivery_days ?? 0)))
-    const _eddOrigin = (await getBusinessValues()).delhiveryOriginPincode
-    const _edd = computeEdd({ pin: _eddPin, originPin: _eddOrigin, handlingDays: _eddHandling, extraDays: _eddExtra })
+    const _edd = computeEdd({
+      pin: _eddPin,
+      store: await getBusinessValues(),
+      handlingDays: _eddHandling,
+      extraDays: _eddExtra,
+    })
 
     const order = await withTransaction(async client => {
       let shippingAddressId = null

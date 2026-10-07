@@ -139,6 +139,16 @@ export default async function OrderDetailsPage({
       })
     : null
   const rawEdd: string | null = eddDateStr ?? null
+  const courierEddStr: string | null = order.courier_edd
+    ? order.courier_edd instanceof Date
+      ? order.courier_edd.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+      : String(order.courier_edd).slice(0, 10)
+    : null
+  const courierEddNote = courierEddStr
+    ? courierEddStr === eddDateStr
+      ? 'Courier estimate (Delhivery)'
+      : `Delhivery estimate: ${new Date(courierEddStr + 'T00:00:00Z').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}`
+    : null
 
   let eddLabel = 'Expected Delivery'
   let eddLabelColor = 'text-foreground-muted'
@@ -1042,6 +1052,7 @@ export default async function OrderDetailsPage({
                           <div className="flex-1 min-w-0">
                             <p className={`text-xs font-medium ${eddLabelColor}`}>{eddLabel}</p>
                             <p className="font-bold text-foreground">{edd}</p>
+                            {courierEddNote && <p className="text-xs text-foreground-muted">{courierEddNote}</p>}
                           </div>
                         </div>
                       ) : (

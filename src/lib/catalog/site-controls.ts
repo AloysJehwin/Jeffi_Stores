@@ -70,6 +70,8 @@ export interface BusinessValues {
   sellerName: string
   sellerAddress: string
   sellerPhone: string
+  // Site Controls > Delivery estimate, JSON parsed by parseEddSettings ('' = defaults).
+  eddSettingsJson: string
 }
 
 export interface StorefrontContent {
@@ -182,6 +184,7 @@ const DEFAULTS: SiteControls = {
     sellerAddress:
       process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur',
     sellerPhone: process.env.DELHIVERY_SELLER_PHONE || '07713585374',
+    eddSettingsJson: '',
   },
   storefront: {
     featuredLimit: 8,
@@ -255,6 +258,7 @@ const KEYS = [
   'delhivery_seller_name',
   'delhivery_seller_address',
   'delhivery_seller_phone',
+  'edd_settings',
   'storefront_featured_limit',
   'storefront_new_arrivals_limit',
   'storefront_stats_json',
@@ -447,6 +451,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         sellerName: str('delhivery_seller_name', d.values.sellerName),
         sellerAddress: str('delhivery_seller_address', d.values.sellerAddress),
         sellerPhone: str('delhivery_seller_phone', d.values.sellerPhone),
+        eddSettingsJson: str('edd_settings', d.values.eddSettingsJson),
       },
       storefront: {
         featuredLimit: Math.max(1, Math.round(num('storefront_featured_limit', d.storefront.featuredLimit))),

@@ -85,6 +85,7 @@ interface OrderDetails {
   trackingUrl: string | null
   awbNumber: string | null
   estimatedDeliveryDate: string | null
+  courierEdd?: string | null
   originalOrderId: string | null
   originalOrderNumber: string | null
   orderType: string
@@ -130,12 +131,14 @@ function getEddDisplay(order: OrderDetails, edd: string): { label: string; sub: 
   }
   const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
   todayIST.setHours(0, 0, 0, 0)
-  const eddDate = new Date(edd + ' 00:00:00')
+  const eddDate = new Date(String(order.estimatedDeliveryDate).slice(0, 10) + 'T00:00:00Z')
   const diffDays = Math.round((eddDate.getTime() - todayIST.getTime()) / 86400000)
   if (diffDays === 0) return { label: 'Arriving Today', sub: edd, color: 'text-accent-500' }
   if (diffDays === 1) return { label: 'Arriving Tomorrow', sub: edd, color: 'text-accent-500' }
   if (diffDays < 0)
     return { label: 'Expected by ' + edd, sub: 'Delivery delayed', color: 'text-orange-500 dark:text-orange-400' }
+  if (order.courierEdd && order.courierEdd === String(order.estimatedDeliveryDate).slice(0, 10))
+    return { label: 'Expected by ' + edd, sub: 'Courier estimate', color: 'text-foreground' }
   return { label: 'Estimated Delivery', sub: edd, color: 'text-foreground' }
 }
 

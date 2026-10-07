@@ -10,6 +10,7 @@ import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { listDelhiveryPickupLocations } from '@/lib/shipping/delhivery'
 import { walletBlocksShipment, chargeDeliveryEstimate } from '@/lib/payments/wallet'
+import { applyCourierEdd } from '@/lib/shipping/courier-edd'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 
@@ -236,33 +237,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'No AWB returned by Delhivery' }, { status: 502 })
     }
 
-    // Fetch TAT (turnaround days) from Delhivery serviceability API — non-fatal
+    // Courier TAT from Delhivery's expected-TAT API (read-only, non-fatal). Recorded as the courier
+    // EDD; the tracking sync replaces it with Delhivery's own expected date once the parcel moves.
     let estimatedDeliveryDate: string | null = null
     try {
       const tatRes = await fetch(
-        `https://track.delhivery.com/api/kinko/v0.2/pickup/serviceability/?md=S&ss=Delivered&d_pin=${pin}&o_pin=${ORIGIN_PIN}`,
+        `https://track.delhivery.com/api/dc/expected_tat?origin_pin=${ORIGIN_PIN}&destination_pin=${pin}&mot=S&pdt=B2C`,
         { headers: { Authorization: `Token ${TOKEN}` }, next: { revalidate: 0 } }
       )
       if (tatRes.ok) {
         const tatData = await tatRes.json()
-        const tat = tatData?.tat ?? tatData?.[0]?.tat ?? null
-        if (typeof tat === 'number' && tat > 0) {
+        const tat = Number(tatData?.data?.tat ?? tatData?.tat ?? tatData?.[0]?.tat ?? NaN)
+        if (Number.isFinite(tat) && tat > 0) {
           estimatedDeliveryDate = addBusinessDays(new Date(), tat).toISOString().slice(0, 10)
         }
       }
     } catch {
-      // TAT lookup failed — proceed without EDD
+      // TAT lookup failed — keep the promised EDD
     }
 
     await query(
       `UPDATE orders SET awb_number = $1, status = 'processing',
-        estimated_delivery_date = COALESCE($3::date, estimated_delivery_date),
         shipment_status = COALESCE(shipment_status, 'created'),
-        delhivery_quoted_weight_kg = $4,
+        delhivery_quoted_weight_kg = $3,
         updated_at = NOW()
        WHERE id = $2`,
-      [awb, id, estimatedDeliveryDate, weightKg]
+      [awb, id, weightKg]
     )
+    await applyCourierEdd(id, estimatedDeliveryDate, 'created').catch(() => {})
 
     // Charge the estimated delivery cost to the wallet NOW, keyed to this AWB (platform-Delhivery
     // tenants only; own_delhivery exempt). This is the single deduction point for a forward

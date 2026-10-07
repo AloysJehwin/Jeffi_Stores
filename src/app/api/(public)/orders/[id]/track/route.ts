@@ -3,6 +3,7 @@ import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { queryOne, query } from '@/lib/shared/db'
 import { resolveShipmentStatus, isAdvancement } from '@/lib/shipping/shipment-status'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { applyCourierEdd, extractCourierEdd } from '@/lib/shipping/courier-edd'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -74,6 +75,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       ]).catch(() => {})
     }
 
+    const courierEdd = extractCourierEdd(shipment)
+    await applyCourierEdd(id, courierEdd, newShipmentStatus).catch(() => {})
+
     return NextResponse.json({
       tracking: {
         awb: shipment.AWB,
@@ -83,7 +87,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         statusDateTime: shipment.Status?.StatusDateTime ?? null,
         instructions: shipment.Status?.Instructions ?? null,
         pickUpDate: shipment.PickUpDate ?? null,
-        expectedDelivery: shipment.ExpectedDeliveryDate ?? null,
+        expectedDelivery: courierEdd,
         origin: shipment.Origin ?? null,
         destination: shipment.Destination ?? null,
         scans,

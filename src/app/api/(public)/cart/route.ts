@@ -115,6 +115,8 @@ export async function GET(request: NextRequest) {
           'hazardous', p.hazardous,
           'flammable', p.flammable,
           'is_digital', COALESCE(p.is_digital, FALSE),
+          'handling_days', p.handling_days,
+          'extra_delivery_days', p.extra_delivery_days,
           'brand_name', b.name, 'category_id', p.category_id,
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'image_url', pi.image_url, 'is_primary', pi.is_primary))
