@@ -20,7 +20,7 @@ spec:
     spec:
       serviceAccountName: flagship
       nodeSelector: { jeffi.io/role: core }
-      imagePullSecrets: [{ name: ghcr }]
+      imagePullSecrets: [{ name: regcred }]
       terminationGracePeriodSeconds: 60
       securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
       containers:

@@ -38,7 +38,7 @@ spec:
         spec:
           restartPolicy: Never
           nodeSelector: { jeffi.io/role: core }
-          imagePullSecrets: [{ name: ghcr }]
+          imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
               image: ghcr.io/aloysjehwin/jeffi_stores:latest
