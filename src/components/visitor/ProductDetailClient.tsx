@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useWishlist } from '@/contexts/WishlistContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { digitalActive } from '@/lib/catalog/digital'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { useRouter } from 'next/navigation'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
@@ -150,6 +151,8 @@ interface ProductDetailClientProps {
     target_gender?: string | null
     target_audience?: string[] | null
     is_cod_allowed?: boolean | null
+    is_digital?: boolean | null
+    owned_in_vault?: boolean | null
   }
   initialSkuParam?: string
   freeShippingThreshold?: number
@@ -551,6 +554,8 @@ export default function ProductDetailClient({
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
   const gstEnabled = useStoreConfig().flags.gstEnabled
+  const digitalMaster = useStoreConfig().flags.digitalProductsEnabled
+  const isDigital = digitalActive(digitalMaster, product.is_digital ?? false)
   const router = useRouter()
 
   useEffect(() => {
@@ -694,16 +699,24 @@ export default function ProductDetailClient({
         />
 
         <div className="hidden lg:block mt-4">
-          <DeliveryInfo {...policy} />
-          <PincodeChecker
-            pincode={pincode}
-            setPincode={setPincode}
-            pincodeResult={pincodeResult}
-            setPincodeResult={setPincodeResult}
-            pincodeChecking={pincodeChecking}
-            checkPincode={checkPincode}
-            pincodeRef={pincodeRef}
-          />
+          {isDigital ? (
+            <div className="rounded-lg border border-border-default bg-surface-secondary/40 p-4 text-sm text-foreground-secondary">
+              Digital product — delivered instantly to your vault. No shipping.
+            </div>
+          ) : (
+            <>
+              <DeliveryInfo {...policy} />
+              <PincodeChecker
+                pincode={pincode}
+                setPincode={setPincode}
+                pincodeResult={pincodeResult}
+                setPincodeResult={setPincodeResult}
+                pincodeChecking={pincodeChecking}
+                checkPincode={checkPincode}
+                pincodeRef={pincodeRef}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -821,6 +834,8 @@ export default function ProductDetailClient({
           launchDate={product.launch_date ?? null}
           discontinueDate={product.discontinue_date ?? null}
           stickyImage={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
+          digital={isDigital}
+          alreadyOwned={product.owned_in_vault ?? false}
         />
 
         <RazorpayOffers />

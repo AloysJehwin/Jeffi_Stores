@@ -24,6 +24,10 @@ export interface StoreConfig {
     ondeviceFinetuneDesktopEnabled: boolean
     /** The store's plan includes storefront AI (ai:storefront). Hide AI features when false. */
     aiStorefrontEnabled: boolean
+    /** Site Controls masters for the digital/vault/subscription storefront treatment. */
+    digitalProductsEnabled: boolean
+    subscriptionsEnabled: boolean
+    vaultDownloadsEnabled: boolean
   }
   orderAutoCancelMinutes: number
   storefront: {
@@ -62,6 +66,9 @@ const DEFAULT_CONFIG: StoreConfig = {
     ondeviceFinetuneDesktopEnabled: false,
     ondeviceFinetuneMobileEnabled: false,
     aiStorefrontEnabled: false,
+    digitalProductsEnabled: true,
+    subscriptionsEnabled: true,
+    vaultDownloadsEnabled: false,
   },
   orderAutoCancelMinutes: 10,
   storefront: {

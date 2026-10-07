@@ -75,6 +75,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       ondeviceFinetuneMobileEnabled: c.flags.ondeviceFinetuneMobileEnabled,
       ondeviceFinetuneDesktopEnabled: c.flags.ondeviceFinetuneDesktopEnabled,
       aiStorefrontEnabled,
+      digitalProductsEnabled: c.flags.digitalProductsEnabled,
+      subscriptionsEnabled: c.flags.subscriptionsEnabled,
+      vaultDownloadsEnabled: c.flags.vaultDownloadsEnabled,
     },
     orderAutoCancelMinutes: c.values.orderAutoCancelMinutes,
     storefront: {
