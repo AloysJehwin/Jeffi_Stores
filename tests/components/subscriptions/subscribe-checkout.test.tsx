@@ -110,6 +110,14 @@ describe('SubscribeCheckout', () => {
     expect(screen.getByText(/₹15,000/)).toBeTruthy()
   })
 
+  it('spans the standard storefront container width', async () => {
+    const { container } = render(<SubscribeCheckout isBusiness={false} />)
+    await waitFor(() => expect(screen.getByTestId('subscribe-summary')).toBeTruthy())
+    const root = container.firstElementChild as HTMLElement
+    expect(root.className).toContain('container mx-auto px-4')
+    expect(root.className).not.toMatch(/max-w-/)
+  })
+
   it('shows the selected interval\'s per-unit price', async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === '/api/user/addresses') return json({ addresses: [ADDRESS] })

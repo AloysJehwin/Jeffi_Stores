@@ -660,11 +660,29 @@ export default function ProductReviews({ productId, productName }: ProductReview
           </div>
 
           {/* Right column — reviews list */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 w-full">
             {isLoading ? (
-              <div className="flex flex-col items-center py-14 gap-3">
-                <div className="w-8 h-8 border-3 border-accent-500 border-t-transparent rounded-full animate-spin" />
-                <p className="text-sm text-foreground-muted">Loading reviews…</p>
+              <div role="status" aria-busy="true" data-testid="reviews-skeleton" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <span className="sr-only">Loading reviews</span>
+                {[1, 2, 3].map(i => (
+                  <div
+                    key={i}
+                    className={`bg-surface-elevated border border-border-default rounded-xl p-4 sm:p-5 animate-pulse${i === 3 ? ' hidden xl:block' : ''}`}
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="w-9 h-9 rounded-full bg-surface-secondary shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 bg-surface-secondary rounded w-1/2" />
+                        <div className="h-2.5 bg-surface-secondary rounded w-1/3" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="h-2.5 bg-surface-secondary rounded" />
+                      <div className="h-2.5 bg-surface-secondary rounded w-11/12" />
+                      <div className="h-2.5 bg-surface-secondary rounded w-3/4" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : reviews.length === 0 ? (
               <div className="bg-surface-elevated border border-border-default rounded-xl py-14 flex flex-col items-center gap-3">

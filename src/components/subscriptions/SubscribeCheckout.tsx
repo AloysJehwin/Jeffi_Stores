@@ -239,10 +239,10 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
   const canPay = !!quote && !!selected && consent && razorpayLoaded && !submitting
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-4xl">
+    <div className="container mx-auto px-4 py-6">
       <h1 className="text-2xl font-bold text-foreground mb-4">Start your subscription</h1>
-      <div className="grid gap-4 lg:grid-cols-5">
-        <section className="lg:col-span-3 bg-surface-elevated rounded-lg border border-border-default p-4">
+      <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
+        <section className="lg:col-span-2 bg-surface-elevated rounded-lg border border-border-default p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-foreground">
               {quote?.isDigital ? 'Billing address' : 'Delivery address'}
@@ -260,7 +260,7 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
           ) : addresses.length === 0 ? (
             <p className="text-sm text-foreground-secondary">No saved addresses. Add one to continue.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {addresses.map(a => (
                 <label
                   key={a.id}
@@ -287,7 +287,7 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
           )}
         </section>
 
-        <section className="lg:col-span-2 bg-surface-elevated rounded-lg border border-border-default p-4 space-y-3">
+        <section className="lg:sticky lg:top-4 bg-surface-elevated rounded-lg border border-border-default p-4 space-y-3">
           <h2 className="font-semibold text-foreground">Each cycle</h2>
           {quote?.productName && <p className="text-sm text-foreground-secondary">{quote.productName}</p>}
           {quoteError ? (
