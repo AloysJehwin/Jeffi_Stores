@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sameHostRedirect } from '@/lib/shared/redirect'
 import { authenticateUser, authenticateBusiness } from '@/lib/auth/jwt'
 import { isValidState, mintVaultTicket, safeTargetPath, type TicketPrincipal } from '@/lib/vault/sso'
 import { vaultBaseUrlAsync } from '@/lib/vault/links'
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   if (!principal || !userId) {
     const back = `/api/vault/handoff?target=${encodeURIComponent(targetPath)}&state=${state}`
-    const res = NextResponse.redirect(new URL(`/login?redirect=${encodeURIComponent(back)}`, request.url))
+    const res = sameHostRedirect(`/login?redirect=${encodeURIComponent(back)}`)
     res.headers.set('Cache-Control', 'no-store')
     return res
   }
