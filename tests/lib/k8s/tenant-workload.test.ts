@@ -107,3 +107,17 @@ describe('probes', () => {
       expect(p.httpGet.httpHeaders).toEqual([{ name: 'Host', value: 'acme.jeffistores.in' }])
   })
 })
+
+describe('tracing env', () => {
+  it('sends each tenant as its own service to in-cluster Coroot', () => {
+    const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme') }) as any[]
+    const env = Object.fromEntries(
+      byKind(objs, 'Deployment', 'storefront')[0].spec.template.spec.containers[0].env.map((e: any) => [
+        e.name,
+        e.value,
+      ])
+    )
+    expect(env.OTEL_SERVICE_NAME).toBe('tenant-acme')
+    expect(env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT).toBe('http://coroot-coroot.observability:8080/v1/traces')
+  })
+})

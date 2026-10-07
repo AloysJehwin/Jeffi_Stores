@@ -10,7 +10,7 @@ metadata:
   namespace: jeffi
   labels: { app: storefront, jeffi.io/tenant: flagship }
 spec:
-  replicas: 2
+  # No replicas: the HPA below owns the count (2→4); a fixed value would reset it on every deploy.
   revisionHistoryLimit: 5
   strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
   selector: { matchLabels: { app: storefront, jeffi.io/tenant: flagship } }
@@ -34,6 +34,12 @@ spec:
             - { name: WEB_CONCURRENCY, value: '1' }
             - { name: IN_PROCESS_CRON, value: 'false' }
             - { name: CLIENT_CERT_PROXY, value: traefik }
+            # Traces → Coroot in-cluster (the public k8s. URL is behind mTLS). 20% head sampling.
+            - { name: OTEL_SERVICE_NAME, value: jeffi-flagship }
+            - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: 'http://coroot-coroot.observability:8080/v1/traces' }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
+            - { name: OTEL_TRACES_SAMPLER, value: parentbased_traceidratio }
+            - { name: OTEL_TRACES_SAMPLER_ARG, value: '0.2' }
             - { name: NODE_OPTIONS, value: --max-old-space-size=640 }
             - name: REDIS_PASSWORD
               valueFrom: { secretKeyRef: { name: redis, key: password } }
@@ -131,3 +137,17 @@ spec:
       services: [{ name: flagship, port: 3000 }]
   tls:
     options: { name: platform-mtls, namespace: jeffi-edge }
+---
+# Scale the store 2→4 pods on CPU. Capped at 4: all flagship pods share the core node (~550 MB each).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: flagship, namespace: jeffi }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: flagship }
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+  behavior:
+    scaleDown: { stabilizationWindowSeconds: 300 }
