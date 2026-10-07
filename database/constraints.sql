@@ -3159,3 +3159,117 @@ ALTER TABLE ONLY public.referral_signups
 
 ALTER TABLE ONLY public.subscriptions
     ADD CONSTRAINT subscriptions_pkey PRIMARY KEY (id);
+
+
+-- =====================================================================
+-- Digital products, vault & customer subscriptions (added together)
+-- =====================================================================
+
+--
+-- product_files
+--
+ALTER TABLE ONLY public.product_files
+    ADD CONSTRAINT product_files_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.product_files
+    ADD CONSTRAINT product_files_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+ALTER TABLE public.product_files
+    ADD CONSTRAINT product_files_kind_check CHECK (kind IN ('video','audio','pdf','image','other'));
+ALTER TABLE public.product_files
+    ADD CONSTRAINT product_files_status_check CHECK (status IN ('uploading','processing','ready','failed'));
+ALTER TABLE public.product_files
+    ADD CONSTRAINT product_files_storage_driver_check CHECK (storage_driver IN ('s3','local'));
+
+--
+-- products: digital products carry no variants
+--
+ALTER TABLE public.products
+    ADD CONSTRAINT products_digital_no_variants_check CHECK (NOT (is_digital AND COALESCE(has_variants, false)));
+
+--
+-- vault_entitlements
+--
+ALTER TABLE ONLY public.vault_entitlements
+    ADD CONSTRAINT vault_entitlements_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.vault_entitlements
+    ADD CONSTRAINT vault_entitlements_order_item_id_key UNIQUE (order_item_id);
+ALTER TABLE ONLY public.vault_entitlements
+    ADD CONSTRAINT vault_entitlements_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.vault_entitlements
+    ADD CONSTRAINT vault_entitlements_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.vault_entitlements
+    ADD CONSTRAINT vault_entitlements_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.vault_entitlements
+    ADD CONSTRAINT vault_entitlements_order_item_id_fkey FOREIGN KEY (order_item_id) REFERENCES public.order_items(id) ON DELETE CASCADE;
+ALTER TABLE public.vault_entitlements
+    ADD CONSTRAINT vault_entitlements_source_check CHECK (source IN ('one_time','subscription'));
+ALTER TABLE public.vault_entitlements
+    ADD CONSTRAINT vault_entitlements_status_check CHECK (status IN ('active','revoked'));
+
+--
+-- subscription_cycle_orders
+--
+ALTER TABLE ONLY public.subscription_cycle_orders
+    ADD CONSTRAINT subscription_cycle_orders_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.subscription_cycle_orders
+    ADD CONSTRAINT subscription_cycle_orders_sub_cycle_key UNIQUE (subscription_id, cycle_number);
+ALTER TABLE ONLY public.subscription_cycle_orders
+    ADD CONSTRAINT subscription_cycle_orders_rzp_payment_key UNIQUE (razorpay_payment_id);
+ALTER TABLE ONLY public.subscription_cycle_orders
+    ADD CONSTRAINT subscription_cycle_orders_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES public.subscriptions(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.subscription_cycle_orders
+    ADD CONSTRAINT subscription_cycle_orders_order_id_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+
+--
+-- subscription_plans_cache
+--
+ALTER TABLE ONLY public.subscription_plans_cache
+    ADD CONSTRAINT subscription_plans_cache_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.subscription_plans_cache
+    ADD CONSTRAINT subscription_plans_cache_key UNIQUE (product_id, period, interval_count, amount_paise, collecting_account);
+
+--
+-- subscriptions: widened status CHECK (legacy 'active' + Razorpay state machine) + new FKs
+--
+ALTER TABLE public.subscriptions
+    ADD CONSTRAINT subscriptions_status_check CHECK (status IN (
+        'active','created','authenticated','pending','halted','paused','cancelled','completed','expired'));
+ALTER TABLE ONLY public.subscriptions
+    ADD CONSTRAINT subscriptions_razorpay_subscription_id_key UNIQUE (razorpay_subscription_id);
+ALTER TABLE ONLY public.subscriptions
+    ADD CONSTRAINT subscriptions_address_id_fkey FOREIGN KEY (address_id) REFERENCES public.addresses(id) ON DELETE SET NULL;
+
+--
+-- orders.subscription_id FK (new column)
+--
+ALTER TABLE ONLY public.orders
+    ADD CONSTRAINT orders_subscription_id_fkey FOREIGN KEY (subscription_id) REFERENCES public.subscriptions(id) ON DELETE SET NULL;
+
+--
+-- vault_tickets
+--
+ALTER TABLE ONLY public.vault_tickets
+    ADD CONSTRAINT vault_tickets_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.vault_tickets
+    ADD CONSTRAINT vault_tickets_ticket_hash_key UNIQUE (ticket_hash);
+ALTER TABLE ONLY public.vault_tickets
+    ADD CONSTRAINT vault_tickets_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+ALTER TABLE public.vault_tickets
+    ADD CONSTRAINT vault_tickets_principal_type_check CHECK (principal_type IN ('customer','business','vault'));
+
+--
+-- vault_access_log (bigint sequence PK)
+--
+ALTER TABLE ONLY public.vault_access_log
+    ADD CONSTRAINT vault_access_log_pkey PRIMARY KEY (id);
+ALTER TABLE public.vault_access_log
+    ADD CONSTRAINT vault_access_log_action_check CHECK (action IN ('stream','download'));
+
+--
+-- upload_sessions
+--
+ALTER TABLE ONLY public.upload_sessions
+    ADD CONSTRAINT upload_sessions_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.upload_sessions
+    ADD CONSTRAINT upload_sessions_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+ALTER TABLE public.upload_sessions
+    ADD CONSTRAINT upload_sessions_status_check CHECK (status IN ('open','completed','aborted'));
