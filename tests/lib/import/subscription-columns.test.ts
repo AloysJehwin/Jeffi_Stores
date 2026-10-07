@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildTemplateWorkbook } from '@/lib/import/template'
 import { parseWorkbook } from '@/lib/import/parse'
 import { groupRows, parseSubscriptionIntervals } from '@/lib/import/validate-row'
-import { buildFields, buildSubVariants, buildVariants } from '@/lib/import/to-draft'
+import { backfillBlankOptionalFields, buildFields, buildSubVariants, buildVariants } from '@/lib/import/to-draft'
 import { valuesToWorkbookBuffer } from '@/lib/import/google-sync'
 import { columnsForSheet } from '@/lib/import/columns'
 import * as XLSX from 'xlsx'
@@ -15,6 +15,8 @@ const SUB = [
   'is_subscription',
   'subscription_intervals',
   'subscription_price',
+  'subscription_price_monthly',
+  'subscription_price_yearly',
   'subscription_total_cycles',
   'subscription_min_cycles',
 ]
@@ -37,6 +39,7 @@ function group(opts: {
         'variant.price',
         'variant.subscription_price',
         'variant.unit',
+        'variant.subscription_price_quarterly',
       ],
       ...opts.variants,
     ]
@@ -49,6 +52,7 @@ function group(opts: {
         'sub_variant.sku',
         'sub_variant.price',
         'sub_variant.subscription_price',
+        'sub_variant.subscription_price_monthly',
       ],
       ...opts.subVariants,
     ]
@@ -137,6 +141,56 @@ describe('import: subscription columns', () => {
     expect('subscription_price' in variants[1]).toBe(false)
     const subs = buildSubVariants(g, new Map([['S1-1K', 'v-1k']]))
     expect(subs[0]).toMatchObject({ variant_id: 'v-1k', subscription_price: 780 })
+  })
+
+  it('ships per-interval price columns at every level', () => {
+    for (const iv of ['weekly', 'monthly', 'quarterly', 'yearly']) {
+      expect(columnsForSheet('Product · Digital').map(c => c.header)).toContain(`subscription_price_${iv}`)
+      expect(columnsForSheet('Variants').map(c => c.header)).toContain(`variant.subscription_price_${iv}`)
+      expect(columnsForSheet('Sub-variants').map(c => c.header)).toContain(`sub_variant.subscription_price_${iv}`)
+    }
+  })
+
+  it('folds subscription_price_<interval> cells into subscription_prices on a simple product', () => {
+    const g = group({ sub: { subscription_price_monthly: '499', subscription_price_yearly: '4999.999' } })
+    expect(g.errors).toEqual([])
+    const f = buildFields(g, NO_IDS)
+    expect(f.subscription_prices).toEqual({ monthly: 499, yearly: 5000 })
+    expect('subscription_price_monthly' in f).toBe(false)
+    expect('subscription_prices' in buildFields(group({ sub: {} }), NO_IDS)).toBe(false)
+  })
+
+  it('rejects negative or over-cap interval prices', () => {
+    expect(group({ sub: { subscription_price_monthly: '-5' } }).errors[0]).toMatch(/subscription_price_monthly must be 0 or more/)
+    expect(group({ sub: { subscription_price_yearly: '15001' } }).errors[0]).toMatch(/cannot exceed ₹15,000/)
+  })
+
+  it('applies the sellable rule to interval prices', () => {
+    const g = group({
+      sub: { subscription_price_monthly: '400' },
+      variants: [
+        ['S1', 'S1-250', '250 g', '300', '', '', '800'],
+        ['S1', 'S1-1K', '1 kg', '900', '', '', '2400'],
+      ],
+      subVariants: [['S1', 'S1-1K', 'Whole bean', 'S1-1K-WB', '900', '', '850']],
+    })
+    expect(g.errors).toEqual([])
+    expect(g.warnings).toHaveLength(2)
+    expect(g.warnings[0]).toMatch(/subscription_price_<interval> ignored on a product with variants/)
+    expect(g.warnings[1]).toMatch(/variant "S1-1K".*subscription_price_<interval> ignored/)
+    expect('subscription_prices' in buildFields(g, NO_IDS)).toBe(false)
+    const variants = buildVariants(g)
+    expect(variants[0].subscription_prices).toEqual({ quarterly: 800 })
+    expect('subscription_prices' in variants[1]).toBe(false)
+    const subs = buildSubVariants(g, new Map([['S1-1K', 'v-1k']]))
+    expect(subs[0].subscription_prices).toEqual({ monthly: 850 })
+  })
+
+  it('re-import keeps live interval prices for blank cells', () => {
+    const f = backfillBlankOptionalFields({ subscription_prices: { monthly: 450 } }, {
+      subscription_prices: { monthly: 400, yearly: 4000 },
+    })
+    expect(f.subscription_prices).toEqual({ monthly: 450, yearly: 4000 })
   })
 
   it('rejects variant / sub-variant rows (and so variant units) on a digital product', () => {

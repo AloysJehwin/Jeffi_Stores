@@ -19,6 +19,7 @@ import LogoUploader from '@/components/admin/site-controls/LogoUploader'
 import CustomShortcutsCard, { CustomShortcut } from '@/components/admin/site-controls/CustomShortcutsCard'
 import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
 import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
+import TemplateVariablesPanel from '@/components/admin/site-controls/TemplateVariablesPanel'
 import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getReferralSettings } from '@/lib/referrals/settings'
@@ -560,6 +561,10 @@ export default async function SiteControlsPage() {
 
         <div>
           <CustomerTagDefinitionsCard isSuperAdmin={isPlatformOwner(admin.role)} />
+        </div>
+
+        <div>
+          <TemplateVariablesPanel />
         </div>
 
         <div>

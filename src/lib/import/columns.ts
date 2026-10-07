@@ -1,3 +1,5 @@
+import { SUBSCRIPTION_INTERVALS, type SubscriptionInterval } from '@/lib/subscriptions/intervals'
+
 export type RowType = 'product' | 'variant' | 'sub_variant'
 export type Coercer = 'text' | 'number' | 'int' | 'bool' | 'date' | 'csv' | 'json'
 
@@ -72,6 +74,19 @@ export const STRUCTURE_COLUMNS: ImportColumn[] = [
 // Product columns — the exact set the publish path writes (product-draft.ts UPDATE
 // products SET ...). category/brand/supplier are given by NAME here and resolved to
 // ids by the engine; category & brand must already exist or the row errors.
+/** Per-interval subscription price column key, e.g. subscription_price_monthly. */
+export const subscriptionPriceKey = (interval: SubscriptionInterval) => `subscription_price_${interval}`
+
+function intervalPriceColumns(prefix: string, rowTypes: RowType[], note?: string): ImportColumn[] {
+  return SUBSCRIPTION_INTERVALS.map(iv => ({
+    key: subscriptionPriceKey(iv),
+    header: `${prefix}${subscriptionPriceKey(iv)}`,
+    coerce: 'number' as const,
+    rowTypes,
+    help: `${iv} price per cycle (incl. GST); blank = subscription_price${note ? `. ${note}` : ''}`,
+  }))
+}
+
 export const PRODUCT_COLUMNS: ImportColumn[] = [
   {
     key: 'sku',
@@ -211,6 +226,7 @@ export const PRODUCT_COLUMNS: ImportColumn[] = [
     rowTypes: ['product'],
     help: 'Simple products only (incl. GST); blank = one-time price',
   },
+  ...intervalPriceColumns('', ['product'], 'Simple products only'),
   {
     key: 'subscription_total_cycles',
     header: 'subscription_total_cycles',
@@ -286,6 +302,7 @@ export const VARIANT_COLUMNS: ImportColumn[] = [
     rowTypes: ['variant'],
     help: 'Ignored when the variant has sub-variants',
   },
+  ...intervalPriceColumns('variant.', ['variant'], 'Ignored when the variant has sub-variants'),
   {
     key: 'sub_variant_type_on',
     header: 'variant.sub_variant_type_on',
@@ -310,6 +327,7 @@ export const SUB_VARIANT_COLUMNS: ImportColumn[] = [
   { key: 'price_ex_gst', header: 'sub_variant.price_ex_gst', coerce: 'number', rowTypes: ['sub_variant'] },
   { key: 'mrp_ex_gst', header: 'sub_variant.mrp_ex_gst', coerce: 'number', rowTypes: ['sub_variant'] },
   { key: 'subscription_price', header: 'sub_variant.subscription_price', coerce: 'number', rowTypes: ['sub_variant'] },
+  ...intervalPriceColumns('sub_variant.', ['sub_variant']),
   {
     key: 'stock_status',
     header: 'sub_variant.stock_status',
@@ -394,6 +412,7 @@ assign('Product · Digital', [
   'subscription_interval',
   'subscription_intervals',
   'subscription_price',
+  ...SUBSCRIPTION_INTERVALS.map(subscriptionPriceKey),
   'subscription_total_cycles',
   'subscription_min_cycles',
   'is_bundle',

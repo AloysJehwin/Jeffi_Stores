@@ -81,6 +81,7 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
     LEFT JOIN product_variants pv ON ci.variant_id = pv.id
     LEFT JOIN product_sub_variants psv ON ci.sub_variant_id = psv.id
     WHERE ci.user_id = $1 AND COALESCE(ci.saved_for_later, FALSE) = FALSE
+      AND COALESCE(p.is_digital, FALSE) = FALSE -- digital is Buy Now only
   `,
     [userId]
   )

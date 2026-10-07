@@ -181,6 +181,22 @@ CREATE TABLE public.custom_scenarios (
 
 
 --
+-- Name: template_variables; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.template_variables (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    key character varying(64) NOT NULL,
+    label character varying(120) NOT NULL,
+    description text,
+    value text DEFAULT ''::text NOT NULL,
+    is_enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: scenarios; Type: TABLE; Schema: public; Owner: -
 --
 

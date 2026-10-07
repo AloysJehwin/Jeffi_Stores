@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Mail, Tag, Package, X, ChevronDown, Wand2 } from 'lucide-react'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
-import RichTextEditor from '@/components/admin/RichTextEditor'
+import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import { useToast } from '@/contexts/ToastContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
@@ -673,7 +673,7 @@ export default function CustomerMailerPanel({
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
               Message
             </label>
-            <RichTextEditor value={body} onChange={setBody} placeholder="Optional message body…" minHeight={180} />
+            <EmailComposer value={body} onChange={setBody} placeholder="Optional message body…" minHeight={180} />
             <p className="text-[11px] text-foreground-muted mt-1.5">
               Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
               are replaced with the actual customer details when the email is sent.

@@ -10,14 +10,15 @@ export interface PdpCard {
   displayPrice: number
   mrp: number | null
   effectiveStock: number
+  isDigital?: boolean
   primaryImage?: { image_url: string; thumbnail_url?: string; blurhash?: string | null } | null
 }
 
 export type StickyBarAction = 'add' | 'choose' | null
 
-/** Items the cart accepts without a variant choice: no variants and in stock. */
-export function canAddDirectly(p: Pick<PdpCard, 'hasVariants' | 'effectiveStock'>): boolean {
-  return !p.hasVariants && Number(p.effectiveStock) > 0
+/** Items the cart accepts without a variant choice: no variants, in stock, not digital (Buy Now only). */
+export function canAddDirectly(p: Pick<PdpCard, 'hasVariants' | 'effectiveStock' | 'isDigital'>): boolean {
+  return !p.hasVariants && !p.isDigital && Number(p.effectiveStock) > 0
 }
 
 /** Mirrors the cart API: not before launch_date, not on or after discontinue_date. */

@@ -50,6 +50,20 @@ describe('ensureBuiltinCampaignRows', () => {
     expect(campParams).toContain('birthday')
   })
 
+  it('seeds new coupon-kind rows with the kind default discount, others with 0', async () => {
+    mockList.mockReturnValue([
+      { kind: 'birthday', name: 'Birthday', description: 'd', defaultParams: {} },
+      { kind: 'viewed_product', name: 'Viewed', description: 'd', defaultParams: {} },
+    ])
+    await ensureBuiltinCampaignRows()
+    const [campSql, campParams] = mockQuery.mock.calls[1]
+    expect(campSql).toContain('discount_percent, enabled)')
+    expect(campSql).toMatch(/ON CONFLICT \(kind\) DO NOTHING/)
+    // Each tuple is 7 params: kind, name, description, scenario_kind, subject, body, discount_percent.
+    expect((campParams as unknown[])[6]).toBe(15)
+    expect((campParams as unknown[])[13]).toBe(0)
+  })
+
   it('swallows DB errors (never throws into the request path)', async () => {
     mockList.mockReturnValue([{ kind: 'x', name: 'X', description: '', defaultParams: {} }])
     mockQuery.mockRejectedValue(new Error('db down'))
@@ -59,7 +73,9 @@ describe('ensureBuiltinCampaignRows', () => {
   it('moves a row still on a retired default onto the current one, matching subject and body exactly', async () => {
     mockList.mockReturnValue([{ kind: 'referral_invite', name: 'Referral', description: 'd', defaultParams: {} }])
     await ensureBuiltinCampaignRows()
-    const upgrade = mockQuery.mock.calls.find(c => String(c[0]).startsWith('UPDATE campaigns'))!
+    const upgrade = mockQuery.mock.calls.find(
+      c => String(c[0]).startsWith('UPDATE campaigns') && (c[1] as unknown[])?.[0] === 'referral_invite'
+    )!
     expect(String(upgrade[0])).toContain('WHERE kind = $1 AND subject_template = $4 AND body_template = $5')
     const old = RETIRED_BUILTIN_TEMPLATES.referral_invite[0]
     const current = getBuiltinTemplate('referral_invite')!

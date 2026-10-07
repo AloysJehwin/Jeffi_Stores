@@ -30,6 +30,7 @@ const product = (o: Record<string, unknown> = {}) => ({
   subscription_intervals: ['monthly', 'quarterly'],
   subscription_price: null,
   subscription_price_ex_gst: null,
+  subscription_prices: {},
   subscription_total_cycles: null,
   subscription_min_cycles: null,
   gst_percentage: '18',
@@ -42,6 +43,8 @@ type Sellable = {
   variant_has_subs?: boolean
   variant_sub_price?: string | null
   sub_variant_sub_price?: string | null
+  variant_sub_prices?: Record<string, unknown> | null
+  sub_variant_sub_prices?: Record<string, unknown> | null
 }
 
 function setup(
@@ -186,6 +189,64 @@ describe('deriveSubscriptionOffer', () => {
     })
     const o2 = await deriveSubscriptionOffer({ ...base, variantId: 'v1', subVariantId: 'sv1' })
     expect(o2.unitPrice).toBe(700)
+  })
+
+  it('prices each interval from subscription_prices, falling back to the legacy price then one-time', async () => {
+    setup(
+      product({
+        subscription_intervals: ['weekly', 'monthly', 'quarterly', 'yearly'],
+        subscription_price: '480.00',
+        subscription_prices: { monthly: '450', yearly: 0, quarterly: '1200' },
+      }),
+      { price: 500 }
+    )
+    const o = await deriveSubscriptionOffer({ ...base, interval: 'quarterly', quantity: 1 })
+    expect(o.unitPrice).toBe(1200)
+    expect(o.amountPaise).toBe(120000)
+    expect(o.intervalPrices).toEqual({ weekly: 480, monthly: 450, quarterly: 1200, yearly: 480 })
+    setup(product({ subscription_prices: { monthly: '450' } }), { price: 500 })
+    const o2 = await deriveSubscriptionOffer({ ...base, interval: 'quarterly' })
+    expect(o2.unitPrice).toBe(500)
+    expect(o2.intervalPrices).toEqual({ monthly: 450, quarterly: 500 })
+  })
+
+  it('applies the GST-off conversion to every interval price', async () => {
+    setup(product({ subscription_prices: { monthly: '118', quarterly: '354' } }), {
+      price: 200,
+      flags: { gstEnabled: false },
+    })
+    const o = await deriveSubscriptionOffer(base)
+    expect(o.unitPrice).toBe(100)
+    expect(o.intervalPrices).toEqual({ monthly: 100, quarterly: 300 })
+  })
+
+  it('uses the selected variant / sub-variant interval prices, never the product map', async () => {
+    setup(product({ subscription_prices: { monthly: '1', quarterly: '1' } }), {
+      price: 600,
+      sellable: { has_variants: true, variant_sub_price: '550.00', variant_sub_prices: { quarterly: '1500' } },
+    })
+    const v = await deriveSubscriptionOffer({ ...base, variantId: 'v1', interval: 'quarterly', quantity: 1 })
+    expect(v.unitPrice).toBe(1500)
+    expect(v.intervalPrices).toEqual({ monthly: 550, quarterly: 1500 })
+    setup(product(), {
+      price: 700,
+      sellable: {
+        has_variants: true,
+        variant_has_subs: true,
+        variant_sub_prices: { monthly: '5' },
+        sub_variant_sub_prices: { monthly: '640' },
+      },
+    })
+    const sv = await deriveSubscriptionOffer({ ...base, variantId: 'v1', subVariantId: 'sv1' })
+    expect(sv.unitPrice).toBe(640)
+    expect(sv.intervalPrices).toEqual({ monthly: 640, quarterly: 700 })
+  })
+
+  it('rejects an interval price above the per-cycle cap', async () => {
+    setup(product({ subscription_prices: { quarterly: '15001' } }), { price: 500 })
+    await expect(deriveSubscriptionOffer({ ...base, interval: 'quarterly', quantity: 1 })).rejects.toThrow(
+      '₹15,000 per cycle'
+    )
   })
 
   it('defaults to the interval cap and no minimum', async () => {

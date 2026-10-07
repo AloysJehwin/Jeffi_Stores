@@ -1303,6 +1303,30 @@ ALTER TABLE ONLY public.support_sessions
     ADD CONSTRAINT support_sessions_pkey PRIMARY KEY (id);
 
 
+--
+-- Name: template_variables template_variables_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.template_variables
+    ADD CONSTRAINT template_variables_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: template_variables template_variables_key_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.template_variables
+    ADD CONSTRAINT template_variables_key_key UNIQUE (key);
+
+
+--
+-- Name: template_variables template_variables_key_check; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.template_variables
+    ADD CONSTRAINT template_variables_key_check CHECK (((key)::text ~ '^[a-z_][a-z0-9_]*$'::text));
+
+
 
 --
 -- Name: user_search_history user_search_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -

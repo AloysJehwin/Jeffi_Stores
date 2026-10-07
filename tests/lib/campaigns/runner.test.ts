@@ -198,3 +198,45 @@ describe('runScenarioForAllCampaigns', () => {
     expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('scenario_kind = $1'), ['winback_90'])
   })
 })
+
+describe('legacy duration params', () => {
+  it('reads a bare legacy count below the field minimum in the key unit', async () => {
+    const { resolveScenarioParams } = await import('@/lib/campaigns/runner')
+    const { abandonedCart } = await import('@/lib/campaigns/scenarios/abandoned-cart')
+    const { postPurchase } = await import('@/lib/campaigns/scenarios/post-purchase')
+    const cart = resolveScenarioParams(abandonedCart as any, {
+      lookbackDays: 30,
+      secondEmailDelayHours: 1440,
+      sendCooldown: 1440,
+    }) as any
+    expect(cart.lookbackDays).toBe(30 * 1440)
+    expect(cart.secondEmailDelayHours).toBe(1440)
+    expect(cart.sendCooldown).toBe(1440)
+    expect((resolveScenarioParams(postPurchase as any, { lookbackDays: 5 }) as any).lookbackDays).toBe(5 * 1440)
+  })
+
+  it('leaves canonical minutes and keys without a minimum alone', async () => {
+    const { normalizeDurationParams } = await import('@/lib/campaigns/runner')
+    const schema = {
+      lookback: { type: 'duration', min: 60, recommendedUnit: 'days', label: 'x' },
+      free: { type: 'duration', recommendedUnit: 'days', label: 'x' },
+      count: { type: 'integer', min: 5, label: 'x' },
+    } as any
+    expect(normalizeDurationParams({ lookback: 2880, free: 3, count: 1 }, schema)).toEqual({
+      lookback: 2880,
+      free: 3,
+      count: 1,
+    })
+    expect(normalizeDurationParams({ lookback: 7 }, schema)).toEqual({ lookback: 7 * 1440 })
+  })
+
+  it('runScenario hands the scenario normalized params', async () => {
+    mockGetCampaign.mockResolvedValue(makeCampaign({ parameters: { lookbackDays: 30 } }))
+    const scenario = makeScenario({
+      defaultParams: { lookbackDays: 43200 },
+      paramSchema: { lookbackDays: { type: 'duration', min: 1440, recommendedUnit: 'days', label: 'x' } },
+    })
+    await runScenario(scenario, 'abandoned_checkout')
+    expect(scenario.findEligible.mock.calls[0][0].params.lookbackDays).toBe(43200)
+  })
+})

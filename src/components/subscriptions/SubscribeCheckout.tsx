@@ -27,6 +27,8 @@ interface Address {
 interface Quote {
   productName?: string
   unitPrice: number
+  intervalPrices?: Partial<Record<string, number>>
+  interval?: string
   oneTimePrice?: number
   totalCycles?: number | null
   minCycles?: number | null
@@ -296,7 +298,10 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
             <dl className="text-sm space-y-1" data-testid="subscribe-summary">
               <div className="flex justify-between">
                 <dt className="text-foreground-secondary">Billed</dt>
-                <dd>{quote.intervalLabel}</dd>
+                <dd data-testid="subscribe-interval-price">
+                  {quote.intervalLabel} · {formatInr(quote.intervalPrices?.[quote.interval ?? interval] ?? quote.unitPrice)}{' '}
+                  each
+                </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-foreground-secondary">

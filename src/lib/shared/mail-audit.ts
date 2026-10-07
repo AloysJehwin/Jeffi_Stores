@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { queryOne } from '@/lib/shared/db'
+import { findTokenKeys } from '@/lib/templates/variables-shared'
 
 // Single chokepoint for outbound mail. Wraps transporter.sendMail and writes
 // a row to email_logs (status, body, kind, entity link) so admins can see
@@ -115,7 +116,21 @@ async function logMail(opts: {
   }
 }
 
-export async function sendAuditedMail(o: SendAuditedMailOptions): Promise<{ messageId?: string }> {
+// Never mail a raw registered variable token: any {store_name} / {{customer_first_name}} / custom
+// variable a path forgot to fill is substituted here and logged.
+async function guardTokens(o: SendAuditedMailOptions): Promise<SendAuditedMailOptions> {
+  if (![o.subject, o.html, o.amp, o.text].some(p => p && findTokenKeys(p).length > 0)) return o
+  try {
+    const { guardTemplateTokens } = await import('@/lib/templates/variables')
+    const to = Array.isArray(o.to) ? o.to[0] : o.to
+    return await guardTemplateTokens(o, { to, userId: o.userId, templateName: o.templateName })
+  } catch {
+    return o
+  }
+}
+
+export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ messageId?: string }> {
+  const o = await guardTokens(input)
   // No explicit from → use the CURRENT store's customer sender (tenant on a tenant host, platform
   // off-tenant) instead of a hardcoded "Jeffi Store's", which leaked into tenant-facing mail.
   const from = o.from || (await resolveDefaultFrom())

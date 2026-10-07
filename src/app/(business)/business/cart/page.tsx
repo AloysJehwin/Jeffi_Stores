@@ -79,7 +79,7 @@ export default function CartPage() {
     try {
       await updateQuantity(cartItemId, newQuantity)
     } catch (error) {
-      showToast('Failed to update quantity', 'error')
+      showToast(error instanceof Error && error.message ? error.message : 'Failed to update quantity', 'error')
     } finally {
       setUpdatingItems(prev => {
         const newSet = new Set(prev)
@@ -256,6 +256,7 @@ export default function CartPage() {
                   const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
                   const unitFactor =
                     !isCustomQty && item.cart_item_unit?.factor ? Number(item.cart_item_unit.factor) : 1
+                  const qtyMax = item.cart_item_unit?.max_qty != null ? Number(item.cart_item_unit.max_qty) : undefined
                   const price = isCustomQty
                     ? item.price_at_addition
                     : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
@@ -421,8 +422,10 @@ export default function CartPage() {
                                   step="0.001"
                                   defaultValue={Number(item.quantity).toFixed(3)}
                                   onBlur={e => {
-                                    const val = parseFloat(e.target.value)
+                                    const raw = parseFloat(e.target.value)
+                                    const val = qtyMax !== undefined && raw > qtyMax ? qtyMax : raw
                                     if (!isNaN(val) && val > 0 && val !== Number(item.quantity)) {
+                                      e.target.value = val.toFixed(3)
                                       handleQuantityChange(item.id, val)
                                     } else {
                                       e.target.value = Number(item.quantity).toFixed(3)
@@ -474,7 +477,8 @@ export default function CartPage() {
                                     defaultValue={Math.round(Number(item.quantity))}
                                     onBlur={e => {
                                       const val = parseInt(e.target.value, 10)
-                                      const safe = !isNaN(val) && val >= 1 ? val : 1
+                                      let safe = !isNaN(val) && val >= 1 ? val : 1
+                                      if (qtyMax !== undefined && safe > qtyMax) safe = qtyMax
                                       e.target.value = String(safe)
                                       if (safe !== Math.round(Number(item.quantity))) {
                                         handleQuantityChange(item.id, safe)
@@ -488,7 +492,7 @@ export default function CartPage() {
                                 )}
                                 <button
                                   onClick={() => handleQuantityChange(item.id, Number(item.quantity) + 1)}
-                                  disabled={isUpdating}
+                                  disabled={isUpdating || (qtyMax !== undefined && Number(item.quantity) >= qtyMax)}
                                   aria-label={`Increase quantity for ${item.products.name}`}
                                   className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >

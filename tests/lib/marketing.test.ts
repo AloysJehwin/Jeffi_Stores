@@ -357,6 +357,14 @@ describe('getAssignedCouponCode', () => {
     mockQueryOne.mockResolvedValue(null)
     expect(await getAssignedCouponCode('missing')).toBeNull()
   })
+
+  it('only returns an active, unexpired coupon', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    await getAssignedCouponCode('coupon-1')
+    const sql = String(mockQueryOne.mock.calls[0][0])
+    expect(sql).toContain('is_active = TRUE')
+    expect(sql).toContain('(valid_until IS NULL OR valid_until > NOW())')
+  })
 })
 
 describe('generateCouponForCampaign', () => {
@@ -415,7 +423,8 @@ describe('generateCouponForCampaign', () => {
     expect(code).toMatch(/^OFFER-/)
   })
 
-  it('returns null on DB insert error', async () => {
+  it('returns null on DB insert error, and logs it', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockQueryOne.mockResolvedValue(null)
     mockQuery.mockRejectedValue(new Error('db error'))
     const code = await generateCouponForCampaign({
@@ -424,6 +433,8 @@ describe('generateCouponForCampaign', () => {
       expiresInDays: 7,
     })
     expect(code).toBeNull()
+    expect(err).toHaveBeenCalledWith('[marketing] coupon generation failed', 'post_purchase', expect.any(Error))
+    err.mockRestore()
   })
 
   it('skips UPDATE campaigns when insert returns no coupon id', async () => {

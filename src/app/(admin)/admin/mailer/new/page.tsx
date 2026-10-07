@@ -6,7 +6,7 @@ import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
-import RichTextEditor from '@/components/admin/RichTextEditor'
+import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
@@ -802,7 +802,7 @@ export default function NewCampaignPage() {
                   <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
                   replaced per recipient at send time.
                 </p>
-                <RichTextEditor
+                <EmailComposer
                   value={templateData.htmlBody || ''}
                   onChange={v => setField('htmlBody', v)}
                   placeholder={

@@ -221,7 +221,8 @@ export async function generateCouponForCampaign(params: {
       await query(`UPDATE campaigns SET coupon_id = $1 WHERE kind = $2`, [couponId, params.campaignKind])
     }
     return code
-  } catch {
+  } catch (err) {
+    console.error('[marketing] coupon generation failed', params.campaignKind, err)
     return null
   }
 }
@@ -231,7 +232,7 @@ export async function getAssignedCouponCode(
 ): Promise<{ code: string; discountValue: number; discountType: string } | null> {
   return queryOne<{ code: string; discountValue: number; discountType: string }>(
     `SELECT code, discount_value::float AS "discountValue", discount_type AS "discountType"
-     FROM coupons WHERE id = $1 AND is_active = TRUE`,
+     FROM coupons WHERE id = $1 AND is_active = TRUE AND (valid_until IS NULL OR valid_until > NOW())`,
     [couponId]
   )
 }

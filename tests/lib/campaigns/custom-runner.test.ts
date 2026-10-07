@@ -20,8 +20,8 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
 }))
 
 import { isCustomScenario, runCustomScenario } from '@/lib/campaigns/custom-runner'
-import { queryOne, getClient } from '@/lib/shared/db'
-import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared/automation-emails'
+import { queryOne, queryMany, getClient } from '@/lib/shared/db'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
 
 const mockQueryOne = queryOne as ReturnType<typeof vi.fn>
@@ -108,9 +108,10 @@ describe('runCustomScenario', () => {
       product_sql: null,
       enabled: true,
     })
-    mockValidateSql.mockReturnValue({ ok: false, error: 'Dangerous SQL' })
+    mockValidateSql.mockReturnValue({ ok: false, reason: 'Dangerous SQL' })
     const result = await runCustomScenario('my_scenario', makeCampaign())
     expect(result.attempted).toBe(0)
+    expect(result.error).toBe('Audience SQL rejected: Dangerous SQL')
   })
 
   it('sends emails to eligible users', async () => {
@@ -205,6 +206,7 @@ describe('runCustomScenario', () => {
 
     const result = await runCustomScenario('my_scenario', makeCampaign())
     expect(result.attempted).toBe(0)
+    expect(result.error).toBe('Audience query failed: query failed')
     expect(client.release).toHaveBeenCalled()
   })
 
@@ -251,5 +253,67 @@ describe('runCustomScenario', () => {
 
     const result = await runCustomScenario('my_scenario', makeCampaign())
     expect(result.attempted).toBe(0)
+  })
+})
+
+describe('runCustomScenario {itemsHtml} order fallback', () => {
+  const mockQueryMany = queryMany as ReturnType<typeof vi.fn>
+  const mockRenderItemRows = renderItemRows as ReturnType<typeof vi.fn>
+
+  function setup(productSql: string | null) {
+    mockQueryOne.mockResolvedValue({ kind: 'k', generated_sql: 'SELECT id FROM users LIMIT $3', product_sql: productSql, enabled: true })
+    mockValidateSql.mockReturnValue({ ok: true, normalized: 'SELECT 1' })
+    mockGetClient.mockResolvedValue(
+      makeDbClient([{ rows: [] }, { rows: [] }, { rows: [] }, { rows: [{ id: 'user-1' }] }, { rows: [] }, { rows: [] }])
+    )
+    mockFetchUserContext.mockResolvedValue({ id: 'user-1', first_name: 'A', email: 'a@x.com', baseUrl: 'https://s.example' })
+    mockResolveCoupon.mockResolvedValue({ couponCode: '', discountPercent: 0 })
+    mockSendCampaignEmail.mockResolvedValue({ ok: true })
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockRenderItemRows.mockImplementation((items: any[]) => (items.length ? '<items/>' : ''))
+  })
+
+  it("fills {itemsHtml} from the recipient's latest paid order when there is no product SQL", async () => {
+    setup(null)
+    mockQueryMany.mockResolvedValue([{ name: 'Drill', quantity: 2, product_slug: 'drill bit', image_url: 'https://img/x.png' }])
+    await runCustomScenario('k', makeCampaign({ body_template: '<p>You ordered:</p>{itemsHtml}' }))
+    expect(mockQueryMany.mock.calls[0][0]).toContain("o.payment_status = 'paid'")
+    expect(mockQueryMany.mock.calls[0][1]).toEqual(['user-1'])
+    expect(mockRenderItemRows).toHaveBeenCalledWith([
+      { name: 'Drill', quantity: 2, imageUrl: 'https://img/x.png', productUrl: 'https://s.example/products/drill%20bit' },
+    ])
+    expect(mockSendCampaignEmail.mock.calls[0][0].vars.itemsHtml).toBe('<items/>')
+  })
+
+  it('also recognises {{itemsHtml}}', async () => {
+    setup(null)
+    mockQueryMany.mockResolvedValue([{ name: 'Drill', quantity: 1, product_slug: null, image_url: null }])
+    await runCustomScenario('k', makeCampaign({ body_template: '{{ itemsHtml }}' }))
+    expect(mockQueryMany).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders an empty string when the recipient has no paid order', async () => {
+    setup(null)
+    mockQueryMany.mockResolvedValue([])
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const result = await runCustomScenario('k', makeCampaign({ body_template: '{itemsHtml}' }))
+    expect(mockSendCampaignEmail.mock.calls[0][0].vars.itemsHtml).toBe('')
+    expect(result.sent).toBe(1)
+    expect(warn).toHaveBeenCalled()
+  })
+
+  it('does not look up orders when the template has no {itemsHtml}', async () => {
+    setup(null)
+    await runCustomScenario('k', makeCampaign({ body_template: '<p>Hi</p>' }))
+    expect(mockQueryMany).not.toHaveBeenCalled()
+  })
+
+  it('keeps product SQL items when product SQL is set', async () => {
+    setup('SELECT 1')
+    await runCustomScenario('k', makeCampaign({ body_template: '{itemsHtml}' }))
+    expect(mockQueryMany).not.toHaveBeenCalled()
   })
 })

@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
-import { previewVarMap, substituteVars } from '@/lib/shared/template-vars'
+import { resolveTemplateVariables, sampleVariableMap, renderTemplate } from '@/lib/templates/variables'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -15,20 +15,25 @@ export async function POST(request: NextRequest) {
   const { template_key, template_data, subject } = await request.json()
   if (!template_key) return NextResponse.json({ error: 'template_key required' }, { status: 400 })
 
-  const sampleVars = previewVarMap()
-  const subbedData: Record<string, string> = {}
-  for (const [k, v] of Object.entries(template_data || {})) {
-    subbedData[k] = typeof v === 'string' ? substituteVars(v, sampleVars) : (v as string)
-  }
-  const subbedSubject = substituteVars(subject || '', sampleVars)
+  // Real store values and custom variables; a sample customer.
+  const sample = sampleVariableMap()
+  const vars = await resolveTemplateVariables({
+    recipient: {
+      email: sample.customer_email,
+      first_name: sample.customer_first_name,
+      last_name: sample.customer_last_name,
+    },
+  })
+  const subbedSubject = renderTemplate(subject || '', vars)
 
   // Same base the real send uses, so a tenant's preview shows its own store's links.
   const { html } = renderCampaignEmail(
     template_key,
-    { ...subbedData, subject: subbedSubject },
-    sampleVars.customer_first_name,
-    await storeBaseUrlAsync()
+    { ...(template_data || {}), subject: subbedSubject },
+    vars.customer_first_name,
+    await storeBaseUrlAsync(),
+    vars.store_name,
+    vars
   )
-  const subbedHtml = substituteVars(html, sampleVars)
-  return NextResponse.json({ html: subbedHtml })
+  return NextResponse.json({ html })
 }

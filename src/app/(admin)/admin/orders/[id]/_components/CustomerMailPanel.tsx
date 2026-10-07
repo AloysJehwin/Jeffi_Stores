@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import RichTextEditor from '@/components/admin/RichTextEditor'
+import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
 
 const TEMPLATES = [
@@ -299,7 +299,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
 
           <div>
             <label className="block text-xs font-medium text-foreground-muted mb-1.5">Message</label>
-            <RichTextEditor value={body} onChange={setBody} placeholder="Write your message…" minHeight={260} />
+            <EmailComposer value={body} onChange={setBody} placeholder="Write your message…" minHeight={260} />
             <p className="text-[11px] text-foreground-muted mt-1.5">
               Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
               are replaced with the actual customer details when the email is sent.

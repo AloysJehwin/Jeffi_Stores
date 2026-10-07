@@ -259,3 +259,48 @@ describe('sendCampaignWhatsApp missing vars', () => {
     )
   })
 })
+
+// Every kind advertised as WhatsApp-capable must actually dispatch (loyalty_points_reminder used to
+// fall through to `default` and always fail).
+describe('every supported kind dispatches', () => {
+  const VARS = { items: 'Bolt', product: 'Bolt', headline: 'Hi', code: 'C1', discount: '5', orderNumber: 'O1', url: 'https://x' }
+  for (const kind of CAMPAIGN_WA_KINDS) {
+    it(`${kind} sends`, async () => {
+      allowAndSend()
+      const result = await sendCampaignWhatsApp(kind, 'user-1', VARS)
+      expect(result).toEqual({ ok: true, reason: undefined })
+      expect(mockSendSMS).toHaveBeenCalled()
+    })
+  }
+
+  it('loyalty_points_reminder → sendPromoOfferWhatsApp', async () => {
+    allowAndSend()
+    await sendCampaignWhatsApp('loyalty_points_reminder', 'user-1', { headline: 'You have 500 points', code: '' })
+    expect(mockPromoOffer).toHaveBeenCalledWith(
+      expect.objectContaining({ headline: 'You have 500 points', entity: { entityType: 'campaign', entityId: 'loyalty_points_reminder' } })
+    )
+  })
+})
+
+describe('campaign SMS copy', () => {
+  it('formats a bare percent discount as "N% off"', async () => {
+    allowAndSend()
+    await sendCampaignWhatsApp('winback_90', 'user-1', { headline: 'We miss you!', code: 'BACK-1', discount: '10' })
+    expect(mockSendSMS).toHaveBeenCalledWith(expect.objectContaining({ body: 'We miss you! — use code BACK-1 for 10% off.' }))
+  })
+
+  it('keeps a discount that is already worded', async () => {
+    allowAndSend()
+    await sendCampaignWhatsApp('winback_90', 'user-1', { headline: 'Hi', code: 'C', discount: '₹100 off' })
+    expect(mockSendSMS).toHaveBeenCalledWith(expect.objectContaining({ body: 'Hi — use code C for ₹100 off.' }))
+  })
+})
+
+describe('var cleanup', () => {
+  it('trims product names before WhatsApp and SMS', async () => {
+    allowAndSend()
+    await sendCampaignWhatsApp('replenishment', 'user-1', { items: 'Earthing Rod ' })
+    expect(mockAbandonedCart).toHaveBeenCalledWith(expect.objectContaining({ items: 'Earthing Rod' }))
+    expect(mockSendSMS).toHaveBeenCalledWith(expect.objectContaining({ body: 'Running low on Earthing Rod? Reorder in a tap.' }))
+  })
+})

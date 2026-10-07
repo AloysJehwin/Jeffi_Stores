@@ -61,6 +61,7 @@ async function dispatch(
     case 'second_purchase_nudge':
     case 'signup_anniversary':
     case 'loyalty_tier_upgrade':
+    case 'loyalty_points_reminder':
     case 'referral_invite':
     case 'birthday':
       return sendPromoOfferWhatsApp({
@@ -109,12 +110,16 @@ export async function sendCampaignWhatsApp(
     }
     await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: waRef }).catch(() => null)
 
-    const ok = await dispatch(kind, user.phone, vars, { entityType: 'campaign', entityId: kind })
+    // Product names can carry stray whitespace ("Earthing Rod ?" in the SMS).
+    const clean = Object.fromEntries(
+      Object.entries(vars).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])
+    ) as CampaignWaVars
+    const ok = await dispatch(kind, user.phone, clean, { entityType: 'campaign', entityId: kind })
 
     // Mobile = both channels: fire a plain-text SMS alongside WhatsApp so a customer reached on
     // mobile gets it even if WhatsApp isn't delivered. Shares the one dedup above (no extra gate),
     // best-effort. (#campaign SMS+WhatsApp together)
-    const smsBody = campaignSmsBody(kind, vars)
+    const smsBody = campaignSmsBody(kind, clean)
     if (smsBody) {
       const { sendCampaignSMS } = await import('@/lib/shared/sms')
       sendCampaignSMS({ phone: user.phone, body: smsBody, kind, userId }).catch(() => {})
@@ -124,6 +129,11 @@ export async function sendCampaignWhatsApp(
   } catch {
     return { ok: false, reason: 'error' }
   }
+}
+
+// Scenarios pass the bare percent ("10"), which read as "for 10." in the SMS.
+function smsDiscount(discount: string): string {
+  return /^\d+(\.\d+)?$/.test(discount.trim()) ? `${discount.trim()}% off` : discount
 }
 
 // A short SMS line per campaign kind, built from the same vars as the WhatsApp template. Returns ''
@@ -155,10 +165,11 @@ function campaignSmsBody(kind: string, vars: CampaignWaVars): string {
     case 'second_purchase_nudge':
     case 'signup_anniversary':
     case 'loyalty_tier_upgrade':
+    case 'loyalty_points_reminder':
     case 'referral_invite':
     case 'birthday':
       return vars.code
-        ? `${vars.headline || 'A special offer for you'} — use code ${vars.code}${vars.discount ? ` for ${vars.discount}` : ''}.`
+        ? `${vars.headline || 'A special offer for you'} — use code ${vars.code}${vars.discount ? ` for ${smsDiscount(vars.discount)}` : ''}.`
         : vars.headline || ''
     case 'review_request':
     case 'review_reminder':

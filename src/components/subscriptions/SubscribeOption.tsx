@@ -18,6 +18,7 @@ export type PurchaseMode = 'once' | 'subscribe'
 
 interface Quote {
   unitPrice: number
+  intervalPrices?: Partial<Record<string, number>>
   oneTimePrice?: number
   totalCycles?: number | null
   minCycles?: number | null
@@ -54,6 +55,8 @@ export function subscribeIntervalsFor(
 export const formatInr = (n: number) =>
   `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
+export const formatInrCompact = (n: number) => `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
+
 export default function SubscribeOption({
   productId,
   variantId,
@@ -76,6 +79,8 @@ export default function SubscribeOption({
   const [quote, setQuote] = useState<Quote | null>(null)
   const [quoteError, setQuoteError] = useState<string | null>(null)
   const [quoting, setQuoting] = useState(false)
+  // Per-interval unit prices for the current item; kept across interval switches.
+  const [chipPrices, setChipPrices] = useState<Partial<Record<string, number>>>({})
   const quantity = digital ? 1 : qty
 
   useEffect(() => {
@@ -92,8 +97,10 @@ export default function SubscribeOption({
       .then(async r => ({ ok: r.ok, data: await r.json().catch(() => ({})) }))
       .then(({ ok, data }) => {
         if (cancelled) return
-        if (ok) setQuote(data)
-        else {
+        if (ok) {
+          setQuote(data)
+          if (data?.intervalPrices) setChipPrices(data.intervalPrices)
+        } else {
           setQuote(null)
           setQuoteError(data?.error || 'Could not price this subscription')
         }
@@ -108,6 +115,8 @@ export default function SubscribeOption({
       cancelled = true
     }
   }, [mode, interval, quantity, productId, variantId, subVariantId, user, needsChoice, isBusiness])
+
+  useEffect(() => setChipPrices({}), [productId, variantId, subVariantId])
 
   if (allowed.length === 0) return null
 
@@ -158,6 +167,11 @@ export default function SubscribeOption({
                   }`}
                 >
                   {SUBSCRIPTION_INTERVAL_LABELS[iv]}
+                  {chipPrices[iv] != null && (
+                    <span className="ml-1 opacity-80" data-testid={`interval-price-${iv}`}>
+                      · {formatInrCompact(chipPrices[iv]!)}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>

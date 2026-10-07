@@ -15,8 +15,21 @@ import Toggle from '@/components/ui/Toggle'
 import DatePicker from '@/components/ui/DatePicker'
 import AIEnrichButton from './AIEnrichButton'
 import UnitsManager, { UnitLoadedInfo } from './UnitsManager'
-import { deriveSellableItems, subscriptionPriceHint, type SellableItem } from '@/lib/subscriptions/sellable'
-import { MAX_BILLING_CYCLES, cycleLimitsError, normalizeCycleCount } from '@/lib/subscriptions/intervals'
+import {
+  deriveSellableItems,
+  monthlyEquivalentLabel,
+  priceInputs,
+  subscriptionPriceError,
+  subscriptionPriceHint,
+  type SellableItem,
+} from '@/lib/subscriptions/sellable'
+import {
+  MAX_BILLING_CYCLES,
+  MAX_CYCLE_AMOUNT_INR,
+  cycleLimitsError,
+  isSubscriptionInterval,
+  normalizeCycleCount,
+} from '@/lib/subscriptions/intervals'
 import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
 import DigitalFilesPanel from './DigitalFilesPanel'
 import SubVariantEditor, { emptySubVariantDraft, SubVariantDraft } from './SubVariantEditor'
@@ -66,6 +79,7 @@ interface VariantRow {
   use_own_images: boolean
   product_suppliers?: SupplierRow[]
   subscription_price?: string
+  subscription_prices?: Record<string, string>
   _isDeleted?: boolean
 }
 
@@ -303,6 +317,7 @@ function emptyVariant(pricing_type: 'unit', unit: string): VariantRow {
     use_own_images: false,
     product_suppliers: [],
     subscription_price: '',
+    subscription_prices: {},
   }
 }
 
@@ -592,6 +607,9 @@ export default function ProductForm({
   const [subscriptionPrice, setSubscriptionPrice] = useState(
     product?.subscription_price != null ? String(product.subscription_price) : ''
   )
+  const [subscriptionPrices, setSubscriptionPrices] = useState<Record<string, string>>(() =>
+    priceInputs(product?.subscription_prices)
+  )
   const [totalCycles, setTotalCycles] = useState(
     product?.subscription_total_cycles != null ? String(product.subscription_total_cycles) : ''
   )
@@ -741,6 +759,7 @@ export default function ProductForm({
           use_own_images:
             v.use_own_images != null ? !!v.use_own_images : !!(v.variant_images && v.variant_images.length > 0),
           subscription_price: v.subscription_price != null ? String(v.subscription_price) : '',
+          subscription_prices: priceInputs(v.subscription_prices),
           product_suppliers: allSuppliers
             .filter(
               (s: any) =>
@@ -950,6 +969,7 @@ export default function ProductForm({
     fields.subscription_intervals = subscriptionIntervals
     fields.subscription_interval = subscriptionIntervals[0] ?? null
     fields.subscription_price = hasVariants ? null : subscriptionPrice || null
+    fields.subscription_prices = hasVariants ? {} : subscriptionPrices
     fields.subscription_total_cycles = normalizeCycleCount(totalCycles)
     fields.subscription_min_cycles = normalizeCycleCount(minCycles)
     fields.meta_title = metaTitle || null
@@ -1077,6 +1097,7 @@ export default function ProductForm({
     isSubscription,
     subscriptionIntervals,
     subscriptionPrice,
+    subscriptionPrices,
     totalCycles,
     minCycles,
     isBundle,
@@ -1417,20 +1438,35 @@ export default function ProductForm({
   // products.supplier_id is the PRODUCT-leaf preferred (simple products only).
   const sellableItems = deriveSellableItems({
     hasVariants,
-    product: { name: productName, sku, price: basePrice, subscription_price: subscriptionPrice },
+    product: {
+      name: productName,
+      sku,
+      price: basePrice,
+      subscription_price: subscriptionPrice,
+      subscription_prices: subscriptionPrices,
+    },
     variants,
     subVariantsByVariant: subVariantsMap,
   })
+  const offeredIntervals = SUBSCRIPTION_INTERVALS.filter(o => subscriptionIntervals.includes(o.value))
+  const subscriptionPricesError = isSubscription
+    ? sellableItems.some(item => offeredIntervals.some(o => subscriptionPriceError(item.subscriptionPrices[o.value])))
+      ? 'Fix the highlighted subscription prices'
+      : null
+    : null
 
-  function setSellableSubscriptionPrice(item: SellableItem, value: string) {
-    if (item.kind === 'product') setSubscriptionPrice(value)
+  function setSellableIntervalPrice(item: SellableItem, interval: string, value: string) {
+    const put = (m: Record<string, string> | undefined) => ({ ...(m ?? {}), [interval]: value })
+    if (item.kind === 'product') setSubscriptionPrices(m => put(m))
     else if (item.kind === 'variant')
-      setVariants(vs => vs.map(v => (v.id === item.variantId ? { ...v, subscription_price: value } : v)))
+      setVariants(vs =>
+        vs.map(v => (v.id === item.variantId ? { ...v, subscription_prices: put(v.subscription_prices) } : v))
+      )
     else
       setSubVariantsMap(m => ({
         ...m,
         [item.variantId!]: (m[item.variantId!] || []).map(sv =>
-          sv.id === item.subVariantId ? { ...sv, subscription_price: value } : sv
+          sv.id === item.subVariantId ? { ...sv, subscription_prices: put(priceInputs(sv.subscription_prices)) } : sv
         ),
       }))
   }
@@ -1442,7 +1478,12 @@ export default function ProductForm({
       .flatMap(v =>
         (subVariantsMap[v.id!] || [])
           .filter((sv: any) => sv.id)
-          .map((sv: any) => ({ variant_id: v.id, id: sv.id, subscription_price: sv.subscription_price ?? '' }))
+          .map((sv: any) => ({
+            variant_id: v.id,
+            id: sv.id,
+            subscription_price: sv.subscription_price ?? '',
+            subscription_prices: priceInputs(sv.subscription_prices),
+          }))
       )
   }
 
@@ -1546,7 +1587,9 @@ export default function ProductForm({
                   .map(toSupplierRow)
             const subscription_price =
               existing?.subscription_price !== undefined ? existing.subscription_price : sv.subscription_price
-            return { ...sv, subscription_price, product_suppliers: rows }
+            const subscription_prices =
+              existing?.subscription_prices !== undefined ? existing.subscription_prices : sv.subscription_prices
+            return { ...sv, subscription_price, subscription_prices, product_suppliers: rows }
           })
           return { ...m, [variantId]: merged }
         })
@@ -1957,8 +2000,8 @@ export default function ProductForm({
     setError(null)
     setBootstrapError(null)
 
-    if (isSubscription && cyclesError) {
-      setError(cyclesError)
+    if (isSubscription && (cyclesError || subscriptionPricesError)) {
+      setError(cyclesError || subscriptionPricesError)
       setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
       return
     }
@@ -2205,6 +2248,7 @@ export default function ProductForm({
       formData.set('subscription_intervals', subscriptionIntervals.join(','))
       formData.set('subscription_interval', subscriptionIntervals[0] ?? '')
       formData.set('subscription_price', hasVariants ? '' : subscriptionPrice)
+      formData.set('subscription_prices', JSON.stringify(hasVariants ? {} : subscriptionPrices))
       formData.set('sub_variant_subscription_prices', JSON.stringify(subVariantSubscriptionPrices()))
       formData.set('subscription_total_cycles', totalCycles)
       formData.set('subscription_min_cycles', minCycles)
@@ -3326,20 +3370,25 @@ export default function ProductForm({
                       </div>
                       <div className="pt-2">
                         <p className="text-xs font-medium text-foreground-muted mb-1">Subscription prices</p>
-                        <div className="overflow-x-auto rounded-md border border-border-default">
-                          <table className="w-full text-xs" data-testid="subscription-prices">
-                            <thead className="bg-surface-secondary text-foreground-muted">
-                              <tr>
-                                <th className="text-left font-medium px-3 py-2">Item</th>
-                                <th className="text-right font-medium px-3 py-2">One-time</th>
-                                <th className="text-left font-medium px-3 py-2">Subscription (₹ per cycle)</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {sellableItems.map(item => {
-                                const hint = subscriptionPriceHint(item.oneTimePrice, item.subscriptionPrice)
-                                return (
-                                  <tr key={item.key} className="border-t border-border-default">
+                        {offeredIntervals.length === 0 ? (
+                          <p className="text-xs text-foreground-muted">Add a billing interval to set its prices.</p>
+                        ) : (
+                          <div className="overflow-x-auto rounded-md border border-border-default">
+                            <table className="w-full text-xs" data-testid="subscription-prices">
+                              <thead className="bg-surface-secondary text-foreground-muted">
+                                <tr>
+                                  <th className="text-left font-medium px-3 py-2">Item</th>
+                                  <th className="text-right font-medium px-3 py-2">One-time</th>
+                                  {offeredIntervals.map(o => (
+                                    <th key={o.value} className="text-left font-medium px-3 py-2 whitespace-nowrap">
+                                      {o.label} (₹ per cycle)
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sellableItems.map(item => (
+                                  <tr key={item.key} className="border-t border-border-default align-top">
                                     <td className="px-3 py-2">
                                       <div className="text-foreground">{item.name}</div>
                                       {item.sku && <div className="text-foreground-muted">{item.sku}</div>}
@@ -3347,40 +3396,58 @@ export default function ProductForm({
                                     <td className="px-3 py-2 text-right text-foreground-secondary whitespace-nowrap">
                                       {item.oneTimePrice != null ? `₹${item.oneTimePrice.toFixed(2)}` : '—'}
                                     </td>
-                                    <td className="px-3 py-2">
-                                      <div className="flex items-center gap-2">
-                                        <input
-                                          type="number"
-                                          min="0"
-                                          step="0.01"
-                                          inputMode="decimal"
-                                          aria-label={`Subscription price for ${item.name}`}
-                                          value={item.subscriptionPrice}
-                                          placeholder={item.oneTimePrice != null ? item.oneTimePrice.toFixed(2) : ''}
-                                          onChange={e => setSellableSubscriptionPrice(item, e.target.value)}
-                                          className={`${inputCls} w-28`}
-                                        />
-                                        {hint && (
-                                          <span
-                                            className={
-                                              hint.endsWith('less')
-                                                ? 'text-green-700 dark:text-green-400'
-                                                : 'text-amber-700 dark:text-amber-400'
-                                            }
-                                          >
-                                            {hint}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
+                                    {offeredIntervals.map(o => {
+                                      const raw = item.subscriptionPrices[o.value] ?? ''
+                                      const effective = raw.trim() !== '' ? raw : item.subscriptionPrice
+                                      const err = subscriptionPriceError(raw)
+                                      const hint = err ? null : subscriptionPriceHint(item.oneTimePrice, effective)
+                                      const perMonth = err || !isSubscriptionInterval(o.value) ? null : monthlyEquivalentLabel(o.value, effective)
+                                      const fallback = item.subscriptionPrice || (item.oneTimePrice != null ? item.oneTimePrice.toFixed(2) : '')
+                                      return (
+                                        <td key={o.value} className="px-3 py-2">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max={MAX_CYCLE_AMOUNT_INR}
+                                            step="0.01"
+                                            inputMode="decimal"
+                                            aria-label={`${o.label} subscription price for ${item.name}`}
+                                            aria-invalid={!!err}
+                                            value={raw}
+                                            placeholder={fallback}
+                                            onChange={e => setSellableIntervalPrice(item, o.value, e.target.value)}
+                                            className={`${inputCls} w-28 ${err ? 'border-red-500' : ''}`}
+                                          />
+                                          {err && <div className="text-red-600 mt-0.5">{err}</div>}
+                                          {(hint || perMonth) && (
+                                            <div className="mt-0.5 space-x-1 whitespace-nowrap">
+                                              {perMonth && <span className="text-foreground-muted">{perMonth}</span>}
+                                              {hint && (
+                                                <span
+                                                  className={
+                                                    hint.endsWith('less')
+                                                      ? 'text-green-700 dark:text-green-400'
+                                                      : 'text-amber-700 dark:text-amber-400'
+                                                  }
+                                                >
+                                                  {hint}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+                                        </td>
+                                      )
+                                    })}
                                   </tr>
-                                )
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                        {subscriptionPricesError && <p className="text-xs text-red-600 mt-1">{subscriptionPricesError}</p>}
                         <p className="text-xs text-foreground-muted mt-1">
                           GST-inclusive, like the one-time price. Leave blank to charge the one-time price each cycle.
+                          Max ₹{MAX_CYCLE_AMOUNT_INR.toLocaleString('en-IN')} per cycle.
                         </p>
                       </div>
                     </div>

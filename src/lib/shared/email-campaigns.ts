@@ -1,8 +1,7 @@
 import nodemailer from 'nodemailer'
 import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
-import { buildVarMap, substituteVars } from '@/lib/shared/template-vars'
-import { getStoreIdentity } from '@/lib/catalog/site-controls'
+import { createTemplateVariableResolver, renderTemplate } from '@/lib/templates/variables'
 import { platformBrandName } from '@/lib/catalog/brand'
 import { mailShell } from '@/lib/shared/mail-template'
 
@@ -38,6 +37,24 @@ function ctaButton(text: string, url: string) {
 export { baseLayout, ctaButton }
 
 export function renderCampaignEmail(
+  templateKey: string,
+  data: TemplateData,
+  recipientName?: string,
+  baseUrl?: string,
+  storeName?: string,
+  vars?: Record<string, string>
+): { subject: string; html: string; ampHtml?: string } {
+  const out = renderCampaignEmailRaw(templateKey, data, recipientName, baseUrl, storeName)
+  if (!vars) return out
+  return {
+    subject: renderTemplate(out.subject, vars),
+    html: renderTemplate(out.html, vars, { escape: true }),
+    ...(out.ampHtml ? { ampHtml: renderTemplate(out.ampHtml, vars, { escape: true }) } : {}),
+  }
+}
+
+// Leaves {store_name} / {store_web} and any composer tokens for the caller's variables.
+function renderCampaignEmailRaw(
   templateKey: string,
   data: TemplateData,
   recipientName?: string,
@@ -273,11 +290,12 @@ interface Recipient {
   user_id: string
   email: string
   first_name: string | null
+  last_name?: string | null
 }
 
 async function resolveAudience(audienceType: string, audienceFilter: Record<string, unknown>): Promise<Recipient[]> {
-  const base = `SELECT u.id AS user_id, u.email, u.first_name FROM users u`
-  const base_cp = `SELECT u.id AS user_id, u.email, u.first_name FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
+  const base = `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u`
+  const base_cp = `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
   const where = `WHERE u.is_active = true AND u.is_guest = false AND u.email IS NOT NULL`
 
   if (audienceType === 'customer_type') {
@@ -295,7 +313,7 @@ async function resolveAudience(audienceType: string, audienceFilter: Record<stri
   if (audienceType === 'specific_user') {
     const userId = audienceFilter.userId as string
     return queryMany<Recipient>(
-      `SELECT u.id AS user_id, u.email, u.first_name FROM users u WHERE u.id = $1 AND u.email IS NOT NULL`,
+      `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u WHERE u.id = $1 AND u.email IS NOT NULL`,
       [userId]
     )
   }
@@ -315,7 +333,7 @@ async function resolveAudience(audienceType: string, audienceFilter: Record<stri
     }
     const cond = segConditions[seg]
     if (cond) {
-      const from = `SELECT u.id AS user_id, u.email, u.first_name FROM users u LEFT JOIN (SELECT user_id, COUNT(*) AS order_count, SUM(total_amount) AS lifetime_value, MAX(created_at) AS last_order_at, COUNT(*) FILTER (WHERE payment_status='paid') AS paid_orders FROM orders GROUP BY user_id) o ON o.user_id=u.id LEFT JOIN customer_profiles cp ON cp.user_id=u.id`
+      const from = `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u LEFT JOIN (SELECT user_id, COUNT(*) AS order_count, SUM(total_amount) AS lifetime_value, MAX(created_at) AS last_order_at, COUNT(*) FILTER (WHERE payment_status='paid') AS paid_orders FROM orders GROUP BY user_id) o ON o.user_id=u.id LEFT JOIN customer_profiles cp ON cp.user_id=u.id`
       return queryMany<Recipient>(`${from} ${where} AND ${cond}`)
     }
   }
@@ -347,8 +365,8 @@ export async function sendCampaign(
 
   const recipients = await resolveAudience(campaign.audience_type, campaign.audience_filter)
 
-  // Store identity drives {store_*} vars. From sender and base URL are tenant-aware.
-  const store = await getStoreIdentity()
+  // Store identity + custom variables load once; From sender and base URL are tenant-aware.
+  const resolveVars = await createTemplateVariableResolver()
   const { campaignMailFromAsync, storeBaseUrlAsync } = await import('@/lib/catalog/brand')
   const fromAddr = await campaignMailFromAsync()
   const baseUrl = await storeBaseUrlAsync()
@@ -394,19 +412,17 @@ export async function sendCampaign(
             }
           }
 
-          const { subject, html } = renderCampaignEmail(
+          const vars = resolveVars({
+            recipient: { email: recipient.email, first_name: recipient.first_name, last_name: recipient.last_name },
+          })
+          const { subject: finalSubject, html: finalHtml } = renderCampaignEmail(
             campaign.template_key,
             templateData,
             recipient.first_name || undefined,
             baseUrl,
-            store.name
+            vars.store_name,
+            vars
           )
-          const vars = buildVarMap({
-            recipient: { email: recipient.email, first_name: recipient.first_name },
-            store: { name: store.name, email: store.email, phone: store.phone, web: store.web },
-          })
-          const finalSubject = substituteVars(subject, vars)
-          const finalHtml = substituteVars(html, vars)
           await sendAuditedMail({
             from: fromAddr,
             to: recipient.email,

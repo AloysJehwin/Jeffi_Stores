@@ -17,10 +17,16 @@ vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zNonEmpty: { _def: {} },
 }))
-vi.mock('@/lib/shared/template-vars', () => ({
-  buildVarMap: vi.fn().mockReturnValue({}),
-  substituteVars: vi.fn().mockImplementation((s: string) => s),
-}))
+vi.mock('@/lib/templates/variables', async () => {
+  const shared = await vi.importActual<typeof import('@/lib/templates/variables-shared')>(
+    '@/lib/templates/variables-shared'
+  )
+  return {
+    ...shared,
+    resolveTemplateVariables: vi.fn(async () => ({ customer_first_name: 'Alice', store_name: 'Acme' })),
+    createTemplateVariableResolver: vi.fn(async () => () => ({ customer_first_name: 'Alice', store_name: 'Acme' })),
+  }
+})
 
 // ── Imports ────────────────────────────────────────────────────────────────
 
@@ -30,7 +36,6 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
 import { sendAdminContactEmail } from '@/lib/email'
 import { parseBody } from '@/lib/shared/validate'
-import { buildVarMap, substituteVars } from '@/lib/shared/template-vars'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -73,8 +78,6 @@ describe('POST /api/admin/orders/[id]/send-customer-mail', () => {
     } as any)
     mockQueryOne.mockResolvedValue(ORDER as any)
     mockSendEmail.mockResolvedValue({ success: true } as any)
-    vi.mocked(substituteVars).mockImplementation((s: string) => s)
-    vi.mocked(buildVarMap).mockReturnValue({})
   })
 
   // ── Auth / authz ────────────────────────────────────────────────────────
