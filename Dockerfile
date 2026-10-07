@@ -103,6 +103,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/cluster-server.js ./cluster-serve
 
 # Copy secrets bootstrap script (fetches from AWS Secrets Manager at container start)
 COPY --from=builder --chown=nextjs:nodejs /app/deploy/load-secrets.mjs ./deploy/load-secrets.mjs
+COPY --from=builder --chown=nextjs:nodejs /app/deploy/k8s-cron.mjs ./deploy/k8s-cron.mjs
 
 # Copy database migration files
 COPY --from=builder --chown=nextjs:nodejs /app/database ./database

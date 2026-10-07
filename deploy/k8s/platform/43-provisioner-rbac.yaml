@@ -1,0 +1,49 @@
+# The flagship runs the provisioning engine (src/lib/k8s/tenant-compute.ts): it creates tenant
+# namespaces and everything inside them, reads Nodes for placement, copies the pull secret / RDS CA
+# out of jeffi, and patches the tenant-admin CA bundle in jeffi-edge.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: { name: jeffi-provisioner }
+rules:
+  - apiGroups: ['']
+    resources: [namespaces, nodes]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: ['']
+    resources: [secrets, configmaps, services, serviceaccounts, resourcequotas, persistentvolumeclaims, pods]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [policy]
+    resources: [poddisruptionbudgets]
+    verbs: [get, list, create, update, patch, delete]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [get, list, create, update, patch, delete]
+  - apiGroups: [traefik.io]
+    resources: [ingressroutes]
+    verbs: [get, list, create, update, patch, delete]
+  - apiGroups: [cert-manager.io]
+    resources: [certificates]
+    verbs: [get, list, create, update, patch, delete]
+  - apiGroups: [metrics.k8s.io]
+    resources: [pods, nodes]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: jeffi-provisioner }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: jeffi-provisioner }
+subjects: [{ kind: ServiceAccount, name: flagship, namespace: jeffi }]
+---
+# Filled in by bootstrap/launch-core.sh output (node SG, core private IP, AMI).
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: provisioning, namespace: jeffi }
+data:
+  PROVISIONING_COMPUTE: k8s
+  CLUSTER_INGRESS_IP: 32.196.38.130
+  K8S_NODE_IAM_PROFILE: jeffi-stores-ec2-profile

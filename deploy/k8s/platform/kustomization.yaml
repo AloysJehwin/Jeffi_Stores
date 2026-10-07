@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - 00-namespaces.yaml
+  - 10-traefik.yaml
+  - 20-cert-manager.yaml
+  - 30-edge.yaml
+  - 40-flagship.yaml
+  - 41-redis.yaml
+  - 42-netpol.yaml
+  - 43-provisioner-rbac.yaml
+  - release.yaml
+  - cronjobs.yaml
+# CRD-backed resources (issuers, Coroot) are applied after their charts settle: see bootstrap/apply-platform.sh.
+images:
+  - name: ghcr.io/aloysjehwin/jeffi_stores
+    newTag: latest

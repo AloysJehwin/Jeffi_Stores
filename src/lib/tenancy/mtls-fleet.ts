@@ -36,6 +36,20 @@ function platformCaPath(): string {
  * Refuses to publish a bundle openssl cannot parse (a broken file breaks every admin host).
  * Returns the certificate count for the step summary. */
 export async function rebuildAndPublishClientCaBundle(): Promise<{ count: number }> {
+  const bundle = await buildClientCaBundle()
+  const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' })
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: truststoreBucket(),
+      Key: FLEET_KEY,
+      Body: bundle,
+      ContentType: 'application/x-pem-file',
+    })
+  )
+  return { count: (bundle.match(/BEGIN CERTIFICATE/g) ?? []).length }
+}
+
+async function buildClientCaBundle(): Promise<string> {
   const caPath = platformCaPath()
   if (!fs.existsSync(caPath)) {
     // nginx refuses an empty ssl_client_certificate, so the platform CA must always be present.
@@ -61,19 +75,11 @@ export async function rebuildAndPublishClientCaBundle(): Promise<{ count: number
     fs.rmSync(tmp, { force: true })
   }
 
-  const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' })
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: truststoreBucket(),
-      Key: FLEET_KEY,
-      Body: bundle,
-      ContentType: 'application/x-pem-file',
-    })
-  )
-
-  const count = (bundle.match(/BEGIN CERTIFICATE/g) ?? []).length
-  return { count }
+  return bundle
 }
+
+// On k8s Traefik reads the tenant-admin CA list from this Secret and reloads it on change.
+const K8S_BUNDLE = { namespace: 'jeffi-edge', name: 'client-ca-bundle' }
 
 // Config-only fleet apply: refresh the bundle + reload nginx, no blue/green image roll.
 function fleetReloadCommands(): string[] {
@@ -91,6 +97,19 @@ function fleetReloadCommands(): string[] {
 export async function refreshTenantMtlsFleet(
   slug?: string
 ): Promise<{ count: number; commandId: string | null; targets: number }> {
+  const { k8sComputeEnabled } = await import('@/lib/k8s/tenant-compute')
+  if (k8sComputeEnabled()) {
+    const bundle = await buildClientCaBundle()
+    const { apply } = await import('@/lib/k8s/client')
+    await apply({
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: { name: K8S_BUNDLE.name, namespace: K8S_BUNDLE.namespace },
+      stringData: { 'ca.crt': bundle },
+    })
+    return { count: (bundle.match(/BEGIN CERTIFICATE/g) ?? []).length, commandId: null, targets: 0 }
+  }
+
   const { count } = await rebuildAndPublishClientCaBundle()
 
   const ids = await describeRunningTenantInstanceIds()

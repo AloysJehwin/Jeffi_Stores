@@ -1,0 +1,18 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: cert-manager
+  namespace: kube-system
+spec:
+  repo: https://charts.jetstack.io
+  chart: cert-manager
+  version: v1.16.2
+  targetNamespace: cert-manager
+  valuesContent: |-
+    crds: { enabled: true }
+    # DNS-01 against Route53 uses the core node's instance profile.
+    extraArgs: [--cluster-issuer-ambient-credentials]
+    nodeSelector: { jeffi.io/role: core }
+    resources: { requests: { cpu: 20m, memory: 64Mi } }
+    webhook: { nodeSelector: { jeffi.io/role: core } }
+    cainjector: { nodeSelector: { jeffi.io/role: core } }

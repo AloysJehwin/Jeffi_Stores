@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { activeProvisioningJobs, getProvisioningJob, controlPlanePool } from '@/lib/tenant-registry'
-import { advanceProvisioningJob } from '@/lib/provisioning/steps'
+import { pendingK8sPlanTenants } from '@/lib/tenant-registry/provisioning'
+import { advanceProvisioningJob, reconcileK8sPlan } from '@/lib/provisioning/steps'
 import { getProvisioningProvider } from '@/lib/provisioning'
 import { provisionTenantOwnerAdmin } from '@/lib/tenancy/tenant-admin-provision'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
@@ -28,6 +29,12 @@ export async function GET(request: NextRequest) {
     results.push({ tenantId: job.tenant_id, step: fresh.step, status })
     // On transition to done, create the owner super_admin + cert in the now-real tenant DB.
     if (status === 'done') await fireOwnerAdmin(job.tenant_id)
+  }
+
+  // Plan changes waiting on a k8s node to join.
+  for (const tenantId of await pendingK8sPlanTenants().catch(() => [])) {
+    const r = await reconcileK8sPlan(tenantId, provider)
+    results.push({ tenantId, step: 'k8s_plan', status: r.ok ? (r.error ?? 'applied') : `error: ${r.error}` })
   }
 
   return NextResponse.json({ success: true, advanced: results.length, results })

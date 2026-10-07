@@ -261,6 +261,38 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // pre-existing POOL_INSTANCE_ID), skip real EC2 and serve from the shared
         // TENANT_APP_TARGET_IP — the flagship/pool host. This keeps provisioning working before
         // per-tenant/pool EC2 is set up, and is the sane default rather than a hard failure.
+        const k8s = await import('@/lib/k8s/tenant-compute')
+        if (k8s.k8sComputeEnabled()) {
+          if (!res.computeWaitStartedAt) res.computeWaitStartedAt = Date.now()
+          const placed = await k8s.ensureTenantNode(
+            slug,
+            tenant.plan,
+            { instanceId: res.ec2InstanceId, poolInstanceId: res.poolInstanceId },
+            async (id, kind) => {
+              if (kind === 'dedicated') res.ec2InstanceId = id
+              else res.poolInstanceId = id
+              await updateProvisioningJob(job.id, { created_resources: res })
+            }
+          )
+          if (!placed.ready) {
+            if (Date.now() - res.computeWaitStartedAt > 15 * 60 * 1000) {
+              throw new Error(`ensure_compute: k8s node for "${slug}" did not become Ready within 15 min`)
+            }
+            await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
+            return 'pending'
+          }
+          const { listCustomDomains } = await import('../tenant-registry/custom-domains')
+          const customDomains = (await listCustomDomains(job.tenant_id).catch(() => []))
+            .filter(d => d.status === 'verified')
+            .map(d => d.domain)
+          await k8s.applyTenantWorkload({ slug, plan: tenant.plan, hosts: tenantHostnames(slug, tenant.plan), customDomains })
+          res.ec2Target = k8s.clusterIngressIp()
+          res.computeMode = 'k8s'
+          delete res.poolInstanceId
+          await writeTenantEc2(job.tenant_id, res.ec2Target, res.ec2InstanceId)
+          return await next(job.id, 'setup_delhivery', res)
+        }
+
         const ec2Configured = tenantComputeConfigured()
         if (!ec2Configured) {
           const target = (process.env.TENANT_APP_TARGET_IP || '').trim()
@@ -335,8 +367,9 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
 
       case 'configure_dns': {
         const hosts = tenantHostnames(slug, tenant.plan)
-        // Point at this tenant's serving IP (dedicated instance or pool); falls back to env.
-        await provider.ensureDns(hosts, res.ec2Target)
+        // k8s: *.jeffistores.in is one wildcard record at the cluster ingress, so nothing to upsert.
+        // Otherwise point at this tenant's serving IP (dedicated instance or pool).
+        if (res.computeMode !== 'k8s') await provider.ensureDns(hosts, res.ec2Target)
         res.dnsHosts = hosts
         return await next(job.id, 'verify_serving', res)
       }
@@ -615,6 +648,10 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   // here, reclaimed by deletePoolIfEmpty on the final deprovision). Prefer the durably-persisted
   // instance id (tenant_infra.ec2_instance_id) over the job JSON, which can be trimmed/lost.
   const rollbackInstanceId = r.ec2InstanceId || tenant?.ec2_instance_id
+  if (r.computeMode === 'k8s' || r.computeWaitStartedAt) {
+    const { deleteTenantWorkload } = await import('@/lib/k8s/tenant-compute')
+    if (tenant?.slug) await deleteTenantWorkload(tenant.slug).catch(() => {})
+  }
   if (rollbackInstanceId) await provider.deleteAppInstance(rollbackInstanceId).catch(() => {})
   // Billable resources.
   if (r.bucket) await provider.deleteBucket(r.bucket).catch(() => {})
@@ -670,6 +707,8 @@ export async function reprovisionDns(tenantId: string, provider: ProvisioningPro
   const prevSet = new Set(prev)
   const added = desired.filter(h => !prevSet.has(h))
   const removed = prev.filter(h => !desiredSet.has(h))
+
+  if (created.computeMode === 'k8s') return reconcileK8sPlan(tenantId, provider)
 
   try {
     // COMPUTE MOVE: if the new plan tier crosses the Basic↔dedicated boundary, the tenant's
@@ -788,9 +827,14 @@ export async function deprovisionTenant(
     // the shared pool — reclaim the pool only when this was the LAST active tenant. Prefer the
     // durably-persisted instance id over the job JSON (which can be trimmed/lost).
     const dedicatedInstanceId = created.ec2InstanceId || tenant.ec2_instance_id
+    const onK8s = created.computeMode === 'k8s'
+    if (onK8s) {
+      const { deleteTenantWorkload } = await import('@/lib/k8s/tenant-compute')
+      await deleteTenantWorkload(slug)
+    }
     if (dedicatedInstanceId) {
       await provider.deleteAppInstance(dedicatedInstanceId).catch(() => {})
-    } else {
+    } else if (!onK8s) {
       const { deletePoolIfEmpty } = await import('@/lib/tenancy/pool-autoscale')
       await deletePoolIfEmpty().catch(() => {})
     }
@@ -891,3 +935,66 @@ export async function deprovisionTenant(
 }
 
 export { STEPS, MAX_CONNECTIONS, dbInstanceId, tenantHostnames }
+
+/**
+ * k8s plan change: make sure the new tier's node exists, then re-apply the namespace (resources,
+ * replicas, placement, hosts). A dedicated node that is still joining parks the change as
+ * k8sPendingPlan; the provisioning worker retries it every tick until it lands. DNS is a wildcard,
+ * so no records move. A downgrade off a dedicated node terminates that node after the pods move.
+ */
+export async function reconcileK8sPlan(tenantId: string, provider: ProvisioningProvider): Promise<ReprovisionResult> {
+  const tenant = await getTenant(tenantId)
+  if (!tenant) return { ok: false, added: [], removed: [], error: 'tenant not found' }
+  const job = await getProvisioningJob(tenantId)
+  const created = (job?.created_resources as Record<string, any>) || {}
+  const desired = tenantHostnames(tenant.slug, tenant.plan)
+  const prev = (created.dnsHosts as string[] | undefined) ?? desired
+  const added = desired.filter(h => !prev.includes(h))
+  const removed = prev.filter(h => !desired.includes(h))
+  const save = (extra: Record<string, unknown>) =>
+    job ? updateProvisioningJob(job.id, { created_resources: { ...created, ...extra } }) : Promise.resolve()
+
+  try {
+    const k8s = await import('@/lib/k8s/tenant-compute')
+    const wantDedicated = isDedicatedPlan(tenant.plan)
+    const oldDedicated = wantDedicated ? undefined : created.ec2InstanceId || tenant.ec2_instance_id || undefined
+    const placed = await k8s.ensureTenantNode(
+      tenant.slug,
+      tenant.plan,
+      { instanceId: wantDedicated ? created.ec2InstanceId : undefined, poolInstanceId: created.poolInstanceId },
+      async (id, kind) => {
+        if (kind === 'dedicated') created.ec2InstanceId = id
+        else created.poolInstanceId = id
+        await save({})
+      }
+    )
+    if (!placed.ready) {
+      await save({ k8sPendingPlan: tenant.plan })
+      return { ok: true, added, removed, error: 'pending: waiting for node to join' }
+    }
+
+    const { listCustomDomains } = await import('../tenant-registry/custom-domains')
+    const customDomains = (await listCustomDomains(tenantId).catch(() => []))
+      .filter(d => d.status === 'verified')
+      .map(d => d.domain)
+    await k8s.applyTenantWorkload({ slug: tenant.slug, plan: tenant.plan, hosts: desired, customDomains })
+
+    if (oldDedicated) {
+      const { remove } = await import('@/lib/k8s/client')
+      const { dedicatedNodeName } = await import('./tiers')
+      await remove('Node', dedicatedNodeName(tenant.slug))
+      await provider.deleteAppInstance(oldDedicated).catch(() => {})
+      const { clearTenantEc2Instance } = await import('../tenant-registry/lifecycle')
+      await clearTenantEc2Instance(tenantId)
+      delete created.ec2InstanceId
+    } else if (created.ec2InstanceId) {
+      await writeTenantEc2(tenantId, k8s.clusterIngressIp(), created.ec2InstanceId)
+    }
+    delete created.k8sPendingPlan
+    delete created.poolInstanceId
+    await save({ dnsHosts: desired })
+    return { ok: true, added, removed }
+  } catch (e: any) {
+    return { ok: false, added, removed, error: e?.message || 'k8s reconcile failed' }
+  }
+}

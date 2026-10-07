@@ -196,3 +196,11 @@ export async function updateProvisioningJob(
   args.push(id)
   await pool.query(`UPDATE provisioning_jobs SET ${sets.join(', ')} WHERE id=$${args.length}`, args)
 }
+
+/** Tenants whose k8s plan change is parked until their new node joins (steps.reconcileK8sPlan). */
+export async function pendingK8sPlanTenants(): Promise<string[]> {
+  const res = await controlPlanePool().query(
+    `SELECT tenant_id FROM provisioning_jobs WHERE created_resources ? 'k8sPendingPlan' ORDER BY updated_at`
+  )
+  return res.rows.map((r: { tenant_id: string }) => r.tenant_id)
+}

@@ -241,8 +241,8 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     // Tenant objects (product images, invoices) are served by direct public S3 URL — the same
     // read model as the platform bucket (s3.ts publicUrl). There is no per-tenant CloudFront, so
     // the bucket must allow public read or every uploaded image 403s on display. The app writes
-    // with IAM creds; the policy below only opens read + the app's own write, mirroring
-    // jeffi-stores-bucket. Public access block must be OFF for the policy to take effect.
+    // with IAM creds (jeffi-tenant-app-role), so the policy opens public READ only — never write.
+    // Public access block must be OFF for the policy to take effect.
     await this.s3.send(
       new PutPublicAccessBlockCommand({
         Bucket: bucket,
@@ -265,13 +265,6 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
               Effect: 'Allow',
               Principal: '*',
               Action: ['s3:GetObject', 's3:GetObjectVersion'],
-              Resource: `arn:aws:s3:::${bucket}/*`,
-            },
-            {
-              Sid: 'AllowUploadFromApplication',
-              Effect: 'Allow',
-              Principal: '*',
-              Action: ['s3:PutObject', 's3:PutObjectAcl', 's3:DeleteObject'],
               Resource: `arn:aws:s3:::${bucket}/*`,
             },
           ],

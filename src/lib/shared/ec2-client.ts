@@ -99,16 +99,22 @@ export interface RunInstanceArgs {
   instanceType: string
   name: string
   userData?: string // shell/cloud-config; base64-encoded here
+  // k8s nodes override the app-instance defaults (stock AL2023 AMI, node SG, node profile).
+  imageId?: string
+  securityGroupId?: string
+  iamProfile?: string
+  appTag?: string
+  metadataHopLimit?: number
 }
 
 /** Launch a new EC2 running the app image. Config (AMI, SG, subnet, key, IAM profile) from env,
  * mirroring how aws-provider reads RDS config. Returns the new instance id. */
 export async function runInstance(args: RunInstanceArgs): Promise<{ instanceId: string }> {
-  const ami = process.env.TENANT_APP_AMI_ID
+  const ami = args.imageId || process.env.TENANT_APP_AMI_ID
   if (!ami) throw new Error('TENANT_APP_AMI_ID is not set — required to launch a tenant/pool app instance')
-  const sg = process.env.TENANT_APP_SECURITY_GROUP || process.env.TENANT_RDS_SECURITY_GROUP || ''
+  const sg = args.securityGroupId || process.env.TENANT_APP_SECURITY_GROUP || process.env.TENANT_RDS_SECURITY_GROUP || ''
   const subnet = process.env.TENANT_APP_SUBNET_ID || ''
-  const iamProfile = process.env.TENANT_APP_IAM_PROFILE || ''
+  const iamProfile = args.iamProfile || process.env.TENANT_APP_IAM_PROFILE || ''
   const keyName = process.env.TENANT_APP_KEY_NAME || ''
 
   const params: Record<string, string> = {
@@ -121,7 +127,11 @@ export async function runInstance(args: RunInstanceArgs): Promise<{ instanceId: 
     'TagSpecification.1.Tag.1.Key': 'Name',
     'TagSpecification.1.Tag.1.Value': args.name,
     'TagSpecification.1.Tag.2.Key': 'app',
-    'TagSpecification.1.Tag.2.Value': 'jeffi-tenant',
+    'TagSpecification.1.Tag.2.Value': args.appTag || 'jeffi-tenant',
+  }
+  if (args.metadataHopLimit) {
+    params['MetadataOptions.HttpTokens'] = 'required'
+    params['MetadataOptions.HttpPutResponseHopLimit'] = String(args.metadataHopLimit)
   }
   if (sg) params['SecurityGroupId.1'] = sg
   if (subnet) params['SubnetId'] = subnet

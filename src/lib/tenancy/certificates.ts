@@ -62,7 +62,6 @@ export async function generateClientCertificate(adminUsername: string, _adminId:
         caCertPath,
         '-CAkey',
         caKeyPath,
-        '-CAcreateserial',
         '-out',
         certPath,
         '-extfile',

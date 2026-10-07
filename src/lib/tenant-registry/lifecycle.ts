@@ -181,7 +181,7 @@ export async function writeTenantInfra(
 export async function clearTenantInfra(tenantId: string): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
-    `UPDATE tenant_infra SET rds_endpoint=NULL, ec2_instance_id=NULL, updated_at=now() WHERE tenant_id=$1`,
+    `UPDATE tenant_infra SET rds_endpoint=NULL, ec2_instance_id=NULL, ec2_target=NULL, s3_bucket=NULL, updated_at=now() WHERE tenant_id=$1`,
     [tenantId]
   )
   clearTenantCache()
@@ -261,4 +261,9 @@ export async function writeTenantEc2(
     `UPDATE tenant_infra SET ec2_target=$1, ec2_instance_id=COALESCE($2, ec2_instance_id), updated_at=now() WHERE tenant_id=$3`,
     [ec2Target, ec2InstanceId ?? null, tenantId]
   )
+}
+
+/** Drop the tenant's dedicated instance id (plan downgrade back to shared compute). */
+export async function clearTenantEc2Instance(tenantId: string): Promise<void> {
+  await controlPlanePool().query(`UPDATE tenant_infra SET ec2_instance_id=NULL, updated_at=now() WHERE tenant_id=$1`, [tenantId])
 }
