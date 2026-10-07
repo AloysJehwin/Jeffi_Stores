@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
-import { isDigitalProduct } from '@/lib/catalog/digital-guard'
+import { canHoldVaultFiles } from '@/lib/catalog/digital-guard'
 import {
   reserveUpload,
   completeUpload,
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   if (!(await productExists(id))) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
-  if (!(await isDigitalProduct(id)))
+  if (!(await canHoldVaultFiles(id)))
     return NextResponse.json({ error: 'Product is not digital' }, { status: 409 })
 
   try {
