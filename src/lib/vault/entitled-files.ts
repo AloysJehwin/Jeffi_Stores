@@ -29,6 +29,17 @@ export interface EntitledProduct {
   source: string
   granted_at: string
   access_expires_at: string | null
+  /** Distinct kinds of the product's ready files (drives the library type filter). */
+  kinds: string[]
+  file_count: number
+}
+
+export interface EntitlementSummary {
+  id: string
+  title: string
+  source: string
+  access_expires_at: string | null
+  order_number: string | null
 }
 
 const ACTIVE = `status = 'active' AND (access_expires_at IS NULL OR access_expires_at > NOW())`
@@ -40,13 +51,32 @@ export async function listEntitlements(userId: string): Promise<EntitledProduct[
     SELECT DISTINCT ON (e.product_id)
       e.product_id, p.name AS title, e.source, e.granted_at, e.access_expires_at,
       (SELECT pi.image_url FROM product_images pi
-        WHERE pi.product_id = e.product_id ORDER BY pi.display_order, pi.id LIMIT 1) AS cover_url
+        WHERE pi.product_id = e.product_id ORDER BY pi.display_order, pi.id LIMIT 1) AS cover_url,
+      f.kinds, f.file_count
     FROM vault_entitlements e
     JOIN products p ON p.id = e.product_id
+    CROSS JOIN LATERAL (
+      SELECT COALESCE(array_agg(DISTINCT pf.kind), '{}') AS kinds, COUNT(*)::int AS file_count
+        FROM product_files pf WHERE pf.product_id = e.product_id AND pf.status = 'ready'
+    ) f
     WHERE e.user_id = $1 AND e.${ACTIVE}
     ORDER BY e.product_id, e.granted_at DESC
     `,
     [userId]
+  )
+}
+
+/** The newest active entitlement for a product (item page meta + watermark reference). */
+export async function entitlementSummary(userId: string, productId: string): Promise<EntitlementSummary | null> {
+  return queryOne<EntitlementSummary>(
+    `SELECT e.id, p.name AS title, e.source, e.access_expires_at, o.order_number
+       FROM vault_entitlements e
+       JOIN products p ON p.id = e.product_id
+       LEFT JOIN orders o ON o.id = e.order_id
+      WHERE e.user_id = $1 AND e.product_id = $2 AND e.status = 'active'
+        AND (e.access_expires_at IS NULL OR e.access_expires_at > NOW())
+      ORDER BY e.granted_at DESC LIMIT 1`,
+    [userId, productId]
   )
 }
 
