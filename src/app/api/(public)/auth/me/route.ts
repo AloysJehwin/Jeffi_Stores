@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne } from '@/lib/shared/db'
-import { authenticateUser } from '@/lib/auth/jwt'
+import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { POLICY_VERSION } from '@/lib/legals/policies'
 import { formatDob } from '@/lib/shared/format'
 
 export async function GET(request: NextRequest) {
   try {
-    const userPayload = await authenticateUser(request)
+    // Business users browse the storefront on their business_sid; every other storefront endpoint
+    // (cart, addresses) accepts them via authenticateAnyUser, so /me must too or /account bounces a
+    // logged-in business user to /login on reload. The row filter below no longer excludes them.
+    const userPayload = await authenticateAnyUser(request)
     if (!userPayload) return NextResponse.json({ user: null })
 
     const user = await queryOne<any>(
-      `SELECT id, email, first_name, last_name, phone, phone_verified, date_of_birth, created_at, avatar_url, policies_accepted_version
-       FROM users WHERE id = $1 AND user_type != 'business'`,
+      `SELECT id, email, first_name, last_name, phone, phone_verified, date_of_birth, created_at, avatar_url, user_type, policies_accepted_version
+       FROM users WHERE id = $1`,
       [userPayload.userId]
     )
     if (!user) return NextResponse.json({ user: null })
@@ -30,6 +33,7 @@ export async function GET(request: NextRequest) {
         requiresDob: dateOfBirth === null,
         createdAt: user.created_at,
         avatarUrl: user.avatar_url || null,
+        isBusiness: user.user_type === 'business',
         policiesAcceptedVersion: user.policies_accepted_version,
         requiresPolicyAcceptance: user.policies_accepted_version !== POLICY_VERSION,
         policyVersion: POLICY_VERSION,
