@@ -40,6 +40,8 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
   const adminHosts = input.hosts.filter(h => h.startsWith(`admin-${slug}.`))
   const publicHosts = input.hosts.filter(h => !adminHosts.includes(h))
   const customDomains = input.customDomains ?? []
+  // Probes must carry a tenant host: the app 404s unknown hosts, and /api/ready then checks this tenant's DB.
+  const probeHost = [{ name: 'Host', value: publicHosts[0] ?? `${slug}.jeffistores.in` }]
 
   const objs: K8sObject[] = [
     {
@@ -138,12 +140,20 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
                 ],
                 resources: { requests: tier.requests, limits: tier.limits },
                 startupProbe: {
-                  httpGet: { path: '/api/health', port: 'http' },
+                  httpGet: { path: '/api/health', port: 'http', httpHeaders: probeHost },
                   periodSeconds: 5,
                   failureThreshold: 36,
                 },
-                readinessProbe: { httpGet: { path: '/api/ready', port: 'http' }, periodSeconds: 10, timeoutSeconds: 5 },
-                livenessProbe: { httpGet: { path: '/api/health', port: 'http' }, periodSeconds: 20, timeoutSeconds: 5 },
+                readinessProbe: {
+                  httpGet: { path: '/api/ready', port: 'http', httpHeaders: probeHost },
+                  periodSeconds: 10,
+                  timeoutSeconds: 5,
+                },
+                livenessProbe: {
+                  httpGet: { path: '/api/health', port: 'http', httpHeaders: probeHost },
+                  periodSeconds: 20,
+                  timeoutSeconds: 5,
+                },
                 lifecycle: { preStop: { exec: { command: ['sleep', '10'] } } },
                 volumeMounts: [
                   { name: 'certs', mountPath: '/app/certs', readOnly: true },
@@ -220,7 +230,8 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
     spec: {
       entryPoints: ['websecure'],
       routes: [{ match: hostRule(publicHosts), kind: 'Rule', middlewares: [strip], services: svc }],
-      tls: { options: { name: 'default', namespace: EDGE_NS } },
+      // The TLSOption named `default` applies implicitly; referencing it by name fails in Traefik.
+      tls: {},
     },
   })
   if (adminHosts.length) {
@@ -258,7 +269,7 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
         spec: {
           entryPoints: ['websecure'],
           routes: [{ match: hostRule([domain]), kind: 'Rule', middlewares: [strip], services: svc }],
-          tls: { secretName, options: { name: 'default', namespace: EDGE_NS } },
+          tls: { secretName },
         },
       }
     )

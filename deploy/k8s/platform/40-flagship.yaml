@@ -44,15 +44,15 @@ spec:
             requests: { cpu: 300m, memory: 512Mi }
             limits: { cpu: 1500m, memory: 900Mi }
           startupProbe:
-            httpGet: { path: /api/health, port: http }
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
             periodSeconds: 5
             failureThreshold: 36
           readinessProbe:
-            httpGet: { path: /api/ready, port: http }
+            httpGet: { path: /api/ready, port: http, httpHeaders: [{ name: Host, value: localhost }] }
             periodSeconds: 10
             timeoutSeconds: 5
           livenessProbe:
-            httpGet: { path: /api/health, port: http }
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
             periodSeconds: 20
             timeoutSeconds: 5
             failureThreshold: 3
@@ -114,8 +114,8 @@ spec:
       kind: Rule
       middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
       services: [{ name: flagship, port: 3000 }]
-  tls:
-    options: { name: default, namespace: jeffi-edge }
+  # No options: the TLSOption named `default` applies automatically (naming it is an error).
+  tls: {}
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute

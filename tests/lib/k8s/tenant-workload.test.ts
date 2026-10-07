@@ -98,3 +98,12 @@ describe('k8s helpers', () => {
     expect(ud).toContain('jeffi/production/k3s')
   })
 })
+
+describe('probes', () => {
+  it('send the tenant storefront host so the app does not 404 the pod IP', () => {
+    const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme') }) as any[]
+    const c = byKind(objs, 'Deployment', 'storefront')[0].spec.template.spec.containers[0]
+    for (const p of [c.startupProbe, c.readinessProbe, c.livenessProbe])
+      expect(p.httpGet.httpHeaders).toEqual([{ name: 'Host', value: 'acme.jeffistores.in' }])
+  })
+})
