@@ -125,6 +125,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       igst_amount: parseFloat(item.igst_amount || '0'),
       buy_mode: item.buy_mode || 'unit',
       buy_unit: item.buy_unit || null,
+      is_digital: !!item.is_digital,
     }))
 
     const buyerAddress: InvoiceBuyerAddress = {

@@ -1226,6 +1226,25 @@ describe('propose_update_order_status', () => {
     expect(result.proposed).toBe(true)
   })
 
+  it('refuses to move a granted or all-digital order through shipping states', async () => {
+    const base = {
+      id: 'o1',
+      order_number: 'ORD-D',
+      payment_status: 'paid',
+      customer_name: 'A',
+      total_amount: '100',
+      awb_number: null,
+    }
+    mockQueryOne.mockResolvedValueOnce({ ...base, status: 'granted', all_digital: true })
+    const r1 = (await getTool('propose_update_order_status').handler({ orderId: 'o1', newStatus: 'shipped' })) as any
+    expect(r1.proposed).toBe(false)
+    expect(r1.info).toMatch(/digital/)
+
+    mockQueryOne.mockResolvedValueOnce({ ...base, status: 'pending', all_digital: true })
+    const r2 = (await getTool('propose_update_order_status').handler({ orderId: 'o1', newStatus: 'processing' })) as any
+    expect(r2.proposed).toBe(false)
+  })
+
   it('throws when order not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
     await expect(

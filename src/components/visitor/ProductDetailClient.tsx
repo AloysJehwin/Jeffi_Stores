@@ -557,6 +557,24 @@ export default function ProductDetailClient({
   const digitalMaster = useStoreConfig().flags.digitalProductsEnabled
   const isDigital = digitalActive(digitalMaster, product.is_digital ?? false)
   const router = useRouter()
+  const [vaultOwned, setVaultOwned] = useState<{ owned: boolean; url: string | null }>({
+    owned: product.owned_in_vault ?? false,
+    url: null,
+  })
+
+  useEffect(() => {
+    if (!isDigital || !user) return
+    let cancelled = false
+    fetch(`/api/vault/owned?productId=${encodeURIComponent(product.id)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!cancelled && d) setVaultOwned({ owned: !!d.owned, url: d.url ?? null })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [isDigital, user, product.id])
 
   useEffect(() => {
     if (user?.email) setNotifyEmail(user.email)
@@ -835,7 +853,8 @@ export default function ProductDetailClient({
           discontinueDate={product.discontinue_date ?? null}
           stickyImage={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
           digital={isDigital}
-          alreadyOwned={product.owned_in_vault ?? false}
+          alreadyOwned={vaultOwned.owned}
+          vaultUrl={vaultOwned.url}
         />
 
         <RazorpayOffers />

@@ -144,6 +144,10 @@ export async function POST(request: NextRequest) {
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
+    // Digital lines are granted only by the online-payment commit (draft → verify), never here.
+    if (product.is_digital === true) {
+      return NextResponse.json({ error: 'Digital items must be paid online' }, { status: 400 })
+    }
 
     // COD is not available for products flagged is_cod_allowed=false.
     if (isCod && product.is_cod_allowed === false) {
@@ -378,8 +382,8 @@ export async function POST(request: NextRequest) {
       const itemMrp = variant?.mrp != null ? Number(variant.mrp) : product.mrp != null ? Number(product.mrp) : null
 
       await client.query(
-        `INSERT INTO order_items (order_id, product_id, variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+        `INSERT INTO order_items (order_id, product_id, variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp, is_digital, is_returnable)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
         [
           createdOrder.id,
           item.productId,
@@ -401,6 +405,8 @@ export async function POST(request: NextRequest) {
           item.buyMode || 'unit',
           item.buyUnit || null,
           itemMrp,
+          product.is_digital === true,
+          product.is_digital !== true,
         ]
       )
 

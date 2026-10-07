@@ -13,6 +13,7 @@ const DELHIVERY_PICKUP_URL = 'https://track.delhivery.com/fm/request/new/'
 const EXCLUDE_STATUSES = [
   'shipped',
   'delivered',
+  'granted',
   'cancelled',
   'returned',
   'return_requested',

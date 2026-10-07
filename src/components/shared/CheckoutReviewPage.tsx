@@ -16,6 +16,7 @@ import { mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import { round2 } from '@/lib/catalog/gst'
 import { bp } from '@/lib/shared/business-path'
 import CheckoutRecapSummary from '@/components/on-device/CheckoutRecapSummary'
+import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -91,6 +92,8 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const [isLoadingShipping, setIsLoadingShipping] = useState(false)
   const [shippingError, setShippingError] = useState('')
   const [serviceable, setServiceable] = useState<boolean>(true)
+  // Buy-now learns digitalness from the rate quote (the intent payload doesn't carry it).
+  const [rateDigital, setRateDigital] = useState<{ hasDigital: boolean; digitalOnly: boolean } | null>(null)
   const [minOrderAmount, setMinOrderAmount] = useState(0)
 
   // Payment state
@@ -384,12 +387,29 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
 
   const belowMinimum = minOrderAmount > 0 && cartSubtotal > 0 && cartSubtotal < minOrderAmount
 
+  // Digital lines need an address (billing / GST place of supply) but never ship: no quote,
+  // serviceability check or delivery date, and online payment only.
+  const hasDigital = isBuyNow ? !!rateDigital?.hasDigital : cartItems.some((i: any) => isDigitalLine(i))
+  const allDigital = isBuyNow
+    ? !!rateDigital?.digitalOnly
+    : cartItems.length > 0 && cartItems.every((i: any) => isDigitalLine(i))
+  const physicalSubtotal = isBuyNow
+    ? cartSubtotal
+    : Math.max(0, cartSubtotal - digitalLinesSubtotal(cartItems as any[], gstEnabled))
+
   useEffect(() => {
     const pin = selectedAddress?.postal_code
     if (!pin || cartSubtotal === 0) {
       setShippingCharge(null)
       setShippingMeta(null)
       setShippingError('')
+      return
+    }
+    if (!isBuyNow && allDigital) {
+      setShippingCharge(0)
+      setShippingMeta(null)
+      setShippingError('')
+      setServiceable(true)
       return
     }
     setIsLoadingShipping(true)
@@ -404,12 +424,14 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
               quantity: buyNowItem.qty,
             },
           ]
-        : cartItems.map((i: any) => ({
-            productId: i.product_id,
-            variantId: i.variant_id || null,
-            subVariantId: i.sub_variant_id || null,
-            quantity: parseFloat(i.quantity),
-          }))
+        : cartItems
+            .filter((i: any) => !isDigitalLine(i))
+            .map((i: any) => ({
+              productId: i.product_id,
+              variantId: i.variant_id || null,
+              subVariantId: i.sub_variant_id || null,
+              quantity: parseFloat(i.quantity),
+            }))
     fetch('/api/shipping/rate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -420,12 +442,13 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       body: JSON.stringify({
         destinationPin: pin,
         cartItems: items,
-        subtotal: cartSubtotal,
+        subtotal: physicalSubtotal,
         isCod: paymentMethod === 'cod',
       }),
     })
       .then(r => r.json())
       .then(data => {
+        if (isBuyNow) setRateDigital({ hasDigital: !!data.hasDigital, digitalOnly: !!data.digitalOnly })
         setServiceable(data.serviceable !== false)
         if (data.serviceable === false) {
           setShippingCharge(null)
@@ -438,20 +461,25 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       })
       .catch(() => setShippingError('Could not fetch rate'))
       .finally(() => setIsLoadingShipping(false))
-  }, [selectedAddress?.postal_code, cartSubtotal, paymentMethod])
+  }, [selectedAddress?.postal_code, cartSubtotal, physicalSubtotal, allDigital, paymentMethod])
 
   const [edd, setEdd] = useState<string | null>(null)
   const [isLoadingEdd, setIsLoadingEdd] = useState(false)
 
   useEffect(() => {
     const pin = selectedAddress?.postal_code
-    if (!pin) {
+    if (!pin || allDigital) {
       setEdd(null)
       return
     }
     const extraDays = isBuyNow
       ? (buyNowItem?.extraDeliveryDays ?? 0)
-      : Math.max(0, ...cartItems.map((i: any) => Number(i.products?.extra_delivery_days ?? 0)))
+      : Math.max(
+          0,
+          ...cartItems
+            .filter((i: any) => !isDigitalLine(i))
+            .map((i: any) => Number(i.products?.extra_delivery_days ?? 0))
+        )
     setIsLoadingEdd(true)
     fetch(`/api/products/edd?pin=${pin}&extraDays=${extraDays}`)
       .then(r => (r.ok ? r.json() : null))
@@ -460,7 +488,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       })
       .catch(() => {})
       .finally(() => setIsLoadingEdd(false))
-  }, [selectedAddress?.postal_code, isBuyNow, buyNowItem?.extraDeliveryDays, cartItems])
+  }, [selectedAddress?.postal_code, isBuyNow, buyNowItem?.extraDeliveryDays, cartItems, allDigital])
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return
@@ -556,12 +584,13 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   // COD shows only when enabled at BOTH the site level AND for every item; never for B2B.
   const codAvailable =
     !isBusiness &&
+    !hasDigital &&
     isCodSiteEnabled &&
     (isBuyNow ? true : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false))
 
   // Business buyers can always fall back to manual (contact-for-payment), so B2B never
   // hits the no-payment state. Consumer storefront has no manual option.
-  const manualAvailable = isBusiness
+  const manualAvailable = isBusiness && !hasDigital
   const noPaymentMethod = !isRazorpayEnabled && !codAvailable && !manualAvailable
 
   // Reset payment method if the selected option becomes unavailable.
@@ -1383,7 +1412,13 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                   />
                 </svg>
                 <div className="flex-1">
-                  {!selectedAddress ? (
+                  {allDigital ? (
+                    <>
+                      <p className="text-sm text-foreground-secondary">Delivery</p>
+                      <p className="text-lg font-semibold text-foreground">Delivered to your vault</p>
+                      <p className="text-sm text-foreground-muted">Available to open as soon as payment completes</p>
+                    </>
+                  ) : !selectedAddress ? (
                     <p className="text-sm text-foreground-muted">
                       Select a delivery address to see expected delivery date
                     </p>
@@ -1408,7 +1443,9 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
             </div>
 
             {/* Delivery Promise */}
-            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6">
+            <div
+              className={`bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 ${allDigital ? 'hidden' : ''}`}
+            >
               <div className="flex items-start gap-4">
                 <svg
                   className="w-8 h-8 text-accent-500 flex-shrink-0 mt-0.5"
@@ -1492,7 +1529,9 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                 )}
                 <div className="flex justify-between text-foreground-secondary">
                   <span>Delivery Charges</span>
-                  {isLoadingShipping ? (
+                  {allDigital ? (
+                    <span className="font-medium text-green-600 dark:text-green-400">Delivered to your vault</span>
+                  ) : isLoadingShipping ? (
                     <span className="text-foreground-muted text-sm animate-pulse">Calculating...</span>
                   ) : shippingError ? (
                     <span className="text-yellow-600 dark:text-yellow-400 text-sm">Unavailable</span>

@@ -108,7 +108,8 @@ export default function OrderDetailModal({ order, onClose }: Props) {
     : o.customer_name || 'Guest'
 
   function statusBadgeClass(status: string) {
-    if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+    if (status === 'delivered' || status === 'granted')
+      return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
     if (status === 'processing' || status === 'shipped')
       return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
     if (status === 'out_for_delivery') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
@@ -126,10 +127,13 @@ export default function OrderDetailModal({ order, onClose }: Props) {
   function statusLabel(status: string) {
     if (status === 'cancel_requested') return 'Cancel Requested'
     if (status === 'out_for_delivery') return 'Out for Delivery'
+    if (status === 'granted') return 'Access granted'
     return status.replace(/_/g, ' ')
   }
 
   const addr = o.shipping_address || o.billing_address
+  // Only an all-digital order reaches 'granted', so it has nothing to pack or ship.
+  const isAllDigital = o.status === 'granted'
 
   return createPortal(
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
@@ -305,6 +309,11 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                             flammable={item.flammable}
                             size="xs"
                           />
+                          {item.is_digital && (
+                            <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300">
+                              Digital
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-xs text-foreground-muted truncate">
                           <span className="inline-flex items-center gap-1">
@@ -329,7 +338,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
 
           {/* Downloads */}
           <div className="flex flex-wrap gap-3 pt-1 border-t border-border-default">
-            {canPackingSlips && (
+            {canPackingSlips && !isAllDigital && (
               <a
                 href={`/api/admin/packing-slips/${order.id}`}
                 target="_blank"
@@ -366,7 +375,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               </a>
             )}
             {(() => {
-              const e = resolveOrderEdd(o)
+              const e = isAllDigital ? null : resolveOrderEdd(o)
               return e ? (
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                   <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

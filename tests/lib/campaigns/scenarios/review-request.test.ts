@@ -72,6 +72,12 @@ describe('reviewRequest scenario', () => {
       expect(rows[0]).toEqual(row)
     })
 
+    it('counts granted (digital) orders as fulfilled', async () => {
+      mockQueryMany.mockResolvedValue([])
+      await reviewRequest.findEligible({ campaign, params: defaultParams })
+      expect(String(mockQueryMany.mock.calls[0][0])).toContain("o.status IN ('delivered', 'granted')")
+    })
+
     it('passes campaign kind and params to queryMany', async () => {
       mockQueryMany.mockResolvedValue([])
       await reviewRequest.findEligible({ campaign, params: defaultParams })

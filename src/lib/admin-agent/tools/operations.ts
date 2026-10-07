@@ -27,9 +27,11 @@ function monthBounds(month?: string): { from: string; to: string; label: string 
   return { from, to, label }
 }
 
+// 'granted' = digital order: never shipped, never picked up.
 const PICKUP_EXCLUDE_STATUSES = [
   'shipped',
   'delivered',
+  'granted',
   'cancelled',
   'returned',
   'return_requested',

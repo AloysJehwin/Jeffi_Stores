@@ -18,6 +18,10 @@ vi.mock('@/lib/shared/customer-links', () => ({
   customerBaseUrlForOrder: vi.fn(async () => 'https://acme.jeffistores.in'),
 }))
 
+vi.mock('@/lib/vault/links', () => ({
+  vaultLibraryUrl: vi.fn(async () => 'https://vault.acme.example/library'),
+}))
+
 vi.mock('nodemailer', () => ({
   default: {
     createTransport: vi.fn(() => ({ sendMail: vi.fn() })),
@@ -370,6 +374,32 @@ describe('email.ts', () => {
       await sendOrderStatusUpdate('cust@example.com', 'Alice', 'ORD-001', 'id-1', 'delivered')
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('Thank You')
+    })
+
+    it('granted status links the vault with "Access granted" copy', async () => {
+      await sendOrderStatusUpdate('cust@example.com', 'Alice', 'ORD-001', 'id-1', 'granted')
+      const { html, subject } = mockSendAuditedMail.mock.calls[0][0]
+      expect(subject).toContain('Access granted')
+      expect(html).toContain('open your vault')
+      expect(html).toContain('https://vault.acme.example/library')
+    })
+
+    it('order confirmation does not promise dispatch for an all-digital order', async () => {
+      await sendOrderConfirmationEmail(
+        'cust@example.com',
+        {
+          id: 'o1',
+          order_number: 'ORD-9',
+          customer_name: 'A',
+          created_at: new Date(),
+          total_amount: 100,
+          status: 'granted',
+        },
+        [{ product_name: 'Ebook', quantity: 1, total_price: 100, is_digital: true }]
+      )
+      const { html } = mockSendAuditedMail.mock.calls[0][0]
+      expect(html).not.toMatch(/dispatch/i)
+      expect(html).toContain('Open my vault')
     })
 
     it('sends status update for cancelled status', async () => {
@@ -1202,9 +1232,19 @@ describe('email.ts', () => {
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Return to Cart')
     })
 
-    it("sends the customer back to the cart or product on their own store", async () => {
-      await sendOrderAutoCancelledEmail('cust@example.com', 'Alice', 'ORD-053', 'id-53', 'direct', 900, '/products/m12-bolt')
-      expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('href="https://acme.jeffistores.in/products/m12-bolt"')
+    it('sends the customer back to the cart or product on their own store', async () => {
+      await sendOrderAutoCancelledEmail(
+        'cust@example.com',
+        'Alice',
+        'ORD-053',
+        'id-53',
+        'direct',
+        900,
+        '/products/m12-bolt'
+      )
+      expect(mockSendAuditedMail.mock.calls[0][0].html).toContain(
+        'href="https://acme.jeffistores.in/products/m12-bolt"'
+      )
     })
 
     it('returns error on failure', async () => {

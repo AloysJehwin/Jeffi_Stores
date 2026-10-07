@@ -351,6 +351,15 @@ describe('postPurchase scenario', () => {
     expect(postPurchase.findSuppressed).toBeUndefined()
   })
 
+  it('findEligible counts granted (digital) orders as fulfilled', async () => {
+    mockQueryMany.mockResolvedValueOnce([])
+    await postPurchase.findEligible({
+      campaign: makeCampaign({ kind: 'post_purchase' }) as any,
+      params: postPurchase.defaultParams,
+    })
+    expect(String(mockQueryMany.mock.calls[0][0])).toContain("o.status IN ('delivered', 'granted')")
+  })
+
   it('findEligible returns rows from queryMany', async () => {
     const rows = [{ id: 'ord-1', user_id: 'usr-1', order_number: 'ORD001' }]
     mockQueryMany.mockResolvedValueOnce(rows as any)
@@ -943,6 +952,15 @@ describe('reviewReminder scenario', () => {
   it('exposes findEligible and send', () => {
     expect(typeof reviewReminder.findEligible).toBe('function')
     expect(typeof reviewReminder.send).toBe('function')
+  })
+
+  it('findEligible counts granted (digital) orders as fulfilled', async () => {
+    mockQueryMany.mockResolvedValueOnce([])
+    await reviewReminder.findEligible({
+      campaign: makeCampaign({ kind: 'review_reminder' }) as any,
+      params: reviewReminder.defaultParams,
+    })
+    expect(String(mockQueryMany.mock.calls[0][0])).toContain("o.status IN ('delivered', 'granted')")
   })
 
   it('findEligible passes campaign.kind and params to queryMany', async () => {

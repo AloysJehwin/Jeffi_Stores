@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
     `SELECT o.id, o.order_number, o.customer_name, o.created_at, o.status, o.total_amount
      FROM orders o
      ${where}
+       AND EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = o.id AND oi.is_digital IS NOT TRUE)
      ORDER BY o.created_at DESC
      LIMIT 500`,
     params

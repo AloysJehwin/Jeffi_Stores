@@ -13,7 +13,8 @@ import {
   commitOrder,
 } from '@/lib/orders/order-commit'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
-import { createDraftInvoice } from '@/lib/documents/invoice'
+import { notifyAccessGranted } from '@/lib/shared/notify'
+import { createDraftInvoice, generateOrderInvoice } from '@/lib/documents/invoice'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { logActivity } from '@/lib/shared/activity'
 import { recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
@@ -194,7 +195,12 @@ export async function POST(request: NextRequest) {
             })
 
       const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
-      createDraftInvoice(created.id).catch(() => {})
+      // An all-digital order is fulfilled at payment ('granted'), so number its invoice now.
+      const draftInvoice = createDraftInvoice(created.id).catch(() => {})
+      if (created.status === 'granted') {
+        draftInvoice.then(() => generateOrderInvoice(created.id)).catch(() => {})
+        notifyAccessGranted(authUser.userId, created.order_number).catch(() => {})
+      }
       const fullOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [created.id])
       const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
       sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})

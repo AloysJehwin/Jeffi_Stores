@@ -42,6 +42,7 @@ const statusColor: Record<string, string> = {
   shipped: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300',
   out_for_delivery: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300',
   delivered: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
+  granted: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
   cancelled: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
   cancel_requested: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300',
   return_requested: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300',
@@ -51,6 +52,7 @@ const statusColor: Record<string, string> = {
 const statusLabel: Record<string, string> = {
   cancel_requested: 'Cancel Requested',
   out_for_delivery: 'Out for Delivery',
+  granted: 'Access granted',
   return_requested: 'Return Requested',
   return_approved: 'Return Approved',
   return_received: 'Return Received',

@@ -5,6 +5,7 @@ vi.mock('@/lib/auth/jwt', () => ({
 }))
 vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
+  queryMany: vi.fn().mockResolvedValue([]),
 }))
 vi.mock('@/lib/catalog/return-policy', () => ({
   getOrderItemsPolicy: vi.fn(),
@@ -57,6 +58,18 @@ function makeRequest() {
 describe('GET /api/orders/[id]/return-policy', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(db.queryMany).mockResolvedValue([])
+  })
+
+  it('excludes digital lines and reports an all-digital order as not returnable', async () => {
+    vi.mocked(jwt.authenticateUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER_DELIVERED as any)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([{ product_id: 'prod-1' }] as any)
+    vi.mocked(returnPolicy.getOrderItemsPolicy).mockResolvedValueOnce(MOCK_ITEMS_ELIGIBLE)
+    const res = await GET(makeRequest() as any, PARAMS)
+    const body = await res.json()
+    expect(body.items).toEqual([])
+    expect(body.refund).toEqual({ allowed: false, reason: 'Digital items cannot be returned' })
   })
 
   it('returns 401 when not authenticated', async () => {

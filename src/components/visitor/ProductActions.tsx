@@ -96,6 +96,7 @@ interface ProductActionsProps {
   stickyImage?: string | null
   digital?: boolean
   alreadyOwned?: boolean
+  vaultUrl?: string | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -153,6 +154,7 @@ export default function ProductActions({
   stickyImage,
   digital = false,
   alreadyOwned = false,
+  vaultUrl = null,
 }: ProductActionsProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -1082,9 +1084,10 @@ export default function ProductActions({
 
       <div id={PDP_BUY_BUTTONS_ID} className="space-y-3">
         {alreadyOwned ? (
-          // TODO(P4): point at the real vault item URL once the vault host exists.
           <a
-            href="#"
+            href={vaultUrl || '/api/vault/handoff'}
+            target="_blank"
+            rel="noopener noreferrer"
             className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
           >
             Open in vault

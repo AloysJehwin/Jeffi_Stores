@@ -328,8 +328,15 @@ describe('resolveBuyNowItem', () => {
         buyMode: 'unit',
         buyUnit: null,
         price: 200,
+        isDigital: false,
       },
     })
+  })
+
+  it('caps a digital product at qty 1 and flags it', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'p1', is_active: true, base_price: 499, is_digital: true })
+    const result = await resolveBuyNowItem({ productId: 'p1', qty: 3 })
+    expect(result).toMatchObject({ ok: true, item: { qty: 1, isDigital: true, price: 499 } })
   })
 
   it('uses variant price when variant present', async () => {
@@ -691,6 +698,7 @@ describe('commitOrder — cart mode', () => {
       query: vi
         .fn()
         .mockResolvedValueOnce({ rows: [makeAddress()] }) // ensureAddressOnOrder
+        .mockResolvedValueOnce({ rows: [] }) // digital-line lookup
         .mockResolvedValueOnce({ rows: [orderRow] }) // INSERT orders
         .mockResolvedValue({ rows: [] }), // subsequent queries
     }
@@ -791,7 +799,7 @@ describe('commitOrder — cart mode', () => {
       })
     )
 
-    const orderInsertCall = client.query.mock.calls[1]
+    const orderInsertCall = client.query.mock.calls[2]
     const params = orderInsertCall[1] as any[]
     expect(params[4]).toBe('Customer') // customerName param
   })
@@ -802,7 +810,7 @@ describe('commitOrder — cart mode', () => {
 
     await commitOrder(makeCartCommitInput({ subtotal: 300, appliedDiscount: 50, shippingAmount: 25 }))
 
-    const orderInsertCall = client.query.mock.calls[1]
+    const orderInsertCall = client.query.mock.calls[2]
     const params = orderInsertCall[1] as any[]
     // total_amount is at index 12 (business_discount_amount was inserted at index 9)
     expect(params[12]).toBe(275)
@@ -821,7 +829,7 @@ describe('commitOrder — cart mode', () => {
       })
     )
 
-    const orderInsertCall = client.query.mock.calls[1]
+    const orderInsertCall = client.query.mock.calls[2]
     const params = orderInsertCall[1] as any[]
     // cod_fee_amount is appended last, at index 25 (26th positional param)
     expect(params[25]).toBe(40)
@@ -847,6 +855,101 @@ describe('commitOrder — cart mode', () => {
     const params = orderItemCall![1] as any[]
     // productName is at index 4
     expect(params[4]).toBe('Widget - Large - Red')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// commitOrder — digital lines
+// ---------------------------------------------------------------------------
+
+describe('commitOrder — digital lines', () => {
+  beforeEach(() => vi.resetAllMocks())
+
+  const PAID = { gatewayOrderId: 'g1', paymentId: 'p1', signature: 's1', amountPaise: 20000 }
+
+  function makeInput(cartItems: CartLine[], paymentRecord: any = PAID) {
+    return {
+      mode: 'cart' as const,
+      userId: 'user-1',
+      user: { email: 't@x.com', phone: null, first_name: 'T', last_name: null },
+      addressId: 'addr-1',
+      notes: null,
+      couponId: null,
+      shippingAmount: 0,
+      codFeeAmount: 0,
+      paymentRecord,
+      cartItems,
+      subtotal: 200,
+      taxAmount: 0,
+      appliedDiscount: 0,
+      businessDiscountAmount: 0,
+    }
+  }
+
+  function makeClient(digitalIds: string[]) {
+    return {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [makeAddress()] })
+        .mockResolvedValueOnce({ rows: digitalIds.map(id => ({ id })) })
+        .mockResolvedValueOnce({ rows: [{ id: 'ord-9', order_number: 'ORD-9', total_amount: '200', status: 'x' }] })
+        .mockResolvedValue({ rows: [], rowCount: 0 }),
+    }
+  }
+
+  const sqlOf = (client: any, frag: string) => client.query.mock.calls.filter((c: any[]) => String(c[0]).includes(frag))
+
+  it('paid all-digital order → status granted with granted/delivered/confirmed stamps, no EDD', async () => {
+    const client = makeClient(['prod-1'])
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
+
+    await commitOrder(makeInput([makeCartLine()]))
+
+    const [orderInsert] = sqlOf(client, 'INSERT INTO orders')
+    expect(orderInsert[0]).toContain('confirmed_at, delivered_at, granted_at')
+    expect(orderInsert[1][5]).toBe('granted')
+    expect(orderInsert[1][6]).toBe('paid')
+    expect(orderInsert[1][24]).toBeNull() // estimated_delivery_date
+    expect(orderInsert[1][26]).toBe(true) // stamp flag
+
+    const [itemInsert] = sqlOf(client, 'INSERT INTO order_items')
+    expect(itemInsert[1].slice(-2)).toEqual([true, false]) // is_digital, is_returnable
+    expect(sqlOf(client, 'INSERT INTO vault_entitlements')).toHaveLength(1)
+  })
+
+  it('paid mixed order stays confirmed; digital line snapshotted, physical returnable', async () => {
+    const client = makeClient(['prod-1'])
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
+
+    const physical = makeCartLine({ product_id: 'prod-2', products: { ...makeCartLine().products, id: 'prod-2' } })
+    await commitOrder(makeInput([makeCartLine(), physical]))
+
+    const [orderInsert] = sqlOf(client, 'INSERT INTO orders')
+    expect(orderInsert[1][5]).toBe('confirmed')
+    expect(orderInsert[1][26]).toBe(false)
+    const items = sqlOf(client, 'INSERT INTO order_items')
+    expect(items[0][1].slice(-2)).toEqual([true, false])
+    expect(items[1][1].slice(-2)).toEqual([false, true])
+    expect(sqlOf(client, 'INSERT INTO vault_entitlements')).toHaveLength(1)
+  })
+
+  it('all-physical paid order does not touch entitlements', async () => {
+    const client = makeClient([])
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
+
+    await commitOrder(makeInput([makeCartLine()]))
+
+    expect(sqlOf(client, 'INSERT INTO orders')[0][1][5]).toBe('confirmed')
+    expect(sqlOf(client, 'INSERT INTO order_items')[0][1].slice(-2)).toEqual([false, true])
+    expect(sqlOf(client, 'INSERT INTO vault_entitlements')).toHaveLength(0)
+  })
+
+  it('rejects an unpaid (COD/manual) commit with a digital line before inserting', async () => {
+    const client = makeClient(['prod-1'])
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
+
+    await expect(commitOrder(makeInput([makeCartLine()], null))).rejects.toThrow('Digital items must be paid online')
+    expect(sqlOf(client, 'INSERT INTO orders')).toHaveLength(0)
   })
 })
 
@@ -893,6 +996,7 @@ describe('commitOrder — buyNow mode', () => {
       query: vi
         .fn()
         .mockResolvedValueOnce({ rows: [makeAddress()] })
+        .mockResolvedValueOnce({ rows: [] }) // digital-line lookup
         .mockResolvedValueOnce({ rows: [orderRow] })
         .mockResolvedValue({ rows: [] }),
     }

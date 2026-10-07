@@ -137,6 +137,32 @@ describe('POST /api/orders/draft', () => {
     expect(orderDraft.signDraftToken).toHaveBeenCalled()
   })
 
+  it('all-digital cart: quotes shipping 0 without calling the carrier', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([
+      { ...MOCK_CART[0], products: { is_digital: true } },
+    ] as any)
+    const res = await POST(makeRequest() as any)
+    expect(res.status).toBe(200)
+    expect((await res.json()).shippingAmount).toBe(0)
+    expect(orderCommit.quoteShipping).not.toHaveBeenCalled()
+  })
+
+  it('mixed cart: quotes only the physical lines on the physical subtotal', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([
+      { ...MOCK_CART[0], products: { is_digital: true } },
+      { ...MOCK_CART[0], product_id: 'prod-2', products: { is_digital: false } },
+    ] as any)
+    vi.mocked(orderCommit.cartSubtotal).mockImplementation((items: any[]) => items.length * 100)
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 40, codFee: 0 })
+    const res = await POST(makeRequest() as any)
+    expect(res.status).toBe(200)
+    expect(orderCommit.quoteShipping).toHaveBeenCalledWith(
+      expect.objectContaining({ items: [expect.objectContaining({ productId: 'prod-2' })], subtotal: 100 })
+    )
+  })
+
   it('returns 400 for buyNow mode without item details', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
     const res = await POST(makeRequest({ ...VALID_BODY, mode: 'buyNow' }) as any)

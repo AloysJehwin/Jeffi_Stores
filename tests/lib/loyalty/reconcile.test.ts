@@ -288,8 +288,15 @@ describe('loyalty reconcile', () => {
     const sql = orderStatesCte(false)
 
     it('counts only online orders the customer kept and paid for, never offline or business orders', () => {
-      expect(sql).toContain("o.source = 'online' AND o.status IN ('delivered', 'return_rejected')")
+      expect(sql).toContain("o.source = 'online' AND o.status IN ('delivered', 'granted', 'return_rejected')")
       expect(sql).toContain("o.payment_status IN ('paid', 'cod_collected')")
+    })
+
+    it('earns on a granted (digital) order and still on a return_rejected one, but only when paid', () => {
+      const kept = sql.match(/o\.status IN \(([^)]*)\) AND o\.payment_status IN \('paid', 'cod_collected'\)/)
+      expect(kept?.[1]).toContain("'granted'")
+      expect(kept?.[1]).toContain("'return_rejected'")
+      expect(kept?.[1]).toContain("'delivered'")
     })
 
     it('keeps an order with a ledger row visible so a now-ineligible order can be reversed', () => {
@@ -402,7 +409,7 @@ describe('loyalty reconcile', () => {
       useFixtures({ u1: {} })
       await reconcileLoyalty()
       const sql = find('FROM referral_signups s')[0].sql
-      expect(sql).toContain("o.source = 'online' AND o.status IN ('delivered', 'return_rejected')")
+      expect(sql).toContain("o.source = 'online' AND o.status IN ('delivered', 'granted', 'return_rejected')")
       expect(sql).toContain("o.created_at <= s.signed_up_at + ($2::int * INTERVAL '1 day')")
       expect(sql).toContain("s.status IN ('joined', 'reversed')")
     })

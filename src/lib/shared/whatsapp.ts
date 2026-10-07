@@ -50,6 +50,8 @@ const TEMPLATES = {
   // freeform fallback text (below) carries the message within the 24h window,
   // and the notify.ts dispatcher falls back to SMS if WhatsApp returns false.
   variantChange: process.env.TWILIO_WA_VARIANT_CHANGE_SID || '',
+  // Digital access granted — no Meta-approved template yet; empty SID → caller falls back to SMS.
+  accessGranted: process.env.TWILIO_WA_ACCESS_GRANTED_SID || '',
 }
 
 function getClient() {
@@ -189,6 +191,21 @@ export async function sendOrderDeliveredWhatsApp(params: {
     { '1': params.orderNumber },
     'order_delivered',
     `${STORE}: Your order ${params.orderNumber} has been delivered.`
+  )
+}
+
+export async function sendAccessGrantedWhatsApp(params: {
+  phone?: string | null
+  orderNumber: string
+  vaultUrl: string
+}): Promise<boolean> {
+  const { name: STORE } = await storeSignature()
+  return sendTemplate(
+    params.phone,
+    TEMPLATES.accessGranted,
+    { '1': params.orderNumber, '2': params.vaultUrl },
+    'order_granted',
+    `${STORE}: Access granted for order ${params.orderNumber}. Open your vault: ${params.vaultUrl}`
   )
 }
 

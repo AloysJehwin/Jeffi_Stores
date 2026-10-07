@@ -100,7 +100,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
-    if (!order.awb_number) return NextResponse.json({ tracking: null })
+    if (!order.awb_number || order.status === 'granted') return NextResponse.json({ tracking: null })
 
     // Default: return DB-cached shipment_status without hitting Delhivery.
     // Pass ?refresh=1 to force a live fetch and re-sync.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'
+import { FULFILLED_SQL } from '@/lib/orders/fulfilled-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,10 +44,10 @@ export async function GET(req: NextRequest) {
       if (seg === 'b2b') {
         segCondition = `(u.gst_number IS NOT NULL OR u.company_name IS NOT NULL)`
       } else if (seg === 'vip') {
-        segCondition = `(SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.user_id = u.id AND o.status = 'delivered') >= 50000`
+        segCondition = `(SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.user_id = u.id AND ${FULFILLED_SQL}) >= 50000`
       } else if (seg === 'loyal') {
         segCondition = `(SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid') >= 5
-          AND (SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.user_id = u.id AND o.status = 'delivered') >= 25000`
+          AND (SELECT COALESCE(SUM(o.total_amount), 0) FROM orders o WHERE o.user_id = u.id AND ${FULFILLED_SQL}) >= 25000`
       } else if (seg === 'repeat') {
         segCondition = `(SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id) >= 3`
       } else if (seg === 'new') {

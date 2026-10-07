@@ -449,6 +449,18 @@ describe('POST /api/admin/agent/actions/[id]/approve', () => {
       .mockResolvedValueOnce(null)
     const res = await POST(makeReq(), params())
     expect(res.status).toBe(500)
-    expect((await res.json()).error).toBe('Order not found')
+    expect((await res.json()).error).toMatch(/^Order not found or not eligible/)
+  })
+
+  it('update_order_status never touches a granted order and needs a physical line for shipping states', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(
+        proposed('update_order_status', { orderId: 'o-dig', newStatus: 'shipped', awbNumber: null }) as any
+      )
+      .mockResolvedValueOnce(null)
+    await POST(makeReq(), params())
+    const sql = String(mockQueryOne.mock.calls.find(c => String(c[0]).startsWith('UPDATE orders SET'))![0])
+    expect(sql).toContain(`status <> 'granted'`)
+    expect(sql).toContain('oi.is_digital IS NOT TRUE')
   })
 })

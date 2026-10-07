@@ -45,7 +45,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         o.*,
         sa.full_name, sa.address_line1, sa.address_line2, sa.landmark,
         sa.city, sa.state, sa.postal_code, sa.phone AS consignee_phone,
-        u.email AS user_email
+        u.email AS user_email,
+        (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id AND oi.is_digital IS NOT TRUE)::int
+          AS physical_item_count
       FROM orders o
       LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
       LEFT JOIN users u ON u.id = o.user_id
@@ -57,6 +59,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (order.awb_number)
       return NextResponse.json({ error: 'Shipment already created', awb: order.awb_number }, { status: 409 })
+    if (order.physical_item_count === 0)
+      return NextResponse.json({ error: 'This order has only digital items — nothing to ship.' }, { status: 422 })
 
     // Prepaid-wallet gate: the platform fronts the real Delhivery cost for this tenant, so block
     // shipment creation when the wallet is below its minimum (own_delhivery tenants are exempt —
@@ -119,7 +123,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       LEFT JOIN products p ON p.id = oi.product_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
       LEFT JOIN product_sub_variants sv ON sv.id = oi.sub_variant_id
-      WHERE oi.order_id = $1
+      WHERE oi.order_id = $1 AND oi.is_digital IS NOT TRUE
     `,
       [id]
     )

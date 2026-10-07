@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { verifyReviewToken } from '@/lib/auth/jwt'
+import { fulfilledSql } from '@/lib/orders/fulfilled-status'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'You have already reviewed this product' }, { status: 400 })
     }
 
-    const orderCheck = await queryOne(`SELECT id FROM orders WHERE id = $1 AND user_id = $2 AND status = 'delivered'`, [
+    const orderCheck = await queryOne(`SELECT id FROM orders WHERE id = $1 AND user_id = $2 AND ${fulfilledSql('')}`, [
       orderId,
       userId,
     ])

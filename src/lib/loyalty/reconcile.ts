@@ -4,6 +4,7 @@ import { getLoyaltySettings, markLoyaltyLaunched, type LoyaltySettings } from '.
 import { getReferralSettings } from '@/lib/referrals/settings'
 import { sendReferralRewardEmail } from '@/lib/email/referral'
 import { tierForPoints, tierRank } from './tiers'
+import { FULFILLED_STATUSES } from '@/lib/orders/fulfilled-status'
 
 const LOCK_NAMESPACE = 7001
 const DEFAULT_MAX_USERS = 500
@@ -15,7 +16,9 @@ export function eligibleCustomerSql(alias: string): string {
     ))`
 }
 
-const KEPT_AND_PAID_SQL = `(o.source = 'online' AND o.status IN ('delivered', 'return_rejected') AND o.payment_status IN ('paid', 'cod_collected'))`
+// Fulfilled (delivered, or granted for digital) plus return_rejected — the customer kept it.
+const KEPT_STATUSES = [...FULFILLED_STATUSES, 'return_rejected'].map(s => `'${s}'`).join(', ')
+const KEPT_AND_PAID_SQL = `(o.source = 'online' AND o.status IN (${KEPT_STATUSES}) AND o.payment_status IN ('paid', 'cod_collected'))`
 // Never updated_at: it moves whenever an order is touched, which would restart the wait.
 const SETTLED_AT_SQL = `COALESCE(o.delivered_at, o.created_at)`
 

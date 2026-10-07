@@ -11,6 +11,7 @@ vi.mock('@/lib/shared/sms', () => ({
   sendOrderCancelledSMS: vi.fn().mockResolvedValue(true),
   sendPaymentFailedSMS: vi.fn().mockResolvedValue(true),
   sendOutForDeliverySMS: vi.fn().mockResolvedValue(true),
+  sendAccessGrantedSMS: vi.fn().mockResolvedValue(true),
 }))
 
 vi.mock('@/lib/shared/whatsapp', () => ({
@@ -20,7 +21,9 @@ vi.mock('@/lib/shared/whatsapp', () => ({
   sendOrderCancelledWhatsApp: vi.fn().mockResolvedValue(true),
   sendPaymentFailedWhatsApp: vi.fn().mockResolvedValue(true),
   sendOutForDeliveryWhatsApp: vi.fn().mockResolvedValue(true),
+  sendAccessGrantedWhatsApp: vi.fn().mockResolvedValue(false),
 }))
+vi.mock('@/lib/vault/links', () => ({ vaultLibraryUrl: vi.fn().mockResolvedValue('https://vault.example.com/library') }))
 
 import {
   notifyOrderConfirmed,
@@ -29,6 +32,7 @@ import {
   notifyOrderCancelled,
   notifyOutForDelivery,
   notifyPaymentFailed,
+  notifyAccessGranted,
 } from '@/lib/shared/notify'
 import { queryOne } from '@/lib/shared/db'
 import * as sms from '@/lib/shared/sms'
@@ -127,6 +131,17 @@ describe('other notify fns route by channel', () => {
     await notifyOrderDelivered('u1', 'O')
     await flush()
     expect(wa.sendOrderDeliveredWhatsApp).toHaveBeenCalled()
+  })
+
+  it('notifyAccessGranted falls back to SMS when no WhatsApp template exists', async () => {
+    mockQueryOne.mockResolvedValue(recipient('whatsapp'))
+    vi.mocked(wa.sendAccessGrantedWhatsApp).mockResolvedValueOnce(false)
+    await notifyAccessGranted('u1', 'O')
+    await flush()
+    expect(wa.sendAccessGrantedWhatsApp).toHaveBeenCalled()
+    expect(sms.sendAccessGrantedSMS).toHaveBeenCalledWith(
+      expect.objectContaining({ orderNumber: 'O', vaultUrl: 'https://vault.example.com/library' })
+    )
   })
 
   it('notifyOrderCancelled', async () => {

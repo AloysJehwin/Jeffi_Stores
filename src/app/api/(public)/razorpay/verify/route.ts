@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { queryOne, queryMany, query, withTransaction, resolveRequestTenant } from '@/lib/shared/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
-import { createDraftInvoice } from '@/lib/documents/invoice'
+import { createDraftInvoice, generateOrderInvoice } from '@/lib/documents/invoice'
 import { verifyDraftToken, hashCartItems } from '@/lib/orders/order-draft'
 import {
   loadActiveCart,
@@ -19,6 +19,7 @@ import { createAutoTask } from '@/lib/shared/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
 import { parseBody, zNonEmpty, zUuid } from '@/lib/shared/validate'
 import { sendOrderConfirmedSMS } from '@/lib/shared/sms'
+import { notifyAccessGranted } from '@/lib/shared/notify'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { getRazorpayInstanceFor } from '@/lib/payments/razorpay'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
@@ -387,7 +388,9 @@ async function commitDraft(args: {
   }).catch(() => {})
 
   const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
-  createDraftInvoice(created.id).catch(() => {})
+  // An all-digital order is fulfilled at payment ('granted'), so number its invoice now.
+  const draftInvoice = createDraftInvoice(created.id).catch(() => {})
+  if (created.status === 'granted') draftInvoice.then(() => generateOrderInvoice(created.id)).catch(() => {})
 
   const fullOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [created.id])
 
@@ -401,7 +404,9 @@ async function commitDraft(args: {
     'paid',
     parseFloat(created.total_amount)
   ).catch(() => {})
-  if (user.notification_channel === 'sms' && user.phone) {
+  if (created.status === 'granted') {
+    notifyAccessGranted(args.userId, created.order_number).catch(() => {})
+  } else if (user.notification_channel === 'sms' && user.phone) {
     sendOrderConfirmedSMS({
       phone: user.phone,
       orderNumber: created.order_number,

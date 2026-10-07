@@ -449,6 +449,21 @@ describe('POST /api/orders/create-direct', () => {
     expect(body.codBlockedProductIds).toContain('prod-1')
   })
 
+  it('returns 400 for a digital product (must be paid online)', async () => {
+    vi.mocked(db.queryOne).mockReset()
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500, isDigital: true },
+    } as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ ...MOCK_PRODUCT, id: 'prod-1', is_digital: true })
+
+    const res = await POST(makeRequest({ ...VALID_BODY, paymentMethod: 'cod' }) as any)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Digital items must be paid online')
+  })
+
   it('creates COD order successfully', async () => {
     vi.mocked(db.queryOne).mockReset()
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)

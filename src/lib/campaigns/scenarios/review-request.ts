@@ -1,4 +1,5 @@
 import { queryMany } from '@/lib/shared/db'
+import { FULFILLED_SQL } from '@/lib/orders/fulfilled-status'
 import { generateReviewToken } from '@/lib/auth/jwt'
 import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/lib/shared/automation-emails'
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
@@ -60,7 +61,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       FROM orders o
       JOIN users u ON u.id = o.user_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
-      WHERE o.status = 'delivered'
+      WHERE ${FULFILLED_SQL}
         AND o.delivered_at < NOW() - ($2 || ' hours')::interval
         AND o.delivered_at > NOW() - ($3 || ' minutes')::interval
         AND u.marketing_opt_out = FALSE AND u.is_active = TRUE
