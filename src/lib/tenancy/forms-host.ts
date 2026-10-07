@@ -32,7 +32,7 @@ export function slugFromHostname(hostname: string): string | null {
   if (host === ROOT_DOMAIN) return null
   const label = host.slice(0, host.length - ROOT_DOMAIN.length - 1)
   const businessScoped = label.match(/^(.+)\.business$/)
-  const appPrefixed = label.match(/^(admin|invoice|quotation|purchaseorder|forms|www)-(.+)$/)
+  const appPrefixed = label.match(/^(admin|invoice|quotation|purchaseorder|forms|vault|www)-(.+)$/)
   const bare = businessScoped ? businessScoped[1] : appPrefixed ? appPrefixed[2] : label
   if (RESERVED_LABELS.has(bare)) return null
   if (bare.includes('.')) return null

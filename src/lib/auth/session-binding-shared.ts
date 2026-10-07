@@ -13,6 +13,7 @@ export const BIND_COOKIE: Record<PrincipalType, string> = {
   business: '_vb',
   admin: '_va',
   owner: '_vo',
+  vault: '_vv',
 }
 
 // EventSource and sendBeacon cannot set a header but still need the short-lived cookie. Matched by

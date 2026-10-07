@@ -1,7 +1,13 @@
 import 'server-only'
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+  CopyObjectCommand,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { getCurrentTenantId } from '@/lib/tenancy/tenant-context'
 
 // Private storage for vault (digital-product) files. Separate from src/lib/shared/s3.ts, whose
 // bucket is PUBLIC — vault bytes must never be world-readable. Two drivers behind one interface:
@@ -10,7 +16,7 @@ import { getCurrentTenantId } from '@/lib/tenancy/tenant-context'
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1'
 const VAULT_BUCKET = process.env.VAULT_S3_BUCKET || ''
 const DEFAULT_GET_TTL = 90 // seconds — short-lived presigned reads
-const DEFAULT_PUT_TTL = 15 * 60
+const DEFAULT_PUT_TTL = 10 * 60
 
 export type StorageDriverName = 's3' | 'local'
 
@@ -31,13 +37,27 @@ export interface StorageDriver {
   delete(key: string): Promise<void>
   /** Byte size of a stored object, for quota accounting. */
   size(key: string): Promise<number>
+  /** Move an object to a new key (used to promote a checked upload out of staging). */
+  move(from: string, to: string): Promise<void>
 }
 
-/** Compose the storage key for a product file. Tenant-scoped so one bucket is safe across tenants. */
-export function vaultKey(productId: string, fileId: string, ext: string): string {
-  const tenantId = getCurrentTenantId() || 'platform'
+function keyTail(tenantId: string | null, productId: string, fileId: string, ext: string): string {
   const safeExt = ext.replace(/[^a-z0-9]/gi, '').slice(0, 8)
-  return `vault/${tenantId}/${productId}/${fileId}${safeExt ? '.' + safeExt : ''}`
+  return `${tenantId || 'platform'}/${productId}/${fileId}${safeExt ? '.' + safeExt : ''}`
+}
+
+/** Final (served) key for a product file. Tenant-scoped so one bucket is safe across tenants. */
+export function vaultKey(tenantId: string | null, productId: string, fileId: string, ext: string): string {
+  return `vault/${keyTail(tenantId, productId, fileId, ext)}`
+}
+
+/**
+ * Where the admin's browser uploads to. Never served: completion sniffs it and moves it to the
+ * final key, so re-using a still-valid upload URL can't swap the checked file. Abandoned uploads
+ * stay under this prefix, which an S3 lifecycle rule expires.
+ */
+export function vaultStagingKey(tenantId: string | null, productId: string, fileId: string, ext: string): string {
+  return `vault-staging/${keyTail(tenantId, productId, fileId, ext)}`
 }
 
 const s3 = new S3Client({
@@ -82,6 +102,13 @@ class S3StorageDriver implements StorageDriver {
     const r = await s3.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }))
     return r.ContentLength ?? 0
   }
+
+  async move(from: string, to: string): Promise<void> {
+    await s3.send(
+      new CopyObjectCommand({ Bucket: this.bucket, Key: to, CopySource: `${this.bucket}/${encodeURI(from)}` })
+    )
+    await this.delete(from)
+  }
 }
 
 let cached: StorageDriver | null = null
@@ -95,6 +122,9 @@ export function getStorageDriver(): StorageDriver {
   if (cached) return cached
   if (VAULT_BUCKET) {
     cached = new S3StorageDriver(VAULT_BUCKET)
+  } else if (process.env.NODE_ENV === 'production') {
+    // The local driver's HMAC-token scheme is for dev only; never serve buyer files from app disk.
+    throw new Error('VAULT_S3_BUCKET is not configured')
   } else {
     // Lazy require so the fs-based driver is only loaded when actually used.
     const { LocalStorageDriver } = require('./vault-storage-local') as typeof import('./vault-storage-local')

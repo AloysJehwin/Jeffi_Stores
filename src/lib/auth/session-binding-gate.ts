@@ -14,7 +14,7 @@ const RETRY_MARKER = '_vr'
 const MARKER_TTL_S = 600
 const MARKER_TTL_TRANSIENT_S = 30
 const SESSIONLESS_APPS = new Set(['forms', 'quotation', 'invoice', 'purchaseorder'])
-const INITIAL: Record<PrincipalType, string> = { customer: 'c', business: 'b', admin: 'a', owner: 'o' }
+const INITIAL: Record<PrincipalType, string> = { customer: 'c', business: 'b', admin: 'a', owner: 'o', vault: 'v' }
 
 // *_sid cookies are shared across every subdomain but a key lives in one origin, so only the
 // session this surface actually uses is worth re-binding here.
@@ -22,6 +22,7 @@ function surfacePrincipals(hostname: string, hostApp: string | null, pathname: s
   if (hostname.startsWith('ecom.')) return ['owner']
   if (hostApp === 'admin') return ['admin']
   if (hostApp === 'business') return ['business']
+  if (hostApp === 'vault') return ['vault']
   if (hostApp && SESSIONLESS_APPS.has(hostApp)) return []
   const p = pathname.startsWith('/api/') ? pathname.slice(4) : pathname
   if (p === '/admin' || p.startsWith('/admin/')) return ['admin']
@@ -52,6 +53,7 @@ export function bindingGate(request: NextRequest, hostname: string, hostApp: str
     business: 'business_sid',
     owner: 'owner_sid',
     admin: adminCookieNameForHost(hostname),
+    vault: 'vault_sid',
   }
   const pending = surfacePrincipals(hostname, hostApp, pathname).filter(type => {
     const sid = request.cookies.get(sidCookie[type])?.value
@@ -75,7 +77,7 @@ export function bindingGate(request: NextRequest, hostname: string, hostApp: str
 }
 
 function rebindPage(need: string): string {
-  const types: Record<string, string> = { c: 'customer', b: 'business', a: 'admin', o: 'owner' }
+  const types: Record<string, string> = { c: 'customer', b: 'business', a: 'admin', o: 'owner', v: 'vault' }
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Loading</title><style>html,body{height:100%;margin:0;background:#fff}</style></head><body><script>setTimeout(function(){document.cookie=${JSON.stringify(RETRY_MARKER)}+'=cbao; Max-Age=${MARKER_TTL_TRANSIENT_S}; Path=/; SameSite=Lax';location.replace(location.href)},20000)</script><script>(function(){
 var E=${JSON.stringify(BIND_ENDPOINT)},H=${JSON.stringify(PROOF_HEADER)},NEED=${JSON.stringify(need)},T=${JSON.stringify(types)},M=${JSON.stringify(RETRY_MARKER)},fired=false;
 function leave(failed,ttl){if(fired)return;fired=true;var cur=(document.cookie.match(new RegExp('(?:^|; )'+M+'=([^;]*)'))||[])[1]||'',next='';for(var i=0;i<cur.length;i++)if(NEED.indexOf(cur[i])<0)next+=cur[i];next+=failed;document.cookie=M+'='+next+'; Max-Age='+(next?ttl:0)+'; Path=/; SameSite=Lax'+(location.protocol==='https:'?'; Secure':'');location.replace(location.href)}
