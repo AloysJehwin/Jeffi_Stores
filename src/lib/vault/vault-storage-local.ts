@@ -1,5 +1,5 @@
 import 'server-only'
-import { createHmac, randomUUID } from 'crypto'
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto'
 import { promises as fs } from 'fs'
 import path from 'path'
 import type { StorageDriver, SignedGetOptions } from './storage'
@@ -28,7 +28,9 @@ export function verifyLocalToken(key: string, token: string): boolean {
     const expiresAt = Number(expStr)
     if (!expiresAt || Date.now() > expiresAt) return false
     const expected = createHmac('sha256', SECRET).update(`${key}|${expiresAt}|${disposition}`).digest('hex').slice(0, 32)
-    return sig === expected
+    const a = Buffer.from(sig ?? '')
+    const b = Buffer.from(expected)
+    return a.length === b.length && timingSafeEqual(a, b)
   } catch {
     return false
   }
@@ -61,6 +63,12 @@ export class LocalStorageDriver implements StorageDriver {
     }
   }
 
+  async move(from: string, to: string): Promise<void> {
+    const dest = diskPath(to)
+    await fs.mkdir(path.dirname(dest), { recursive: true })
+    await fs.rename(diskPath(from), dest)
+  }
+
   async writeLocal(key: string, body: Buffer): Promise<void> {
     const p = diskPath(key)
     await fs.mkdir(path.dirname(p), { recursive: true })
@@ -69,6 +77,18 @@ export class LocalStorageDriver implements StorageDriver {
 
   async readLocal(key: string): Promise<Buffer> {
     return fs.readFile(diskPath(key))
+  }
+
+  /** Leading bytes only (content sniff) without loading a multi-GB file. */
+  async readHead(key: string, n: number): Promise<Buffer> {
+    const fh = await fs.open(diskPath(key), 'r')
+    try {
+      const buf = Buffer.alloc(n)
+      const { bytesRead } = await fh.read(buf, 0, n, 0)
+      return buf.subarray(0, bytesRead)
+    } finally {
+      await fh.close()
+    }
   }
 
   newFileId(): string {

@@ -82,6 +82,9 @@ CREATE TABLE public.vault_tickets (
     user_id uuid NOT NULL,
     principal_type character varying(12) NOT NULL,
     target_path character varying(512),
+    -- SHA-256 of the vault_state cookie the vault host set before bouncing to the store. The callback
+    -- must present the matching cookie, so a ticket can't be planted in another browser (login CSRF).
+    state_hash character varying(64),
     expires_at timestamp with time zone NOT NULL,
     used_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL

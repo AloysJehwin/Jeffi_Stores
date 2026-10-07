@@ -15,6 +15,7 @@ import Toggle from '@/components/ui/Toggle'
 import DatePicker from '@/components/ui/DatePicker'
 import AIEnrichButton from './AIEnrichButton'
 import UnitsManager, { UnitLoadedInfo } from './UnitsManager'
+import DigitalFilesPanel from './DigitalFilesPanel'
 import SubVariantEditor, { emptySubVariantDraft, SubVariantDraft } from './SubVariantEditor'
 import { generateSerialNumber, generateLotNumber, generateSerialRun } from '@/lib/catalog/selling-unit'
 import { applyDiscount } from '@/lib/catalog/pricing'
@@ -3159,9 +3160,14 @@ export default function ProductForm({
                           className={inputCls}
                         />
                       </div>
-                      <p className="sm:col-span-2 text-xs text-foreground-muted">
-                        Files are uploaded in the Digital Files panel. Buyers open them in the vault.
-                      </p>
+                      {productId ? (
+                        <DigitalFilesPanel productId={productId} />
+                      ) : (
+                        <p className="sm:col-span-2 text-xs text-foreground-muted">
+                          Save the product first, then upload files in the Digital Files panel. Buyers open them in
+                          the vault.
+                        </p>
+                      )}
                     </div>
                   )}
                   {subscriptionsEnabled && isSubscription && (
