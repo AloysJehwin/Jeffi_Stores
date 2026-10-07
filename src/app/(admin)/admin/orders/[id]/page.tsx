@@ -5,7 +5,8 @@ import Link from 'next/link'
 import CopySku from '@/components/ui/CopySku'
 import { headers } from 'next/headers'
 import { getOrder, getReturnRequest } from '@/lib/queries'
-import { resolveRequestTenant } from '@/lib/shared/db'
+import SubscriptionOrderBadge from '@/components/admin/SubscriptionOrderBadge'
+import { resolveRequestTenant, queryMany } from '@/lib/shared/db'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { computeRefundableAmount } from '@/lib/payments/refund'
 import { ap } from '@/lib/shared/admin-path'
@@ -28,6 +29,9 @@ import MailLogsPanel from '@/app/(admin)/admin/orders/[id]/_components/MailLogsP
 import ExtendEddButton from '@/app/(admin)/admin/orders/[id]/_components/ExtendEddButton'
 import CodRemittanceButton from '@/app/(admin)/admin/orders/[id]/_components/CodRemittanceButton'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import DigitalAccessCard, {
+  type DigitalAccessLine,
+} from '@/app/(admin)/admin/orders/[id]/_components/DigitalAccessCard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -101,6 +105,21 @@ export default async function OrderDetailsPage({
     reviewedAt: r.reviewed_at ? new Date(r.reviewed_at).toISOString() : null,
   }))
   const isReturnStatus = RETURN_STATUSES.includes(order.status)
+  const digitalLines = await queryMany<DigitalAccessLine & { access_revoked_at: string | null }>(
+    `SELECT oi.id AS order_item_id, oi.product_name, oi.access_revoked_at,
+            ve.status, COALESCE(ve.granted_at, oi.granted_at) AS granted_at, ve.revoked_at, ve.revoke_reason,
+            ve.access_expires_at
+       FROM order_items oi
+       LEFT JOIN vault_entitlements ve ON ve.order_item_id = oi.id
+      WHERE oi.order_id = $1 AND oi.is_digital = TRUE
+      ORDER BY oi.created_at`,
+    [id]
+  ).catch(() => [])
+  const digitalItemIds = new Set(digitalLines.map(l => l.order_item_id))
+  const isAllDigital =
+    digitalLines.length > 0 &&
+    (order.order_items?.length ?? 0) > 0 &&
+    order.order_items.every((i: any) => digitalItemIds.has(i.id))
   const refundableAmount = await computeRefundableAmount(order, returnRequest).catch(() => Number(order.total_amount))
   const showRetryEmailButton =
     (order.payment_status === 'failed' || order.payment_status === 'unpaid') &&
@@ -120,6 +139,16 @@ export default async function OrderDetailsPage({
       })
     : null
   const rawEdd: string | null = eddDateStr ?? null
+  const courierEddStr: string | null = order.courier_edd
+    ? order.courier_edd instanceof Date
+      ? order.courier_edd.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+      : String(order.courier_edd).slice(0, 10)
+    : null
+  const courierEddNote = courierEddStr
+    ? courierEddStr === eddDateStr
+      ? 'Courier estimate (Delhivery)'
+      : `Delhivery estimate: ${new Date(courierEddStr + 'T00:00:00Z').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', timeZone: 'Asia/Kolkata' })}`
+    : null
 
   let eddLabel = 'Expected Delivery'
   let eddLabelColor = 'text-foreground-muted'
@@ -159,6 +188,11 @@ export default async function OrderDetailsPage({
             <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
               Order #{order.order_number || order.id.slice(0, 8)}
             </h1>
+            {order.subscription_id && (
+              <Link href={ap(`/admin/subscriptions/${order.subscription_id}`, host)} className="inline-block mt-1">
+                <SubscriptionOrderBadge subscriptionId={order.subscription_id} cycle={order.subscription_cycle} />
+              </Link>
+            )}
             {order.original_order_id && order.original_order_number && (
               <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
                 Replacement for{' '}
@@ -202,7 +236,7 @@ export default async function OrderDetailsPage({
             </span>
             <span
               className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
-                order.status === 'delivered'
+                order.status === 'delivered' || order.status === 'granted'
                   ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
                   : order.status === 'processing' || order.status === 'shipped'
                     ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
@@ -223,7 +257,7 @@ export default async function OrderDetailsPage({
             >
               <span
                 className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                  order.status === 'delivered'
+                  order.status === 'delivered' || order.status === 'granted'
                     ? 'bg-green-500'
                     : order.status === 'processing' ||
                         order.status === 'shipped' ||
@@ -247,12 +281,14 @@ export default async function OrderDetailsPage({
                 ? 'Cancellation Requested'
                 : order.status === 'cancel_rejected'
                   ? 'Cancellation Rejected'
-                  : order.status.replace(/_/g, ' ')}
+                  : order.status === 'granted'
+                    ? 'Access granted'
+                    : order.status.replace(/_/g, ' ')}
             </span>
             {/* Divider between status pills and action buttons */}
             <span className="w-px h-6 bg-border-default hidden sm:block" />
             {/* Packing Slip — download + print combined pill */}
-            {canPackingSlips && (
+            {canPackingSlips && !isAllDigital && (
               <div className="inline-flex rounded-full overflow-hidden border border-secondary-300 dark:border-secondary-700 text-sm font-semibold">
                 <a
                   href={`/api/admin/packing-slips/${order.id}`}
@@ -377,7 +413,8 @@ export default async function OrderDetailsPage({
                   order.status === 'processing' ||
                   order.status === 'shipped' ||
                   order.status === 'out_for_delivery' ||
-                  order.status === 'delivered') && <GenerateInvoiceButton orderId={order.id} />
+                  order.status === 'delivered' ||
+                  order.status === 'granted') && <GenerateInvoiceButton orderId={order.id} />
               ))}
             {showRetryEmailButton && <RetryPaymentEmailButton orderId={order.id} />}
           </div>
@@ -458,6 +495,11 @@ export default async function OrderDetailsPage({
                             flammable={item.flammable}
                             size="xs"
                           />
+                          {digitalItemIds.has(item.id) && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
+                              Digital
+                            </span>
+                          )}
                         </div>
                         <p className="text-sm text-foreground-secondary mt-1">
                           {(() => {
@@ -588,115 +630,117 @@ export default async function OrderDetailsPage({
             </div>
           </div>
 
-          {![
-            'processing',
-            'shipped',
-            'out_for_delivery',
-            'delivered',
-            'cancelled',
-            'return_requested',
-            'return_approved',
-            'return_received',
-            'returned',
-            'return_rejected',
-          ].includes(order.status) && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-              <div className="px-6 py-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-foreground">Inventory Status</h2>
-              </div>
-              <div className="divide-y divide-border-default">
-                {order.order_items && order.order_items.length > 0 ? (
-                  order.order_items.map((item: any) => {
-                    const inv =
-                      item.sub_variant?.inventory_quantity ??
-                      item.variant?.inventory_quantity ??
-                      item.products?.inventory_quantity ??
-                      0
-                    const orderedQty = Number(item.quantity)
-                    const isCount = item.sell_unit_dimension === 'count' || !item.buy_mode || item.buy_mode === 'unit'
-                    const factor = item.sell_unit_factor ? Number(item.sell_unit_factor) : 1
-                    // For count dimension: inventory is in individual pieces; ordered qty is in selling units (e.g. boxes)
-                    // Show both: "5 box (250 pcs)" where factor=50
-                    const deductedQty = isCount ? orderedQty * factor : orderedQty
-                    const unitLabel = item.buy_unit && item.buy_unit !== 'unit' ? item.buy_unit : null
-                    const isOut = inv < deductedQty
-                    const isLow = !isOut && inv < deductedQty * 2
-                    return (
-                      <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {item.product_id ? (
-                              <Link
-                                href={ap(`/admin/products/${item.product_id}`, host)}
-                                target="_blank"
-                                className="hover:underline text-orange-600 dark:text-orange-400"
-                              >
-                                {item.product_name}
-                              </Link>
-                            ) : (
-                              item.product_name
+          {!isAllDigital &&
+            ![
+              'processing',
+              'shipped',
+              'out_for_delivery',
+              'delivered',
+              'granted',
+              'cancelled',
+              'return_requested',
+              'return_approved',
+              'return_received',
+              'returned',
+              'return_rejected',
+            ].includes(order.status) && (
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+                <div className="px-6 py-4 border-b border-border-default">
+                  <h2 className="text-lg font-semibold text-foreground">Inventory Status</h2>
+                </div>
+                <div className="divide-y divide-border-default">
+                  {order.order_items && order.order_items.length > 0 ? (
+                    order.order_items.map((item: any) => {
+                      const inv =
+                        item.sub_variant?.inventory_quantity ??
+                        item.variant?.inventory_quantity ??
+                        item.products?.inventory_quantity ??
+                        0
+                      const orderedQty = Number(item.quantity)
+                      const isCount = item.sell_unit_dimension === 'count' || !item.buy_mode || item.buy_mode === 'unit'
+                      const factor = item.sell_unit_factor ? Number(item.sell_unit_factor) : 1
+                      // For count dimension: inventory is in individual pieces; ordered qty is in selling units (e.g. boxes)
+                      // Show both: "5 box (250 pcs)" where factor=50
+                      const deductedQty = isCount ? orderedQty * factor : orderedQty
+                      const unitLabel = item.buy_unit && item.buy_unit !== 'unit' ? item.buy_unit : null
+                      const isOut = inv < deductedQty
+                      const isLow = !isOut && inv < deductedQty * 2
+                      return (
+                        <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-foreground truncate">
+                              {item.product_id ? (
+                                <Link
+                                  href={ap(`/admin/products/${item.product_id}`, host)}
+                                  target="_blank"
+                                  className="hover:underline text-orange-600 dark:text-orange-400"
+                                >
+                                  {item.product_name}
+                                </Link>
+                              ) : (
+                                item.product_name
+                              )}
+                            </p>
+                            <p className="text-xs text-foreground-muted mt-0.5">
+                              SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}
+                              {(item.sub_variant?.sku || item.variant?.sku || item.product_sku) && (
+                                <CopySku
+                                  sku={item.sub_variant?.sku || item.variant?.sku || item.product_sku}
+                                  className="ml-1"
+                                />
+                              )}
+                              {' · '}
+                              Ordered:{' '}
+                              {isCount && unitLabel
+                                ? `${orderedQty} ${unitLabel}${factor > 1 ? ` (${deductedQty} pcs)` : ''}`
+                                : `${orderedQty}${unitLabel ? ` ${unitLabel}` : ''}`}
+                            </p>
+                            {item.variant_name && (
+                              <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                                {item.variant_name}
+                              </span>
                             )}
-                          </p>
-                          <p className="text-xs text-foreground-muted mt-0.5">
-                            SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}
-                            {(item.sub_variant?.sku || item.variant?.sku || item.product_sku) && (
-                              <CopySku
-                                sku={item.sub_variant?.sku || item.variant?.sku || item.product_sku}
-                                className="ml-1"
+                            {item.sub_variant?.sub_variant_name && (
+                              <span className="inline-flex items-center mt-1 ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                                {item.sub_variant.sub_variant_name}
+                              </span>
+                            )}
+                            <div className="mt-1">
+                              <ProductWarningBadges
+                                fragile={item.fragile}
+                                hazardous={item.hazardous}
+                                flammable={item.flammable}
+                                size="xs"
                               />
-                            )}
-                            {' · '}
-                            Ordered:{' '}
-                            {isCount && unitLabel
-                              ? `${orderedQty} ${unitLabel}${factor > 1 ? ` (${deductedQty} pcs)` : ''}`
-                              : `${orderedQty}${unitLabel ? ` ${unitLabel}` : ''}`}
-                          </p>
-                          {item.variant_name && (
-                            <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
-                              {item.variant_name}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p
+                              className={`text-sm font-semibold ${isOut ? 'text-red-500' : isLow ? 'text-yellow-500' : 'text-green-600 dark:text-green-400'}`}
+                            >
+                              {inv} in stock
+                            </p>
+                            <span
+                              className={`inline-block mt-0.5 px-2 py-0.5 text-xs font-medium rounded-full ${
+                                isOut
+                                  ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                                  : isLow
+                                    ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                                    : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                              }`}
+                            >
+                              {isOut ? 'Out of stock' : isLow ? 'Low stock' : 'In stock'}
                             </span>
-                          )}
-                          {item.sub_variant?.sub_variant_name && (
-                            <span className="inline-flex items-center mt-1 ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
-                              {item.sub_variant.sub_variant_name}
-                            </span>
-                          )}
-                          <div className="mt-1">
-                            <ProductWarningBadges
-                              fragile={item.fragile}
-                              hazardous={item.hazardous}
-                              flammable={item.flammable}
-                              size="xs"
-                            />
                           </div>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p
-                            className={`text-sm font-semibold ${isOut ? 'text-red-500' : isLow ? 'text-yellow-500' : 'text-green-600 dark:text-green-400'}`}
-                          >
-                            {inv} in stock
-                          </p>
-                          <span
-                            className={`inline-block mt-0.5 px-2 py-0.5 text-xs font-medium rounded-full ${
-                              isOut
-                                ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                                : isLow
-                                  ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
-                                  : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                            }`}
-                          >
-                            {isOut ? 'Out of stock' : isLow ? 'Low stock' : 'In stock'}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })
-                ) : (
-                  <p className="px-6 py-4 text-sm text-foreground-muted">No items</p>
-                )}
+                      )
+                    })
+                  ) : (
+                    <p className="px-6 py-4 text-sm text-foreground-muted">No items</p>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {order.status === 'cancel_requested' && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border-2 border-orange-300 dark:border-orange-800">
@@ -846,6 +890,7 @@ export default async function OrderDetailsPage({
           )}
 
           {order.status === 'processing' &&
+            !isAllDigital &&
             !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) &&
             canWrite && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
@@ -857,6 +902,8 @@ export default async function OrderDetailsPage({
                 </div>
               </div>
             )}
+
+          {digitalLines.length > 0 && <DigitalAccessCard orderId={order.id} initial={digitalLines} />}
 
           {order.awb_number && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
@@ -980,39 +1027,42 @@ export default async function OrderDetailsPage({
                   {order.shipping_address.phone && (
                     <p className="mt-2">Phone: +91 {order.shipping_address.phone.replace(/^\+91|^91/, '')}</p>
                   )}
-                  <div className="mt-4 px-4 py-3 rounded-xl border border-border-default bg-surface">
-                    {edd ? (
-                      <div className="flex items-center gap-3">
-                        <svg
-                          className="w-8 h-8 text-green-500 shrink-0"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={1.5}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
-                          />
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M13 16V5a1 1 0 00-1-1H4a1 1 0 00-1 1v11m10 0h-3M6 16H3m4-7h6l3 5"
-                          />
-                        </svg>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-medium ${eddLabelColor}`}>{eddLabel}</p>
-                          <p className="font-bold text-foreground">{edd}</p>
+                  {!isAllDigital && (
+                    <div className="mt-4 px-4 py-3 rounded-xl border border-border-default bg-surface">
+                      {edd ? (
+                        <div className="flex items-center gap-3">
+                          <svg
+                            className="w-8 h-8 text-green-500 shrink-0"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={1.5}
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
+                            />
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              d="M13 16V5a1 1 0 00-1-1H4a1 1 0 00-1 1v11m10 0h-3M6 16H3m4-7h6l3 5"
+                            />
+                          </svg>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-xs font-medium ${eddLabelColor}`}>{eddLabel}</p>
+                            <p className="font-bold text-foreground">{edd}</p>
+                            {courierEddNote && <p className="text-xs text-foreground-muted">{courierEddNote}</p>}
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-foreground-muted">No expected delivery date set</p>
-                    )}
-                    {order.status !== 'delivered' && canWrite && (
-                      <ExtendEddButton orderId={order.id} currentEdd={rawEdd} />
-                    )}
-                  </div>
+                      ) : (
+                        <p className="text-xs text-foreground-muted">No expected delivery date set</p>
+                      )}
+                      {order.status !== 'delivered' && canWrite && (
+                        <ExtendEddButton orderId={order.id} currentEdd={rawEdd} />
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-foreground-muted">No shipping address</p>

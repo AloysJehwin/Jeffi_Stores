@@ -9,8 +9,10 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { applyDiscount, mrpDiscountPct } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
+import { digitalActive } from '@/lib/catalog/digital'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import QuickAddButton from '@/components/visitor/QuickAddButton'
+import { QuickAddHeaderActions } from '@/components/visitor/QuickAddPicker'
 
 interface ProductCardProps {
   id: string
@@ -30,6 +32,7 @@ interface ProductCardProps {
   fragile?: boolean | null
   hazardous?: boolean | null
   flammable?: boolean | null
+  isDigital?: boolean
 }
 
 export default function ProductCard({
@@ -50,9 +53,12 @@ export default function ProductCard({
   fragile,
   hazardous,
   flammable,
+  isDigital = false,
 }: ProductCardProps) {
   const { user } = useAuth()
-  const gstEnabled = useStoreConfig().flags.gstEnabled
+  const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
+  const digital = digitalActive(digitalProductsEnabled, isDigital)
+  const inStock = digital || effectiveStock > 0
 
   // Apply per-category business discount off the selling price, show combined % off MRP
   const discountPct = categoryId ? (user?.businessDiscountMap?.[categoryId] ?? 0) : 0
@@ -64,10 +70,11 @@ export default function ProductCard({
   const [edd, setEdd] = useState<string | null>(null)
 
   useEffect(() => {
+    if (digital) return
     resolveEdd(!!user, handlingDays, extraDeliveryDays, 'business').then(v => {
       if (v) setEdd(v)
     })
-  }, [user, handlingDays, extraDeliveryDays])
+  }, [digital, user, handlingDays, extraDeliveryDays])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
@@ -167,6 +174,11 @@ export default function ProductCard({
                   </svg>
                 </div>
               )}
+              {digital && (
+                <div className="absolute bottom-2 right-2 bg-violet-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
+                  Digital
+                </div>
+              )}
               {discountPct > 0 && (
                 <div className="absolute top-5 right-[-22px] w-28 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[8px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10 overflow-hidden">
                   Business offer
@@ -197,13 +209,15 @@ export default function ProductCard({
                   productName={name}
                   slug={slug}
                   hasVariants={hasVariants}
-                  inStock={effectiveStock > 0}
+                  inStock={inStock}
                   imageUrl={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
                   brandName={brandName}
                   categoryName={categoryName}
                   displayPrice={shownPrice}
                   mrp={mrp}
                   discountPct={shownDiscount}
+                  isDigital={digital}
+                  portal="business"
                 />
                 <button
                   onClick={handleShare}
@@ -252,9 +266,9 @@ export default function ProductCard({
               {gstEnabled && <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>}
               <div className="flex items-center justify-between gap-1">
                 <span
-                  className={`text-xs font-medium whitespace-nowrap ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}
+                  className={`text-xs font-medium whitespace-nowrap ${inStock ? 'text-green-600' : 'text-red-600'}`}
                 >
-                  {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
+                  {digital ? 'Instant access' : inStock ? 'In Stock' : 'Out of Stock'}
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all group-hover:translate-x-1">
@@ -262,7 +276,7 @@ export default function ProductCard({
                   </span>
                 </div>
               </div>
-              {edd && effectiveStock > 0 && (
+              {edd && !digital && inStock && (
                 <p className="text-[10px] text-foreground-muted mt-0.5">
                   Deliver by{' '}
                   <span className="font-medium text-foreground">
@@ -317,6 +331,15 @@ export default function ProductCard({
                 {brandName && <p className="text-xs text-foreground-muted">{brandName}</p>}
                 {categoryName && <p className="text-xs text-foreground-muted">{categoryName}</p>}
               </div>
+              <QuickAddHeaderActions
+                productId={id}
+                productName={name}
+                slug={slug}
+                href={bp(`/business/products/${slug}`)}
+                showWishlist={false}
+                onClose={() => setShowQuickView(false)}
+                onStop={e => e.stopPropagation()}
+              />
             </div>
 
             <div className="flex items-center gap-3 mb-4">
@@ -352,13 +375,13 @@ export default function ProductCard({
             <div className="flex items-center gap-2 mb-5">
               <span
                 className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full ${
-                  effectiveStock > 0
+                  inStock
                     ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
                     : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
                 }`}
               >
-                <span className={`w-1.5 h-1.5 rounded-full ${effectiveStock > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
-                {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
+                <span className={`w-1.5 h-1.5 rounded-full ${inStock ? 'bg-green-500' : 'bg-red-500'}`} />
+                {digital ? 'Instant access' : inStock ? 'In Stock' : 'Out of Stock'}
               </span>
               <span className="text-xs text-foreground-muted">{gstEnabled ? 'Incl. all taxes' : 'Tax-free'}</span>
             </div>

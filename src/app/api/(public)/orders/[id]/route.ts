@@ -22,6 +22,7 @@ import {
   notifyOrderConfirmed,
   notifyOrderShipped,
   notifyOrderDelivered,
+  notifyAccessGranted,
   notifyOrderCancelled,
   notifyOutForDelivery,
   notifyPaymentFailed,
@@ -58,6 +59,7 @@ const ALL_ORDER_STATUSES = [
   'shipped',
   'out_for_delivery',
   'delivered',
+  'granted',
   'cancel_requested',
   'cancel_rejected',
   'cancelled',
@@ -138,6 +140,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const orderItems = await queryMany(
       `
       SELECT oi.id, oi.product_id, oi.product_name, oi.product_sku, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price, oi.buy_mode, oi.buy_unit,
+        oi.is_digital, oi.granted_at, oi.access_revoked_at,
+        (SELECT ve.status FROM vault_entitlements ve WHERE ve.order_item_id = oi.id) AS entitlement_status,
         psv.sub_variant_name, psv.sku AS sub_variant_sku,
         json_build_object('slug', p.slug, 'extra_delivery_days', p.extra_delivery_days,
           'fragile', p.fragile, 'hazardous', p.hazardous, 'flammable', p.flammable,
@@ -209,6 +213,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       addressChangeAvailable = false
     }
 
+    const hasDigital = orderItems.some((i: any) => i.is_digital)
+    const isAllDigital = orderItems.length > 0 && orderItems.every((i: any) => i.is_digital)
+    let vaultUrl: string | null = null
+    const itemVaultUrls = new Map<string, string>()
+    if (hasDigital) {
+      const { vaultLibraryUrl, vaultItemUrl } = await import('@/lib/vault/links')
+      vaultUrl = await vaultLibraryUrl()
+      for (const i of orderItems as any[]) {
+        if (i.is_digital && i.product_id) itemVaultUrls.set(i.id, await vaultItemUrl(i.product_id))
+      }
+    }
+
     const orderDetails = {
       id: order.id,
       orderNumber: order.order_number,
@@ -236,10 +252,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           ? order.estimated_delivery_date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
           : String(order.estimated_delivery_date).slice(0, 10)
         : null,
+      courierEdd: order.courier_edd
+        ? order.courier_edd instanceof Date
+          ? order.courier_edd.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+          : String(order.courier_edd).slice(0, 10)
+        : null,
       originalOrderId: order.original_order_id || null,
       originalOrderNumber: order.original_order_number || null,
       orderType: order.order_type || 'cart',
       shippingAddress: order.shipping_address,
+      grantedAt: order.granted_at || null,
+      isAllDigital,
+      hasDigital,
+      vaultUrl,
       items: orderItems.map((item: any) => ({
         id: item.id,
         productId: item.product_id,
@@ -254,16 +279,23 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         buyMode: item.buy_mode || 'unit',
         buyUnit: item.buy_unit || null,
         products: item.products,
+        isDigital: !!item.is_digital,
+        accessGranted: !!item.is_digital && item.entitlement_status === 'active' && !item.access_revoked_at,
+        accessRevoked: !!item.is_digital && (!!item.access_revoked_at || item.entitlement_status === 'revoked'),
+        vaultUrl: itemVaultUrls.get(item.id) || null,
         // Returns/replacements are only available on Growth plan and above.
         // Basic plan tenants don't have the returns module — force false so the
         // UI never shows Return/Replace buttons regardless of product settings.
-        returnAllowed: returnsEnabled ? (item.return_allowed === false ? false : !!item.return_allowed) : false,
+        // Digital lines are never returnable.
+        returnAllowed:
+          returnsEnabled && !item.is_digital ? (item.return_allowed === false ? false : !!item.return_allowed) : false,
         returnWindowDays: parseInt(item.return_window_days) || 7,
-        replacementAllowed: returnsEnabled
-          ? item.replacement_allowed === false
-            ? false
-            : !!item.replacement_allowed
-          : false,
+        replacementAllowed:
+          returnsEnabled && !item.is_digital
+            ? item.replacement_allowed === false
+              ? false
+              : !!item.replacement_allowed
+            : false,
         replacementWindowDays: parseInt(item.replacement_window_days) || 7,
       })),
       pendingVariantChange: pendingVcr
@@ -353,6 +385,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       shipped: ['out_for_delivery', 'delivered'],
       out_for_delivery: ['delivered'],
       delivered: ['return_requested'],
+      // Digital fulfilment: set by the payment paths, never by hand; nothing follows it.
+      granted: [],
       cancel_requested: ['cancelled', 'cancel_rejected'],
       cancel_rejected: [],
       cancelled: [],
@@ -421,7 +455,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             WHEN oi.variant_id IS NOT NULL THEN (SELECT inventory_quantity FROM product_variants WHERE id = oi.variant_id)
             ELSE (SELECT inventory_quantity FROM products WHERE id = oi.product_id)
           END AS inventory_quantity
-         FROM order_items oi WHERE oi.order_id = $1`,
+         FROM order_items oi WHERE oi.order_id = $1 AND oi.is_digital = FALSE`,
         [orderId]
       )
       const insufficient: string[] = []
@@ -473,6 +507,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (status === 'delivered') {
       updates.push(`delivered_at = NOW()`)
+    }
+
+    if (status === 'granted') {
+      updates.push(`granted_at = COALESCE(granted_at, NOW())`, `delivered_at = COALESCE(delivered_at, NOW())`)
     }
 
     values.push(orderId)
@@ -689,6 +727,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             notifyOutForDelivery(uid, on).catch(() => {})
           } else if (status === 'delivered') {
             notifyOrderDelivered(uid, on).catch(() => {})
+          } else if (status === 'granted') {
+            notifyAccessGranted(uid, on).catch(() => {})
           } else if (status === 'cancelled') {
             notifyOrderCancelled(uid, on).catch(() => {})
           }
@@ -754,8 +794,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       buy_mode: string
       buy_unit: string | null
     }>(
-      `SELECT product_id, variant_id, sub_variant_id, quantity, unit_price, buy_mode, buy_unit
-       FROM order_items WHERE order_id = $1`,
+      `SELECT oi.product_id, oi.variant_id, oi.sub_variant_id, oi.quantity, oi.unit_price, oi.buy_mode, oi.buy_unit
+       FROM order_items oi JOIN products p ON p.id = oi.product_id
+       WHERE oi.order_id = $1 AND COALESCE(p.is_digital, FALSE) = FALSE`,
       [id]
     )
     for (const item of orderItems) {

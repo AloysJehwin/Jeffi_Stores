@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSiteControls } from '@/lib/catalog/site-controls'
 import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,8 +11,12 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   const c = await getSiteControls()
   const aiStorefrontEnabled = await storefrontAiAllowed().catch(() => false)
+  // Store slug so the client can namespace on-device AI artifacts (the LoRA adapter) per tenant
+  // (#489). Non-secret; null on the platform/flagship host.
+  const slug = (await resolveTenant().catch(() => null))?.slug ?? null
   return NextResponse.json(
     {
+      slug,
       identity: {
         name: c.identity.name,
         email: c.identity.email,
@@ -30,6 +35,9 @@ export async function GET() {
         ondeviceFinetuneMobileEnabled: c.flags.ondeviceFinetuneMobileEnabled,
         ondeviceFinetuneDesktopEnabled: c.flags.ondeviceFinetuneDesktopEnabled,
         aiStorefrontEnabled,
+        digitalProductsEnabled: c.flags.digitalProductsEnabled,
+        subscriptionsEnabled: c.flags.subscriptionsEnabled,
+        vaultDownloadsEnabled: c.flags.vaultDownloadsEnabled,
       },
       orderAutoCancelMinutes: c.values.orderAutoCancelMinutes,
       storefront: {

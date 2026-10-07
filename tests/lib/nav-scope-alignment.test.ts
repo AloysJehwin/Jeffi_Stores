@@ -49,7 +49,7 @@ describe('a nav link is gated on the same scope as the page it points at', () =>
  * only their own products:* gate, which every plan has.
  */
 describe('every admin API directory resolves to a scope', () => {
-  const dirs = ['merchant', 'social-posts', 'returns', 'replacements', 'crm', 'tasks', 'traffic']
+  const dirs = ['merchant', 'social-posts', 'returns', 'replacements', 'crm', 'tasks', 'traffic', 'loyalty']
 
   it('maps each feature directory to a scope', () => {
     const unmapped = dirs.filter(d => !getScopeForPath(`/api/admin/${d}/anything`))

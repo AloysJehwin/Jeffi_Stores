@@ -92,7 +92,7 @@ async function BusinessRFQsStats() {
 
   return (
     <div className="animate-fade-in">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:h-56">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:min-h-56">
         <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white">
           <div>
             <p className="text-white/80 text-sm">Total RFQs</p>
@@ -170,7 +170,9 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
       </div>
 
       {/* Stats + trend stream above the filters while the shell stays mounted */}
-      <Suspense fallback={<AdminStatsSkeleton cards={6} gridClass="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" banner />}>
+      <Suspense
+        fallback={<AdminStatsSkeleton cards={6} gridClass="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" banner />}
+      >
         <BusinessRFQsStats />
       </Suspense>
 
@@ -182,11 +184,11 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
           name="search"
           defaultValue={search}
           placeholder="Search by RFQ number, company, email…"
-          className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+          className="flex-1 px-3 h-control-sm text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
         <button
           type="submit"
-          className="px-4 py-1.5 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
+          className="px-4 h-control-sm text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
         >
           Search
         </button>
@@ -373,6 +375,7 @@ async function BusinessRFQsListContent({ resolvedSearchParams, host }: { resolve
             {page > 1 && (
               <Link
                 href={buildUrl(page - 1)}
+                scroll={false}
                 className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
               >
                 Previous
@@ -384,6 +387,7 @@ async function BusinessRFQsListContent({ resolvedSearchParams, host }: { resolve
             {page < totalPages && (
               <Link
                 href={buildUrl(page + 1)}
+                scroll={false}
                 className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
               >
                 Next

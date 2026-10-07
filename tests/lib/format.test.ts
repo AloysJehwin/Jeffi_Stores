@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest'
-import { humanizeLabel, formatINR, formatDate, numberToWords } from '@/lib/shared/format'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import {
+  humanizeLabel,
+  formatINR,
+  formatDate,
+  numberToWords,
+  normalizeDob,
+  isValidDob,
+  formatDob,
+} from '@/lib/shared/format'
 
 describe('humanizeLabel', () => {
   it('title-cases an underscore key', () => {
@@ -95,5 +103,109 @@ describe('numberToWords', () => {
     expect(numberToWords(12345678.99)).toBe(
       'One Crore Twenty Three Lakh Forty Five Thousand Six Hundred and Seventy Eight and Ninety Nine paise'
     )
+  })
+})
+
+describe('normalizeDob', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('returns a real past date unchanged', () => {
+    expect(normalizeDob('1990-05-15')).toBe('1990-05-15')
+    expect(normalizeDob('  1990-05-15  ')).toBe('1990-05-15')
+  })
+
+  it('rejects anything that is not a YYYY-MM-DD string', () => {
+    for (const bad of [
+      undefined,
+      null,
+      19900515,
+      '',
+      '15-05-1990',
+      '1990/05/15',
+      '1990-5-15',
+      '1990-05-15T00:00:00Z',
+    ]) {
+      expect(normalizeDob(bad)).toBeNull()
+    }
+  })
+
+  it('rejects calendar dates that do not exist', () => {
+    expect(normalizeDob('1990-02-30')).toBeNull()
+    expect(normalizeDob('1990-13-01')).toBeNull()
+    expect(normalizeDob('1990-00-10')).toBeNull()
+    expect(normalizeDob('2001-02-29')).toBeNull()
+    expect(normalizeDob('2000-02-29')).toBe('2000-02-29')
+  })
+
+  it('rejects a date in the future', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-04T12:00:00Z'))
+    expect(normalizeDob('2026-10-05')).toBeNull()
+    expect(normalizeDob('2030-01-01')).toBeNull()
+  })
+
+  it('accepts a third birthday today and rejects one that is a day away', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-04T12:00:00Z'))
+    expect(normalizeDob('2023-10-04')).toBe('2023-10-04')
+    expect(normalizeDob('2023-10-05')).toBeNull()
+  })
+
+  it('accepts age 120 and rejects age 121', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-04T12:00:00Z'))
+    expect(normalizeDob('1905-10-05')).toBe('1905-10-05')
+    expect(normalizeDob('1905-10-04')).toBeNull()
+  })
+})
+
+describe('isValidDob', () => {
+  it('agrees with normalizeDob', () => {
+    expect(isValidDob('1990-05-15')).toBe(true)
+    expect(isValidDob('1990-02-30')).toBe(false)
+    expect(isValidDob('')).toBe(false)
+  })
+})
+
+describe('formatDob', () => {
+  it('reads a pg DATE, a Date at local midnight, back as the same calendar day', () => {
+    expect(formatDob(new Date(1990, 4, 15))).toBe('1990-05-15')
+    expect(formatDob(new Date(2000, 0, 1))).toBe('2000-01-01')
+  })
+
+  it('does not lose a day in a timezone ahead of UTC', () => {
+    const original = process.env.TZ
+    process.env.TZ = 'Asia/Kolkata'
+    try {
+      const fromPg = new Date(1990, 4, 15)
+      expect(fromPg.toISOString().slice(0, 10)).toBe('1990-05-14')
+      expect(formatDob(fromPg)).toBe('1990-05-15')
+    } finally {
+      if (original === undefined) delete process.env.TZ
+      else process.env.TZ = original
+    }
+  })
+
+  it('does not gain a day in a timezone behind UTC', () => {
+    const original = process.env.TZ
+    process.env.TZ = 'America/Los_Angeles'
+    try {
+      expect(formatDob(new Date(1990, 4, 15))).toBe('1990-05-15')
+    } finally {
+      if (original === undefined) delete process.env.TZ
+      else process.env.TZ = original
+    }
+  })
+
+  it('passes a date-only string through', () => {
+    expect(formatDob('1990-05-15')).toBe('1990-05-15')
+  })
+
+  it('returns null for empty or non-date values', () => {
+    for (const bad of [null, undefined, '', 'not a date', new Date('invalid'), 19900515, '1990-05-15T00:00:00.000Z']) {
+      expect(formatDob(bad)).toBeNull()
+    }
   })
 })

@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query, queryMany } from '@/lib/shared/db'
 import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/catalog/selling-unit'
+import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,6 +98,13 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+
+  const digital = await queryOne<{ is_digital: boolean }>(
+    `SELECT COALESCE(NULLIF(d.fields->>'is_digital', '')::boolean, p.is_digital, false) AS is_digital
+       FROM products p LEFT JOIN product_drafts d ON d.product_id = p.id WHERE p.id = $1`,
+    [id]
+  )
+  if (digital?.is_digital) return NextResponse.json({ error: DIGITAL_UNIT_MESSAGE }, { status: 409 })
 
   const variantId = req.nextUrl.searchParams.get('variant_id')
   const subVariantId = req.nextUrl.searchParams.get('sub_variant_id')

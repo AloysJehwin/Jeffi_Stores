@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
+import { CampaignCardListSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
@@ -169,27 +170,7 @@ export default function CampaignsListClient() {
     return `${((num / den) * 100).toFixed(1)}%`
   }
 
-  if (loading)
-    return (
-      <div className="space-y-3">
-        {[...Array(4)].map((_, i) => (
-          <div
-            key={i}
-            className="bg-surface-elevated rounded-xl border border-border-default p-5 animate-pulse"
-            style={{ animationDelay: `${i * 50}ms` }}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 space-y-2">
-                <div className="h-5 w-40 bg-surface-secondary rounded" />
-                <div className="h-3 w-56 bg-surface-secondary rounded" />
-                <div className="h-3 w-32 bg-surface-secondary rounded" />
-              </div>
-              <div className="h-8 w-20 bg-surface-secondary rounded-lg" />
-            </div>
-          </div>
-        ))}
-      </div>
-    )
+  if (loading) return <CampaignCardListSkeleton />
 
   return (
     <div className="space-y-3">
@@ -237,7 +218,7 @@ export default function CampaignsListClient() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search campaigns..."
-            className="w-full pl-9 pr-8 py-2 text-sm bg-surface-elevated border border-border-default rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40 focus:border-accent-500 transition-colors"
+            className="w-full pl-9 pr-8 h-control text-sm bg-surface-elevated border border-border-default rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40 focus:border-accent-500 transition-colors"
           />
           {search && (
             <button
@@ -341,7 +322,7 @@ export default function CampaignsListClient() {
                         type="button"
                         onClick={() => discardDraft(d)}
                         disabled={busy === d.kind}
-                        className="px-2.5 py-1 text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors disabled:opacity-50"
+                        className="px-2.5 h-control-sm text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors disabled:opacity-50"
                       >
                         {busy === d.kind ? '…' : 'Discard'}
                       </button>
@@ -410,7 +391,7 @@ export default function CampaignsListClient() {
                     type="button"
                     onClick={() => runNow(c)}
                     disabled={busy === c.kind || !c.enabled}
-                    className="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+                    className="px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
                   >
                     Run now
                   </button>
@@ -491,7 +472,7 @@ export default function CampaignsListClient() {
                 setOffset(o)
                 load(o)
               }}
-              className="px-3 py-1.5 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+              className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
             >
               Previous
             </button>
@@ -502,7 +483,7 @@ export default function CampaignsListClient() {
                 setOffset(o)
                 load(o)
               }}
-              className="px-3 py-1.5 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+              className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
             >
               Next
             </button>

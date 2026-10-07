@@ -1,12 +1,12 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
   minMinutesAfterCancel: number
   autoCancelMaxMinutes: number
-  sendCooldownDays: number
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
 }
@@ -16,6 +16,7 @@ interface Row {
   user_id: string
   order_number: string
   total_amount: string
+  order_type?: string | null
 }
 
 export const abandonedCheckout: ScenarioModule<Params, Row> = {
@@ -25,34 +26,28 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
   trigger:
     "Fires when an order is auto-cancelled because Razorpay payment didn't complete within the 10-minute window. Only orders cancelled within ~15 min of creation are treated as auto-cancels (not manual cancellations days later). Sends at most once per cooldown window per user.",
   defaultParams: {
-    minMinutesAfterCancel: 15,
-    autoCancelMaxMinutes: 15,
-    sendCooldownDays: 1,
+    minMinutesAfterCancel: minutes(15),
+    autoCancelMaxMinutes: minutes(15),
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
   },
   paramSchema: {
     minMinutesAfterCancel: {
-      type: 'integer',
-      min: 1,
-      max: 120,
-      label: 'Minimum minutes after cancel',
+      type: 'duration',
+      recommendedUnit: 'minutes',
+      min: minutes(1),
+      max: minutes(120),
+      label: 'Minimum wait after cancel',
       description: 'Wait at least this many minutes after the order was cancelled',
     },
     autoCancelMaxMinutes: {
-      type: 'integer',
-      min: 5,
-      max: 120,
-      label: 'Auto-cancel detection (minutes)',
+      type: 'duration',
+      recommendedUnit: 'minutes',
+      min: minutes(5),
+      max: minutes(120),
+      label: 'Auto-cancel detection window',
       description:
         'Only treat as auto-cancel if cancelled within N minutes of order creation. Filters out manual late cancellations.',
-    },
-    sendCooldownDays: {
-      type: 'integer',
-      min: 1,
-      max: 30,
-      label: 'Per-user cooldown (days)',
-      description: 'Skip users sent this campaign within N days',
     },
     maxRecipientsPerSweep: {
       type: 'integer',
@@ -69,10 +64,13 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
   },
 
   async findEligible({ campaign, params }) {
+    const minAfterCancel = readDurationParam(params, 'minMinutesAfterCancel') ?? minutes(15)
+    const autoCancelMax = readDurationParam(params, 'autoCancelMaxMinutes') ?? minutes(15)
+    const cooldownMin = cooldownMinutes(params)
     return queryMany<Row>(
       `
       SELECT DISTINCT ON (o.user_id)
-        o.id, o.user_id, o.order_number, o.total_amount::text
+        o.id, o.user_id, o.order_number, o.total_amount::text, o.order_type
       FROM orders o
       JOIN users u ON u.id = o.user_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
@@ -86,7 +84,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
             AND ecs.user_id = o.user_id
-            AND ecs.sent_at > NOW() - ($4 || ' days')::interval
+            AND ecs.sent_at > NOW() - ($4 || ' minutes')::interval
         )
       ORDER BY o.user_id, o.updated_at DESC
       LIMIT $5
@@ -94,15 +92,18 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
       [
         campaign.kind,
         campaign.delay_hours,
-        params.minMinutesAfterCancel,
-        params.sendCooldownDays,
+        String(minAfterCancel),
+        String(cooldownMin),
         params.maxRecipientsPerSweep,
-        params.autoCancelMaxMinutes,
+        String(autoCancelMax),
       ]
     )
   },
 
   async findSuppressed({ campaign, params }) {
+    const minAfterCancel = readDurationParam(params, 'minMinutesAfterCancel') ?? minutes(15)
+    const autoCancelMax = readDurationParam(params, 'autoCancelMaxMinutes') ?? minutes(15)
+    const cooldownMin = cooldownMinutes(params)
     const rows = await queryMany<{
       id: string
       user_id: string
@@ -138,7 +139,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
           ELSE NULL
         END AS reason_detail,
         CASE
-          WHEN ecs.sent_at IS NOT NULL THEN (ecs.sent_at + ($4 || ' days')::interval)::text
+          WHEN ecs.sent_at IS NOT NULL THEN (ecs.sent_at + ($4 || ' minutes')::interval)::text
           ELSE NULL
         END AS blocked_until
       FROM latest_cancelled lc
@@ -147,7 +148,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         SELECT sent_at FROM email_campaigns_sent
          WHERE campaign_kind = $1
            AND user_id = lc.user_id::uuid
-           AND sent_at > NOW() - ($4 || ' days')::interval
+           AND sent_at > NOW() - ($4 || ' minutes')::interval
          ORDER BY sent_at DESC LIMIT 1
       ) ecs ON TRUE
       WHERE u.is_active = FALSE OR u.marketing_opt_out = TRUE OR ecs.sent_at IS NOT NULL
@@ -156,9 +157,9 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
       [
         campaign.kind,
         campaign.delay_hours,
-        params.minMinutesAfterCancel,
-        params.sendCooldownDays,
-        params.autoCancelMaxMinutes,
+        String(minAfterCancel),
+        String(cooldownMin),
+        String(autoCancelMax),
       ]
     )
     return rows.map(r => ({
@@ -208,6 +209,14 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 
+    // Cancelling a cart order puts its items back in the cart; a "buy now" order's items never were
+    // in it, so that customer goes back to the product instead of an empty cart.
+    const firstSlug = items.find(i => i.product_slug)?.product_slug
+    const ctaUrl =
+      row.order_type === 'direct' && firstSlug
+        ? `${user.baseUrl}/products/${encodeURIComponent(firstSlug)}`
+        : `${user.baseUrl}/cart`
+
     const emailResult = await sendCampaignEmail({
       campaign,
       user,
@@ -219,7 +228,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         itemsHtml,
         couponCode,
         discountPercent,
-        ctaUrl: `${user.baseUrl}/cart`,
+        ctaUrl,
       },
     })
     if ((params as any).whatsappEnabled) {

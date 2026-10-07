@@ -44,6 +44,19 @@ export function verifyAdminState(state: string): AdminOAuthState | null {
   }
 }
 
+// The signed state carries a tenant-stamped returnBase, but the callback is cross-site and
+// unauthenticated, so the host is trusted only when it exactly matches the admin host the verified
+// tenantId resolves to on the server. Returns the approved origin, or null to fall back to default.
+export function safeReturnBase(returnBase: string | undefined, expectedAdminBase: string): string | null {
+  if (!returnBase) return null
+  try {
+    const got = new URL(returnBase)
+    const want = new URL(expectedAdminBase)
+    if (got.protocol === 'https:' && got.host === want.host) return got.origin
+  } catch {}
+  return null
+}
+
 // The admin cookie is SameSite=Strict and withheld for the whole redirect chain that began at the
 // provider, so a plain redirect lands on /login. Navigating from this page makes the last hop same-site.
 export function returnToAdmin(url: string): NextResponse {

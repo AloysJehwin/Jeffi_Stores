@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getCustomerById } from '@/lib/queries'
 import { ap } from '@/lib/shared/admin-path'
+import { isFulfilledStatus } from '@/lib/orders/fulfilled-status'
 import { getHost } from '@/lib/tenancy/get-host'
 import { hasScope } from '@/lib/auth/scopes'
 import CustomerActionButton from '@/app/(admin)/admin/customers/[id]/_components/CustomerActionButton'
@@ -16,6 +17,8 @@ import CustomerTimeline from '@/app/(admin)/admin/customers/[id]/_components/Cus
 import CustomerAiSummary from '@/app/(admin)/admin/customers/[id]/_components/CustomerAiSummary'
 import CustomerConversations from '@/app/(admin)/admin/customers/[id]/_components/CustomerConversations'
 import HealthScoreCard from '@/app/(admin)/admin/customers/[id]/_components/HealthScoreCard'
+import CustomerLoyaltyCard from '@/app/(admin)/admin/customers/[id]/_components/CustomerLoyaltyCard'
+import CustomerReferralsCard from '@/app/(admin)/admin/customers/[id]/_components/CustomerReferralsCard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -29,6 +32,7 @@ function formatOrderStatus(status: string) {
     shipped: 'Shipped',
     out_for_delivery: 'Out for Delivery',
     delivered: 'Delivered',
+    granted: 'Access granted',
     cancelled: 'Cancelled',
     return_requested: 'Return Requested',
     return_approved: 'Return Approved',
@@ -53,7 +57,7 @@ function formatPaymentStatus(status: string) {
 }
 
 function orderStatusBadge(status: string) {
-  if (['delivered', 'replaced'].includes(status))
+  if (isFulfilledStatus(status) || status === 'replaced')
     return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
   if (['cancelled', 'return_rejected'].includes(status))
     return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
@@ -347,6 +351,10 @@ export default async function CustomerDetailPage({
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <CustomerTasks customerId={customer.id} canWrite={canWrite} />
           </div>
+
+          <CustomerLoyaltyCard customerId={customer.id} />
+
+          <CustomerReferralsCard customerId={customer.id} email={customer.email} host={host} />
 
           {/* Business details (customer_profiles) */}
           {(customer.company_name || customer.gst_number || customer.credit_limit) && (

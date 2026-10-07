@@ -74,7 +74,19 @@ export async function generateTotpSecret(): Promise<string> {
 }
 
 export async function buildOtpauthUrl(label: string, secret: string, issuer?: string): Promise<string> {
-  return await generateURI({ secret, label, issuer: issuer?.trim() || PLATFORM_ISSUER })
+  // Default the authenticator-app issuer to the CURRENT store's name so a tenant owner enrolling on
+  // their own store sees their brand, not the platform's. Falls back to the platform issuer.
+  let resolved = issuer?.trim() || ''
+  if (!resolved) {
+    try {
+      const { currentBrandNameAsync } = await import('@/lib/catalog/brand')
+      const brand = (await currentBrandNameAsync()).trim()
+      resolved = brand ? `${brand} Admin` : PLATFORM_ISSUER
+    } catch {
+      resolved = PLATFORM_ISSUER
+    }
+  }
+  return await generateURI({ secret, label, issuer: resolved })
 }
 
 export async function verifyTotp(secret: string, code: string): Promise<boolean> {

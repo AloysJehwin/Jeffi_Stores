@@ -187,14 +187,14 @@ export default function GoogleMerchantPanel() {
             <button
               onClick={syncNow}
               disabled={syncing}
-              className="px-3 py-1.5 text-sm border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50 transition-colors"
+              className="px-3 h-control-sm text-sm border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50 transition-colors"
             >
               {syncing ? 'Pushing…' : 'Sync now (push to Google)'}
             </button>
             <button
               onClick={refresh}
               disabled={refreshing}
-              className="px-3 py-1.5 text-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 transition-colors"
+              className="px-3 h-control-sm text-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 transition-colors"
             >
               {refreshing ? 'Refreshing…' : 'Refresh from Google'}
             </button>
@@ -225,7 +225,7 @@ export default function GoogleMerchantPanel() {
                 if (e.key === 'Enter') doSearch()
               }}
               placeholder="Search SKU or title…"
-              className="px-3 py-1.5 text-sm border border-border-default rounded-lg bg-surface text-foreground w-64 max-w-full"
+              className="px-3 h-control-sm text-sm border border-border-default rounded-lg bg-surface text-foreground w-64 max-w-full"
             />
             <button onClick={doSearch} className={btn}>
               Search
@@ -236,7 +236,7 @@ export default function GoogleMerchantPanel() {
               <button
                 key={st}
                 onClick={() => changeStatus(st)}
-                className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${statusFilter === st ? 'bg-accent-500 text-white border-accent-500' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                className={`px-2.5 h-control-sm text-xs rounded-lg border transition-colors ${statusFilter === st ? 'bg-accent-500 text-white border-accent-500' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
               >
                 {st}
               </button>

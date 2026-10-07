@@ -9,6 +9,9 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
 import QuantityInput from '@/components/shared/QuantityInput'
+import InCartQtyHint from '@/components/shared/InCartQtyHint'
+import { inCartQuantity, pickerQtyCap, unitCapError } from '@/lib/catalog/cart-unit-cap'
+import SubscribeOption, { type PurchaseMode } from '@/components/subscriptions/SubscribeOption'
 import { round2 } from '@/lib/catalog/gst'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
 
@@ -92,6 +95,9 @@ interface ProductActionsProps {
   handlingDays?: number
   is_active?: boolean
   isCodAllowed?: boolean | null
+  digital?: boolean
+  isSubscription?: boolean
+  subscriptionIntervals?: string[] | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -146,8 +152,11 @@ export default function ProductActions({
   handlingDays = 2,
   is_active = true,
   isCodAllowed,
+  digital = false,
+  isSubscription = false,
+  subscriptionIntervals = null,
 }: ProductActionsProps) {
-  const { addToCart } = useCart()
+  const { addToCart, cartItems } = useCart()
   const { showToast } = useToast()
   const router = useRouter()
   const { user } = useAuth()
@@ -193,6 +202,8 @@ export default function ProductActions({
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [quantityRaw, setQuantityRaw] = useState('1')
+  const [purchaseMode, setPurchaseMode] = useState<PurchaseMode>('once')
+  const subscribing = purchaseMode === 'subscribe'
 
   const pricingTypes = Array.from(new Set(variants.map(v => v.pricing_type || 'unit')))
   const hasMultipleModes = pricingTypes.length > 1
@@ -395,7 +406,7 @@ export default function ProductActions({
       ? getPerUnitRate(effectivePrice, selectedVariant.numeric_value, selectedVariant.unit)
       : null
 
-  const units = productUnitsProp ?? []
+  const units = digital ? [] : (productUnitsProp ?? [])
   const variantSellUnitId = variants.find(v => v.id === selectedVariantId)?.sell_unit_id ?? null
   const sellUnit = (() => {
     // 1. Variant's explicit sell_unit_id pointer
@@ -459,6 +470,18 @@ export default function ProductActions({
           : 1
   const qtyMin = sellUnit?.min_qty != null ? Number(sellUnit.min_qty) : 1
   const qtyMax = sellUnit?.max_qty != null ? Number(sellUnit.max_qty) : undefined
+  // Input stays at max_qty for Buy Now; Add to Cart is capped by what this line already holds.
+  const cartCap = pickerQtyCap(
+    qtyMax,
+    inCartQuantity(cartItems, {
+      productId,
+      variantId: selectedVariantId,
+      subVariantId: selectedSubVariantId,
+      buyMode: effectiveUnitKey,
+    }),
+    qtyMin
+  )
+  const addBlocked = cartCap.full || (cartCap.max != null && quantity > cartCap.max)
 
   useEffect(() => {
     setQuantity(qtyMin)
@@ -482,6 +505,10 @@ export default function ProductActions({
   }, [effectiveUnitKey, effectiveUnitLabel, qtyMin, qtyMax, qtyStep, unitFactor, sellUnit?.dimension])
 
   const handleAddToCart = async () => {
+    if (addBlocked) {
+      showToast(unitCapError(qtyMax, cartCap.inCart, quantity) ?? 'Max quantity already in cart', 'error')
+      return
+    }
     setIsAddingToCart(true)
     try {
       if (selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && !selectedSubVariantId) {
@@ -893,21 +920,26 @@ export default function ProductActions({
                 )}
               </div>
             </div>
-            <QuantityInput
-              dimension={sellUnit?.dimension ?? 'count'}
-              quantity={quantity}
-              quantityRaw={quantityRaw}
-              unitLabel={effectiveUnitLabel}
-              unitKey={effectiveUnitKey}
-              effectiveStock={effectiveStock}
-              qtyStep={qtyStep}
-              qtyMin={qtyMin}
-              qtyMax={qtyMax}
-              onChange={(qty, raw) => {
-                setQuantity(qty)
-                setQuantityRaw(raw)
-              }}
-            />
+            {!subscribing && !digital && (
+              <QuantityInput
+                dimension={sellUnit?.dimension ?? 'count'}
+                quantity={quantity}
+                quantityRaw={quantityRaw}
+                unitLabel={effectiveUnitLabel}
+                unitKey={effectiveUnitKey}
+                effectiveStock={effectiveStock}
+                qtyStep={qtyStep}
+                qtyMin={qtyMin}
+                qtyMax={qtyMax}
+                onChange={(qty, raw) => {
+                  setQuantity(qty)
+                  setQuantityRaw(raw)
+                }}
+              />
+            )}
+            {!subscribing && !digital && (
+              <InCartQtyHint cap={cartCap} unitLabel={effectiveUnitLabel} adding={quantity} />
+            )}
           </div>
         </>
       )}
@@ -1128,71 +1160,100 @@ export default function ProductActions({
                 )}
               </div>
             </div>
-            <QuantityInput
-              dimension={sellUnit?.dimension ?? 'count'}
-              quantity={quantity}
-              quantityRaw={quantityRaw}
-              unitLabel={effectiveUnitLabel}
-              unitKey={effectiveUnitKey}
-              effectiveStock={effectiveStock}
-              qtyStep={qtyStep}
-              qtyMin={qtyMin}
-              qtyMax={qtyMax}
-              onChange={(qty, raw) => {
-                setQuantity(qty)
-                setQuantityRaw(raw)
-              }}
-            />
+            {!subscribing && !digital && (
+              <QuantityInput
+                dimension={sellUnit?.dimension ?? 'count'}
+                quantity={quantity}
+                quantityRaw={quantityRaw}
+                unitLabel={effectiveUnitLabel}
+                unitKey={effectiveUnitKey}
+                effectiveStock={effectiveStock}
+                qtyStep={qtyStep}
+                qtyMin={qtyMin}
+                qtyMax={qtyMax}
+                onChange={(qty, raw) => {
+                  setQuantity(qty)
+                  setQuantityRaw(raw)
+                }}
+              />
+            )}
+            {!subscribing && !digital && (
+              <InCartQtyHint cap={cartCap} unitLabel={effectiveUnitLabel} adding={quantity} />
+            )}
           </div>
         </>
       )}
 
-      <div className="space-y-3">
-        <button
-          onClick={handleBuyNow}
-          disabled={!is_active || effectiveStock === 0 || isBuyingNow}
-          className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
-        >
-          {isBuyingNow ? (
-            <>
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Buy Now
-            </>
-          )}
-        </button>
+      <SubscribeOption
+        productId={productId}
+        variantId={selectedVariantId}
+        subVariantId={selectedSubVariantId}
+        isSubscription={isSubscription}
+        intervals={subscriptionIntervals}
+        digital={digital}
+        isBusiness
+        mode={purchaseMode}
+        onModeChange={setPurchaseMode}
+        disabled={!is_active}
+        needsChoice={
+          hasVariants && !selectedVariant
+            ? 'Select an option to see the subscription price.'
+            : !!selectedVariant?.sub_variants?.length && !selectedSubVariantId
+              ? `Select a ${selectedVariant.sub_variant_type || 'sub-variant'} to see the subscription price.`
+              : null
+        }
+      />
 
-        <button
-          onClick={handleAddToCart}
-          disabled={!is_active || effectiveStock === 0 || isAddingToCart}
-          className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
-        >
-          {isAddingToCart ? (
-            <>
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-              Adding...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              Add to Cart
-            </>
+      {!subscribing && (
+        <div className="space-y-3">
+          <button
+            onClick={handleBuyNow}
+            disabled={!is_active || effectiveStock === 0 || isBuyingNow}
+            className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
+          >
+            {isBuyingNow ? (
+              <>
+                <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Buy Now
+              </>
+            )}
+          </button>
+
+          {!digital && (
+            <button
+              onClick={handleAddToCart}
+              disabled={!is_active || effectiveStock === 0 || isAddingToCart || addBlocked}
+              className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
+            >
+              {isAddingToCart ? (
+                <>
+                  <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                    />
+                  </svg>
+                  {cartCap.full ? 'Max quantity already in cart' : 'Add to Cart'}
+                </>
+              )}
+            </button>
           )}
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   )
 }

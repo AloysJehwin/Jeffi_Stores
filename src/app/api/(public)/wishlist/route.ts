@@ -9,6 +9,7 @@ import {
   VARIANT_MIN_PRICE_EX_GST_SQL,
   VARIANT_MIN_MRP_SQL,
   VARIANT_STOCK_TOTAL_SQL,
+  PRODUCT_IN_STOCK_SQL,
 } from '@/lib/queries'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { logActivity } from '@/lib/shared/activity'
@@ -34,6 +35,17 @@ export async function GET(request: NextRequest) {
   try {
     const userId = await resolveUserId(request)
 
+    // ?ids=1: just the saved product ids, for the hearts and header count on every page.
+    if (new URL(request.url).searchParams.get('ids') === '1') {
+      const rows = await queryMany<{ product_id: string }>(
+        `SELECT wi.product_id::text AS product_id
+         FROM wishlist_items wi JOIN products p ON p.id = wi.product_id AND p.is_active = true
+         WHERE wi.user_id = $1`,
+        [userId]
+      )
+      return NextResponse.json({ productIds: rows.map(row => row.product_id) })
+    }
+
     const { gstEnabled } = await getFeatureFlags()
     const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
 
@@ -42,11 +54,12 @@ export async function GET(request: NextRequest) {
       SELECT
         wi.id, wi.product_id, wi.created_at,
         wi.snapshot_price, wi.snapshot_in_stock,
-        (p.inventory_quantity > 0) AS inventory_in_stock,
+        ${PRODUCT_IN_STOCK_SQL} AS inventory_in_stock,
         json_build_object(
           'id', p.id, 'name', p.name, 'slug', p.slug,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'mrp', p.mrp, 'has_variants', p.has_variants,
+          'is_digital', COALESCE(p.is_digital, FALSE),
           'stock_status', p.stock_status,
           'variant_stock_total', ${VARIANT_STOCK_TOTAL_SQL},
           'variant_min_price', ${MIN_PRICE_SQL},
@@ -90,7 +103,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Item already in wishlist' })
     }
 
-    await query('INSERT INTO wishlist_items (user_id, product_id) VALUES ($1, $2)', [userId, productId])
+    const inserted = await query(
+      `INSERT INTO wishlist_items (user_id, product_id, snapshot_price, snapshot_in_stock, snapshot_taken_at)
+       SELECT $1::uuid, p.id, p.base_price, ${PRODUCT_IN_STOCK_SQL}, NOW()
+       FROM products p WHERE p.id = $2`,
+      [userId, productId]
+    )
+    if (!inserted.rowCount) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
 
     const auth = await authenticateUser(request)
     if (auth?.userId) {

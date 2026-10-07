@@ -234,7 +234,7 @@ export default function NewScenarioClient() {
                   type="button"
                   onClick={generate}
                   disabled={generating || !aiPrompt.trim()}
-                  className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                  className="px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
                 >
                   {generating ? 'Generating…' : 'Generate SQL with AI'}
                 </button>
@@ -367,7 +367,7 @@ export default function NewScenarioClient() {
                 type="button"
                 onClick={dryRun}
                 disabled={dryRunning || !validationOk}
-                className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                className="px-4 h-control bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
               >
                 {dryRunning ? 'Running…' : dryRunCount !== null ? 'Re-run dry run' : 'Run dry run'}
               </button>
@@ -477,7 +477,7 @@ export default function NewScenarioClient() {
                     value={name}
                     onChange={e => setName(e.target.value)}
                     placeholder="e.g. One-time buyers"
-                    className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    className="w-full px-3 h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
                   />
                 </div>
                 <div>
@@ -489,7 +489,7 @@ export default function NewScenarioClient() {
                     value={kind}
                     onChange={e => setKind(e.target.value.toLowerCase().replace(/[^a-z0-9_]+/g, '_'))}
                     placeholder={name ? slugify(name) : 'auto from name'}
-                    className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    className="w-full px-3 h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
                   />
                   <p className="text-[10px] text-foreground-muted mt-1">
                     Lowercase letters, numbers, underscores. Auto-generated from name if blank.
@@ -504,7 +504,7 @@ export default function NewScenarioClient() {
                   type="text"
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  className="w-full px-3 h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
                 />
               </div>
 
@@ -514,7 +514,7 @@ export default function NewScenarioClient() {
                     type="button"
                     onClick={save}
                     disabled={saving || !name.trim()}
-                    className="px-5 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                    className="px-5 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
                   >
                     {saving ? 'Saving…' : 'Save scenario (paused)'}
                   </button>

@@ -16,6 +16,7 @@ vi.mock('@/lib/shared/email-campaigns', () => ({
 }))
 
 import { reviewRequest } from '@/lib/campaigns/scenarios/review-request'
+import { days } from '@/lib/campaigns/duration'
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/lib/shared/automation-emails'
 import { generateReviewToken } from '@/lib/auth/jwt'
@@ -52,13 +53,14 @@ describe('reviewRequest scenario', () => {
   })
 
   it('has defaultParams with expected values', () => {
-    expect(defaultParams.lookbackDays).toBe(30)
+    expect(defaultParams.lookbackDays).toBe(days(30))
     expect(defaultParams.maxRecipientsPerSweep).toBe(50)
   })
 
-  it('has a paramSchema', () => {
+  it('has a paramSchema with lookback as a duration field', () => {
     expect(reviewRequest.paramSchema).toBeDefined()
     expect(reviewRequest.paramSchema.lookbackDays).toBeDefined()
+    expect(reviewRequest.paramSchema.lookbackDays.type).toBe('duration')
     expect(reviewRequest.paramSchema.maxRecipientsPerSweep).toBeDefined()
   })
 
@@ -68,6 +70,12 @@ describe('reviewRequest scenario', () => {
       const rows = await reviewRequest.findEligible({ campaign, params: defaultParams })
       expect(rows).toHaveLength(1)
       expect(rows[0]).toEqual(row)
+    })
+
+    it('counts granted (digital) orders as fulfilled', async () => {
+      mockQueryMany.mockResolvedValue([])
+      await reviewRequest.findEligible({ campaign, params: defaultParams })
+      expect(String(mockQueryMany.mock.calls[0][0])).toContain("o.status IN ('delivered', 'granted')")
     })
 
     it('passes campaign kind and params to queryMany', async () => {

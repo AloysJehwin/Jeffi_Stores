@@ -4,10 +4,16 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
-vi.mock('@/lib/shared/template-vars', () => ({
-  buildVarMap: vi.fn().mockReturnValue({ recipient_first_name: 'Alice' }),
-  substituteVars: vi.fn().mockImplementation((t: string) => t),
-}))
+vi.mock('@/lib/templates/variables', async () => {
+  const shared = await vi.importActual<typeof import('@/lib/templates/variables-shared')>(
+    '@/lib/templates/variables-shared'
+  )
+  return {
+    ...shared,
+    resolveTemplateVariables: vi.fn(async () => ({ customer_first_name: 'Alice', store_name: 'Acme' })),
+    createTemplateVariableResolver: vi.fn(async () => () => ({ customer_first_name: 'Alice', store_name: 'Acme' })),
+  }
+})
 
 import { POST } from '@/app/api/(admin)/admin/orders/[id]/send-customer-mail/preview/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'

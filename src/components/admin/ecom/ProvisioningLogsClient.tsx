@@ -261,7 +261,7 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
       <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={load}
-          className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium hover:bg-surface-secondary transition-colors"
+          className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium hover:bg-surface-secondary transition-colors"
         >
           Refresh
         </button>

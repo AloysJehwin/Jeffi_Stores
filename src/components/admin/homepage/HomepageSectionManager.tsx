@@ -158,7 +158,7 @@ export default function HomepageSectionManager({ initial, options, heroEditor, a
           <button
             type="button"
             onClick={() => setPicking(p => !p)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border border-border-secondary text-foreground hover:bg-surface-secondary"
+            className="inline-flex items-center gap-1.5 px-3 h-control text-sm font-medium rounded-lg border border-border-secondary text-foreground hover:bg-surface-secondary"
           >
             <Plus className="w-4 h-4" /> Add section
           </button>

@@ -138,29 +138,45 @@ describe('POST /api/auth/google', () => {
     expect(res.status).toBe(401)
   })
 
-  it('creates new user when not found, returns login response', async () => {
+  it('returns the Google profile for an unknown identity without creating an account', async () => {
     mockIdTokenVerify(GOOGLE_PAYLOAD)
     mockQueryOne
-      .mockResolvedValueOnce(null) // user lookup → not found
-      .mockResolvedValueOnce(DB_USER) // INSERT → new user
-      .mockResolvedValueOnce(null) // guest user lookup
+      .mockResolvedValueOnce(null) // customer lookup → not found
+      .mockResolvedValueOnce(null) // business lookup → not found
     const res = await POST(makePost({ idToken: 'valid-token' }) as any)
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.message).toMatch(/login successful/i)
-    expect(body.user.email).toBe('user@example.com')
-    expect(mockCookieStore.set).toHaveBeenCalledWith('user_sid', 'user-sid', expect.any(Object))
+    expect(body).toEqual({
+      newUser: true,
+      profile: { email: 'user@example.com', firstName: 'John', lastName: 'Doe' },
+    })
+    const insertCalls = mockQueryOne.mock.calls.filter((c: any[]) => String(c[0]).includes('INSERT INTO users'))
+    expect(insertCalls).toHaveLength(0)
+    expect(mockQuery).not.toHaveBeenCalled()
   })
 
-  it('returns 500 when user insert returns null', async () => {
+  it('does not issue a session for an unknown identity', async () => {
     mockIdTokenVerify(GOOGLE_PAYLOAD)
-    mockQueryOne
-      .mockResolvedValueOnce(null) // user lookup → not found
-      .mockResolvedValueOnce(null) // INSERT → null
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
+    await POST(makePost({ idToken: 'valid-token' }) as any)
+    expect(mockIssueUserToken).not.toHaveBeenCalled()
+    expect(mockCookieStore.set).not.toHaveBeenCalled()
+  })
+
+  it('splits the display name when Google sends no given or family name', async () => {
+    mockIdTokenVerify({ ...GOOGLE_PAYLOAD, given_name: undefined, family_name: undefined, name: 'Mary Ann Smith' })
+    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(null)
     const res = await POST(makePost({ idToken: 'valid-token' }) as any)
-    expect(res.status).toBe(500)
     const body = await res.json()
-    expect(body.error).toMatch(/failed to create account/i)
+    expect(body.profile).toEqual({ email: 'user@example.com', firstName: 'Mary', lastName: 'Ann Smith' })
+  })
+
+  it('returns the stored date of birth of an existing user as YYYY-MM-DD', async () => {
+    mockIdTokenVerify(GOOGLE_PAYLOAD)
+    mockQueryOne.mockResolvedValueOnce({ ...DB_USER, date_of_birth: new Date(1990, 4, 15) }).mockResolvedValueOnce(null)
+    const res = await POST(makePost({ idToken: 'valid-token' }) as any)
+    const body = await res.json()
+    expect(body.user.dateOfBirth).toBe('1990-05-15')
   })
 
   it('logs in existing user and updates last_login', async () => {
@@ -236,7 +252,7 @@ describe('POST /api/auth/google', () => {
 
   it('uploads avatar picture when user has picture url', async () => {
     mockIdTokenVerify({ ...GOOGLE_PAYLOAD, picture: 'https://example.com/avatar.jpg' })
-    mockQueryOne.mockResolvedValueOnce(null).mockResolvedValueOnce(DB_USER).mockResolvedValueOnce(null)
+    mockQueryOne.mockResolvedValueOnce(DB_USER).mockResolvedValueOnce(null)
     // picture fetch
     mockFetch.mockResolvedValueOnce({
       ok: true,

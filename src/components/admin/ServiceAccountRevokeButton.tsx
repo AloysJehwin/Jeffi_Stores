@@ -39,7 +39,7 @@ export default function ServiceAccountRevokeButton({ id, name }: { id: string; n
       type="button"
       onClick={handleRevoke}
       disabled={loading}
-      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
+      className="inline-flex items-center gap-1.5 px-2.5 h-control-sm rounded-lg text-xs font-medium text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
     >
       {loading ? (
         <>

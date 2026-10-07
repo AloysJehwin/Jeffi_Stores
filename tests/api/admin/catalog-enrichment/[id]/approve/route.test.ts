@@ -167,8 +167,11 @@ describe('POST /api/admin/catalog-enrichment/[id]/approve', () => {
     const body = await res.json()
     expect(body.ok).toBe(true)
     expect(body.promoted).toBe(true)
-    // Two UPDATE queries for enrichment log + one for products
-    expect(vi.mocked(query)).toHaveBeenCalledTimes(3)
+    // Two UPDATE queries (enrichment log) + one for products + the embedding INSERT, which now
+    // goes through the TENANT pool (db.ts query), not a separate replica Pool (#489).
+    expect(vi.mocked(query)).toHaveBeenCalledTimes(4)
+    const sqls = vi.mocked(query).mock.calls.map(c => String(c[0]))
+    expect(sqls.some(s => /INSERT INTO embeddings/i.test(s))).toBe(true)
   })
 
   it('calls approve and product update queries with correct args', async () => {

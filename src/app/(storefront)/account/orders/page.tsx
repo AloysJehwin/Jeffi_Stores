@@ -86,6 +86,7 @@ function getStatusColor(status: string) {
     case 'out_for_delivery':
       return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
     case 'delivered':
+    case 'granted':
       return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
     case 'cancel_requested':
       return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
@@ -113,6 +114,8 @@ function getStatusLabel(status: string) {
       return 'Cancellation Rejected'
     case 'out_for_delivery':
       return 'Out for Delivery'
+    case 'granted':
+      return 'Access granted'
     case 'return_requested':
       return 'Return Requested'
     case 'return_approved':

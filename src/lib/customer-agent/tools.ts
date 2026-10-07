@@ -261,7 +261,7 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
       type: 'object',
       properties: {
         limit: { type: 'integer', default: 5, minimum: 1, maximum: 20 },
-        status: { type: 'string', description: 'pending|confirmed|processing|shipped|delivered|cancelled' },
+        status: { type: 'string', description: 'pending|confirmed|processing|shipped|delivered|granted (digital: access granted)|cancelled' },
       },
     },
     handler: async ({ limit, status }, ctx) => {

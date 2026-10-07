@@ -8,6 +8,14 @@ import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { publishProductDraft, openOrdersForProduct } from '@/lib/catalog/product-draft'
 import { generateVariantSku } from '@/lib/catalog/sku'
 import { round2 } from '@/lib/catalog/gst'
+import { normalizeDigitalProduct } from '@/lib/catalog/digital-units'
+import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
+import { cycleLimitsError, normalizeCycleCount } from '@/lib/subscriptions/intervals'
+import {
+  applyDraftSubVariantPrices,
+  applyLiveSubVariantPrices,
+  parseSubVariantPriceEntries,
+} from '@/lib/subscriptions/sub-variant-prices'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 
 // Background AI enrichment after a save. Gated on catalog_enrichment:write, which the session
@@ -135,7 +143,7 @@ export async function updateProduct(productId: string, formData: FormData) {
   const description = formData.get('description') as string
   const categoryId = formData.get('category_id') as string
   const brandId = formData.get('brand_id') as string
-  const hasVariants = formData.get('has_variants') === 'true'
+  const hasVariants = formData.get('has_variants') === 'true' && formData.get('is_digital') !== 'true'
   const variantType = (formData.get('variant_type') as string) || null
   const subVariantType = (formData.get('sub_variant_type') as string) || null
   const basePrice = hasVariants ? 0 : round2(parseFloat(formData.get('base_price') as string))
@@ -161,7 +169,9 @@ export async function updateProduct(productId: string, formData: FormData) {
   const hsnCode = (formData.get('hsn_code') as string) || null
   const mpn = (formData.get('mpn') as string) || null
   const gtin = (formData.get('gtin') as string) || null
-  const stockStatus = hasVariants ? 'In Stock' : (formData.get('stock_status') as string)
+  // Digital stock is never tracked: always In Stock.
+  const stockStatus =
+    hasVariants || formData.get('is_digital') === 'true' ? 'In Stock' : (formData.get('stock_status') as string)
   const weight = formData.get('weight') ? parseFloat(formData.get('weight') as string) : null
   const dimensions = (formData.get('dimensions') as string) || null
   const weightGrams = formData.get('weight_grams') ? parseInt(formData.get('weight_grams') as string) : null
@@ -172,12 +182,13 @@ export async function updateProduct(productId: string, formData: FormData) {
   const intent = formData.get('intent') as string | null
   const isActive = intent === 'draft' || intent === 'draft-stay' ? false : formData.get('is_active') === 'true'
   const isFeatured = formData.get('is_featured') === 'true'
+  const isDigitalProduct = formData.get('is_digital') === 'true'
 
   // Server-side weight & packaging validation — enforced on publish only, so a
   // partial draft can still be saved. Mirrors the client checks in ProductForm so
   // a direct/programmatic submit can't slip a null/zero weight or missing box dims
-  // past the UI. See src/lib/shipping.ts STORED_DIMS_REQUIRED.
-  if (intent === 'publish') {
+  // past the UI. See src/lib/shipping.ts STORED_DIMS_REQUIRED. Skipped for digital.
+  if (intent === 'publish' && !isDigitalProduct) {
     const STORED_DIMS_TYPES = ['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube']
     const errors: string[] = []
     if (!hasVariants) {
@@ -319,8 +330,8 @@ export async function updateProduct(productId: string, formData: FormData) {
   const fragile = formData.get('fragile') === 'true'
   const hazardous = formData.get('hazardous') === 'true'
   const flammable = formData.get('flammable') === 'true'
-  const perishable = formData.get('perishable') === 'true'
-  const serialized = formData.get('serialized') === 'true'
+  const perishable = !isDigitalProduct && formData.get('perishable') === 'true'
+  const serialized = !isDigitalProduct && formData.get('serialized') === 'true'
   const certifications = (formData.get('certifications') as string)
     ? (formData.get('certifications') as string)
         .split(',')
@@ -340,7 +351,6 @@ export async function updateProduct(productId: string, formData: FormData) {
   const shippingClass = (formData.get('shipping_class') as string) || 'standard'
   const isOversized = formData.get('is_oversized') === 'true'
   const isDigital = formData.get('is_digital') === 'true'
-  const downloadUrl = (formData.get('download_url') as string) || null
   const licenseType = (formData.get('license_type') as string) || null
   const fileFormat = (formData.get('file_format') as string) || null
   const platformCompatibility = (formData.get('platform_compatibility') as string)
@@ -350,15 +360,27 @@ export async function updateProduct(productId: string, formData: FormData) {
         .filter(Boolean)
     : null
   const isSubscription = formData.get('is_subscription') === 'true'
-  const subscriptionInterval = (formData.get('subscription_interval') as string) || null
-  const subscriptionPrice = formData.get('subscription_price')
-    ? round2(parseFloat(formData.get('subscription_price') as string))
-    : null
+  const subscriptionIntervals = (formData.get('subscription_intervals') as string)
+    ? (formData.get('subscription_intervals') as string)
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+    : []
+  const subscriptionInterval = subscriptionIntervals[0] ?? null
+  const subscriptionPrice = hasVariants ? null : normalizeSubscriptionPrice(formData.get('subscription_price'))
+  const subscriptionPrices = hasVariants ? {} : normalizeSubscriptionPrices(formData.get('subscription_prices'))
+  const subVariantPrices = hasVariants
+    ? parseSubVariantPriceEntries(formData.get('sub_variant_subscription_prices'))
+    : []
+  const subscriptionTotalCycles = normalizeCycleCount(formData.get('subscription_total_cycles'))
+  const subscriptionMinCycles = normalizeCycleCount(formData.get('subscription_min_cycles'))
+  const cyclesError = isSubscription ? cycleLimitsError(subscriptionTotalCycles, subscriptionMinCycles) : null
+  if (cyclesError) return { error: cyclesError }
   const isBundle = formData.get('is_bundle') === 'true'
   const metaTitle = (formData.get('meta_title') as string) || null
   const metaDescription = (formData.get('meta_description') as string) || null
   const isSearchable = formData.get('is_searchable') !== 'false'
-  const inventorySync = formData.get('inventory_sync') === 'true'
+  const inventorySync = !isDigitalProduct && formData.get('inventory_sync') === 'true'
   const lowStockThreshold = formData.get('low_stock_threshold')
     ? parseFloat(formData.get('low_stock_threshold') as string)
     : null
@@ -460,13 +482,16 @@ export async function updateProduct(productId: string, formData: FormData) {
         shipping_class: shippingClass,
         is_oversized: isOversized,
         is_digital: isDigital,
-        download_url: downloadUrl,
         license_type: licenseType,
         file_format: fileFormat,
         platform_compatibility: platformCompatibility,
         is_subscription: isSubscription,
+        subscription_intervals: subscriptionIntervals,
         subscription_interval: subscriptionInterval,
         subscription_price: subscriptionPrice,
+        subscription_prices: subscriptionPrices,
+        subscription_total_cycles: subscriptionTotalCycles,
+        subscription_min_cycles: subscriptionMinCycles,
         is_bundle: isBundle,
         meta_title: metaTitle,
         meta_description: metaDescription,
@@ -485,7 +510,15 @@ export async function updateProduct(productId: string, formData: FormData) {
       }
       // Snapshot variants from form and images/sub_variants/units from live DB
       const variantsJsonRaw = formData.get('variants_json') as string | null
-      const draftVariants = variantsJsonRaw ? JSON.parse(variantsJsonRaw).filter((v: any) => !v._isDeleted) : null
+      const draftVariants = variantsJsonRaw
+        ? JSON.parse(variantsJsonRaw)
+            .filter((v: any) => !v._isDeleted)
+            .map((v: any) => ({
+              ...v,
+              subscription_price: normalizeSubscriptionPrice(v.subscription_price),
+              subscription_prices: normalizeSubscriptionPrices(v.subscription_prices),
+            }))
+        : null
 
       await query(
         `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, updated_at)
@@ -506,6 +539,7 @@ export async function updateProduct(productId: string, formData: FormData) {
            updated_at = NOW()`,
         [productId, JSON.stringify(draftFields), draftVariants ? JSON.stringify(draftVariants) : null]
       )
+      await applyDraftSubVariantPrices(productId, subVariantPrices)
       revalidatePath(`/admin/products/edit/${productId}`)
       const host = await getHost()
 
@@ -646,18 +680,29 @@ export async function updateProduct(productId: string, formData: FormData) {
     params.push(handlingDays, shippingClass, isOversized)
     setClauses.push(
       `is_digital = $${params.length + 1}`,
-      `download_url = $${params.length + 2}`,
-      `license_type = $${params.length + 3}`,
-      `file_format = $${params.length + 4}`,
-      `platform_compatibility = $${params.length + 5}`
+      `license_type = $${params.length + 2}`,
+      `file_format = $${params.length + 3}`,
+      `platform_compatibility = $${params.length + 4}`
     )
-    params.push(isDigital, downloadUrl, licenseType, fileFormat, platformCompatibility)
+    params.push(isDigital, licenseType, fileFormat, platformCompatibility)
     setClauses.push(
       `is_subscription = $${params.length + 1}`,
-      `subscription_interval = $${params.length + 2}`,
-      `subscription_price = $${params.length + 3}`
+      `subscription_intervals = $${params.length + 2}`,
+      `subscription_interval = $${params.length + 3}`,
+      `subscription_price = $${params.length + 4}`,
+      `subscription_total_cycles = $${params.length + 5}`,
+      `subscription_min_cycles = $${params.length + 6}`,
+      `subscription_prices = $${params.length + 7}::jsonb`
     )
-    params.push(isSubscription, subscriptionInterval, subscriptionPrice)
+    params.push(
+      isSubscription,
+      subscriptionIntervals,
+      subscriptionInterval,
+      subscriptionPrice,
+      subscriptionTotalCycles,
+      subscriptionMinCycles,
+      JSON.stringify(subscriptionPrices)
+    )
     setClauses.push(`is_bundle = $${params.length + 1}`)
     params.push(isBundle)
     setClauses.push(
@@ -848,6 +893,9 @@ export async function updateProduct(productId: string, formData: FormData) {
       }
     }
 
+    // Runs after the tracking toggle-OFF cleanup above so nothing re-adds stock.
+    if (isDigital) await normalizeDigitalProduct({ query }, productId)
+
     if (uploadedImages.length > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
       const allExistingImages = await queryMany('SELECT * FROM product_images WHERE product_id = $1', [productId])
 
@@ -1026,12 +1074,14 @@ export async function updateProduct(productId: string, formData: FormData) {
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
               `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, stock_status = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_grams = $13, package_type = $14, length_cm = $15, breadth_cm = $16, height_cm = $17, sub_variant_type = $18, variant_type = $19, discount_pct = $20,
-                 asin = $21,
+                 asin = $21::text,
                  asin_match = CASE
                    WHEN $21::text IS NULL THEN NULL
                    WHEN asin_match IN ('gtin','listed') AND asin IS NOT DISTINCT FROM $21::text THEN asin_match
                    ELSE 'manual' END,
-                 isbn = $22
+                 isbn = $22,
+                 subscription_price = $25,
+                 subscription_prices = $26::jsonb
                WHERE id = $23 AND product_id = $24`,
               [
                 variantSku,
@@ -1062,6 +1112,8 @@ export async function updateProduct(productId: string, formData: FormData) {
                 variant.isbn || null,
                 variant.id,
                 productId,
+                normalizeSubscriptionPrice(variant.subscription_price),
+                JSON.stringify(normalizeSubscriptionPrices(variant.subscription_prices)),
               ]
             )
             const subVariants = await queryMany<{ id: string; sub_variant_name: string }>(
@@ -1081,8 +1133,8 @@ export async function updateProduct(productId: string, formData: FormData) {
             if (!variant.variant_name) continue
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, asin_match, isbn, is_active)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, CASE WHEN $22::text IS NOT NULL THEN 'manual' ELSE NULL END, $23, true)`,
+              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, asin_match, isbn, is_active, subscription_price, subscription_prices)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22::text, CASE WHEN $22::text IS NOT NULL THEN 'manual' ELSE NULL END, $23, true, $24, $25::jsonb)`,
               [
                 productId,
                 variantSku,
@@ -1111,11 +1163,14 @@ export async function updateProduct(productId: string, formData: FormData) {
                 variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
                 variant.asin || null,
                 variant.isbn || null,
+                normalizeSubscriptionPrice(variant.subscription_price),
+                JSON.stringify(normalizeSubscriptionPrices(variant.subscription_prices)),
               ]
             )
           }
         }
       }
+      await applyLiveSubVariantPrices(productId, subVariantPrices)
     } else {
       await query('DELETE FROM product_variants WHERE product_id = $1', [productId])
     }

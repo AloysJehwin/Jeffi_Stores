@@ -340,15 +340,46 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'campaigns:read',
     label: 'Campaigns (Read)',
     description: 'View marketing campaigns',
-    routes: ['/admin/campaigns', '/admin/social-posts'],
+    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/customer-programs', '/admin/loyalty', '/admin/referrals'],
     group: 'Marketing',
   },
   {
     key: 'campaigns:write',
     label: 'Campaigns (Write)',
     description: 'Create and manage marketing campaigns',
-    routes: ['/admin/campaigns', '/admin/social-posts'],
+    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/customer-programs', '/admin/loyalty', '/admin/referrals'],
     group: 'Marketing',
+  },
+  // Customer subscriptions (Razorpay recurring). On every plan; the renewal-reminder campaign
+  // still needs campaigns:read (Pro+).
+  {
+    key: 'subscriptions:read',
+    label: 'Subscriptions (Read)',
+    description: 'View customer subscriptions and their cycles',
+    routes: ['/admin/subscriptions'],
+    group: 'Orders',
+  },
+  {
+    key: 'subscriptions:write',
+    label: 'Subscriptions (Write)',
+    description: 'Cancel, pause, resume and sync customer subscriptions',
+    routes: ['/admin/subscriptions'],
+    group: 'Orders',
+  },
+  // Vault — private digital files served through the authenticated vault host. On every plan.
+  {
+    key: 'vault:read',
+    label: 'Vault (Read)',
+    description: 'View digital files and vault access logs',
+    routes: ['/admin/vault'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'vault:write',
+    label: 'Vault (Write)',
+    description: 'Upload, replace and delete digital files; set download permissions',
+    routes: ['/admin/vault'],
+    group: 'Catalogue',
   },
   // Traffic analytics — previously piggybacked on dashboard:read. Dedicated key.
   {
@@ -645,6 +676,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/invoices')) return 'invoices:read'
   if (pathname.startsWith('/api/admin/orders/create')) return 'invoices:read'
   if (pathname.startsWith('/api/admin/orders')) return 'orders:read'
+  if (pathname.startsWith('/api/admin/subscriptions')) return 'subscriptions:read'
   if (pathname.startsWith('/api/admin/data-source')) return 'products:read'
   if (pathname.startsWith('/api/admin/products')) return 'products:read'
   if (pathname.startsWith('/api/admin/categories')) return 'categories:read'
@@ -674,6 +706,8 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/social-posts')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/traffic')) return 'traffic:read'
   if (pathname.startsWith('/api/admin/campaigns')) return 'campaigns:read'
+  if (pathname.startsWith('/api/admin/loyalty')) return 'campaigns:read'
+  if (pathname.startsWith('/api/admin/referrals')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/agent')) return 'agent:read'
   if (pathname.startsWith('/api/admin/catalog-enrichment')) return 'catalog_enrichment:read'
   if (pathname.startsWith('/api/admin/audit')) return 'audit:read'

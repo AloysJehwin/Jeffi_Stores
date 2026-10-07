@@ -86,6 +86,7 @@ const VALID_SIGNUP_BODY = {
   gstNumber: '27AAPFU0939F1ZV',
   businessAddress: '123 Main St',
   industry: 'Retail',
+  dateOfBirth: '1990-05-15',
 }
 
 const NEW_BIZ_USER = {
@@ -264,6 +265,37 @@ describe('POST /api/business/signup', () => {
       expect(res.status).toBe(400)
       const body = await res.json()
       expect(body.error).toMatch(/10-digit/i)
+    })
+  })
+
+  describe('date of birth', () => {
+    it('returns 400 when date of birth is missing', async () => {
+      vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
+
+      const res = await signupPOST(signupRequest({ ...VALID_SIGNUP_BODY, dateOfBirth: undefined }) as any)
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toMatch(/date of birth/i)
+      expect(db.queryOne).not.toHaveBeenCalled()
+    })
+
+    it('returns 400 for a date of birth in the future', async () => {
+      vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
+      const nextYear = `${new Date().getUTCFullYear() + 1}-01-01`
+
+      const res = await signupPOST(signupRequest({ ...VALID_SIGNUP_BODY, dateOfBirth: nextYear }) as any)
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toMatch(/date of birth/i)
+    })
+
+    it('stores the date of birth on the new business user', async () => {
+      vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_BIZ_USER)
+      vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+
+      await signupPOST(signupRequest(VALID_SIGNUP_BODY) as any)
+      const insert = vi.mocked(db.queryOne).mock.calls.find(c => String(c[0]).includes('INSERT INTO users'))
+      expect(String(insert?.[0])).toContain('date_of_birth')
+      expect(insert?.[1]).toContain('1990-05-15')
     })
   })
 

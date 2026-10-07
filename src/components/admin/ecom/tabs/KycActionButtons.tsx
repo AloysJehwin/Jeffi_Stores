@@ -80,7 +80,7 @@ export default function KycActionButtons({
         <button
           onClick={retrySubscription}
           disabled={busy}
-          className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+          className="px-4 h-control rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
         >
           {busy ? 'Generating…' : 'Resend payment link'}
         </button>
@@ -104,14 +104,14 @@ export default function KycActionButtons({
             <button
               onClick={reject}
               disabled={busy}
-              className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+              className="flex-1 px-4 h-control rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
             >
               {busy ? 'Rejecting…' : 'Confirm reject'}
             </button>
             <button
               onClick={() => setShowReject(false)}
               disabled={busy}
-              className="px-4 py-2 rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
+              className="px-4 h-control rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
               Cancel
             </button>
@@ -122,14 +122,14 @@ export default function KycActionButtons({
           <button
             onClick={() => setShowReject(true)}
             disabled={busy}
-            className="px-4 py-2 rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition-colors"
+            className="px-4 h-control rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition-colors"
           >
             Reject
           </button>
           <button
             onClick={approve}
             disabled={busy}
-            className="px-5 py-2 rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
+            className="px-5 h-control rounded-lg bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
           >
             {busy ? 'Approving…' : 'Approve'}
           </button>

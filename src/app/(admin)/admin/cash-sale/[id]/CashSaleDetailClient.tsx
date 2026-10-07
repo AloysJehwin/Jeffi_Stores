@@ -141,7 +141,7 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
             href={`/api/admin/cash-sale/${s.id}/receipt`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

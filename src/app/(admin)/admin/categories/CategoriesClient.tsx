@@ -316,7 +316,7 @@ function PolicyExpandRow({
           <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={onClose}
-              className="px-3 py-1.5 text-xs border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface transition-colors"
+              className="px-3 h-control-sm text-xs border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface transition-colors"
             >
               Cancel
             </button>
@@ -324,7 +324,7 @@ function PolicyExpandRow({
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-3 py-1.5 text-xs bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
+                className="px-3 h-control-sm text-xs bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
               >
                 {saving ? 'Saving…' : 'Save Policy'}
               </button>
@@ -559,7 +559,7 @@ function SortableRow({
           <button
             onClick={onTogglePolicy}
             title="Edit return & replacement policy"
-            className={`mr-3 text-xs px-2 py-1 rounded border transition-colors ${policyOpen ? 'bg-accent-100 dark:bg-accent-900/30 border-accent-400 text-accent-600 dark:text-accent-400' : 'border-border-secondary text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
+            className={`mr-3 text-xs px-2 h-control-sm rounded border transition-colors ${policyOpen ? 'bg-accent-100 dark:bg-accent-900/30 border-accent-400 text-accent-600 dark:text-accent-400' : 'border-border-secondary text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
           >
             Policy
           </button>
@@ -985,7 +985,7 @@ export default function CategoriesClient({
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               Prev
             </button>
@@ -995,7 +995,7 @@ export default function CategoriesClient({
             <button
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               Next
             </button>

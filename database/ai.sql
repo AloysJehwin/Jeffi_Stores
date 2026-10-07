@@ -138,8 +138,14 @@ CREATE TABLE public.ai_queries (
 -- Name: embeddings; Type: TABLE; Schema: public; Owner: -
 --
 
+-- tenant_id scopes an embedding to the tenant that owns the source row (#489). NULL = the
+-- platform's own (flagship) rows, so pre-tenant data keeps working unchanged. RAG reads filter on
+-- it (tenant_id IS NOT DISTINCT FROM <current>), so no tenant ever sees another tenant's / the
+-- platform's vectors. The uniqueness key includes tenant_id so the same source id can exist once
+-- per tenant.
 CREATE TABLE public.embeddings (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id uuid,
     source_table character varying(64),
     source_id text,
     content text,
@@ -148,11 +154,12 @@ CREATE TABLE public.embeddings (
     metadata jsonb,
     updated_at timestamp with time zone,
     CONSTRAINT embeddings_pkey PRIMARY KEY (id),
-    CONSTRAINT embeddings_source_table_source_id_key UNIQUE (source_table, source_id)
+    CONSTRAINT embeddings_tenant_source_key UNIQUE (tenant_id, source_table, source_id)
 );
 
 CREATE INDEX idx_embeddings_source_table ON public.embeddings USING btree (source_table);
 CREATE INDEX idx_embeddings_content_hash ON public.embeddings USING btree (content_hash);
+CREATE INDEX idx_embeddings_tenant ON public.embeddings USING btree (tenant_id);
 
 
 --

@@ -1,3 +1,5 @@
+import { SUBSCRIPTION_INTERVALS, type SubscriptionInterval } from '@/lib/subscriptions/intervals'
+
 export type RowType = 'product' | 'variant' | 'sub_variant'
 export type Coercer = 'text' | 'number' | 'int' | 'bool' | 'date' | 'csv' | 'json'
 
@@ -13,6 +15,13 @@ export type SheetName =
   | 'Product · Digital'
   | 'Product · SEO & Audience'
 
+// Blank-cell policy for OPTIONAL columns (#492). A blank optional cell is coerced to `undefined`
+// and its key is omitted from the draft (coerce.ts). The documented default for every optional
+// field is therefore: on UPDATE keep the product's existing live value (backfillBlankOptionalFields
+// in to-draft.ts carries it back so the shared publish SQL cannot NULL it out), and on CREATE take
+// the DB column default (database/catalog.sql, e.g. inventory_quantity 0 / stock_status 'In Stock' /
+// currency 'INR' / return_window_days 7). Identical for Google Sheets and CSV — both coerce here.
+// `required` columns (sku/name/row_type/variant_name/sub_variant_name) are never defaulted.
 export interface ImportColumn {
   key: string
   header: string
@@ -65,6 +74,19 @@ export const STRUCTURE_COLUMNS: ImportColumn[] = [
 // Product columns — the exact set the publish path writes (product-draft.ts UPDATE
 // products SET ...). category/brand/supplier are given by NAME here and resolved to
 // ids by the engine; category & brand must already exist or the row errors.
+/** Per-interval subscription price column key, e.g. subscription_price_monthly. */
+export const subscriptionPriceKey = (interval: SubscriptionInterval) => `subscription_price_${interval}`
+
+function intervalPriceColumns(prefix: string, rowTypes: RowType[], note?: string): ImportColumn[] {
+  return SUBSCRIPTION_INTERVALS.map(iv => ({
+    key: subscriptionPriceKey(iv),
+    header: `${prefix}${subscriptionPriceKey(iv)}`,
+    coerce: 'number' as const,
+    rowTypes,
+    help: `${iv} price per cycle (incl. GST); blank = subscription_price${note ? `. ${note}` : ''}`,
+  }))
+}
+
 export const PRODUCT_COLUMNS: ImportColumn[] = [
   {
     key: 'sku',
@@ -190,7 +212,35 @@ export const PRODUCT_COLUMNS: ImportColumn[] = [
     rowTypes: ['product'],
     enumKey: 'subscription_interval',
   },
-  { key: 'subscription_price', header: 'subscription_price', coerce: 'number', rowTypes: ['product'] },
+  {
+    key: 'subscription_intervals',
+    header: 'subscription_intervals',
+    coerce: 'text',
+    rowTypes: ['product'],
+    help: 'weekly|monthly|quarterly|yearly (pipe or comma separated)',
+  },
+  {
+    key: 'subscription_price',
+    header: 'subscription_price',
+    coerce: 'number',
+    rowTypes: ['product'],
+    help: 'Simple products only (incl. GST); blank = one-time price',
+  },
+  ...intervalPriceColumns('', ['product'], 'Simple products only'),
+  {
+    key: 'subscription_total_cycles',
+    header: 'subscription_total_cycles',
+    coerce: 'int',
+    rowTypes: ['product'],
+    help: '1-520; blank = until cancelled',
+  },
+  {
+    key: 'subscription_min_cycles',
+    header: 'subscription_min_cycles',
+    coerce: 'int',
+    rowTypes: ['product'],
+    help: 'Minimum commitment; cannot exceed subscription_total_cycles',
+  },
   { key: 'is_bundle', header: 'is_bundle', coerce: 'bool', rowTypes: ['product'] },
   { key: 'meta_title', header: 'meta_title', coerce: 'text', rowTypes: ['product'] },
   { key: 'meta_description', header: 'meta_description', coerce: 'text', rowTypes: ['product'] },
@@ -246,6 +296,14 @@ export const VARIANT_COLUMNS: ImportColumn[] = [
   { key: 'height_cm', header: 'variant.height_cm', coerce: 'number', rowTypes: ['variant'] },
   { key: 'cost_price', header: 'variant.cost_price', coerce: 'number', rowTypes: ['variant'] },
   {
+    key: 'subscription_price',
+    header: 'variant.subscription_price',
+    coerce: 'number',
+    rowTypes: ['variant'],
+    help: 'Ignored when the variant has sub-variants',
+  },
+  ...intervalPriceColumns('variant.', ['variant'], 'Ignored when the variant has sub-variants'),
+  {
     key: 'sub_variant_type_on',
     header: 'variant.sub_variant_type_on',
     coerce: 'bool',
@@ -268,6 +326,8 @@ export const SUB_VARIANT_COLUMNS: ImportColumn[] = [
   { key: 'mrp', header: 'sub_variant.mrp', coerce: 'number', rowTypes: ['sub_variant'] },
   { key: 'price_ex_gst', header: 'sub_variant.price_ex_gst', coerce: 'number', rowTypes: ['sub_variant'] },
   { key: 'mrp_ex_gst', header: 'sub_variant.mrp_ex_gst', coerce: 'number', rowTypes: ['sub_variant'] },
+  { key: 'subscription_price', header: 'sub_variant.subscription_price', coerce: 'number', rowTypes: ['sub_variant'] },
+  ...intervalPriceColumns('sub_variant.', ['sub_variant']),
   {
     key: 'stock_status',
     header: 'sub_variant.stock_status',
@@ -350,7 +410,11 @@ assign('Product · Digital', [
   'platform_compatibility',
   'is_subscription',
   'subscription_interval',
+  'subscription_intervals',
   'subscription_price',
+  ...SUBSCRIPTION_INTERVALS.map(subscriptionPriceKey),
+  'subscription_total_cycles',
+  'subscription_min_cycles',
   'is_bundle',
 ])
 // SEO + audience targeting.

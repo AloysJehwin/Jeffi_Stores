@@ -15,6 +15,7 @@ import CartInsightPanel from '@/components/on-device/CartInsightPanel'
 import FreeShippingProgress from '@/components/visitor/cart/FreeShippingProgress'
 import CartUpsellRow from '@/components/visitor/cart/CartUpsellRow'
 import CouponNudge from '@/components/visitor/cart/CouponNudge'
+import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
 
 interface AppliedCoupon {
   couponId: string
@@ -93,7 +94,7 @@ export default function CartPage() {
     try {
       await updateQuantity(cartItemId, newQuantity)
     } catch (error) {
-      showToast('Failed to update quantity', 'error')
+      showToast(error instanceof Error && error.message ? error.message : 'Failed to update quantity', 'error')
     } finally {
       setUpdatingItems(prev => {
         const newSet = new Set(prev)
@@ -175,6 +176,8 @@ export default function CartPage() {
   }
 
   const total = getCartTotal()
+  // Digital lines don't ship, so only physical lines count towards free delivery.
+  const physicalTotal = Math.max(0, total - digitalLinesSubtotal(cartItems as any[], gstEnabled))
   const tax = getCartTax()
   const discount = appliedCoupon?.discountAmount ?? 0
   const finalTotal = Math.max(0, total - discount)
@@ -227,7 +230,7 @@ export default function CartPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           {/* Cart Items */}
           <div className="lg:col-span-2">
-            <FreeShippingProgress subtotal={total} />
+            <FreeShippingProgress subtotal={physicalTotal} />
             {cartItems.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-8 text-center">
                 <svg
@@ -283,7 +286,7 @@ export default function CartPage() {
                   const qtyMin = isCustomQty
                     ? (item.cart_item_unit?.min_qty ?? 0.001)
                     : (item.cart_item_unit?.min_qty ?? 1)
-                  const qtyMax = item.cart_item_unit?.max_qty ?? undefined
+                  const qtyMax = isDigitalLine(item as any) ? 1 : (item.cart_item_unit?.max_qty ?? undefined)
                   const qtyStep = isCustomQty
                     ? (item.cart_item_unit?.qty_step ?? 0.001)
                     : (item.cart_item_unit?.qty_step ?? 1)
@@ -409,7 +412,9 @@ export default function CartPage() {
                           {/* Quantity Controls */}
                           <div className="mt-4">
                             <div className="flex items-center gap-3 flex-wrap">
-                              {isCustomQty ? (
+                              {isDigitalLine(item as any) ? (
+                                <span className="text-sm text-foreground-secondary">Qty 1 · Digital</span>
+                              ) : isCustomQty ? (
                                 <div className="flex items-center gap-2">
                                   <input
                                     type="number"

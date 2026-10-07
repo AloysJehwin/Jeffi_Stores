@@ -32,6 +32,7 @@ function toCardProps(p: RecCard) {
     discountPct: Number(p.discount_pct ?? 0),
     extraDeliveryDays: Number(p.extra_delivery_days ?? 0),
     handlingDays: Number(p.handling_days ?? 2),
+    isDigital: !!p.is_digital,
   }
 }
 

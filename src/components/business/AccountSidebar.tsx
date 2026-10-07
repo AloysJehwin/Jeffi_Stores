@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { bp } from '@/lib/shared/business-path'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 export const navItems = [
   {
@@ -83,6 +84,27 @@ export const navItems = [
   },
 ]
 
+const subscriptionsNavItem = {
+  href: '/business/account/subscriptions',
+  label: 'Subscriptions',
+  exact: false,
+  icon: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+      />
+    </svg>
+  ),
+}
+
+export function useBusinessNavItems() {
+  const subscriptionsEnabled = useStoreConfig().flags.subscriptionsEnabled
+  return subscriptionsEnabled ? [...navItems.slice(0, 2), subscriptionsNavItem, ...navItems.slice(2)] : navItems
+}
+
 const backLinkMap: Array<{ pattern: RegExp; label: string; href: string }> = [
   { pattern: /^\/business\/account\/orders\/.+/, label: 'My Orders', href: '/business/account/orders' },
   { pattern: /^\/business\/quotes\/.+/, label: 'My Quotes', href: '/business/quotes' },
@@ -90,9 +112,10 @@ const backLinkMap: Array<{ pattern: RegExp; label: string; href: string }> = [
 
 export function BusinessAccountNavBar() {
   const pathname = usePathname()
+  const items = useBusinessNavItems()
 
   const activeLabel = (() => {
-    const match = navItems
+    const match = items
       .slice()
       .reverse()
       .find(item => (item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))))
@@ -110,7 +133,7 @@ export function BusinessAccountNavBar() {
           </span>
           <div className="hidden sm:block w-px h-5 bg-border-default flex-shrink-0" />
           <nav className="flex items-center gap-1 overflow-x-auto scrollbar-none flex-1">
-            {navItems.map(item => {
+            {items.map(item => {
               const isActive = item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))
               return (
                 <Link
@@ -147,11 +170,12 @@ export function BusinessAccountNavBar() {
 
 export default function BusinessAccountSidebar() {
   const pathname = usePathname()
+  const items = useBusinessNavItems()
 
   return (
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">
       <nav className="space-y-2">
-        {navItems.map(item => {
+        {items.map(item => {
           const isActive = item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))
 
           return (

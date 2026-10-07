@@ -47,13 +47,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isAdminSubdomain = hostApp === 'admin'
   const isEcomSubdomain = host.startsWith('ecom.')
   const isCertPortalSubdomain = host.startsWith('certificate.')
+  const isVaultSubdomain = hostApp === 'vault'
 
   // Read the browser-safe store config on the server so the very first render
   // (SSR + hydration) already has the true DB-backed values — no client fetch
   // flash on price/GST. Mirrors the /api/store-config payload shape.
   const c = await getSiteControls()
   const aiStorefrontEnabled = await storefrontAiAllowed().catch(() => false)
+  const { resolveTenant } = await import('@/lib/tenancy/tenant-context')
+  const storeSlug = (await resolveTenant().catch(() => null))?.slug ?? null
   const initialStoreConfig: StoreConfig = {
+    slug: storeSlug,
     identity: {
       name: c.identity.name,
       email: c.identity.email,
@@ -72,6 +76,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       ondeviceFinetuneMobileEnabled: c.flags.ondeviceFinetuneMobileEnabled,
       ondeviceFinetuneDesktopEnabled: c.flags.ondeviceFinetuneDesktopEnabled,
       aiStorefrontEnabled,
+      digitalProductsEnabled: c.flags.digitalProductsEnabled,
+      subscriptionsEnabled: c.flags.subscriptionsEnabled,
+      vaultDownloadsEnabled: c.flags.vaultDownloadsEnabled,
     },
     orderAutoCancelMinutes: c.values.orderAutoCancelMinutes,
     storefront: {
@@ -81,7 +88,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     },
   }
   return (
-    <html lang="en" className="bg-surface" suppressHydrationWarning>
+    // Vault: dark html/body so iOS/macOS overscroll bounce never reveals the light store surface.
+    <html
+      lang="en"
+      className={isVaultSubdomain ? 'bg-neutral-950 [color-scheme:dark]' : 'bg-surface'}
+      suppressHydrationWarning
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -89,16 +101,23 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
       </head>
-      <body className="antialiased bg-surface text-foreground m-0 p-0">
+      <body
+        className={`antialiased m-0 p-0 ${isVaultSubdomain ? 'bg-neutral-950 text-neutral-100' : 'bg-surface text-foreground'}`}
+      >
         <SessionGuard />
-        <Script src="https://www.googletagmanager.com/gtag/js?id=GT-NM2C3M85" strategy="afterInteractive" />
-        <Script
-          id="gtag-init"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');`,
-          }}
-        />
+        {/* No third-party analytics on the vault (strict CSP, buyer privacy). */}
+        {!isVaultSubdomain && (
+          <>
+            <Script src="https://www.googletagmanager.com/gtag/js?id=GT-NM2C3M85" strategy="afterInteractive" />
+            <Script
+              id="gtag-init"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');`,
+              }}
+            />
+          </>
+        )}
         <ConditionalLayout
           initialStoreConfig={initialStoreConfig}
           isFormsSubdomain={isFormsSubdomain}
@@ -107,6 +126,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           isAdminSubdomain={isAdminSubdomain}
           isEcomSubdomain={isEcomSubdomain}
           isCertPortalSubdomain={isCertPortalSubdomain}
+          isVaultSubdomain={isVaultSubdomain}
         >
           {children}
         </ConditionalLayout>

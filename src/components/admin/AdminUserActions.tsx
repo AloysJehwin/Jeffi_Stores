@@ -378,7 +378,7 @@ export default function AdminUserActions({
                         key={r}
                         type="button"
                         onClick={() => setRole(r)}
-                        className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+                        className={`flex-1 px-3 h-control rounded-lg border text-sm font-medium transition-colors ${
                           role === r
                             ? 'border-accent-500 bg-accent-500/10 text-accent-600 dark:text-accent-400'
                             : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'
@@ -445,7 +445,7 @@ export default function AdminUserActions({
                 <button
                   type="button"
                   onClick={() => setEditing(false)}
-                  className="px-4 py-2 rounded-lg text-sm text-foreground-secondary bg-surface-secondary hover:bg-border-default transition-colors"
+                  className="px-4 h-control rounded-lg text-sm text-foreground-secondary bg-surface-secondary hover:bg-border-default transition-colors"
                 >
                   Cancel
                 </button>
@@ -453,7 +453,7 @@ export default function AdminUserActions({
                   type="button"
                   onClick={handleSave}
                   disabled={loading}
-                  className="px-5 py-2 rounded-lg text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors"
+                  className="px-5 h-control rounded-lg text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors"
                 >
                   {loading ? 'Saving…' : 'Save changes'}
                 </button>

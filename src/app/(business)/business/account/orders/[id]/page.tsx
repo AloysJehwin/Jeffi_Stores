@@ -49,6 +49,10 @@ interface OrderItem {
   totalPrice: number
   buyMode?: string
   buyUnit?: string | null
+  isDigital?: boolean
+  accessGranted?: boolean
+  accessRevoked?: boolean
+  vaultUrl?: string | null
   products: {
     slug: string
     extra_delivery_days?: number | null
@@ -81,9 +85,13 @@ interface OrderDetails {
   trackingUrl: string | null
   awbNumber: string | null
   estimatedDeliveryDate: string | null
+  courierEdd?: string | null
   originalOrderId: string | null
   originalOrderNumber: string | null
   orderType: string
+  isAllDigital?: boolean
+  hasDigital?: boolean
+  vaultUrl?: string | null
   canChangeAddress?: boolean
   addressChange?: AddressChangeInfo | null
   shippingAddress: {
@@ -123,12 +131,14 @@ function getEddDisplay(order: OrderDetails, edd: string): { label: string; sub: 
   }
   const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
   todayIST.setHours(0, 0, 0, 0)
-  const eddDate = new Date(edd + ' 00:00:00')
+  const eddDate = new Date(String(order.estimatedDeliveryDate).slice(0, 10) + 'T00:00:00Z')
   const diffDays = Math.round((eddDate.getTime() - todayIST.getTime()) / 86400000)
   if (diffDays === 0) return { label: 'Arriving Today', sub: edd, color: 'text-accent-500' }
   if (diffDays === 1) return { label: 'Arriving Tomorrow', sub: edd, color: 'text-accent-500' }
   if (diffDays < 0)
     return { label: 'Expected by ' + edd, sub: 'Delivery delayed', color: 'text-orange-500 dark:text-orange-400' }
+  if (order.courierEdd && order.courierEdd === String(order.estimatedDeliveryDate).slice(0, 10))
+    return { label: 'Expected by ' + edd, sub: 'Courier estimate', color: 'text-foreground' }
   return { label: 'Estimated Delivery', sub: edd, color: 'text-foreground' }
 }
 
@@ -145,6 +155,7 @@ function getStatusColor(status: string) {
     case 'out_for_delivery':
       return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
     case 'delivered':
+    case 'granted':
       return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
     case 'cancel_requested':
       return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
@@ -188,6 +199,8 @@ function statusLabel(status: string) {
       return 'Cancellation Rejected'
     case 'out_for_delivery':
       return 'Out for Delivery'
+    case 'granted':
+      return 'Access granted'
     case 'return_requested':
       return 'Return Requested'
     case 'return_approved':
@@ -550,7 +563,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                 >
                   Payment: {order.paymentStatus}
                 </span>
-                {CANCELLABLE_STATUSES.includes(order.status) && (
+                {CANCELLABLE_STATUSES.includes(order.status) && !order.hasDigital && (
                   <button
                     type="button"
                     onClick={handleCancelOrder}
@@ -564,6 +577,16 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                       ? 'Cancel Order'
                       : 'Request Cancellation'}
                   </button>
+                )}
+                {order.hasDigital && order.vaultUrl && (
+                  <a
+                    href={order.vaultUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 hover:bg-green-700 text-white shadow-sm transition-colors"
+                  >
+                    Open my vault
+                  </a>
                 )}
                 {order.invoiceNumber && !order.originalOrderId && order.viewToken && (
                   <a
@@ -619,6 +642,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
 
           {/* Estimated Delivery */}
           {!['cancelled', 'returned'].includes(order.status) &&
+            !order.isAllDigital &&
             (() => {
               const edd = resolveOrderEdd(order)
               if (!edd) return null
@@ -645,7 +669,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                 </div>
               )
             })()}
-          {order.awbNumber && (
+          {order.awbNumber && !order.isAllDigital && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center gap-2">
                 <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -727,6 +751,27 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                         flammable={item.products?.flammable}
                         size="xs"
                       />
+                      {item.isDigital && (
+                        <p className="text-xs mt-1">
+                          {item.accessGranted ? (
+                            <span className="text-green-700 dark:text-green-400 font-medium">
+                              Access granted
+                              {item.vaultUrl && (
+                                <>
+                                  {' · '}
+                                  <a href={item.vaultUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                                    Open in vault
+                                  </a>
+                                </>
+                              )}
+                            </span>
+                          ) : item.accessRevoked ? (
+                            <span className="text-red-600 dark:text-red-400 font-medium">Access revoked</span>
+                          ) : (
+                            <span className="text-foreground-muted">Digital item · access on payment</span>
+                          )}
+                        </p>
+                      )}
                       {(() => {
                         const isFractional = item.buyUnit
                           ? CONTINUOUS_UNITS.has(item.buyUnit.toLowerCase())
@@ -797,7 +842,9 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
           {/* Shipping Address */}
           {order.shippingAddress && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-              <h3 className="text-lg font-bold text-foreground mb-4">Shipping Address</h3>
+              <h3 className="text-lg font-bold text-foreground mb-4">
+                {order.isAllDigital ? 'Billing Address' : 'Shipping Address'}
+              </h3>
               <div className="text-foreground-secondary">
                 <p className="font-semibold">{order.shippingAddress.full_name}</p>
                 <p className="mt-2">{order.shippingAddress.address_line1}</p>
@@ -812,7 +859,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
               </div>
               <OrderAddressChange
                 orderId={order.id}
-                canChange={!!order.canChangeAddress}
+                canChange={!!order.canChangeAddress && !order.isAllDigital}
                 request={order.addressChange ?? null}
                 currentAddress={order.shippingAddress}
                 portalHeader="business"

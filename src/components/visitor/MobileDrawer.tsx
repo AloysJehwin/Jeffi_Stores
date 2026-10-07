@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
+import { useWishlist } from '@/contexts/WishlistContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import ThemeToggle from '@/components/ThemeToggle'
 
@@ -17,6 +18,7 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
   const pathname = usePathname()
   const { user, logout } = useAuth()
   const { cartCount } = useCart()
+  const { count: wishlistCount } = useWishlist()
   const { identity } = useStoreConfig()
 
   useEffect(() => {
@@ -98,9 +100,12 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
             </Link>
             <Link
               href="/wishlist"
-              className="px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors"
+              className="flex items-center justify-between px-4 py-3 rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
-              Wishlist
+              <span className="font-medium">Wishlist</span>
+              {wishlistCount > 0 && (
+                <span className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">{wishlistCount}</span>
+              )}
             </Link>
           </div>
 

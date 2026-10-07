@@ -12,6 +12,7 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import CopySku from '@/components/ui/CopySku'
 import { mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
+import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -54,6 +55,7 @@ function CheckoutPage() {
   const [discountAmount, setDiscountAmount] = useState(0)
   const [shippingCharge, setShippingCharge] = useState<number | null>(null)
   const [serviceable, setServiceable] = useState(true)
+  const [rateDigital, setRateDigital] = useState<{ hasDigital: boolean; digitalOnly: boolean } | null>(null)
 
   const businessDiscountAmount =
     !isBuyNow && user?.isBusiness && user.approvalStatus === 'approved'
@@ -247,6 +249,7 @@ function CheckoutPage() {
             return
           }
           setIntentMode('buyNow')
+          if (d.isDigital) setRateDigital({ hasDigital: true, digitalOnly: true })
           setBuyNowItem({
             productId: d.productId,
             variantId: d.variantId || null,
@@ -334,16 +337,32 @@ function CheckoutPage() {
 
   // If online payments get disabled while on this page, fall back to manual so
   // we never submit a Razorpay order the server will reject.
+  // Digital lines never ship (no quote/serviceability) and can't use manual payment.
+  const hasDigital = isBuyNow ? !!rateDigital?.hasDigital : cartItems.some((i: any) => isDigitalLine(i))
+  const allDigital = isBuyNow
+    ? !!rateDigital?.digitalOnly
+    : cartItems.length > 0 && cartItems.every((i: any) => isDigitalLine(i))
+
   useEffect(() => {
     if (!isRazorpayEnabled && paymentMethod === 'razorpay') setPaymentMethod('manual')
-  }, [isRazorpayEnabled, paymentMethod])
+    else if (hasDigital && isRazorpayEnabled && paymentMethod === 'manual') setPaymentMethod('razorpay')
+  }, [isRazorpayEnabled, paymentMethod, hasDigital])
 
   const fetchShipping = (postalCode: string) => {
     if (isBuyNow && !buyNowItem) return
-    const subtotal = isBuyNow ? buyNowItem!.price * buyNowItem!.qty : getCartTotal()
+    if (!isBuyNow && allDigital) {
+      setShippingCharge(0)
+      setServiceable(true)
+      return
+    }
+    const subtotal = isBuyNow
+      ? buyNowItem!.price * buyNowItem!.qty
+      : Math.max(0, getCartTotal() - digitalLinesSubtotal(cartItems as any[], gstEnabled))
     const items = isBuyNow
       ? [{ productId: buyNowItem!.productId, variantId: buyNowItem!.variantId || null, quantity: buyNowItem!.qty }]
-      : cartItems.map(i => ({ productId: i.product_id, variantId: i.variant_id || null, quantity: Number(i.quantity) }))
+      : cartItems
+          .filter((i: any) => !isDigitalLine(i))
+          .map(i => ({ productId: i.product_id, variantId: i.variant_id || null, quantity: Number(i.quantity) }))
     if (items.length === 0) return
     fetch('/api/shipping/rate', {
       method: 'POST',
@@ -353,6 +372,7 @@ function CheckoutPage() {
     })
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
+        if (isBuyNow && d) setRateDigital({ hasDigital: !!d.hasDigital, digitalOnly: !!d.digitalOnly })
         if (d?.charge != null) setShippingCharge(Number(d.charge))
         if (d) setServiceable(d.serviceable !== false)
       })
@@ -1173,7 +1193,7 @@ function CheckoutPage() {
                         </label>
                       )}
                       <label
-                        className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
+                        className={`${hasDigital ? 'hidden' : 'flex'} items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}
                       >
                         <input
                           type="radio"
@@ -1406,6 +1426,7 @@ function CheckoutPage() {
                   disabled={
                     isSubmitting ||
                     !serviceable ||
+                    (paymentMethod === 'manual' && hasDigital) ||
                     (paymentMethod === 'razorpay' && (!isRazorpayEnabled || !razorpayLoaded))
                   }
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"

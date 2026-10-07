@@ -230,6 +230,24 @@ describe('GET /api/admin/orders/[id]/track', () => {
     vi.unstubAllGlobals()
   })
 
+  it('persists the courier EDD on refresh and returns it normalised', async () => {
+    process.env.DELHIVERY_API_KEY = 'test-key'
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne.mockResolvedValue({ ...mockOrder, status: 'shipped', shipment_status: 'in_transit' } as any)
+    const payload = buildTrackingResponse('UD', [
+      { ScanDetail: { Scan: 'In Transit', ScanType: 'UD', ScanDateTime: '2024-01-11T10:00:00' } },
+    ])
+    payload.ShipmentData[0].Shipment.ExpectedDeliveryDate = '2024-01-14T23:59:59'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(payload) }))
+
+    const data = await (await GET(makeGetRefresh(), routeParams as any)).json()
+    expect(data.tracking.expectedDelivery).toBe('2024-01-14')
+    const eddCall = mockQuery.mock.calls.find(([sql]) => String(sql).includes('courier_edd'))
+    expect(eddCall?.[1]?.slice(0, 2)).toEqual([orderId, '2024-01-14'])
+    vi.unstubAllGlobals()
+  })
+
   it('syncs DL status to delivered', async () => {
     process.env.DELHIVERY_API_KEY = 'test-key'
     mockAuth.mockResolvedValue(admin as any)

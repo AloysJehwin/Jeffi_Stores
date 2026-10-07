@@ -434,7 +434,7 @@ function renderBlock(
       return (
         <Link
           href={b.href}
-          className="inline-flex items-center px-3 py-1.5 rounded text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white"
+          className="inline-flex items-center px-3 h-control-sm rounded text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white"
         >
           {b.label}
         </Link>
@@ -524,7 +524,7 @@ function ProductSearchPicker({ onPick }: { onPick: (p: ManualPickResult) => void
             setQuery(e.target.value)
             search(e.target.value)
           }}
-          className="w-full rounded-md border border-border-default bg-surface-primary pl-7 pr-2 py-1.5 text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent-500"
+          className="w-full rounded-md border border-border-default bg-surface-primary pl-7 pr-2 h-control-sm text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent-500"
         />
       </div>
       {loading && <p className="text-[10px] text-foreground-muted mt-1">Searching…</p>}
@@ -748,7 +748,7 @@ function QuotationResolverBlockUI({
           <button
             type="button"
             onClick={submitQuotation}
-            className="px-2.5 py-1 rounded bg-accent-500 hover:bg-accent-600 text-white font-semibold shrink-0 text-xs"
+            className="px-2.5 h-control-sm rounded bg-accent-500 hover:bg-accent-600 text-white font-semibold shrink-0 text-xs"
           >
             Create quotation
           </button>
@@ -996,7 +996,7 @@ function QuotationResolverBlockUI({
                     <button
                       type="button"
                       onClick={useCurrentCandidate}
-                      className="flex-1 py-1.5 rounded-md bg-accent-500 hover:bg-accent-600 text-white font-semibold text-xs"
+                      className="flex-1 h-control-sm rounded-md bg-accent-500 hover:bg-accent-600 text-white font-semibold text-xs"
                     >
                       Use this
                     </button>
@@ -1014,7 +1014,7 @@ function QuotationResolverBlockUI({
                         if (next >= 0) setCardIndex(next)
                         else if (cardIndex + 1 < lines.length) setCardIndex(cardIndex + 1)
                       }}
-                      className="px-3 py-1.5 rounded-md border border-border-secondary text-foreground-muted hover:text-foreground hover:border-border-default text-xs font-medium"
+                      className="px-3 h-control-sm rounded-md border border-border-secondary text-foreground-muted hover:text-foreground hover:border-border-default text-xs font-medium"
                     >
                       Skip
                     </button>

@@ -736,7 +736,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
         <h1 className="text-xl font-bold text-foreground">Admin Audit Log</h1>
       </div>
 
-      <div className="flex items-center gap-1 border-b border-border-default mb-5">
+      <div className="flex items-center gap-1 border-b border-border-default mb-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {[
           { id: 'audit' as const, label: 'Audit Events', icon: ScrollText, show: true },
           { id: 'mail_log' as const, label: 'Mail Log', icon: Mail, show: true },
@@ -751,7 +751,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               key={id}
               type="button"
               onClick={() => setPageTab(id)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors -mb-px ${
+              className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors -mb-px ${
                 pageTab === id
                   ? 'text-accent-600 dark:text-accent-400 border-accent-500'
                   : 'text-foreground-muted hover:text-foreground border-transparent'
@@ -774,7 +774,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               type="button"
               onClick={loadMailLog}
               disabled={mailLoading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
+              className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${mailLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -787,7 +787,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               placeholder="Search by recipient or subject..."
               value={mailQuery}
               onChange={e => setMailQuery(e.target.value)}
-              className="text-sm px-3 py-1.5 rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+              className="text-sm px-3 h-control-sm rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
             />
             <AdminSelect
               value={mailKind}
@@ -1012,7 +1012,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               type="button"
               onClick={loadSmsLog}
               disabled={smsLoading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
+              className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${smsLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -1025,7 +1025,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               placeholder="Search by number or message..."
               value={smsQuery}
               onChange={e => setSmsQuery(e.target.value)}
-              className="text-sm px-3 py-1.5 rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+              className="text-sm px-3 h-control-sm rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
             />
             <AdminSelect
               value={smsKind}
@@ -1215,7 +1215,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               type="button"
               onClick={loadWaLog}
               disabled={waLoading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
+              className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${waLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -1228,7 +1228,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               placeholder="Search by number or message..."
               value={waQuery}
               onChange={e => setWaQuery(e.target.value)}
-              className="text-sm px-3 py-1.5 rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+              className="text-sm px-3 h-control-sm rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
             />
             <AdminSelect
               value={waKind}
@@ -1421,7 +1421,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               type="button"
               onClick={loadCronJobs}
               disabled={cronLoading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
+              className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${cronLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -1476,7 +1476,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                           type="button"
                           disabled={cronTriggeringId === job.id}
                           onClick={() => triggerCronJob(job.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface-secondary text-foreground-muted hover:bg-accent-100 dark:hover:bg-accent-900/30 hover:text-accent-700 dark:hover:text-accent-300 disabled:opacity-50 transition-colors"
+                          className="flex items-center gap-1.5 px-3 h-control-sm rounded text-xs font-semibold bg-surface-secondary text-foreground-muted hover:bg-accent-100 dark:hover:bg-accent-900/30 hover:text-accent-700 dark:hover:text-accent-300 disabled:opacity-50 transition-colors"
                         >
                           {cronTriggeringId === job.id ? (
                             <RefreshCw className="w-3 h-3 animate-spin" />
@@ -1489,7 +1489,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                           <button
                             type="button"
                             onClick={() => setExpandedCronId(isExpanded ? null : job.id)}
-                            className="px-3 py-1.5 rounded text-xs font-semibold bg-surface-secondary text-foreground-muted hover:bg-surface-elevated transition-colors"
+                            className="px-3 h-control-sm rounded text-xs font-semibold bg-surface-secondary text-foreground-muted hover:bg-surface-elevated transition-colors"
                           >
                             {isExpanded ? 'Hide' : `Logs (${job.log.length})`}
                           </button>
@@ -1586,7 +1586,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               type="button"
               onClick={loadReplication}
               disabled={replLoading}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
+              className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${replLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -1754,7 +1754,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                 setEntityFilter('all')
                 setActionFilter('all')
               }}
-              className="text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary flex items-center gap-1"
+              className="text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary flex items-center gap-1"
             >
               <Filter className="w-3.5 h-3.5" /> Reset
             </button>

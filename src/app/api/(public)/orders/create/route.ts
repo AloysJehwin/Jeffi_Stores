@@ -94,7 +94,8 @@ export async function POST(request: NextRequest) {
           'extra_delivery_days', p.extra_delivery_days,
           'handling_days', p.handling_days,
           'weight_grams', p.weight_grams, 'package_type', p.package_type,
-          'length_cm', p.length_cm, 'breadth_cm', p.breadth_cm, 'height_cm', p.height_cm
+          'length_cm', p.length_cm, 'breadth_cm', p.breadth_cm, 'height_cm', p.height_cm,
+          'is_digital', COALESCE(p.is_digital, FALSE)
         ) AS products,
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
@@ -139,6 +140,12 @@ export async function POST(request: NextRequest) {
         },
         { status: 422 }
       )
+    }
+
+    // Digital lines are granted only by the online-payment commit (draft → verify), which this
+    // place-then-pay route never reaches — so it takes no digital line on any payment method.
+    if (cartItems.some((item: any) => item.products?.is_digital === true)) {
+      return NextResponse.json({ error: 'Digital items must be paid online' }, { status: 400 })
     }
 
     if (isCod) {
@@ -248,10 +255,14 @@ export async function POST(request: NextRequest) {
     const appliedCodFee = !isCod ? 0 : quoteResolved ? quote.codFee : clientCodFee != null ? round2(clientCodFee) : 0
 
     const _eddPin = String(destinationPin || '')
-    const _eddHandling = Math.max(2, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 2)))
+    const _eddHandling = Math.max(0, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 0)))
     const _eddExtra = Math.max(0, ...cartItems.map((i: any) => Number(i.products?.extra_delivery_days ?? 0)))
-    const _eddOrigin = (await getBusinessValues()).delhiveryOriginPincode
-    const _edd = computeEdd({ pin: _eddPin, originPin: _eddOrigin, handlingDays: _eddHandling, extraDays: _eddExtra })
+    const _edd = computeEdd({
+      pin: _eddPin,
+      store: await getBusinessValues(),
+      handlingDays: _eddHandling,
+      extraDays: _eddExtra,
+    })
 
     const order = await withTransaction(async client => {
       let shippingAddressId = null
@@ -449,8 +460,8 @@ export async function POST(request: NextRequest) {
           item.sub_variant?.breadth_cm ?? item.variant?.breadth_cm ?? item.products?.breadth_cm ?? null
         const snapHeightCm = item.sub_variant?.height_cm ?? item.variant?.height_cm ?? item.products?.height_cm ?? null
         await client.query(
-          `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp, weight_grams, package_type, length_cm, breadth_cm, height_cm)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`,
+          `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp, weight_grams, package_type, length_cm, breadth_cm, height_cm, is_digital, is_returnable)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)`,
           [
             createdOrder.id,
             item.product_id,
@@ -484,6 +495,8 @@ export async function POST(request: NextRequest) {
             snapLengthCm,
             snapBreadthCm,
             snapHeightCm,
+            item.products?.is_digital === true,
+            item.products?.is_digital !== true,
           ]
         )
       }

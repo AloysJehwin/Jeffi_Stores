@@ -298,7 +298,7 @@ export const TOOLS: ToolDef[] = [
       type: 'object',
       properties: {
         userId: { type: 'string' },
-        status: { type: 'string', description: 'pending|confirmed|processing|shipped|delivered|cancelled' },
+        status: { type: 'string', description: 'pending|confirmed|processing|shipped|delivered|granted (digital: access granted)|cancelled' },
         days: { type: 'integer', default: 7, minimum: 1, maximum: 365 },
         limit: { type: 'integer', default: 20, minimum: 1, maximum: 100 },
       },
@@ -507,6 +507,9 @@ export const TOOLS: ToolDef[] = [
       if (o.status === 'shipped' || o.status === 'delivered') {
         return { proposed: false, info: `Order ${o.order_number} is already ${o.status}.` }
       }
+      if (o.status === 'granted') {
+        return { proposed: false, info: `Order ${o.order_number} is a digital order (access granted); it never ships.` }
+      }
       return {
         proposed: true,
         kind: 'mark_order_shipped',
@@ -702,7 +705,7 @@ export const TOOLS: ToolDef[] = [
       )
       if (!order) throw new Error('Order not found')
       if (!order.customer_email) throw new Error('Order has no customer email on file')
-      if (['delivered', 'cancelled'].includes(order.status)) {
+      if (['delivered', 'granted', 'cancelled'].includes(order.status)) {
         return {
           proposed: false,
           info: `Order ${order.order_number} is already ${order.status}; delay email not appropriate.`,

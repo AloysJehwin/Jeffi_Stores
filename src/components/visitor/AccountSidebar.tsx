@@ -5,6 +5,9 @@ import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useAccountSearch } from '@/contexts/AccountSearchContext'
 import AccountSearch from '@/components/visitor/AccountSearch'
+import { useLoyaltyEnabled } from '@/hooks/useLoyaltyEnabled'
+import { useReferralEnabled } from '@/hooks/useReferralEnabled'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 const navItems = [
   {
@@ -101,7 +104,65 @@ const businessNavItem = {
   ),
 }
 
+const subscriptionsNavItem = {
+  href: '/account/subscriptions',
+  label: 'Subscriptions',
+  exact: false,
+  icon: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+      />
+    </svg>
+  ),
+}
+
+const rewardsNavItem = {
+  href: '/account/rewards',
+  label: 'Rewards',
+  exact: false,
+  icon: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"
+      />
+    </svg>
+  ),
+}
+
+const referralsNavItem = {
+  href: '/account/referrals',
+  label: 'Refer & Earn',
+  exact: false,
+  icon: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+      />
+    </svg>
+  ),
+}
+
 export { navItems }
+
+export function useAccountNavItems() {
+  const { user } = useAuth()
+  const loyaltyEnabled = useLoyaltyEnabled()
+  const referralEnabled = useReferralEnabled()
+  const subscriptionsEnabled = useStoreConfig().flags.subscriptionsEnabled
+  const base = subscriptionsEnabled ? [...navItems.slice(0, 2), subscriptionsNavItem, ...navItems.slice(2)] : navItems
+  if (!loyaltyEnabled || user?.isBusiness) return base
+  return referralEnabled ? [...base, rewardsNavItem, referralsNavItem] : [...base, rewardsNavItem]
+}
 
 const accountBackLinkMap: Array<{ pattern: RegExp; label: string; href: string }> = [
   { pattern: /^\/account\/orders\/.+/, label: 'My Orders', href: '/account/orders' },
@@ -112,11 +173,11 @@ export function AccountNavBar() {
   const pathname = usePathname()
   const { user } = useAuth()
   const { query, suggestions, placeholder, setQuery } = useAccountSearch()
-  const items = user?.isBusiness && user.approvalStatus === 'approved' ? [...navItems, businessNavItem] : navItems
+  const baseItems = useAccountNavItems()
+  const items = user?.isBusiness && user.approvalStatus === 'approved' ? [...baseItems, businessNavItem] : baseItems
 
   const activeLabel = (() => {
-    const all = user?.isBusiness && user.approvalStatus === 'approved' ? [...navItems, businessNavItem] : navItems
-    const match = all
+    const match = items
       .slice()
       .reverse()
       .find(item => (item.exact ? pathname === item.href : pathname.startsWith(item.href)))
@@ -177,7 +238,8 @@ export function AccountNavBar() {
 export default function AccountSidebar() {
   const pathname = usePathname()
   const { user } = useAuth()
-  const items = user?.isBusiness && user.approvalStatus === 'approved' ? [...navItems, businessNavItem] : navItems
+  const baseItems = useAccountNavItems()
+  const items = user?.isBusiness && user.approvalStatus === 'approved' ? [...baseItems, businessNavItem] : baseItems
 
   return (
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4">

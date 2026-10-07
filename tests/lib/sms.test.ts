@@ -10,6 +10,11 @@ vi.mock('@/lib/shared/message-log', () => ({
   logMessage: vi.fn(),
 }))
 
+// Order links resolve to the exact order page on the customer's store.
+vi.mock('@/lib/shared/customer-links', () => ({
+  orderUrlByNumber: vi.fn(async (n: string) => (n === 'UNKNOWN' ? null : `https://acme.jeffistores.in/account/orders/id-${n}`)),
+}))
+
 import { logMessage } from '@/lib/shared/message-log'
 
 const mockLog = vi.mocked(logMessage)
@@ -76,6 +81,24 @@ describe('sms senders (happy path)', () => {
     const ok = await sms.sendOrderCancelledSMS({ phone: '9876543210', orderNumber: 'ORD4', reason: 'OOS' })
     expect(ok).toBe(true)
     expect(messagesCreate.mock.calls[0][0].body).toContain('OOS')
+  })
+
+  it('links every order SMS to that exact order page, with the scheme so it is tappable', async () => {
+    const sms = await loadSms()
+    await sms.sendOrderConfirmedSMS({ phone: '9876543210', orderNumber: 'A1', total: 100 })
+    await sms.sendOrderShippedSMS({ phone: '9876543210', orderNumber: 'A2' })
+    await sms.sendOrderDeliveredSMS({ phone: '9876543210', orderNumber: 'A3' })
+    await sms.sendOrderCancelledSMS({ phone: '9876543210', orderNumber: 'A4' })
+    await sms.sendPaymentFailedSMS({ phone: '9876543210', orderNumber: 'A5' })
+    const bodies = messagesCreate.mock.calls.map(c => String(c[0].body))
+    bodies.forEach((body, i) => expect(body).toContain(`https://acme.jeffistores.in/account/orders/id-A${i + 1}`))
+    for (const body of bodies) expect(body).not.toMatch(/\/orders\.?$|\/orders /)
+  })
+
+  it('falls back to the order list when the order number is unknown', async () => {
+    const sms = await loadSms()
+    await sms.sendPaymentFailedSMS({ phone: '9876543210', orderNumber: 'UNKNOWN' })
+    expect(String(messagesCreate.mock.calls[0][0].body)).toMatch(/https?:\/\/[^ ]+\/account\/orders$/)
   })
 
   it('sendOTPSMS returns true', async () => {

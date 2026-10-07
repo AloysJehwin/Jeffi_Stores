@@ -10,6 +10,7 @@ vi.mock('@/lib/shared/automation-emails', () => ({
 }))
 
 import { winback180 } from '@/lib/campaigns/scenarios/winback-180'
+import { days } from '@/lib/campaigns/duration'
 
 describe('winback180 scenario', () => {
   it('has correct kind', () => {
@@ -20,18 +21,14 @@ describe('winback180 scenario', () => {
     expect(winback180.name).toBe('Win-Back (180 days, dormant)')
   })
 
-  it('defaultParams use deep dormant window', () => {
-    expect(winback180.defaultParams.minDaysSinceOrder).toBe(150)
-    expect(winback180.defaultParams.maxDaysSinceOrder).toBe(365)
+  it('defaultParams use deep dormant window (canonical minutes)', () => {
+    expect(winback180.defaultParams.minDaysSinceOrder).toBe(days(150))
+    expect(winback180.defaultParams.maxDaysSinceOrder).toBe(days(365))
   })
 
-  it('defaultParams use low health score range', () => {
+  it('has no health-score cut by default: the old under-25 cut matched nobody', () => {
     expect(winback180.defaultParams.healthScoreMin).toBe(0)
-    expect(winback180.defaultParams.healthScoreMax).toBe(25)
-  })
-
-  it('uses 60-day cooldown', () => {
-    expect(winback180.defaultParams.sendCooldownDays).toBe(60)
+    expect(winback180.defaultParams.healthScoreMax).toBe(100)
   })
 
   it('has findEligible function', () => {
@@ -44,6 +41,6 @@ describe('winback180 scenario', () => {
 
   it('has paramSchema', () => {
     expect(winback180.paramSchema).toBeDefined()
-    expect(Object.keys(winback180.paramSchema)).toHaveLength(7)
+    expect(Object.keys(winback180.paramSchema)).toHaveLength(6)
   })
 })

@@ -70,6 +70,7 @@ function OrderStatusBadge({ status }: { status: string }) {
     shipped: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
     dispatched: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
     delivered: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
+    granted: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
     cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
     returned: 'bg-gray-100 text-gray-700 dark:bg-gray-700/40 dark:text-gray-300',
   }
@@ -77,7 +78,7 @@ function OrderStatusBadge({ status }: { status: string }) {
     <span
       className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold capitalize ${map[status] ?? 'bg-gray-100 text-gray-700'}`}
     >
-      {status}
+      {status === 'granted' ? 'Access granted' : status}
     </span>
   )
 }

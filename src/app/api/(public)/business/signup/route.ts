@@ -8,13 +8,14 @@ import { logActivity } from '@/lib/shared/activity'
 import { createAdminNotification } from '@/lib/shared/admin-notify'
 import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 import { POLICY_VERSION } from '@/lib/legals/policies'
+import { normalizeDob } from '@/lib/shared/format'
 
 if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, firstName, lastName, phone, companyName, gstNumber, businessAddress, industry } = body
+    const { email, firstName, lastName, phone, companyName, gstNumber, businessAddress, industry, dateOfBirth } = body
 
     if (!email || !firstName || !phone || !companyName || !gstNumber || !businessAddress || !industry) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
@@ -31,6 +32,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Enter a valid 10-digit mobile number' }, { status: 400 })
     }
 
+    const normalizedDob = normalizeDob(dateOfBirth)
+    if (!normalizedDob) {
+      return NextResponse.json({ error: 'Enter a valid date of birth' }, { status: 400 })
+    }
+
     const existingUser = await queryOne<{ id: string }>(
       "SELECT id FROM users WHERE email = $1 AND user_type = 'business'",
       [email.toLowerCase()]
@@ -42,10 +48,10 @@ export async function POST(request: NextRequest) {
 
     const newUser = await queryOne<any>(
       `INSERT INTO users (email, first_name, last_name, phone, is_active, user_type, last_login,
-                         policies_accepted_version, policies_accepted_at)
-       VALUES ($1, $2, $3, $4, true, 'business', NOW(), $5, NOW())
+                         policies_accepted_version, policies_accepted_at, date_of_birth)
+       VALUES ($1, $2, $3, $4, true, 'business', NOW(), $5, NOW(), $6)
        RETURNING *`,
-      [email.toLowerCase(), firstName, lastName || null, cleaned, POLICY_VERSION]
+      [email.toLowerCase(), firstName, lastName || null, cleaned, POLICY_VERSION, normalizedDob]
     )
     if (!newUser) return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
 

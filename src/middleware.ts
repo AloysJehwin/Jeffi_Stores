@@ -91,12 +91,25 @@ function adminWritePathParent(pathname: string): string {
 // _next and well-known icon paths; this catches everything else in public/ by file extension.
 const STATIC_ASSET_RE = /\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp4|webm|pdf)$/i
 
+// On a vault host these must reach the authenticated vault branch, never the static passthrough.
+const VAULT_BLOCKED_STATIC_RE = /\.(?:mp4|webm|pdf)$/i
+
 export async function middleware(request: NextRequest) {
   const hostname = resolveTrustedHost(request)
   const pathname = request.nextUrl.pathname
 
-  // Serve public/ assets directly regardless of host, before any tenant/host rewrite runs.
-  if (STATIC_ASSET_RE.test(pathname)) return NextResponse.next()
+  const hostApp = appFromHost(hostname)
+
+  // Serve public/ assets directly regardless of host, before any tenant/host rewrite runs. Vault pages
+  // and vault-host APIs never take this shortcut: it skips the x-tenant-* header stripping below.
+  const vaultPath = pathname.startsWith('/vault/') || (hostApp === 'vault' && pathname.startsWith('/api/'))
+  if (
+    STATIC_ASSET_RE.test(pathname) &&
+    !vaultPath &&
+    !(hostApp === 'vault' && VAULT_BLOCKED_STATIC_RE.test(pathname))
+  ) {
+    return NextResponse.next()
+  }
   // Per-request device-binding signals: resolveSession revokes + rejects a cookie replayed
   // from a clearly different environment (>= 2 STABLE signals differ — see evaluateBinding).
   const reqSignals = extractSessionSignals(request)
@@ -110,8 +123,6 @@ export async function middleware(request: NextRequest) {
   }
 
   const isAdminApiPath = pathname.startsWith('/api/admin')
-  const hostApp = appFromHost(hostname)
-
   const rebind = bindingGate(request, hostname, hostApp)
   if (rebind) return addSecurityHeaders(rebind)
   const isAdminSubdomain = hostApp === 'admin'
@@ -327,6 +338,55 @@ export async function middleware(request: NextRequest) {
     }
     const slug = pathname === '/' ? '' : pathname
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/business${slug}${request.nextUrl.search}`, request.url)))
+  }
+
+  // The vault route group is only reachable through the vault host rewrite.
+  if (hostApp !== 'vault' && (pathname === '/vault' || pathname.startsWith('/vault/'))) {
+    return addSecurityHeaders(new NextResponse('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } }))
+  }
+
+  if (hostApp === 'vault') {
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
+    const noindex = (res: NextResponse) => {
+      res.headers.set('X-Robots-Tag', 'noindex, nofollow')
+      res.headers.set('Cache-Control', 'no-store')
+      return addSecurityHeaders(res)
+    }
+    if (pathname === '/') return noindex(NextResponse.redirect(buildRedirectUrl(request, '/library')))
+    // /callback establishes the session, so it is the one path reachable without one.
+    if (pathname !== '/callback') {
+      const vaultSid = request.cookies.get('vault_sid')?.value
+      const sess = vaultSid
+        ? await inTenant(async () => {
+            const { resolveVaultSid } = await import('./lib/vault/session')
+            return resolveVaultSid(vaultSid, reqSignals).catch(() => null)
+          })
+        : null
+      if (!sess || sess.tenantId !== (tenant?.tenantId ?? null)) {
+        const { storeHostForSlug } = await import('./lib/tenancy/forms-host')
+        const handoff = buildRedirectUrl(request, '/api/vault/handoff')
+        handoff.hostname = tenant ? storeHostForSlug(tenant.slug) : hostname.split(':')[0].replace(/^vault\./, '')
+        handoff.searchParams.set('target', pathname + request.nextUrl.search)
+        // Per-browser state, echoed through the store and checked at /callback (login-CSRF guard).
+        const state = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '')
+        handoff.searchParams.set('state', state)
+        const res = NextResponse.redirect(handoff)
+        res.cookies.set('vault_state', state, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 600,
+        })
+        if (sess) res.cookies.delete('vault_sid')
+        return noindex(res)
+      }
+    }
+    return noindex(
+      NextResponse.rewrite(new URL(`/vault${pathname}${request.nextUrl.search}`, request.url), {
+        request: { headers: stripped },
+      })
+    )
   }
 
   // Business portal auth — applies to /business/* paths (not subdomain, not API, not public pages)

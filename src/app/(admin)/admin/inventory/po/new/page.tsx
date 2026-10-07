@@ -830,7 +830,7 @@ export default function NewPOPage() {
                                 type="button"
                                 disabled={!categoryIds[it.id]}
                                 onClick={() => openPicker(it.id, categoryIds[it.id] ?? '')}
-                                className="px-3 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+                                className="px-3 h-control-sm bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
                               >
                                 Select Product
                               </button>
@@ -1062,7 +1062,7 @@ export default function NewPOPage() {
                 <button
                   type="button"
                   onClick={() => setLineItems([...lineItems, newPOLineItem()])}
-                  className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-border-default text-xs font-semibold text-secondary-500 dark:text-secondary-300 hover:bg-surface-secondary hover:border-secondary-400 transition-colors"
+                  className="mt-3 w-full flex items-center justify-center gap-1.5 h-control-sm rounded-lg border border-dashed border-border-default text-xs font-semibold text-secondary-500 dark:text-secondary-300 hover:bg-surface-secondary hover:border-secondary-400 transition-colors"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

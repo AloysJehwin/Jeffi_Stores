@@ -8,61 +8,14 @@ import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { ap } from '@/lib/shared/admin-path'
 import CopySku from '@/components/ui/CopySku'
 
-const METRO_PINS_3 = new Set([
-  '110',
-  '111',
-  '112',
-  '400',
-  '401',
-  '402',
-  '403',
-  '410',
-  '421',
-  '560',
-  '561',
-  '562',
-  '563',
-  '600',
-  '601',
-  '602',
-  '603',
-  '500',
-  '501',
-  '502',
-  '503',
-  '700',
-  '711',
-  '712',
-  '411',
-  '412',
-  '413',
-  '380',
-  '382',
-  '383',
-])
-function getTatDays(pin: string): number {
-  if (pin.startsWith('49')) return 7
-  if (METRO_PINS_3.has(pin.slice(0, 3))) return 10
-  return 14
-}
+// The stored EDD is the only source: computeEdd at order time, then courier/admin updates.
 function resolveOrderEdd(o: any): string | null {
-  const isShipped = ['shipped', 'out_for_delivery', 'delivered'].includes(o.status)
-  if (isShipped && o.estimated_delivery_date) {
-    return new Date(o.estimated_delivery_date + 'T00:00:00').toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-    })
-  }
-  const pin: string = o.shipping_address?.postal_code ?? ''
-  if (!pin) return null
-  const maxExtra = (o.order_items ?? []).reduce((max: number, item: any) => {
-    const d = Number(item.products?.extra_delivery_days ?? 0)
-    return d > max ? d : max
-  }, 0)
-  const tat = (/^\d{6}$/.test(pin) ? getTatDays(pin) : 7) + maxExtra
-  const d = new Date(o.created_at)
-  d.setDate(d.getDate() + tat)
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  const raw = o.estimated_delivery_date
+  if (!raw) return null
+  return new Date(String(raw).slice(0, 10) + 'T00:00:00').toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+  })
 }
 
 interface Props {
@@ -108,7 +61,8 @@ export default function OrderDetailModal({ order, onClose }: Props) {
     : o.customer_name || 'Guest'
 
   function statusBadgeClass(status: string) {
-    if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+    if (status === 'delivered' || status === 'granted')
+      return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
     if (status === 'processing' || status === 'shipped')
       return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
     if (status === 'out_for_delivery') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
@@ -126,10 +80,13 @@ export default function OrderDetailModal({ order, onClose }: Props) {
   function statusLabel(status: string) {
     if (status === 'cancel_requested') return 'Cancel Requested'
     if (status === 'out_for_delivery') return 'Out for Delivery'
+    if (status === 'granted') return 'Access granted'
     return status.replace(/_/g, ' ')
   }
 
   const addr = o.shipping_address || o.billing_address
+  // Only an all-digital order reaches 'granted', so it has nothing to pack or ship.
+  const isAllDigital = o.status === 'granted'
 
   return createPortal(
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
@@ -305,6 +262,11 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                             flammable={item.flammable}
                             size="xs"
                           />
+                          {item.is_digital && (
+                            <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300">
+                              Digital
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-xs text-foreground-muted truncate">
                           <span className="inline-flex items-center gap-1">
@@ -329,12 +291,12 @@ export default function OrderDetailModal({ order, onClose }: Props) {
 
           {/* Downloads */}
           <div className="flex flex-wrap gap-3 pt-1 border-t border-border-default">
-            {canPackingSlips && (
+            {canPackingSlips && !isAllDigital && (
               <a
                 href={`/api/admin/packing-slips/${order.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+                className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -352,7 +314,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                 href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+                className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -366,7 +328,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               </a>
             )}
             {(() => {
-              const e = resolveOrderEdd(o)
+              const e = isAllDigital ? null : resolveOrderEdd(o)
               return e ? (
                 <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                   <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -386,7 +348,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                 href={`/api/orders/${order.id}/invoice`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+                className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path

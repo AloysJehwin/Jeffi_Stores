@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, query, queryOne } from '@/lib/shared/db'
 import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
+import { ensureBuiltinCampaignRows } from '@/lib/campaigns/ensure-builtin-campaigns'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
@@ -23,6 +24,9 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const limit = Math.min(50, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)))
   const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10))
+
+  // Backfill a disabled campaign row for any built-in scenario missing one, so the full catalogue shows.
+  await ensureBuiltinCampaignRows()
 
   const [campaigns, countRow] = await Promise.all([
     queryMany(

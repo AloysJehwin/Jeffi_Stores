@@ -495,6 +495,7 @@ describe('provisioning state machine', () => {
         'acme.jeffistores.in',
         'admin-acme.jeffistores.in',
         'invoice-acme.jeffistores.in',
+        'vault-acme.jeffistores.in',
         'quotation-acme.jeffistores.in',
         'purchaseorder-acme.jeffistores.in',
         'forms-acme.jeffistores.in',
@@ -517,6 +518,7 @@ describe('provisioning state machine', () => {
               'acme.jeffistores.in',
               'admin-acme.jeffistores.in',
               'invoice-acme.jeffistores.in',
+              'vault-acme.jeffistores.in',
               'quotation-acme.jeffistores.in',
               'purchaseorder-acme.jeffistores.in',
               'forms-acme.jeffistores.in',
@@ -541,13 +543,29 @@ describe('provisioning state machine', () => {
       expect(remove).toHaveBeenCalled()
     })
 
-    it('is a no-op when the tier is unchanged', async () => {
+    it('backfills the vault host for a tenant provisioned before it existed', async () => {
       reg.getTenant.mockResolvedValue({ ...ACTIVE, plan: 'basic' })
       reg.getProvisioningJob.mockResolvedValue(
         job({
           status: 'done',
           created_resources: {
             dnsHosts: ['acme.jeffistores.in', 'admin-acme.jeffistores.in', 'invoice-acme.jeffistores.in'],
+          },
+        })
+      )
+      const { reprovisionDns } = await import('@/lib/provisioning/steps')
+      const out = await reprovisionDns('t-1', provider)
+      expect(out.added).toEqual(['vault-acme.jeffistores.in'])
+      expect(out.removed).toEqual([])
+    })
+
+    it('is a no-op when the tier is unchanged', async () => {
+      reg.getTenant.mockResolvedValue({ ...ACTIVE, plan: 'basic' })
+      reg.getProvisioningJob.mockResolvedValue(
+        job({
+          status: 'done',
+          created_resources: {
+            dnsHosts: ['acme.jeffistores.in', 'admin-acme.jeffistores.in', 'invoice-acme.jeffistores.in', 'vault-acme.jeffistores.in'],
           },
         })
       )

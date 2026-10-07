@@ -513,3 +513,186 @@ describe('PATCH /api/cart — cart item not found', () => {
     expect(body.error).toBe('Cart item not found')
   })
 })
+
+describe('POST /api/cart — digital product', () => {
+  const digitalProduct = { id: PRODUCT_ID, name: 'E-book', base_price: 499, is_active: true, is_digital: true }
+
+  beforeEach(() => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
+    vi.mocked(query)
+      .mockReset()
+      .mockResolvedValue({ rows: [{ quantity: 1, inserted: true }], rowCount: 1 } as any)
+    vi.mocked(queryOne)
+      .mockReset()
+      .mockResolvedValueOnce(digitalProduct as any)
+      .mockResolvedValue(null)
+  })
+
+  it('rejects with 409 DIGITAL_BUY_NOW_ONLY and never writes a cart line', async () => {
+    const res = await POST(
+      makeRequest('POST', 'http://localhost/api/cart', { productId: PRODUCT_ID, quantity: 1 }) as any
+    )
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({
+      error: 'Digital products are bought directly — use Buy Now',
+      code: 'DIGITAL_BUY_NOW_ONLY',
+    })
+    expect(vi.mocked(query)).not.toHaveBeenCalled()
+  })
+})
+
+describe('GET /api/cart — legacy digital lines', () => {
+  beforeEach(() => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
+    vi.mocked(query)
+      .mockReset()
+      .mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    vi.mocked(queryMany).mockReset().mockResolvedValue([])
+  })
+
+  it('purges digital lines for the user and excludes them from the listing', async () => {
+    const res = await GET(makeRequest('GET', 'http://localhost/api/cart') as any)
+    expect(res.status).toBe(200)
+    const [delSql, delParams] = vi.mocked(query).mock.calls[0]! as [string, any[]]
+    expect(delSql).toMatch(/DELETE FROM cart_items/)
+    expect(delSql).toMatch(/is_digital = TRUE/)
+    expect(delParams).toEqual(['guest-user-uuid'])
+    expect(String(vi.mocked(queryMany).mock.calls[0]![0])).toMatch(/COALESCE\(p\.is_digital, FALSE\) = FALSE/)
+  })
+})
+
+describe('PATCH /api/cart — digital line', () => {
+  it('drops a legacy digital line and returns 409', async () => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
+    vi.mocked(queryOne)
+      .mockReset()
+      .mockResolvedValueOnce({ id: CART_ITEM_ID, is_digital: true } as any)
+    vi.mocked(query)
+      .mockReset()
+      .mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    const res = await PATCH(
+      makeRequest('PATCH', 'http://localhost/api/cart', { cartItemId: CART_ITEM_ID, savedForLater: false }) as any
+    )
+    expect(res.status).toBe(409)
+    expect((await res.json()).code).toBe('DIGITAL_BUY_NOW_ONLY')
+    expect(String(vi.mocked(query).mock.calls[0]![0])).toMatch(/DELETE FROM cart_items/)
+  })
+})
+
+describe('POST /api/cart — selling-unit max counts the existing line', () => {
+  const unitRow = { unit: 'pc', factor: '1', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: '100' }
+
+  beforeEach(() => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
+    vi.mocked(query)
+      .mockReset()
+      .mockResolvedValue({ rows: [{ quantity: 100, inserted: false }], rowCount: 1 } as any)
+  })
+
+  function mockLookups(existing: number | null) {
+    vi.mocked(queryOne)
+      .mockReset()
+      .mockResolvedValueOnce({ id: PRODUCT_ID, name: 'Bolt', base_price: 10, is_active: true } as any) // product
+      .mockResolvedValueOnce({ factor: '1', is_base: true } as any) // unit factor
+      .mockResolvedValueOnce(unitRow as any) // unit constraint
+      .mockResolvedValueOnce(existing == null ? null : ({ quantity: String(existing) } as any)) // active line
+  }
+
+  const add = (quantity: number) =>
+    POST(
+      makeRequest('POST', 'http://localhost/api/cart', {
+        productId: PRODUCT_ID,
+        quantity,
+        buyMode: 'pc',
+        buyUnit: 'pc',
+      }) as any
+    )
+
+  it('rejects 100 more when 5 are already in the cart, with the remaining amount', async () => {
+    mockLookups(5)
+    const res = await add(100)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({
+      error: 'You can add up to 95 more — 5 already in your cart (max 100)',
+      code: 'UNIT_MAX_EXCEEDED',
+    })
+    expect(vi.mocked(query)).not.toHaveBeenCalled()
+  })
+
+  it('accepts exactly the remaining 95', async () => {
+    mockLookups(5)
+    const res = await add(95)
+    expect(res.status).toBe(200)
+    expect(vi.mocked(query)).toHaveBeenCalledTimes(1)
+  })
+
+  it('says the line is full once it holds max_qty', async () => {
+    mockLookups(100)
+    const res = await add(1)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Max quantity already in cart (max 100)')
+  })
+
+  it('still allows a full max_qty add to an empty line', async () => {
+    mockLookups(null)
+    const res = await add(100)
+    expect(res.status).toBe(200)
+  })
+
+  it('only counts active (not saved-for-later) lines of the same unit', async () => {
+    mockLookups(0)
+    await add(1)
+    const lineSql = String(vi.mocked(queryOne).mock.calls[3]![0])
+    expect(lineSql).toMatch(/buy_mode = \$5/)
+    expect(lineSql).toMatch(/saved_for_later, FALSE\) = FALSE/)
+  })
+})
+
+describe('PATCH /api/cart — quantity respects max_qty', () => {
+  beforeEach(() => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
+    vi.mocked(cookies).mockResolvedValue({
+      get: (_k: string) => ({ value: 'sess-abc' }) as any,
+      set: vi.fn(),
+      delete: vi.fn(),
+    } as any)
+    vi.mocked(queryOne)
+      .mockReset()
+      .mockResolvedValueOnce({
+        id: CART_ITEM_ID,
+        product_id: PRODUCT_ID,
+        variant_id: null,
+        sub_variant_id: null,
+        buy_unit: 'pc',
+        is_digital: false,
+      } as any)
+      .mockResolvedValueOnce({
+        unit: 'pc',
+        factor: '1',
+        dimension: 'count',
+        qty_step: '1',
+        min_qty: '1',
+        max_qty: '100',
+      } as any)
+    vi.mocked(query)
+      .mockReset()
+      .mockResolvedValue({ rows: [], rowCount: 1 } as any)
+  })
+
+  it('rejects a stepper value above max_qty', async () => {
+    const res = await PATCH(
+      makeRequest('PATCH', 'http://localhost/api/cart', { cartItemId: CART_ITEM_ID, quantity: 101 }) as any
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Maximum quantity is 100 pc.')
+    expect(vi.mocked(query)).not.toHaveBeenCalled()
+  })
+
+  it('accepts max_qty itself', async () => {
+    const res = await PATCH(
+      makeRequest('PATCH', 'http://localhost/api/cart', { cartItemId: CART_ITEM_ID, quantity: 100 }) as any
+    )
+    expect(res.status).toBe(200)
+    expect(vi.mocked(query).mock.calls[0]![1]).toEqual([100, CART_ITEM_ID])
+  })
+})

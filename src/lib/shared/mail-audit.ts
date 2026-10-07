@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { queryOne } from '@/lib/shared/db'
+import { findTokenKeys } from '@/lib/templates/variables-shared'
 
 // Single chokepoint for outbound mail. Wraps transporter.sendMail and writes
 // a row to email_logs (status, body, kind, entity link) so admins can see
@@ -34,10 +35,20 @@ export interface SendAuditedMailOptions {
   redactBody?: boolean
 }
 
-const DEFAULT_FROM = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL || 'noreply@jeffistores.in'}>`
+async function resolveDefaultFrom(): Promise<string> {
+  try {
+    const { customerMailFromAsync } = await import('@/lib/catalog/brand')
+    return await customerMailFromAsync()
+  } catch {
+    return `noreply@${process.env.PLATFORM_DOMAIN || 'jeffistores.in'}`
+  }
+}
 
-let transporter: nodemailer.Transporter | null = null
-function getTransporter(): nodemailer.Transporter {
+// nodemailer v10 no longer exposes a `Transporter` namespace type; createTransport returns a Mail
+// instance, so derive the type from the function's return.
+type MailTransport = ReturnType<typeof nodemailer.createTransport>
+let transporter: MailTransport | null = null
+function getTransporter(): MailTransport {
   if (!transporter) {
     transporter = nodemailer.createTransport({
       host: 'email-smtp.us-east-1.amazonaws.com',
@@ -105,8 +116,24 @@ async function logMail(opts: {
   }
 }
 
-export async function sendAuditedMail(o: SendAuditedMailOptions): Promise<{ messageId?: string }> {
-  const from = o.from || DEFAULT_FROM
+// Never mail a raw registered variable token: any {store_name} / {{customer_first_name}} / custom
+// variable a path forgot to fill is substituted here and logged.
+async function guardTokens(o: SendAuditedMailOptions): Promise<SendAuditedMailOptions> {
+  if (![o.subject, o.html, o.amp, o.text].some(p => p && findTokenKeys(p).length > 0)) return o
+  try {
+    const { guardTemplateTokens } = await import('@/lib/templates/variables')
+    const to = Array.isArray(o.to) ? o.to[0] : o.to
+    return await guardTemplateTokens(o, { to, userId: o.userId, templateName: o.templateName })
+  } catch {
+    return o
+  }
+}
+
+export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ messageId?: string }> {
+  const o = await guardTokens(input)
+  // No explicit from → use the CURRENT store's customer sender (tenant on a tenant host, platform
+  // off-tenant) instead of a hardcoded "Jeffi Store's", which leaked into tenant-facing mail.
+  const from = o.from || (await resolveDefaultFrom())
   const to = Array.isArray(o.to) ? o.to.join(', ') : o.to
   const cc = joinAddrs(o.cc)
   const bcc = joinAddrs(o.bcc)

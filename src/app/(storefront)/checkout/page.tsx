@@ -11,6 +11,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import CopySku from '@/components/ui/CopySku'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
+import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -59,6 +60,7 @@ function CheckoutPage() {
   const [shippingCharge, setShippingCharge] = useState<number | null>(null)
   const [codFee, setCodFee] = useState<number>(0)
   const [serviceable, setServiceable] = useState<boolean>(true)
+  const [rateDigital, setRateDigital] = useState<{ hasDigital: boolean; digitalOnly: boolean } | null>(null)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -210,6 +212,7 @@ function CheckoutPage() {
             return
           }
           setIntentMode('buyNow')
+          if (d.isDigital) setRateDigital({ hasDigital: true, digitalOnly: true })
           setBuyNowItem({
             productId: d.productId,
             variantId: d.variantId || null,
@@ -295,12 +298,28 @@ function CheckoutPage() {
     document.body.appendChild(script)
   }, [paymentMethod, razorpayLoaded])
 
+  // Digital lines never ship (no quote/serviceability) and are online-pay only.
+  const hasDigital = isBuyNow ? !!rateDigital?.hasDigital : cartItems.some((i: any) => isDigitalLine(i))
+  const allDigital = isBuyNow
+    ? !!rateDigital?.digitalOnly
+    : cartItems.length > 0 && cartItems.every((i: any) => isDigitalLine(i))
+
   const fetchShipping = (postalCode: string) => {
     if (isBuyNow && !buyNowItem) return
-    const subtotal = isBuyNow ? buyNowItem!.price * buyNowItem!.qty : getCartTotal()
+    if (!isBuyNow && allDigital) {
+      setShippingCharge(0)
+      setCodFee(0)
+      setServiceable(true)
+      return
+    }
+    const subtotal = isBuyNow
+      ? buyNowItem!.price * buyNowItem!.qty
+      : Math.max(0, getCartTotal() - digitalLinesSubtotal(cartItems as any[], gstEnabled))
     const items = isBuyNow
       ? [{ productId: buyNowItem!.productId, variantId: buyNowItem!.variantId || null, quantity: buyNowItem!.qty }]
-      : cartItems.map(i => ({ productId: i.product_id, variantId: i.variant_id || null, quantity: Number(i.quantity) }))
+      : cartItems
+          .filter((i: any) => !isDigitalLine(i))
+          .map(i => ({ productId: i.product_id, variantId: i.variant_id || null, quantity: Number(i.quantity) }))
     if (items.length === 0) return
     fetch('/api/shipping/rate', {
       method: 'POST',
@@ -310,6 +329,7 @@ function CheckoutPage() {
     })
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
+        if (isBuyNow && d) setRateDigital({ hasDigital: !!d.hasDigital, digitalOnly: !!d.digitalOnly })
         if (d?.charge != null) setShippingCharge(Number(d.charge))
         setCodFee(d?.codFee != null ? Number(d.codFee) : 0)
         setServiceable(d?.serviceable !== false)
@@ -363,10 +383,11 @@ function CheckoutPage() {
   useEffect(() => {
     const codOk =
       isCodSiteEnabled &&
+      !hasDigital &&
       (isBuyNow || (cartItems.length > 0 && cartItems.every((i: any) => i.products?.is_cod_allowed !== false)))
     if (paymentMethod === 'razorpay' && !isRazorpayEnabled && codOk) setPaymentMethod('cod')
     else if (paymentMethod === 'cod' && !codOk && isRazorpayEnabled) setPaymentMethod('razorpay')
-  }, [paymentMethod, isRazorpayEnabled, isCodSiteEnabled, isBuyNow, cartItems])
+  }, [paymentMethod, isRazorpayEnabled, isCodSiteEnabled, isBuyNow, cartItems, hasDigital])
 
   useEffect(() => {
     if (!couponId) return
@@ -768,6 +789,7 @@ function CheckoutPage() {
   // COD is available only when enabled at BOTH the site level AND for every item in the order.
   const codAvailable =
     isCodSiteEnabled &&
+    !hasDigital &&
     (isBuyNow
       ? true // buy-now: is_cod_allowed not in intent payload, allow by default; server will validate
       : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false))

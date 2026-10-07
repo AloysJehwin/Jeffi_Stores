@@ -190,6 +190,18 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     expect(body.codBlockedProductIds).toEqual(['prod-b1'])
   })
 
+  it('returns 400 when the cart holds a digital line (COD/manual are not allowed for digital)', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER)
+    const digital = baseCartItem({ products: { ...baseCartItem().products, is_digital: true } })
+    vi.mocked(db.queryMany).mockResolvedValue([digital])
+
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Digital items must be paid online')
+    expect(db.withTransaction).not.toHaveBeenCalled()
+  })
+
   it('allows COD when all items allow it (payment_mode = cod, status cod_pending)', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(null) // min order

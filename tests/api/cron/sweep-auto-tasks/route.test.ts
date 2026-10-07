@@ -49,6 +49,12 @@ describe('GET /api/cron/sweep-auto-tasks', () => {
     expect(json.totalCreated).toBe(0)
   })
 
+  it('no fulfilment-reminder rule ever selects a granted (digital) order', async () => {
+    mockQueryMany.mockResolvedValue([])
+    await GET(makeRequest('Bearer test-cron-secret') as any)
+    for (const [sql] of mockQueryMany.mock.calls) expect(String(sql)).not.toContain("'granted'")
+  })
+
   it('creates tasks for matched rows', async () => {
     mockQueryMany.mockResolvedValueOnce([{ user_id: 'u1', ref_id: 'r1', title: 'Task 1' }]).mockResolvedValue([])
     mockCreateAutoTask.mockResolvedValueOnce('task-id').mockResolvedValue(null)

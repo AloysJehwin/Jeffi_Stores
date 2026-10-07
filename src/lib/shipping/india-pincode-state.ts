@@ -94,3 +94,20 @@ export function stateFromPincode(pin: string | null | undefined): string | null 
   if (!/^\d{6}$/.test(p)) return null
   return THREE_DIGIT[p.slice(0, 3)] ?? TWO_DIGIT[p.slice(0, 2)] ?? null
 }
+
+/**
+ * Remote delivery areas that couriers serve on longer transit: the North-East (78, 79 and
+ * Sikkim 737), Jammu & Kashmir / Ladakh (18, 19), Andaman & Nicobar (744) and Lakshadweep (68255x).
+ */
+export function remoteRegionFromPincode(pin: string | null | undefined): string | null {
+  const p = String(pin ?? '').replace(/\D/g, '')
+  if (!/^\d{6}$/.test(p)) return null
+  if (p.startsWith('68255')) return 'Lakshadweep'
+  if (p.startsWith('744')) return 'Andaman and Nicobar Islands'
+  if (p.startsWith('737')) return 'Sikkim'
+  if (p.startsWith('194')) return 'Ladakh'
+  const state = stateFromPincode(p)
+  if (state === 'Jammu and Kashmir' || state === 'Assam') return state
+  if (p.startsWith('79')) return 'North-East'
+  return null
+}

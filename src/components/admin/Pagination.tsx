@@ -35,6 +35,10 @@ export default function Pagination({ page, total, pageSize, buildUrl, onPageChan
     return (
       <Link
         href={buildUrl!(targetPage)}
+        // scroll={false}: a server-component list paginates via the URL, but without this Next
+        // scrolls the whole page to the top on each Prev/Next — which reads as "the whole page
+        // reloaded". Keeping scroll position makes only the list content appear to change.
+        scroll={false}
         className={`${btnCls} ${disabled ? 'opacity-40 pointer-events-none' : ''}`}
         aria-label={label}
       >

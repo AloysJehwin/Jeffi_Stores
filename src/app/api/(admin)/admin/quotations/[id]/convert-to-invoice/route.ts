@@ -1,3 +1,4 @@
+import { documentUrl, orderUrlById } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { productLabel } from '@/lib/catalog/product-label'
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -9,6 +10,7 @@ import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { sendBusinessInvoiceGeneratedEmail } from '@/lib/shared/email-business'
 import { lineItemExGst } from '@/lib/catalog/pricing'
 import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
+import { findDigitalProductIds } from '@/lib/catalog/digital-guard'
 import { currentBrandNameAsync } from '@/lib/catalog/brand'
 import { getRazorpayInstance } from '@/lib/payments/razorpay'
 import sharp from 'sharp'
@@ -40,6 +42,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!qItems.length) {
       return NextResponse.json({ error: 'Quotation has no line items' }, { status: 400 })
     }
+
+    const digitalIds = await findDigitalProductIds(qItems.map((i: any) => i.product_id).filter(Boolean))
+    if (digitalIds.length)
+      return NextResponse.json({ error: 'Digital products cannot be sold through this channel' }, { status: 400 })
 
     const body = await request.json().catch(() => ({}))
     const paymentMode: string = body.paymentMode || 'cash'
@@ -397,13 +403,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!result.saveAsDraft && result.invoice_number) {
       if (customerEmail) {
         // Fetch the view_token so the invoice link is correct.
-        // The middleware rewrites invoice.jeffistores.in/<token> → /invoice/<token>.
+        // The store's invoice host serves /<token> (invoice-{slug}. on a tenant). Without a token,
+        // the order's own page on the customer's portal.
         const orderRow = await queryOne<{ view_token: string }>(`SELECT view_token FROM orders WHERE id = $1`, [
           result.id,
         ])
         const invoiceViewUrl = orderRow?.view_token
-          ? `https://invoice.jeffistores.in/${orderRow.view_token}`
-          : `https://jeffistores.in/account/orders`
+          ? await documentUrl('invoice', orderRow.view_token)
+          : await orderUrlById(result.id)
 
         // B2B (came from an RFQ) → business-specific email; regular → standard invoice email.
         // Never send both — the customer would receive two identical emails.

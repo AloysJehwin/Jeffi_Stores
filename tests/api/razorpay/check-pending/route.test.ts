@@ -30,6 +30,7 @@ vi.mock('@/lib/email', () => ({
 }))
 vi.mock('@/lib/documents/invoice', () => ({
   createDraftInvoice: vi.fn().mockResolvedValue(undefined),
+  generateOrderInvoice: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
@@ -313,6 +314,34 @@ describe('POST /api/razorpay/check-pending', () => {
     expect(body.order).toEqual({ id: 'order-new', orderNumber: 'ORD-NEW' })
     expect(orderCommit.commitOrder).toHaveBeenCalledOnce()
     expect(orderCommit.validateCouponForUser).toHaveBeenCalledOnce()
+  })
+
+  it('numbers the invoice right away for a granted (all-digital) order', async () => {
+    const invoice = await import('@/lib/documents/invoice')
+    vi.mocked(invoice.createDraftInvoice).mockResolvedValue(undefined)
+    vi.mocked(invoice.generateOrderInvoice).mockClear()
+    vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue(draft() as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'intent-1' })
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce({ ...MOCK_USER })
+    vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
+    vi.mocked(orderCommit.cartSubtotal).mockReturnValue(500)
+    vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(76)
+    vi.mocked(orderCommit.commitOrder).mockResolvedValue({
+      id: 'order-dig',
+      order_number: 'ORD-DIG',
+      total_amount: '500',
+      status: 'granted',
+    } as any)
+
+    mockRazorpay({ status: 'paid' }, { items: [CAPTURED_PAYMENT] })
+    const res = await POST(makeRequest(VALID_BODY) as any)
+    await new Promise(r => setTimeout(r, 0))
+    expect(res.status).toBe(200)
+    expect(invoice.generateOrderInvoice).toHaveBeenCalledWith('order-dig')
   })
 
   it('commits cart-mode order when coupon validation fails (no discount applied)', async () => {

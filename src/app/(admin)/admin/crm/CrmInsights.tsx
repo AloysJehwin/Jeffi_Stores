@@ -94,7 +94,7 @@ export default function CrmInsights({ initial }: { initial: CrmInsightsData }) {
           value={segment}
           onChange={e => changeSegment(e.target.value as CrmSegment)}
           disabled={loading}
-          className="bg-surface-secondary border border-border-default rounded-xl px-3 py-2 text-xs font-semibold text-foreground disabled:opacity-50 self-start"
+          className="bg-surface-secondary border border-border-default rounded-xl px-3 h-control text-xs font-semibold text-foreground disabled:opacity-50 self-start"
         >
           <option value="all">All customers</option>
           {CRM_SEGMENT_KEYS.map(k => (

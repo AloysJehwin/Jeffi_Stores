@@ -170,7 +170,8 @@ CREATE TABLE public.users (
     policies_accepted_at timestamp with time zone,
     notification_channel character varying(20) DEFAULT 'email'::character varying NOT NULL,
     phone_verified boolean DEFAULT false NOT NULL,
-    phone_verified_at timestamp with time zone
+    phone_verified_at timestamp with time zone,
+    date_of_birth date
 );
 
 UPDATE public.admins a SET role = 'administrator'

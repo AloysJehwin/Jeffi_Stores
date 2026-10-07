@@ -8,7 +8,7 @@ import { query, queryOne, queryMany } from '@/lib/shared/db'
 // token and the row id are DIFFERENT identifiers. resolveSession() is the single source of truth
 // used by BOTH the Node-runtime middleware and the Node authenticate* functions. Node-only (uses pg).
 
-export type PrincipalType = 'admin' | 'customer' | 'business' | 'owner'
+export type PrincipalType = 'admin' | 'customer' | 'business' | 'owner' | 'vault'
 
 export const IDLE_TIMEOUT_MS = 30 * 24 * 60 * 60 * 1000 // 30d of inactivity ends a storefront session (non-admin cap). Was 24h, which logged returning shoppers out on their next reload; admins keep their own shorter per-account window via idleWindowMsFor.
 export const DEFAULT_ADMIN_IDLE_MINUTES = 8 * 60 // admins with no per-account timeout set
@@ -632,6 +632,25 @@ export async function revokeAllForPrincipal(principalType: PrincipalType, princi
     `UPDATE auth_sessions SET revoked_at = now()
      WHERE principal_type = $1 AND principal_id = $2 AND revoked_at IS NULL RETURNING id`,
     [principalType, principalId]
+  )
+  await Promise.all((res?.rows || []).map(r => emitSessionEvent(r.id, { type: 'logout', reason: 'logout' })))
+  const vault =
+    principalType === 'customer' || principalType === 'business'
+      ? await revokeVaultSessionsFor(principalType, principalId)
+      : 0
+  return (res?.rowCount || 0) + vault
+}
+
+/**
+ * Vault sessions are minted from a store session but stored separately (principal 'vault', role =
+ * the store principal). Revoke them whenever the store session ends, so logging out of the store or
+ * "sign out everywhere" also closes the buyer's vault.
+ */
+export async function revokeVaultSessionsFor(role: 'customer' | 'business', userId: string): Promise<number> {
+  const res = await query<{ id: string }>(
+    `UPDATE auth_sessions SET revoked_at = now()
+     WHERE principal_type = 'vault' AND role = $1 AND principal_id = $2 AND revoked_at IS NULL RETURNING id`,
+    [role, userId]
   )
   await Promise.all((res?.rows || []).map(r => emitSessionEvent(r.id, { type: 'logout', reason: 'logout' })))
   return res?.rowCount || 0

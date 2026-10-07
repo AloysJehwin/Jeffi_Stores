@@ -1,6 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import { z } from 'zod'
-import { zUuid, zEmail, zIndianPin, zPositiveInt, zNonEmpty, zCurrency, zPhone, parseBody } from '@/lib/shared/validate'
+import {
+  zUuid,
+  zEmail,
+  zIndianPin,
+  zPositiveInt,
+  zNonEmpty,
+  zCurrency,
+  zPhone,
+  zDob,
+  parseBody,
+} from '@/lib/shared/validate'
 
 // ---------------------------------------------------------------------------
 // zUuid
@@ -215,6 +225,32 @@ describe('zPhone', () => {
 
   it('rejects null', () => {
     expect(zPhone.safeParse(null).success).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// zDob
+// ---------------------------------------------------------------------------
+describe('zDob', () => {
+  it('parses a valid date of birth to the same YYYY-MM-DD string', () => {
+    const result = zDob.safeParse('1990-05-15')
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data).toBe('1990-05-15')
+  })
+
+  it('rejects a date that does not exist with a readable message', () => {
+    const result = zDob.safeParse('1990-02-30')
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues[0].message).toBe('Enter a valid date of birth')
+  })
+
+  it('rejects a future date', () => {
+    expect(zDob.safeParse(`${new Date().getUTCFullYear() + 1}-01-01`).success).toBe(false)
+  })
+
+  it('rejects non-string input', () => {
+    expect(zDob.safeParse(19900515).success).toBe(false)
+    expect(zDob.safeParse(null).success).toBe(false)
   })
 })
 

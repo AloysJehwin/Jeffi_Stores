@@ -1,3 +1,4 @@
+import { documentUrl } from '@/lib/shared/customer-links'
 import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { round2 } from '@/lib/catalog/gst'
 import { lineItemExGst } from '@/lib/catalog/pricing'
@@ -752,7 +753,7 @@ const propose_create_quotation: ToolDef = {
       consigneeAddr1: { type: 'string', description: 'Address line 1.' },
       consigneeAddr2: { type: 'string', description: 'Address line 2.' },
       consigneeCity: { type: 'string', description: 'City.' },
-      consigneeState: { type: 'string', description: 'State, defaults to Chhattisgarh.' },
+      consigneeState: { type: 'string', description: "State; defaults to the store's own state when omitted." },
       consigneeGstin: { type: 'string', description: 'GSTIN of consignee.' },
       consigneePincode: { type: 'string', description: 'Pincode.' },
       buyerSame: { type: 'boolean', description: 'Whether buyer is same as consignee. Defaults true.' },
@@ -952,6 +953,10 @@ const propose_create_quotation: ToolDef = {
     const sgst = cgst
     const total = round2(subtotal + cgst + sgst)
 
+    // Fallback consignee state is the store's own state (site_settings), never a flagship default.
+    const { storeOrigin } = await import('@/lib/catalog/brand')
+    const storeState = (await storeOrigin()).state
+
     const payload = {
       consignee_email: email,
       consignee_name: consigneeNameResolved,
@@ -963,7 +968,7 @@ const propose_create_quotation: ToolDef = {
       consignee_addr1: consigneeAddr1 || addrToUse?.address_line1 || customer?.business_address || '',
       consignee_addr2: consigneeAddr2 || addrToUse?.address_line2 || null,
       consignee_city: consigneeCity || addrToUse?.city || '',
-      consignee_state: consigneeState || addrToUse?.state || 'Chhattisgarh',
+      consignee_state: consigneeState || addrToUse?.state || storeState,
       consignee_gstin: consigneeGstin || customer?.gst_number || null,
       consignee_pincode: consigneePincode || addrToUse?.postal_code || null,
       buyer_same: buyerSame !== false,
@@ -1120,7 +1125,7 @@ const propose_send_quotation_email: ToolDef = {
         },
         {
           type: 'text',
-          value: `Customer will receive the public link https://quotation.jeffistores.in/${q.view_token}.`,
+          value: `Customer will receive the public link ${await documentUrl('quotation', q.view_token)}.`,
           weight: 'muted',
         },
       ],
@@ -1205,7 +1210,7 @@ const propose_mark_invoice_paid: ToolDef = {
 
 const propose_update_order_status: ToolDef = {
   name: 'propose_update_order_status',
-  description: `Propose advancing an order's status. Allowed: ${ORDER_STATUS_FLOW.join(' → ')}. Optionally attach an AWB on shipped. Replaces mark_order_shipped for richer transitions. Flags status regressions in the preview.`,
+  description: `Propose advancing an order's status. Allowed: ${ORDER_STATUS_FLOW.join(' → ')}. Optionally attach an AWB on shipped. Replaces mark_order_shipped for richer transitions. Flags status regressions in the preview. Digital orders (status "granted" = access granted) never ship and cannot be changed here.`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -1236,15 +1241,24 @@ const propose_update_order_status: ToolDef = {
       customer_name: string | null
       total_amount: string
       awb_number: string | null
+      all_digital: boolean | null
     }>(
       `SELECT id::text, order_number, status, payment_status, customer_name,
-              total_amount::text, awb_number
+              total_amount::text, awb_number,
+              (SELECT bool_and(oi.is_digital IS TRUE) FROM order_items oi WHERE oi.order_id = orders.id) AS all_digital
          FROM orders WHERE id = $1::uuid OR order_number = $2 LIMIT 1`,
       [orderId || '00000000-0000-0000-0000-000000000000', orderNumber || '']
     )
     if (!o) throw new Error('Order not found')
     if (o.status === status) {
       return { proposed: false, info: `Order ${o.order_number} is already in status "${status}".` }
+    }
+    // Digital orders are settled by payment (status 'granted'); they never ship.
+    if (o.status === 'granted' || (o.all_digital && status !== 'cancelled')) {
+      return {
+        proposed: false,
+        info: `Order ${o.order_number} is a digital order — access is granted on payment and it has no shipping states.`,
+      }
     }
 
     const fromIdx = ORDER_STATUS_FLOW.indexOf(o.status)

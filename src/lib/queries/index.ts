@@ -6,6 +6,7 @@ export {
   VARIANT_MIN_PRICE_EX_GST_SQL,
   VARIANT_MIN_MRP_SQL,
   EFFECTIVE_STOCK_SQL,
+  PRODUCT_IN_STOCK_SQL,
   EFFECTIVE_PRICE_SQL,
   type AnalyticsRange,
   type RevenuePeriod,

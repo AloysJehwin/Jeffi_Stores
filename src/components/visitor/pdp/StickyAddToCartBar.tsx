@@ -20,6 +20,8 @@ interface StickyAddToCartBarProps {
   quantity: number
   adding: boolean
   onAdd: () => void
+  /** Digital products: the primary action is Buy Now, never Add to Cart. */
+  buyNow?: boolean
 }
 
 /** Slim bottom bar that appears once the main Buy Now / Add to Cart buttons have scrolled away. */
@@ -33,6 +35,7 @@ export default function StickyAddToCartBar({
   quantity,
   adding,
   onAdd,
+  buyNow = false,
 }: StickyAddToCartBarProps) {
   const [pastControls, setPastControls] = useState(false)
   const { compareList } = useCompare()
@@ -60,7 +63,7 @@ export default function StickyAddToCartBar({
   return (
     <div
       role="region"
-      aria-label="Quick add to cart"
+      aria-label={buyNow ? 'Quick buy' : 'Quick add to cart'}
       className={`fixed inset-x-0 ${position} z-30 bg-surface-elevated border-t border-border-default shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.25)] animate-slide-up motion-reduce:animate-none`}
     >
       <div className="container mx-auto px-4 py-2 flex items-center gap-3">
@@ -93,7 +96,7 @@ export default function StickyAddToCartBar({
                 aria-hidden="true"
               />
             )}
-            {adding ? 'Adding...' : 'Add to Cart'}
+            {buyNow ? (adding ? 'Processing...' : 'Buy Now') : adding ? 'Adding...' : 'Add to Cart'}
           </button>
         ) : (
           <button

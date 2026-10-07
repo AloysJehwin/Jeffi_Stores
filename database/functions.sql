@@ -350,21 +350,32 @@ CREATE FUNCTION public.merge_guest_cart_to_user(p_guest_user_id uuid, p_actual_u
     LANGUAGE plpgsql
     AS $$
 BEGIN
-  INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, created_at, updated_at)
+  INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit, saved_for_later, saved_at, created_at, updated_at)
   SELECT
     p_actual_user_id,
-    product_id,
-    variant_id,
-    sub_variant_id,
-    quantity,
-    price_at_addition,
-    created_at,
-    updated_at
-  FROM cart_items
-  WHERE user_id = p_guest_user_id
-  ON CONFLICT (user_id, product_id, variant_id, sub_variant_id)
+    gc.product_id,
+    gc.variant_id,
+    gc.sub_variant_id,
+    gc.quantity,
+    gc.price_at_addition,
+    gc.buy_mode,
+    gc.buy_unit,
+    gc.saved_for_later,
+    gc.saved_at,
+    gc.created_at,
+    gc.updated_at
+  FROM cart_items gc
+  WHERE gc.user_id = p_guest_user_id
+  -- Match the real arbiter index cart_items_upsert_key (COALESCE on variant/sub_variant + buy_mode),
+  -- not a plain 4-column target that no unique index backs.
+  ON CONFLICT (user_id, product_id, COALESCE(variant_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(sub_variant_id, '00000000-0000-0000-0000-000000000000'::uuid), buy_mode)
   DO UPDATE SET
-    quantity = cart_items.quantity + EXCLUDED.quantity,
+    -- Digital products are capped at quantity 1 (a buyer owns a title once, not twice).
+    quantity = CASE
+      WHEN COALESCE((SELECT p.is_digital FROM products p WHERE p.id = EXCLUDED.product_id), false)
+      THEN 1
+      ELSE cart_items.quantity + EXCLUDED.quantity
+    END,
     updated_at = NOW();
 
   DELETE FROM cart_items WHERE user_id = p_guest_user_id;

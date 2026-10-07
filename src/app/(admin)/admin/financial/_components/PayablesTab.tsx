@@ -362,7 +362,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                             <td className="px-4 py-3 text-center">
                               {canWrite && (
                                 <button
-                                  className="px-3 py-1 rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors"
+                                  className="px-3 h-control-sm rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors"
                                   onClick={() => openPayModal(r)}
                                 >
                                   Pay
@@ -429,7 +429,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                           <StatusBadge status={r.status} />
                           {canWrite && (
                             <button
-                              className="px-4 py-1.5 rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 text-white dark:text-secondary-900 transition-colors"
+                              className="px-4 h-control-sm rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 text-white dark:text-secondary-900 transition-colors"
                               onClick={() => openPayModal(r)}
                             >
                               Pay
@@ -450,14 +450,14 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                       <button
                         onClick={() => load(page - 1)}
                         disabled={page === 1 || loading}
-                        className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         Previous
                       </button>
                       <button
                         onClick={() => load(page + 1)}
                         disabled={page === totalPages || loading}
-                        className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         Next
                       </button>

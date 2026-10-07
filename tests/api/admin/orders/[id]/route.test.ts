@@ -3,6 +3,9 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+vi.mock('@/lib/shared/customer-links', () => ({
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+}))
 vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
@@ -187,6 +190,47 @@ describe('PATCH /api/admin/orders/[id]', () => {
     expect(body.ok).toBe(true)
   })
 
+  it('stamps the matching lifecycle timestamp without clobbering an existing one', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { status: 'delivered' } } as any)
+    mockQueryOne.mockResolvedValue(null)
+
+    const req = makeRequest('PATCH', 'order-1', { status: 'delivered' })
+    await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
+
+    const updateCall = mockQueryOne.mock.calls.find(c => String(c[0]).startsWith('UPDATE orders SET'))
+    expect(updateCall).toBeDefined()
+    expect(String(updateCall![0])).toContain('delivered_at = COALESCE(delivered_at, NOW())')
+  })
+
+  it('granted stamps both granted_at and delivered_at', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { status: 'granted' } } as any)
+    mockQueryOne.mockResolvedValue(null)
+
+    const req = makeRequest('PATCH', 'order-1', { status: 'granted' })
+    await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
+
+    const updateCall = mockQueryOne.mock.calls.find(c => String(c[0]).startsWith('UPDATE orders SET'))
+    expect(String(updateCall![0])).toContain('granted_at = COALESCE(granted_at, NOW())')
+    expect(String(updateCall![0])).toContain('delivered_at = COALESCE(delivered_at, NOW())')
+  })
+
+  it('does not stamp a timestamp for a status with no lifecycle column', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { status: 'processing' } } as any)
+    mockQueryOne.mockResolvedValue(null)
+
+    const req = makeRequest('PATCH', 'order-1', { status: 'processing' })
+    await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
+
+    const updateCall = mockQueryOne.mock.calls.find(c => String(c[0]).startsWith('UPDATE orders SET'))
+    expect(String(updateCall![0])).not.toContain('_at = COALESCE')
+  })
+
   it('returns ok on awb_number update', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
@@ -245,6 +289,8 @@ describe('PATCH /api/admin/orders/[id]', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
+    const mail = mockSendAuditedMail.mock.calls.at(-1)![0] as any
+    expect(mail.html).toContain('href="https://acme.jeffistores.in/account/orders/order-1"')
   })
 
   it('returns ok on EDD update when order has no email (skips mail)', async () => {

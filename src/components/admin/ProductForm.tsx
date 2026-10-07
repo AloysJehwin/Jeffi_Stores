@@ -15,10 +15,28 @@ import Toggle from '@/components/ui/Toggle'
 import DatePicker from '@/components/ui/DatePicker'
 import AIEnrichButton from './AIEnrichButton'
 import UnitsManager, { UnitLoadedInfo } from './UnitsManager'
+import {
+  deriveSellableItems,
+  monthlyEquivalentLabel,
+  priceInputs,
+  subscriptionPriceError,
+  subscriptionPriceHint,
+  type SellableItem,
+} from '@/lib/subscriptions/sellable'
+import {
+  MAX_BILLING_CYCLES,
+  MAX_CYCLE_AMOUNT_INR,
+  cycleLimitsError,
+  isSubscriptionInterval,
+  normalizeCycleCount,
+} from '@/lib/subscriptions/intervals'
+import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
+import DigitalFilesPanel from './DigitalFilesPanel'
 import SubVariantEditor, { emptySubVariantDraft, SubVariantDraft } from './SubVariantEditor'
 import { generateSerialNumber, generateLotNumber, generateSerialRun } from '@/lib/catalog/selling-unit'
 import { applyDiscount } from '@/lib/catalog/pricing'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface Category {
   id: string
@@ -60,6 +78,8 @@ interface VariantRow {
   variant_type: string
   use_own_images: boolean
   product_suppliers?: SupplierRow[]
+  subscription_price?: string
+  subscription_prices?: Record<string, string>
   _isDeleted?: boolean
 }
 
@@ -123,9 +143,20 @@ interface ProductFormProps {
   // Basic plan: no returns module (hide return/replacement policy fields).
   hasInventory?: boolean // default true (Growth+)
   hasReturns?: boolean // default true (Growth+)
+  // Site Controls master switches (effective = master && the product's own flag).
+  subscriptionsEnabled?: boolean // default true
+  digitalProductsEnabled?: boolean // default true
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
+
+// Razorpay-backable billing intervals (no 'daily' — Razorpay needs period>=weekly).
+const SUBSCRIPTION_INTERVALS = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'yearly', label: 'Yearly' },
+]
 const PACKAGE_TYPES = [
   'flat_poly_auto',
   'flat_poly_s',
@@ -285,6 +316,8 @@ function emptyVariant(pricing_type: 'unit', unit: string): VariantRow {
     variant_type: '',
     use_own_images: false,
     product_suppliers: [],
+    subscription_price: '',
+    subscription_prices: {},
   }
 }
 
@@ -350,6 +383,8 @@ export default function ProductForm({
   initialBsEntries = null,
   hasInventory = true,
   hasReturns = true,
+  subscriptionsEnabled = true,
+  digitalProductsEnabled = true,
 }: ProductFormProps) {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -535,7 +570,6 @@ export default function ProductForm({
   const [isOversized, setIsOversized] = useState(product?.is_oversized ?? false)
   // Digital / Content
   const [isDigital, setIsDigital] = useState(product?.is_digital ?? false)
-  const [downloadUrl, setDownloadUrl] = useState(product?.download_url || '')
   const [licenseType, setLicenseType] = useState(product?.license_type || '')
   const [fileFormat, setFileFormat] = useState(product?.file_format || '')
   const [platformCompatibility, setPlatformCompatibility] = useState(
@@ -543,10 +577,50 @@ export default function ProductForm({
   )
   // Subscriptions
   const [isSubscription, setIsSubscription] = useState(product?.is_subscription ?? false)
-  const [subscriptionInterval, setSubscriptionInterval] = useState(product?.subscription_interval || '')
+  const [subscriptionIntervals, setSubscriptionIntervals] = useState<string[]>(
+    Array.isArray(product?.subscription_intervals) && product.subscription_intervals.length
+      ? product.subscription_intervals
+      : product?.subscription_interval
+        ? [product.subscription_interval]
+        : []
+  )
+  const confirm = useConfirm()
+  async function handleDigitalToggle(next: boolean) {
+    if (next && productId && !product?.is_digital) {
+      const ok = await confirm({
+        title: 'Convert to a digital product?',
+        message:
+          "Its stock will be set to 0 and stock will no longer be tracked. Variants, sub-variants, selling units and shipping details will be removed. This can't be undone automatically.",
+        confirmLabel: 'Convert',
+        cancelLabel: 'Cancel',
+        variant: 'danger',
+      })
+      if (!ok) return
+    }
+    if (next) {
+      setPerishable(false)
+      setSerialized(false)
+      setInventorySync(false)
+    }
+    setIsDigital(next)
+  }
   const [subscriptionPrice, setSubscriptionPrice] = useState(
     product?.subscription_price != null ? String(product.subscription_price) : ''
   )
+  const [subscriptionPrices, setSubscriptionPrices] = useState<Record<string, string>>(() =>
+    priceInputs(product?.subscription_prices)
+  )
+  const [totalCycles, setTotalCycles] = useState(
+    product?.subscription_total_cycles != null ? String(product.subscription_total_cycles) : ''
+  )
+  const [minCycles, setMinCycles] = useState(
+    product?.subscription_min_cycles != null ? String(product.subscription_min_cycles) : ''
+  )
+  const cyclesError = cycleLimitsError(normalizeCycleCount(totalCycles), normalizeCycleCount(minCycles))
+  // A digital product is single-SKU with no variants (and no shipping).
+  useEffect(() => {
+    if (isDigital && hasVariants) setHasVariants(false)
+  }, [isDigital, hasVariants])
   // Bundling
   const [isBundle, setIsBundle] = useState(product?.is_bundle ?? false)
   // SEO
@@ -684,6 +758,8 @@ export default function ProductForm({
           variant_type: v.variant_type || '',
           use_own_images:
             v.use_own_images != null ? !!v.use_own_images : !!(v.variant_images && v.variant_images.length > 0),
+          subscription_price: v.subscription_price != null ? String(v.subscription_price) : '',
+          subscription_prices: priceInputs(v.subscription_prices),
           product_suppliers: allSuppliers
             .filter(
               (s: any) =>
@@ -887,12 +963,15 @@ export default function ProductForm({
     fields.sort_order = sortOrderVal
     fields.handling_days = handlingDays
     fields.shipping_class = shippingClass
-    fields.download_url = downloadUrl || null
     fields.license_type = licenseType || null
     fields.file_format = fileFormat || null
     fields.platform_compatibility = platformCompatibility
-    fields.subscription_interval = subscriptionInterval || null
-    fields.subscription_price = subscriptionPrice || null
+    fields.subscription_intervals = subscriptionIntervals
+    fields.subscription_interval = subscriptionIntervals[0] ?? null
+    fields.subscription_price = hasVariants ? null : subscriptionPrice || null
+    fields.subscription_prices = hasVariants ? {} : subscriptionPrices
+    fields.subscription_total_cycles = normalizeCycleCount(totalCycles)
+    fields.subscription_min_cycles = normalizeCycleCount(minCycles)
     fields.meta_title = metaTitle || null
     fields.meta_description = metaDescription || null
     fields.tax_class = taxClass
@@ -932,6 +1011,7 @@ export default function ProductForm({
           imageOrder,
           existingImagesToKeep,
           galleryImageIds,
+          subVariantSubscriptionPrices: subVariantSubscriptionPrices(),
           variants: variantsRef.current
             .filter((v: any) => !v._isDeleted)
             .map((v: any) => {
@@ -1010,14 +1090,16 @@ export default function ProductForm({
     weightGrams,
     // digital
     isDigital,
-    downloadUrl,
     licenseType,
     fileFormat,
     platformCompatibility,
     // subscription & bundle
     isSubscription,
-    subscriptionInterval,
+    subscriptionIntervals,
     subscriptionPrice,
+    subscriptionPrices,
+    totalCycles,
+    minCycles,
     isBundle,
     // seo & tax
     metaTitle,
@@ -1354,6 +1436,57 @@ export default function ProductForm({
   // (sub-variant leaf), or neither (product leaf, simple products only).
   // product-draft.ts resolves these SKUs to ids at publish. The legacy
   // products.supplier_id is the PRODUCT-leaf preferred (simple products only).
+  const sellableItems = deriveSellableItems({
+    hasVariants,
+    product: {
+      name: productName,
+      sku,
+      price: basePrice,
+      subscription_price: subscriptionPrice,
+      subscription_prices: subscriptionPrices,
+    },
+    variants,
+    subVariantsByVariant: subVariantsMap,
+  })
+  const offeredIntervals = SUBSCRIPTION_INTERVALS.filter(o => subscriptionIntervals.includes(o.value))
+  const subscriptionPricesError = isSubscription
+    ? sellableItems.some(item => offeredIntervals.some(o => subscriptionPriceError(item.subscriptionPrices[o.value])))
+      ? 'Fix the highlighted subscription prices'
+      : null
+    : null
+
+  function setSellableIntervalPrice(item: SellableItem, interval: string, value: string) {
+    const put = (m: Record<string, string> | undefined) => ({ ...(m ?? {}), [interval]: value })
+    if (item.kind === 'product') setSubscriptionPrices(m => put(m))
+    else if (item.kind === 'variant')
+      setVariants(vs =>
+        vs.map(v => (v.id === item.variantId ? { ...v, subscription_prices: put(v.subscription_prices) } : v))
+      )
+    else
+      setSubVariantsMap(m => ({
+        ...m,
+        [item.variantId!]: (m[item.variantId!] || []).map(sv =>
+          sv.id === item.subVariantId ? { ...sv, subscription_prices: put(priceInputs(sv.subscription_prices)) } : sv
+        ),
+      }))
+  }
+
+  function subVariantSubscriptionPrices() {
+    if (!hasVariants) return []
+    return variants
+      .filter(v => !v._isDeleted && v.sub_variant_type_on && v.id)
+      .flatMap(v =>
+        (subVariantsMap[v.id!] || [])
+          .filter((sv: any) => sv.id)
+          .map((sv: any) => ({
+            variant_id: v.id,
+            id: sv.id,
+            subscription_price: sv.subscription_price ?? '',
+            subscription_prices: priceInputs(sv.subscription_prices),
+          }))
+      )
+  }
+
   function buildFlatSuppliers(): { suppliers: any[]; preferredProductSupplierId: string } {
     const clean = (s: SupplierRow) => ({
       supplier_id: s.supplier_id,
@@ -1452,7 +1585,11 @@ export default function ProductForm({
                         (!s.variant_sku || s.variant_sku === parentSku))
                   )
                   .map(toSupplierRow)
-            return { ...sv, product_suppliers: rows }
+            const subscription_price =
+              existing?.subscription_price !== undefined ? existing.subscription_price : sv.subscription_price
+            const subscription_prices =
+              existing?.subscription_prices !== undefined ? existing.subscription_prices : sv.subscription_prices
+            return { ...sv, subscription_price, subscription_prices, product_suppliers: rows }
           })
           return { ...m, [variantId]: merged }
         })
@@ -1863,6 +2000,12 @@ export default function ProductForm({
     setError(null)
     setBootstrapError(null)
 
+    if (isSubscription && (cyclesError || subscriptionPricesError)) {
+      setError(cyclesError || subscriptionPricesError)
+      setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
+      return
+    }
+
     if (showBootstrap && isPublishIntent) {
       // Surface bootstrap validation both in the panel AND the top-level error box
       // (near the buttons), then scroll it into view — otherwise a failed publish
@@ -1918,7 +2061,7 @@ export default function ProductForm({
     // Weight & packaging validation — enforced on publish only, so a partial
     // draft can still be saved. Simple products validate the product-level weight
     // and (for box package types) the stored dims; variant products validate each.
-    if (isPublishIntent) {
+    if (isPublishIntent && !isDigital) {
       const failValidation = (msg: string) => {
         setError(msg)
         setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
@@ -2097,14 +2240,18 @@ export default function ProductForm({
       formData.set('is_oversized', String(isOversized))
       // Digital / Content
       formData.set('is_digital', String(isDigital))
-      formData.set('download_url', downloadUrl)
       formData.set('license_type', licenseType)
       formData.set('file_format', fileFormat)
       formData.set('platform_compatibility', platformCompatibility)
       // Subscriptions
       formData.set('is_subscription', String(isSubscription))
-      formData.set('subscription_interval', subscriptionInterval)
-      formData.set('subscription_price', subscriptionPrice)
+      formData.set('subscription_intervals', subscriptionIntervals.join(','))
+      formData.set('subscription_interval', subscriptionIntervals[0] ?? '')
+      formData.set('subscription_price', hasVariants ? '' : subscriptionPrice)
+      formData.set('subscription_prices', JSON.stringify(hasVariants ? {} : subscriptionPrices))
+      formData.set('sub_variant_subscription_prices', JSON.stringify(subVariantSubscriptionPrices()))
+      formData.set('subscription_total_cycles', totalCycles)
+      formData.set('subscription_min_cycles', minCycles)
       // Bundling
       formData.set('is_bundle', String(isBundle))
       // SEO
@@ -2248,7 +2395,7 @@ export default function ProductForm({
               <button
                 type="button"
                 onClick={() => setConfirmUnperishable(false)}
-                className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+                className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
               >
                 Cancel
               </button>
@@ -2258,7 +2405,7 @@ export default function ProductForm({
                   setConfirmUnperishable(false)
                   setPerishable(false)
                 }}
-                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                className="px-4 h-control text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
               >
                 Yes, Remove
               </button>
@@ -2281,7 +2428,7 @@ export default function ProductForm({
               <button
                 type="button"
                 onClick={() => setConfirmUnSerialized(false)}
-                className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+                className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
               >
                 Cancel
               </button>
@@ -2291,7 +2438,7 @@ export default function ProductForm({
                   setConfirmUnSerialized(false)
                   setSerialized(false)
                 }}
-                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                className="px-4 h-control text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
               >
                 Yes, Remove
               </button>
@@ -2954,12 +3101,14 @@ export default function ProductForm({
                 <input type="hidden" name="is_featured" value={isFeatured ? 'true' : ''} />
                 <Toggle id="is_featured" checked={isFeatured} onChange={setIsFeatured} label="Featured Product" />
               </div>
-              <Toggle
-                id="has_variants_toggle"
-                checked={hasVariants}
-                onChange={setHasVariants}
-                label="This product has variants"
-              />
+              {!isDigital && (
+                <Toggle
+                  id="has_variants_toggle"
+                  checked={hasVariants}
+                  onChange={setHasVariants}
+                  label="This product has variants"
+                />
+              )}
             </div>
 
             {/* Identification & Compliance */}
@@ -3089,27 +3238,21 @@ export default function ProductForm({
               {digitalExpanded && (
                 <div className="p-4 space-y-4 border-t border-border-default">
                   <div className="flex flex-wrap gap-6">
-                    <Toggle id="is_digital" checked={isDigital} onChange={setIsDigital} label="Digital Product" />
+                    {digitalProductsEnabled && (
+                      <Toggle id="is_digital" checked={isDigital} onChange={handleDigitalToggle} label="Digital Product" />
+                    )}
                     <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
-                    <Toggle
-                      id="is_subscription"
-                      checked={isSubscription}
-                      onChange={setIsSubscription}
-                      label="Subscription"
-                    />
+                    {subscriptionsEnabled && (
+                      <Toggle
+                        id="is_subscription"
+                        checked={isSubscription}
+                        onChange={setIsSubscription}
+                        label="Subscription"
+                      />
+                    )}
                   </div>
                   {isDigital && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-muted mb-1">Download URL</label>
-                        <input
-                          type="url"
-                          value={downloadUrl}
-                          onChange={e => setDownloadUrl(e.target.value)}
-                          placeholder="https://..."
-                          className={inputCls}
-                        />
-                      </div>
                       <div>
                         <label className="block text-xs font-medium text-foreground-muted mb-1">License Type</label>
                         <input
@@ -3142,40 +3285,170 @@ export default function ProductForm({
                           className={inputCls}
                         />
                       </div>
+                      {productId ? (
+                        <DigitalFilesPanel productId={productId} />
+                      ) : (
+                        <p className="sm:col-span-2 text-xs text-foreground-muted">
+                          Save the product first, then upload files in the Digital Files panel. Buyers open them in
+                          the vault.
+                        </p>
+                      )}
                     </div>
                   )}
-                  {isSubscription && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-muted mb-1">
-                          Subscription Interval
-                        </label>
-                        <AdminSelect
-                          value={subscriptionInterval}
-                          onChange={v => setSubscriptionInterval(v)}
-                          className="w-full"
-                          options={[
-                            { value: '', label: '— select —' },
-                            { value: 'daily', label: 'Daily' },
-                            { value: 'weekly', label: 'Weekly' },
-                            { value: 'monthly', label: 'Monthly' },
-                            { value: 'quarterly', label: 'Quarterly' },
-                            { value: 'yearly', label: 'Yearly' },
-                          ]}
-                        />
+                  {subscriptionsEnabled && isSubscription && (
+                    <div className="pt-2 border-t border-border-default space-y-2">
+                      <AdminSelect
+                        label="Billing intervals offered"
+                        placeholder={
+                          subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length
+                            ? 'All intervals added'
+                            : 'Add a billing interval…'
+                        }
+                        value=""
+                        options={SUBSCRIPTION_INTERVALS.filter(o => !subscriptionIntervals.includes(o.value))}
+                        disabled={subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length}
+                        onChange={v => v && setSubscriptionIntervals(prev => (prev.includes(v) ? prev : [...prev, v]))}
+                      />
+                      {subscriptionIntervals.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {SUBSCRIPTION_INTERVALS.filter(o => subscriptionIntervals.includes(o.value)).map(opt => (
+                            <span
+                              key={opt.value}
+                              className="inline-flex items-center gap-1 rounded-full bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 px-2.5 py-1 text-xs font-medium"
+                            >
+                              {opt.label}
+                              <button
+                                type="button"
+                                aria-label={`Remove ${opt.label}`}
+                                onClick={() => setSubscriptionIntervals(prev => prev.filter(v => v !== opt.value))}
+                                className="hover:text-red-600"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-muted mb-1">
+                            Number of billing cycles
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={MAX_BILLING_CYCLES}
+                            step={1}
+                            value={totalCycles}
+                            onChange={e => setTotalCycles(e.target.value)}
+                            placeholder="Until cancelled"
+                            className={inputCls}
+                          />
+                          <p className="text-xs text-foreground-muted mt-1">
+                            Leave blank to bill until the customer cancels.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-muted mb-1">
+                            Minimum billing cycles
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={MAX_BILLING_CYCLES}
+                            step={1}
+                            value={minCycles}
+                            onChange={e => setMinCycles(e.target.value)}
+                            placeholder="No minimum"
+                            className={inputCls}
+                          />
+                          <p className="text-xs text-foreground-muted mt-1">
+                            Customers can&apos;t cancel or pause before this many charges.
+                          </p>
+                        </div>
+                        {cyclesError && <p className="sm:col-span-2 text-xs text-red-600">{cyclesError}</p>}
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-muted mb-1">
-                          Subscription Price (₹)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={subscriptionPrice}
-                          onChange={e => setSubscriptionPrice(e.target.value)}
-                          className={inputCls}
-                        />
+                      <div className="pt-2">
+                        <p className="text-xs font-medium text-foreground-muted mb-1">Subscription prices</p>
+                        {offeredIntervals.length === 0 ? (
+                          <p className="text-xs text-foreground-muted">Add a billing interval to set its prices.</p>
+                        ) : (
+                          <div className="overflow-x-auto rounded-md border border-border-default">
+                            <table className="w-full text-xs" data-testid="subscription-prices">
+                              <thead className="bg-surface-secondary text-foreground-muted">
+                                <tr>
+                                  <th className="text-left font-medium px-3 py-2">Item</th>
+                                  <th className="text-right font-medium px-3 py-2">One-time</th>
+                                  {offeredIntervals.map(o => (
+                                    <th key={o.value} className="text-left font-medium px-3 py-2 whitespace-nowrap">
+                                      {o.label} (₹ per cycle)
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sellableItems.map(item => (
+                                  <tr key={item.key} className="border-t border-border-default align-top">
+                                    <td className="px-3 py-2">
+                                      <div className="text-foreground">{item.name}</div>
+                                      {item.sku && <div className="text-foreground-muted">{item.sku}</div>}
+                                    </td>
+                                    <td className="px-3 py-2 text-right text-foreground-secondary whitespace-nowrap">
+                                      {item.oneTimePrice != null ? `₹${item.oneTimePrice.toFixed(2)}` : '—'}
+                                    </td>
+                                    {offeredIntervals.map(o => {
+                                      const raw = item.subscriptionPrices[o.value] ?? ''
+                                      const effective = raw.trim() !== '' ? raw : item.subscriptionPrice
+                                      const err = subscriptionPriceError(raw)
+                                      const hint = err ? null : subscriptionPriceHint(item.oneTimePrice, effective)
+                                      const perMonth = err || !isSubscriptionInterval(o.value) ? null : monthlyEquivalentLabel(o.value, effective)
+                                      const fallback = item.subscriptionPrice || (item.oneTimePrice != null ? item.oneTimePrice.toFixed(2) : '')
+                                      return (
+                                        <td key={o.value} className="px-3 py-2">
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            max={MAX_CYCLE_AMOUNT_INR}
+                                            step="0.01"
+                                            inputMode="decimal"
+                                            aria-label={`${o.label} subscription price for ${item.name}`}
+                                            aria-invalid={!!err}
+                                            value={raw}
+                                            placeholder={fallback}
+                                            onChange={e => setSellableIntervalPrice(item, o.value, e.target.value)}
+                                            className={`${inputCls} w-28 ${err ? 'border-red-500' : ''}`}
+                                          />
+                                          {err && <div className="text-red-600 mt-0.5">{err}</div>}
+                                          {(hint || perMonth) && (
+                                            <div className="mt-0.5 space-x-1 whitespace-nowrap">
+                                              {perMonth && <span className="text-foreground-muted">{perMonth}</span>}
+                                              {hint && (
+                                                <span
+                                                  className={
+                                                    hint.endsWith('less')
+                                                      ? 'text-green-700 dark:text-green-400'
+                                                      : 'text-amber-700 dark:text-amber-400'
+                                                  }
+                                                >
+                                                  {hint}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+                                        </td>
+                                      )
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                        {subscriptionPricesError && <p className="text-xs text-red-600 mt-1">{subscriptionPricesError}</p>}
+                        <p className="text-xs text-foreground-muted mt-1">
+                          GST-inclusive, like the one-time price. Leave blank to charge the one-time price each cycle.
+                          Max ₹{MAX_CYCLE_AMOUNT_INR.toLocaleString('en-IN')} per cycle.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -3721,7 +3994,7 @@ export default function ProductForm({
                                                   type="button"
                                                   title="Regenerate"
                                                   onClick={() => regenLot(g)}
-                                                  className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
+                                                  className="px-2 h-control-sm rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
                                                 >
                                                   ↺
                                                 </button>
@@ -3773,7 +4046,7 @@ export default function ProductForm({
                                               )}
                                               <button
                                                 type="button"
-                                                className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                                className="text-xs px-2 h-control-sm rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
                                                 onClick={() => generateAll(g)}
                                               >
                                                 Generate All
@@ -4072,7 +4345,7 @@ export default function ProductForm({
                       <button
                         type="button"
                         onClick={() => addGroup('unit')}
-                        className="px-4 py-2 text-sm font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface-secondary transition-colors"
+                        className="px-4 h-control text-sm font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface-secondary transition-colors"
                       >
                         + Add Variants
                       </button>
@@ -4693,7 +4966,7 @@ export default function ProductForm({
                                           <button
                                             type="button"
                                             onClick={() => (variant.id ? openVariantPopup(variant.id) : undefined)}
-                                            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors text-foreground-muted hover:text-foreground hover:bg-surface-secondary"
+                                            className="flex items-center gap-1 px-2 h-control-sm rounded text-xs font-medium transition-colors text-foreground-muted hover:text-foreground hover:bg-surface-secondary"
                                             title="Edit images & sub-variants"
                                           >
                                             <svg
@@ -4748,7 +5021,7 @@ export default function ProductForm({
                           <button
                             type="button"
                             onClick={() => addVariantToGroup(group.pricing_type, group.unit)}
-                            className="px-3 py-1.5 text-xs font-medium text-accent-600 dark:text-accent-400 border border-accent-300 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors"
+                            className="px-3 h-control-sm text-xs font-medium text-accent-600 dark:text-accent-400 border border-accent-300 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors"
                           >
                             + Add Variant
                           </button>
@@ -4767,7 +5040,15 @@ export default function ProductForm({
         </div>
 
         {/* Selling Units (product-level — applies to every variant) */}
-        {productId && (
+        {productId && isDigital && (
+          <div className="px-4 sm:px-6 py-4 border-t border-border-default-default">
+            <h3 className="text-sm font-semibold text-foreground mb-1">Selling Units &amp; Conversions</h3>
+            <p className="text-xs text-foreground-muted" data-testid="digital-units-note">
+              {DIGITAL_UNIT_MESSAGE}.
+            </p>
+          </div>
+        )}
+        {productId && !isDigital && (
           <div className="px-4 sm:px-6 py-4 border-t border-border-default-default">
             <h3 className="text-sm font-semibold text-foreground mb-3">Selling Units &amp; Conversions</h3>
             <p className="text-xs text-foreground-muted mb-4">
@@ -5369,7 +5650,7 @@ export default function ProductForm({
                                 setIsActive(false)
                                 pendingPopupVariantIdRef.current = variantPopupId
                               }}
-                              className="shrink-0 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                              className="shrink-0 px-3 h-control-sm bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                             >
                               {isSubmitting ? 'Saving...' : 'Save (draft)'}
                             </button>
@@ -5612,7 +5893,7 @@ export default function ProductForm({
                     <button
                       type="button"
                       onClick={() => setVariantPopupId(null)}
-                      className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
+                      className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
                     >
                       Done
                     </button>

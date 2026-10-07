@@ -165,7 +165,7 @@ async function deductInTx(client: PoolClient, orderId: string, opts: DeductOptio
 
   const items = await client.query<OrderItemRow>(
     `SELECT id, product_id, variant_id, sub_variant_id, product_name, variant_name, quantity, buy_unit
-       FROM order_items WHERE order_id = $1`,
+       FROM order_items WHERE order_id = $1 AND is_digital = FALSE`,
     [orderId]
   )
   await deductItems(client, orderId, items.rows, opts)

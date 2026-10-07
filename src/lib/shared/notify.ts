@@ -3,6 +3,7 @@ import {
   sendOrderConfirmedSMS,
   sendOrderShippedSMS,
   sendOrderDeliveredSMS,
+  sendAccessGrantedSMS,
   sendOrderCancelledSMS,
   sendPaymentFailedSMS,
   sendOutForDeliverySMS,
@@ -12,6 +13,7 @@ import {
   sendOrderConfirmedWhatsApp,
   sendOrderShippedWhatsApp,
   sendOrderDeliveredWhatsApp,
+  sendAccessGrantedWhatsApp,
   sendOrderCancelledWhatsApp,
   sendPaymentFailedWhatsApp,
   sendOutForDeliveryWhatsApp,
@@ -91,6 +93,19 @@ export async function notifyOrderDelivered(userId: string | null, orderNumber: s
     r.phone,
     () => sendOrderDeliveredSMS({ phone: r.phone, orderNumber }),
     () => sendOrderDeliveredWhatsApp({ phone: r.phone, orderNumber })
+  )
+}
+
+export async function notifyAccessGranted(userId: string | null, orderNumber: string): Promise<void> {
+  const r = await getRecipient(userId)
+  if (!r) return
+  const { vaultLibraryUrl } = await import('@/lib/vault/links')
+  const vaultUrl = await vaultLibraryUrl()
+  dispatch(
+    r.notification_channel,
+    r.phone,
+    () => sendAccessGrantedSMS({ phone: r.phone, orderNumber, vaultUrl }),
+    () => sendAccessGrantedWhatsApp({ phone: r.phone, orderNumber, vaultUrl })
   )
 }
 

@@ -226,13 +226,13 @@ export default function WalletCard() {
               min="1"
               inputMode="numeric"
               placeholder="Amount in ₹"
-              className="w-40 text-sm rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-foreground"
+              className="w-40 text-sm rounded-lg border border-border-default bg-surface-elevated px-3 h-control text-foreground"
             />
             <button
               type="button"
               onClick={topUp}
               disabled={busy}
-              className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+              className="px-4 h-control rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
             >
               {busy ? 'Processing…' : 'Top up'}
             </button>
@@ -302,7 +302,7 @@ export default function WalletCard() {
                 onChange={e => setPeriod(e.target.value)}
                 type="text"
                 placeholder="Billing period e.g. 2026-08"
-                className="w-48 text-sm rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-foreground"
+                className="w-48 text-sm rounded-lg border border-border-default bg-surface-elevated px-3 h-control text-foreground"
               />
               <label
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${

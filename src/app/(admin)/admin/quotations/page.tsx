@@ -6,9 +6,11 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import QuotationsClient from './QuotationsClient'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
-export const metadata = {
-  title: 'Quotations — Jeffi Admin',
+export async function generateMetadata() {
+  const { name } = await getStoreIdentity()
+  return { title: `Quotations — ${name} Admin` }
 }
 
 export default async function QuotationsPage() {

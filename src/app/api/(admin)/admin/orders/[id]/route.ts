@@ -7,8 +7,10 @@ import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import { restoreOrderStock } from '@/lib/orders/order-stock'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
-import { storeContactLine, currentBrandNameAsync } from '@/lib/catalog/brand'
+import { storeContactLine, currentBrandNameAsync, customerMailFromAsync } from '@/lib/catalog/brand'
+import { orderUrlById } from '@/lib/shared/customer-links'
 import { mailShell } from '@/lib/shared/mail-template'
+import { isFulfilledStatus } from '@/lib/orders/fulfilled-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,7 +57,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
              oi.sub_variant_id, oi.hsn_code, oi.gst_rate, oi.quantity, oi.unit_price, oi.mrp,
              oi.discount_pct, oi.discount_amount, oi.total_price,
              oi.taxable_amount, oi.cgst_amount, oi.sgst_amount, oi.igst_amount, oi.tax_amount,
-             oi.buy_mode, oi.buy_unit, oi.sold_unit_factor, oi.base_quantity,
+             oi.buy_mode, oi.buy_unit, oi.sold_unit_factor, oi.base_quantity, oi.is_digital,
              CASE WHEN psv.id IS NOT NULL THEN json_build_object(
                'id', psv.id,
                'sub_variant_name', psv.sub_variant_name,
@@ -118,7 +120,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     if (d.estimated_delivery_date !== undefined) {
       const current = await queryOne<any>(`SELECT status FROM orders WHERE id = $1`, [id])
-      if (current?.status === 'delivered') {
+      if (isFulfilledStatus(current?.status)) {
         return NextResponse.json({ error: 'Cannot change EDD on a delivered order' }, { status: 400 })
       }
     }
@@ -129,6 +131,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (d.status !== undefined) {
       setClauses.push(`status = $${values.length + 1}`)
       values.push(d.status)
+      // Stamp the lifecycle timestamp that matches the new status, but never clobber an
+      // existing one (COALESCE) — the Delhivery sync may already have recorded the real
+      // moment. Without this, a manual status change leaves delivered_at/shipped_at null,
+      // which starves delivery-gated campaigns and the loyalty credit-delay clock.
+      // 'granted' (digital) also stamps delivered_at — the shared "fulfilled" clock.
+      const STATUS_STAMP: Record<string, string[]> = {
+        confirmed: ['confirmed_at'],
+        shipped: ['shipped_at'],
+        delivered: ['delivered_at'],
+        granted: ['granted_at', 'delivered_at'],
+        cancelled: ['cancelled_at'],
+      }
+      for (const col of STATUS_STAMP[d.status] ?? []) setClauses.push(`${col} = COALESCE(${col}, NOW())`)
     }
     if (d.awb_number !== undefined) {
       setClauses.push(`awb_number = $${values.length + 1}`)
@@ -174,7 +189,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           day: 'numeric',
           month: 'short',
         })
-        const from = `"${brand}" <${process.env.SES_FROM_EMAIL}>`
+        // The store's own sender and order page (business portal for a business customer).
+        const from = await customerMailFromAsync()
+        const orderLink = await orderUrlById(id)
         const subject = `Your delivery date has been updated — Order #${order.order_number}`
         const html = mailShell({
           brand,
@@ -188,6 +205,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             <p style="margin:6px 0 0;font-size:22px;font-weight:700;color:#15803d;">${readableDate}</p>
           </div>
           <p>Our team is working hard to deliver your order as soon as possible. We appreciate your patience.</p>
+          <div class="cta"><a href="${orderLink}" class="button" style="color:#ffffff;">View Your Order</a></div>
           <p style="margin:24px 0 0;color:#666;">Thank you for shopping with us,<br>The ${brand} team</p>`,
           footerLines: [storeName !== brand ? storeName : '', contactLine],
         })

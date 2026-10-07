@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import RichTextEditor from '@/components/admin/RichTextEditor'
+import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
 
 const TEMPLATES = [
@@ -225,7 +225,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
                   key={t.id}
                   type="button"
                   onClick={() => handleTemplateChange(t.id)}
-                  className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                  className={`px-3 h-control-sm rounded-lg border text-xs font-medium transition-colors ${
                     selectedTemplate === t.id
                       ? 'border-accent-500 bg-accent-500/10 text-accent-600 dark:text-accent-400'
                       : 'border-border-default bg-surface text-foreground-secondary hover:bg-surface-secondary'
@@ -261,7 +261,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
                   type="button"
                   onClick={generateFromScenario}
                   disabled={scenarioLoading || scenarioPrompt.trim().length < 10}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-violet-500 hover:bg-violet-600 text-white rounded text-xs font-medium disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-3 h-control-sm bg-violet-500 hover:bg-violet-600 text-white rounded text-xs font-medium disabled:opacity-50"
                 >
                   {scenarioLoading ? 'Generating…' : body ? 'Regenerate' : 'Generate'}
                 </button>
@@ -293,13 +293,13 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
               type="text"
               value={subject}
               onChange={e => setSubject(e.target.value)}
-              className="w-full border border-border-secondary rounded-lg px-3 py-2 text-sm bg-surface text-foreground focus:ring-accent-500 focus:border-accent-500"
+              className="w-full border border-border-secondary rounded-lg px-3 h-control text-sm bg-surface text-foreground focus:ring-accent-500 focus:border-accent-500"
             />
           </div>
 
           <div>
             <label className="block text-xs font-medium text-foreground-muted mb-1.5">Message</label>
-            <RichTextEditor value={body} onChange={setBody} placeholder="Write your message…" minHeight={260} />
+            <EmailComposer value={body} onChange={setBody} placeholder="Write your message…" minHeight={260} />
             <p className="text-[11px] text-foreground-muted mt-1.5">
               Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
               are replaced with the actual customer details when the email is sent.
@@ -374,7 +374,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
                 type="button"
                 onClick={handleSend}
                 disabled={sending || !subject.trim() || !body.trim()}
-                className="bg-accent-500 hover:bg-accent-600 disabled:bg-gray-400 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors inline-flex items-center gap-2"
+                className="bg-accent-500 hover:bg-accent-600 disabled:bg-gray-400 text-white px-5 h-control rounded-lg text-sm font-semibold transition-colors inline-flex items-center gap-2"
               >
                 {sending ? (
                   <>
@@ -406,7 +406,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="bg-surface-secondary hover:bg-border-default text-foreground-secondary px-5 py-2 rounded-lg text-sm font-semibold transition-colors"
+              className="bg-surface-secondary hover:bg-border-default text-foreground-secondary px-5 h-control rounded-lg text-sm font-semibold transition-colors"
             >
               Close
             </button>

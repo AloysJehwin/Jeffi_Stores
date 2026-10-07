@@ -10,14 +10,17 @@
  * wired. When wiring one, gate the spawn on that DB flag and pass it into the
  * worker's init message rather than relying on the build-time env read below.
  *
- * Saves LoRA weights to IndexedDB key 'jeffi_lora_v1'.
+ * Saves LoRA weights to a TENANT-NAMESPACED IndexedDB key (onDeviceKeys(slug).loraKey), so one
+ * store's adapter never bleeds into another's inference on a shared browser (#489).
  *
  * Protocol (main → worker):
+ *   { type: 'init', slug }                       // sets the tenant namespace (optional)
  *   { type: 'finetune', examples: FineTuneExample[] }
  * Worker → main:
  *   { type: 'finetune-done', steps: number }
  *   { type: 'finetune-error', error: string }
  */
+import { onDeviceKeys } from './keys'
 
 export interface FineTuneExample {
   prompt: string
@@ -27,7 +30,7 @@ export interface FineTuneExample {
 
 const LORA_DB_NAME = 'jeffi-ondevice'
 const LORA_STORE = 'lora-weights'
-const LORA_KEY = 'jeffi_lora_v1'
+let loraKey = onDeviceKeys(null).loraKey // tenant-namespaced; set from the init message
 const FINETUNE_STEPS = 3
 
 async function openLoraDb(): Promise<IDBDatabase> {
@@ -45,7 +48,7 @@ async function saveLoraWeights(weights: ArrayBuffer): Promise<void> {
   const db = await openLoraDb()
   return new Promise((resolve, reject) => {
     const tx = db.transaction(LORA_STORE, 'readwrite')
-    tx.objectStore(LORA_STORE).put(weights, LORA_KEY)
+    tx.objectStore(LORA_STORE).put(weights, loraKey)
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
   })
@@ -56,7 +59,7 @@ async function loadLoraWeights(): Promise<ArrayBuffer | null> {
     const db = await openLoraDb()
     return new Promise((resolve, reject) => {
       const tx = db.transaction(LORA_STORE, 'readonly')
-      const req = tx.objectStore(LORA_STORE).get(LORA_KEY)
+      const req = tx.objectStore(LORA_STORE).get(loraKey)
       req.onsuccess = () => resolve(req.result || null)
       req.onerror = () => reject(req.error)
     })
@@ -140,6 +143,10 @@ async function runFineTune(examples: FineTuneExample[]): Promise<number> {
 
 self.addEventListener('message', async (e: MessageEvent) => {
   const msg = e.data
+  if (msg.type === 'init') {
+    loraKey = onDeviceKeys(msg.slug).loraKey
+    return
+  }
   if (msg.type === 'finetune') {
     try {
       const steps = await runFineTune(msg.examples || [])

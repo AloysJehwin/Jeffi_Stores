@@ -106,6 +106,21 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
     expect((await res.json()).awb).toBe('AWB-EXISTING')
   })
 
+  it('refuses a shipment for an all-digital order', async () => {
+    global.fetch = vi.fn() as any
+    mockQueryOne.mockResolvedValueOnce({ ...baseOrder, physical_item_count: 0 })
+    const res = await POST(makeReq(), params)
+    expect(res.status).toBe(422)
+    expect((await res.json()).error).toMatch(/digital/i)
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  it('weighs physical lines only', async () => {
+    mockQueryOne.mockResolvedValueOnce({ ...baseOrder, physical_item_count: 1, postal_code: '12' })
+    await POST(makeReq(), params)
+    expect(String(mockQueryOne.mock.calls[0][0])).toContain('is_digital IS NOT TRUE')
+  })
+
   it('returns 422 when pincode is invalid', async () => {
     mockQueryOne.mockResolvedValueOnce({ ...baseOrder, postal_code: '12' })
     const res = await POST(makeReq(), params)

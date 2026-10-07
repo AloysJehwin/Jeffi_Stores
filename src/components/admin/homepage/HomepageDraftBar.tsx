@@ -139,7 +139,7 @@ export default function HomepageDraftBar({ initial }: { initial: HomepageDraftSu
             type="button"
             onClick={discard}
             disabled={!pending || busy !== null}
-            className="rounded-lg border border-border-default px-3 py-1.5 text-sm text-foreground hover:bg-surface-secondary disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg border border-border-default px-3 h-control-sm text-sm text-foreground hover:bg-surface-secondary disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy === 'discard' ? 'Discarding...' : 'Discard'}
           </button>
@@ -147,7 +147,7 @@ export default function HomepageDraftBar({ initial }: { initial: HomepageDraftSu
             type="button"
             onClick={publish}
             disabled={!pending || busy !== null}
-            className="rounded-lg bg-accent-500 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-accent-500 px-4 h-control-sm text-sm font-medium text-white transition-colors hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy === 'publish' ? 'Publishing...' : 'Publish'}
           </button>

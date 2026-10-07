@@ -1,6 +1,7 @@
 import twilio from 'twilio'
 import { logMessage } from '@/lib/shared/message-log'
-import { storeSignature } from '@/lib/catalog/brand'
+import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
+import { orderUrlByNumber } from '@/lib/shared/customer-links'
 
 // Twilio SMS client — initialized lazily so missing creds don't crash the app.
 // Set TWILIO_ACCOUNT_SID + TWILIO_FROM_NUMBER, plus EITHER:
@@ -53,7 +54,58 @@ async function sendSMS(to: string | null | undefined, body: string, kind: string
   }
 }
 
+// Marketing/campaign SMS — paired with the WhatsApp send so a campaign targeting a mobile reaches
+// the customer on BOTH channels. Tagged with the campaign entity so the campaign detail page can
+// show a per-campaign SMS log. Best-effort; shares the campaign's dedup with the WhatsApp send.
+export async function sendCampaignSMS(params: {
+  phone?: string | null
+  body: string
+  kind: string
+  userId?: string | null
+}): Promise<boolean> {
+  const normalized = normalizePhone(params.phone)
+  if (!normalized || DISABLED) return false
+  const client = getClient()
+  if (!client) return false
+  try {
+    const msg = await client.messages.create({ from: FROM_NUMBER, to: normalized, body: params.body })
+    logMessage({
+      channel: 'sms',
+      to: normalized,
+      from: FROM_NUMBER,
+      body: params.body,
+      kind: params.kind,
+      status: 'sent',
+      providerSid: msg.sid,
+      userId: params.userId ?? null,
+      entityType: 'campaign',
+      entityId: params.kind,
+    })
+    return true
+  } catch (err: any) {
+    logMessage({
+      channel: 'sms',
+      to: normalized,
+      from: FROM_NUMBER,
+      body: params.body,
+      kind: params.kind,
+      status: 'failed',
+      error: err?.message,
+      userId: params.userId ?? null,
+      entityType: 'campaign',
+      entityId: params.kind,
+    })
+    return false
+  }
+}
+
 // ── Notification templates ────────────────────────────────────────────────────
+
+// The order's own page on its store (or business portal), with the scheme so phones make it
+// tappable. Falls back to the store's order list if the number is unknown.
+async function orderLink(orderNumber: string): Promise<string> {
+  return (await orderUrlByNumber(orderNumber)) ?? `${await storeBaseUrlAsync()}/account/orders`
+}
 
 export async function sendOrderConfirmedSMS(params: {
   phone?: string | null
@@ -65,10 +117,10 @@ export async function sendOrderConfirmedSMS(params: {
     currency: 'INR',
     maximumFractionDigits: 0,
   }).format(params.total)
-  const { name: STORE_NAME, web: STORE_WEB } = await storeSignature()
+  const { name: STORE_NAME } = await storeSignature()
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} is confirmed! Total: ${amount}. Track at ${STORE_WEB}/orders.`,
+    `${STORE_NAME}: Your order ${params.orderNumber} is confirmed! Total: ${amount}. Track it: ${await orderLink(params.orderNumber)}`,
     'order_confirmed'
   )
 }
@@ -81,20 +133,33 @@ export async function sendOrderShippedSMS(params: {
 }): Promise<boolean> {
   const tracking = params.trackingId ? ` Tracking: ${params.trackingId}.` : ''
   const courier = params.courier ? ` via ${params.courier}` : ''
-  const { name: STORE_NAME, web: STORE_WEB } = await storeSignature()
+  const { name: STORE_NAME } = await storeSignature()
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} has been shipped${courier}!${tracking} Track at ${STORE_WEB}/orders.`,
+    `${STORE_NAME}: Your order ${params.orderNumber} has been shipped${courier}!${tracking} Track it: ${await orderLink(params.orderNumber)}`,
     'order_shipped'
   )
 }
 
 export async function sendOrderDeliveredSMS(params: { phone?: string | null; orderNumber: string }): Promise<boolean> {
-  const { name: STORE_NAME, web: STORE_WEB } = await storeSignature()
+  const { name: STORE_NAME } = await storeSignature()
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} has been delivered. Thank you for shopping with us! Shop again at ${STORE_WEB}.`,
+    `${STORE_NAME}: Your order ${params.orderNumber} has been delivered. Thank you for shopping with us! View your order: ${await orderLink(params.orderNumber)}`,
     'order_delivered'
+  )
+}
+
+export async function sendAccessGrantedSMS(params: {
+  phone?: string | null
+  orderNumber: string
+  vaultUrl: string
+}): Promise<boolean> {
+  const { name: STORE_NAME } = await storeSignature()
+  return sendSMS(
+    params.phone,
+    `${STORE_NAME}: Access granted for order ${params.orderNumber} — open your vault: ${params.vaultUrl}`,
+    'order_granted'
   )
 }
 
@@ -104,10 +169,10 @@ export async function sendOrderCancelledSMS(params: {
   reason?: string | null
 }): Promise<boolean> {
   const reason = params.reason ? ` Reason: ${params.reason}.` : ''
-  const { name: STORE_NAME, web: STORE_WEB } = await storeSignature()
+  const { name: STORE_NAME } = await storeSignature()
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} has been cancelled.${reason} For help, visit ${STORE_WEB}/support.`,
+    `${STORE_NAME}: Your order ${params.orderNumber} has been cancelled.${reason} Details: ${await orderLink(params.orderNumber)}`,
     'order_cancelled'
   )
 }
@@ -135,10 +200,10 @@ export async function sendVariantChangeRequestedSMS(params: {
 }
 
 export async function sendPaymentFailedSMS(params: { phone?: string | null; orderNumber: string }): Promise<boolean> {
-  const { name: STORE_NAME, web: STORE_WEB } = await storeSignature()
+  const { name: STORE_NAME } = await storeSignature()
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Payment for order ${params.orderNumber} failed. Please retry at ${STORE_WEB}/orders or contact support.`,
+    `${STORE_NAME}: Payment for order ${params.orderNumber} failed. Retry it here: ${await orderLink(params.orderNumber)}`,
     'payment_failed'
   )
 }

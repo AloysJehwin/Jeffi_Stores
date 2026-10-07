@@ -36,6 +36,8 @@ export interface InvoiceOrderItem {
   igst_amount: number
   buy_mode?: string
   buy_unit?: string | null
+  /** Digital line: a service (SAC in hsn_code), never shipped. */
+  is_digital?: boolean
 }
 
 export interface InvoiceOrder {
@@ -224,6 +226,7 @@ export async function generateInvoicePDF(
 ): Promise<Buffer> {
   const nicQRBuf = order.signed_qr_code ? await buildQRBuffer(order.signed_qr_code, 80) : null
   const payQRBuf = order.payment_link_url ? await buildQRBuffer(order.payment_link_url, 80) : null
+  const allDigital = items.length > 0 && items.every(i => i.is_digital)
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 28 })
@@ -330,7 +333,7 @@ export async function generateInvoicePDF(
       .font(F)
       .fontSize(6)
       .text('Terms of Delivery', metaX + 2, my + 2, { width: metaW - 4 })
-    if (order.estimated_delivery_date) {
+    if (order.estimated_delivery_date && !allDigital) {
       doc
         .font(FB)
         .fontSize(7)
@@ -378,7 +381,10 @@ export async function generateInvoicePDF(
       y += ewbRowH
     }
 
-    y = renderAddressBlock(doc, 'Consignee (Ship to)', buyerAddress, order.buyer_gstin, LM, pw, y)
+    // An all-digital order is never shipped, so it has no consignee — only the bill-to party.
+    if (!allDigital) {
+      y = renderAddressBlock(doc, 'Consignee (Ship to)', buyerAddress, order.buyer_gstin, LM, pw, y)
+    }
 
     const billAddr = billingAddress || buyerAddress
     y = renderAddressBlock(doc, 'Buyer (Bill to)', billAddr, order.buyer_gstin, LM, pw, y)
@@ -492,7 +498,7 @@ export async function generateInvoicePDF(
 
       const rowData = [
         String(i + 1),
-        item.product_name,
+        item.is_digital ? `${item.product_name} (Digital)` : item.product_name,
         item.hsn_code || '',
         `${item.gst_rate} %`,
         qtyLabel,

@@ -280,7 +280,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
             type="button"
             onClick={confirmVariantPick}
             disabled={isSubmitting}
-            className="px-4 py-2 text-sm font-medium text-white bg-accent-500 hover:bg-accent-600 rounded-lg disabled:opacity-50"
+            className="px-4 h-control text-sm font-medium text-white bg-accent-500 hover:bg-accent-600 rounded-lg disabled:opacity-50"
           >
             Confirm replacement with selected variant(s)
           </button>
@@ -391,7 +391,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
               type="button"
               onClick={() => submit('approve')}
               disabled={isSubmitting}
-              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+              className="flex-1 px-4 h-control bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Processing...' : 'Approve Return'}
             </button>
@@ -399,7 +399,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
               type="button"
               onClick={() => submit('reject')}
               disabled={isSubmitting}
-              className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+              className="flex-1 px-4 h-control bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Processing...' : 'Reject Return'}
             </button>
@@ -429,13 +429,13 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                         value={rvpCharge}
                         onChange={e => setRvpCharge(e.target.value)}
                         placeholder="e.g. 80"
-                        className="flex-1 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm"
+                        className="flex-1 px-3 h-control border border-border-secondary rounded-lg bg-surface text-foreground text-sm"
                       />
                       <button
                         type="button"
                         onClick={handleSaveRvpCharge}
                         disabled={rvpChargeSaving}
-                        className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                        className="px-4 h-control bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
                       >
                         {rvpChargeSaving ? 'Saving...' : 'Save charge'}
                       </button>
@@ -453,7 +453,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                   type="button"
                   onClick={handleCreateRVP}
                   disabled={isSubmitting}
-                  className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 h-control bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
                 >
                   {isSubmitting ? 'Creating...' : 'Create RVP Pickup (Delhivery QC)'}
                 </button>
@@ -476,14 +476,14 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                   value={returnTrackingNumber}
                   onChange={e => setReturnTrackingNumber(e.target.value)}
                   placeholder="e.g. 123456789012"
-                  className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                  className="w-full px-3 h-control border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
                 />
               </div>
               <button
                 type="button"
                 onClick={() => submit('mark_received')}
                 disabled={isSubmitting}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                className="w-full px-4 h-control bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
               >
                 {isSubmitting ? 'Processing...' : 'Mark Item as Received'}
               </button>
@@ -552,7 +552,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                     type="button"
                     onClick={() => submit('process')}
                     disabled={isSubmitting}
-                    className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                    className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
                   >
                     {isSubmitting ? 'Processing...' : type === 'refund' ? 'Process Refund' : 'Create Replacement Order'}
                   </button>

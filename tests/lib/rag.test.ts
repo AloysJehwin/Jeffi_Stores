@@ -21,9 +21,20 @@ vi.mock('pg', () => {
 
 vi.mock('@/lib/shared/ai-client', () => ({ aiEmbed: vi.fn() }))
 
+// Tenant resolver drives RAG isolation (#489): default null = platform/off-tenant.
+const { mockResolveTenantId } = vi.hoisted(() => ({ mockResolveTenantId: vi.fn().mockResolvedValue(null) }))
+vi.mock('@/lib/tenancy/tenant-context', () => ({ resolveTenantId: mockResolveTenantId }))
+
 // ── Import after mocks ────────────────────────────────────────────────────────
 
-import { embed, findSimilar, findSimilarProducts, findSimilarProductIds, findSimilarCustomers } from '@/lib/shared/rag'
+import {
+  embed,
+  findSimilar,
+  findSimilarProducts,
+  findSimilarProductIds,
+  findSimilarCustomers,
+  queryManyReplica,
+} from '@/lib/shared/rag'
 import { aiEmbed } from '@/lib/shared/ai-client'
 
 const mockAiEmbed = vi.mocked(aiEmbed)
@@ -270,5 +281,55 @@ describe('findSimilarCustomers', () => {
   it('delegates to findSimilar with users table', async () => {
     const results = await findSimilarCustomers('john')
     expect(results).toEqual([])
+  })
+})
+
+// #489: the shared replica holds ONLY platform data. A tenant request must never read it — every
+// query filters tenant_id (platform = NULL), and the raw escape hatch refuses on a tenant.
+describe('tenant isolation (#489)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAiEmbed.mockResolvedValue([MOCK_VEC])
+    mockClientQuery.mockResolvedValue({ rows: [] })
+  })
+
+  it('findSimilar off-tenant filters tenant_id IS NULL (platform rows)', async () => {
+    mockResolveTenantId.mockResolvedValue(null)
+    await findSimilar('q')
+    const [sql, params] = mockClientQuery.mock.calls.at(-1)!
+    expect(sql).toMatch(/tenant_id IS NOT DISTINCT FROM/)
+    expect(params).toContain(null)
+  })
+
+  it('findSimilar on a tenant filters by that tenant id', async () => {
+    mockResolveTenantId.mockResolvedValue('t-123')
+    await findSimilar('q')
+    const [sql, params] = mockClientQuery.mock.calls.at(-1)!
+    expect(sql).toMatch(/tenant_id IS NOT DISTINCT FROM/)
+    expect(params).toContain('t-123')
+  })
+
+  it('findSimilarProductIds scopes the product + variant queries to the tenant', async () => {
+    mockResolveTenantId.mockResolvedValue('t-123')
+    await findSimilarProductIds('bolt')
+    const tenantScoped = mockClientQuery.mock.calls.filter(
+      c => /tenant_id IS NOT DISTINCT FROM/.test(c[0]) && (c[1] as unknown[]).includes('t-123')
+    )
+    expect(tenantScoped.length).toBeGreaterThanOrEqual(2) // products + product_variants
+  })
+
+  it('queryManyReplica refuses on a tenant (returns [] without touching the pool)', async () => {
+    mockResolveTenantId.mockResolvedValue('t-123')
+    const rows = await queryManyReplica('SELECT 1')
+    expect(rows).toEqual([])
+    expect(mockPoolConnect).not.toHaveBeenCalled()
+  })
+
+  it('queryManyReplica runs off-tenant (platform)', async () => {
+    mockResolveTenantId.mockResolvedValue(null)
+    mockClientQuery.mockResolvedValue({ rows: [{ x: 1 }] })
+    const rows = await queryManyReplica('SELECT 1')
+    expect(rows).toEqual([{ x: 1 }])
+    expect(mockPoolConnect).toHaveBeenCalled()
   })
 })

@@ -773,7 +773,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                   <button
                     key={m}
                     onClick={() => setOutputMode(m)}
-                    className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-medium transition-colors ${
+                    className={`flex-1 h-control-sm px-2 rounded-lg border text-xs font-medium transition-colors ${
                       outputMode === m
                         ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
                         : 'border-border-default text-foreground-secondary hover:border-orange-300'
@@ -794,7 +794,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                 max={100}
                 value={copies}
                 onChange={e => setCopies(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
-                className="w-full px-2 py-1.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
+                className="w-full px-2 h-control-sm rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
               />
             </div>
             <div className="flex-1">
@@ -911,14 +911,14 @@ export default function ProductLabelModal({ product, onClose }: Props) {
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
+              className="px-4 h-control text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleDownload}
               disabled={selected.size === 0 || downloading || loading}
-              className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
+              className="flex items-center gap-2 px-4 h-control bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

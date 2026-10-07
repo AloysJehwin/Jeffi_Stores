@@ -5,12 +5,16 @@ vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn() }))
 vi.mock('@/lib/shipping/delivery-settings', () => ({ invalidateDeliverySettingsCache: vi.fn() }))
+vi.mock('@/lib/loyalty/settings', () => ({ getLoyaltySettings: vi.fn() }))
+vi.mock('@/lib/loyalty/reconcile', () => ({ reconcileLoyaltyUntilDone: vi.fn() }))
 
 import { PATCH } from '@/app/api/(admin)/admin/settings/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'
 import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
+import { getLoyaltySettings } from '@/lib/loyalty/settings'
+import { reconcileLoyaltyUntilDone } from '@/lib/loyalty/reconcile'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -117,5 +121,64 @@ describe('PATCH /api/admin/settings', () => {
     const res = await PATCH(makeRequest({ key: 'min_order_amount', value: '100' }))
     expect(res.status).toBe(500)
     expect((await res.json()).error).toMatch(/failed to update/i)
+  })
+
+  describe('customer program switches', () => {
+    beforeEach(() => {
+      mockAuth.mockResolvedValue(admin as any)
+      mockHasScope.mockReturnValue(true)
+      mockQuery.mockResolvedValue(undefined as any)
+    })
+
+    it('refuses to switch Refer & Earn on while loyalty is off, in single and batch mode', async () => {
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: false } as any)
+      const single = await PATCH(makeRequest({ key: 'referral_enabled', value: 'true' }))
+      expect(single.status).toBe(400)
+      expect((await single.json()).error).toMatch(/loyalty program first/)
+      const batch = await PATCH(makeRequest({ updates: [{ key: 'referral_enabled', value: 'true' }] }))
+      expect(batch.status).toBe(400)
+      expect(mockQuery).not.toHaveBeenCalled()
+    })
+
+    it('lets Refer & Earn be switched on with loyalty on, and off at any time', async () => {
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: true } as any)
+      expect((await PATCH(makeRequest({ key: 'referral_enabled', value: 'true' }))).status).toBe(200)
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: false } as any)
+      expect((await PATCH(makeRequest({ key: 'referral_enabled', value: 'false' }))).status).toBe(200)
+      expect(mockQuery).toHaveBeenCalledTimes(2)
+    })
+
+    it('counts past orders silently the first time Loyalty is switched on', async () => {
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: true, launchedAt: null } as any)
+      vi.mocked(reconcileLoyaltyUntilDone).mockResolvedValue({ users: 40, earned: 9645 } as any)
+      const res = await PATCH(makeRequest({ key: 'loyalty_enabled', value: true }))
+      expect(res.status).toBe(200)
+      expect(mockQuery.mock.calls[0][1]).toEqual(['loyalty_enabled', 'true'])
+      expect(mockQuery.mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(reconcileLoyaltyUntilDone).mock.invocationCallOrder[0]
+      )
+      expect((await res.json()).firstPass).toMatchObject({ users: 40, earned: 9645 })
+      // ...and only then switches on the tier-upgrade email.
+      const enable = mockQuery.mock.calls.findIndex(c => String(c[0]).includes("kind = 'loyalty_tier_upgrade'"))
+      expect(enable).toBeGreaterThan(0)
+      expect(mockQuery.mock.invocationCallOrder[enable]).toBeGreaterThan(
+        vi.mocked(reconcileLoyaltyUntilDone).mock.invocationCallOrder[0]
+      )
+    })
+
+    it('does not rerun the first pass once launched, nor when Loyalty is switched off', async () => {
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: true, launchedAt: '2026-10-01' } as any)
+      expect((await (await PATCH(makeRequest({ key: 'loyalty_enabled', value: 'true' }))).json()).firstPass).toBeNull()
+      await PATCH(makeRequest({ updates: [{ key: 'loyalty_enabled', value: 'false' }] }))
+      expect(reconcileLoyaltyUntilDone).not.toHaveBeenCalled()
+      // An admin who switched the tier email off keeps it off when loyalty is toggled again.
+      expect(mockQuery.mock.calls.some(c => String(c[0]).includes('loyalty_tier_upgrade'))).toBe(false)
+    })
+
+    it('saves the Birthday rewards switch without needing loyalty', async () => {
+      vi.mocked(getLoyaltySettings).mockResolvedValue({ enabled: false } as any)
+      expect((await PATCH(makeRequest({ key: 'feature_birthday_enabled', value: 'false' }))).status).toBe(200)
+      expect(mockQuery.mock.calls[0][1]).toEqual(['feature_birthday_enabled', 'false'])
+    })
   })
 })

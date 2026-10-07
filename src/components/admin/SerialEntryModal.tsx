@@ -336,7 +336,7 @@ export function SerialPicker({
                     }}
                     onBlur={() => commitFieldFromDom(i)}
                     placeholder={`Scan serial ${i + 1}`}
-                    className={`flex-1 min-w-0 px-2.5 py-1.5 text-sm rounded-lg border bg-surface text-foreground font-mono focus:outline-none focus:ring-1 ${
+                    className={`flex-1 min-w-0 px-2.5 h-control-sm text-sm rounded-lg border bg-surface text-foreground font-mono focus:outline-none focus:ring-1 ${
                       bad ? 'border-red-400 focus:ring-red-400' : 'border-border-default focus:ring-secondary-500'
                     }`}
                   />
@@ -365,7 +365,7 @@ export function SerialPicker({
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Filter serials or lot…"
-              className="w-full mb-2 px-3 py-1.5 text-sm rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-secondary-500 font-mono"
+              className="w-full mb-2 px-3 h-control-sm text-sm rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-secondary-500 font-mono"
             />
           )}
           <div className="max-h-64 overflow-y-auto rounded-lg border border-border-default">
@@ -528,14 +528,14 @@ export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) 
         <div className="px-6 py-4 border-t border-border-default flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+            className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={!canConfirm}
-            className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+            className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
           >
             Confirm Serials
           </button>

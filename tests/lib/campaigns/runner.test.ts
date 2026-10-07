@@ -120,6 +120,50 @@ describe('runScenario', () => {
     const ctx = findEligible.mock.calls[0][0]
     expect(ctx.params.sendCooldownDays).toBe(30)
   })
+
+  it('records the error instead of throwing when findEligible throws', async () => {
+    mockGetCampaign.mockResolvedValue(makeCampaign())
+    const send = vi.fn()
+    const scenario = makeScenario({
+      findEligible: vi.fn().mockRejectedValue(new Error('column u.date_of_birth does not exist')),
+      send,
+    })
+    const result = await runScenario(scenario, 'birthday')
+    expect(result).toEqual({
+      campaign: 'birthday',
+      attempted: 0,
+      sent: 0,
+      skipped: 0,
+      error: 'column u.date_of_birth does not exist',
+    })
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('records the error instead of throwing when getCampaign throws', async () => {
+    mockGetCampaign.mockRejectedValue(new Error('db down'))
+    const result = await runScenario(makeScenario(), 'abandoned_checkout')
+    expect(result.error).toBe('db down')
+    expect(result.attempted).toBe(0)
+  })
+
+  it('keeps sending to the remaining rows after one send throws', async () => {
+    mockGetCampaign.mockResolvedValue(makeCampaign())
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true })
+      .mockRejectedValueOnce(new Error('coupon lookup failed'))
+      .mockResolvedValueOnce({ ok: true })
+    const scenario = makeScenario({
+      findEligible: vi.fn().mockResolvedValue([{ id: '1' }, { id: '2' }, { id: '3' }]),
+      send,
+    })
+    const result = await runScenario(scenario, 'abandoned_checkout')
+    expect(send).toHaveBeenCalledTimes(3)
+    expect(result.attempted).toBe(3)
+    expect(result.sent).toBe(2)
+    expect(result.skipped).toBe(1)
+    expect(result.error).toBe('coupon lookup failed')
+  })
 })
 
 describe('runScenarioForAllCampaigns', () => {
@@ -152,5 +196,47 @@ describe('runScenarioForAllCampaigns', () => {
     const scenario = makeScenario({ kind: 'winback_90' })
     await runScenarioForAllCampaigns(scenario)
     expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('scenario_kind = $1'), ['winback_90'])
+  })
+})
+
+describe('legacy duration params', () => {
+  it('reads a bare legacy count below the field minimum in the key unit', async () => {
+    const { resolveScenarioParams } = await import('@/lib/campaigns/runner')
+    const { abandonedCart } = await import('@/lib/campaigns/scenarios/abandoned-cart')
+    const { postPurchase } = await import('@/lib/campaigns/scenarios/post-purchase')
+    const cart = resolveScenarioParams(abandonedCart as any, {
+      lookbackDays: 30,
+      secondEmailDelayHours: 1440,
+      sendCooldown: 1440,
+    }) as any
+    expect(cart.lookbackDays).toBe(30 * 1440)
+    expect(cart.secondEmailDelayHours).toBe(1440)
+    expect(cart.sendCooldown).toBe(1440)
+    expect((resolveScenarioParams(postPurchase as any, { lookbackDays: 5 }) as any).lookbackDays).toBe(5 * 1440)
+  })
+
+  it('leaves canonical minutes and keys without a minimum alone', async () => {
+    const { normalizeDurationParams } = await import('@/lib/campaigns/runner')
+    const schema = {
+      lookback: { type: 'duration', min: 60, recommendedUnit: 'days', label: 'x' },
+      free: { type: 'duration', recommendedUnit: 'days', label: 'x' },
+      count: { type: 'integer', min: 5, label: 'x' },
+    } as any
+    expect(normalizeDurationParams({ lookback: 2880, free: 3, count: 1 }, schema)).toEqual({
+      lookback: 2880,
+      free: 3,
+      count: 1,
+    })
+    expect(normalizeDurationParams({ lookback: 7 }, schema)).toEqual({ lookback: 7 * 1440 })
+  })
+
+  it('runScenario hands the scenario normalized params', async () => {
+    mockGetCampaign.mockResolvedValue(makeCampaign({ parameters: { lookbackDays: 30 } }))
+    const scenario = makeScenario({
+      defaultParams: { lookbackDays: 43200 },
+      paramSchema: { lookbackDays: { type: 'duration', min: 1440, recommendedUnit: 'days', label: 'x' } },
+    })
+    await runScenario(scenario, 'abandoned_checkout')
+    expect(scenario.findEligible.mock.calls[0][0].params.lookbackDays).toBe(43200)
   })
 })

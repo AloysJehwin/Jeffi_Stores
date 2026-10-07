@@ -6,6 +6,8 @@ import { createDraftInvoice } from '@/lib/documents/invoice'
 import { computeEdd } from '@/lib/shipping/edd'
 import type { DraftBuyNowItem, DraftCartItem } from '@/lib/orders/order-draft'
 import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
+import { grantOrderEntitlements } from '@/lib/orders/entitlements'
+import { digitalUnitError } from '@/lib/catalog/digital-units'
 
 export interface CartLine {
   product_id: string
@@ -27,6 +29,7 @@ export interface CartLine {
     mrp: number | null
     extra_delivery_days: number | null
     handling_days?: number | null
+    is_digital?: boolean
   }
   variant: {
     id: string
@@ -58,7 +61,8 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
         'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
         'category_id', p.category_id, 'mrp', p.mrp,
         'extra_delivery_days', p.extra_delivery_days,
-        'handling_days', p.handling_days
+        'handling_days', p.handling_days,
+        'is_digital', COALESCE(p.is_digital, FALSE)
       ) AS products,
       CASE WHEN ci.variant_id IS NOT NULL THEN
         json_build_object(
@@ -77,6 +81,7 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
     LEFT JOIN product_variants pv ON ci.variant_id = pv.id
     LEFT JOIN product_sub_variants psv ON ci.sub_variant_id = psv.id
     WHERE ci.user_id = $1 AND COALESCE(ci.saved_for_later, FALSE) = FALSE
+      AND COALESCE(p.is_digital, FALSE) = FALSE -- digital is Buy Now only
   `,
     [userId]
   )
@@ -149,6 +154,7 @@ export async function resolveBuyNowItem(input: {
         buyMode: string
         buyUnit: string | null
         price: number
+        isDigital: boolean
       }
     }
   | { ok: false; error: string }
@@ -156,7 +162,7 @@ export async function resolveBuyNowItem(input: {
   if (!input.productId) return { ok: false, error: 'productId required' }
   const qty = Number(input.qty)
   if (!Number.isFinite(qty) || qty <= 0 || qty > 10_000) return { ok: false, error: 'Invalid qty' }
-  const buyMode = input.buyMode || 'unit'
+  let buyMode = input.buyMode || 'unit'
 
   const product = await queryOne<{
     id: string
@@ -165,10 +171,18 @@ export async function resolveBuyNowItem(input: {
     price_ex_gst: string | number | null
     gst_percentage: string | number | null
     stock_status: string | null
-  }>(`SELECT id, is_active, base_price, price_ex_gst, gst_percentage, stock_status FROM products WHERE id = $1`, [
-    input.productId,
-  ])
+    is_digital: boolean | null
+  }>(
+    `SELECT id, is_active, base_price, price_ex_gst, gst_percentage, stock_status, is_digital FROM products WHERE id = $1`,
+    [input.productId]
+  )
   if (!product || !product.is_active) return { ok: false, error: 'Product not found or inactive' }
+  const isDigital = product.is_digital === true
+  if (isDigital) {
+    const unitErr = digitalUnitError(input.buyMode, input.buyUnit)
+    if (unitErr) return { ok: false, error: unitErr }
+    buyMode = 'unit'
+  }
 
   let variant: {
     id: string
@@ -261,10 +275,12 @@ export async function resolveBuyNowItem(input: {
       productId: input.productId,
       variantId: input.variantId || null,
       subVariantId: input.subVariantId || null,
-      qty,
+      // A digital title is owned once — buy-now is always a single copy.
+      qty: isDigital ? 1 : qty,
       buyMode,
-      buyUnit: input.buyUnit || null,
+      buyUnit: isDigital ? null : input.buyUnit || null,
       price,
+      isDigital,
     },
   }
 }
@@ -414,6 +430,8 @@ export async function findExistingUnpaidRazorpayOrder(userId: string) {
   )
 }
 
+export const DIGITAL_REQUIRES_ONLINE_PAYMENT = 'Digital items must be paid online'
+
 export interface CommitInput {
   userId: string
   user: { email: string; phone: string | null; first_name: string | null; last_name: string | null }
@@ -446,6 +464,7 @@ export interface BuyNowCommitInput extends CommitInput {
     mrp: number | null
     extra_delivery_days?: number | null
     handling_days?: number | null
+    is_digital?: boolean | null
   }
   variant: { id: string; variant_name: string; sku: string; mrp: number | null } | null
   subVariant: { id: string; sub_variant_name: string; sku: string | null; mrp: number | null } | null
@@ -478,22 +497,44 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     const address = await ensureAddressOnOrder(client, input.userId, input.addressId)
     if (!address) throw new Error('Address not found')
 
+    // is_digital is snapshotted from products at commit time (authoritative), never from the caller.
+    const lineProductIds = input.mode === 'cart' ? input.cartItems.map(i => i.product_id) : [input.product.id]
+    const digitalRes = await client.query<{ id: string }>(
+      `SELECT id::text AS id FROM products WHERE id = ANY($1::uuid[]) AND is_digital = TRUE`,
+      [lineProductIds]
+    )
+    const digitalIds = new Set(digitalRes.rows.map(r => r.id))
+    const hasDigital = digitalIds.size > 0
+    const allDigital = lineProductIds.length > 0 && lineProductIds.every(id => digitalIds.has(id))
+    if (hasDigital && !input.paymentRecord) throw new Error(DIGITAL_REQUIRES_ONLINE_PAYMENT)
+    const unitLines =
+      input.mode === 'cart'
+        ? input.cartItems.map(i => ({ productId: i.product_id, buyMode: i.buy_mode, buyUnit: i.buy_unit }))
+        : [{ productId: input.product.id, buyMode: input.item.buyMode, buyUnit: input.item.buyUnit }]
+    for (const l of unitLines) {
+      const unitErr = digitalIds.has(l.productId) ? digitalUnitError(l.buyMode, l.buyUnit) : null
+      if (unitErr) throw new Error(unitErr)
+    }
+
     const pin = String(address.postal_code ?? '')
+    const physicalLines = input.mode === 'cart' ? input.cartItems.filter(i => !digitalIds.has(i.product_id)) : []
     const maxExtraDays =
       input.mode === 'cart'
-        ? Math.max(0, ...input.cartItems.map(i => Number(i.products.extra_delivery_days ?? 0)))
+        ? Math.max(0, ...physicalLines.map(i => Number(i.products.extra_delivery_days ?? 0)))
         : Number(input.product.extra_delivery_days ?? 0)
     const maxHandlingDays =
       input.mode === 'cart'
-        ? Math.max(2, ...input.cartItems.map(i => Number(i.products.handling_days ?? 2)))
-        : Number(input.product.handling_days ?? 2)
+        ? Math.max(0, ...physicalLines.map(i => Number(i.products.handling_days ?? 0)))
+        : Number(input.product.handling_days ?? 0)
     const bv = await getBusinessValues()
-    const estimatedDeliveryDate = computeEdd({
-      pin,
-      originPin: bv.delhiveryOriginPincode,
-      handlingDays: maxHandlingDays,
-      extraDays: maxExtraDays,
-    })
+    const estimatedDeliveryDate = allDigital
+      ? null
+      : computeEdd({
+          pin,
+          store: bv,
+          handlingDays: maxHandlingDays,
+          extraDays: maxExtraDays,
+        })
 
     const customerName = `${input.user.first_name || ''} ${input.user.last_name || ''}`.trim() || 'Customer'
     const isGSTEnabled = (await getFeatureFlags()).gstEnabled
@@ -636,7 +677,9 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     })
 
     const paymentStatus = input.paymentRecord ? 'paid' : 'unpaid'
-    const orderStatus = input.paymentRecord ? 'confirmed' : 'pending'
+    // A paid all-digital order is fulfilled at payment: access is granted below in this txn.
+    const isGranted = !!input.paymentRecord && allDigital
+    const orderStatus = isGranted ? 'granted' : input.paymentRecord ? 'confirmed' : 'pending'
 
     const orderResult = await client.query(
       `INSERT INTO orders (
@@ -646,9 +689,11 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         shipping_address_id, billing_address_id, notes,
         taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst,
         order_type, shipping_address_snapshot, billing_address_snapshot,
-        estimated_delivery_date, cod_fee_amount
+        estimated_delivery_date, cod_fee_amount,
+        confirmed_at, delivered_at, granted_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26,
+        CASE WHEN $27::boolean THEN NOW() END, CASE WHEN $27::boolean THEN NOW() END, CASE WHEN $27::boolean THEN NOW() END)
       RETURNING id, order_number, total_amount, status`,
       [
         orderNumber,
@@ -677,6 +722,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         addressSnapshot,
         estimatedDeliveryDate,
         round2(input.codFeeAmount),
+        isGranted,
       ]
     )
     const created = orderResult.rows[0]
@@ -685,12 +731,14 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
       // When GST is off we charge the ex-GST price, so there is NO embedded tax
       // to strip — the per-item tax is 0, not a back-calculated amount.
       const taxAmt = r.gst ? r.gst.totalTax : 0
+      const isDigital = digitalIds.has(r.productId)
       await client.query(
         `INSERT INTO order_items (
           order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name,
           quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate,
-          taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
+          taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp,
+          is_digital, is_returnable
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
         [
           created.id,
           r.productId,
@@ -712,6 +760,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           r.buyMode,
           r.buyUnit,
           r.mrp ?? null,
+          isDigital,
+          !isDigital,
         ]
       )
     }
@@ -745,6 +795,10 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           }),
         ]
       )
+
+      // Digital grant runs INSIDE this txn so an entitlement can't exist without the paid order.
+      // No-op for an all-physical order (it only grants order_items.is_digital = TRUE lines).
+      if (hasDigital) await grantOrderEntitlements(client, { orderId: created.id, userId: input.userId })
     }
 
     return created

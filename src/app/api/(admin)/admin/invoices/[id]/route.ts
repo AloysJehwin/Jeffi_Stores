@@ -1,3 +1,4 @@
+import { invoiceUrlForOrder } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { productLabel } from '@/lib/catalog/product-label'
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -516,7 +517,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (order.invoice_number && customerEmail) {
       try {
-        await sendInvoiceFinalizedEmail(customerEmail, customerName, order.invoice_number, totalAmount)
+        await sendInvoiceFinalizedEmail(
+          customerEmail,
+          customerName,
+          order.invoice_number,
+          totalAmount,
+          undefined,
+          await invoiceUrlForOrder(id)
+        )
       } catch (_) {}
     }
 

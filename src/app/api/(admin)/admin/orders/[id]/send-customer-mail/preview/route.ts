@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
-import { buildVarMap, substituteVars } from '@/lib/shared/template-vars'
+import { renderTemplate, resolveTemplateVariables } from '@/lib/templates/variables'
 import { storeContactLine, currentBrandNameAsync } from '@/lib/catalog/brand'
 
 export const dynamic = 'force-dynamic'
@@ -38,12 +38,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     ? `${order.users.first_name} ${order.users.last_name || ''}`.trim()
     : order.customer_name || 'Valued Customer'
 
-  const vars = {
-    ...buildVarMap({ recipient: { email, first_name: firstName, last_name: lastName } }),
-    order_number: order.order_number || '',
-  }
+  const vars = await resolveTemplateVariables({
+    recipient: { email, first_name: firstName, last_name: lastName },
+    extra: { order_number: order.order_number || '' },
+  })
 
-  const finalBody = substituteVars((body || '').trim(), vars)
+  const finalBody = renderTemplate((body || '').trim(), vars, { escape: true })
 
   const html = `<!DOCTYPE html>
 <html>

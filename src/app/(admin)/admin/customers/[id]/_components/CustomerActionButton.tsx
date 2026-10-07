@@ -66,14 +66,14 @@ export default function CustomerActionButton({
             onChange={e => setFlagReason(e.target.value)}
             disabled={isLoading}
             placeholder="e.g. Multiple fraudulent orders"
-            className="w-full px-3 py-2 border border-border-default rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+            className="w-full px-3 h-control border border-border-default rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
           />
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => handleAction('flag')}
             disabled={isLoading}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+            className="px-4 h-control bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
           >
             {isLoading ? 'Flagging...' : 'Confirm Flag'}
           </button>
@@ -98,7 +98,7 @@ export default function CustomerActionButton({
         <button
           onClick={() => handleAction('deactivate')}
           disabled={isLoading}
-          className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+          className="px-4 h-control bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
         >
           {isLoading ? 'Deactivating...' : 'Confirm Deactivate'}
         </button>
@@ -119,7 +119,7 @@ export default function CustomerActionButton({
         <button
           onClick={() => handleAction('activate')}
           disabled={isLoading}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
+          className="px-4 h-control bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
         >
           {isLoading ? 'Reactivating...' : 'Confirm Reactivate'}
         </button>
@@ -140,7 +140,7 @@ export default function CustomerActionButton({
         {(isActive || isFlagged) && (
           <button
             onClick={() => setConfirm('activate')}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
+            className="px-4 h-control bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Reactivate
           </button>
@@ -148,7 +148,7 @@ export default function CustomerActionButton({
         {isActive && !isFlagged && (
           <button
             onClick={() => setConfirm('deactivate')}
-            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors"
+            className="px-4 h-control bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Deactivate
           </button>
@@ -156,7 +156,7 @@ export default function CustomerActionButton({
         {!isFlagged && (
           <button
             onClick={() => setConfirm('flag')}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+            className="px-4 h-control bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
           >
             Flag as Suspicious
           </button>

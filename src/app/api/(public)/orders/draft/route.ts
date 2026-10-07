@@ -76,8 +76,10 @@ export async function POST(req: NextRequest) {
   let cartItemIds: string[] | null = null
   let buyNowItem: any = null
   let businessDiscountAmount = 0
+  // Digital lines never ship: they are left out of the shipping quote and the free-shipping subtotal.
   let shippingItems: { productId: string; variantId: string | null; subVariantId: string | null; quantity: number }[] =
     []
+  let physicalSubtotal = 0
   const { gstEnabled } = await getFeatureFlags()
 
   if (mode === 'cart') {
@@ -86,7 +88,9 @@ export async function POST(req: NextRequest) {
     subtotal = cartSubtotal(cart, gstEnabled)
     cartHash = hashCartItems(cartItemsForHash(cart))
     cartItemIds = cart.map(c => `${c.product_id}:${c.variant_id || ''}:${c.sub_variant_id || ''}:${c.buy_mode}`)
-    shippingItems = cart.map(c => ({
+    const physical = cart.filter(c => !c.products?.is_digital)
+    physicalSubtotal = cartSubtotal(physical, gstEnabled)
+    shippingItems = physical.map(c => ({
       productId: c.product_id,
       variantId: c.variant_id,
       subVariantId: c.sub_variant_id,
@@ -141,14 +145,17 @@ export async function POST(req: NextRequest) {
     if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
     subtotal = round2(resolved.item.price * resolved.item.qty)
     buyNowItem = resolved.item
-    shippingItems = [
-      {
-        productId: resolved.item.productId,
-        variantId: resolved.item.variantId,
-        subVariantId: resolved.item.subVariantId,
-        quantity: resolved.item.qty,
-      },
-    ]
+    if (!resolved.item.isDigital) {
+      physicalSubtotal = subtotal
+      shippingItems = [
+        {
+          productId: resolved.item.productId,
+          variantId: resolved.item.variantId,
+          subVariantId: resolved.item.subVariantId,
+          quantity: resolved.item.qty,
+        },
+      ]
+    }
 
     const productRow = await queryOne<{ category_id: string | null }>(
       `SELECT category_id FROM products WHERE id = $1`,
@@ -163,14 +170,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const quote = address.postal_code
-    ? await quoteShipping({
-        destinationPin: String(address.postal_code),
-        items: shippingItems,
-        subtotal,
-        isCod,
-      })
-    : { shipping: 0, codFee: 0 }
+  const quote =
+    address.postal_code && shippingItems.length > 0
+      ? await quoteShipping({
+          destinationPin: String(address.postal_code),
+          items: shippingItems,
+          subtotal: physicalSubtotal,
+          isCod,
+        })
+      : { shipping: 0, codFee: 0 }
   const shippingAmount = quote.shipping
   const codFeeAmount = isCod ? quote.codFee : 0
 

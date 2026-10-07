@@ -3,16 +3,17 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { navItems } from '@/components/business/AccountSidebar'
+import { useBusinessNavItems } from '@/components/business/AccountSidebar'
 import { bp } from '@/lib/shared/business-path'
 
 export function BusinessAccountMobileTabBar() {
   const pathname = usePathname()
+  const items = useBusinessNavItems()
   return (
     <div className="lg:hidden mx-3 mt-3 mb-4">
       <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
         <div className="flex">
-          {navItems.map(item => {
+          {items.map(item => {
             const isActive = item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))
             return (
               <Link
@@ -40,6 +41,7 @@ export function BusinessAccountMobileTabBar() {
 export default function BusinessAccountMobileHeader() {
   const { user } = useAuth()
   const pathname = usePathname()
+  const items = useBusinessNavItems()
 
   if (!user) return null
 
@@ -74,7 +76,7 @@ export default function BusinessAccountMobileHeader() {
       <div className="lg:hidden relative z-10 mx-4 -mt-8 mb-4">
         <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
           <div className="flex">
-            {navItems.map(item => {
+            {items.map(item => {
               const isActive = item.exact ? pathname === bp(item.href) : pathname.startsWith(bp(item.href))
               return (
                 <Link

@@ -190,7 +190,7 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
           <button
             type="button"
             onClick={() => setOpen(o => !o)}
-            className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
+            className="px-4 h-control rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
           >
             {open ? 'Hide' : '+ Add warehouse'}
           </button>
@@ -226,7 +226,7 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
                 <input
                   value={form[k]}
                   onChange={set(k)}
-                  className="w-full text-sm rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-foreground"
+                  className="w-full text-sm rounded-lg border border-border-default bg-surface-elevated px-3 h-control text-foreground"
                 />
               </div>
             ))}
@@ -235,14 +235,14 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
               <input
                 value={form.address}
                 onChange={set('address')}
-                className="w-full text-sm rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-foreground"
+                className="w-full text-sm rounded-lg border border-border-default bg-surface-elevated px-3 h-control text-foreground"
               />
             </div>
             <div className="sm:col-span-2">
               <button
                 onClick={save}
                 disabled={busy || !form.name || !form.address || !form.phone || !form.pincode}
-                className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+                className="px-4 h-control rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
               >
                 {busy ? 'Adding…' : 'Add warehouse'}
               </button>
@@ -331,7 +331,7 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
                         type="button"
                         onClick={() => setDefault(w.name)}
                         disabled={rowBusy === w.name}
-                        className="px-2.5 py-1 rounded-lg border border-border-default text-xs font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 transition-colors"
+                        className="px-2.5 h-control-sm rounded-lg border border-border-default text-xs font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 transition-colors"
                       >
                         {rowBusy === w.name ? '…' : 'Set as default'}
                       </button>
@@ -339,7 +339,7 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
                         type="button"
                         onClick={() => remove(w.name)}
                         disabled={rowBusy === w.name}
-                        className="px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 transition-colors"
+                        className="px-2.5 h-control-sm rounded-lg border border-red-200 dark:border-red-900/40 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 transition-colors"
                       >
                         Remove
                       </button>
@@ -789,7 +789,7 @@ export default function DelhiveryPageClient({
                   <button
                     disabled={ordersPage <= 1}
                     onClick={() => setOrdersPage(p => Math.max(1, p - 1))}
-                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                   >
                     Prev
                   </button>
@@ -799,7 +799,7 @@ export default function DelhiveryPageClient({
                   <button
                     disabled={ordersPage >= ordersTotalPages}
                     onClick={() => setOrdersPage(p => Math.min(ordersTotalPages, p + 1))}
-                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                   >
                     Next
                   </button>
@@ -815,7 +815,7 @@ export default function DelhiveryPageClient({
                 <button
                   onClick={handleSubmit}
                   disabled={submitting || selected.size === 0}
-                  className="px-5 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center gap-2"
+                  className="px-5 h-control text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center gap-2"
                 >
                   {submitting ? (
                     <>
@@ -1099,7 +1099,7 @@ export default function DelhiveryPageClient({
                 <button
                   disabled={historyPage <= 1}
                   onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
-                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                 >
                   Prev
                 </button>
@@ -1109,7 +1109,7 @@ export default function DelhiveryPageClient({
                 <button
                   disabled={historyPage >= historyTotalPages}
                   onClick={() => setHistoryPage(p => Math.min(historyTotalPages, p + 1))}
-                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                 >
                   Next
                 </button>

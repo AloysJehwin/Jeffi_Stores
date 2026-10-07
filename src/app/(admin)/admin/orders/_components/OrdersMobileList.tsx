@@ -8,6 +8,7 @@ import { useHasScope } from '@/contexts/AdminScopesContext'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import SubscriptionOrderBadge from '@/components/admin/SubscriptionOrderBadge'
 
 interface Props {
   orders: any[]
@@ -32,7 +33,7 @@ function sourceBadge(source: string) {
 }
 
 function statusBadge(status: string) {
-  if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+  if (status === 'delivered' || status === 'granted') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
   if (status === 'processing' || status === 'shipped')
     return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
   if (status === 'out_for_delivery') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
@@ -42,6 +43,7 @@ function statusBadge(status: string) {
 }
 
 function statusLabel(status: string) {
+  if (status === 'granted') return 'Access granted'
   if (status === 'cancel_requested') return 'Cancel Req.'
   if (status === 'out_for_delivery') return 'Out for Delivery'
   return status
@@ -83,7 +85,7 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
         onSelect: () => router.push(ap(`/admin/orders/${order.id}?back=${encodeURIComponent(backUrl)}`)),
       },
     ]
-    if (canPackingSlips) {
+    if (canPackingSlips && order.status !== 'granted') {
       actions.push({
         key: 'packing',
         label: 'Packing slip',
@@ -137,6 +139,7 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
                   <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${sourceBadge(order.source)}`}>
                     {sourceLabel(order.source)}
                   </span>
+                  <SubscriptionOrderBadge subscriptionId={order.subscription_id} cycle={order.subscription_cycle} />
                 </div>
                 <span className={`shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadge(order.status)}`}>
                   {statusLabel(order.status)}

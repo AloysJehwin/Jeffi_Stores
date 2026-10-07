@@ -133,7 +133,7 @@ export async function collectBriefingData(): Promise<BriefingData> {
         `
       SELECT id::text, name, sku, inventory_quantity
       FROM products
-      WHERE is_active = TRUE AND inventory_quantity <= 10
+      WHERE is_active = TRUE AND is_digital = FALSE AND inventory_quantity <= 10
       ORDER BY inventory_quantity ASC, name ASC
       LIMIT 15
     `,
@@ -285,8 +285,11 @@ export async function narrate(data: BriefingData): Promise<string> {
 
 const BRIEFING_BRAND = "Jeffi Store's"
 const FROM = `"${BRIEFING_BRAND} Ops" <${process.env.SES_FROM_EMAIL || 'ops@jeffistores.in'}>`
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
-const ADMIN_URL = process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'
+// The admin host serves its pages at the root, so a base ending in /admin (as in .env.example)
+// must lose it or the link becomes /admin/admin. Same normalisation as currentAdminBaseUrl().
+const ADMIN_URL = (process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in')
+  .replace(/\/admin\/?$/, '')
+  .replace(/\/$/, '')
 
 const BRIEFING_CSS = `
   .section { margin: 24px 0 10px; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #6b7280; }
@@ -448,7 +451,7 @@ export function renderBriefingEmail(data: BriefingData, narration: string): { su
       <p class="muted" style="text-align:center;margin-top:24px;">
         Abandoned checkouts (24h): <span style="color:#1f2937;font-weight:600;">${data.abandoned_checkouts_24h}</span>
         &nbsp;·&nbsp;
-        <a href="${ADMIN_URL}/admin" style="color:#2563eb;text-decoration:none;">Open admin →</a>
+        <a href="${ADMIN_URL}/" style="color:#2563eb;text-decoration:none;">Open admin →</a>
       </p>`,
   })
 

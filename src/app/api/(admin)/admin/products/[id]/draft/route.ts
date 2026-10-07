@@ -3,6 +3,8 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
 import { deleteProductImage } from '@/lib/shared/s3'
+import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
+import { applyDraftSubVariantPrices, parseSubVariantPriceEntries } from '@/lib/subscriptions/sub-variant-prices'
 
 export const dynamic = 'force-dynamic'
 
@@ -135,7 +137,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     const variantsFromBody = body?.variants
-    const variantsJson = Array.isArray(variantsFromBody) ? JSON.stringify(variantsFromBody) : null
+    const variantsJson = Array.isArray(variantsFromBody)
+      ? JSON.stringify(
+          variantsFromBody.map((v: any) => ({
+            ...v,
+            subscription_price: normalizeSubscriptionPrice(v?.subscription_price),
+            subscription_prices: normalizeSubscriptionPrices(v?.subscription_prices),
+          }))
+        )
+      : null
 
     await query(
       `UPDATE product_drafts SET fields = $2::jsonb,
@@ -144,6 +154,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
        updated_at = NOW() WHERE product_id = $1`,
       [id, JSON.stringify(fields), imagesJson, variantsJson]
     )
+    await applyDraftSubVariantPrices(id, parseSubVariantPriceEntries(body?.subVariantSubscriptionPrices))
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {

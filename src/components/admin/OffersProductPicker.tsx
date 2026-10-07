@@ -199,7 +199,7 @@ export default function OfferProductPicker({
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search products by name or SKU…"
                 disabled={!canWrite || busy}
-                className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+                className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
               />
               {(results.length > 0 || searching) && query.trim().length >= 2 && (
                 <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded-lg border border-border-default bg-surface-elevated shadow-lg">
@@ -260,7 +260,7 @@ export default function OfferProductPicker({
             value={filter}
             onChange={e => setFilter(e.target.value)}
             placeholder={`Filter ${members.length} assigned products…`}
-            className="w-full sm:max-w-sm px-3 py-1.5 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+            className="w-full sm:max-w-sm px-3 h-control-sm rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
           />
         )}
         <div className="flex flex-wrap gap-2 max-h-[32rem] overflow-y-auto">
@@ -336,7 +336,7 @@ function BulkAssign({
           type="button"
           disabled={inactive}
           onClick={() => selected && onRun('add', selected)}
-          className="px-3 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 h-control-sm rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {selected ? `Add ${selected.count} product${selected.count === 1 ? '' : 's'}` : 'Add all'}
         </button>
@@ -344,7 +344,7 @@ function BulkAssign({
           type="button"
           disabled={inactive}
           onClick={() => selected && onRun('remove', selected)}
-          className="px-3 py-1.5 rounded-lg border border-border-default text-xs font-medium text-foreground-secondary hover:text-red-600 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-3 h-control-sm rounded-lg border border-border-default text-xs font-medium text-foreground-secondary hover:text-red-600 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Remove from offer
         </button>

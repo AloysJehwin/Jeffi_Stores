@@ -4,22 +4,23 @@ import { NextRequest } from 'next/server'
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/email-campaigns', () => ({ renderCampaignEmail: vi.fn() }))
-vi.mock('@/lib/shared/template-vars', () => ({
-  previewVarMap: vi.fn(),
-  substituteVars: vi.fn(),
-}))
+vi.mock('@/lib/templates/variables', async () => {
+  const shared = await vi.importActual<typeof import('@/lib/templates/variables-shared')>(
+    '@/lib/templates/variables-shared'
+  )
+  return { ...shared, resolveTemplateVariables: vi.fn() }
+})
 
 import { POST } from '@/app/api/(admin)/admin/mailer/preview/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
-import { previewVarMap, substituteVars } from '@/lib/shared/template-vars'
+import { resolveTemplateVariables } from '@/lib/templates/variables'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
 const mockRenderCampaignEmail = vi.mocked(renderCampaignEmail)
-const mockPreviewVarMap = vi.mocked(previewVarMap)
-const mockSubstituteVars = vi.mocked(substituteVars)
+const mockResolve = vi.mocked(resolveTemplateVariables)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['mailer'] }
 
@@ -34,8 +35,7 @@ function makeRequest(body: object) {
 describe('POST /api/admin/mailer/preview', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockPreviewVarMap.mockReturnValue({ customer_first_name: 'Preview' } as any)
-    mockSubstituteVars.mockImplementation((str: string) => str)
+    mockResolve.mockResolvedValue({ customer_first_name: 'Preview', store_name: 'Acme' })
     mockRenderCampaignEmail.mockReturnValue({ html: '<p>Hello</p>' } as any)
   })
 
@@ -90,22 +90,27 @@ describe('POST /api/admin/mailer/preview', () => {
     expect(body.html).toBeDefined()
   })
 
-  it('applies substituteVars to subject and data values', async () => {
+  it('fills the subject and hands store + sample customer variables to the renderer', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
 
     await POST(
       makeRequest({
         template_key: 'promo',
-        template_data: { headline: 'Big {{sale}}' },
-        subject: 'Sale for {{name}}',
+        template_data: { headline: 'Big {{store_name}}' },
+        subject: 'Sale for {{customer_first_name}}',
       })
     )
 
-    expect(mockSubstituteVars).toHaveBeenCalled()
+    const [, data, name, , storeName, vars] = mockRenderCampaignEmail.mock.calls[0]
+    expect(data.subject).toBe('Sale for Preview')
+    expect(data.headline).toBe('Big {{store_name}}')
+    expect(name).toBe('Preview')
+    expect(storeName).toBe('Acme')
+    expect(vars).toEqual({ customer_first_name: 'Preview', store_name: 'Acme' })
   })
 
-  it('skips substituteVars for non-string data values', async () => {
+  it('accepts non-string data values', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)
 

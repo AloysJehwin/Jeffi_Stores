@@ -15,16 +15,19 @@
 
 BEGIN;
 
-INSERT INTO public.plans (slug, name, tier, monthly_price_inr, max_custom_domains, is_active) VALUES
-  ('basic', 'Basic', 1, 4999.00, 0, true),
-  ('growth', 'Growth', 2, 9999.00, 0, true),
-  ('pro', 'Pro', 3, 19999.00, 1, true),
-  ('enterprise', 'Enterprise', 4, 49999.00, 3, true)
+INSERT INTO public.plans (slug, name, tier, monthly_price_inr, max_custom_domains, is_active, storage_quota_bytes, max_file_bytes) VALUES
+  ('basic', 'Basic', 1, 4999.00, 0, true, 10737418240, 5368709120),
+  ('growth', 'Growth', 2, 9999.00, 0, true, 53687091200, 5368709120),
+  ('pro', 'Pro', 3, 19999.00, 1, true, 214748364800, 5368709120),
+  ('enterprise', 'Enterprise', 4, 49999.00, 3, true, 1099511627776, 5368709120)
 ON CONFLICT (slug) DO UPDATE SET
   name = EXCLUDED.name, tier = EXCLUDED.tier,
   monthly_price_inr = EXCLUDED.monthly_price_inr,
   max_custom_domains = EXCLUDED.max_custom_domains,
-  is_active = EXCLUDED.is_active, updated_at = now();
+  is_active = EXCLUDED.is_active,
+  storage_quota_bytes = EXCLUDED.storage_quota_bytes,
+  max_file_bytes = EXCLUDED.max_file_bytes,
+  updated_at = now();
 
 INSERT INTO public.plan_features (plan_id, scope_key)
 SELECT p.id, v.scope_key
@@ -240,7 +243,16 @@ JOIN (VALUES
   ('enterprise', 'shelving:write'),
   ('enterprise', 'tasks:read'),
   ('enterprise', 'tasks:write'),
-  ('enterprise', 'traffic:read')
+  ('enterprise', 'traffic:read'),
+  -- Vault + customer subscriptions ship on EVERY plan (storefront features are not plan-gated).
+  ('basic', 'vault:read'), ('basic', 'vault:write'),
+  ('basic', 'subscriptions:read'), ('basic', 'subscriptions:write'),
+  ('growth', 'vault:read'), ('growth', 'vault:write'),
+  ('growth', 'subscriptions:read'), ('growth', 'subscriptions:write'),
+  ('pro', 'vault:read'), ('pro', 'vault:write'),
+  ('pro', 'subscriptions:read'), ('pro', 'subscriptions:write'),
+  ('enterprise', 'vault:read'), ('enterprise', 'vault:write'),
+  ('enterprise', 'subscriptions:read'), ('enterprise', 'subscriptions:write')
 ) AS v(plan_slug, scope_key) ON v.plan_slug = p.slug
 ON CONFLICT (plan_id, scope_key) DO NOTHING;
 
@@ -464,7 +476,15 @@ WHERE pf.plan_id = p.id
       ('enterprise', 'shelving:write'),
       ('enterprise', 'tasks:read'),
       ('enterprise', 'tasks:write'),
-      ('enterprise', 'traffic:read')
+      ('enterprise', 'traffic:read'),
+      ('basic', 'vault:read'), ('basic', 'vault:write'),
+      ('basic', 'subscriptions:read'), ('basic', 'subscriptions:write'),
+      ('growth', 'vault:read'), ('growth', 'vault:write'),
+      ('growth', 'subscriptions:read'), ('growth', 'subscriptions:write'),
+      ('pro', 'vault:read'), ('pro', 'vault:write'),
+      ('pro', 'subscriptions:read'), ('pro', 'subscriptions:write'),
+      ('enterprise', 'vault:read'), ('enterprise', 'vault:write'),
+      ('enterprise', 'subscriptions:read'), ('enterprise', 'subscriptions:write')
     ) AS d(plan_slug, scope_key)
     WHERE d.plan_slug = p.slug AND d.scope_key = pf.scope_key
   );
