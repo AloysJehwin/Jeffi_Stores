@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "src/components/admin/ProductForm.tsx": {
-    "mtime": 1791360722.0672872,
-    "ast_hash": "1e49ace24142208c64c08881d599e942",
+    "mtime": 1791361583.414816,
+    "ast_hash": "1a5210ffe84081b4619a9863b5b4bff5",
     "semantic_hash": ""
   },
   "src/components/admin/ProductStockMovements.tsx": {
@@ -7460,8 +7460,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/products/add/actions.ts": {
-    "mtime": 1790931248.7124138,
-    "ast_hash": "0f7899bd2a8966f17213472861730c71",
+    "mtime": 1791361452.0382516,
+    "ast_hash": "307c2c1f0f102b9cfe1a34846a15469b",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/products/add/loading.tsx": {
@@ -7470,13 +7470,13 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/products/add/page.tsx": {
-    "mtime": 1790931248.7163389,
-    "ast_hash": "fbc89d8555e795374cedb97177e99008",
+    "mtime": 1791361655.039822,
+    "ast_hash": "81899338d95a9690b490a5e248770b0e",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/products/edit/[id]/actions.ts": {
-    "mtime": 1790931248.7208955,
-    "ast_hash": "d3046b381e453117cc81596526c7a359",
+    "mtime": 1791361519.2865715,
+    "ast_hash": "610b174b31e19585bbcad3edc89b81a7",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/products/edit/[id]/error.tsx": {
@@ -7490,8 +7490,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/products/edit/[id]/page.tsx": {
-    "mtime": 1790931248.727804,
-    "ast_hash": "307adee39564827c166e824de7d32c8e",
+    "mtime": 1791361669.4096086,
+    "ast_hash": "116f43af0f0ca6fd25e278abdd9335ac",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/products/loading.tsx": {
@@ -11600,8 +11600,8 @@
     "semantic_hash": ""
   },
   "src/lib/catalog/product-draft.ts": {
-    "mtime": 1790931253.543701,
-    "ast_hash": "9a24b6a8af3e3444f5aa39474c3de660",
+    "mtime": 1791361542.9173346,
+    "ast_hash": "2c99cba38fa4f664366cd4f18c1ec980",
     "semantic_hash": ""
   },
   "src/lib/catalog/product-filters.ts": {

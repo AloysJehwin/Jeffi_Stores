@@ -172,12 +172,13 @@ export async function updateProduct(productId: string, formData: FormData) {
   const intent = formData.get('intent') as string | null
   const isActive = intent === 'draft' || intent === 'draft-stay' ? false : formData.get('is_active') === 'true'
   const isFeatured = formData.get('is_featured') === 'true'
+  const isDigitalProduct = formData.get('is_digital') === 'true'
 
   // Server-side weight & packaging validation — enforced on publish only, so a
   // partial draft can still be saved. Mirrors the client checks in ProductForm so
   // a direct/programmatic submit can't slip a null/zero weight or missing box dims
-  // past the UI. See src/lib/shipping.ts STORED_DIMS_REQUIRED.
-  if (intent === 'publish') {
+  // past the UI. See src/lib/shipping.ts STORED_DIMS_REQUIRED. Skipped for digital.
+  if (intent === 'publish' && !isDigitalProduct) {
     const STORED_DIMS_TYPES = ['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube']
     const errors: string[] = []
     if (!hasVariants) {
@@ -340,7 +341,6 @@ export async function updateProduct(productId: string, formData: FormData) {
   const shippingClass = (formData.get('shipping_class') as string) || 'standard'
   const isOversized = formData.get('is_oversized') === 'true'
   const isDigital = formData.get('is_digital') === 'true'
-  const downloadUrl = (formData.get('download_url') as string) || null
   const licenseType = (formData.get('license_type') as string) || null
   const fileFormat = (formData.get('file_format') as string) || null
   const platformCompatibility = (formData.get('platform_compatibility') as string)
@@ -350,7 +350,13 @@ export async function updateProduct(productId: string, formData: FormData) {
         .filter(Boolean)
     : null
   const isSubscription = formData.get('is_subscription') === 'true'
-  const subscriptionInterval = (formData.get('subscription_interval') as string) || null
+  const subscriptionIntervals = (formData.get('subscription_intervals') as string)
+    ? (formData.get('subscription_intervals') as string)
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+    : []
+  const subscriptionInterval = subscriptionIntervals[0] ?? null
   const subscriptionPrice = formData.get('subscription_price')
     ? round2(parseFloat(formData.get('subscription_price') as string))
     : null
@@ -460,11 +466,11 @@ export async function updateProduct(productId: string, formData: FormData) {
         shipping_class: shippingClass,
         is_oversized: isOversized,
         is_digital: isDigital,
-        download_url: downloadUrl,
         license_type: licenseType,
         file_format: fileFormat,
         platform_compatibility: platformCompatibility,
         is_subscription: isSubscription,
+        subscription_intervals: subscriptionIntervals,
         subscription_interval: subscriptionInterval,
         subscription_price: subscriptionPrice,
         is_bundle: isBundle,
@@ -646,18 +652,18 @@ export async function updateProduct(productId: string, formData: FormData) {
     params.push(handlingDays, shippingClass, isOversized)
     setClauses.push(
       `is_digital = $${params.length + 1}`,
-      `download_url = $${params.length + 2}`,
-      `license_type = $${params.length + 3}`,
-      `file_format = $${params.length + 4}`,
-      `platform_compatibility = $${params.length + 5}`
+      `license_type = $${params.length + 2}`,
+      `file_format = $${params.length + 3}`,
+      `platform_compatibility = $${params.length + 4}`
     )
-    params.push(isDigital, downloadUrl, licenseType, fileFormat, platformCompatibility)
+    params.push(isDigital, licenseType, fileFormat, platformCompatibility)
     setClauses.push(
       `is_subscription = $${params.length + 1}`,
-      `subscription_interval = $${params.length + 2}`,
-      `subscription_price = $${params.length + 3}`
+      `subscription_intervals = $${params.length + 2}`,
+      `subscription_interval = $${params.length + 3}`,
+      `subscription_price = $${params.length + 4}`
     )
-    params.push(isSubscription, subscriptionInterval, subscriptionPrice)
+    params.push(isSubscription, subscriptionIntervals, subscriptionInterval, subscriptionPrice)
     setClauses.push(`is_bundle = $${params.length + 1}`)
     params.push(isBundle)
     setClauses.push(

@@ -37,6 +37,7 @@ export async function createProduct(formData: FormData) {
   const breadthCm = formData.get('breadth_cm') ? parseFloat(formData.get('breadth_cm') as string) : null
   const heightCm = formData.get('height_cm') ? parseFloat(formData.get('height_cm') as string) : null
   const intent = formData.get('intent') as string | null
+  const isDigital = formData.get('is_digital') === 'true'
   const isActive = intent === 'draft' ? false : intent === 'publish' ? true : formData.get('is_active') === 'true'
   // Create-as-draft: intent 'draft' (or an implicit save) makes a create-draft (is_draft = true,
   // is_active = false) that lives ONLY in the Drafts section and never the live list/storefront.
@@ -49,7 +50,7 @@ export async function createProduct(formData: FormData) {
   // partial draft can still be saved. Mirrors the client checks in ProductForm and
   // the edit page so a direct/programmatic submit can't publish a null/zero weight
   // or missing box dims. See src/lib/shipping.ts STORED_DIMS_REQUIRED.
-  if (intent === 'publish') {
+  if (intent === 'publish' && !isDigital) {
     const STORED_DIMS_TYPES = ['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube']
     const errors: string[] = []
     if (!hasVariants) {
