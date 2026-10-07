@@ -428,12 +428,15 @@ export default function AccountRewards() {
   return (
     <div className="bg-surface min-h-screen">
       <AccountMobileHeader />
-      <div className="container mx-auto px-4 pt-4 pb-10 max-w-5xl">
+      <div className="container mx-auto px-4 pt-4 pb-10">
         {authLoading || loading ? (
-          <div className="space-y-4 animate-pulse">
-            <div className="h-44 rounded-xl bg-surface-elevated border border-border-default" />
-            <div className="h-28 rounded-xl bg-surface-elevated border border-border-default" />
-            <div className="h-56 rounded-xl bg-surface-elevated border border-border-default" />
+          <div className="grid gap-4 lg:grid-cols-3 lg:items-start animate-pulse">
+            <div className="space-y-4 lg:col-span-2">
+              <div className="h-44 rounded-xl bg-surface-elevated border border-border-default" />
+              <div className="h-28 rounded-xl bg-surface-elevated border border-border-default" />
+              <div className="h-56 rounded-xl bg-surface-elevated border border-border-default" />
+            </div>
+            <div className="hidden lg:block h-72 rounded-xl bg-surface-elevated border border-border-default" />
           </div>
         ) : unavailable || !data ? (
           <div className={`${CARD} text-center py-12`}>
