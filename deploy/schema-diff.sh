@@ -17,7 +17,7 @@ for arg in "$@"; do [[ "$arg" == "--dry-run" ]] && DRY_RUN=true; done
 
 TEMP_DB="schema_diff_$$"
 
-cleanup() { docker rm -f "$TEMP_DB" 2>/dev/null || true; }
+cleanup() { docker rm -fv "$TEMP_DB" 2>/dev/null || true; }
 trap cleanup EXIT
 
 # seed-plans.sql is row data (plans + plan_features), not structure, so migra never sees it.
