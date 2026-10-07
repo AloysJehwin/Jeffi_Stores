@@ -19,16 +19,25 @@ const row = (o: Record<string, unknown>) => ({
   current_cycle: 2,
   total_count: 120,
   min_cycles: null,
+  term_cycles: null,
   ...o,
 })
 
 describe('loadCustomerSubscriptions term fields', () => {
   it('exposes currentCycle, a fixed totalCycles and minCycles', async () => {
     vi.mocked(queryMany)
-      .mockResolvedValueOnce([row({ total_count: 12, min_cycles: 3 }), row({ id: 's2' })] as any)
+      .mockResolvedValueOnce([row({ total_count: 12, term_cycles: 12, min_cycles: 3 }), row({ id: 's2' })] as any)
       .mockResolvedValueOnce([])
     const [fixed, open] = await loadCustomerSubscriptions('u1')
     expect(fixed).toMatchObject({ currentCycle: 2, totalCycles: 12, minCycles: 3 })
     expect(open).toMatchObject({ totalCycles: null, minCycles: null })
+  })
+
+  it('keeps an admin term equal to the interval cap as a fixed term', async () => {
+    vi.mocked(queryMany)
+      .mockResolvedValueOnce([row({ total_count: 120, term_cycles: 120 })] as any)
+      .mockResolvedValueOnce([])
+    const [s] = await loadCustomerSubscriptions('u1')
+    expect(s.totalCycles).toBe(120)
   })
 })

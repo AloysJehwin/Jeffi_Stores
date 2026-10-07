@@ -14,6 +14,8 @@ import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { formatINR, formatDate } from '@/lib/shared/format'
+import { deriveSellableItems, subscriptionSavingsPct } from '@/lib/subscriptions/sellable'
+import { SUBSCRIPTION_INTERVAL_LABELS, isSubscriptionInterval } from '@/lib/subscriptions/intervals'
 
 function TagBadge({ tag, accent }: { tag: string; accent?: boolean }) {
   return (
@@ -266,6 +268,64 @@ function Field({ label, value, mono }: { label: string; value?: any; mono?: bool
       <span className="text-foreground-secondary shrink-0">{label}</span>
       <span className={`text-foreground text-right ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
     </div>
+  )
+}
+
+function SubscriptionDetails({ p, variants }: { p: any; variants: any[] }) {
+  const intervals: string[] = Array.isArray(p.subscription_intervals) ? p.subscription_intervals : []
+  const subsByVariant: Record<string, any[]> = {}
+  for (const v of variants) subsByVariant[String(v.id)] = v.sub_variants || []
+  const items = deriveSellableItems({
+    hasVariants: !!p.has_variants,
+    product: { name: p.name, sku: p.sku, price: p.base_price, subscription_price: p.subscription_price },
+    variants: variants.map(v => ({
+      ...v,
+      sub_variant_type_on: !!v.sub_variant_type_on || (v.sub_variants || []).length > 0,
+    })),
+    subVariantsByVariant: subsByVariant,
+  })
+  return (
+    <>
+      <Field
+        label="Billing Intervals"
+        value={intervals.map(i => (isSubscriptionInterval(i) ? SUBSCRIPTION_INTERVAL_LABELS[i] : i)).join(', ') || '—'}
+      />
+      <Field label="Billing Cycles" value={p.subscription_total_cycles ?? 'Until cancelled'} />
+      <Field label="Minimum Billing Cycles" value={p.subscription_min_cycles ?? '—'} />
+      <div className="overflow-x-auto pt-1">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-foreground-secondary">
+              <th className="py-1.5 pr-2 text-left font-semibold">Item</th>
+              <th className="py-1.5 px-2 text-right font-semibold">One-time</th>
+              <th className="py-1.5 px-2 text-right font-semibold">Subscription</th>
+              <th className="py-1.5 pl-2 text-right font-semibold">Savings</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-default">
+            {items.map(it => {
+              const sub = it.subscriptionPrice ? Number(it.subscriptionPrice) : null
+              const pct = sub != null && it.oneTimePrice != null ? subscriptionSavingsPct(it.oneTimePrice, sub) : 0
+              return (
+                <tr key={it.key}>
+                  <td className="py-1.5 pr-2 text-foreground">
+                    {it.name}
+                    {it.sku && <span className="block font-mono text-[10px] text-foreground-muted">{it.sku}</span>}
+                  </td>
+                  <td className="py-1.5 px-2 text-right text-foreground">
+                    {it.oneTimePrice != null ? formatINR(it.oneTimePrice) : '—'}
+                  </td>
+                  <td className="py-1.5 px-2 text-right text-foreground">
+                    {sub != null ? formatINR(sub) : <span className="text-foreground-muted">Same as one-time</span>}
+                  </td>
+                  <td className="py-1.5 pl-2 text-right text-foreground">{pct > 0 ? `${pct}%` : '—'}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
@@ -1052,17 +1112,14 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
               <Field label="Tax Class" value={p.tax_class} />
               <Field label="Inclusive Tax" value={p.inclusive_tax ? 'Yes' : 'No'} />
               <Field label="COD Allowed" value={p.is_cod_allowed ? 'Yes' : 'No'} />
-              {p.is_subscription && (
-                <>
-                  <Field label="Subscription" value="Yes" />
-                  <Field label="Interval" value={p.subscription_interval} />
-                  <Field
-                    label="Sub. Price"
-                    value={p.subscription_price != null ? formatINR(Number(p.subscription_price)) : null}
-                  />
-                </>
-              )}
+              {p.is_subscription && <Field label="Subscription" value="Yes" />}
             </CollapsibleCard>
+
+            {p.is_subscription && (
+              <CollapsibleCard title="Subscription">
+                <SubscriptionDetails p={p} variants={variants} />
+              </CollapsibleCard>
+            )}
 
             {/* — Description — */}
             {p.description && (

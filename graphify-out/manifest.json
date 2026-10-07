@@ -1005,8 +1005,8 @@
     "semantic_hash": ""
   },
   "database/marketing.sql": {
-    "mtime": 1791375291.4484174,
-    "ast_hash": "969a1d06ff9162bbd9846b9b2693d45c",
+    "mtime": 1791378617.1588068,
+    "ast_hash": "12435135548f32dffba049a9a3ca5742",
     "semantic_hash": ""
   },
   "database/orders.sql": {
@@ -3815,8 +3815,8 @@
     "semantic_hash": ""
   },
   "src/lib/import/columns.ts": {
-    "mtime": 1790962298.1063523,
-    "ast_hash": "e91b191083f24e43648a983869672513",
+    "mtime": 1791380860.6799495,
+    "ast_hash": "d42ff363ff03ae59f94d9f6b24a851f3",
     "semantic_hash": ""
   },
   "src/lib/import/jobs.ts": {
@@ -3840,8 +3840,8 @@
     "semantic_hash": ""
   },
   "src/lib/import/validate-row.ts": {
-    "mtime": 1790931253.7155387,
-    "ast_hash": "d6f832095259180d83d18e1de9753c2d",
+    "mtime": 1791380880.511442,
+    "ast_hash": "714687e2586b723185987f9ce3fcec02",
     "semantic_hash": ""
   },
   "src/lib/import/enums.ts": {
@@ -6210,8 +6210,8 @@
     "semantic_hash": ""
   },
   "src/lib/queries/catalog.ts": {
-    "mtime": 1790931253.852142,
-    "ast_hash": "e4fcb68e1558139edec59ed758d31e23",
+    "mtime": 1791380764.2887137,
+    "ast_hash": "7e5f84a69ab1c30f2f2b7966f0b63161",
     "semantic_hash": ""
   },
   "src/lib/queries/customers.ts": {
@@ -7405,8 +7405,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/products/[id]/ProductDetailClient.tsx": {
-    "mtime": 1790931248.6660075,
-    "ast_hash": "c7017cdc23adbc7d30ddb6c00c51dc10",
+    "mtime": 1791381007.7880242,
+    "ast_hash": "7800c6d5d938b7c3c67b257ead128c9f",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/products/[id]/analytics/ProductAnalyticsClient.tsx": {
@@ -11610,8 +11610,8 @@
     "semantic_hash": ""
   },
   "src/lib/catalog/product-import.ts": {
-    "mtime": 1790962282.5978003,
-    "ast_hash": "2ed299f6d82f7f68ad69086c9c7b6b62",
+    "mtime": 1791381007.7103198,
+    "ast_hash": "068c06f9be5963aacd51c87680f14038",
     "semantic_hash": ""
   },
   "src/lib/catalog/product-label.ts": {
@@ -13605,18 +13605,18 @@
     "semantic_hash": ""
   },
   "src/lib/queries/subscriptions.ts": {
-    "mtime": 1791375479.3278768,
-    "ast_hash": "ef06862efaaf18d4ccad8d91c57a3786",
+    "mtime": 1791378617.1618848,
+    "ast_hash": "e4279d2c5854d501470eb20637a4043b",
     "semantic_hash": ""
   },
   "src/lib/subscriptions/create.ts": {
-    "mtime": 1791375320.8537898,
-    "ast_hash": "de144bde290f26cae434e6cd1df2f872",
+    "mtime": 1791378617.1601267,
+    "ast_hash": "9977007f981eb08693e6ff8d6848dc4b",
     "semantic_hash": ""
   },
   "src/lib/subscriptions/customer.ts": {
-    "mtime": 1791375334.2946324,
-    "ast_hash": "733ef5bdf3a738d4a9b5a462d4e3247e",
+    "mtime": 1791378617.160795,
+    "ast_hash": "f41fba047548dcf7685223e6e063f077",
     "semantic_hash": ""
   },
   "src/lib/subscriptions/cycle.ts": {
@@ -13625,8 +13625,8 @@
     "semantic_hash": ""
   },
   "src/lib/subscriptions/intervals.ts": {
-    "mtime": 1791375334.2658126,
-    "ast_hash": "1a64e7b15dc7bedc3d043b6921213487",
+    "mtime": 1791380502.74698,
+    "ast_hash": "f0914a9b5347afc5e643bb42dc00d4f1",
     "semantic_hash": ""
   },
   "src/lib/subscriptions/offer.ts": {
@@ -13645,8 +13645,8 @@
     "semantic_hash": ""
   },
   "src/lib/subscriptions/types.ts": {
-    "mtime": 1791375351.0088856,
-    "ast_hash": "aaa5c08d5b06f93f99b594d65961ad7d",
+    "mtime": 1791378617.1595342,
+    "ast_hash": "6d321ad5209c1ac96debcb9905f0cb72",
     "semantic_hash": ""
   },
   "src/lib/subscriptions/verify.ts": {
@@ -13705,28 +13705,28 @@
     "semantic_hash": ""
   },
   "tests/lib/subscriptions/create.test.ts": {
-    "mtime": 1791376295.4299986,
-    "ast_hash": "ec18319dc9d28ed792b9448e4f773d29",
+    "mtime": 1791380512.50706,
+    "ast_hash": "a3a1161eeb700cb9ef92d5c08420a63e",
     "semantic_hash": ""
   },
   "tests/lib/subscriptions/cycle.test.ts": {
-    "mtime": 1791369388.229374,
+    "mtime": 1791381034.1700554,
     "ast_hash": "21c00b7d6a06e32e950143cb7334d6e2",
     "semantic_hash": ""
   },
   "tests/lib/subscriptions/offer.test.ts": {
-    "mtime": 1791375795.4467747,
+    "mtime": 1791381034.1704464,
     "ast_hash": "c727abae40892860b75042c6f292412d",
     "semantic_hash": ""
   },
   "tests/lib/subscriptions/verify.test.ts": {
-    "mtime": 1791369341.353604,
+    "mtime": 1791381034.1707764,
     "ast_hash": "5697c172f0910d173962e6a2ffd12246",
     "semantic_hash": ""
   },
   "integration-tests/subscriptions/webhook-replay.test.ts": {
-    "mtime": 1791371746.7293363,
-    "ast_hash": "5a14c4e4bc703c049cc469d64787b96c",
+    "mtime": 1791380741.7523694,
+    "ast_hash": "0ec22910820bf56a1252c7e65df0412b",
     "semantic_hash": ""
   },
   "src/lib/catalog/digital-units.ts": {
@@ -13765,13 +13765,13 @@
     "semantic_hash": ""
   },
   "tests/lib/subscriptions/customer.test.ts": {
-    "mtime": 1791376097.7753775,
-    "ast_hash": "c26397e73068034610e11b6a2cf86aa4",
+    "mtime": 1791380512.5041616,
+    "ast_hash": "ce743fced473c976aa5b0a99636b6f2b",
     "semantic_hash": ""
   },
   "tests/lib/subscriptions/intervals-cycles.test.ts": {
-    "mtime": 1791375890.4195201,
-    "ast_hash": "1b8afa60621f029ee7c0980d957a0e05",
+    "mtime": 1791381007.8607519,
+    "ast_hash": "826a8d5e7272f0dc78c76a61ad7b9bae",
     "semantic_hash": ""
   },
   "tests/lib/subscriptions/sellable.test.ts": {
@@ -13787,6 +13787,11 @@
   "tests/lib/subscriptions/sub-variant-prices.test.ts": {
     "mtime": 1791375912.2937932,
     "ast_hash": "89224893443b3f9ed83369550a026ea6",
+    "semantic_hash": ""
+  },
+  "tests/lib/import/subscription-columns.test.ts": {
+    "mtime": 1791381007.6367393,
+    "ast_hash": "10576db5be6099636bc6ec4710028ec3",
     "semantic_hash": ""
   }
 }

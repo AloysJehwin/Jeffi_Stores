@@ -88,6 +88,8 @@ describe('createCustomerSubscription', () => {
     const params = insert[1] as unknown[]
     expect(params[22]).toBe(12) // $23 total_count
     expect(params[24]).toBe(3) // $25 min_cycles
+    expect(String(insert[0])).toContain('term_cycles')
+    expect(params[25]).toBe(12) // $26 term_cycles
   })
 
   it('flagship store indexes under the NIL tenant id', async () => {

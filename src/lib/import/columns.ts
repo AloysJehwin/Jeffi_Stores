@@ -197,7 +197,34 @@ export const PRODUCT_COLUMNS: ImportColumn[] = [
     rowTypes: ['product'],
     enumKey: 'subscription_interval',
   },
-  { key: 'subscription_price', header: 'subscription_price', coerce: 'number', rowTypes: ['product'] },
+  {
+    key: 'subscription_intervals',
+    header: 'subscription_intervals',
+    coerce: 'text',
+    rowTypes: ['product'],
+    help: 'weekly|monthly|quarterly|yearly (pipe or comma separated)',
+  },
+  {
+    key: 'subscription_price',
+    header: 'subscription_price',
+    coerce: 'number',
+    rowTypes: ['product'],
+    help: 'Simple products only (incl. GST); blank = one-time price',
+  },
+  {
+    key: 'subscription_total_cycles',
+    header: 'subscription_total_cycles',
+    coerce: 'int',
+    rowTypes: ['product'],
+    help: '1-520; blank = until cancelled',
+  },
+  {
+    key: 'subscription_min_cycles',
+    header: 'subscription_min_cycles',
+    coerce: 'int',
+    rowTypes: ['product'],
+    help: 'Minimum commitment; cannot exceed subscription_total_cycles',
+  },
   { key: 'is_bundle', header: 'is_bundle', coerce: 'bool', rowTypes: ['product'] },
   { key: 'meta_title', header: 'meta_title', coerce: 'text', rowTypes: ['product'] },
   { key: 'meta_description', header: 'meta_description', coerce: 'text', rowTypes: ['product'] },
@@ -253,6 +280,13 @@ export const VARIANT_COLUMNS: ImportColumn[] = [
   { key: 'height_cm', header: 'variant.height_cm', coerce: 'number', rowTypes: ['variant'] },
   { key: 'cost_price', header: 'variant.cost_price', coerce: 'number', rowTypes: ['variant'] },
   {
+    key: 'subscription_price',
+    header: 'variant.subscription_price',
+    coerce: 'number',
+    rowTypes: ['variant'],
+    help: 'Ignored when the variant has sub-variants',
+  },
+  {
     key: 'sub_variant_type_on',
     header: 'variant.sub_variant_type_on',
     coerce: 'bool',
@@ -275,6 +309,7 @@ export const SUB_VARIANT_COLUMNS: ImportColumn[] = [
   { key: 'mrp', header: 'sub_variant.mrp', coerce: 'number', rowTypes: ['sub_variant'] },
   { key: 'price_ex_gst', header: 'sub_variant.price_ex_gst', coerce: 'number', rowTypes: ['sub_variant'] },
   { key: 'mrp_ex_gst', header: 'sub_variant.mrp_ex_gst', coerce: 'number', rowTypes: ['sub_variant'] },
+  { key: 'subscription_price', header: 'sub_variant.subscription_price', coerce: 'number', rowTypes: ['sub_variant'] },
   {
     key: 'stock_status',
     header: 'sub_variant.stock_status',
@@ -357,7 +392,10 @@ assign('Product · Digital', [
   'platform_compatibility',
   'is_subscription',
   'subscription_interval',
+  'subscription_intervals',
   'subscription_price',
+  'subscription_total_cycles',
+  'subscription_min_cycles',
   'is_bundle',
 ])
 // SEO + audience targeting.

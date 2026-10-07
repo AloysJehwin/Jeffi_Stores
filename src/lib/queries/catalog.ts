@@ -79,7 +79,8 @@ export async function getProduct(id: string) {
             'weight_grams', pv.weight_grams, 'package_type', pv.package_type,
             'length_cm', pv.length_cm, 'breadth_cm', pv.breadth_cm, 'height_cm', pv.height_cm,
             'sub_variant_type', pv.sub_variant_type, 'variant_type', pv.variant_type,
-            'is_active', pv.is_active,
+            'is_active', pv.is_active, 'subscription_price', pv.subscription_price,
+            'sub_variant_type_on', pv.sub_variant_type_on,
             'variant_images', COALESCE(
               (SELECT json_agg(vi ORDER BY vi.display_order)
                FROM variant_images vi WHERE vi.variant_id = pv.id),
@@ -92,7 +93,7 @@ export async function getProduct(id: string) {
                   'price', sv.price, 'mrp', sv.mrp, 'mrp_ex_gst', sv.mrp_ex_gst,
                   'price_ex_gst', sv.price_ex_gst,
                   'stock_status', sv.stock_status, 'inventory_quantity', sv.inventory_quantity,
-                  'is_active', sv.is_active
+                  'is_active', sv.is_active, 'subscription_price', sv.subscription_price
                 )
                 ORDER BY sv.is_active DESC, sv.sub_variant_name
               )

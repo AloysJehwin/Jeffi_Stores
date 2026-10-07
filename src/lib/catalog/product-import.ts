@@ -13,6 +13,7 @@ import {
   type DraftImage,
 } from '@/lib/import/to-draft'
 import type { RowResult, ImageProgress } from '@/lib/import/jobs'
+import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
 
 export interface ImportOutcome {
   totalRows: number
@@ -92,6 +93,16 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
 
       // Blank optional cells keep the existing product's values (not NULL) on re-import (#492).
       const draftFields = backfillBlankOptionalFields(buildFields(group, ids), liveRow)
+      if (group.variants.length > 0 && (draftFields.is_digital === true || draftFields.is_digital === 'true')) {
+        rowResults.push({
+          row: group.rowNumber,
+          sku: group.sku,
+          outcome: 'error',
+          message: `digital products cannot have variant or sub-variant rows (${DIGITAL_UNIT_MESSAGE})`,
+        })
+        errors++
+        continue
+      }
       await writeDraft(productId, draftFields, buildVariants(group), images, [])
       await publishProductDraft(productId)
 
@@ -111,6 +122,8 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
         }
       }
 
+      for (const w of group.warnings)
+        rowResults.push({ row: group.rowNumber, sku: group.sku, outcome: 'warning', message: w })
       rowResults.push({ row: group.rowNumber, sku: group.sku, outcome: isNew ? 'created' : 'updated' })
       if (isNew) created++
       else updated++
