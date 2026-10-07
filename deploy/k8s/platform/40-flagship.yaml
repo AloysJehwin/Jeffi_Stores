@@ -25,7 +25,7 @@ spec:
       securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
       containers:
         - name: app
-          image: ghcr.io/aloysjehwin/jeffi_stores:latest
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
           ports: [{ name: http, containerPort: 3000 }]
           envFrom:
             - configMapRef: { name: provisioning, optional: true }

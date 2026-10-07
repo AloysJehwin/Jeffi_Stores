@@ -5,7 +5,7 @@ import type { K8sObject } from './client'
 // IngressRoutes (+ cert-manager Certificate per verified custom domain). Pure, so it is unit
 // tested; tenant-compute.ts applies it.
 
-export const DEFAULT_IMAGE = 'ghcr.io/aloysjehwin/jeffi_stores:latest'
+export const DEFAULT_IMAGE = '708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest'
 const EDGE_NS = 'jeffi-edge'
 
 export interface TenantWorkloadInput {

@@ -67,10 +67,10 @@ describe('renderTenantWorkload', () => {
       slug: 'a',
       plan: 'basic',
       hosts: hosts('a'),
-      image: 'ghcr.io/x/y:main-abc',
+      image: '708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:main-abc',
     }) as any[]
     expect(byKind(objs, 'Deployment', 'storefront')[0].spec.template.spec.containers[0].image).toBe(
-      'ghcr.io/x/y:main-abc'
+      '708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:main-abc'
     )
   })
 })
