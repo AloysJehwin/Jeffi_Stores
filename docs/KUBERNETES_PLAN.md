@@ -1,5 +1,9 @@
 # Self-Managed Kubernetes Plan
 
+> **SUPERSEDED (2026-10-08)** by [`K8S_MIGRATION_PLAN.md`](K8S_MIGRATION_PLAN.md): every tenant now gets its own pods
+> (Basic on a shared pool node), observability (Coroot + Headlamp) runs on EC2, and the AI platform stays on
+> the Razer with only its monitoring on EC2. Keep this file for design rationale only.
+
 _Last updated: 2026-09-24_
 
 > **Status: plan only. Nothing here is provisioned or implemented.** This document records the

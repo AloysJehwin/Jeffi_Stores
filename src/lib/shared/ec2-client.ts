@@ -112,7 +112,8 @@ export interface RunInstanceArgs {
 export async function runInstance(args: RunInstanceArgs): Promise<{ instanceId: string }> {
   const ami = args.imageId || process.env.TENANT_APP_AMI_ID
   if (!ami) throw new Error('TENANT_APP_AMI_ID is not set — required to launch a tenant/pool app instance')
-  const sg = args.securityGroupId || process.env.TENANT_APP_SECURITY_GROUP || process.env.TENANT_RDS_SECURITY_GROUP || ''
+  const sg =
+    args.securityGroupId || process.env.TENANT_APP_SECURITY_GROUP || process.env.TENANT_RDS_SECURITY_GROUP || ''
   const subnet = process.env.TENANT_APP_SUBNET_ID || ''
   const iamProfile = args.iamProfile || process.env.TENANT_APP_IAM_PROFILE || ''
   const keyName = process.env.TENANT_APP_KEY_NAME || ''

@@ -25,11 +25,20 @@ export default async function K8sWorkloadSection({ slug, plan }: { slug: string;
     <Section title="Kubernetes" action={links}>
       <FieldGrid>
         <Field label="Namespace" value={<Mono>{ns}</Mono>} />
-        <Field label="Placement" value={tier.placement === 'dedicated' ? `Dedicated ${tier.nodeType}` : 'Shared basic pool'} />
+        <Field
+          label="Placement"
+          value={tier.placement === 'dedicated' ? `Dedicated ${tier.nodeType}` : 'Shared basic pool'}
+        />
         <Field label="Pod size" value={`${tier.requests.cpu} / ${tier.limits.memory}`} />
         <Field
           label="Replicas"
-          value={status ? `${status.ready}/${status.desired} ready` : status === null ? 'Not deployed' : 'Cluster unreachable'}
+          value={
+            status
+              ? `${status.ready}/${status.desired} ready`
+              : status === null
+                ? 'Not deployed'
+                : 'Cluster unreachable'
+          }
         />
         <Field wide label="Image" value={status?.image ? <Mono>{status.image.split('/').pop()}</Mono> : '—'} />
       </FieldGrid>

@@ -3,7 +3,13 @@ import crypto from 'node:crypto'
 import { apply, get, list, remove, type K8sObject } from './client'
 import { renderTenantWorkload, type TenantWorkloadInput } from './tenant-workload'
 import { agentNodeUserData } from './node-user-data'
-import { computeTierFor, dedicatedNodeName, POOL_NODE_CAPACITY, POOL_NODE_TYPE, tenantNamespace } from '@/lib/provisioning/tiers'
+import {
+  computeTierFor,
+  dedicatedNodeName,
+  POOL_NODE_CAPACITY,
+  POOL_NODE_TYPE,
+  tenantNamespace,
+} from '@/lib/provisioning/tiers'
 
 // k3s compute for a tenant (PROVISIONING_COMPUTE=k8s). Every call is idempotent so the
 // provisioning worker can retry it; node launches report 'pending' until the node is Ready.
@@ -28,13 +34,23 @@ function nodeLaunchConfig() {
   if (!server || !imageId || !securityGroupId) {
     throw new Error('k8s node launch needs K8S_SERVER_URL, K8S_NODE_AMI_ID and K8S_NODE_SECURITY_GROUP')
   }
-  return { server, imageId, securityGroupId, iamProfile: process.env.K8S_NODE_IAM_PROFILE || 'jeffi-stores-ec2-profile' }
+  return {
+    server,
+    imageId,
+    securityGroupId,
+    iamProfile: process.env.K8S_NODE_IAM_PROFILE || 'jeffi-stores-ec2-profile',
+  }
 }
 
 const isReady = (node: any) =>
   !!node?.status?.conditions?.some((c: any) => c.type === 'Ready' && c.status === 'True') && !node?.spec?.unschedulable
 
-async function launchNode(nodeName: string, instanceType: string, labels: Record<string, string>, taints: string[] = []) {
+async function launchNode(
+  nodeName: string,
+  instanceType: string,
+  labels: Record<string, string>,
+  taints: string[] = []
+) {
   const { runInstance } = await import('@/lib/shared/ec2-client')
   const cfg = nodeLaunchConfig()
   return runInstance({
@@ -115,7 +131,8 @@ async function seedNamespace(ns: string) {
     } as K8sObject)
   }
   const rdsCa = await get<any>('ConfigMap', 'rds-ca', PLATFORM_NS)
-  if (rdsCa) await apply({ apiVersion: 'v1', kind: 'ConfigMap', metadata: { name: 'rds-ca', namespace: ns }, data: rdsCa.data })
+  if (rdsCa)
+    await apply({ apiVersion: 'v1', kind: 'ConfigMap', metadata: { name: 'rds-ca', namespace: ns }, data: rdsCa.data })
   if (!(await get('Secret', 'redis', ns))) {
     await apply({
       apiVersion: 'v1',
@@ -163,7 +180,14 @@ export interface TenantWorkloadStatus {
   image: string | null
   desired: number
   ready: number
-  pods: { name: string; phase: string; ready: boolean; restarts: number; node: string | null; startedAt: string | null }[]
+  pods: {
+    name: string
+    phase: string
+    ready: boolean
+    restarts: number
+    node: string | null
+    startedAt: string | null
+  }[]
 }
 
 /** Live namespace status for the admin infrastructure tab; null when the namespace is absent. */

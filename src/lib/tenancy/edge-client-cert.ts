@@ -31,7 +31,10 @@ function decimalToHex(dec: string): string | null {
 }
 
 // Info looks like: Subject="CN=alice,O=Acme";Issuer="CN=CA";SerialNumber="1234";NB="…";NA="…"
-export function parseTraefikCertInfo(raw: string | null | undefined): { serial: string | null; commonName: string | null } {
+export function parseTraefikCertInfo(raw: string | null | undefined): {
+  serial: string | null
+  commonName: string | null
+} {
   const none = { serial: null, commonName: null }
   if (!raw || !raw.trim()) return none
   const decoded = safeDecode(raw.trim())

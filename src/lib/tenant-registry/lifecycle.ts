@@ -265,5 +265,7 @@ export async function writeTenantEc2(
 
 /** Drop the tenant's dedicated instance id (plan downgrade back to shared compute). */
 export async function clearTenantEc2Instance(tenantId: string): Promise<void> {
-  await controlPlanePool().query(`UPDATE tenant_infra SET ec2_instance_id=NULL, updated_at=now() WHERE tenant_id=$1`, [tenantId])
+  await controlPlanePool().query(`UPDATE tenant_infra SET ec2_instance_id=NULL, updated_at=now() WHERE tenant_id=$1`, [
+    tenantId,
+  ])
 }

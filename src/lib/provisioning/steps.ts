@@ -285,7 +285,12 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           const customDomains = (await listCustomDomains(job.tenant_id).catch(() => []))
             .filter(d => d.status === 'verified')
             .map(d => d.domain)
-          await k8s.applyTenantWorkload({ slug, plan: tenant.plan, hosts: tenantHostnames(slug, tenant.plan), customDomains })
+          await k8s.applyTenantWorkload({
+            slug,
+            plan: tenant.plan,
+            hosts: tenantHostnames(slug, tenant.plan),
+            customDomains,
+          })
           res.ec2Target = k8s.clusterIngressIp()
           res.computeMode = 'k8s'
           delete res.poolInstanceId
