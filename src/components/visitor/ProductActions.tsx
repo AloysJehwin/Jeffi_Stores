@@ -12,6 +12,7 @@ import { round2 } from '@/lib/catalog/gst'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
 import StickyAddToCartBar from './pdp/StickyAddToCartBar'
 import { PDP_BUY_BUTTONS_ID, PDP_OPTIONS_ID, stickyBarAction } from './pdp/pdp'
+import SubscribeOption, { type PurchaseMode } from '@/components/subscriptions/SubscribeOption'
 
 interface VariantImage {
   id: string
@@ -97,6 +98,8 @@ interface ProductActionsProps {
   digital?: boolean
   alreadyOwned?: boolean
   vaultUrl?: string | null
+  isSubscription?: boolean
+  subscriptionIntervals?: string[] | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -155,6 +158,8 @@ export default function ProductActions({
   digital = false,
   alreadyOwned = false,
   vaultUrl = null,
+  isSubscription = false,
+  subscriptionIntervals = null,
 }: ProductActionsProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -217,6 +222,8 @@ export default function ProductActions({
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [quantityRaw, setQuantityRaw] = useState('1')
+  const [purchaseMode, setPurchaseMode] = useState<PurchaseMode>('once')
+  const subscribing = purchaseMode === 'subscribe'
 
   const pricingTypes = Array.from(new Set(variants.map(v => v.pricing_type || 'unit')))
   const hasMultipleModes = pricingTypes.length > 1
@@ -873,6 +880,7 @@ export default function ProductActions({
                 )}
               </div>
             </div>
+            {!subscribing && (
             <QuantityInput
               dimension={sellUnit?.dimension ?? 'count'}
               quantity={quantity}
@@ -888,6 +896,7 @@ export default function ProductActions({
                 setQuantityRaw(raw)
               }}
             />
+            )}
           </div>
         </>
       )}
@@ -1051,6 +1060,7 @@ export default function ProductActions({
                 )}
               </div>
             </div>
+            {!subscribing && (
             <QuantityInput
               dimension={sellUnit?.dimension ?? 'count'}
               quantity={quantity}
@@ -1066,6 +1076,7 @@ export default function ProductActions({
                 setQuantityRaw(raw)
               }}
             />
+            )}
           </div>
         </>
       )}
@@ -1082,8 +1093,29 @@ export default function ProductActions({
         </div>
       )}
 
+      {!alreadyOwned && (
+        <SubscribeOption
+          productId={productId}
+          variantId={selectedVariantId}
+          subVariantId={selectedSubVariantId}
+          isSubscription={isSubscription}
+          intervals={subscriptionIntervals}
+          digital={digital}
+          mode={purchaseMode}
+          onModeChange={setPurchaseMode}
+          disabled={!is_active || isPreLaunch || isDiscontinued}
+          needsChoice={
+            hasVariants && !selectedVariant
+              ? 'Select an option to see the subscription price.'
+              : !!selectedVariant?.sub_variants?.length && !selectedSubVariantId
+                ? `Select a ${selectedVariant.sub_variant_type || 'sub-variant'} to see the subscription price.`
+                : null
+          }
+        />
+      )}
+
       <div id={PDP_BUY_BUTTONS_ID} className="space-y-3">
-        {alreadyOwned ? (
+        {subscribing && !alreadyOwned ? null : alreadyOwned ? (
           <a
             href={vaultUrl || '/api/vault/handoff'}
             target="_blank"

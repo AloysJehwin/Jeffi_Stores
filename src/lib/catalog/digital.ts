@@ -68,7 +68,8 @@ export function resolveDigitalUi(
   const isDigital = digitalActive(masters.digitalProductsEnabled, p.isDigital)
   return {
     isDigital,
-    subscribe: isDigital && subscribeAllowed(masters.subscriptionsEnabled, p.isSubscription),
+    // Physical and digital products both subscribe; a digital one only while digital is on.
+    subscribe: subscribeAllowed(masters.subscriptionsEnabled, p.isSubscription) && (!p.isDigital || isDigital),
     download: isDigital && effectiveDownloadable(masters.vaultDownloadsEnabled, p.downloadable),
     formats: isDigital ? fileFormats(p.fileFormat, p.platformCompatibility) : [],
   }

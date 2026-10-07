@@ -152,6 +152,8 @@ interface ProductDetailClientProps {
     target_audience?: string[] | null
     is_cod_allowed?: boolean | null
     is_digital?: boolean | null
+    is_subscription?: boolean | null
+    subscription_intervals?: string[] | null
     owned_in_vault?: boolean | null
   }
   initialSkuParam?: string
@@ -855,6 +857,8 @@ export default function ProductDetailClient({
           digital={isDigital}
           alreadyOwned={vaultOwned.owned}
           vaultUrl={vaultOwned.url}
+          isSubscription={product.is_subscription ?? false}
+          subscriptionIntervals={product.subscription_intervals ?? null}
         />
 
         <RazorpayOffers />

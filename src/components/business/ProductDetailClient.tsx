@@ -474,6 +474,9 @@ export default function ProductDetailClient({
           categoryId={categoryId ?? null}
           productUnits={product.product_units ?? []}
           sellUnitId={product.sell_unit_id ?? null}
+          digital={isDigital}
+          isSubscription={(product as { is_subscription?: boolean }).is_subscription ?? false}
+          subscriptionIntervals={(product as { subscription_intervals?: string[] | null }).subscription_intervals ?? null}
         />
 
         {(() => {

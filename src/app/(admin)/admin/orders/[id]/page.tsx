@@ -5,6 +5,7 @@ import Link from 'next/link'
 import CopySku from '@/components/ui/CopySku'
 import { headers } from 'next/headers'
 import { getOrder, getReturnRequest } from '@/lib/queries'
+import SubscriptionOrderBadge from '@/components/admin/SubscriptionOrderBadge'
 import { resolveRequestTenant, queryMany } from '@/lib/shared/db'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { computeRefundableAmount } from '@/lib/payments/refund'
@@ -177,6 +178,11 @@ export default async function OrderDetailsPage({
             <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
               Order #{order.order_number || order.id.slice(0, 8)}
             </h1>
+            {order.subscription_id && (
+              <Link href={ap(`/admin/subscriptions/${order.subscription_id}`, host)} className="inline-block mt-1">
+                <SubscriptionOrderBadge subscriptionId={order.subscription_id} cycle={order.subscription_cycle} />
+              </Link>
+            )}
             {order.original_order_id && order.original_order_number && (
               <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
                 Replacement for{' '}

@@ -8,6 +8,7 @@ import { useHasScope } from '@/contexts/AdminScopesContext'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import SubscriptionOrderBadge from '@/components/admin/SubscriptionOrderBadge'
 
 interface Props {
   orders: any[]
@@ -138,6 +139,7 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
                   <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${sourceBadge(order.source)}`}>
                     {sourceLabel(order.source)}
                   </span>
+                  <SubscriptionOrderBadge subscriptionId={order.subscription_id} cycle={order.subscription_cycle} />
                 </div>
                 <span className={`shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadge(order.status)}`}>
                   {statusLabel(order.status)}

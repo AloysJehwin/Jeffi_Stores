@@ -6,6 +6,7 @@ import Link from 'next/link'
 import HoverCard from '@/components/ui/HoverCard'
 import OrderDetailModal from '@/components/admin/OrderDetailModal'
 import { ap } from '@/lib/shared/admin-path'
+import SubscriptionOrderBadge from '@/components/admin/SubscriptionOrderBadge'
 
 function statusBadgeClass(status: string) {
   if (status === 'delivered' || status === 'granted') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
@@ -174,6 +175,11 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
                 </div>
               </div>
             </HoverCard>
+            <SubscriptionOrderBadge
+              subscriptionId={order.subscription_id}
+              cycle={order.subscription_cycle}
+              className="ml-2"
+            />
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <span

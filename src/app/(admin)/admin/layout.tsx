@@ -44,6 +44,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/data-source', label: 'Data Source', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/social-posts', label: 'Social Posts', scope: 'campaigns:read', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders:read', group: 'Sales' },
+    { href: '/admin/subscriptions', label: 'Subscriptions', scope: 'subscriptions:read', group: 'Sales' },
     { href: '/admin/quotations', label: 'Quotations', scope: 'quotations:read', group: 'Sales' },
     { href: '/admin/invoices', label: 'Invoices', scope: 'invoices:read', group: 'Sales' },
     { href: '/admin/cash-sale', label: 'Cash Sale', scope: 'invoices:read', group: 'Sales' },
