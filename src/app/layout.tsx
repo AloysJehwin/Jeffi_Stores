@@ -47,6 +47,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isAdminSubdomain = hostApp === 'admin'
   const isEcomSubdomain = host.startsWith('ecom.')
   const isCertPortalSubdomain = host.startsWith('certificate.')
+  const isVaultSubdomain = hostApp === 'vault'
 
   // Read the browser-safe store config on the server so the very first render
   // (SSR + hydration) already has the true DB-backed values — no client fetch
@@ -87,7 +88,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     },
   }
   return (
-    <html lang="en" className="bg-surface" suppressHydrationWarning>
+    // Vault: dark html/body so iOS/macOS overscroll bounce never reveals the light store surface.
+    <html
+      lang="en"
+      className={isVaultSubdomain ? 'bg-neutral-950 [color-scheme:dark]' : 'bg-surface'}
+      suppressHydrationWarning
+    >
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -95,10 +101,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           }}
         />
       </head>
-      <body className="antialiased bg-surface text-foreground m-0 p-0">
+      <body
+        className={`antialiased m-0 p-0 ${isVaultSubdomain ? 'bg-neutral-950 text-neutral-100' : 'bg-surface text-foreground'}`}
+      >
         <SessionGuard />
         {/* No third-party analytics on the vault (strict CSP, buyer privacy). */}
-        {hostApp !== 'vault' && (
+        {!isVaultSubdomain && (
           <>
             <Script src="https://www.googletagmanager.com/gtag/js?id=GT-NM2C3M85" strategy="afterInteractive" />
             <Script
@@ -118,6 +126,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           isAdminSubdomain={isAdminSubdomain}
           isEcomSubdomain={isEcomSubdomain}
           isCertPortalSubdomain={isCertPortalSubdomain}
+          isVaultSubdomain={isVaultSubdomain}
         >
           {children}
         </ConditionalLayout>

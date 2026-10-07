@@ -24,6 +24,7 @@ export default function ConditionalLayout({
   isAdminSubdomain,
   isEcomSubdomain,
   isCertPortalSubdomain,
+  isVaultSubdomain,
 }: {
   children: React.ReactNode
   initialStoreConfig?: StoreConfig
@@ -33,8 +34,11 @@ export default function ConditionalLayout({
   isAdminSubdomain?: boolean
   isEcomSubdomain?: boolean
   isCertPortalSubdomain?: boolean
+  isVaultSubdomain?: boolean
 }) {
   const pathname = usePathname()
+  // The vault brings its own chrome; host paths there are /library, not /vault/*.
+  if (isVaultSubdomain) return <>{children}</>
   const isAdminPage = isAdminSubdomain || pathname?.startsWith('/admin')
   const isBusinessPage = !isAdminPage && (isBusinessSubdomain || pathname?.startsWith('/business'))
   const isFormsPage = isFormsSubdomain || pathname?.startsWith('/forms')

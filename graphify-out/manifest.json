@@ -1,12 +1,12 @@
 {
   "src/app/layout.tsx": {
-    "mtime": 1791371513.9779947,
-    "ast_hash": "e03da7bd90e910a36964f27b83075120",
+    "mtime": 1791385598.9372008,
+    "ast_hash": "8b8ec6761959dc21dbc81ffe0a742d7d",
     "semantic_hash": ""
   },
   "src/components/ConditionalLayout.tsx": {
-    "mtime": 1791310897.6452289,
-    "ast_hash": "5bdaf878c4df31b2f1fe25f299570f46",
+    "mtime": 1791385315.105701,
+    "ast_hash": "328e96c32afbaf36126473c0651e368e",
     "semantic_hash": ""
   },
   "src/components/DelhiveryTracking.tsx": {
@@ -13285,8 +13285,8 @@
     "semantic_hash": ""
   },
   "src/lib/vault/links.ts": {
-    "mtime": 1791362911.7605674,
-    "ast_hash": "a62f3b8787ff06617c7cd9d5b016d798",
+    "mtime": 1791385298.6126769,
+    "ast_hash": "bdd40611810742c6763978533a069624",
     "semantic_hash": ""
   },
   "src/lib/vault/storage.ts": {
@@ -13310,18 +13310,18 @@
     "semantic_hash": ""
   },
   "src/app/(vault)/vault/item/[productId]/page.tsx": {
-    "mtime": 1791364260.1635368,
-    "ast_hash": "733fbfa8f476c2e44654e0b703bed212",
+    "mtime": 1791385526.5890658,
+    "ast_hash": "2966182706aa339af36e0f823e5581e2",
     "semantic_hash": ""
   },
   "src/app/(vault)/vault/layout.tsx": {
-    "mtime": 1791363579.1141489,
-    "ast_hash": "2a9a8555e8bcfd7191ae85a04c6cf709",
+    "mtime": 1791385368.2191136,
+    "ast_hash": "7c2b45881bc5f135725c6d91772b5cfc",
     "semantic_hash": ""
   },
   "src/app/(vault)/vault/library/page.tsx": {
-    "mtime": 1791363589.4233246,
-    "ast_hash": "d2e2982d8c933ca0d102dc7789b66129",
+    "mtime": 1791385376.428049,
+    "ast_hash": "e321de4b556856db3f91717a93feb237",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/products/[id]/files/route.ts": {
@@ -13355,18 +13355,18 @@
     "semantic_hash": ""
   },
   "src/components/vault/ContentGuard.tsx": {
-    "mtime": 1791364354.2671063,
-    "ast_hash": "73b4969410ee38631b20f78448b18f16",
+    "mtime": 1791386003.293604,
+    "ast_hash": "f74e7d8188854a90907ece6c27c31ae7",
     "semantic_hash": ""
   },
   "src/components/vault/ItemViewer.tsx": {
-    "mtime": 1791363695.7171555,
-    "ast_hash": "02b7a779e1765e5823e906ee30a0bb4c",
+    "mtime": 1791385506.2053912,
+    "ast_hash": "1c5af358468a04bfc80ca61df26acad3",
     "semantic_hash": ""
   },
   "src/components/vault/MediaViewer.tsx": {
-    "mtime": 1791368039.8184876,
-    "ast_hash": "cdb728d7eb6598214704164d15500574",
+    "mtime": 1791385488.9839258,
+    "ast_hash": "890c9944fcfe3c2cf74108c967943590",
     "semantic_hash": ""
   },
   "src/components/vault/PdfCanvasViewer.tsx": {
@@ -13375,8 +13375,8 @@
     "semantic_hash": ""
   },
   "src/components/vault/Watermark.tsx": {
-    "mtime": 1791363624.3786108,
-    "ast_hash": "9ee573c3c3b5bdbeb10c1b5d02b78ba3",
+    "mtime": 1791385420.4961169,
+    "ast_hash": "44760cc265d530d5492ddbe5af66e9f3",
     "semantic_hash": ""
   },
   "src/components/vault/stream-client.ts": {
@@ -13385,8 +13385,8 @@
     "semantic_hash": ""
   },
   "src/lib/vault/entitled-files.ts": {
-    "mtime": 1791364250.3557763,
-    "ast_hash": "8a53088f6b046f939b15737ed6305650",
+    "mtime": 1791385280.7784102,
+    "ast_hash": "6b98b00fc3144448bcc0cb57eecd3b80",
     "semantic_hash": ""
   },
   "src/lib/vault/files.ts": {
@@ -13425,8 +13425,8 @@
     "semantic_hash": ""
   },
   "tests/vault/content-guard.test.tsx": {
-    "mtime": 1791364419.8588388,
-    "ast_hash": "80c33f021a2ebc482967bb125fab0b85",
+    "mtime": 1791385991.2216358,
+    "ast_hash": "f5584949e9b95b98e1a00be19ee42113",
     "semantic_hash": ""
   },
   "tests/vault/local-route.test.ts": {
@@ -13792,6 +13792,41 @@
   "tests/lib/import/subscription-columns.test.ts": {
     "mtime": 1791381007.6367393,
     "ast_hash": "10576db5be6099636bc6ec4710028ec3",
+    "semantic_hash": ""
+  },
+  "src/app/api/(public)/vault/logout/route.ts": {
+    "mtime": 1791385306.6277308,
+    "ast_hash": "1a09220c3a4eb6f89db756ef39de919d",
+    "semantic_hash": ""
+  },
+  "src/components/vault/LibraryGrid.tsx": {
+    "mtime": 1791385408.1696897,
+    "ast_hash": "b5a08e292c2c1c9ce33cbd204489bbfb",
+    "semantic_hash": ""
+  },
+  "src/components/vault/VaultShell.tsx": {
+    "mtime": 1791385613.8802955,
+    "ast_hash": "47d22dae76b26d4f6426903e5fbc6cca",
+    "semantic_hash": ""
+  },
+  "src/lib/vault/library-filter.ts": {
+    "mtime": 1791385268.765417,
+    "ast_hash": "79853576443eb7373998f76c78c4d6fb",
+    "semantic_hash": ""
+  },
+  "tests/vault/conditional-layout.test.tsx": {
+    "mtime": 1791385706.6268153,
+    "ast_hash": "bc3635ddd5dbed49260d712c9c831dde",
+    "semantic_hash": ""
+  },
+  "tests/vault/library.test.tsx": {
+    "mtime": 1791385706.6103606,
+    "ast_hash": "501ad1776f1039064514756d690f5d01",
+    "semantic_hash": ""
+  },
+  "tests/vault/logout-route.test.ts": {
+    "mtime": 1791385720.264299,
+    "ast_hash": "cd9565deaf539cd1a16fb2bb8d9fa506",
     "semantic_hash": ""
   }
 }
