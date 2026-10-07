@@ -283,7 +283,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={downloadTemplate}
-              className="inline-flex items-center rounded-md border border-border-default px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-secondary"
+              className="inline-flex items-center rounded-md border border-border-default px-4 h-control text-sm font-medium text-foreground hover:bg-surface-secondary"
             >
               Download template (.xlsx)
             </button>
@@ -420,14 +420,14 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                   <button
                     onClick={() => reconcile('approve')}
                     disabled={reconciling}
-                    className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium text-white bg-red-600 shadow-sm ${reconciling ? 'opacity-60 cursor-wait' : 'hover:bg-red-700'}`}
+                    className={`inline-flex items-center rounded-md px-4 h-control text-sm font-medium text-white bg-red-600 shadow-sm ${reconciling ? 'opacity-60 cursor-wait' : 'hover:bg-red-700'}`}
                   >
                     {reconciling ? 'Working…' : 'Approve removal'}
                   </button>
                   <button
                     onClick={() => reconcile('keep')}
                     disabled={reconciling}
-                    className={`inline-flex items-center rounded-md border border-border-default px-4 py-2 text-sm font-medium text-foreground ${reconciling ? 'opacity-60 cursor-wait' : 'hover:bg-surface-secondary'}`}
+                    className={`inline-flex items-center rounded-md border border-border-default px-4 h-control text-sm font-medium text-foreground ${reconciling ? 'opacity-60 cursor-wait' : 'hover:bg-surface-secondary'}`}
                   >
                     Keep
                   </button>
@@ -443,12 +443,12 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                 value={sheetInput}
                 onChange={e => setSheetInput(e.target.value)}
                 placeholder="Google Sheet URL or ID"
-                className="w-full max-w-xl rounded-md border border-border-default bg-surface px-3 py-2 text-sm text-foreground"
+                className="w-full max-w-xl rounded-md border border-border-default bg-surface px-3 h-control text-sm text-foreground"
               />
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={connectSheet}
-                  className="inline-flex items-center rounded-md border border-border-default px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-secondary"
+                  className="inline-flex items-center rounded-md border border-border-default px-4 h-control text-sm font-medium text-foreground hover:bg-surface-secondary"
                 >
                   {gsheet.connected ? 'Reconnect Google' : 'Connect Google'}
                 </button>
@@ -456,7 +456,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                   <button
                     onClick={createSheet}
                     disabled={creating}
-                    className={`inline-flex items-center rounded-md border border-border-default px-4 py-2 text-sm font-medium text-foreground ${creating ? 'opacity-60 cursor-wait' : 'hover:bg-surface-secondary'}`}
+                    className={`inline-flex items-center rounded-md border border-border-default px-4 h-control text-sm font-medium text-foreground ${creating ? 'opacity-60 cursor-wait' : 'hover:bg-surface-secondary'}`}
                   >
                     {creating ? 'Creating…' : 'Create sheet from template'}
                   </button>
@@ -464,7 +464,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                 <button
                   onClick={syncNow}
                   disabled={!gsheet.connected || syncing}
-                  className={`inline-flex items-center rounded-md px-4 py-2 text-sm font-medium text-white bg-blue-600 shadow-sm ${!gsheet.connected || syncing ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-700'}`}
+                  className={`inline-flex items-center rounded-md px-4 h-control text-sm font-medium text-white bg-blue-600 shadow-sm ${!gsheet.connected || syncing ? 'opacity-60 cursor-not-allowed' : 'hover:bg-blue-700'}`}
                 >
                   {syncing ? 'Syncing…' : 'Sync now'}
                 </button>

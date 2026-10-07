@@ -337,7 +337,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                     key={m}
                     type="button"
                     onClick={() => setOutputMode(m)}
-                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                    className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
                   >
                     {m === 'thermal' ? 'Thermal (1/page)' : 'A4 sheet'}
                   </button>
@@ -358,7 +358,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                 type="button"
                 onClick={() => setShowPrice(v => !v)}
                 title="Print price on label"
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
               >
                 Print Price: {showPrice ? 'On' : 'Off'}
               </button>
@@ -366,7 +366,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                 type="button"
                 onClick={() => setQrAction(v => !v)}
                 title="QR opens quick actions when scanned"
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
               >
                 QR Action: {qrAction ? 'On' : 'Off'}
               </button>
@@ -374,7 +374,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                 type="button"
                 onClick={handleDownload}
                 disabled={selectedProducts.length === 0 || downloading}
-                className="ml-auto px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="ml-auto px-4 h-control rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {downloading
                   ? 'Generating…'
@@ -455,7 +455,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                       selectTaItem(taItems[taIndex])
                     } else if (e.key === 'Escape') setTaOpen(false)
                   }}
-                  className="w-full px-3 py-1.5 pl-9 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm placeholder:text-foreground-muted"
+                  className="w-full px-3 h-control-sm pl-9 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm placeholder:text-foreground-muted"
                 />
                 <svg
                   className="absolute left-3 top-2.5 w-4 h-4 text-foreground-muted"
@@ -708,7 +708,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                   <button
                     onClick={() => setPreviewIndex(i => Math.max(0, i - 1))}
                     disabled={safePreviewIdx === 0}
-                    className="px-3 py-1.5 rounded-lg border border-border-default text-xs font-medium text-foreground-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
+                    className="px-3 h-control-sm rounded-lg border border-border-default text-xs font-medium text-foreground-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
                   >
                     ← Prev
                   </button>
@@ -718,7 +718,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                   <button
                     onClick={() => setPreviewIndex(i => Math.min(selectedProducts.length - 1, i + 1))}
                     disabled={safePreviewIdx === selectedProducts.length - 1}
-                    className="px-3 py-1.5 rounded-lg border border-border-default text-xs font-medium text-foreground-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
+                    className="px-3 h-control-sm rounded-lg border border-border-default text-xs font-medium text-foreground-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
                   >
                     Next →
                   </button>

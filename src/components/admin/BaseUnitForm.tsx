@@ -115,7 +115,7 @@ export function BaseUnitRow({
             type="button"
             onClick={onReset}
             disabled={saving}
-            className="text-xs text-foreground-muted hover:text-red-500 border border-border-secondary rounded px-2 py-1 disabled:opacity-50"
+            className="text-xs text-foreground-muted hover:text-red-500 border border-border-secondary rounded px-2 h-control-sm disabled:opacity-50"
           >
             {isSubVariantScope ? 'Reset to variant default' : 'Reset to product default'}
           </button>
@@ -431,7 +431,7 @@ export default function BaseUnitForm({
         <button
           type="button"
           onClick={onCancel}
-          className="px-3 py-1.5 text-xs text-foreground-muted hover:text-foreground border border-border-secondary rounded"
+          className="px-3 h-control-sm text-xs text-foreground-muted hover:text-foreground border border-border-secondary rounded"
         >
           Cancel
         </button>
@@ -439,7 +439,7 @@ export default function BaseUnitForm({
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="px-3 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50"
+          className="px-3 h-control-sm text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>

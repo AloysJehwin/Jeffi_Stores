@@ -210,7 +210,7 @@ export default function CustomerNotes({
               type="button"
               onClick={add}
               disabled={busy || (!title.trim() && !body.trim() && files.length === 0)}
-              className="px-4 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
+              className="px-4 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
             >
               {busy ? 'Saving…' : 'Add Note'}
             </button>

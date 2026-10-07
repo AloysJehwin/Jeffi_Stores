@@ -103,7 +103,7 @@ export function MiniStat({
     return (
       <Link
         href={href}
-        className="flex items-center justify-between gap-3 rounded-md px-1 -mx-1 py-1 hover:bg-surface-secondary transition-colors"
+        className="flex items-center justify-between gap-3 rounded-md px-1 -mx-1 h-control-sm hover:bg-surface-secondary transition-colors"
       >
         {inner}
       </Link>
@@ -186,7 +186,7 @@ export function LinkedLegend({ items }: { items: { label: string; value: string;
         <li key={i}>
           <Link
             href={it.href}
-            className="flex items-center gap-2 text-xs rounded-md px-1 -mx-1 py-1 hover:bg-surface-secondary transition-colors"
+            className="flex items-center gap-2 text-xs rounded-md px-1 -mx-1 h-control-sm hover:bg-surface-secondary transition-colors"
           >
             <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: it.color }} />
             <span className="text-foreground-secondary flex-1 min-w-0 truncate">{it.label}</span>

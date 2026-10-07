@@ -84,13 +84,13 @@ export default function AIFillForm({ fields, onFill, scope, context }: Props) {
           onChange={e => setScenario(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && handleFill()}
           placeholder="e.g. 10% discount coupon for new customers, valid 30 days…"
-          className="flex-1 px-3 py-2 text-sm border border-violet-200 dark:border-violet-700 rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent"
+          className="flex-1 px-3 h-control text-sm border border-violet-200 dark:border-violet-700 rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent"
         />
         <button
           type="button"
           onClick={handleFill}
           disabled={loading || !scenario.trim()}
-          className="px-4 py-2 text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
+          className="px-4 h-control text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
         >
           {loading ? (
             <>

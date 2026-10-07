@@ -73,7 +73,7 @@ export default function TenantActions({
         <button
           onClick={() => call(`/api/admin/ecom/customers/${tenantId}/retry`, undefined, 'retry')}
           disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          className="inline-flex items-center gap-1.5 px-3.5 h-control rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
           title={`Resume from "${jobStep}" — keeps everything the run already created`}
         >
           {busy === 'retry' ? 'Resuming…' : `Retry from ${jobStep ?? 'last step'}`}
@@ -84,7 +84,7 @@ export default function TenantActions({
         <button
           onClick={() => call(`/api/admin/ecom/customers/${tenantId}/provision`, undefined, 'provision')}
           disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-secondary-500 hover:bg-secondary-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          className="inline-flex items-center gap-1.5 px-3.5 h-control rounded-lg bg-secondary-500 hover:bg-secondary-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
           title={failed ? 'Start a fresh provisioning run from the first step' : undefined}
         >
           {busy === 'provision' ? 'Provisioning…' : failed ? 'Start fresh provision' : 'Provision infrastructure'}
@@ -130,7 +130,7 @@ export default function TenantActions({
             call(`/api/admin/ecom/customers/${tenantId}/deprovision`, { confirm: true }, 'deprovision')
           }}
           disabled={busy !== null}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          className="inline-flex items-center gap-1.5 px-3.5 h-control rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
           title="Take store down, back up its DB to S3, then delete RDS + bucket"
         >
           {busy === 'deprovision' ? 'Deprovisioning…' : 'Deprovision & back up'}

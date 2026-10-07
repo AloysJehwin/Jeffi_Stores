@@ -246,7 +246,7 @@ export default function ImageGalleryEditor({
           <button
             type="button"
             onClick={onOpenGallery}
-            className="px-2.5 py-1 bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg text-xs font-semibold transition-colors"
+            className="px-2.5 h-control-sm bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg text-xs font-semibold transition-colors"
           >
             Choose from Gallery
           </button>

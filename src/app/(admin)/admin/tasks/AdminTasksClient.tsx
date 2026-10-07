@@ -448,7 +448,7 @@ export default function AdminTasksClient() {
                   setSearch('')
                 }
               }}
-              className="pl-7 pr-7 py-1.5 text-xs rounded-lg border border-border-default bg-surface-elevated text-foreground placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40 w-56"
+              className="pl-7 pr-7 h-control-sm text-xs rounded-lg border border-border-default bg-surface-elevated text-foreground placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40 w-56"
             />
             {search && (
               <button
@@ -667,7 +667,7 @@ export default function AdminTasksClient() {
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1 || loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border-default bg-surface-elevated text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-1.5 px-3 h-control-sm rounded-lg text-xs font-semibold border border-border-default bg-surface-elevated text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -707,7 +707,7 @@ export default function AdminTasksClient() {
           <button
             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages || loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border-default bg-surface-elevated text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+            className="flex items-center gap-1.5 px-3 h-control-sm rounded-lg text-xs font-semibold border border-border-default bg-surface-elevated text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
             Next
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>

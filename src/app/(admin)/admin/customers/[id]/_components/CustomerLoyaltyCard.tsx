@@ -151,7 +151,7 @@ export default function CustomerLoyaltyCard({ customerId }: { customerId: string
           <button
             type="submit"
             disabled={!valid || saving}
-            className="w-full px-3 py-1.5 text-sm font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50"
+            className="w-full px-3 h-control-sm text-sm font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50"
           >
             {saving ? 'Applying' : 'Apply'}
           </button>

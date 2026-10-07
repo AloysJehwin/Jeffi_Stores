@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { CampaignCardListSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
@@ -145,8 +146,10 @@ export default function ScenariosListClient() {
         </RequireWrite>
       </div>
 
-      {loading ? (
-        <p className="text-sm text-foreground-muted pt-4">Loading scenarios…</p>
+      {loading && scenarios.length === 0 ? (
+        <div className="pt-2">
+          <CampaignCardListSkeleton />
+        </div>
       ) : (
         <div className="space-y-3 pt-2">
           {scenarios.map(s => (
@@ -221,7 +224,7 @@ export default function ScenariosListClient() {
                         type="button"
                         onClick={() => remove(s)}
                         disabled={busy === s.kind}
-                        className="px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-all disabled:opacity-50"
+                        className="px-3 h-control-sm text-xs font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-all disabled:opacity-50"
                       >
                         Delete
                       </button>

@@ -933,7 +933,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
             type="button"
             onClick={() => setScanSerials(v => !v)}
             title={scanSerials ? 'Scanning on — scan each unit to fill the next serial slot' : 'Serial scanning off'}
-            className={`ml-auto flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${scanSerials ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
+            className={`ml-auto flex items-center gap-1.5 text-xs font-semibold px-2.5 h-control-sm rounded-lg border transition-colors ${scanSerials ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path
@@ -1155,7 +1155,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                                         items.map((r, i) => (i === idx ? { ...r, lot_number: autoLot } : r))
                                       )
                                     }}
-                                    className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
+                                    className="px-2 h-control-sm rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
                                   >
                                     ↺
                                   </button>
@@ -1224,7 +1224,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                                       )}
                                       <button
                                         type="button"
-                                        className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                        className="text-xs px-2 h-control-sm rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
                                         onClick={() =>
                                           setReceiveItems(items =>
                                             items.map((r, i) => {
@@ -1507,7 +1507,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                 Mark as Sent
               </button>
               <button
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
+                className="px-4 h-control rounded-lg text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors"
                 onClick={() => cancelPO(viewPO.po.id)}
               >
                 Cancel PO
@@ -1553,7 +1553,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
           <button
             type="button"
             onClick={printReceivedSerialLabels}
-            className="px-3 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors"
+            className="px-3 h-control-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors"
           >
             Print serial labels
           </button>
@@ -3440,7 +3440,7 @@ function StockTab() {
                     setValPage(1)
                     syncUrl({ val_search: '', val_category: '', val_brand: '', val_stock: '' })
                   }}
-                  className="px-3 py-1.5 rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
+                  className="px-3 h-control-sm rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
                 >
                   Clear filters
                 </button>

@@ -244,7 +244,7 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
               value={search}
               onChange={e => handleSearchChange(e.target.value)}
               placeholder="Search by product or reviewer…"
-              className="w-full pl-9 pr-3 py-1.5 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
+              className="w-full pl-9 pr-3 h-control-sm bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
             />
           </div>
         </div>
@@ -432,7 +432,7 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                     <button
                       type="button"
                       onClick={() => handleApprove(review.id)}
-                      className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3.5 py-1.5 rounded-lg font-medium text-sm transition-colors"
+                      className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3.5 h-control-sm rounded-lg font-medium text-sm transition-colors"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -442,7 +442,7 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                     <button
                       type="button"
                       onClick={() => handleReject(review.id)}
-                      className="inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-700 px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
+                      className="inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-700 px-3 h-control-sm rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path
@@ -473,7 +473,7 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
             <button
               disabled={page <= 1}
               onClick={() => fetchReviews(search, page - 1)}
-              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               Prev
             </button>
@@ -483,7 +483,7 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
             <button
               disabled={page >= totalPages}
               onClick={() => fetchReviews(search, page + 1)}
-              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               Next
             </button>

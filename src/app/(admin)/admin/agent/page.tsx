@@ -1189,13 +1189,13 @@ export default function AdminAgentPage() {
                                 <div className="flex gap-2">
                                   <button
                                     onClick={() => decideAction(turn.id, action.id, 'approve')}
-                                    className="flex-1 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1"
+                                    className="flex-1 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1"
                                   >
                                     <CheckCircle className="w-3.5 h-3.5" /> Approve
                                   </button>
                                   <button
                                     onClick={() => decideAction(turn.id, action.id, 'reject')}
-                                    className="flex-1 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default"
+                                    className="flex-1 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default"
                                   >
                                     <XCircle className="w-3.5 h-3.5" /> Reject
                                   </button>

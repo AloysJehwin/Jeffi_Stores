@@ -352,14 +352,14 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                           const val = parseFloat(e.target.value)
                           if (!isNaN(val) && val !== d.discount_pct) handleDiscountChange(d.category_id, val)
                         }}
-                        className="w-20 px-2 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 text-right disabled:opacity-60"
+                        className="w-20 px-2 h-control-sm text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 text-right disabled:opacity-60"
                       />
                       <span className="text-sm text-foreground-secondary">%</span>
                       {savingDiscount === d.category_id && <span className="text-xs text-accent-500">Saving…</span>}
                       <RequireWrite scope="business_customers:write">
                         <button
                           onClick={() => handleDiscountChange(d.category_id, 0)}
-                          className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          className="text-xs text-red-500 hover:text-red-700 font-medium px-2 h-control-sm rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                         >
                           Remove
                         </button>
@@ -401,7 +401,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                   <button
                     onClick={handleAddDiscount}
                     disabled={!newCategoryId || !newDiscountPct}
-                    className="px-4 py-2 text-sm font-semibold bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors disabled:opacity-50 mb-0.5"
+                    className="px-4 h-control text-sm font-semibold bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors disabled:opacity-50 mb-0.5"
                   >
                     Add
                   </button>
@@ -425,14 +425,14 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                   <button
                     onClick={handleApprove}
                     disabled={actionLoading}
-                    className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60"
+                    className="w-full px-4 h-control bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60"
                   >
                     Approve Account
                   </button>
                   {!showRejectForm ? (
                     <button
                       onClick={() => setShowRejectForm(true)}
-                      className="w-full px-4 py-2 border border-red-400 text-red-600 dark:text-red-400 text-sm font-semibold rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      className="w-full px-4 h-control border border-red-400 text-red-600 dark:text-red-400 text-sm font-semibold rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       Reject Account
                     </button>
@@ -449,13 +449,13 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                         <button
                           onClick={handleReject}
                           disabled={actionLoading}
-                          className="flex-1 px-3 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+                          className="flex-1 px-3 h-control bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
                         >
                           Confirm Reject
                         </button>
                         <button
                           onClick={() => setShowRejectForm(false)}
-                          className="px-3 py-2 border border-border-default text-sm rounded-lg hover:bg-surface-secondary transition-colors"
+                          className="px-3 h-control border border-border-default text-sm rounded-lg hover:bg-surface-secondary transition-colors"
                         >
                           Cancel
                         </button>
@@ -478,7 +478,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                   {!showRejectForm ? (
                     <button
                       onClick={() => setShowRejectForm(true)}
-                      className="w-full px-4 py-2 border border-red-400 text-red-600 dark:text-red-400 text-sm font-semibold rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      className="w-full px-4 h-control border border-red-400 text-red-600 dark:text-red-400 text-sm font-semibold rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                     >
                       Revoke &amp; Reject
                     </button>
@@ -495,13 +495,13 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                         <button
                           onClick={handleReject}
                           disabled={actionLoading}
-                          className="flex-1 px-3 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+                          className="flex-1 px-3 h-control bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
                         >
                           Confirm Reject
                         </button>
                         <button
                           onClick={() => setShowRejectForm(false)}
-                          className="px-3 py-2 border border-border-default text-sm rounded-lg hover:bg-surface-secondary transition-colors"
+                          className="px-3 h-control border border-border-default text-sm rounded-lg hover:bg-surface-secondary transition-colors"
                         >
                           Cancel
                         </button>
@@ -524,7 +524,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                   <button
                     onClick={handleApprove}
                     disabled={actionLoading}
-                    className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60"
+                    className="w-full px-4 h-control bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60"
                   >
                     Approve Instead
                   </button>

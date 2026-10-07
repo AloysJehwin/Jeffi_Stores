@@ -340,7 +340,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                 <button
                   onClick={doConvert}
                   disabled={converting}
-                  className="flex-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 h-control bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
                 >
                   {converting && (
                     <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -349,7 +349,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                 </button>
                 <button
                   onClick={() => setConfirmOpen(false)}
-                  className="px-4 py-2 border border-border-default text-sm font-medium rounded-lg hover:bg-surface-secondary transition-colors"
+                  className="px-4 h-control border border-border-default text-sm font-medium rounded-lg hover:bg-surface-secondary transition-colors"
                 >
                   Cancel
                 </button>
@@ -400,13 +400,13 @@ export default function RFQDetailClient({ id }: { id: string }) {
                   <button
                     onClick={() => handleStatusChange('reviewed')}
                     disabled={actionLoading}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
+                    className="px-4 h-control bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
                   >
                     Mark Reviewed
                   </button>
                   <button
                     onClick={() => setShowRejectForm(s => !s)}
-                    className="px-4 py-2 border border-red-400 text-red-300 text-sm font-semibold rounded-lg hover:bg-red-900/30 transition-colors"
+                    className="px-4 h-control border border-red-400 text-red-300 text-sm font-semibold rounded-lg hover:bg-red-900/30 transition-colors"
                   >
                     Reject
                   </button>
@@ -438,7 +438,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                 {rfq.order_id && (
                   <Link
                     href={ap(`/admin/invoices/${rfq.order_id}`)}
-                    className="px-5 py-2 border-2 border-green-500 text-green-400 text-sm font-semibold rounded-lg hover:bg-green-900/20 transition-colors flex items-center gap-2"
+                    className="px-5 h-control border-2 border-green-500 text-green-400 text-sm font-semibold rounded-lg hover:bg-green-900/20 transition-colors flex items-center gap-2"
                   >
                     View Invoice {rfq.invoice_number ? `(${rfq.invoice_number})` : ''} →
                     {rfq.order_status === 'draft' && (
@@ -483,13 +483,13 @@ export default function RFQDetailClient({ id }: { id: string }) {
               <button
                 onClick={() => handleStatusChange('rejected')}
                 disabled={actionLoading}
-                className="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
+                className="px-4 h-control bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
               >
                 Confirm Reject
               </button>
               <button
                 onClick={() => setShowRejectForm(false)}
-                className="px-4 py-2 border border-border-default text-sm rounded-lg hover:bg-surface-secondary transition-colors"
+                className="px-4 h-control border border-border-default text-sm rounded-lg hover:bg-surface-secondary transition-colors"
               >
                 Cancel
               </button>
@@ -524,7 +524,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
             <button
               onClick={() => setConfirmOpen(true)}
               disabled={converting}
-              className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2 shrink-0"
+              className="px-5 h-control bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2 shrink-0"
             >
               {converting && (
                 <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1182,7 +1182,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                   placeholder={reqInclGst(item) != null ? String(reqInclGst(item)) : '—'}
                                   value={counterInputs[item.id] ?? ''}
                                   onChange={e => setCounterInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                  className="w-full pl-6 pr-2 py-1.5 text-xs bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                  className="w-full pl-6 pr-2 h-control-sm text-xs bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
                                 />
                               </div>
                             </div>
@@ -1193,7 +1193,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                       <button
                         onClick={handleSendReply}
                         disabled={sendingReply || !replyText.trim()}
-                        className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                        className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
                       >
                         {sendingReply && (
                           <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -1287,7 +1287,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                   placeholder={reqInclGst(item) != null ? String(reqInclGst(item)) : '—'}
                                   value={counterInputs[item.id] ?? ''}
                                   onChange={e => setCounterInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                  className="w-full pl-6 pr-2 py-1.5 text-xs bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                  className="w-full pl-6 pr-2 h-control-sm text-xs bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
                                 />
                               </div>
                             </div>
@@ -1298,7 +1298,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                       <button
                         onClick={handleSendReply}
                         disabled={sendingReply || !replyText.trim()}
-                        className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                        className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
                       >
                         {sendingReply && (
                           <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

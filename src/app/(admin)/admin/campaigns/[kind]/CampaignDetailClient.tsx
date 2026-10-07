@@ -7,6 +7,7 @@ import {
   stripDoubleBraceTokens,
 } from '@/lib/templates/variables-shared'
 import { useEffect, useState } from 'react'
+import { CampaignDetailSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
@@ -482,7 +483,13 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     }
   }
 
-  if (loading || !campaign || !form) return <p className="text-sm text-foreground-muted">Loading…</p>
+  // Skeleton only on first load; refetches after save keep the page rendered.
+  if (!campaign || !form)
+    return loading ? (
+      <CampaignDetailSkeleton />
+    ) : (
+      <p className="text-sm text-foreground-muted">Campaign not found.</p>
+    )
 
   const couponOptions: SelectOption[] = [
     { value: '', label: 'None — use discount % to auto-generate' },
@@ -576,7 +583,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                 type="button"
                 onClick={generateWithAI}
                 disabled={aiGenerating || !aiPrompt.trim()}
-                className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
+                className="px-4 h-control-sm bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
               >
                 {aiGenerating ? 'Generating…' : 'Generate'}
               </button>
@@ -735,7 +742,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                   type="button"
                   onClick={publish}
                   disabled={publishing}
-                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors disabled:opacity-50"
+                  className="px-3 h-control-sm bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors disabled:opacity-50"
                 >
                   {publishing ? 'Publishing…' : 'Publish'}
                 </button>
@@ -952,7 +959,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             type="button"
             onClick={loadEligible}
             disabled={eligibleLoading}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-border-default text-foreground hover:bg-surface-secondary disabled:opacity-50"
+            className="px-3 h-control-sm text-xs font-semibold rounded-lg border border-border-default text-foreground hover:bg-surface-secondary disabled:opacity-50"
           >
             {eligibleLoading ? 'Refreshing…' : 'Refresh'}
           </button>
@@ -962,7 +969,11 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         ) : eligibleNote ? (
           <p className="p-8 text-sm text-foreground-muted text-center italic">{eligibleNote}</p>
         ) : eligibleLoading && !eligible ? (
-          <p className="p-8 text-sm text-foreground-muted text-center">Loading…</p>
+          <div className="p-4 space-y-2 animate-pulse" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-8 rounded bg-surface-secondary" />
+            ))}
+          </div>
         ) : eligible && eligible.length === 0 ? (
           <p className="p-8 text-sm text-foreground-muted text-center">
             No customers currently match this campaign&apos;s trigger.
@@ -1108,14 +1119,14 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                     <button
                       disabled={sendsOffset === 0 || sendsLoading}
                       onClick={() => loadSendsPage(Math.max(0, sendsOffset - SENDS_LIMIT))}
-                      className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                      className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
                     >
                       Previous
                     </button>
                     <button
                       disabled={sendsOffset + SENDS_LIMIT >= sendsTotal || sendsLoading}
                       onClick={() => loadSendsPage(sendsOffset + SENDS_LIMIT)}
-                      className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                      className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
                     >
                       Next
                     </button>
@@ -1190,14 +1201,14 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                       <button
                         disabled={waPage === 0}
                         onClick={() => setWaPage(p => Math.max(0, p - 1))}
-                        className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                        className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
                       >
                         Previous
                       </button>
                       <button
                         disabled={(waPage + 1) * WA_LIMIT >= whatsappLogs.length}
                         onClick={() => setWaPage(p => p + 1)}
-                        className="px-3 py-1 rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                        className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
                       >
                         Next
                       </button>

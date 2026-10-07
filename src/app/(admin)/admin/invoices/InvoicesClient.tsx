@@ -1646,7 +1646,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+                  className="px-6 h-control bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
                 >
                   {submitting ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save Changes' : 'Create Invoice'}
                 </button>
@@ -1656,7 +1656,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                   type="button"
                   disabled={submitting}
                   onClick={handleSaveDraft}
-                  className="px-6 py-2 border border-border-default hover:bg-surface-secondary text-foreground rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+                  className="px-6 h-control border border-border-default hover:bg-surface-secondary text-foreground rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
                 >
                   {submitting ? 'Saving…' : 'Save as Draft'}
                 </button>
@@ -1666,7 +1666,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                   type="button"
                   disabled={submitting}
                   onClick={handleFinalizeEdit}
-                  className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+                  className="px-6 h-control bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
                 >
                   {submitting ? 'Finalizing…' : 'Save & Finalize'}
                 </button>
@@ -1688,7 +1688,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                   resetForm()
                   navigateView('list')
                 }}
-                className="px-6 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+                className="px-6 h-control border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
               >
                 Cancel
               </button>
@@ -1756,7 +1756,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           {canWrite && (
             <button
               onClick={() => navigateView('create')}
-              className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
+              className="flex items-center gap-2 px-4 h-control bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -2464,7 +2464,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               <button
                 disabled={page <= 1}
                 onClick={() => fetchInvoices(page - 1)}
-                className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
               >
                 Prev
               </button>
@@ -2474,7 +2474,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               <button
                 disabled={page >= totalPages}
                 onClick={() => fetchInvoices(page + 1)}
-                className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
               >
                 Next
               </button>
@@ -2603,7 +2603,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
                 href={`/api/admin/cash-sale/${inv.id}/receipt`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+                className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -2620,7 +2620,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
                 href={`/api/orders/${inv.id}/invoice`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+                className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path

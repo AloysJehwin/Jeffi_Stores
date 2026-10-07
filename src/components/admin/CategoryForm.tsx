@@ -338,7 +338,7 @@ export default function CategoryForm({
                       type="button"
                       onClick={handleGenerate}
                       disabled={generating}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-1.5 px-3 h-control-sm text-xs font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {generating ? (
                         <>
@@ -356,7 +356,7 @@ export default function CategoryForm({
                   <button
                     type="button"
                     onClick={() => setShowPicker(v => !v)}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium border border-border-secondary text-foreground-secondary hover:bg-surface-secondary rounded-md transition-colors"
+                    className="inline-flex items-center gap-1 px-3 h-control-sm text-xs font-medium border border-border-secondary text-foreground-secondary hover:bg-surface-secondary rounded-md transition-colors"
                   >
                     <Icons.Grid2x2 className="w-3 h-3" />
                     {showPicker ? 'Close' : 'Browse'}
@@ -372,7 +372,7 @@ export default function CategoryForm({
                   placeholder="Search icons…"
                   value={iconSearch}
                   onChange={e => setIconSearch(e.target.value)}
-                  className="w-full px-3 py-1.5 text-sm border border-border-secondary rounded-md bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent mb-3"
+                  className="w-full px-3 h-control-sm text-sm border border-border-secondary rounded-md bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent mb-3"
                 />
                 <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5 max-h-52 overflow-y-auto">
                   {filteredIcons.map(name => (

@@ -248,7 +248,7 @@ export default function UnitRulesPanel({ productId, unitId, unitVariantId, rules
                   type="button"
                   onClick={addTier}
                   disabled={busy}
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50 h-[34px]"
+                  className="px-3 h-control-sm text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50 h-[34px]"
                 >
                   + Add Tier
                 </button>

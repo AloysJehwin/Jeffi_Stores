@@ -165,7 +165,7 @@ export default function FilterValueHelp({
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder={`Search ${label}…`}
-                  className="w-full pl-9 pr-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 placeholder:text-foreground-muted"
+                  className="w-full pl-9 pr-3 h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 placeholder:text-foreground-muted"
                 />
               </div>
             </div>
@@ -263,14 +263,14 @@ export default function FilterValueHelp({
               <button
                 type="button"
                 onClick={() => onChange('')}
-                className="px-4 py-2 text-sm text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors"
+                className="px-4 h-control text-sm text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors"
               >
                 Clear
               </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="px-6 py-2 text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
+                className="px-6 h-control text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
               >
                 {multi ? `Apply (${selected.length} selected)` : 'Close'}
               </button>

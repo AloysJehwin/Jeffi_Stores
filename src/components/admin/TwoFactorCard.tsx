@@ -89,7 +89,7 @@ export default function TwoFactorCard() {
             type="button"
             onClick={regenerate}
             disabled={loading}
-            className="text-sm bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg px-3 py-1.5 disabled:opacity-50"
+            className="text-sm bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg px-3 h-control-sm disabled:opacity-50"
           >
             {loading ? 'Generating…' : 'Regenerate recovery codes'}
           </button>

@@ -244,7 +244,7 @@ function AiPanel({
               <button
                 onClick={() => decide('approve')}
                 disabled={busy}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded text-sm font-semibold disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 h-control bg-accent-500 hover:bg-accent-600 text-white rounded text-sm font-semibold disabled:opacity-50"
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                 Approve
@@ -252,7 +252,7 @@ function AiPanel({
               <button
                 onClick={() => decide('reject')}
                 disabled={busy}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-border-default text-foreground hover:bg-surface-secondary rounded text-sm font-semibold disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 h-control border border-border-default text-foreground hover:bg-surface-secondary rounded text-sm font-semibold disabled:opacity-50"
               >
                 <XCircle className="w-3.5 h-3.5" />
                 Reject
@@ -957,7 +957,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
           {canEnrich && (
             <button
               onClick={() => setAiOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
               <Sparkles className="w-4 h-4 text-accent-500" />
               AI
@@ -972,7 +972,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
           <RequireWrite scope="products:write">
             <button
               onClick={() => setShowDraftModal(true)}
-              className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+              className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
             >
               Edit
             </button>

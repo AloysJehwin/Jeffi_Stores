@@ -60,7 +60,7 @@ export default function LogoUploader({ initialUrl }: { initialUrl: string }) {
               type="button"
               onClick={() => inputRef.current?.click()}
               disabled={busy}
-              className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors disabled:opacity-60"
+              className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors disabled:opacity-60"
             >
               {busy ? 'Uploading…' : url ? 'Replace logo' : 'Upload logo'}
             </button>

@@ -220,7 +220,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                   syncUrl({ customer: e.target.value })
                 }}
                 onFocus={() => setShowSuggestions(true)}
-                className="w-full px-2 py-1.5 pr-9 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 placeholder:text-foreground-muted"
+                className="w-full px-2 h-control-sm pr-9 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 placeholder:text-foreground-muted"
               />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -257,14 +257,14 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
           <button
             onClick={applyDateFilter}
             disabled={filtering}
-            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
+            className="px-4 h-control-sm bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
           >
             {filtering ? 'Loading…' : 'Search'}
           </button>
           {hasActiveFilters && (
             <button
               onClick={clearAll}
-              className="px-4 py-1.5 border border-border-default text-sm text-foreground-secondary rounded-lg hover:bg-surface-secondary transition-colors"
+              className="px-4 h-control-sm border border-border-default text-sm text-foreground-secondary rounded-lg hover:bg-surface-secondary transition-colors"
             >
               Clear
             </button>
@@ -321,7 +321,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
             <button
               onClick={downloadBulk}
               disabled={downloading}
-              className="inline-flex items-center gap-2 px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-2 px-4 h-control-sm bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-60"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
@@ -470,7 +470,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage(p => Math.max(1, p - 1))}
-                  className="px-3 py-1.5 rounded-lg border border-border-default text-xs font-medium hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-3 h-control-sm rounded-lg border border-border-default text-xs font-medium hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Previous
                 </button>
@@ -481,7 +481,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                   type="button"
                   disabled={page >= totalPages}
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  className="px-3 py-1.5 rounded-lg border border-border-default text-xs font-medium hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-3 h-control-sm rounded-lg border border-border-default text-xs font-medium hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>

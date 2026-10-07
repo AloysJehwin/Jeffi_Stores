@@ -277,7 +277,7 @@ export default function SubVariantEditor({
           <button
             type="button"
             onClick={onCancel}
-            className="px-3 py-1.5 text-xs font-medium text-foreground-secondary hover:text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+            className="px-3 h-control-sm text-xs font-medium text-foreground-secondary hover:text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
           >
             Cancel
           </button>
@@ -286,7 +286,7 @@ export default function SubVariantEditor({
           type="button"
           onClick={onSubmit}
           disabled={!canSubmit}
-          className="px-3 py-1.5 text-xs font-semibold text-white bg-accent-500 hover:bg-accent-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="px-3 h-control-sm text-xs font-semibold text-white bg-accent-500 hover:bg-accent-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           {mode === 'add' ? '+ Add Sub-Variant' : 'Save changes'}
         </button>

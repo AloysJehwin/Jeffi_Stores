@@ -260,7 +260,7 @@ export default function CouponForm({
               type="submit"
               name="intent"
               value="draft"
-              className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm"
+              className="px-5 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm"
             >
               Save Draft
             </button>
@@ -268,7 +268,7 @@ export default function CouponForm({
               type="submit"
               name="intent"
               value="publish"
-              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm"
+              className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm"
             >
               Publish
             </button>
@@ -276,7 +276,7 @@ export default function CouponForm({
         ) : (
           <button
             type="submit"
-            className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm"
+            className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm"
           >
             {submitLabel || 'Save Changes'}
           </button>

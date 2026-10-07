@@ -350,7 +350,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                 setPreview(null)
               }}
               placeholder="e.g. 10 for +10%"
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+              className="w-full px-4 h-control border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
             />
           </div>
         </div>
@@ -434,7 +434,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
             type="button"
             onClick={handlePreview}
             disabled={!canPreview || previewLoading}
-            className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 h-control bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {previewLoading ? 'Loading…' : 'Preview Changes'}
           </button>
@@ -443,7 +443,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
               type="button"
               onClick={handleApply}
               disabled={!canApply || applying}
-              className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {applying ? 'Applying…' : `Apply to ${preview.length} product${preview.length !== 1 ? 's' : ''}`}
             </button>
@@ -616,7 +616,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                             type="button"
                             onClick={() => handleRollback(log)}
                             disabled={rollingBack === log.id}
-                            className="px-2.5 py-1 text-xs font-medium rounded border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-2.5 h-control-sm text-xs font-medium rounded border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {rollingBack === log.id ? 'Rolling back…' : 'Rollback'}
                           </button>
@@ -709,7 +709,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                   <button
                     disabled={logsPage <= 1}
                     onClick={() => setLogsPage(p => Math.max(1, p - 1))}
-                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                   >
                     Prev
                   </button>
@@ -719,7 +719,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                   <button
                     disabled={logsPage >= logsTotalPages}
                     onClick={() => setLogsPage(p => Math.min(logsTotalPages, p + 1))}
-                    className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                   >
                     Next
                   </button>

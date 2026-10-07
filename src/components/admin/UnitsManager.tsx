@@ -772,7 +772,7 @@ export default function UnitsManager({
                     setFormMode(null)
                     setEditingExtraId(null)
                   }}
-                  className="px-3 py-1.5 text-xs text-foreground-muted hover:text-foreground border border-border-secondary rounded"
+                  className="px-3 h-control-sm text-xs text-foreground-muted hover:text-foreground border border-border-secondary rounded"
                 >
                   Cancel
                 </button>
@@ -780,7 +780,7 @@ export default function UnitsManager({
                   type="button"
                   onClick={handleSaveExtra}
                   disabled={saving}
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50"
+                  className="px-3 h-control-sm text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50"
                 >
                   {saving ? 'Saving…' : editingExtraId ? 'Update' : 'Add unit'}
                 </button>

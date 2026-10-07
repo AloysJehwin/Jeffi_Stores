@@ -347,7 +347,7 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
                   type="button"
                   onClick={handleValuate}
                   disabled={isSubmitting || !condition}
-                  className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                  className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
                 >
                   {isSubmitting ? 'Saving...' : 'Complete Valuation'}
                 </button>

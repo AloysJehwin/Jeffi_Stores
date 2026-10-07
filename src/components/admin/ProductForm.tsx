@@ -2395,7 +2395,7 @@ export default function ProductForm({
               <button
                 type="button"
                 onClick={() => setConfirmUnperishable(false)}
-                className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+                className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
               >
                 Cancel
               </button>
@@ -2405,7 +2405,7 @@ export default function ProductForm({
                   setConfirmUnperishable(false)
                   setPerishable(false)
                 }}
-                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                className="px-4 h-control text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
               >
                 Yes, Remove
               </button>
@@ -2428,7 +2428,7 @@ export default function ProductForm({
               <button
                 type="button"
                 onClick={() => setConfirmUnSerialized(false)}
-                className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+                className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
               >
                 Cancel
               </button>
@@ -2438,7 +2438,7 @@ export default function ProductForm({
                   setConfirmUnSerialized(false)
                   setSerialized(false)
                 }}
-                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                className="px-4 h-control text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
               >
                 Yes, Remove
               </button>
@@ -3994,7 +3994,7 @@ export default function ProductForm({
                                                   type="button"
                                                   title="Regenerate"
                                                   onClick={() => regenLot(g)}
-                                                  className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
+                                                  className="px-2 h-control-sm rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
                                                 >
                                                   ↺
                                                 </button>
@@ -4046,7 +4046,7 @@ export default function ProductForm({
                                               )}
                                               <button
                                                 type="button"
-                                                className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                                className="text-xs px-2 h-control-sm rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
                                                 onClick={() => generateAll(g)}
                                               >
                                                 Generate All
@@ -4345,7 +4345,7 @@ export default function ProductForm({
                       <button
                         type="button"
                         onClick={() => addGroup('unit')}
-                        className="px-4 py-2 text-sm font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface-secondary transition-colors"
+                        className="px-4 h-control text-sm font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface-secondary transition-colors"
                       >
                         + Add Variants
                       </button>
@@ -4966,7 +4966,7 @@ export default function ProductForm({
                                           <button
                                             type="button"
                                             onClick={() => (variant.id ? openVariantPopup(variant.id) : undefined)}
-                                            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors text-foreground-muted hover:text-foreground hover:bg-surface-secondary"
+                                            className="flex items-center gap-1 px-2 h-control-sm rounded text-xs font-medium transition-colors text-foreground-muted hover:text-foreground hover:bg-surface-secondary"
                                             title="Edit images & sub-variants"
                                           >
                                             <svg
@@ -5021,7 +5021,7 @@ export default function ProductForm({
                           <button
                             type="button"
                             onClick={() => addVariantToGroup(group.pricing_type, group.unit)}
-                            className="px-3 py-1.5 text-xs font-medium text-accent-600 dark:text-accent-400 border border-accent-300 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors"
+                            className="px-3 h-control-sm text-xs font-medium text-accent-600 dark:text-accent-400 border border-accent-300 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors"
                           >
                             + Add Variant
                           </button>
@@ -5650,7 +5650,7 @@ export default function ProductForm({
                                 setIsActive(false)
                                 pendingPopupVariantIdRef.current = variantPopupId
                               }}
-                              className="shrink-0 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                              className="shrink-0 px-3 h-control-sm bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                             >
                               {isSubmitting ? 'Saving...' : 'Save (draft)'}
                             </button>
@@ -5893,7 +5893,7 @@ export default function ProductForm({
                     <button
                       type="button"
                       onClick={() => setVariantPopupId(null)}
-                      className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
+                      className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
                     >
                       Done
                     </button>

@@ -65,7 +65,7 @@ export default function ScopeGrid({
             <button
               type="button"
               onClick={onSelectAll}
-              className="px-2.5 py-1 rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors"
+              className="px-2.5 h-control-sm rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors"
             >
               Select All
             </button>
@@ -75,7 +75,7 @@ export default function ScopeGrid({
             <button
               type="button"
               onClick={onClearAll}
-              className="px-2.5 py-1 rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors"
+              className="px-2.5 h-control-sm rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors"
             >
               Clear All
             </button>

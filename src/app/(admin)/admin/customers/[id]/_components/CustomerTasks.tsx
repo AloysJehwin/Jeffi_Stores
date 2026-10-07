@@ -185,7 +185,7 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="hidden md:inline-flex items-center px-2.5 py-1 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95"
+              className="hidden md:inline-flex items-center px-2.5 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95"
             >
               + Add
             </button>
@@ -201,7 +201,7 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
             onChange={e => setTitle(e.target.value)}
             placeholder="Task title (e.g. Call about return)"
             maxLength={255}
-            className="w-full px-2.5 py-1.5 text-sm border border-border-secondary rounded bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent-500"
+            className="w-full px-2.5 h-control-sm text-sm border border-border-secondary rounded bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-1 focus:ring-accent-500"
           />
           <textarea
             value={description}
@@ -252,7 +252,7 @@ export default function CustomerTasks({ customerId, canWrite: canWriteProp = fal
               type="button"
               onClick={add}
               disabled={busy || !title.trim()}
-              className="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+              className="px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
             >
               Create Task
             </button>

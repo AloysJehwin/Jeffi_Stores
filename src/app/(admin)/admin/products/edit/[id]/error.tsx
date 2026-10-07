@@ -21,14 +21,14 @@ export default function EditProductError({ error, reset }: { error: Error & { di
           <button
             type="button"
             onClick={reset}
-            className="px-3 py-1.5 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+            className="px-3 h-control-sm rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
           >
             Try again
           </button>
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="px-3 py-1.5 rounded-md border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+            className="px-3 h-control-sm rounded-md border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
           >
             Reload
           </button>
