@@ -260,6 +260,7 @@ function buildCommonAttributes(
 }
 
 export function productToAmazonListings(product: any, marketplaceId: string, contactText?: string): AmazonListing[] {
+  if (product.is_digital) return []
   const productType = resolveProductType(product)
   const brandName = product.brands?.name || ''
   const common = buildCommonAttributes(product, brandName, marketplaceId, contactText)

@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { withTransaction, queryMany } from '@/lib/shared/db'
 import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, round2 } from '@/lib/catalog/gst'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { findDigitalProductIds } from '@/lib/catalog/digital-guard'
 import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/catalog/pricing'
 import { deductStockForLines, type LineItem } from '@/lib/orders/inventory-deduct'
 import { z } from 'zod'
@@ -66,6 +67,12 @@ export async function POST(request: NextRequest) {
     if (!VALID_PAYMENT_MODES.includes(paymentMode)) {
       return NextResponse.json({ error: 'Invalid payment mode for cash sale' }, { status: 400 })
     }
+
+    const digitalIds = await findDigitalProductIds(
+      items.map(i => i.product_id).filter((v): v is string => !!v)
+    )
+    if (digitalIds.length)
+      return NextResponse.json({ error: 'Digital products cannot be sold through this channel' }, { status: 400 })
 
     const orderIsIgst = false
 

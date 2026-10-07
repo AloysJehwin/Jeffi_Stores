@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, query } from '@/lib/shared/db'
+import { isDigitalProduct } from '@/lib/catalog/digital-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,6 +81,9 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const variantId = req.nextUrl.searchParams.get('variant_id')
   if (!variantId) return NextResponse.json({ error: 'variant_id required' }, { status: 400 })
+
+  if (await isDigitalProduct(id))
+    return NextResponse.json({ error: 'Digital products cannot have variants' }, { status: 409 })
 
   const body = await req.json()
   let all = await getAllDraftSubVariants(id)

@@ -130,6 +130,17 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants/[subVa
     expect(res.status).toBe(404)
   })
 
+  it('returns 409 when product is digital', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne
+      .mockResolvedValueOnce({ id: 'sv-1' }) // ensureSubVariant
+      .mockResolvedValueOnce({ is_digital: true }) // digital guard
+    const res = await POST(makePostReq({ unit: 'pc', factor: 1 }), { params })
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toBe('Digital products cannot have variants')
+  })
+
   it('returns 400 on invalid JSON', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)

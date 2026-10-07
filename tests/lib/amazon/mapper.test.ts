@@ -82,6 +82,10 @@ describe('amazon/mapper', () => {
       expect(listings).toHaveLength(1)
     })
 
+    it('excludes digital products', () => {
+      expect(productToAmazonListings(makeProduct({ is_digital: true }), MP)).toEqual([])
+    })
+
     it('sets sku, requirements LISTING', () => {
       const listings = productToAmazonListings(makeProduct({ sku: 'HB-M12' }), MP)
       expect(listings[0].sku).toBe('HB-M12')

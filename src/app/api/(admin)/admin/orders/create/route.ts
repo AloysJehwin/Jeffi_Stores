@@ -4,6 +4,7 @@ import { productLabel } from '@/lib/catalog/product-label'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
+import { findDigitalProductIds } from '@/lib/catalog/digital-guard'
 import { withTransaction } from '@/lib/shared/db'
 import {
   isInterState,
@@ -91,6 +92,10 @@ export async function POST(request: NextRequest) {
       items,
       notes,
     } = parsed.data
+
+    const digitalIds = await findDigitalProductIds(items.map(i => i.product_id).filter((v): v is string => !!v))
+    if (digitalIds.length)
+      return NextResponse.json({ error: 'Digital products cannot be sold through this channel' }, { status: 400 })
 
     const sellerStateCode = (await getBusinessValues()).businessStateCode
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false

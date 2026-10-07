@@ -157,6 +157,15 @@ describe('POST /api/admin/products/[id]/units', () => {
     expect(res.status).toBe(404)
   })
 
+  it('returns 409 when product is digital', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne.mockResolvedValueOnce({ is_digital: true })
+    const res = await POST(makePostReq({ unit: 'pc', factor: 1 }), { params })
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toBe('Digital products cannot have variants')
+  })
+
   it('creates unit on happy path', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)

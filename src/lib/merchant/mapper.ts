@@ -41,6 +41,7 @@ function buildDetails(product: any): Array<{ sectionName: string; attributeName:
 }
 
 export function productToGmcItems(product: any): any[] {
+  if (product.is_digital) return []
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
   const imageLink = primaryImage?.image_url || ''
   const additionalImages = buildAdditionalImages(product, primaryImage?.id)

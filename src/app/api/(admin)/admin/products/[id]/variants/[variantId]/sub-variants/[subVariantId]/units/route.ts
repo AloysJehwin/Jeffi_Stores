@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne, withTransaction, query } from '@/lib/shared/db'
+import { isDigitalProduct } from '@/lib/catalog/digital-guard'
 import {
   validateSerializedUnitStep,
   assertUnitChangeAllowed,
@@ -60,6 +61,9 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!(await ensureSubVariant(id, variantId, subVariantId))) {
     return NextResponse.json({ error: 'Sub-variant not found' }, { status: 404 })
   }
+
+  if (await isDigitalProduct(id))
+    return NextResponse.json({ error: 'Digital products cannot have variants' }, { status: 409 })
 
   const body = await request.json().catch(() => null)
   if (!body) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })

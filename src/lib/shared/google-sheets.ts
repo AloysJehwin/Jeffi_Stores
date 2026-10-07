@@ -270,7 +270,7 @@ async function fetchAllProducts(limit?: number) {
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.is_draft = false
+    WHERE p.is_draft = false AND p.is_digital = false
     ORDER BY p.created_at DESC
     ${limit ? `LIMIT ${limit}` : ''}
   `)
@@ -302,7 +302,7 @@ async function fetchProduct(productId: string) {
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.id = $1
+    WHERE p.id = $1 AND p.is_digital = false
   `,
     [productId]
   )
