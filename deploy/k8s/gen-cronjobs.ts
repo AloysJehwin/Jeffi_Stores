@@ -42,7 +42,8 @@ spec:
           containers:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
-              command: [node, deploy/k8s-cron.mjs, ${id}, ${method}, '${path}']
+              # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs ${id} ${method} ${path}']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }

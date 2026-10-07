@@ -54,13 +54,24 @@ metadata: { name: headlamp-viewer }
 roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: view }
 subjects: [{ kind: ServiceAccount, name: headlamp-viewer, namespace: observability }]
 ---
+# Headlamp only serves /headlamp/ (trailing slash).
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: headlamp-slash, namespace: observability }
+spec:
+  redirectRegex: { regex: '^(https://[^/]+/headlamp)$', replacement: '${1}/', permanent: true }
+---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata: { name: k8s-console, namespace: observability }
 spec:
   entryPoints: [websecure]
   routes:
-    - match: Host(`k8s.jeffistores.in`) && PathPrefix(`/headlamp`)
+    - match: Host(`k8s.jeffistores.in`) && Path(`/headlamp`)
+      kind: Rule
+      middlewares: [{ name: headlamp-slash }]
+      services: [{ name: noop@internal, kind: TraefikService }]
+    - match: Host(`k8s.jeffistores.in`) && PathPrefix(`/headlamp/`)
       kind: Rule
       middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
       services: [{ name: headlamp, port: 80 }]

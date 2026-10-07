@@ -76,6 +76,6 @@ describe('generated k8s CronJobs', () => {
     const { readFileSync } = await import('node:fs')
     const { renderCronJobs, CRONJOBS_PATH } = await import('../../../deploy/k8s/gen-cronjobs')
     expect(readFileSync(CRONJOBS_PATH, 'utf8')).toBe(renderCronJobs())
-    for (const job of CRON_JOBS) expect(renderCronJobs()).toContain(`deploy/k8s-cron.mjs, ${job.id}, ${job.method}`)
+    for (const job of CRON_JOBS) expect(renderCronJobs()).toContain(`deploy/k8s-cron.mjs ${job.id} ${job.method}`)
   })
 })
