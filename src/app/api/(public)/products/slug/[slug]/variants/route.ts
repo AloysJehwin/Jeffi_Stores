@@ -53,7 +53,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
                'dimension', pu.dimension, 'min_qty', pu.min_qty, 'max_qty', pu.max_qty, 'qty_step', pu.qty_step
              ) ORDER BY pu.is_base DESC
            )
-           FROM product_units pu WHERE pu.product_id = p.id
+           FROM product_units pu WHERE pu.product_id = p.id AND NOT COALESCE(p.is_digital, FALSE)
           ),
           '[]'::json
         ) AS product_units

@@ -295,6 +295,7 @@ export const policies: Policy[] = [
           'Some products can be bought as a subscription (weekly, monthly, every 3 months or yearly). Subscribing sets up a recurring payment mandate (UPI Autopay, card or e-mandate) through Razorpay, and you authorise us to charge the per-cycle amount shown at sign-up automatically each cycle until you cancel.',
           'The first cycle is charged when you authorise the mandate. Each later cycle is charged automatically and a new order (and tax invoice) is created for it. Subscriptions are limited to ₹15,000 per cycle and are available in India only.',
           'You can pause, resume or cancel any time from My subscriptions in your account. A cancellation takes effect at the end of the current paid cycle; you will not be charged again, and digital access continues until that cycle ends.',
+          'Some subscriptions have a fixed number of charges, after which they end automatically, or a minimum commitment shown before you subscribe; a subscription with a minimum commitment cannot be paused or cancelled until that many charges have been made.',
           'If a charge fails after the retries made by your bank or payment provider, the subscription is halted and no further orders are created until the mandate is restored.',
           'Your bank or UPI app shows the merchant on the mandate as the payment collector: "Jeffi" where the store collects payments through the Jeffi Commerce platform, otherwise the store\'s own name.',
         ],
@@ -399,6 +400,7 @@ export const policies: Policy[] = [
         heading: '7. Subscriptions & auto-debit',
         body: [
           'Subscriptions renew automatically each cycle through your payment mandate until you cancel. You can cancel any time from My subscriptions; cancellation takes effect at the end of the current cycle, and cycles already charged are not refunded by cancelling.',
+          'Where a subscription has a minimum commitment (shown before you subscribe), it cannot be cancelled or paused until that many charges have been made.',
           'A charged cycle of a digital subscription is non-refundable once access has been granted for that cycle.',
           'Each delivered cycle of a physical subscription is a separate order and follows this Return & Refund Policy like any other order.',
           'Your bank or UPI app shows the merchant on the mandate as the payment collector: "Jeffi" where the store collects payments through the Jeffi Commerce platform, otherwise the store\'s own name.',

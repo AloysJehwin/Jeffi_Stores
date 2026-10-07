@@ -35,7 +35,11 @@ export default async function SubscriptionDetailPage({ params }: { params: Promi
     ['Per cycle', inr(sub.amount)],
     ['Shipping / cycle', inr(Number(sub.shipping_paise || 0) / 100)],
     ['Type', sub.is_digital ? 'Digital' : 'Physical'],
-    ['Cycles paid', `${sub.current_cycle}${sub.total_count ? ` of ${sub.total_count}` : ''}`],
+    ['Cycles paid', `${sub.current_cycle}${sub.totalCycles ? ` of ${sub.totalCycles}` : ' (until cancelled)'}`],
+    [
+      'Commitment',
+      sub.min_cycles ? `Minimum ${sub.min_cycles} charges (customer can't cancel or pause before)` : 'None',
+    ],
     ['Current period', `${fmtDate(str(sub.current_start))} – ${fmtDate(str(sub.current_end))}`],
     ['Access until', fmtDate(str(sub.access_expires_at))],
     ['Collected by', sub.collecting_account === 'own' ? 'Store Razorpay account' : 'Platform (Jeffi)'],

@@ -38,6 +38,22 @@ async function rzpFor(sub: SubscriptionRow): Promise<any> {
   return (await razorpayForSubscription(sub)).instance
 }
 
+/** Customers can't cancel or pause before the minimum number of charges; admins can. */
+export function assertCommitmentMet(
+  sub: Pick<SubscriptionRow, 'min_cycles' | 'current_cycle'>,
+  actor: 'customer' | 'admin'
+) {
+  if (actor === 'admin') return
+  const min = Number(sub.min_cycles ?? 0)
+  const paid = Number(sub.current_cycle ?? 0)
+  if (min > 0 && paid < min) {
+    throw new SubscriptionError(
+      `This subscription has a minimum of ${min} charges; you can cancel after charge ${min} (${paid} paid so far).`,
+      409
+    )
+  }
+}
+
 async function reload(localId: string): Promise<SubscriptionRow> {
   return (await queryOne<SubscriptionRow>(`SELECT * FROM subscriptions WHERE id = $1`, [localId]))!
 }
@@ -48,6 +64,7 @@ export async function cancelSubscription(
 ): Promise<SubscriptionRow> {
   const sub = await loadSub(localId)
   if (TERMINAL.has(sub.status)) throw new SubscriptionError('Subscription is already ended')
+  assertCommitmentMet(sub, opts.actor)
   const rzp = await rzpFor(sub)
   // Razorpay only supports cycle-end cancellation on an active sub; anything else ends now.
   const atEnd = opts.atCycleEnd && sub.status === 'active'
@@ -62,9 +79,13 @@ export async function cancelSubscription(
   return reload(localId)
 }
 
-export async function pauseSubscription(localId: string): Promise<SubscriptionRow> {
+export async function pauseSubscription(
+  localId: string,
+  actor: 'customer' | 'admin' = 'customer'
+): Promise<SubscriptionRow> {
   const sub = await loadSub(localId)
   if (sub.status !== 'active') throw new SubscriptionError('Only an active subscription can be paused')
+  assertCommitmentMet(sub, actor)
   const entity = await (await rzpFor(sub)).subscriptions.pause(sub.razorpay_subscription_id, { pause_at: 'now' })
   return (await applySubscriptionState(localId, 'paused', entity)).row
 }

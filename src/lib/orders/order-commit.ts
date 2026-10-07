@@ -7,6 +7,7 @@ import { computeEdd } from '@/lib/shipping/edd'
 import type { DraftBuyNowItem, DraftCartItem } from '@/lib/orders/order-draft'
 import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
 import { grantOrderEntitlements } from '@/lib/orders/entitlements'
+import { digitalUnitError } from '@/lib/catalog/digital-units'
 
 export interface CartLine {
   product_id: string
@@ -160,7 +161,7 @@ export async function resolveBuyNowItem(input: {
   if (!input.productId) return { ok: false, error: 'productId required' }
   const qty = Number(input.qty)
   if (!Number.isFinite(qty) || qty <= 0 || qty > 10_000) return { ok: false, error: 'Invalid qty' }
-  const buyMode = input.buyMode || 'unit'
+  let buyMode = input.buyMode || 'unit'
 
   const product = await queryOne<{
     id: string
@@ -176,6 +177,11 @@ export async function resolveBuyNowItem(input: {
   )
   if (!product || !product.is_active) return { ok: false, error: 'Product not found or inactive' }
   const isDigital = product.is_digital === true
+  if (isDigital) {
+    const unitErr = digitalUnitError(input.buyMode, input.buyUnit)
+    if (unitErr) return { ok: false, error: unitErr }
+    buyMode = 'unit'
+  }
 
   let variant: {
     id: string
@@ -271,7 +277,7 @@ export async function resolveBuyNowItem(input: {
       // A digital title is owned once — buy-now is always a single copy.
       qty: isDigital ? 1 : qty,
       buyMode,
-      buyUnit: input.buyUnit || null,
+      buyUnit: isDigital ? null : input.buyUnit || null,
       price,
       isDigital,
     },
@@ -500,6 +506,14 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     const hasDigital = digitalIds.size > 0
     const allDigital = lineProductIds.length > 0 && lineProductIds.every(id => digitalIds.has(id))
     if (hasDigital && !input.paymentRecord) throw new Error(DIGITAL_REQUIRES_ONLINE_PAYMENT)
+    const unitLines =
+      input.mode === 'cart'
+        ? input.cartItems.map(i => ({ productId: i.product_id, buyMode: i.buy_mode, buyUnit: i.buy_unit }))
+        : [{ productId: input.product.id, buyMode: input.item.buyMode, buyUnit: input.item.buyUnit }]
+    for (const l of unitLines) {
+      const unitErr = digitalIds.has(l.productId) ? digitalUnitError(l.buyMode, l.buyUnit) : null
+      if (unitErr) throw new Error(unitErr)
+    }
 
     const pin = String(address.postal_code ?? '')
     const physicalLines = input.mode === 'cart' ? input.cartItems.filter(i => !digitalIds.has(i.product_id)) : []

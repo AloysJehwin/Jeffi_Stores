@@ -3,6 +3,7 @@ import { queryOne, queryMany, queryCount } from './shared'
 import {
   SUBSCRIPTION_INTERVAL_LABELS,
   SUBSCRIPTION_STATUS_LABELS,
+  fixedCycles,
   isSubscriptionInterval,
 } from '@/lib/subscriptions/intervals'
 
@@ -35,6 +36,8 @@ export interface AdminSubscriptionListItem {
   quantity: number
   amount: number
   currentCycle: number
+  /** Fixed number of charges, or null = until cancelled. */
+  totalCycles: number | null
   currentEnd: string | null
   cancelAtCycleEnd: boolean
   collectingAccount: string
@@ -56,6 +59,7 @@ interface ListRow {
   quantity: string
   cycle_paise: string
   current_cycle: number
+  total_count: number | null
   current_end: string | null
   cancel_at_cycle_end: boolean
   collecting_account: string
@@ -85,6 +89,7 @@ function toItem(r: ListRow): AdminSubscriptionListItem {
     quantity: Number(r.quantity),
     amount: Math.round(Number(r.cycle_paise)) / 100,
     currentCycle: r.current_cycle,
+    totalCycles: fixedCycles(r.interval, r.total_count),
     currentEnd: r.current_end,
     cancelAtCycleEnd: r.cancel_at_cycle_end,
     collectingAccount: r.collecting_account,
@@ -136,7 +141,7 @@ export async function listAdminSubscriptions(filters: { status?: string; q?: str
     queryMany<ListRow>(
       `SELECT s.id::text, s.status, s.user_id::text, u.first_name, u.last_name, u.email,
               s.product_id::text, p.name AS product_name, s.is_digital, s.interval, s.quantity::text,
-              ${CYCLE_PAISE_SQL}::text AS cycle_paise, s.current_cycle, s.current_end::text,
+              ${CYCLE_PAISE_SQL}::text AS cycle_paise, s.current_cycle, s.total_count, s.current_end::text,
               s.cancel_at_cycle_end, s.collecting_account, s.razorpay_subscription_id, s.created_at::text
          ${from} ${where}
         ORDER BY s.created_at DESC
@@ -228,6 +233,7 @@ export async function getAdminSubscriptionDetail(id: string) {
       statusLabel: statusLabel(sub.status),
       intervalLabel: intervalLabel(sub.interval),
       amount: Math.round(Number(sub.cycle_paise)) / 100,
+      totalCycles: fixedCycles(sub.interval, sub.total_count),
     },
     customer: customer ? { ...customer, name: fullName(customer) } : null,
     product,

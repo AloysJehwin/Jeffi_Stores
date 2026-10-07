@@ -322,7 +322,7 @@ export async function getDashboardInsights(
                CASE WHEN p.has_variants THEN (SELECT COALESCE(SUM(COALESCE(pv.inventory_quantity, 0) * COALESCE(NULLIF(pv.cost_price, 0), NULLIF(pv.price, 0), NULLIF(p.cost_price, 0), NULLIF(p.base_price, 0), 0)), 0) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true)
                     ELSE COALESCE(p.inventory_quantity, 0) * COALESCE(NULLIF(p.cost_price, 0), NULLIF(p.base_price, 0), 0) END AS value
           FROM products p
-         WHERE p.is_active = true AND COALESCE(p.is_draft, false) = false
+         WHERE p.is_active = true AND COALESCE(p.is_draft, false) = false AND p.is_digital = false
       )
       SELECT
         (SELECT COUNT(*) FROM products WHERE is_active = true AND COALESCE(is_draft, false) = false) AS active_products,

@@ -133,7 +133,7 @@ export async function collectBriefingData(): Promise<BriefingData> {
         `
       SELECT id::text, name, sku, inventory_quantity
       FROM products
-      WHERE is_active = TRUE AND inventory_quantity <= 10
+      WHERE is_active = TRUE AND is_digital = FALSE AND inventory_quantity <= 10
       ORDER BY inventory_quantity ASC, name ASC
       LIMIT 15
     `,

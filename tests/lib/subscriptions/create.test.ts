@@ -17,8 +17,15 @@ import { createCustomerSubscription } from '@/lib/subscriptions/create'
 
 const rz = { subscriptions: { create: vi.fn(), cancel: vi.fn() } }
 
-function offer(collectingAccount: 'platform' | 'own', tenantId: string | null = 't1') {
+function offer(
+  collectingAccount: 'platform' | 'own',
+  tenantId: string | null = 't1',
+  extra: Record<string, unknown> = {}
+) {
   return {
+    totalCycles: null,
+    totalCount: 120,
+    minCycles: null,
     product: { id: 'p1', name: 'Coffee', hsn_code: '0901' },
     variantId: null,
     subVariantId: null,
@@ -37,6 +44,7 @@ function offer(collectingAccount: 'platform' | 'own', tenantId: string | null = 
     merchantLabel: 'Jeffi',
     tenantId,
     rzp: { instance: rz, creds: { key_id: 'rzp_test_k', key_secret: 's', isOwn: collectingAccount === 'own' } },
+    ...extra,
   } as any
 }
 
@@ -67,6 +75,19 @@ describe('createCustomerSubscription', () => {
 
     const idx = cpQuery.mock.calls.find(c => String(c[0]).includes('razorpay_subscription_index'))
     expect(idx?.[1]).toEqual(['sub_1', 't1', 'p1', r.localId])
+  })
+
+  it('uses the fixed cycle count and snapshots it with the minimum commitment', async () => {
+    vi.mocked(deriveSubscriptionOffer).mockResolvedValue(
+      offer('platform', 't1', { totalCycles: 12, totalCount: 12, minCycles: 3 })
+    )
+    await createCustomerSubscription(input)
+    expect(rz.subscriptions.create.mock.calls[0][0]).toMatchObject({ total_count: 12 })
+    const insert = vi.mocked(query).mock.calls.find(c => String(c[0]).includes('INSERT INTO subscriptions'))!
+    expect(String(insert[0])).toContain('min_cycles')
+    const params = insert[1] as unknown[]
+    expect(params[22]).toBe(12) // $23 total_count
+    expect(params[24]).toBe(3) // $25 min_cycles
   })
 
   it('flagship store indexes under the NIL tenant id', async () => {

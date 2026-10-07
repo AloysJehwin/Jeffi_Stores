@@ -15,11 +15,15 @@ import Toggle from '@/components/ui/Toggle'
 import DatePicker from '@/components/ui/DatePicker'
 import AIEnrichButton from './AIEnrichButton'
 import UnitsManager, { UnitLoadedInfo } from './UnitsManager'
+import { deriveSellableItems, subscriptionPriceHint, type SellableItem } from '@/lib/subscriptions/sellable'
+import { MAX_BILLING_CYCLES, cycleLimitsError, normalizeCycleCount } from '@/lib/subscriptions/intervals'
+import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
 import DigitalFilesPanel from './DigitalFilesPanel'
 import SubVariantEditor, { emptySubVariantDraft, SubVariantDraft } from './SubVariantEditor'
 import { generateSerialNumber, generateLotNumber, generateSerialRun } from '@/lib/catalog/selling-unit'
 import { applyDiscount } from '@/lib/catalog/pricing'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface Category {
   id: string
@@ -61,6 +65,7 @@ interface VariantRow {
   variant_type: string
   use_own_images: boolean
   product_suppliers?: SupplierRow[]
+  subscription_price?: string
   _isDeleted?: boolean
 }
 
@@ -297,6 +302,7 @@ function emptyVariant(pricing_type: 'unit', unit: string): VariantRow {
     variant_type: '',
     use_own_images: false,
     product_suppliers: [],
+    subscription_price: '',
   }
 }
 
@@ -563,6 +569,36 @@ export default function ProductForm({
         ? [product.subscription_interval]
         : []
   )
+  const confirm = useConfirm()
+  async function handleDigitalToggle(next: boolean) {
+    if (next && productId && !product?.is_digital) {
+      const ok = await confirm({
+        title: 'Convert to a digital product?',
+        message:
+          "Its stock will be set to 0 and stock will no longer be tracked. Variants, sub-variants, selling units and shipping details will be removed. This can't be undone automatically.",
+        confirmLabel: 'Convert',
+        cancelLabel: 'Cancel',
+        variant: 'danger',
+      })
+      if (!ok) return
+    }
+    if (next) {
+      setPerishable(false)
+      setSerialized(false)
+      setInventorySync(false)
+    }
+    setIsDigital(next)
+  }
+  const [subscriptionPrice, setSubscriptionPrice] = useState(
+    product?.subscription_price != null ? String(product.subscription_price) : ''
+  )
+  const [totalCycles, setTotalCycles] = useState(
+    product?.subscription_total_cycles != null ? String(product.subscription_total_cycles) : ''
+  )
+  const [minCycles, setMinCycles] = useState(
+    product?.subscription_min_cycles != null ? String(product.subscription_min_cycles) : ''
+  )
+  const cyclesError = cycleLimitsError(normalizeCycleCount(totalCycles), normalizeCycleCount(minCycles))
   // A digital product is single-SKU with no variants (and no shipping).
   useEffect(() => {
     if (isDigital && hasVariants) setHasVariants(false)
@@ -704,6 +740,7 @@ export default function ProductForm({
           variant_type: v.variant_type || '',
           use_own_images:
             v.use_own_images != null ? !!v.use_own_images : !!(v.variant_images && v.variant_images.length > 0),
+          subscription_price: v.subscription_price != null ? String(v.subscription_price) : '',
           product_suppliers: allSuppliers
             .filter(
               (s: any) =>
@@ -912,7 +949,9 @@ export default function ProductForm({
     fields.platform_compatibility = platformCompatibility
     fields.subscription_intervals = subscriptionIntervals
     fields.subscription_interval = subscriptionIntervals[0] ?? null
-    fields.subscription_price = null
+    fields.subscription_price = hasVariants ? null : subscriptionPrice || null
+    fields.subscription_total_cycles = normalizeCycleCount(totalCycles)
+    fields.subscription_min_cycles = normalizeCycleCount(minCycles)
     fields.meta_title = metaTitle || null
     fields.meta_description = metaDescription || null
     fields.tax_class = taxClass
@@ -952,6 +991,7 @@ export default function ProductForm({
           imageOrder,
           existingImagesToKeep,
           galleryImageIds,
+          subVariantSubscriptionPrices: subVariantSubscriptionPrices(),
           variants: variantsRef.current
             .filter((v: any) => !v._isDeleted)
             .map((v: any) => {
@@ -1036,6 +1076,9 @@ export default function ProductForm({
     // subscription & bundle
     isSubscription,
     subscriptionIntervals,
+    subscriptionPrice,
+    totalCycles,
+    minCycles,
     isBundle,
     // seo & tax
     metaTitle,
@@ -1372,6 +1415,37 @@ export default function ProductForm({
   // (sub-variant leaf), or neither (product leaf, simple products only).
   // product-draft.ts resolves these SKUs to ids at publish. The legacy
   // products.supplier_id is the PRODUCT-leaf preferred (simple products only).
+  const sellableItems = deriveSellableItems({
+    hasVariants,
+    product: { name: productName, sku, price: basePrice, subscription_price: subscriptionPrice },
+    variants,
+    subVariantsByVariant: subVariantsMap,
+  })
+
+  function setSellableSubscriptionPrice(item: SellableItem, value: string) {
+    if (item.kind === 'product') setSubscriptionPrice(value)
+    else if (item.kind === 'variant')
+      setVariants(vs => vs.map(v => (v.id === item.variantId ? { ...v, subscription_price: value } : v)))
+    else
+      setSubVariantsMap(m => ({
+        ...m,
+        [item.variantId!]: (m[item.variantId!] || []).map(sv =>
+          sv.id === item.subVariantId ? { ...sv, subscription_price: value } : sv
+        ),
+      }))
+  }
+
+  function subVariantSubscriptionPrices() {
+    if (!hasVariants) return []
+    return variants
+      .filter(v => !v._isDeleted && v.sub_variant_type_on && v.id)
+      .flatMap(v =>
+        (subVariantsMap[v.id!] || [])
+          .filter((sv: any) => sv.id)
+          .map((sv: any) => ({ variant_id: v.id, id: sv.id, subscription_price: sv.subscription_price ?? '' }))
+      )
+  }
+
   function buildFlatSuppliers(): { suppliers: any[]; preferredProductSupplierId: string } {
     const clean = (s: SupplierRow) => ({
       supplier_id: s.supplier_id,
@@ -1470,7 +1544,9 @@ export default function ProductForm({
                         (!s.variant_sku || s.variant_sku === parentSku))
                   )
                   .map(toSupplierRow)
-            return { ...sv, product_suppliers: rows }
+            const subscription_price =
+              existing?.subscription_price !== undefined ? existing.subscription_price : sv.subscription_price
+            return { ...sv, subscription_price, product_suppliers: rows }
           })
           return { ...m, [variantId]: merged }
         })
@@ -1881,6 +1957,12 @@ export default function ProductForm({
     setError(null)
     setBootstrapError(null)
 
+    if (isSubscription && cyclesError) {
+      setError(cyclesError)
+      setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
+      return
+    }
+
     if (showBootstrap && isPublishIntent) {
       // Surface bootstrap validation both in the panel AND the top-level error box
       // (near the buttons), then scroll it into view — otherwise a failed publish
@@ -2122,7 +2204,10 @@ export default function ProductForm({
       formData.set('is_subscription', String(isSubscription))
       formData.set('subscription_intervals', subscriptionIntervals.join(','))
       formData.set('subscription_interval', subscriptionIntervals[0] ?? '')
-      formData.set('subscription_price', '')
+      formData.set('subscription_price', hasVariants ? '' : subscriptionPrice)
+      formData.set('sub_variant_subscription_prices', JSON.stringify(subVariantSubscriptionPrices()))
+      formData.set('subscription_total_cycles', totalCycles)
+      formData.set('subscription_min_cycles', minCycles)
       // Bundling
       formData.set('is_bundle', String(isBundle))
       // SEO
@@ -3110,7 +3195,7 @@ export default function ProductForm({
                 <div className="p-4 space-y-4 border-t border-border-default">
                   <div className="flex flex-wrap gap-6">
                     {digitalProductsEnabled && (
-                      <Toggle id="is_digital" checked={isDigital} onChange={setIsDigital} label="Digital Product" />
+                      <Toggle id="is_digital" checked={isDigital} onChange={handleDigitalToggle} label="Digital Product" />
                     )}
                     <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
                     {subscriptionsEnabled && (
@@ -3200,10 +3285,104 @@ export default function ProductForm({
                           ))}
                         </div>
                       )}
-                      <p className="text-xs text-foreground-muted">
-                        Each cycle is charged at the product&apos;s price
-                        {isDigital ? '' : ' (or the chosen variant / sub-variant price)'}.
-                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-muted mb-1">
+                            Number of billing cycles
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={MAX_BILLING_CYCLES}
+                            step={1}
+                            value={totalCycles}
+                            onChange={e => setTotalCycles(e.target.value)}
+                            placeholder="Until cancelled"
+                            className={inputCls}
+                          />
+                          <p className="text-xs text-foreground-muted mt-1">
+                            Leave blank to bill until the customer cancels.
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-muted mb-1">
+                            Minimum billing cycles
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={MAX_BILLING_CYCLES}
+                            step={1}
+                            value={minCycles}
+                            onChange={e => setMinCycles(e.target.value)}
+                            placeholder="No minimum"
+                            className={inputCls}
+                          />
+                          <p className="text-xs text-foreground-muted mt-1">
+                            Customers can&apos;t cancel or pause before this many charges.
+                          </p>
+                        </div>
+                        {cyclesError && <p className="sm:col-span-2 text-xs text-red-600">{cyclesError}</p>}
+                      </div>
+                      <div className="pt-2">
+                        <p className="text-xs font-medium text-foreground-muted mb-1">Subscription prices</p>
+                        <div className="overflow-x-auto rounded-md border border-border-default">
+                          <table className="w-full text-xs" data-testid="subscription-prices">
+                            <thead className="bg-surface-secondary text-foreground-muted">
+                              <tr>
+                                <th className="text-left font-medium px-3 py-2">Item</th>
+                                <th className="text-right font-medium px-3 py-2">One-time</th>
+                                <th className="text-left font-medium px-3 py-2">Subscription (₹ per cycle)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sellableItems.map(item => {
+                                const hint = subscriptionPriceHint(item.oneTimePrice, item.subscriptionPrice)
+                                return (
+                                  <tr key={item.key} className="border-t border-border-default">
+                                    <td className="px-3 py-2">
+                                      <div className="text-foreground">{item.name}</div>
+                                      {item.sku && <div className="text-foreground-muted">{item.sku}</div>}
+                                    </td>
+                                    <td className="px-3 py-2 text-right text-foreground-secondary whitespace-nowrap">
+                                      {item.oneTimePrice != null ? `₹${item.oneTimePrice.toFixed(2)}` : '—'}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          inputMode="decimal"
+                                          aria-label={`Subscription price for ${item.name}`}
+                                          value={item.subscriptionPrice}
+                                          placeholder={item.oneTimePrice != null ? item.oneTimePrice.toFixed(2) : ''}
+                                          onChange={e => setSellableSubscriptionPrice(item, e.target.value)}
+                                          className={`${inputCls} w-28`}
+                                        />
+                                        {hint && (
+                                          <span
+                                            className={
+                                              hint.endsWith('less')
+                                                ? 'text-green-700 dark:text-green-400'
+                                                : 'text-amber-700 dark:text-amber-400'
+                                            }
+                                          >
+                                            {hint}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        <p className="text-xs text-foreground-muted mt-1">
+                          GST-inclusive, like the one-time price. Leave blank to charge the one-time price each cycle.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -4794,7 +4973,15 @@ export default function ProductForm({
         </div>
 
         {/* Selling Units (product-level — applies to every variant) */}
-        {productId && (
+        {productId && isDigital && (
+          <div className="px-4 sm:px-6 py-4 border-t border-border-default-default">
+            <h3 className="text-sm font-semibold text-foreground mb-1">Selling Units &amp; Conversions</h3>
+            <p className="text-xs text-foreground-muted" data-testid="digital-units-note">
+              {DIGITAL_UNIT_MESSAGE}.
+            </p>
+          </div>
+        )}
+        {productId && !isDigital && (
           <div className="px-4 sm:px-6 py-4 border-t border-border-default-default">
             <h3 className="text-sm font-semibold text-foreground mb-3">Selling Units &amp; Conversions</h3>
             <p className="text-xs text-foreground-muted mb-4">

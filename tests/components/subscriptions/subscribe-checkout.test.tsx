@@ -110,6 +110,26 @@ describe('SubscribeCheckout', () => {
     expect(screen.getByText(/₹15,000/)).toBeTruthy()
   })
 
+  it('shows the one-time comparison and states a fixed term and minimum commitment in the consent', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/user/addresses') return json({ addresses: [ADDRESS] })
+      if (url === '/api/subscriptions/quote') return json({ ...QUOTE, oneTimePrice: 500, totalCycles: 6, minCycles: 3 })
+      return json({}, false)
+    })
+    render(<SubscribeCheckout isBusiness={false} />)
+    await waitFor(() => expect(screen.getByTestId('subscribe-savings').textContent).toContain('Save 20% vs one-time'))
+    expect(screen.getByTestId('subscribe-term').textContent).toBe('6 deliveries, then it ends · Minimum 3 charges')
+    expect(screen.getByText(/for 6 charges, after which it ends/)).toBeTruthy()
+    expect(screen.getByText(/minimum commitment of 3 charges/)).toBeTruthy()
+  })
+
+  it('says "until I cancel" without a fixed term', async () => {
+    render(<SubscribeCheckout isBusiness={false} />)
+    await waitFor(() => expect(screen.getByTestId('subscribe-summary')).toBeTruthy())
+    expect(screen.getByText(/until I cancel/)).toBeTruthy()
+    expect(screen.queryByTestId('subscribe-savings')).toBeNull()
+  })
+
   it('requires consent before paying', async () => {
     render(<SubscribeCheckout isBusiness={false} />)
     await waitFor(() => expect(screen.getByTestId('subscribe-summary')).toBeTruthy())

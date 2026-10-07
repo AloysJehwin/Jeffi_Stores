@@ -40,3 +40,35 @@ export const INTERVAL_SPEC: Record<
   quarterly: { period: 'monthly', interval: 3, totalCount: 40, minutes: 129600 },
   yearly: { period: 'yearly', interval: 1, totalCount: 10, minutes: 525600 },
 }
+
+export const MAX_BILLING_CYCLES = 520
+
+/** Admin input → stored cycle count: integer 1..520, else null (no limit). */
+export function normalizeCycleCount(x: unknown): number | null {
+  if (x == null || (typeof x === 'string' && x.trim() === '')) return null
+  const n = Number(x)
+  if (!Number.isInteger(n) || n < 1 || n > MAX_BILLING_CYCLES) return null
+  return n
+}
+
+export function cycleLimitsError(totalCycles: number | null, minCycles: number | null): string | null {
+  if (totalCycles != null && minCycles != null && minCycles > totalCycles) {
+    return 'Minimum billing cycles cannot exceed the number of billing cycles'
+  }
+  return null
+}
+
+/** "12 charges, then it ends" / "Until you cancel". */
+export function billingCyclesLabel(totalCycles: number | null | undefined, isDigital: boolean): string {
+  if (!totalCycles) return 'Until you cancel'
+  const noun = isDigital ? (totalCycles === 1 ? 'charge' : 'charges') : totalCycles === 1 ? 'delivery' : 'deliveries'
+  return `${totalCycles} ${noun}, then it ends`
+}
+
+/** A stored total_count below the interval's default cap is an admin-set fixed term. */
+export function fixedCycles(interval: unknown, totalCount: unknown): number | null {
+  const n = Number(totalCount)
+  if (!Number.isInteger(n) || n < 1) return null
+  if (!isSubscriptionInterval(interval)) return n
+  return n < INTERVAL_SPEC[interval].totalCount ? n : null
+}

@@ -429,7 +429,7 @@ export default function ProductActions({
       ? getPerUnitRate(effectivePrice, selectedVariant.numeric_value, selectedVariant.unit)
       : null
 
-  const productUnits = productUnitsProp ?? []
+  const productUnits = digital ? [] : (productUnitsProp ?? [])
   // Resolve MOST SPECIFIC GRAIN FIRST. A sell_unit_id pointer only speaks for the
   // grain that owns it: the variant's own pointer, never the product's standing in
   // for it. Collapsing the two (variant?.sell_unit_id ?? sellUnitId) made a

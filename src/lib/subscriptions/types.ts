@@ -41,6 +41,7 @@ export interface SubscriptionRow {
   current_end: string | Date | null
   access_expires_at: string | Date | null
   total_count: number | null
+  min_cycles: number | null
   consent_version: string | null
   consent_at: string | Date | null
   cancel_at_cycle_end: boolean | null

@@ -3186,6 +3186,14 @@ ALTER TABLE public.products
     ADD CONSTRAINT products_digital_no_variants_check CHECK (NOT (is_digital AND COALESCE(has_variants, false)));
 
 --
+-- products: subscription cycle limits (NULL = until cancelled / no commitment)
+--
+ALTER TABLE public.products
+    ADD CONSTRAINT products_subscription_total_cycles_check CHECK (subscription_total_cycles IS NULL OR subscription_total_cycles > 0);
+ALTER TABLE public.products
+    ADD CONSTRAINT products_subscription_min_cycles_check CHECK (subscription_min_cycles IS NULL OR subscription_min_cycles > 0);
+
+--
 -- vault_entitlements
 --
 ALTER TABLE ONLY public.vault_entitlements

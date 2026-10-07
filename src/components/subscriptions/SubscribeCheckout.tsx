@@ -8,7 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import AddressFormModal from '@/components/visitor/AddressFormModal'
 import { bp } from '@/lib/shared/business-path'
 import { MAX_CYCLE_AMOUNT_INR } from '@/lib/subscriptions/intervals'
-import { formatInr } from './SubscribeOption'
+import { SavingsNote, TermNote, formatInr } from './SubscribeOption'
 
 const CHECKOUT_JS = 'https://checkout.razorpay.com/v1/checkout.js'
 
@@ -27,6 +27,9 @@ interface Address {
 interface Quote {
   productName?: string
   unitPrice: number
+  oneTimePrice?: number
+  totalCycles?: number | null
+  minCycles?: number | null
   quantity: number
   shipping: number
   amount: number
@@ -311,6 +314,8 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
                 <dt>Total per cycle</dt>
                 <dd>{formatInr(quote.amount)}</dd>
               </div>
+              <SavingsNote oneTimePrice={quote.oneTimePrice} unitPrice={quote.unitPrice} />
+              <TermNote totalCycles={quote.totalCycles} minCycles={quote.minCycles} digital={quote.isDigital} />
             </dl>
           )}
 
@@ -324,9 +329,13 @@ export function SubscribeCheckout({ isBusiness }: { isBusiness: boolean }) {
             />
             <span>
               I authorise an auto-debit of {quote ? formatInr(quote.amount) : 'the amount above'}{' '}
-              {quote ? quote.intervalLabel.toLowerCase() : 'each cycle'} until I cancel. The first cycle is charged
-              now. I can cancel anytime from My subscriptions; cancellation takes effect at the end of the current
-              cycle. The mandate will show the merchant name <strong>{merchant}</strong>. Subscriptions are limited to{' '}
+              {quote ? quote.intervalLabel.toLowerCase() : 'each cycle'}{' '}
+              {quote?.totalCycles ? `for ${quote.totalCycles} charges, after which it ends` : 'until I cancel'}. The
+              first cycle is charged now.{' '}
+              {quote?.minCycles
+                ? `This subscription has a minimum commitment of ${quote.minCycles} charges; I can cancel or pause from My subscriptions only after charge ${quote.minCycles}.`
+                : 'I can cancel anytime from My subscriptions;'}{' '}
+              cancellation takes effect at the end of the current cycle. The mandate will show the merchant name <strong>{merchant}</strong>. Subscriptions are limited to{' '}
               {formatInr(MAX_CYCLE_AMOUNT_INR)} per cycle.
             </span>
           </label>

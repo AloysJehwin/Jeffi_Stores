@@ -50,6 +50,21 @@ describe('customer subscription routes', () => {
     expect((await res.json()).error).toContain('₹15,000')
   })
 
+  it('quote returns the one-time comparison and term', async () => {
+    vi.mocked(deriveSubscriptionOffer).mockResolvedValue({
+      product: { name: 'Coffee' },
+      unitPrice: 450,
+      oneTimePrice: 500,
+      totalCycles: 12,
+      minCycles: 3,
+      quantity: 1,
+      shipping: 0,
+      amount: 450,
+    } as any)
+    const res = await quote(post({ productId: PID, interval: 'monthly', quantity: 1, unitPrice: 1 }))
+    expect(await res.json()).toMatchObject({ unitPrice: 450, oneTimePrice: 500, totalCycles: 12, minCycles: 3 })
+  })
+
   it('create requires explicit consent', async () => {
     const res = await create(post({ productId: PID, interval: 'monthly', quantity: 1, addressId: AID }))
     expect(res.status).toBe(400)

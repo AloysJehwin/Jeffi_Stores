@@ -26,7 +26,12 @@ export async function getInventorySync(
   const run = client
     ? (sql: string, params: any[]) => client.query(sql, params)
     : (sql: string, params: any[]) => query(sql, params)
-  const res = await run(`SELECT inventory_sync, low_stock_threshold FROM products WHERE id = $1`, [productId])
+  // Digital products never track stock, whatever the flag says.
+  const res = await run(
+    `SELECT inventory_sync AND NOT COALESCE(is_digital, FALSE) AS inventory_sync, low_stock_threshold
+       FROM products WHERE id = $1`,
+    [productId]
+  )
   const row = res.rows[0]
   return {
     enabled: !!row?.inventory_sync,

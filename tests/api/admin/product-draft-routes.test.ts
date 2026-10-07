@@ -204,6 +204,7 @@ describe('products draft units route', () => {
   })
 
   it('POST adds unit to draft', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_digital: false }) // digital guard
     // liveBaseUnit() runs first for the base-change guard; null = no live base, guard skipped.
     mockQueryOne.mockResolvedValueOnce(null)
     mockQueryOne.mockResolvedValueOnce({ units: [] })
@@ -211,6 +212,14 @@ describe('products draft units route', () => {
     const res = await unitsPost(req('POST', { unit: 'pc', factor: 1, is_base: true }), { params: idParams })
     const data = await res.json()
     expect(data.unit).toBeDefined()
+  })
+
+  it('POST rejects units for a digital product (live or staged)', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_digital: true })
+    const res = await unitsPost(req('POST', { unit: 'box', factor: 10 }), { params: idParams })
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toBe('Digital products sell as 1 pc')
+    expect(mockQuery).not.toHaveBeenCalled()
   })
 
   it('DELETE removes unit from draft', async () => {

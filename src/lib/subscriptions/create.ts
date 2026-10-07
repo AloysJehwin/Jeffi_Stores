@@ -67,7 +67,7 @@ export async function createCustomerSubscription(
 
   const rzpSub = await (instance as any).subscriptions.create({
     plan_id: planId,
-    total_count: spec.totalCount,
+    total_count: offer.totalCount,
     quantity: 1,
     customer_notify: 1,
     notes: {
@@ -89,11 +89,11 @@ export async function createCustomerSubscription(
          razorpay_subscription_id, razorpay_plan_id, variant_id, sub_variant_id, quantity,
          interval, interval_count, period, unit_price_paise, unit_price_ex_gst, shipping_paise,
          gst_rate, hsn_code, is_digital, address_id, address_snapshot, collecting_account,
-         linked_account_id, current_cycle, total_count, consent_version, consent_at, locked_price_at
+         linked_account_id, current_cycle, total_count, min_cycles, consent_version, consent_at, locked_price_at
        ) VALUES (
          $1, $2, $3, 'created', $4, NOW() + make_interval(mins => $4), 'razorpay',
          $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21,
-         $22, 0, $23, $24, NOW(), NOW()
+         $22, 0, $23, $25, $24, NOW(), NOW()
        )`,
       [
         localId,
@@ -118,8 +118,9 @@ export async function createCustomerSubscription(
         JSON.stringify(snapshotAddress(offer.address)),
         offer.collectingAccount,
         linkedAccountId,
-        spec.totalCount,
+        offer.totalCount,
         CONSENT_VERSION,
+        offer.minCycles,
       ]
     )
   } catch (err) {
