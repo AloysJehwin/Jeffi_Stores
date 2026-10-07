@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
+import { sameHostRedirect } from '@/lib/shared/redirect'
 import { authenticateUser } from '@/lib/auth/jwt'
 import { normalizeReferralCode, resolveReferralCode } from '@/lib/referrals/codes'
 import { setReferralCookie } from '@/lib/referrals/cookie'
@@ -10,22 +11,16 @@ export const dynamic = 'force-dynamic'
 // signed-in customer is sent home without the cookie, as is any link that no longer resolves.
 export async function GET(request: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = await params
-  const home = request.nextUrl.clone()
-  home.pathname = '/'
-  home.search = ''
 
   try {
     const code = normalizeReferralCode(rawCode)
-    if (!code || !(await isReferralLive()) || (await authenticateUser(request))) return NextResponse.redirect(home)
-    if (!(await resolveReferralCode(code))) return NextResponse.redirect(home)
+    if (!code || !(await isReferralLive()) || (await authenticateUser(request))) return sameHostRedirect('/')
+    if (!(await resolveReferralCode(code))) return sameHostRedirect('/')
 
-    const signup = request.nextUrl.clone()
-    signup.pathname = '/signup'
-    signup.search = '?ref=1'
-    const res = NextResponse.redirect(signup)
+    const res = sameHostRedirect('/signup?ref=1')
     setReferralCookie(res, code)
     return res
   } catch {
-    return NextResponse.redirect(home)
+    return sameHostRedirect('/')
   }
 }
