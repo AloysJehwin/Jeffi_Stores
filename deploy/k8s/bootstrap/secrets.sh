@@ -13,12 +13,13 @@ kubectl -n jeffi create secret generic cron-secret --from-literal=CRON_SECRET="$
 kubectl -n jeffi get secret redis >/dev/null 2>&1 ||
   kubectl -n jeffi create secret generic redis --from-literal=password="$(openssl rand -hex 24)"
 
-# GHCR pull secret (package is private): GH_DEPLOY_TOKEN must be exported by the caller.
-: "${GH_DEPLOY_TOKEN:?export GH_DEPLOY_TOKEN (read:packages)}"
-for ns in jeffi; do
-  kubectl -n $ns create secret docker-registry ghcr --docker-server=ghcr.io --docker-username=aloysjehwin \
+# GHCR pull secret (package is private). GH_DEPLOY_TOKEN needs read:packages; skipped when unset.
+if [ -n "${GH_DEPLOY_TOKEN:-}" ]; then
+  kubectl -n jeffi create secret docker-registry ghcr --docker-server=ghcr.io --docker-username=aloysjehwin \
     --docker-password="$GH_DEPLOY_TOKEN" --dry-run=client -o yaml | apply
-done
+else
+  echo "GH_DEPLOY_TOKEN unset — ghcr pull secret skipped" >&2
+fi
 
 # Platform CA: public cert for Traefik verification; key only into the flagship pods.
 kubectl -n jeffi-edge create secret generic platform-ca --from-file=ca.crt=certs/ca-cert.pem --dry-run=client -o yaml | apply
