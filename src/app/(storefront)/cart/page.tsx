@@ -412,7 +412,9 @@ export default function CartPage() {
                           {/* Quantity Controls */}
                           <div className="mt-4">
                             <div className="flex items-center gap-3 flex-wrap">
-                              {isCustomQty ? (
+                              {isDigitalLine(item as any) ? (
+                                <span className="text-sm text-foreground-secondary">Qty 1 · Digital</span>
+                              ) : isCustomQty ? (
                                 <div className="flex items-center gap-2">
                                   <input
                                     type="number"

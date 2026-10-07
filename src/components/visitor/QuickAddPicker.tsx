@@ -64,6 +64,7 @@ interface ProductUnit {
 interface VariantsResponse {
   product_variants: Variant[]
   product_units: ProductUnit[]
+  is_digital?: boolean
 }
 
 interface QuickAddPickerProps {
@@ -125,6 +126,7 @@ export default function QuickAddPicker({
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [quantityRaw, setQuantityRaw] = useState('1')
+  const [isDigital, setIsDigital] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -137,6 +139,7 @@ export default function QuickAddPicker({
         const vs = data.product_variants ?? []
         setVariants(vs)
         setProductUnits(data.product_units ?? [])
+        setIsDigital(!!data.is_digital)
         const firstVariant = vs.find(v => v.stock_status !== 'Out of Stock') ?? vs[0] ?? null
         if (firstVariant) {
           setSelectedVariantId(firstVariant.id)
@@ -221,7 +224,9 @@ export default function QuickAddPicker({
   const effectivePrice = useMemo(() => {
     if (selectedSubVariant) {
       if (!gstEnabled)
-        return round2(pickUnitPrice({ inclusive: selectedSubVariant.price, exGst: selectedSubVariant.price_ex_gst }, false))
+        return round2(
+          pickUnitPrice({ inclusive: selectedSubVariant.price, exGst: selectedSubVariant.price_ex_gst }, false)
+        )
       if (selectedSubVariant.price != null) return round2(Number(selectedSubVariant.price))
     }
     if (selectedVariant) {
@@ -293,7 +298,6 @@ export default function QuickAddPicker({
     showToast,
     subVariants.length,
   ])
-
 
   const body = (
     <div className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto" onClick={onStop}>
@@ -448,21 +452,23 @@ export default function QuickAddPicker({
             )}
           </div>
 
-          <QuantityInput
-            dimension={sellUnit?.dimension ?? 'count'}
-            quantity={quantity}
-            quantityRaw={quantityRaw}
-            unitLabel={effectiveUnitLabel}
-            unitKey={effectiveUnitKey}
-            effectiveStock={pickerStock}
-            qtyStep={qtyStep}
-            qtyMin={qtyMin}
-            qtyMax={qtyMax}
-            onChange={(qty, raw) => {
-              setQuantity(qty)
-              setQuantityRaw(raw)
-            }}
-          />
+          {!isDigital && (
+            <QuantityInput
+              dimension={sellUnit?.dimension ?? 'count'}
+              quantity={quantity}
+              quantityRaw={quantityRaw}
+              unitLabel={effectiveUnitLabel}
+              unitKey={effectiveUnitKey}
+              effectiveStock={pickerStock}
+              qtyStep={qtyStep}
+              qtyMin={qtyMin}
+              qtyMax={qtyMax}
+              onChange={(qty, raw) => {
+                setQuantity(qty)
+                setQuantityRaw(raw)
+              }}
+            />
+          )}
 
           <button
             type="button"
