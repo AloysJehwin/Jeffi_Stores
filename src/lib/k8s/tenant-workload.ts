@@ -116,7 +116,7 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
           spec: {
             ...place,
             automountServiceAccountToken: false,
-            imagePullSecrets: [{ name: 'ghcr' }],
+            imagePullSecrets: [{ name: 'regcred' }],
             terminationGracePeriodSeconds: 60,
             securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 },
             containers: [

@@ -9,6 +9,7 @@ resources:
   - 41-redis.yaml
   - 42-netpol.yaml
   - 43-provisioner-rbac.yaml
+  - 44-ecr-pull-secret.yaml
   - release.yaml
   - cronjobs.yaml
 # CRD-backed resources (issuers, Coroot) are applied after their charts settle: see bootstrap/apply-platform.sh.

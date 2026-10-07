@@ -120,14 +120,14 @@ export async function ensureTenantNode(
 
 /** Copy platform-provided Secrets/ConfigMaps a tenant namespace needs (pull secret, RDS CA). */
 async function seedNamespace(ns: string) {
-  const ghcr = await get<any>('Secret', 'ghcr', PLATFORM_NS)
-  if (ghcr) {
+  const regcred = await get<any>('Secret', 'regcred', PLATFORM_NS)
+  if (regcred) {
     await apply({
       apiVersion: 'v1',
       kind: 'Secret',
-      metadata: { name: 'ghcr', namespace: ns },
-      type: ghcr.type,
-      data: ghcr.data,
+      metadata: { name: 'regcred', namespace: ns },
+      type: regcred.type,
+      data: regcred.data,
     } as K8sObject)
   }
   const rdsCa = await get<any>('ConfigMap', 'rds-ca', PLATFORM_NS)
