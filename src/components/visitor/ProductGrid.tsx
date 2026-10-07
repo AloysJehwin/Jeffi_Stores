@@ -9,6 +9,7 @@ import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
 
 interface ProductItem {
+  is_digital?: boolean
   id: string
   name: string
   slug: string
@@ -501,6 +502,7 @@ export default function ProductGrid({
                           mrp={mrp}
                           mrpDiscount={mrpDiscount}
                           effectiveStock={effectiveStock}
+                          isDigital={!!product.is_digital}
                           primaryImage={primaryImage}
                           brandName={product.brands?.name ?? null}
                           categoryName={product.categories?.name ?? null}

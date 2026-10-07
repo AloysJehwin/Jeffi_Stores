@@ -20,6 +20,7 @@ import { pickUnitPrice } from '@/lib/catalog/pricing'
 
 export interface RecCard {
   id: string
+  is_digital?: boolean | null
   name: string
   slug: string
   has_variants: boolean

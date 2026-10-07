@@ -38,6 +38,7 @@ export function productCardProps(product: any, gstEnabled: boolean) {
     categoryName: product.categories?.name || null,
     discountPct: Number(product.discount_pct ?? 0),
     extraDeliveryDays: Number(product.extra_delivery_days ?? 0),
+    isDigital: !!product.is_digital,
   }
 }
 

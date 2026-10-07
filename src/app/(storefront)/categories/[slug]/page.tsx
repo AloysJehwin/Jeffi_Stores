@@ -197,6 +197,7 @@ export default async function CategoryDetailPage({
                       mrp={mrp}
                       mrpDiscount={mrpDiscount}
                       effectiveStock={effectiveStock}
+                      isDigital={!!product.is_digital}
                       primaryImage={primaryImage || null}
                       brandName={product.brands?.name || null}
                       categoryName={product.categories?.name || null}
