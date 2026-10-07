@@ -902,22 +902,22 @@ export default function ProductActions({
                 )}
               </div>
             </div>
-            {!subscribing && (
-            <QuantityInput
-              dimension={sellUnit?.dimension ?? 'count'}
-              quantity={quantity}
-              quantityRaw={quantityRaw}
-              unitLabel={effectiveUnitLabel}
-              unitKey={effectiveUnitKey}
-              effectiveStock={effectiveStock}
-              qtyStep={qtyStep}
-              qtyMin={qtyMin}
-              qtyMax={qtyMax}
-              onChange={(qty, raw) => {
-                setQuantity(qty)
-                setQuantityRaw(raw)
-              }}
-            />
+            {!subscribing && !digital && (
+              <QuantityInput
+                dimension={sellUnit?.dimension ?? 'count'}
+                quantity={quantity}
+                quantityRaw={quantityRaw}
+                unitLabel={effectiveUnitLabel}
+                unitKey={effectiveUnitKey}
+                effectiveStock={effectiveStock}
+                qtyStep={qtyStep}
+                qtyMin={qtyMin}
+                qtyMax={qtyMax}
+                onChange={(qty, raw) => {
+                  setQuantity(qty)
+                  setQuantityRaw(raw)
+                }}
+              />
             )}
           </div>
         </>
@@ -1139,22 +1139,22 @@ export default function ProductActions({
                 )}
               </div>
             </div>
-            {!subscribing && (
-            <QuantityInput
-              dimension={sellUnit?.dimension ?? 'count'}
-              quantity={quantity}
-              quantityRaw={quantityRaw}
-              unitLabel={effectiveUnitLabel}
-              unitKey={effectiveUnitKey}
-              effectiveStock={effectiveStock}
-              qtyStep={qtyStep}
-              qtyMin={qtyMin}
-              qtyMax={qtyMax}
-              onChange={(qty, raw) => {
-                setQuantity(qty)
-                setQuantityRaw(raw)
-              }}
-            />
+            {!subscribing && !digital && (
+              <QuantityInput
+                dimension={sellUnit?.dimension ?? 'count'}
+                quantity={quantity}
+                quantityRaw={quantityRaw}
+                unitLabel={effectiveUnitLabel}
+                unitKey={effectiveUnitKey}
+                effectiveStock={effectiveStock}
+                qtyStep={qtyStep}
+                qtyMin={qtyMin}
+                qtyMax={qtyMax}
+                onChange={(qty, raw) => {
+                  setQuantity(qty)
+                  setQuantityRaw(raw)
+                }}
+              />
             )}
           </div>
         </>
@@ -1181,52 +1181,52 @@ export default function ProductActions({
       />
 
       {!subscribing && (
-      <div className="space-y-3">
-        <button
-          onClick={handleBuyNow}
-          disabled={!is_active || effectiveStock === 0 || isBuyingNow}
-          className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
-        >
-          {isBuyingNow ? (
-            <>
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Buy Now
-            </>
-          )}
-        </button>
+        <div className="space-y-3">
+          <button
+            onClick={handleBuyNow}
+            disabled={!is_active || effectiveStock === 0 || isBuyingNow}
+            className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
+          >
+            {isBuyingNow ? (
+              <>
+                <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Buy Now
+              </>
+            )}
+          </button>
 
-        <button
-          onClick={handleAddToCart}
-          disabled={!is_active || effectiveStock === 0 || isAddingToCart}
-          className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
-        >
-          {isAddingToCart ? (
-            <>
-              <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-              Adding...
-            </>
-          ) : (
-            <>
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-              Add to Cart
-            </>
-          )}
-        </button>
-      </div>
+          <button
+            onClick={handleAddToCart}
+            disabled={!is_active || effectiveStock === 0 || isAddingToCart}
+            className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
+          >
+            {isAddingToCart ? (
+              <>
+                <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
+                Add to Cart
+              </>
+            )}
+          </button>
+        </div>
       )}
     </div>
   )

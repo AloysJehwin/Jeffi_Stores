@@ -14,6 +14,7 @@ import RequestQuoteButton from '@/components/business/RequestQuoteButton'
 import CopySku from '@/components/ui/CopySku'
 import { mrpDiscountPct, applyDiscount } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
+import { isDigitalLine } from '@/components/visitor/cart/digital-lines'
 
 interface AppliedCoupon {
   couponId: string
@@ -410,7 +411,9 @@ export default function CartPage() {
 
                           {/* Quantity Controls */}
                           <div className="mt-4 flex items-center gap-3 flex-wrap">
-                            {isCustomQty ? (
+                            {isDigitalLine(item as any) ? (
+                              <span className="text-sm text-foreground-secondary">Qty 1 · Digital</span>
+                            ) : isCustomQty ? (
                               <div className="flex items-center gap-2">
                                 <input
                                   type="number"
