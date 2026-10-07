@@ -13,6 +13,20 @@ Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until 
 
 ---
 
+## Kubernetes (2026-10-08)
+
+Tenant compute is moving from AMI-built EC2s to k3s. The plan is in [`K8S_MIGRATION_PLAN.md`](K8S_MIGRATION_PLAN.md) and the runbook in [`deploy/k8s/README.md`](../deploy/k8s/README.md).
+
+- **Selection:** `PROVISIONING_COMPUTE=k8s` switches `ensure_compute` to `src/lib/k8s/tenant-compute.ts`. Each tenant gets the namespace `tenant-{slug}`, with per-plan pod sizing (`src/lib/provisioning/tiers.ts`).
+  - Basic tenants run on shared `pool-basic-N` nodes.
+  - Growth and above get a dedicated `t-{slug}` node.
+- **DNS:** a single `*.jeffistores.in` wildcard. `configure_dns` no longer writes per-host records in k8s mode.
+- **Plan changes:** go through `reconcileK8sPlan`. A node that is still joining parks the change as `k8sPendingPlan`, which the worker retries.
+- **Tenant-admin CA bundle:** is a Secret (`jeffi-edge/client-ca-bundle`) patched by `mtls-fleet` instead of being pushed over SSM.
+- **Live state:** not live yet. The cluster bring-up is the manual runbook step.
+
+---
+
 ## What Has Been Done
 
 ### 1. Tenant Foundation (earlier sessions)
@@ -192,7 +206,7 @@ database/control-plane/schema.sql
 | 🟡 **3** | **Add alerting on failed/stuck provisioning jobs** | Query `provisioning_jobs WHERE status='failed'` or `updated_at < now()-interval '30min' AND status IN ('pending','running')` |
 | 🟡 **4** | **Document the deprovision multi-minute reality** | RDS delete takes several minutes; deprovision returns before the DB is actually gone. Operators should know to wait before re-provisioning the same slug. |
 | 🟡 **5** | **Wildcard cert renewal is now a fleet-wide SPOF** | Cert expires **2026-11-15**. Every tenant's HTTPS depends on it. Wildcards need DNS-01, so certbot auto-renew must retain working `dns-route53` creds on the box — a silent renewal failure takes down *all* tenants at once. Verify `certbot renew --dry-run` + add an expiry alert. |
-| 🟡 **6** | **Release the idle EIP `32.196.38.130`** | The old (pre-EIP-swap) address is still allocated and **unassociated** — AWS bills idle EIPs (~$3.60/mo). Three other EIPs are attached to non-instance ENIs and are worth an audit at the same time. |
+| 🟡 **6** | ~~Release the idle EIP `32.196.38.130`~~ | **Reused (2026-10-08)** as the k3s core node's address — see `deploy/k8s/README.md`. |
 | 🟡 **7** | **`deploy/aws/aws-infrastructure.yaml` still documents the dead IP** | `32.196.38.130` appears in 4 places incl. `EC2_HOST`. Verified **not consumed by any tooling** (doc-only, so nothing breaks) — but it's the file an operator would trust mid-incident. Update to `52.20.193.62`. |
 | 🟡 **8** | **Never re-enable the EC2/RDS start-stop schedules** | `jeffi-start/stop-ec2` + `jeffi-start/stop-rds` in EventBridge group `jeffi-stores` are currently **DISABLED** (app runs 24/7 — correct for SaaS). Re-enabling them would take **every tenant storefront offline overnight**, and would stall the provisioning worker during the down window. The stale comment in `deploy/sync-cron-setup.sh` ("app is only up 09:00–00:00 IST") predates this and should be corrected. |
 | 🟡 **9** | **Local AWS CLI is authenticated as account ROOT** | The `default` profile holds **root access keys** (`arn:aws:iam::708835965056:root`, `AccountAccessKeysPresent: 1`). Root keys bypass all IAM policy/boundaries/SCPs; root MFA (enabled) does **not** protect them. 5 IAM users already exist. Point `default` at a scoped IAM admin (or Identity Center) and delete the root access keys. Does not affect the app, which correctly uses the `jeffi-tenant-provisioning` role on the EC2 instance profile. |

@@ -45,7 +45,10 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
     {
       apiVersion: 'v1',
       kind: 'Namespace',
-      metadata: { name: ns, labels: { 'jeffi.io/tier': 'tenant', 'jeffi.io/tenant': slug, 'jeffi.io/plan': input.plan || 'basic' } },
+      metadata: {
+        name: ns,
+        labels: { 'jeffi.io/tier': 'tenant', 'jeffi.io/tenant': slug, 'jeffi.io/plan': input.plan || 'basic' },
+      },
     },
     {
       apiVersion: 'v1',
@@ -74,7 +77,16 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
               {
                 name: 'redis',
                 image: 'redis:7-alpine',
-                args: ['--requirepass', '$(REDIS_PASSWORD)', '--save', '', '--maxmemory', '48mb', '--maxmemory-policy', 'volatile-lru'],
+                args: [
+                  '--requirepass',
+                  '$(REDIS_PASSWORD)',
+                  '--save',
+                  '',
+                  '--maxmemory',
+                  '48mb',
+                  '--maxmemory-policy',
+                  'volatile-lru',
+                ],
                 env: [{ name: 'REDIS_PASSWORD', valueFrom: { secretKeyRef: { name: 'redis', key: 'password' } } }],
                 ports: [{ containerPort: 6379 }],
                 resources: { requests: { cpu: '10m', memory: '24Mi' }, limits: { memory: '96Mi' } },
@@ -117,12 +129,19 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
                   { name: 'WEB_CONCURRENCY', value: '1' },
                   { name: 'IN_PROCESS_CRON', value: 'false' },
                   { name: 'CLIENT_CERT_PROXY', value: 'traefik' },
-                  { name: 'NODE_OPTIONS', value: `--max-old-space-size=${Math.floor(parseInt(tier.limits.memory) * 0.7)}` },
+                  {
+                    name: 'NODE_OPTIONS',
+                    value: `--max-old-space-size=${Math.floor(parseInt(tier.limits.memory) * 0.7)}`,
+                  },
                   { name: 'REDIS_PASSWORD', valueFrom: { secretKeyRef: { name: 'redis', key: 'password' } } },
                   { name: 'REDIS_URL', value: 'redis://:$(REDIS_PASSWORD)@redis:6379' },
                 ],
                 resources: { requests: tier.requests, limits: tier.limits },
-                startupProbe: { httpGet: { path: '/api/health', port: 'http' }, periodSeconds: 5, failureThreshold: 36 },
+                startupProbe: {
+                  httpGet: { path: '/api/health', port: 'http' },
+                  periodSeconds: 5,
+                  failureThreshold: 36,
+                },
                 readinessProbe: { httpGet: { path: '/api/ready', port: 'http' }, periodSeconds: 10, timeoutSeconds: 5 },
                 livenessProbe: { httpGet: { path: '/api/health', port: 'http' }, periodSeconds: 20, timeoutSeconds: 5 },
                 lifecycle: { preStop: { exec: { command: ['sleep', '10'] } } },
@@ -185,7 +204,9 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
         scaleTargetRef: { apiVersion: 'apps/v1', kind: 'Deployment', name: 'storefront' },
         minReplicas: tier.replicas,
         maxReplicas: tier.maxReplicas,
-        metrics: [{ type: 'Resource', resource: { name: 'cpu', target: { type: 'Utilization', averageUtilization: 70 } } }],
+        metrics: [
+          { type: 'Resource', resource: { name: 'cpu', target: { type: 'Utilization', averageUtilization: 70 } } },
+        ],
       },
     })
   }

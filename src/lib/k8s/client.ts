@@ -127,6 +127,11 @@ export async function remove(kind: string, name: string, namespace?: string): Pr
   }
 }
 
-export function patchMerge(kind: string, name: string, namespace: string | undefined, patch: unknown): Promise<unknown> {
+export function patchMerge(
+  kind: string,
+  name: string,
+  namespace: string | undefined,
+  patch: unknown
+): Promise<unknown> {
   return request('PATCH', resourcePath(kind, name, namespace), JSON.stringify(patch), 'application/merge-patch+json')
 }

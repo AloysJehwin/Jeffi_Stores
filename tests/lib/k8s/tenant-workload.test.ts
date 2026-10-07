@@ -3,8 +3,13 @@ import { renderTenantWorkload } from '@/lib/k8s/tenant-workload'
 import { agentNodeUserData } from '@/lib/k8s/node-user-data'
 import { resourcePath } from '@/lib/k8s/client'
 
-const hosts = (slug: string) => [`${slug}.jeffistores.in`, `admin-${slug}.jeffistores.in`, `vault-${slug}.jeffistores.in`]
-const byKind = (objs: any[], kind: string, name?: string) => objs.filter(o => o.kind === kind && (!name || o.metadata.name === name))
+const hosts = (slug: string) => [
+  `${slug}.jeffistores.in`,
+  `admin-${slug}.jeffistores.in`,
+  `vault-${slug}.jeffistores.in`,
+]
+const byKind = (objs: any[], kind: string, name?: string) =>
+  objs.filter(o => o.kind === kind && (!name || o.metadata.name === name))
 
 describe('renderTenantWorkload', () => {
   it('basic: one pod on the shared pool, no HPA/PDB, isolated namespace', () => {
@@ -45,7 +50,12 @@ describe('renderTenantWorkload', () => {
   })
 
   it('issues an HTTP-01 certificate per verified custom domain', () => {
-    const objs = renderTenantWorkload({ slug: 'acme', plan: 'pro', hosts: hosts('acme'), customDomains: ['shop.acme.com'] }) as any[]
+    const objs = renderTenantWorkload({
+      slug: 'acme',
+      plan: 'pro',
+      hosts: hosts('acme'),
+      customDomains: ['shop.acme.com'],
+    }) as any[]
     const cert = byKind(objs, 'Certificate')[0]
     expect(cert.spec).toMatchObject({ dnsNames: ['shop.acme.com'], issuerRef: { name: 'letsencrypt-http' } })
     const route = byKind(objs, 'IngressRoute', 'custom-0')[0]
@@ -53,14 +63,23 @@ describe('renderTenantWorkload', () => {
   })
 
   it('uses the release image when given', () => {
-    const objs = renderTenantWorkload({ slug: 'a', plan: 'basic', hosts: hosts('a'), image: 'ghcr.io/x/y:main-abc' }) as any[]
-    expect(byKind(objs, 'Deployment', 'storefront')[0].spec.template.spec.containers[0].image).toBe('ghcr.io/x/y:main-abc')
+    const objs = renderTenantWorkload({
+      slug: 'a',
+      plan: 'basic',
+      hosts: hosts('a'),
+      image: 'ghcr.io/x/y:main-abc',
+    }) as any[]
+    expect(byKind(objs, 'Deployment', 'storefront')[0].spec.template.spec.containers[0].image).toBe(
+      'ghcr.io/x/y:main-abc'
+    )
   })
 })
 
 describe('k8s helpers', () => {
   it('builds API paths for core, grouped and cluster-scoped kinds', () => {
-    expect(resourcePath('Deployment', 'storefront', 'tenant-a')).toBe('/apis/apps/v1/namespaces/tenant-a/deployments/storefront')
+    expect(resourcePath('Deployment', 'storefront', 'tenant-a')).toBe(
+      '/apis/apps/v1/namespaces/tenant-a/deployments/storefront'
+    )
     expect(resourcePath('Namespace', 'tenant-a')).toBe('/api/v1/namespaces/tenant-a')
     expect(resourcePath('IngressRoute', undefined, 'x')).toBe('/apis/traefik.io/v1alpha1/namespaces/x/ingressroutes')
     expect(() => resourcePath('Bogus')).toThrow()

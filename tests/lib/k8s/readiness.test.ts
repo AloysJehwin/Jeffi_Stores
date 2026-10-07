@@ -26,7 +26,9 @@ describe('traefik client cert adapter', () => {
   })
 
   it('parses the leaf CN and converts the decimal serial to hex', () => {
-    const info = encodeURIComponent('Subject="CN=alice,O=Acme";Issuer="CN=CA";SerialNumber="255";NB="1";NA="2",Subject="CN=ca"')
+    const info = encodeURIComponent(
+      'Subject="CN=alice,O=Acme";Issuer="CN=CA";SerialNumber="255";NB="1";NA="2",Subject="CN=ca"'
+    )
     expect(parseTraefikCertInfo(info)).toEqual({ serial: 'FF', commonName: 'alice' })
     expect(parseTraefikCertInfo(encodeURIComponent('SerialNumber="4096"')).serial).toBe('1000')
   })
@@ -38,7 +40,9 @@ describe('traefik client cert adapter', () => {
     })
     expect(clientCertFromProxy(h, 'nginx')).toMatchObject({ serial: 'ABCD', commonName: null })
     expect(clientCertFromProxy(h, 'traefik')).toMatchObject({ serial: '01', commonName: 'mallory' })
-    expect(clientCertFromProxy(new Headers({ [TRAEFIK_CERT_HEADER]: B64 }), 'traefik').pem).toContain('BEGIN CERTIFICATE')
+    expect(clientCertFromProxy(new Headers({ [TRAEFIK_CERT_HEADER]: B64 }), 'traefik').pem).toContain(
+      'BEGIN CERTIFICATE'
+    )
   })
 })
 
