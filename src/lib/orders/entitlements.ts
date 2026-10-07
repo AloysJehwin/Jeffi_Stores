@@ -41,9 +41,9 @@ export async function grantOrderEntitlements(client: PoolClient, input: GrantInp
       AND oi.is_digital = TRUE
       AND oi.product_id IS NOT NULL
     ON CONFLICT (order_item_id) DO UPDATE SET
-      -- A subscription renewal re-extends access on the same entitlement row.
+      -- A subscription renewal re-extends access on the same entitlement row. (access_revoked_at
+      -- belongs to order_items, not here — it is reset by the UPDATE below.)
       status = 'active',
-      access_revoked_at = NULL,
       revoked_at = NULL,
       revoke_reason = NULL,
       access_expires_at = EXCLUDED.access_expires_at,
