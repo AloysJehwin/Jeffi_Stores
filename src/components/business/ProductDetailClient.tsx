@@ -9,6 +9,7 @@ import RazorpayOffers from '@/components/visitor/RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { digitalActive } from '@/lib/catalog/digital'
 import { applyDiscount, mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
@@ -323,6 +324,7 @@ export default function ProductDetailClient({
   const { user } = useAuth()
   const { showToast } = useToast()
   const gstEnabled = useStoreConfig().flags.gstEnabled
+  const isDigital = digitalActive(useStoreConfig().flags.digitalProductsEnabled, (product as { is_digital?: boolean }).is_digital ?? false)
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -419,7 +421,7 @@ export default function ProductDetailClient({
         </div>
 
         <div className="hidden lg:block mt-4">
-          <DeliveryInfo {...policy} />
+          {!isDigital && <DeliveryInfo {...policy} />}
         </div>
       </div>
 
@@ -522,7 +524,7 @@ export default function ProductDetailClient({
       </div>
 
       <div className="order-3 lg:hidden">
-        <DeliveryInfo {...policy} />
+        {!isDigital && <DeliveryInfo {...policy} />}
       </div>
     </>
   )

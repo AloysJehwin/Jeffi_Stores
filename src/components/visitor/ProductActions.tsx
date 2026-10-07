@@ -94,6 +94,8 @@ interface ProductActionsProps {
   discontinueDate?: string | null
   isCodAllowed?: boolean | null
   stickyImage?: string | null
+  digital?: boolean
+  alreadyOwned?: boolean
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -149,6 +151,8 @@ export default function ProductActions({
   discontinueDate,
   isCodAllowed,
   stickyImage,
+  digital = false,
+  alreadyOwned = false,
 }: ProductActionsProps) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -1077,6 +1081,16 @@ export default function ProductActions({
       )}
 
       <div id={PDP_BUY_BUTTONS_ID} className="space-y-3">
+        {alreadyOwned ? (
+          // TODO(P4): point at the real vault item URL once the vault host exists.
+          <a
+            href="#"
+            className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+          >
+            Open in vault
+          </a>
+        ) : (
+          <>
         <button
           onClick={handleBuyNow}
           disabled={!is_active || effectiveStock === 0 || isBuyingNow || isPreLaunch || isDiscontinued}
@@ -1137,6 +1151,8 @@ export default function ProductActions({
             </svg>
             View cart
           </a>
+        )}
+        </>
         )}
       </div>
 
