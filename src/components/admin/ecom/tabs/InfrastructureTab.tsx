@@ -1,6 +1,7 @@
 import type { TenantDetail, ProvisioningJob, CustomDomain } from '@/lib/tenant-registry'
 import type { TenantMigrationRun } from '@/lib/tenant-migrations'
 import { Field, FieldGrid, Section, Mono, StatusPill, NOT_PROVISIONED } from '../EcomUI'
+import K8sWorkloadSection from './K8sWorkloadSection'
 
 export default function InfrastructureTab({
   tenant: t,
@@ -20,6 +21,7 @@ export default function InfrastructureTab({
   const res = (job?.created_resources as Record<string, unknown>) || {}
   const hosts: string[] = Array.isArray(res.dnsHosts) ? (res.dnsHosts as string[]) : []
   const str = (v: unknown) => (typeof v === 'string' && v ? v : null)
+  const onK8s = res.computeMode === 'k8s'
 
   return (
     <div className="space-y-6 min-w-0">
@@ -38,7 +40,7 @@ export default function InfrastructureTab({
 
         <Section title="Compute & storage">
           <FieldGrid>
-            <Field label="EC2 target" value={t.ec2_target || 'shared pool'} />
+            <Field label={onK8s ? 'Ingress IP' : 'EC2 target'} value={t.ec2_target || 'shared pool'} />
             <Field label="Instance state" value={<span className="capitalize">{t.instance_state}</span>} />
             <Field label="S3 bucket" value={t.s3_bucket ? <Mono>{t.s3_bucket}</Mono> : NOT_PROVISIONED} />
             <Field label="CloudFront" value={t.cloudfront_id ? <Mono>{t.cloudfront_id}</Mono> : '—'} />
@@ -47,6 +49,8 @@ export default function InfrastructureTab({
           </FieldGrid>
         </Section>
       </div>
+
+      {onK8s && <K8sWorkloadSection slug={t.slug} plan={t.plan} />}
 
       <Section
         title="Schema version"

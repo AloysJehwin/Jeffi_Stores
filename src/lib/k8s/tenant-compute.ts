@@ -157,3 +157,36 @@ export async function deleteTenantWorkload(slug: string): Promise<void> {
   await remove('Namespace', tenantNamespace(slug))
   await remove('Node', dedicatedNodeName(slug))
 }
+
+export interface TenantWorkloadStatus {
+  namespace: string
+  image: string | null
+  desired: number
+  ready: number
+  pods: { name: string; phase: string; ready: boolean; restarts: number; node: string | null; startedAt: string | null }[]
+}
+
+/** Live namespace status for the admin infrastructure tab; null when the namespace is absent. */
+export async function getTenantWorkloadStatus(slug: string): Promise<TenantWorkloadStatus | null> {
+  const ns = tenantNamespace(slug)
+  const d = await get<any>('Deployment', 'storefront', ns)
+  if (!d) return null
+  const pods = await list<any>('Pod', ns, `app=storefront,jeffi.io/tenant=${slug}`)
+  return {
+    namespace: ns,
+    image: d.spec?.template?.spec?.containers?.[0]?.image ?? null,
+    desired: d.spec?.replicas ?? 0,
+    ready: d.status?.readyReplicas ?? 0,
+    pods: pods.map(p => {
+      const cs = p.status?.containerStatuses?.[0]
+      return {
+        name: p.metadata.name,
+        phase: p.status?.phase ?? 'Unknown',
+        ready: !!cs?.ready,
+        restarts: cs?.restartCount ?? 0,
+        node: p.spec?.nodeName ?? null,
+        startedAt: p.status?.startTime ?? null,
+      }
+    }),
+  }
+}
