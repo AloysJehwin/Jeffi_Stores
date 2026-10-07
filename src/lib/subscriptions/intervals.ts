@@ -64,11 +64,3 @@ export function billingCyclesLabel(totalCycles: number | null | undefined, isDig
   const noun = isDigital ? (totalCycles === 1 ? 'charge' : 'charges') : totalCycles === 1 ? 'delivery' : 'deliveries'
   return `${totalCycles} ${noun}, then it ends`
 }
-
-/** A stored total_count below the interval's default cap is an admin-set fixed term. */
-export function fixedCycles(interval: unknown, totalCount: unknown): number | null {
-  const n = Number(totalCount)
-  if (!Number.isInteger(n) || n < 1) return null
-  if (!isSubscriptionInterval(interval)) return n
-  return n < INTERVAL_SPEC[interval].totalCount ? n : null
-}

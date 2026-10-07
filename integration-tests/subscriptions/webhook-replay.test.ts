@@ -157,12 +157,12 @@ describe.skipIf(!ENABLED)('Razorpay subscription webhook replay (real DB)', () =
          user_id, product_id, status, interval_minutes, next_renewal_at, source,
          razorpay_subscription_id, razorpay_plan_id, quantity, interval, interval_count, period,
          unit_price_paise, unit_price_ex_gst, shipping_paise, gst_rate, hsn_code, is_digital,
-         address_id, address_snapshot, collecting_account, current_cycle, total_count,
+         address_id, address_snapshot, collecting_account, current_cycle, total_count, term_cycles,
          consent_version, consent_at, locked_price_at
        ) VALUES (
          $1, $2, 'authenticated', 43200, NOW() + interval '30 days', 'razorpay',
          $3, $4, 1, 'monthly', 1, 'monthly', 49900, 422.88, $5, 18, '8471', $6,
-         $7, $8::jsonb, 'platform', 0, 120, 'v1', NOW(), NOW()
+         $7, $8::jsonb, 'platform', 0, 120, NULL, 'v1', NOW(), NOW()
        ) RETURNING id`,
       [
         userId,

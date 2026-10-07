@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { billingCyclesLabel, cycleLimitsError, fixedCycles, normalizeCycleCount } from '@/lib/subscriptions/intervals'
+import { billingCyclesLabel, cycleLimitsError, normalizeCycleCount } from '@/lib/subscriptions/intervals'
 
 describe('billing cycle helpers', () => {
   it('normalizes the admin cycle count to 1..520 or null', () => {
@@ -24,12 +24,5 @@ describe('billing cycle helpers', () => {
     expect(billingCyclesLabel(12, false)).toBe('12 deliveries, then it ends')
     expect(billingCyclesLabel(12, true)).toBe('12 charges, then it ends')
     expect(billingCyclesLabel(1, true)).toBe('1 charge, then it ends')
-  })
-
-  it('treats a stored total_count below the interval cap as a fixed term', () => {
-    expect(fixedCycles('monthly', 12)).toBe(12)
-    expect(fixedCycles('monthly', 120)).toBeNull()
-    expect(fixedCycles('yearly', 10)).toBeNull()
-    expect(fixedCycles('monthly', null)).toBeNull()
   })
 })

@@ -336,6 +336,7 @@ CREATE TABLE public.subscriptions (
     access_expires_at timestamp with time zone,
     total_count integer,
     min_cycles integer,
+    term_cycles integer,
     consent_version character varying(16),
     consent_at timestamp with time zone,
     cancel_at_cycle_end boolean DEFAULT false NOT NULL,

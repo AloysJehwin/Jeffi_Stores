@@ -1,4 +1,6 @@
 import type { ParsedRow } from './parse'
+import { MAX_BILLING_CYCLES, SUBSCRIPTION_INTERVALS, isSubscriptionInterval } from '@/lib/subscriptions/intervals'
+import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
 
 const rowRef = (r: ParsedRow) => (r.sheet ? `${r.sheet} row ${r.rowNumber}` : `row ${r.rowNumber}`)
 
@@ -17,6 +19,7 @@ export interface ProductGroup {
   rowNumber: number
   variants: VariantGroup[]
   errors: string[]
+  warnings: string[]
 }
 
 export interface GroupResult {
@@ -49,6 +52,7 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
         rowNumber: row.rowNumber,
         variants: [],
         errors,
+        warnings: [],
       }
       if (sku && byProductSku.has(sku)) {
         group.errors.push(`duplicate product sku "${sku}" in file (also row ${byProductSku.get(sku)!.rowNumber})`)
@@ -106,5 +110,69 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
     }
   }
 
+  for (const g of groups) {
+    checkDigital(g)
+    checkSubscription(g)
+  }
+
   return { groups, orphans }
+}
+
+const isTrue = (v: unknown) => v === true || String(v).toLowerCase() === 'true'
+
+// Digital products sell as one piece: no variant / sub-variant rows (and so no variant units).
+function checkDigital(g: ProductGroup): void {
+  if (!isTrue(g.values.is_digital)) return
+  if (g.variants.length > 0) {
+    g.errors.push(`digital products cannot have variant or sub-variant rows (${DIGITAL_UNIT_MESSAGE})`)
+  } else if (isTrue(g.values.has_variants)) {
+    g.errors.push('digital products cannot have variants (has_variants must be FALSE)')
+  }
+}
+
+/** "weekly|Monthly, yearly" → ['weekly','monthly','yearly'] in canonical order; invalid entries returned separately. */
+export function parseSubscriptionIntervals(raw: unknown): { intervals: string[]; invalid: string[] } {
+  const parts = String(raw ?? '')
+    .split(/[|,]/)
+    .map(x => x.trim().toLowerCase())
+    .filter(Boolean)
+  const invalid = parts.filter(x => !isSubscriptionInterval(x))
+  return { intervals: SUBSCRIPTION_INTERVALS.filter(i => parts.includes(i)), invalid }
+}
+
+// Intervals / cycle limits, and the sellable rule for subscription_price: only the product (no
+// variants), a variant without sub-variants, or a sub-variant carries one.
+function checkSubscription(g: ProductGroup): void {
+  const v = g.values
+  if (v.subscription_intervals !== undefined) {
+    const { intervals, invalid } = parseSubscriptionIntervals(v.subscription_intervals)
+    if (invalid.length) {
+      g.errors.push(
+        `subscription_intervals: unknown "${invalid.join('", "')}" (use ${SUBSCRIPTION_INTERVALS.join(' | ')})`
+      )
+    }
+    v.subscription_intervals = intervals
+  }
+  const total = v.subscription_total_cycles as number | undefined
+  const min = v.subscription_min_cycles as number | undefined
+  if (total !== undefined && (total < 1 || total > MAX_BILLING_CYCLES)) {
+    g.errors.push(`subscription_total_cycles must be between 1 and ${MAX_BILLING_CYCLES}`)
+  }
+  if (min !== undefined && min < 1) g.errors.push('subscription_min_cycles must be greater than 0')
+  if (total !== undefined && min !== undefined && min > total) {
+    g.errors.push('subscription_min_cycles cannot exceed subscription_total_cycles')
+  }
+
+  if (v.subscription_price !== undefined && (g.variants.length > 0 || isTrue(v.has_variants))) {
+    g.warnings.push('subscription_price ignored on a product with variants (set it per variant / sub-variant)')
+    delete v.subscription_price
+  }
+  for (const variant of g.variants) {
+    if (variant.values.subscription_price !== undefined && variant.subVariants.length > 0) {
+      g.warnings.push(
+        `variant "${variant.sku}": subscription_price ignored (variant has sub-variants; set it per sub-variant)`
+      )
+      delete variant.values.subscription_price
+    }
+  }
 }

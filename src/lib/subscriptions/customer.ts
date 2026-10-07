@@ -1,7 +1,7 @@
 import 'server-only'
 import { queryMany } from '@/lib/shared/db'
 import { round2 } from '@/lib/catalog/gst'
-import { SUBSCRIPTION_INTERVAL_LABELS, SUBSCRIPTION_STATUS_LABELS, fixedCycles, isSubscriptionInterval } from './intervals'
+import { SUBSCRIPTION_INTERVAL_LABELS, SUBSCRIPTION_STATUS_LABELS, isSubscriptionInterval } from './intervals'
 
 export interface CustomerSubscriptionItem {
   id: string
@@ -73,7 +73,7 @@ export async function loadCustomerSubscriptions(userId: string, id?: string): Pr
       quantity: qty,
       amount,
       currentCycle: Number(r.current_cycle ?? 0),
-      totalCycles: fixedCycles(interval, r.total_count),
+      totalCycles: r.term_cycles != null ? Number(r.term_cycles) : null,
       minCycles: r.min_cycles != null ? Number(r.min_cycles) : null,
       currentEnd: iso(r.current_end),
       nextChargeAt: CHARGEABLE.has(r.status) && !r.cancel_at_cycle_end ? iso(r.current_end ?? r.next_renewal_at) : null,
