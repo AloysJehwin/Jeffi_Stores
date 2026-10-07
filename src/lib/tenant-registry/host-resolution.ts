@@ -42,7 +42,7 @@ export function slugFromHost(hostname: string): { slug: string | null; isCustomD
   const label = host.slice(0, host.length - ROOT_DOMAIN.length - 1) // strip ".jeffistores.in"
   // App subdomains like admin-{tenant} / invoice-{tenant}, plus {tenant}.business.
   const businessScoped = label.match(/^(.+)\.business$/)
-  const appPrefixed = label.match(/^(admin|invoice|quotation|purchaseorder|forms|www)-(.+)$/)
+  const appPrefixed = label.match(/^(admin|invoice|quotation|purchaseorder|forms|vault|www)-(.+)$/)
   const bare = businessScoped ? businessScoped[1] : appPrefixed ? appPrefixed[2] : label
   // Reserved single-label app hosts (admin. / business. / forms. etc.) = platform, not tenant.
   if (RESERVED_LABELS.has(bare)) return { slug: null, isCustomDomain: false }
@@ -51,9 +51,9 @@ export function slugFromHost(hostname: string): { slug: string | null; isCustomD
   return { slug: bare, isCustomDomain: false }
 }
 
-export type HostApp = 'admin' | 'invoice' | 'quotation' | 'purchaseorder' | 'forms' | 'business'
+export type HostApp = 'admin' | 'invoice' | 'quotation' | 'purchaseorder' | 'forms' | 'business' | 'vault'
 
-const APP_PREFIXES: HostApp[] = ['admin', 'invoice', 'quotation', 'purchaseorder', 'forms', 'business']
+const APP_PREFIXES: HostApp[] = ['admin', 'invoice', 'quotation', 'purchaseorder', 'forms', 'business', 'vault']
 
 /** Which app surface a host addresses: `admin.` (platform) and `admin-{slug}.` (tenant) both → 'admin'. */
 export function appFromHost(hostname: string): HostApp | null {
