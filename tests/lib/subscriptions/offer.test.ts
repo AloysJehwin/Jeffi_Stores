@@ -62,8 +62,8 @@ const base = { userId: 'u1', productId: PID, interval: 'monthly', quantity: 2 }
 describe('deriveSubscriptionOffer', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('prices from the product subscription_price, never the client', async () => {
-    setup()
+  it('prices from the product / variant price, never the client or a stale subscription_price', async () => {
+    setup(product(), { price: 450 })
     const o = await deriveSubscriptionOffer({ ...base, addressId: 'a1', price: 1 } as any)
     expect(o.unitPrice).toBe(450)
     expect(o.shipping).toBe(60)
@@ -73,7 +73,7 @@ describe('deriveSubscriptionOffer', () => {
     expect(o.merchantLabel).toBe(platformBrandName())
   })
 
-  it('falls back to the normal resolved price when subscription_price is null', async () => {
+  it('skips shipping without an address', async () => {
     setup(product({ subscription_price: null }), { price: 300 })
     const o = await deriveSubscriptionOffer(base)
     expect(o.unitPrice).toBe(300)
@@ -81,7 +81,7 @@ describe('deriveSubscriptionOffer', () => {
   })
 
   it('rejects a cycle above the ₹15,000 cap', async () => {
-    setup(product({ subscription_price: '7600' }))
+    setup(product(), { price: 7600 })
     await expect(deriveSubscriptionOffer(base)).rejects.toThrow('Subscriptions are limited to ₹15,000 per cycle')
   })
 

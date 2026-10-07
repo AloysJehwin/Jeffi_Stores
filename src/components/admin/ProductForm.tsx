@@ -563,9 +563,6 @@ export default function ProductForm({
         ? [product.subscription_interval]
         : []
   )
-  const [subscriptionPrice, setSubscriptionPrice] = useState(
-    product?.subscription_price != null ? String(product.subscription_price) : ''
-  )
   // A digital product is single-SKU with no variants (and no shipping).
   useEffect(() => {
     if (isDigital && hasVariants) setHasVariants(false)
@@ -915,7 +912,7 @@ export default function ProductForm({
     fields.platform_compatibility = platformCompatibility
     fields.subscription_intervals = subscriptionIntervals
     fields.subscription_interval = subscriptionIntervals[0] ?? null
-    fields.subscription_price = subscriptionPrice || null
+    fields.subscription_price = null
     fields.meta_title = metaTitle || null
     fields.meta_description = metaDescription || null
     fields.tax_class = taxClass
@@ -1039,7 +1036,6 @@ export default function ProductForm({
     // subscription & bundle
     isSubscription,
     subscriptionIntervals,
-    subscriptionPrice,
     isBundle,
     // seo & tax
     metaTitle,
@@ -2126,7 +2122,7 @@ export default function ProductForm({
       formData.set('is_subscription', String(isSubscription))
       formData.set('subscription_intervals', subscriptionIntervals.join(','))
       formData.set('subscription_interval', subscriptionIntervals[0] ?? '')
-      formData.set('subscription_price', subscriptionPrice)
+      formData.set('subscription_price', '')
       // Bundling
       formData.set('is_bundle', String(isBundle))
       // SEO
@@ -3171,44 +3167,43 @@ export default function ProductForm({
                     </div>
                   )}
                   {subscriptionsEnabled && isSubscription && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-muted mb-1">
-                          Billing intervals offered
-                        </label>
-                        <div className="flex flex-wrap gap-3">
-                          {SUBSCRIPTION_INTERVALS.map(opt => {
-                            const on = subscriptionIntervals.includes(opt.value)
-                            return (
-                              <label key={opt.value} className="flex items-center gap-1.5 text-sm text-foreground">
-                                <input
-                                  type="checkbox"
-                                  checked={on}
-                                  onChange={() =>
-                                    setSubscriptionIntervals(prev =>
-                                      on ? prev.filter(v => v !== opt.value) : [...prev, opt.value]
-                                    )
-                                  }
-                                />
-                                {opt.label}
-                              </label>
-                            )
-                          })}
+                    <div className="pt-2 border-t border-border-default space-y-2">
+                      <AdminSelect
+                        label="Billing intervals offered"
+                        placeholder={
+                          subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length
+                            ? 'All intervals added'
+                            : 'Add a billing interval…'
+                        }
+                        value=""
+                        options={SUBSCRIPTION_INTERVALS.filter(o => !subscriptionIntervals.includes(o.value))}
+                        disabled={subscriptionIntervals.length === SUBSCRIPTION_INTERVALS.length}
+                        onChange={v => v && setSubscriptionIntervals(prev => (prev.includes(v) ? prev : [...prev, v]))}
+                      />
+                      {subscriptionIntervals.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {SUBSCRIPTION_INTERVALS.filter(o => subscriptionIntervals.includes(o.value)).map(opt => (
+                            <span
+                              key={opt.value}
+                              className="inline-flex items-center gap-1 rounded-full bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 px-2.5 py-1 text-xs font-medium"
+                            >
+                              {opt.label}
+                              <button
+                                type="button"
+                                aria-label={`Remove ${opt.label}`}
+                                onClick={() => setSubscriptionIntervals(prev => prev.filter(v => v !== opt.value))}
+                                className="hover:text-red-600"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
                         </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-muted mb-1">
-                          Subscription Price (₹ per cycle)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={subscriptionPrice}
-                          onChange={e => setSubscriptionPrice(e.target.value)}
-                          className={inputCls}
-                        />
-                      </div>
+                      )}
+                      <p className="text-xs text-foreground-muted">
+                        Each cycle is charged at the product&apos;s price
+                        {isDigital ? '' : ' (or the chosen variant / sub-variant price)'}.
+                      </p>
                     </div>
                   )}
                 </div>

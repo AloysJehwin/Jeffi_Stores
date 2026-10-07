@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "src/components/admin/ProductForm.tsx": {
-    "mtime": 1791363693.8867826,
-    "ast_hash": "aa3c4e4e033d42781c9db1bba43aa914",
+    "mtime": 1791371122.071078,
+    "ast_hash": "481434c68509f24b37f06ab48ca7e224",
     "semantic_hash": ""
   },
   "src/components/admin/ProductStockMovements.tsx": {
@@ -715,8 +715,8 @@
     "semantic_hash": ""
   },
   "next.config.js": {
-    "mtime": 1790931247.749759,
-    "ast_hash": "31d03240671a7e7edbcd8e8e3b409024",
+    "mtime": 1791371232.572475,
+    "ast_hash": "727db01e886ab202e299ff4e950464e7",
     "semantic_hash": ""
   },
   "package.json": {
@@ -3230,8 +3230,8 @@
     "semantic_hash": ""
   },
   "src/lib/provisioning/steps.ts": {
-    "mtime": 1790931253.8430307,
-    "ast_hash": "055b23e10c117f79c3df86bf6b7fcaf5",
+    "mtime": 1791370891.1686637,
+    "ast_hash": "9f4a379ecb459406f4ed54831ab0f581",
     "semantic_hash": ""
   },
   "src/lib/provisioning/stub-provider.ts": {
@@ -3395,8 +3395,8 @@
     "semantic_hash": ""
   },
   "tests/lib/provisioning/steps.test.ts": {
-    "mtime": 1790931257.4761558,
-    "ast_hash": "5b9d71990c4b7cbe756e6fe63a473e0d",
+    "mtime": 1791370983.9610755,
+    "ast_hash": "2d759433c135d7c05bd0784a9b01cfb4",
     "semantic_hash": ""
   },
   "tests/lib/provisioning/stub-provider.test.ts": {
@@ -13270,8 +13270,8 @@
     "semantic_hash": ""
   },
   "src/lib/catalog/digital-guard.ts": {
-    "mtime": 1791360974.5509334,
-    "ast_hash": "63b708fbe3522a010efba8501395d4ec",
+    "mtime": 1791371081.4431562,
+    "ast_hash": "d888c3478e75e3403ae13da7c9cf1752",
     "semantic_hash": ""
   },
   "src/lib/catalog/digital.ts": {
@@ -13325,8 +13325,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/products/[id]/files/route.ts": {
-    "mtime": 1791364290.7758827,
-    "ast_hash": "4fee6a36e0c13c321e37c15d33dffe63",
+    "mtime": 1791371081.4436142,
+    "ast_hash": "b1152fedeca16c046fad099f810b88e1",
     "semantic_hash": ""
   },
   "src/app/api/(public)/vault/handoff/route.ts": {
@@ -13630,8 +13630,8 @@
     "semantic_hash": ""
   },
   "src/lib/subscriptions/offer.ts": {
-    "mtime": 1791369668.717462,
-    "ast_hash": "947f71231119b54762ede45c081e7eed",
+    "mtime": 1791371143.8846729,
+    "ast_hash": "1c0224a151fa90ce90c518f41c2c1853",
     "semantic_hash": ""
   },
   "src/lib/subscriptions/plans.ts": {
@@ -13715,8 +13715,8 @@
     "semantic_hash": ""
   },
   "tests/lib/subscriptions/offer.test.ts": {
-    "mtime": 1791369668.7177503,
-    "ast_hash": "66c8d8a7acb02521363ad4178088d198",
+    "mtime": 1791371183.4807193,
+    "ast_hash": "131c26f8658f8cd7fa89b28b9fdbfd1b",
     "semantic_hash": ""
   },
   "tests/lib/subscriptions/verify.test.ts": {

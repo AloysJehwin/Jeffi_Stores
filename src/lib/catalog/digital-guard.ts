@@ -7,6 +7,17 @@ export async function isDigitalProduct(productId: string): Promise<boolean> {
   return !!row?.is_digital
 }
 
+// Vault uploads: live digital, or being edited as a draft (the toggle may not be published yet).
+export async function canHoldVaultFiles(productId: string): Promise<boolean> {
+  const row = await queryOne<{ ok: boolean }>(
+    `SELECT (p.is_digital OR d.product_id IS NOT NULL) AS ok
+       FROM products p LEFT JOIN product_drafts d ON d.product_id = p.id
+      WHERE p.id = $1`,
+    [productId]
+  )
+  return !!row?.ok
+}
+
 // Return the subset of productIds that are digital. Empty input → empty array (no query).
 export async function findDigitalProductIds(productIds: string[]): Promise<string[]> {
   const ids = [...new Set(productIds.filter(Boolean))]

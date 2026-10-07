@@ -117,10 +117,8 @@ export async function deriveSubscriptionOffer(input: OfferInput): Promise<Subscr
   })
   if (!resolved.ok) throw new SubscriptionError(resolved.error)
 
-  const subPrice = flags.gstEnabled
-    ? Number(product.subscription_price ?? 0)
-    : Number(product.subscription_price_ex_gst ?? product.subscription_price ?? 0)
-  const unitPrice = round2(subPrice > 0 ? subPrice : resolved.item.price)
+  // Each cycle is charged the live product / variant / sub-variant price.
+  const unitPrice = round2(resolved.item.price)
   const gstRate = Number(product.gst_percentage ?? 0)
   const unitPriceExGst = flags.gstEnabled ? round2(unitPrice / (1 + gstRate / 100)) : unitPrice
 
