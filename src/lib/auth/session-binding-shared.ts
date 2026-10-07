@@ -29,6 +29,31 @@ export function normHost(host: string | null | undefined): string {
     .replace(/:\d+$/, '')
 }
 
+// The scope a key + bind cookie are valid across. The *_sid session cookies are set with
+// Domain=.jeffistores.in, so the browser sends one session to every subdomain; binding must cover
+// exactly those hosts and no wider. When the host is under the shared cookie domain we collapse to
+// that domain (apex + all subdomains share one bind); otherwise the host is returned unchanged, so
+// hosts that do NOT share a cookie stay host-pinned exactly as before — custom tenant domains, the
+// tenant-admin admin-{slug}. host (its own host-scoped admin_sid_t cookie), and localhost/non-prod
+// (cookieDomain undefined). cookieDomain is passed in to keep this file dependency-free.
+export function bindScope(host: string | null | undefined, cookieDomain?: string | null): string {
+  const h = normHost(host)
+  if (!cookieDomain) return h
+  const d = cookieDomain.replace(/^\./, '')
+  return isUnderCookieDomain(h, cookieDomain) ? d : h
+}
+
+// Whether a host is covered by the shared cookie domain — the apex itself AND every subdomain. The
+// bind cookie must carry Domain for exactly these hosts. bindScope() can't stand in for this: at the
+// apex the scope equals the host, so a "scope !== host" test wrongly treats the apex as host-pinned
+// and mints a host-only bind, which is why the apex logged out on reload.
+export function isUnderCookieDomain(host: string | null | undefined, cookieDomain?: string | null): boolean {
+  if (!cookieDomain) return false
+  const h = normHost(host)
+  const d = cookieDomain.replace(/^\./, '')
+  return h === d || h.endsWith('.' + d)
+}
+
 export interface BindingContext {
   host: string
   method: string
