@@ -10,6 +10,7 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useRouter } from 'next/navigation'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import { digitalActive } from '@/lib/catalog/digital'
 import QuickAddButton from '@/components/visitor/QuickAddButton'
 import { applyDiscount, mrpDiscountPct } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
@@ -34,6 +35,7 @@ interface ProductCardProps {
   hazardous?: boolean | null
   flammable?: boolean | null
   badge?: string | null
+  isDigital?: boolean
   portal?: 'storefront' | 'business'
 }
 
@@ -57,11 +59,14 @@ export default function ProductCard({
   hazardous,
   flammable,
   badge,
+  isDigital = false,
   portal = 'storefront',
 }: ProductCardProps) {
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
-  const gstEnabled = useStoreConfig().flags.gstEnabled
+  const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
+  const digital = digitalActive(digitalProductsEnabled, isDigital)
+  const inStock = digital || effectiveStock > 0
   const router = useRouter()
   const { has: inWishlist, toggle: toggleWishlist } = useWishlist()
   const isInWishlist = inWishlist(id)
@@ -78,10 +83,11 @@ export default function ProductCard({
   const shownMrpDiscount = businessPrice && mrp && mrp > 0 ? mrpDiscountPct(mrp, businessPrice) : mrpDiscount
 
   useEffect(() => {
+    if (digital) return
     resolveEdd(!!user, handlingDays, extraDeliveryDays, isBusiness ? 'business' : undefined).then(v => {
       if (v) setEdd(v)
     })
-  }, [user, handlingDays, extraDeliveryDays, isBusiness])
+  }, [digital, user, handlingDays, extraDeliveryDays, isBusiness])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
@@ -205,12 +211,15 @@ export default function ProductCard({
               )
             )}
 
-            {(shownMrpDiscount > 0 || badge) && (
+            {(shownMrpDiscount > 0 || badge || digital) && (
               <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
                 {shownMrpDiscount > 0 && (
                   <div className="bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                     {shownMrpDiscount}% off
                   </div>
+                )}
+                {digital && (
+                  <div className="bg-violet-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">Digital</div>
                 )}
                 {badge && (
                   <div className="bg-primary-500 dark:bg-primary-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
@@ -237,7 +246,7 @@ export default function ProductCard({
                   productName={name}
                   slug={slug}
                   hasVariants={hasVariants}
-                  inStock={effectiveStock > 0}
+                  inStock={inStock}
                   imageUrl={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
                   brandName={brandName}
                   categoryName={categoryName}
@@ -318,15 +327,15 @@ export default function ProductCard({
               {gstEnabled && <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>}
               <div className="flex items-center justify-between gap-1">
                 <span
-                  className={`text-xs font-medium whitespace-nowrap ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}
+                  className={`text-xs font-medium whitespace-nowrap ${inStock ? 'text-green-600' : 'text-red-600'}`}
                 >
-                  {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
+                  {digital ? 'Instant access' : inStock ? 'In Stock' : 'Out of Stock'}
                 </span>
                 <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all group-hover:translate-x-1">
                   View Details &#x2192;
                 </span>
               </div>
-              {edd && effectiveStock > 0 && (
+              {edd && !digital && inStock && (
                 <p className="text-[10px] text-foreground-muted mt-0.5">
                   Deliver by{' '}
                   <span className="font-medium text-foreground">

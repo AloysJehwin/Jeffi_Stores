@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import ProductCard from '@/components/visitor/ProductCard'
 
 interface Product {
+  is_digital?: boolean
   id: string
   name: string
   slug: string
@@ -73,6 +74,7 @@ export default function RecommendedProducts({ title = 'You Might Also Like', lim
               mrp={mrp}
               mrpDiscount={mrpDiscount}
               effectiveStock={effectiveStock}
+              isDigital={!!product.is_digital}
               primaryImage={primaryImage || null}
               brandName={product.brands?.name || null}
               categoryName={product.categories?.name || null}
