@@ -24,6 +24,9 @@ export interface SubscriptionItem {
   intervalLabel: string
   quantity: number
   amount: number
+  currentCycle?: number
+  totalCycles?: number | null
+  minCycles?: number | null
   currentEnd: string | null
   nextChargeAt: string | null
   cancelAtCycleEnd: boolean
@@ -155,6 +158,8 @@ export function MySubscriptions({ isBusiness }: { isBusiness: boolean }) {
             const canPause = s.status === 'active' && !s.cancelAtCycleEnd
             const canResume = s.status === 'paused'
             const canAddress = !s.isDigital && !ended
+            const paid = s.currentCycle ?? 0
+            const locked = !!s.minCycles && paid < s.minCycles
             return (
               <article
                 key={s.id}
@@ -182,6 +187,7 @@ export function MySubscriptions({ isBusiness }: { isBusiness: boolean }) {
                     <p className="text-sm text-foreground-secondary">
                       {formatInr(s.amount)} · {s.intervalLabel}
                       {!s.isDigital && ` · Qty ${s.quantity}`}
+                      {s.totalCycles ? ` · Cycle ${paid} of ${s.totalCycles}` : ''}
                     </p>
                     {!ended && !s.cancelAtCycleEnd && s.nextChargeAt && (
                       <p className="text-sm text-foreground-secondary">Next charge {fmtDate(s.nextChargeAt)}</p>
@@ -200,7 +206,7 @@ export function MySubscriptions({ isBusiness }: { isBusiness: boolean }) {
                 {!ended && (
                   <div className="flex flex-wrap gap-2">
                     {canPause && (
-                      <button className={btn} disabled={busy === s.id} onClick={() => ask(s, 'pause')}>
+                      <button className={btn} disabled={busy === s.id || locked} onClick={() => ask(s, 'pause')}>
                         Pause
                       </button>
                     )}
@@ -217,11 +223,17 @@ export function MySubscriptions({ isBusiness }: { isBusiness: boolean }) {
                     {canCancel && (
                       <button
                         className={`${btn} text-red-600 dark:text-red-400`}
-                        disabled={busy === s.id}
+                        disabled={busy === s.id || locked}
                         onClick={() => ask(s, 'cancel')}
                       >
                         Cancel
                       </button>
+                    )}
+                    {locked && (canPause || canCancel) && (
+                      <p className="basis-full text-xs text-foreground-muted" data-testid="subscription-commitment">
+                        Minimum {s.minCycles} charges: you can cancel or pause after charge {s.minCycles} ({paid} paid
+                        so far).
+                      </p>
                     )}
                   </div>
                 )}

@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!owned) return NextResponse.json({ error: 'Subscription not found' }, { status: 404 })
 
     if (action === 'cancel') await cancelSubscription(id, { atCycleEnd: true, actor: 'customer' })
-    else if (action === 'pause') await pauseSubscription(id)
+    else if (action === 'pause') await pauseSubscription(id, 'customer')
     else if (action === 'resume') await resumeSubscription(id)
     else {
       if (!addressId) return NextResponse.json({ error: 'addressId is required' }, { status: 400 })

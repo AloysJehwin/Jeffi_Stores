@@ -1,6 +1,9 @@
 import { queryOne, queryMany, withTransaction, query } from '@/lib/shared/db'
 import { recomputeStockStatusForProduct } from '@/lib/orders/inventory'
 import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/catalog/selling-unit'
+import { normalizeDigitalProduct } from '@/lib/catalog/digital-units'
+import { normalizeSubscriptionPrice } from '@/lib/subscriptions/sellable'
+import { cycleLimitsError, normalizeCycleCount } from '@/lib/subscriptions/intervals'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -287,9 +290,14 @@ export async function publishProductDraft(productId: string): Promise<void> {
       [productId]
     )) || []
   const fields: any = draft.fields || {}
-  const newPerishable = fields.perishable === true || fields.perishable === 'true'
-  const newSerialized = fields.serialized === true || fields.serialized === 'true'
-  const newHasVariants = fields.has_variants === true || fields.has_variants === 'true'
+  const newDigital = fields.is_digital === true || fields.is_digital === 'true'
+  const newPerishable = !newDigital && (fields.perishable === true || fields.perishable === 'true')
+  const newSerialized = !newDigital && (fields.serialized === true || fields.serialized === 'true')
+  const newHasVariants = !newDigital && (fields.has_variants === true || fields.has_variants === 'true')
+  const totalCycles = normalizeCycleCount(fields.subscription_total_cycles)
+  const minCycles = normalizeCycleCount(fields.subscription_min_cycles)
+  const cyclesError = cycleLimitsError(totalCycles, minCycles)
+  if (cyclesError) throw new Error(cyclesError)
   const turnedOffPerishable = !!liveFlags?.perishable && !newPerishable
   const turnedOffSerialized = !!liveFlags?.serialized && !newSerialized
   // Product changed from variant-based → simple. Its old variants/sub-variants (and
@@ -311,8 +319,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
       ? draft.sub_variants
       : await queryMany(`SELECT * FROM product_sub_variants WHERE product_id = $1`, [productId])
 
-  const units =
-    Array.isArray(draft.units) && draft.units.length > 0
+  const units = newDigital
+    ? []
+    : Array.isArray(draft.units) && draft.units.length > 0
       ? draft.units
       : await queryMany(`SELECT * FROM product_units WHERE product_id = $1`, [productId])
 
@@ -408,6 +417,8 @@ export async function publishProductDraft(productId: string): Promise<void> {
          subscription_intervals   = CASE WHEN jsonb_typeof(($2::jsonb)->'subscription_intervals') = 'array' THEN ARRAY(SELECT jsonb_array_elements_text(($2::jsonb)->'subscription_intervals')) ELSE '{}'::text[] END,
          subscription_interval    = ($2::jsonb)->>'subscription_interval',
          subscription_price       = NULLIF(($2::jsonb)->>'subscription_price', '')::numeric,
+         subscription_total_cycles = NULLIF(($2::jsonb)->>'subscription_total_cycles', '')::integer,
+         subscription_min_cycles  = NULLIF(($2::jsonb)->>'subscription_min_cycles', '')::integer,
          is_bundle                = (($2::jsonb)->>'is_bundle')::boolean,
          bundle_items             = ($2::jsonb)->'bundle_items',
          meta_title               = ($2::jsonb)->>'meta_title',
@@ -426,7 +437,24 @@ export async function publishProductDraft(productId: string): Promise<void> {
          is_draft                 = false,
          updated_at               = NOW()
        WHERE id = $1`,
-      [productId, JSON.stringify(draft.fields)]
+      [
+        productId,
+        JSON.stringify({
+          ...fields,
+          // Variant products price subscriptions per variant / sub-variant.
+          subscription_price: newHasVariants ? null : normalizeSubscriptionPrice(fields.subscription_price),
+          subscription_total_cycles: totalCycles,
+          subscription_min_cycles: minCycles,
+          sell_unit_id: newDigital ? null : fields.sell_unit_id,
+          ...(newDigital && {
+            has_variants: false,
+            perishable: false,
+            serialized: false,
+            inventory_sync: false,
+            stock_status: 'In Stock',
+          }),
+        }),
+      ]
     )
 
     // NOTE: Leaf-level supplier reconcile runs AFTER the variant + sub-variant
@@ -435,7 +463,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
 
     // UPSERT variants — never hard-delete to preserve FK references from POs/orders
     // Only process variants that have valid SKUs
-    const validVariants = (variants as any[]).filter((v: any) => v.sku)
+    const validVariants = (variants as any[])
+      .filter((v: any) => v.sku)
+      .map((v: any) => ({ ...v, subscription_price: normalizeSubscriptionPrice(v.subscription_price) }))
     const draftSkus = validVariants.map((v: any) => v.sku)
     const subsOffVariantIds = new Set<string>()
 
@@ -453,7 +483,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          weight_grams, length_cm, breadth_cm, height_cm,
          package_type, cost_price, inventory_quantity, mrp_ex_gst,
          variant_type, sub_variant_type, sub_variant_type_on, use_own_images,
-         discount_pct, stock_decimal_precision, sell_unit_id, stock_status,
+         discount_pct, stock_decimal_precision, sell_unit_id, stock_status, subscription_price,
          created_at, updated_at
        )
        SELECT $1, v->>'sku', v->>'variant_name', NULLIF(v->>'price','')::numeric, v->'attributes',
@@ -470,7 +500,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          v->>'variant_type', v->>'sub_variant_type', COALESCE((v->>'sub_variant_type_on')::boolean, false),
          COALESCE((v->>'use_own_images')::boolean, false), COALESCE(NULLIF(v->>'discount_pct','')::numeric, 0),
          COALESCE(NULLIF(v->>'stock_decimal_precision','')::integer, 0), NULLIF(v->>'sell_unit_id','')::uuid,
-         COALESCE(NULLIF(v->>'stock_status',''), 'In Stock'), NOW(), NOW()
+         COALESCE(NULLIF(v->>'stock_status',''), 'In Stock'), NULLIF(v->>'subscription_price','')::numeric, NOW(), NOW()
        FROM jsonb_array_elements($2::jsonb) AS v
        ON CONFLICT (sku) DO UPDATE SET
          variant_name = EXCLUDED.variant_name, price = EXCLUDED.price,
@@ -495,6 +525,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          use_own_images = EXCLUDED.use_own_images, discount_pct = EXCLUDED.discount_pct,
          stock_decimal_precision = EXCLUDED.stock_decimal_precision,
          sell_unit_id = EXCLUDED.sell_unit_id, stock_status = EXCLUDED.stock_status,
+         subscription_price = EXCLUDED.subscription_price,
          updated_at = NOW()`,
         [productId, JSON.stringify(validVariants)]
       )
@@ -693,9 +724,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
             await client.query(
               `INSERT INTO product_sub_variants (variant_id, product_id, sku, sub_variant_name, price, mrp,
                  price_ex_gst, mrp_ex_gst, attributes, is_active, inventory_quantity, discount_pct, stock_status,
-                 weight_grams, length_cm, breadth_cm, height_cm, package_type,
+                 weight_grams, length_cm, breadth_cm, height_cm, package_type, subscription_price,
                  created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, NOW(), NOW())`,
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW())`,
               [
                 vid,
                 productId,
@@ -715,6 +746,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
                 num(sv.breadth_cm) ?? null,
                 num(sv.height_cm) ?? null,
                 sv.package_type || null,
+                normalizeSubscriptionPrice(sv.subscription_price),
               ]
             )
           } else {
@@ -727,7 +759,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
                  is_active = $10, discount_pct = $11, stock_status = $12,
                  inventory_quantity = CASE WHEN is_active OR NOT $10::boolean THEN inventory_quantity ELSE 0 END,
                  weight_grams = $13, length_cm = $14, breadth_cm = $15, height_cm = $16, package_type = $17,
-                 updated_at = NOW()
+                 subscription_price = $18, updated_at = NOW()
                WHERE id = $1 AND product_id = $2`,
               [
                 targetId,
@@ -747,6 +779,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
                 num(sv.breadth_cm) ?? null,
                 num(sv.height_cm) ?? null,
                 sv.package_type || null,
+                normalizeSubscriptionPrice(sv.subscription_price),
               ]
             )
           }
@@ -1461,6 +1494,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
     // If inventory_sync is ON for this product, derive stock_status from the final
     // quantities at every grain (backfill on flag flip + steady-state on each
     // publish). No-op when OFF, so the manual stock_status written above stands.
+    if (newDigital) await normalizeDigitalProduct(client, productId)
     await recomputeStockStatusForProduct(client, productId)
 
     await client.query(`DELETE FROM product_drafts WHERE product_id = $1`, [productId])

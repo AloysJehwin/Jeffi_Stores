@@ -211,7 +211,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
                             AND pv2.inventory_quantity <= $1
                           ORDER BY pv2.inventory_quantity ASC LIMIT 5) pv) AS low_variants
            FROM products p LEFT JOIN brands b ON b.id = p.brand_id
-          WHERE p.is_active = TRUE
+          WHERE p.is_active = TRUE AND p.is_digital = FALSE
             AND (p.inventory_quantity <= $1
                  OR EXISTS (SELECT 1 FROM product_variants pv
                               WHERE pv.product_id = p.id AND pv.is_active = TRUE

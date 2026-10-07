@@ -9,6 +9,7 @@ import { recordImplicitSignal } from '@/lib/shared/ai-feedback'
 import { logActivity } from '@/lib/shared/activity'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { toSellingUnit, validatePurchaseQuantity } from '@/lib/catalog/selling-unit'
+import { digitalUnitError } from '@/lib/catalog/digital-units'
 
 const AddCartSchema = z
   .object({
@@ -143,7 +144,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const parsedCart = parseBody(AddCartSchema, body)
     if (!parsedCart.ok) return parsedCart.response
-    const { productId, variantId, buyMode = 'unit', buyUnit, subVariantId } = parsedCart.data
+    const { productId, variantId, subVariantId } = parsedCart.data
+    let buyMode = parsedCart.data.buyMode || 'unit'
+    let buyUnit = parsedCart.data.buyUnit
     let quantity = parsedCart.data.quantity ?? 1
 
     const { userId } = await resolveUserId(request)
@@ -165,6 +168,10 @@ export async function POST(request: NextRequest) {
     // A digital title is owned once: one copy per cart, and none if the buyer already owns it.
     const isDigital = product.is_digital === true
     if (isDigital) {
+      const unitErr = digitalUnitError(buyMode, buyUnit)
+      if (unitErr) return NextResponse.json({ error: unitErr }, { status: 400 })
+      buyMode = 'unit'
+      buyUnit = null
       quantity = 1
       const owned = await queryOne(
         `SELECT 1 FROM vault_entitlements

@@ -288,6 +288,19 @@ describe('resolveBuyNowItem', () => {
     expect(result).toEqual({ ok: false, error: 'Invalid qty' })
   })
 
+  it('rejects a non-piece unit for a digital product', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'p1', is_active: true, base_price: 100, is_digital: true })
+    const result = await resolveBuyNowItem({ productId: 'p1', qty: 1, buyMode: 'box', buyUnit: 'box' })
+    expect(result).toEqual({ ok: false, error: 'Digital products sell as 1 pc' })
+  })
+
+  it('resolves a digital product as one plain piece', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'p1', is_active: true, base_price: 100, is_digital: true })
+    const result = await resolveBuyNowItem({ productId: 'p1', qty: 3, buyMode: 'pcs', buyUnit: 'pcs' })
+    expect(result).toMatchObject({ ok: true, item: { qty: 1, buyMode: 'unit', buyUnit: null, price: 100 } })
+    expect(mockQueryOne).toHaveBeenCalledTimes(1) // no unit-factor lookup
+  })
+
   it('returns error when product not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
     const result = await resolveBuyNowItem({ productId: 'p1', qty: 1 })
@@ -710,6 +723,23 @@ describe('commitOrder — cart mode', () => {
 
     const result = await commitOrder(makeCartCommitInput())
     expect(result).toMatchObject({ id: 'ord-1', order_number: 'ORD-001' })
+  })
+
+  it('refuses a digital cart line that carries a non-piece unit', async () => {
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [makeAddress()] })
+        .mockResolvedValueOnce({ rows: [{ id: 'prod-1' }] }) // prod-1 is digital
+        .mockResolvedValue({ rows: [] }),
+    }
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
+    const input = makeCartCommitInput({
+      cartItems: [makeCartLine({ buy_mode: 'box', buy_unit: 'box', quantity: 1 })],
+      paymentRecord: { gatewayOrderId: 'o', paymentId: 'p', signature: 's', amountPaise: 20000 },
+    })
+    await expect(commitOrder(input)).rejects.toThrow('Digital products sell as 1 pc')
+    expect(client.query).toHaveBeenCalledTimes(2) // nothing inserted
   })
 
   it('throws when address not found', async () => {

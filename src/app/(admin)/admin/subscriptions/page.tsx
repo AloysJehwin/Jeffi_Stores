@@ -122,7 +122,10 @@ async function SubscriptionsListContent({ sp }: { sp: SP }) {
                     {s.quantity > 1 && <span className="text-foreground-muted"> × {s.quantity}</span>}
                   </td>
                   <td className="px-4 py-3">{inr(s.amount)}</td>
-                  <td className="px-4 py-3">{s.currentCycle}</td>
+                  <td className="px-4 py-3">
+                    {s.currentCycle}
+                    {s.totalCycles ? ` of ${s.totalCycles}` : ''}
+                  </td>
                   <td className="px-4 py-3">
                     {s.status === 'active' && !s.cancelAtCycleEnd ? fmtDate(s.currentEnd) : '—'}
                   </td>
@@ -159,6 +162,7 @@ async function SubscriptionsListContent({ sp }: { sp: SP }) {
               <p className="text-sm text-foreground-secondary">{s.productName}</p>
               <p className="text-xs text-foreground-muted mt-1">
                 {s.intervalLabel} · {inr(s.amount)} · cycle {s.currentCycle}
+                {s.totalCycles ? ` of ${s.totalCycles}` : ''}
               </p>
             </Link>
           ))}

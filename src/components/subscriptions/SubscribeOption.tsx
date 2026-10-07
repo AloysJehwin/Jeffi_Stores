@@ -6,8 +6,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { subscribeAllowed } from '@/lib/catalog/digital'
 import { bp } from '@/lib/shared/business-path'
+import { subscriptionSavingsPct } from '@/lib/subscriptions/sellable'
 import {
   SUBSCRIPTION_INTERVAL_LABELS,
+  billingCyclesLabel,
   isSubscriptionInterval,
   type SubscriptionInterval,
 } from '@/lib/subscriptions/intervals'
@@ -16,6 +18,9 @@ export type PurchaseMode = 'once' | 'subscribe'
 
 interface Quote {
   unitPrice: number
+  oneTimePrice?: number
+  totalCycles?: number | null
+  minCycles?: number | null
   quantity: number
   shipping: number
   amount: number
@@ -194,6 +199,8 @@ export default function SubscribeOption({
                 {quote.shipping > 0 && (
                   <span className="text-foreground-muted"> (incl. {formatInr(quote.shipping)} shipping)</span>
                 )}
+                <SavingsNote oneTimePrice={quote.oneTimePrice} unitPrice={quote.unitPrice} />
+                <TermNote totalCycles={quote.totalCycles} minCycles={quote.minCycles} digital={digital} />
               </span>
             ) : null}
           </div>
@@ -210,5 +217,32 @@ export default function SubscribeOption({
         </div>
       )}
     </div>
+  )
+}
+
+export function SavingsNote({ oneTimePrice, unitPrice }: { oneTimePrice?: number; unitPrice: number }) {
+  const pct = subscriptionSavingsPct(Number(oneTimePrice ?? 0), unitPrice)
+  if (!pct) return null
+  return (
+    <span className="block text-xs font-semibold text-green-700 dark:text-green-400" data-testid="subscribe-savings">
+      Save {pct}% vs one-time ({formatInr(Number(oneTimePrice))} each)
+    </span>
+  )
+}
+
+export function TermNote({
+  totalCycles,
+  minCycles,
+  digital,
+}: {
+  totalCycles?: number | null
+  minCycles?: number | null
+  digital: boolean
+}) {
+  return (
+    <span className="block text-xs text-foreground-muted" data-testid="subscribe-term">
+      {billingCyclesLabel(totalCycles, digital)}
+      {minCycles ? ` · Minimum ${minCycles} charges` : ''}
+    </span>
   )
 }

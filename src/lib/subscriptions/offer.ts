@@ -11,6 +11,7 @@ import {
   MAX_CYCLE_AMOUNT_INR,
   SUBSCRIPTION_INTERVAL_LABELS,
   isSubscriptionInterval,
+  normalizeCycleCount,
   type SubscriptionInterval,
 } from './intervals'
 import { SubscriptionError } from './types'
@@ -37,6 +38,8 @@ export interface SubscriptionProduct {
   subscription_intervals: string[] | null
   subscription_price: string | number | null
   subscription_price_ex_gst: string | number | null
+  subscription_total_cycles: number | null
+  subscription_min_cycles: number | null
   gst_percentage: string | number | null
   hsn_code: string | null
 }
@@ -47,8 +50,14 @@ export interface SubscriptionOffer {
   subVariantId: string | null
   interval: SubscriptionInterval
   intervalLabel: string
+  /** Fixed number of charges, or null = until cancelled. */
+  totalCycles: number | null
+  /** Razorpay total_count: totalCycles, else the interval's default cap. */
+  totalCount: number
+  minCycles: number | null
   quantity: number
   unitPrice: number
+  oneTimePrice: number
   unitPriceExGst: number
   gstRate: number
   shipping: number
@@ -88,7 +97,8 @@ export async function deriveSubscriptionOffer(input: OfferInput): Promise<Subscr
 
   const product = await queryOne<SubscriptionProduct>(
     `SELECT id, name, slug, is_active, is_digital, is_subscription, subscription_intervals,
-            subscription_price, subscription_price_ex_gst, gst_percentage, hsn_code
+            subscription_price, subscription_price_ex_gst, subscription_total_cycles, subscription_min_cycles,
+            gst_percentage, hsn_code
        FROM products WHERE id = $1`,
     [input.productId]
   )
@@ -100,6 +110,12 @@ export async function deriveSubscriptionOffer(input: OfferInput): Promise<Subscr
     throw new SubscriptionError('This subscription interval is not available for this product')
   }
   const interval = input.interval
+  const capCount = INTERVAL_SPEC[interval].totalCount
+  const fixed = normalizeCycleCount(product.subscription_total_cycles)
+  const totalCycles = fixed != null ? Math.min(fixed, capCount) : null
+  const totalCount = totalCycles ?? capCount
+  const min = normalizeCycleCount(product.subscription_min_cycles)
+  const minCycles = min != null ? Math.min(min, totalCount) : null
 
   const isDigital = product.is_digital === true
   const rawQty = Number(input.quantity ?? 1)
@@ -108,18 +124,45 @@ export async function deriveSubscriptionOffer(input: OfferInput): Promise<Subscr
   }
   const quantity = isDigital ? 1 : rawQty
 
+  const variantId = input.variantId || null
+  const subVariantId = input.subVariantId || null
+  const sellable = await queryOne<{
+    has_variants: boolean
+    variant_has_subs: boolean
+    variant_sub_price: string | number | null
+    sub_variant_sub_price: string | number | null
+  }>(
+    `SELECT EXISTS (SELECT 1 FROM product_variants WHERE product_id = $1 AND is_active = TRUE) AS has_variants,
+            EXISTS (SELECT 1 FROM product_sub_variants
+                     WHERE product_id = $1 AND variant_id = $2::uuid AND is_active = TRUE) AS variant_has_subs,
+            (SELECT subscription_price FROM product_variants WHERE id = $2::uuid AND product_id = $1) AS variant_sub_price,
+            (SELECT subscription_price FROM product_sub_variants WHERE id = $3::uuid AND product_id = $1) AS sub_variant_sub_price`,
+    [product.id, variantId, subVariantId]
+  )
+  if (sellable?.has_variants && !variantId) throw new SubscriptionError('Choose an option to subscribe')
+  if (sellable?.variant_has_subs && !subVariantId) throw new SubscriptionError('Choose an option to subscribe')
+
   const resolved = await resolveBuyNowItem({
     productId: product.id,
-    variantId: input.variantId || null,
-    subVariantId: input.subVariantId || null,
+    variantId,
+    subVariantId,
     qty: quantity,
     gstEnabled: flags.gstEnabled,
   })
   if (!resolved.ok) throw new SubscriptionError(resolved.error)
 
-  // Each cycle is charged the live product / variant / sub-variant price.
-  const unitPrice = round2(resolved.item.price)
   const gstRate = Number(product.gst_percentage ?? 0)
+  const oneTimePrice = round2(resolved.item.price)
+  const subPrice = Number(
+    (subVariantId
+      ? sellable?.sub_variant_sub_price
+      : variantId
+        ? sellable?.variant_sub_price
+        : product.subscription_price) ?? 0
+  )
+  // subscription_price is GST-inclusive like `price`; GST off charges its ex-GST value.
+  const unitPrice =
+    subPrice > 0 ? (flags.gstEnabled ? round2(subPrice) : round2(subPrice / (1 + gstRate / 100))) : oneTimePrice
   const unitPriceExGst = flags.gstEnabled ? round2(unitPrice / (1 + gstRate / 100)) : unitPrice
 
   let address: Record<string, any> | null = null
@@ -134,7 +177,7 @@ export async function deriveSubscriptionOffer(input: OfferInput): Promise<Subscr
   if (!isDigital && address) {
     const q = await quoteShipping({
       destinationPin: String(address.postal_code ?? ''),
-      items: [{ productId: product.id, variantId: input.variantId, subVariantId: input.subVariantId, quantity }],
+      items: [{ productId: product.id, variantId, subVariantId, quantity }],
       subtotal,
     })
     shipping = q.shipping
@@ -156,8 +199,12 @@ export async function deriveSubscriptionOffer(input: OfferInput): Promise<Subscr
     subVariantId: resolved.item.subVariantId,
     interval,
     intervalLabel: SUBSCRIPTION_INTERVAL_LABELS[interval],
+    totalCycles,
+    totalCount,
+    minCycles,
     quantity,
     unitPrice,
+    oneTimePrice,
     unitPriceExGst,
     gstRate,
     shipping,

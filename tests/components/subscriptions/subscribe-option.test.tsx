@@ -115,3 +115,36 @@ describe('SubscribeOption subscribe mode', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })
+
+describe('SubscribeOption comparison & term', () => {
+  it('shows the saving vs one-time and a fixed term with minimum', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        unitPrice: 450,
+        oneTimePrice: 500,
+        totalCycles: 12,
+        minCycles: 3,
+        quantity: 1,
+        shipping: 0,
+        amount: 450,
+        intervalLabel: 'Monthly',
+      }),
+    })
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Subscribe' }))
+    await waitFor(() => expect(screen.getByTestId('subscribe-savings').textContent).toContain('Save 10% vs one-time'))
+    expect(screen.getByTestId('subscribe-term').textContent).toBe('12 deliveries, then it ends · Minimum 3 charges')
+  })
+
+  it('shows no saving when not cheaper, and "Until you cancel" by default', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ unitPrice: 500, oneTimePrice: 500, quantity: 1, shipping: 0, amount: 500, intervalLabel: 'Monthly' }),
+    })
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Subscribe' }))
+    await waitFor(() => expect(screen.getByTestId('subscribe-term').textContent).toBe('Until you cancel'))
+    expect(screen.queryByTestId('subscribe-savings')).toBeNull()
+  })
+})

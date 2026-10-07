@@ -277,6 +277,16 @@ describe('PATCH /api/admin/inventory/stock', () => {
     expect(res.status).toBe(403)
   })
 
+  it('returns 409 for a digital product (stock is not tracked)', async () => {
+    mockAuth.mockResolvedValue(ADMIN as any)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne.mockResolvedValueOnce({ perishable: false, serialized: false, is_digital: true } as any)
+    const res = await PATCH(makePatchReq({ product_id: PRODUCT_UUID, new_quantity: 10 }))
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatch(/Digital products do not track stock/)
+    expect(mockGetClient).not.toHaveBeenCalled()
+  })
+
   it('returns 400 for invalid JSON body', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)

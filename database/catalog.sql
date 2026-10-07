@@ -185,6 +185,7 @@ CREATE TABLE public.product_sub_variants (
     breadth_cm numeric(6,2),
     height_cm numeric(6,2),
     package_type character varying(30),
+    subscription_price numeric(12,2),
     CONSTRAINT product_sub_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 
@@ -274,6 +275,7 @@ CREATE TABLE public.product_variants (
     sell_unit_id uuid,
     supplier_id uuid,
     stock_status character varying(20) DEFAULT 'In Stock'::character varying NOT NULL,
+    subscription_price numeric(12,2),
     CONSTRAINT product_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 
@@ -384,6 +386,8 @@ CREATE TABLE public.products (
     subscription_price numeric(12,2),
     subscription_price_ex_gst numeric(12,2),
     subscription_intervals text[] DEFAULT '{}'::text[] NOT NULL,
+    subscription_total_cycles integer,
+    subscription_min_cycles integer,
     subscription_discount_type character varying(10),
     subscription_discount_value numeric(12,2),
     -- Digital delivery (vault). download_url is retained for back-compat but no longer written/exposed;

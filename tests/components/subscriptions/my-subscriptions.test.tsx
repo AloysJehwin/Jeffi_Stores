@@ -83,6 +83,29 @@ describe('MySubscriptions', () => {
     expect(screen.getByText('Cycle 1 · ORD-1').getAttribute('href')).toBe('/account/orders/o1')
   })
 
+  it('shows "Cycle k of N" for a fixed-term subscription', async () => {
+    list = [{ ...base, currentCycle: 2, totalCycles: 12 }]
+    render(<MySubscriptions isBusiness={false} />)
+    await waitFor(() => expect(screen.getByText(/Cycle 2 of 12/)).toBeTruthy())
+  })
+
+  it('disables Cancel and Pause until the minimum commitment is met', async () => {
+    list = [{ ...base, currentCycle: 2, minCycles: 6 }]
+    render(<MySubscriptions isBusiness={false} />)
+    const cancel = (await screen.findByRole('button', { name: 'Cancel' })) as HTMLButtonElement
+    expect(cancel.disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Pause' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByTestId('subscription-commitment').textContent).toContain('after charge 6 (2 paid')
+  })
+
+  it('enables Cancel once the minimum is met', async () => {
+    list = [{ ...base, currentCycle: 6, minCycles: 6 }]
+    render(<MySubscriptions isBusiness={false} />)
+    const cancel = (await screen.findByRole('button', { name: 'Cancel' })) as HTMLButtonElement
+    expect(cancel.disabled).toBe(false)
+    expect(screen.queryByTestId('subscription-commitment')).toBeNull()
+  })
+
   it('pause confirms then POSTs the pause action and updates the card', async () => {
     render(<MySubscriptions isBusiness={false} />)
     fireEvent.click(await screen.findByRole('button', { name: 'Pause' }))

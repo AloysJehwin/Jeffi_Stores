@@ -134,7 +134,7 @@ describe('admin subscriptions API', () => {
     it.each([
       ['cancel_now', () => expect(cancelSubscription).toHaveBeenCalledWith('sub1', { atCycleEnd: false, actor: 'admin' })],
       ['cancel_at_end', () => expect(cancelSubscription).toHaveBeenCalledWith('sub1', { atCycleEnd: true, actor: 'admin' })],
-      ['pause', () => expect(pauseSubscription).toHaveBeenCalledWith('sub1')],
+      ['pause', () => expect(pauseSubscription).toHaveBeenCalledWith('sub1', 'admin')],
       ['resume', () => expect(resumeSubscription).toHaveBeenCalledWith('sub1')],
       ['sync', () => expect(syncSubscription).toHaveBeenCalledWith('sub1')],
     ])('%s calls the service and returns fresh detail', async (action, check) => {

@@ -538,6 +538,35 @@ describe('POST /api/cart — digital product', () => {
     expect(params[8]).toBe(true) // digital → ON CONFLICT keeps EXCLUDED.quantity (1)
   })
 
+  it('rejects a non-piece selling unit for a digital product', async () => {
+    vi.mocked(queryOne)
+      .mockReset()
+      .mockResolvedValueOnce(digitalProduct as any)
+      .mockResolvedValue(null)
+    const res = await POST(
+      makeRequest('POST', 'http://localhost/api/cart', { productId: PRODUCT_ID, buyMode: 'box', buyUnit: 'box' }) as any
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Digital products sell as 1 pc')
+    expect(vi.mocked(query)).not.toHaveBeenCalled()
+  })
+
+  it('stores a digital line as the plain piece unit with no unit factor lookup', async () => {
+    vi.mocked(queryOne)
+      .mockReset()
+      .mockResolvedValueOnce(digitalProduct as any)
+      .mockResolvedValue(null)
+    const res = await POST(
+      makeRequest('POST', 'http://localhost/api/cart', { productId: PRODUCT_ID, buyMode: 'pcs', buyUnit: 'pcs' }) as any
+    )
+    expect(res.status).toBe(200)
+    const [, params] = vi.mocked(query).mock.calls[0]! as [string, any[]]
+    expect(params[6]).toBe('unit') // buy_mode
+    expect(params[7]).toBeNull() // buy_unit
+    const sqls = vi.mocked(queryOne).mock.calls.map(c => String(c[0]))
+    expect(sqls.some(s => s.includes('FROM product_units'))).toBe(false)
+  })
+
   it('returns 409 alreadyOwned when the buyer holds an active entitlement', async () => {
     vi.mocked(queryOne)
       .mockReset()

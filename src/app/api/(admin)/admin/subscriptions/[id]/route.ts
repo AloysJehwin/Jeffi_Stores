@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 const ACTIONS = {
   cancel_now: (id: string) => cancelSubscription(id, { atCycleEnd: false, actor: 'admin' }),
   cancel_at_end: (id: string) => cancelSubscription(id, { atCycleEnd: true, actor: 'admin' }),
-  pause: (id: string) => pauseSubscription(id),
+  pause: (id: string) => pauseSubscription(id, 'admin'),
   resume: (id: string) => resumeSubscription(id),
   sync: (id: string) => syncSubscription(id),
 } as const

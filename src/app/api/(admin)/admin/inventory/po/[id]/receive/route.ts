@@ -129,10 +129,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         await updateWeightedAvgCost(client, { productId, variantId, subVariantId, qtyReceived, unitCost })
 
         // Fetch perishable + serialized flags
-        const productRow = await client.query<{ perishable: boolean; serialized: boolean }>(
-          'SELECT perishable, serialized FROM products WHERE id = $1',
+        const productRow = await client.query<{ perishable: boolean; serialized: boolean; is_digital: boolean }>(
+          'SELECT perishable, serialized, is_digital FROM products WHERE id = $1',
           [productId]
         )
+        if (productRow.rows[0]?.is_digital)
+          throw new Error(`Product ${productId} is digital — it has no stock to receive`)
         const isPerishable = productRow.rows[0]?.perishable ?? false
         const isSerialised = productRow.rows[0]?.serialized ?? false
         // Serials hang off a batch and the shelf/central sync is batch-driven, so a

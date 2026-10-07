@@ -6,6 +6,8 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { generateProductSku, generateVariantSku } from '@/lib/catalog/sku'
 import { round2 } from '@/lib/catalog/gst'
+import { normalizeSubscriptionPrice } from '@/lib/subscriptions/sellable'
+import { cycleLimitsError, normalizeCycleCount } from '@/lib/subscriptions/intervals'
 
 export async function createProduct(formData: FormData) {
   const name = formData.get('name') as string
@@ -93,6 +95,10 @@ export async function createProduct(formData: FormData) {
       return { error: errors[0] }
     }
   }
+  const totalCycles = normalizeCycleCount(formData.get('subscription_total_cycles'))
+  const minCycles = normalizeCycleCount(formData.get('subscription_min_cycles'))
+  const cyclesError = cycleLimitsError(totalCycles, minCycles)
+  if (cyclesError) return { error: cyclesError }
   const productId = (formData.get('product_id') as string) || null
   const uploadedImagesJson = formData.get('uploaded_images') as string
   const uploadedImages: any[] = uploadedImagesJson ? JSON.parse(uploadedImagesJson) : []
@@ -127,8 +133,9 @@ export async function createProduct(formData: FormData) {
         base_price, mrp, mrp_ex_gst, price_ex_gst, gst_percentage, hsn_code, mpn, gtin,
         stock_status, weight, dimensions, is_active, is_draft, is_featured,
         has_variants, variant_type, sub_variant_type,
-        weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price, discount_pct, supplier_id
-      ) VALUES (${productId ? '$1, ' : ''}${(productId ? [...Array(31)].map((_, i) => `$${i + 2}`) : [...Array(31)].map((_, i) => `$${i + 1}`)).join(', ')})
+        weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price, discount_pct, supplier_id,
+        subscription_price, subscription_total_cycles, subscription_min_cycles
+      ) VALUES (${productId ? '$1, ' : ''}${(productId ? [...Array(34)].map((_, i) => `$${i + 2}`) : [...Array(34)].map((_, i) => `$${i + 1}`)).join(', ')})
       RETURNING *`,
       [
         ...(productId ? [productId] : []),
@@ -163,6 +170,9 @@ export async function createProduct(formData: FormData) {
         costPrice,
         discountPct,
         supplierId,
+        hasVariants ? null : normalizeSubscriptionPrice(formData.get('subscription_price')),
+        totalCycles,
+        minCycles,
       ]
     )
 
@@ -282,8 +292,8 @@ export async function createProduct(formData: FormData) {
           if (!variant.variant_name) continue
           const variantSku = generateVariantSku(sku, variant.variant_name)
           await query(
-            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, isbn, is_active)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, true)`,
+            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, isbn, is_active, subscription_price)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, true, $24)`,
             [
               data.id,
               variantSku,
@@ -312,6 +322,7 @@ export async function createProduct(formData: FormData) {
               variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
               variant.asin || null,
               variant.isbn || null,
+              normalizeSubscriptionPrice(variant.subscription_price),
             ]
           )
         }

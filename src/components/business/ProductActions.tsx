@@ -404,7 +404,7 @@ export default function ProductActions({
       ? getPerUnitRate(effectivePrice, selectedVariant.numeric_value, selectedVariant.unit)
       : null
 
-  const units = productUnitsProp ?? []
+  const units = digital ? [] : (productUnitsProp ?? [])
   const variantSellUnitId = variants.find(v => v.id === selectedVariantId)?.sell_unit_id ?? null
   const sellUnit = (() => {
     // 1. Variant's explicit sell_unit_id pointer
