@@ -22,6 +22,39 @@ import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
 import { transferToLinkedAccount, recordTenantTransaction, recordRefundSettlement } from '@/lib/payments/razorpay-route'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { controlPlanePool } from '@/lib/tenant-registry'
+import { resolveSubscriptionTenant, runInTenant, type WebhookTenant } from '@/lib/payments/webhook-tenant'
+
+// Customer-subscription events we route to handleSubscriptionEvent. Kept as a Set so the POST
+// dispatch stays a single membership test and new states only touch this list.
+const SUBSCRIPTION_EVENTS = new Set([
+  'subscription.authenticated',
+  'subscription.activated',
+  'subscription.charged',
+  'subscription.pending',
+  'subscription.halted',
+  'subscription.paused',
+  'subscription.resumed',
+  'subscription.cancelled',
+  'subscription.completed',
+  'subscription.updated',
+])
+
+/**
+ * Raised ONLY inside handleSubscriptionEvent on a TRANSIENT failure (DB/connection error) so the
+ * POST handler can map it to a 5xx and let Razorpay retry. A benign unknown subscription is NOT a
+ * transient error — it is acked and dropped (200), exactly like today's unrecognised events. This
+ * is deliberately a distinct type so the subscription dispatch can single it out without disturbing
+ * the catch-all 200 that every other event branch still relies on.
+ */
+class TransientWebhookError extends Error {
+  constructor(
+    message: string,
+    readonly cause?: unknown
+  ) {
+    super(message)
+    this.name = 'TransientWebhookError'
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,12 +95,89 @@ export async function POST(request: NextRequest) {
       await handleTransferReversed(event.payload.transfer.entity)
     } else if (eventType === 'refund.created' || eventType === 'refund.processed') {
       await handleRefund(event.payload.refund.entity)
+    } else if (SUBSCRIPTION_EVENTS.has(eventType)) {
+      // Customer subscriptions are the ONLY branch allowed to break the 200-on-catch contract, and
+      // only on a transient failure. We run the dispatch in its own try so a TransientWebhookError
+      // maps to a 503 (Razorpay retries) while a benign unknown subscription — or any other throw —
+      // still falls through to the shared 200 below, leaving every existing branch untouched.
+      try {
+        await handleSubscriptionEvent(eventType, event, request.headers.get('x-razorpay-event-id'))
+      } catch (subErr) {
+        if (subErr instanceof TransientWebhookError) {
+          return NextResponse.json({ error: 'retry' }, { status: 503 })
+        }
+        throw subErr
+      }
     }
 
     return NextResponse.json({ status: 'ok' })
   } catch (err) {
     return NextResponse.json({ status: 'ok' })
   }
+}
+
+/**
+ * Customer-subscription event handler. Runs with NO tenant context (the platform webhook URL has no
+ * host, so getCurrentTenant() is empty and raw db helpers hit the PLATFORM pool), so it MUST resolve
+ * the tenant from the authoritative control-plane index first and then run its body inside
+ * runInTenant so every per-tenant read/write lands in the right DB.
+ *
+ * Phase 2 scope: prove routing + idempotency only. The in-tenant body is a STUB — it logs the event
+ * and performs a DB-backed, event-safe no-op. The real cycle-order creation + subscription state
+ * machine are Phase 6.
+ *
+ * TODO(P6): own-key tenants' subscription events are signed with the tenant's own
+ * tenants.razorpay_webhook_secret and never touch the platform index, so they will arrive on a
+ * dedicated per-tenant endpoint /webhooks/razorpay/[tenant] that verifies against that secret. This
+ * platform endpoint keeps verifying against RAZORPAY_WEBHOOK_SECRET only.
+ */
+async function handleSubscriptionEvent(
+  eventType: string,
+  event: any,
+  eventId: string | null
+): Promise<void> {
+  const subscriptionEntity = event?.payload?.subscription?.entity
+  const subId = (subscriptionEntity?.id ?? '').toString().trim()
+
+  // Resolve + verify the tenant against the control-plane index. A null result means the
+  // subscription is unknown to us (not in the index, no trustworthy notes) — benign, so ack-and-drop
+  // with a normal return (the shared 200), exactly like today's unrecognised events.
+  let tenant: WebhookTenant | null
+  try {
+    tenant = await resolveSubscriptionTenant(subscriptionEntity)
+  } catch (err) {
+    // The control-plane lookup itself failed to connect — transient, let Razorpay retry.
+    throw new TransientWebhookError('subscription tenant resolution failed', err)
+  }
+  if (!tenant) {
+    console.info('[webhook:subscription] unknown subscription, ack-and-drop', { eventType, subId })
+    return
+  }
+
+  await runInTenant(tenant, async () => {
+    try {
+      // TODO(P6): mint one order per paid cycle and drive the subscription state machine, using the
+      // Phase-1 UNIQUE constraints on subscription_cycle_orders for idempotent INSERT ON CONFLICT.
+      const paymentId = (event?.payload?.payment?.entity?.id ?? '').toString().trim() || null
+      const alreadySeen = paymentId
+        ? await queryOne<{ id: string }>(
+            `SELECT id FROM subscription_cycle_orders WHERE razorpay_payment_id = $1 LIMIT 1`,
+            [paymentId]
+          )
+        : null
+
+      console.info('[webhook:subscription] routed', {
+        eventType,
+        subId,
+        eventId,
+        tenant: tenant.slug,
+        paymentId,
+        duplicate: !!alreadySeen,
+      })
+    } catch (err) {
+      throw new TransientWebhookError('subscription in-tenant handler failed', err)
+    }
+  })
 }
 
 async function resolveWebhookTenantId(

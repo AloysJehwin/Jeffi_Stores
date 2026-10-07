@@ -6,6 +6,7 @@ import { createDraftInvoice } from '@/lib/documents/invoice'
 import { computeEdd } from '@/lib/shipping/edd'
 import type { DraftBuyNowItem, DraftCartItem } from '@/lib/orders/order-draft'
 import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
+import { grantOrderEntitlements } from '@/lib/orders/entitlements'
 
 export interface CartLine {
   product_id: string
@@ -745,6 +746,12 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           }),
         ]
       )
+
+      // Digital grant — runs INSIDE this commit transaction (never fire-and-forget) so an
+      // entitlement can't exist without the committed, paid order. grantOrderEntitlements self-
+      // guards on order_items.is_digital = TRUE, so this is a NO-OP for an all-physical order,
+      // which is every order today — nothing sets is_digital until the digital order flow lands.
+      await grantOrderEntitlements(client, { orderId: created.id, userId: input.userId })
     }
 
     return created
