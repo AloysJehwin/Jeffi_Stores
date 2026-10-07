@@ -26,6 +26,25 @@ const CSP = [
   "form-action 'self' https://*.jeffistores.in",
 ].join('; ')
 
+// Vault hosts (vault. / vault-{slug}.) get a locked-down policy: no eval, no third-party scripts,
+// no framing, network limited to self + the vault bucket.
+const VAULT_HOST_RE = 'vault(-[a-z0-9-]+)?\\.jeffistores\\.in'
+const VAULT_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  `connect-src 'self' ${VAULT_ORIGINS}`,
+  `media-src 'self' blob: ${VAULT_ORIGINS}`,
+  `img-src 'self' data: blob: https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com ${VAULT_ORIGINS}`,
+  "worker-src 'self' blob:",
+  "frame-src 'none'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ')
+
 const nextConfig = {
   output: 'standalone',
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
@@ -51,6 +70,11 @@ const nextConfig = {
       {
         source: '/(.*)',
         headers: [{ key: 'Content-Security-Policy', value: CSP }],
+      },
+      {
+        source: '/(.*)',
+        has: [{ type: 'host', value: VAULT_HOST_RE }],
+        headers: [{ key: 'Content-Security-Policy', value: VAULT_CSP }],
       },
       {
         source: '/api/gallery/:path*',

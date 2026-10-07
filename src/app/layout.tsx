@@ -97,14 +97,19 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body className="antialiased bg-surface text-foreground m-0 p-0">
         <SessionGuard />
-        <Script src="https://www.googletagmanager.com/gtag/js?id=GT-NM2C3M85" strategy="afterInteractive" />
-        <Script
-          id="gtag-init"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');`,
-          }}
-        />
+        {/* No third-party analytics on the vault (strict CSP, buyer privacy). */}
+        {hostApp !== 'vault' && (
+          <>
+            <Script src="https://www.googletagmanager.com/gtag/js?id=GT-NM2C3M85" strategy="afterInteractive" />
+            <Script
+              id="gtag-init"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');`,
+              }}
+            />
+          </>
+        )}
         <ConditionalLayout
           initialStoreConfig={initialStoreConfig}
           isFormsSubdomain={isFormsSubdomain}
