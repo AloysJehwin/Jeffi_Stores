@@ -8,7 +8,7 @@ import OrderDetailModal from '@/components/admin/OrderDetailModal'
 import { ap } from '@/lib/shared/admin-path'
 
 function statusBadgeClass(status: string) {
-  if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+  if (status === 'delivered' || status === 'granted') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
   if (status === 'processing' || status === 'shipped')
     return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
   if (status === 'out_for_delivery') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
@@ -24,6 +24,7 @@ function paymentBadgeClass(status: string) {
 }
 
 function statusLabel(status: string) {
+  if (status === 'granted') return 'Access granted'
   if (status === 'cancel_requested') return 'Cancel Requested'
   if (status === 'out_for_delivery') return 'Out for Delivery'
   return status.replace(/_/g, ' ')

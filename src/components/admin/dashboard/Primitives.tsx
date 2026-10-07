@@ -336,7 +336,7 @@ export function FunnelBar({ counts, hrefFor }: { counts: Record<string, number>;
 }
 
 export function statusBadgeClass(status: string) {
-  if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+  if (status === 'delivered' || status === 'granted') return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
   if (status === 'processing' || status === 'confirmed')
     return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
   if (status === 'shipped') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
@@ -347,6 +347,7 @@ export function statusBadgeClass(status: string) {
 }
 
 export function statusLabel(s: string) {
+  if (s === 'granted') return 'Access granted'
   if (s === 'out_for_delivery') return 'Out for Delivery'
   if (s === 'cancel_requested') return 'Cancel Req.'
   return s.replace(/_/g, ' ')

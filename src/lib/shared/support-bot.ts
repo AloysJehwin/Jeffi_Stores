@@ -103,6 +103,7 @@ function longestMatch(text: string, orders: SupportOrder[]): SupportOrder | null
 }
 
 const CANCELLABLE = ['pending', 'confirmed', 'processing']
+// 'granted' (digital, access granted) is deliberately absent: digital items are never returnable.
 const RETURNABLE = ['delivered']
 
 export function getBotPayload(
@@ -150,6 +151,13 @@ export function getBotPayload(
         type: 'text_actions',
         text: "you don't have any orders yet.",
         actions: [{ label: 'Browse Products', url: '/products' }],
+      }
+    }
+    if (contextOrder.status === 'granted' && (selectedOrder || orders.length === 1)) {
+      return {
+        type: 'text_actions',
+        text: `order #${contextOrder.order_number} is a digital order — access is already granted, so there's nothing to ship or track.`,
+        actions: [{ label: 'View Order', url: `/account/orders/${contextOrder.id}` }],
       }
     }
     // If a specific order was picked, always show its detail (don't re-prompt).

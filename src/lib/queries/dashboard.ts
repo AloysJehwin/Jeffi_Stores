@@ -1,6 +1,7 @@
 import { queryOne, queryMany, queryCount, type AnalyticsRange } from './shared'
 import { getDashboardInsights, rangeDays, type DashboardInsights } from '@/lib/shared/dashboard-insights'
 import { DashboardStats } from '@/types'
+import { fulfilledSql } from '@/lib/orders/fulfilled-status'
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
@@ -106,7 +107,7 @@ export async function getDashboardMetrics() {
         COUNT(CASE WHEN status IN ('confirmed','processing') THEN 1 END) AS processing,
         COUNT(CASE WHEN status = 'shipped' THEN 1 END) AS shipped,
         COUNT(CASE WHEN status = 'out_for_delivery' THEN 1 END) AS out_for_delivery,
-        COUNT(CASE WHEN status = 'delivered' THEN 1 END) AS delivered,
+        COUNT(CASE WHEN ${fulfilledSql('')} THEN 1 END) AS delivered,
         COUNT(CASE WHEN status = 'cancelled' THEN 1 END) AS cancelled
       FROM orders
     `),

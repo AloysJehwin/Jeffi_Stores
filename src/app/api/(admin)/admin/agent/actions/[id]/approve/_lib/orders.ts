@@ -1,17 +1,21 @@
 import { queryOne } from '@/lib/shared/db'
 import type { AgentAction, ActionResult } from './shared'
 
+// Digital lines are never shipped; an all-digital order has no shipping states.
+const HAS_PHYSICAL_LINE = `EXISTS (SELECT 1 FROM order_items oi WHERE oi.order_id = orders.id AND oi.is_digital IS NOT TRUE)`
+
 export async function markOrderShipped(action: AgentAction): Promise<ActionResult> {
   const { orderId, awbNumber } = action.payload
   const updated = await queryOne(
     `UPDATE orders
        SET status = 'shipped', shipped_at = COALESCE(shipped_at, NOW()),
            awb_number = COALESCE($2, awb_number), updated_at = NOW()
-       WHERE id = $1::uuid AND status NOT IN ('shipped','delivered','cancelled')
+       WHERE id = $1::uuid AND status NOT IN ('shipped','delivered','granted','cancelled')
+         AND ${HAS_PHYSICAL_LINE}
        RETURNING id::text, order_number, status, awb_number`,
     [orderId, awbNumber || null]
   )
-  if (!updated) return { result: null, error: 'Order not found or already shipped/delivered/cancelled' }
+  if (!updated) return { result: null, error: 'Order not found, already shipped/delivered/cancelled, or digital-only' }
   return { result: updated, error: null }
 }
 
@@ -100,10 +104,13 @@ export async function updateOrderStatus(action: AgentAction): Promise<ActionResu
     params.push(awbNumber)
     setParts.push(`awb_number = COALESCE(awb_number, $${params.length})`)
   }
+  // Granted (digital) orders are settled by the payment/refund flows, never by the agent.
+  const guards = [`status <> 'granted'`]
+  if (newStatus !== 'cancelled' && newStatus !== 'pending') guards.push(HAS_PHYSICAL_LINE)
   const updated = await queryOne(
-    `UPDATE orders SET ${setParts.join(', ')} WHERE id = $1::uuid RETURNING id::text, order_number, status, awb_number`,
+    `UPDATE orders SET ${setParts.join(', ')} WHERE id = $1::uuid AND ${guards.join(' AND ')} RETURNING id::text, order_number, status, awb_number`,
     params
   )
-  if (!updated) return { result: null, error: 'Order not found' }
+  if (!updated) return { result: null, error: 'Order not found or not eligible (digital orders have no shipping states)' }
   return { result: updated, error: null }
 }

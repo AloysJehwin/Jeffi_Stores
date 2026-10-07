@@ -85,6 +85,11 @@ describe('GET /api/admin/coupons/user-pool', () => {
     }
   )
 
+  it('VIP spend counts granted (digital) orders as fulfilled', async () => {
+    await GET(makeReq({ mode: 'segment', segment: 'vip' }))
+    expect(String(mockQueryMany.mock.calls.at(-1)![0])).toContain("o.status IN ('delivered', 'granted')")
+  })
+
   it('returns users for mode=score with defaults', async () => {
     const res = await GET(makeReq({ mode: 'score' }))
     expect(res.status).toBe(200)

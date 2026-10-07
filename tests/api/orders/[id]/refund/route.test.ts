@@ -20,8 +20,10 @@ vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   query: vi.fn(),
+  withTransaction: vi.fn(async (fn: any) => fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) })),
   resolveRequestTenant: vi.fn().mockResolvedValue(null),
 }))
+vi.mock('@/lib/orders/entitlements', () => ({ revokeOrderEntitlements: vi.fn().mockResolvedValue(0) }))
 vi.mock('@/lib/email', () => ({
   sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
 }))
@@ -48,6 +50,7 @@ import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'
 import * as razorpayRoute from '@/lib/payments/razorpay-route'
+import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 
 const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['orders:write'] }
 const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }
@@ -162,6 +165,29 @@ describe('POST /api/orders/[id]/refund', () => {
     expect(body.refundIds).toEqual(['rfnd_123'])
     expect(body.totalRefunded).toBe(500)
     expect(mockRefund).toHaveBeenCalledWith('pay_rzp_123', { amount: 50000 })
+  })
+
+  it('revokes every digital line on a full (cancelled-order) refund', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([MOCK_PAYMENT] as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({
+      instance: { payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_1' }) } },
+    } as any)
+    const res = await POST(makeRequest() as any, PARAMS)
+    expect(res.status).toBe(200)
+    expect(revokeOrderEntitlements).toHaveBeenCalledWith(expect.anything(), { orderId: 'order-123', reason: 'refund' })
+  })
+
+  it('does not revoke digital access when refunding a return', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ ...MOCK_ORDER, status: 'returned' })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([MOCK_PAYMENT] as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({
+      instance: { payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_2' }) } },
+    } as any)
+    await POST(makeRequest() as any, PARAMS)
+    expect(revokeOrderEntitlements).not.toHaveBeenCalled()
   })
 
   it('processes refund for returned order', async () => {

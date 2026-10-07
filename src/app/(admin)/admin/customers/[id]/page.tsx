@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getCustomerById } from '@/lib/queries'
 import { ap } from '@/lib/shared/admin-path'
+import { isFulfilledStatus } from '@/lib/orders/fulfilled-status'
 import { getHost } from '@/lib/tenancy/get-host'
 import { hasScope } from '@/lib/auth/scopes'
 import CustomerActionButton from '@/app/(admin)/admin/customers/[id]/_components/CustomerActionButton'
@@ -31,6 +32,7 @@ function formatOrderStatus(status: string) {
     shipped: 'Shipped',
     out_for_delivery: 'Out for Delivery',
     delivered: 'Delivered',
+    granted: 'Access granted',
     cancelled: 'Cancelled',
     return_requested: 'Return Requested',
     return_approved: 'Return Approved',
@@ -55,7 +57,7 @@ function formatPaymentStatus(status: string) {
 }
 
 function orderStatusBadge(status: string) {
-  if (['delivered', 'replaced'].includes(status))
+  if (isFulfilledStatus(status) || status === 'replaced')
     return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
   if (['cancelled', 'return_rejected'].includes(status))
     return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'

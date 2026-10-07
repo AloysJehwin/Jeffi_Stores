@@ -128,6 +128,15 @@ describe('POST /api/reviews/from-token', () => {
     expect((await res.json()).error).toMatch(/not delivered/)
   })
 
+  it('accepts a granted (digital) order as fulfilled', async () => {
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce(null as any)
+      .mockResolvedValueOnce({ id: 'ord-1' } as any)
+      .mockResolvedValueOnce({ id: 'rev-1' } as any)
+    await POST(makePostReq({ token: 't', rating: 5, comment: 'great' }))
+    expect(String(vi.mocked(queryOne).mock.calls[1][0])).toContain("status IN ('delivered', 'granted')")
+  })
+
   it('stores tags as JSON text and links the review to its order', async () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce(null as any)

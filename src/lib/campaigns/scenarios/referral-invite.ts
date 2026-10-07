@@ -61,6 +61,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
       FROM users u
       JOIN orders o ON o.user_id = u.id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
+      -- delivered_at is also stamped on grant, so paid digital ('granted') orders qualify too.
       WHERE o.delivered_at IS NOT NULL
         AND o.delivered_at < NOW() - ($2::text || ' minutes')::interval
         AND u.is_active = TRUE

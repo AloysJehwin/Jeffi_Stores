@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/auth/jwt'
-import { queryOne } from '@/lib/shared/db'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import { getOrderItemsPolicy } from '@/lib/catalog/return-policy'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -23,7 +23,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
-    const items = await getOrderItemsPolicy(id)
+    // Digital lines are never returnable, so they drop out of the eligibility set entirely.
+    const digital = await queryMany<{ product_id: string }>(
+      `SELECT product_id::text FROM order_items WHERE order_id = $1 AND is_digital = TRUE`,
+      [id]
+    )
+    const digitalIds = new Set(digital.map(d => d.product_id))
+    const allItems = await getOrderItemsPolicy(id)
+    const items = allItems.filter(p => !digitalIds.has(p.product_id))
 
     const isDelivered = order.status === 'delivered'
     const deliveredAt = order.delivered_at || order.updated_at
@@ -31,7 +38,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const computeEligibility = (kind: 'refund' | 'replacement') => {
       if (!isDelivered) return { allowed: false, reason: 'Order not delivered yet' }
-      if (items.length === 0) return { allowed: false, reason: 'Order has no items' }
+      if (items.length === 0)
+        return {
+          allowed: false,
+          reason: allItems.length > 0 ? 'Digital items cannot be returned' : 'Order has no items',
+        }
       const blocked = items.find(p => (kind === 'refund' ? !p.return_allowed : !p.replacement_allowed))
       if (blocked) {
         return {

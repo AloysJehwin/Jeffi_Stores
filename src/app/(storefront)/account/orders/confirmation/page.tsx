@@ -224,14 +224,16 @@ function OrderConfirmationPage() {
                       ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
                       : order.status === 'out_for_delivery'
                         ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
-                        : order.status === 'delivered'
+                        : order.status === 'delivered' || order.status === 'granted'
                           ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                           : 'bg-surface-secondary text-foreground'
               }`}
             >
               {order.status === 'out_for_delivery'
                 ? 'Out for Delivery'
-                : order.status === 'cancel_requested'
+                : order.status === 'granted'
+                  ? 'Access granted'
+                  : order.status === 'cancel_requested'
                   ? 'Cancellation Requested'
                   : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
             </span>

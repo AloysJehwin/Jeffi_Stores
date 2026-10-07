@@ -175,6 +175,18 @@ describe('POST /api/orders/[id]/return', () => {
     expect(body.error).toMatch(/delivered/i)
   })
 
+  it('rejects a digital line server-side', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(DELIVERED_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([
+      { id: 'oi-1', product_id: 'p-1', product_name: 'Ebook', quantity: '1', unit_price: '100', is_digital: true },
+    ])
+    const res = await POST(makeRequest(VALID_BODY) as any, PARAMS)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/digital/i)
+    expect(returnPolicy.checkReturnEligibility).not.toHaveBeenCalled()
+  })
+
   it('returns 400 when outside return window', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce(DELIVERED_ORDER)

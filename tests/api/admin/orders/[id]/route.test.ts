@@ -204,6 +204,20 @@ describe('PATCH /api/admin/orders/[id]', () => {
     expect(String(updateCall![0])).toContain('delivered_at = COALESCE(delivered_at, NOW())')
   })
 
+  it('granted stamps both granted_at and delivered_at', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { status: 'granted' } } as any)
+    mockQueryOne.mockResolvedValue(null)
+
+    const req = makeRequest('PATCH', 'order-1', { status: 'granted' })
+    await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
+
+    const updateCall = mockQueryOne.mock.calls.find(c => String(c[0]).startsWith('UPDATE orders SET'))
+    expect(String(updateCall![0])).toContain('granted_at = COALESCE(granted_at, NOW())')
+    expect(String(updateCall![0])).toContain('delivered_at = COALESCE(delivered_at, NOW())')
+  })
+
   it('does not stamp a timestamp for a status with no lifecycle column', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)

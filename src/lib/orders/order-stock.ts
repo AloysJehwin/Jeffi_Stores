@@ -197,7 +197,7 @@ export async function restoreOrderStock(orderId: string): Promise<{ skipped: Res
   const skipped: RestoreSkip[] = []
   await withTransaction(async client => {
     const itemsResult = await client.query(
-      `SELECT product_id, variant_id, sub_variant_id, quantity, buy_unit FROM order_items WHERE order_id = $1`,
+      `SELECT product_id, variant_id, sub_variant_id, quantity, buy_unit FROM order_items WHERE order_id = $1 AND is_digital = FALSE`,
       [orderId]
     )
 

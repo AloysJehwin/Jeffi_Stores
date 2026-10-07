@@ -50,6 +50,11 @@ export async function sendOrderStatusUpdate(
       message: 'Your order is out for delivery today! Our delivery partner will arrive soon.',
       color: '#6366f1',
     },
+    granted: {
+      title: 'Access granted',
+      message: 'Your digital purchase is ready. Open your vault to view it any time.',
+      color: '#10b981',
+    },
     delivered: {
       title: 'Order Delivered',
       message: 'Your order has been successfully delivered. Thank you for shopping with us!',
@@ -80,6 +85,8 @@ export async function sendOrderStatusUpdate(
     color: '#6b7280',
   }
 
+  const vaultLink = newStatus === 'granted' ? await import('@/lib/vault/links').then(m => m.vaultLibraryUrl()) : null
+
   const from = await customerMailFromAsync()
   const subject = `${statusInfo.title} - Order ${orderNumber}`
   const html = mailShell({
@@ -105,7 +112,7 @@ export async function sendOrderStatusUpdate(
           : ''
       }
 
-      <div class="status-badge">${newStatus}</div>
+      <div class="status-badge">${newStatus === 'granted' ? 'Access granted' : newStatus}</div>
 
       <div class="card">
         <h3 style="margin-top: 0;">Order Details</h3>
@@ -127,6 +134,21 @@ export async function sendOrderStatusUpdate(
           <p style="text-align: center; margin: 0;">
             <a href="${orderLink}" class="button" style="padding: 10px 24px; font-size: 14px;">
               Track Your Order
+            </a>
+          </p>
+        </div>
+      `
+          : ''
+      }
+
+      ${
+        vaultLink
+          ? `
+        <div class="info">
+          <h4 style="margin-top: 0;">Access granted — open your vault</h4>
+          <p style="text-align: center; margin: 0;">
+            <a href="${vaultLink}" class="button" style="padding: 10px 24px; font-size: 14px; color:#ffffff;">
+              Open my vault
             </a>
           </p>
         </div>

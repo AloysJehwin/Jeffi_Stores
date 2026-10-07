@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     }
     const userId = auth.userId
 
+    // active_orders is an in-flight membership list: 'granted' (digital) is settled, so it stays out.
     const [stats, recentOrders, defaultAddress, wishlistCount] = await Promise.all([
       queryOne<{ total_orders: number; total_spent: number; active_orders: number }>(
         `SELECT

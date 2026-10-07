@@ -253,6 +253,25 @@ describe('POST /api/reviews', () => {
     expect(insertCall![1]).toContain(true)
   })
 
+  it('verified-purchase check counts granted (digital) orders and granted digital lines', async () => {
+    mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
+    mockQueryOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'oi1' })
+      .mockResolvedValueOnce({ id: 'r-new', rating: 5, is_verified_purchase: true })
+      .mockResolvedValueOnce({ name: 'Ebook' })
+      .mockResolvedValueOnce({ first_name: 'J', last_name: 'D', email: 'j@e.com' })
+      .mockResolvedValueOnce({ name: 'Ebook', slug: 'ebook' })
+    mockSendNotif.mockResolvedValueOnce(undefined as any)
+
+    await POST(makeFormRequest({ productId: PRODUCT_ID, rating: '5', comment: 'Great digital download here' }) as any)
+    const purchaseSql = String(
+      mockQueryOne.mock.calls.find(c => typeof c[0] === 'string' && c[0].includes('FROM order_items oi'))![0]
+    )
+    expect(purchaseSql).toContain("o.status IN ('delivered', 'granted')")
+    expect(purchaseSql).toContain('oi.granted_at IS NOT NULL AND oi.access_revoked_at IS NULL')
+  })
+
   it('uploads review images and calls query UPDATE after inserting review', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
     mockQueryOne

@@ -13,7 +13,8 @@ import {
   validateCouponForUser,
   commitOrder,
 } from '@/lib/orders/order-commit'
-import { createDraftInvoice } from '@/lib/documents/invoice'
+import { notifyAccessGranted } from '@/lib/shared/notify'
+import { createDraftInvoice, generateOrderInvoice } from '@/lib/documents/invoice'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { settleVariantChangePayment } from '@/lib/orders/variant-change'
 import { logActivity } from '@/lib/shared/activity'
@@ -626,28 +627,61 @@ async function handleRefund(refund: any) {
   const paymentId = (refund?.payment_id ?? '').toString().trim()
   if (!paymentId) return
 
-  const updated = await query(
-    `UPDATE payments SET status = 'refunded', updated_at = NOW()
-      WHERE transaction_id = $1 AND status <> 'refunded'
-      RETURNING order_id`,
-    [paymentId]
-  ).catch(() => null)
+  // Razorpay hits a fixed URL with no tenant host, so ALS is empty here. Resolve the tenant first
+  // (refund notes, else the captured payment's notes) and do every per-tenant write inside it.
+  let tenant = await resolveWebhookTenantId(refund, '').catch(() => null)
+  if (!tenant) {
+    const payment = await import('@/lib/payments/razorpay')
+      .then(m => m.getRazorpayInstanceFor())
+      .then(({ instance }) => instance.payments.fetch(paymentId))
+      .catch(() => null)
+    if (payment) tenant = await resolveWebhookTenantId(payment, '').catch(() => null)
+  }
+  const NIL = '00000000-0000-0000-0000-000000000000'
+  const ctx =
+    tenant?.tenantId && tenant.tenantId !== NIL
+      ? await import('@/lib/tenant-registry/host-resolution')
+          .then(m => m.lookupTenantContextById(tenant!.tenantId))
+          .catch(() => null)
+      : null
+  const scope: WebhookTenant = { tenantId: tenant?.tenantId ?? NIL, slug: tenant?.slug ?? '', ctx }
 
-  const orderId = updated?.rows?.[0]?.order_id
-  if (!orderId) return // already recorded by the in-app refund path
+  const order = await runInTenant(scope, async () => {
+    const updated = await query(
+      `UPDATE payments SET status = 'refunded', updated_at = NOW()
+        WHERE transaction_id = $1 AND status <> 'refunded'
+        RETURNING order_id`,
+      [paymentId]
+    ).catch(() => null)
 
-  await query(`UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`, [orderId]).catch(
-    () => {}
-  )
+    const orderId = updated?.rows?.[0]?.order_id
+    if (!orderId) return null // already recorded by the in-app refund path
 
-  const order = await queryOne<{ order_number: string }>(`SELECT order_number FROM orders WHERE id = $1`, [
-    orderId,
-  ]).catch(() => null)
-  if (!order?.order_number) return
-  // Razorpay hits a fixed URL with no tenant host, so ALS is empty here — the tenant is carried
-  // in the refund's own notes (copied from the payment), same as every other handler in this file.
-  const tenant = await resolveWebhookTenantId(refund, order.order_number).catch(() => null)
-  if (!tenant?.tenantId) return
+    // A refund covering the whole order total revokes every digital line's vault access. A partial
+    // dashboard refund carries no line information, so it revokes nothing (an admin can revoke
+    // specific lines from the order page).
+    return withTransaction(async client => {
+      const o = await client.query<{ order_number: string; total_amount: string }>(
+        `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1
+         RETURNING order_number, total_amount`,
+        [orderId]
+      )
+      const row = o.rows[0]
+      if (!row) return null
+      const refundPaise = Number(refund?.amount) || 0
+      if (refundPaise > 0 && refundPaise >= Math.round(Number(row.total_amount) * 100) - 1) {
+        const { revokeOrderEntitlements } = await import('@/lib/orders/entitlements')
+        await revokeOrderEntitlements(client, { orderId, reason: 'refund' })
+      }
+      return row
+    }).catch(() =>
+      queryOne<{ order_number: string }>(
+        `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1 RETURNING order_number`,
+        [orderId]
+      ).catch(() => null)
+    )
+  })
+  if (!order?.order_number || !tenant?.tenantId) return
 
   // Out-of-band refund: nothing reversed the tenant's share, so the whole amount is owed.
   const refundedInr = (Number(refund?.amount) || 0) / 100
@@ -799,7 +833,12 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
         })
 
   const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
-  createDraftInvoice(created.id).catch(() => {})
+  // An all-digital order is fulfilled at payment ('granted'), so number its invoice now.
+  const draftInvoice = createDraftInvoice(created.id).catch(() => {})
+  if (created.status === 'granted') {
+    draftInvoice.then(() => generateOrderInvoice(created.id)).catch(() => {})
+    notifyAccessGranted(intent.user_id, created.order_number).catch(() => {})
+  }
   const fullOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [created.id])
   const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
   sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})

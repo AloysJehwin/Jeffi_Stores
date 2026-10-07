@@ -100,13 +100,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Validate submitted items first so we can scope eligibility check to selected products
     const orderItemIds = items.map((i: any) => i.order_item_id)
     const orderItems = await queryMany(
-      `SELECT id, product_id, variant_id, product_name, variant_name, quantity, unit_price
+      `SELECT id, product_id, variant_id, product_name, variant_name, quantity, unit_price, is_digital
        FROM order_items WHERE order_id = $1 AND id = ANY($2::uuid[])`,
       [id, orderItemIds]
     )
 
     if (orderItems.length !== orderItemIds.length) {
       return NextResponse.json({ error: 'One or more selected items do not belong to this order.' }, { status: 400 })
+    }
+    if (orderItems.some((oi: any) => oi.is_digital)) {
+      return NextResponse.json({ error: 'Digital items cannot be returned.' }, { status: 400 })
     }
 
     const selectedProductIds = orderItems.map((oi: any) => String(oi.product_id))

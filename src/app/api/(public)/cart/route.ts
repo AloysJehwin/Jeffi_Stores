@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
           'fragile', p.fragile,
           'hazardous', p.hazardous,
           'flammable', p.flammable,
+          'is_digital', COALESCE(p.is_digital, FALSE),
           'brand_name', b.name, 'category_id', p.category_id,
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'image_url', pi.image_url, 'is_primary', pi.is_primary))
@@ -119,7 +120,8 @@ export async function GET(request: NextRequest) {
            LIMIT 1
           ),
           NULL
-        ) AS cart_item_unit
+        ) AS cart_item_unit,
+        COALESCE(p.is_digital, FALSE) AS is_digital
       FROM cart_items ci
       LEFT JOIN products p ON ci.product_id = p.id
       LEFT JOIN brands b ON p.brand_id = b.id
@@ -141,12 +143,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const parsedCart = parseBody(AddCartSchema, body)
     if (!parsedCart.ok) return parsedCart.response
-    const { productId, quantity = 1, variantId, buyMode = 'unit', buyUnit, subVariantId } = parsedCart.data
+    const { productId, variantId, buyMode = 'unit', buyUnit, subVariantId } = parsedCart.data
+    let quantity = parsedCart.data.quantity ?? 1
 
     const { userId } = await resolveUserId(request)
 
     const product = await queryOne(
-      'SELECT id, name, base_price, price_ex_gst, is_active, launch_date, discontinue_date, stock_status FROM products WHERE id = $1',
+      'SELECT id, name, base_price, price_ex_gst, is_active, launch_date, discontinue_date, stock_status, is_digital FROM products WHERE id = $1',
       [productId]
     )
     if (!productId || !product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -158,6 +161,21 @@ export async function POST(request: NextRequest) {
     }
     if (product.discontinue_date && new Date(product.discontinue_date) <= today) {
       return NextResponse.json({ error: 'This product has been discontinued' }, { status: 410 })
+    }
+    // A digital title is owned once: one copy per cart, and none if the buyer already owns it.
+    const isDigital = product.is_digital === true
+    if (isDigital) {
+      quantity = 1
+      const owned = await queryOne(
+        `SELECT 1 FROM vault_entitlements
+          WHERE user_id = $1 AND product_id = $2 AND status = 'active'
+            AND (access_expires_at IS NULL OR access_expires_at > NOW())
+          LIMIT 1`,
+        [userId, productId]
+      )
+      if (owned) {
+        return NextResponse.json({ error: 'You already own this item', alreadyOwned: true }, { status: 409 })
+      }
     }
 
     let priceAtAddition: number
@@ -261,14 +279,24 @@ export async function POST(request: NextRequest) {
          buy_mode
        )
        DO UPDATE SET
-         quantity = CASE WHEN cart_items.saved_for_later THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END,
+         quantity = CASE WHEN $9::boolean OR cart_items.saved_for_later THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END,
          price_at_addition = CASE WHEN cart_items.saved_for_later THEN EXCLUDED.price_at_addition ELSE cart_items.price_at_addition END,
          buy_unit = CASE WHEN cart_items.saved_for_later THEN EXCLUDED.buy_unit ELSE cart_items.buy_unit END,
          saved_for_later = FALSE,
          saved_at = NULL,
          updated_at = NOW()
        RETURNING quantity, (xmax = 0) AS inserted`,
-      [userId, productId, variantId || null, subVariantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]
+      [
+        userId,
+        productId,
+        variantId || null,
+        subVariantId || null,
+        quantity,
+        priceAtAddition,
+        buyMode,
+        buyUnit || null,
+        isDigital,
+      ]
     )
     const newQuantity = upsertResult.rows[0]?.quantity
     const wasInserted = upsertResult.rows[0]?.inserted
@@ -308,8 +336,9 @@ export async function PATCH(request: NextRequest) {
 
     const cartItem = await queryOne(
       `
-      SELECT ci.*
+      SELECT ci.*, COALESCE(p.is_digital, FALSE) AS is_digital
       FROM cart_items ci
+      LEFT JOIN products p ON p.id = ci.product_id
       WHERE ci.id = $1 AND ci.user_id = $2
     `,
       [cartItemId, userId]
@@ -326,7 +355,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (typeof quantity === 'number') {
-      await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [quantity, cartItemId])
+      const qty = cartItem.is_digital === true ? Math.min(quantity, 1) : quantity
+      await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [qty, cartItemId])
       return NextResponse.json({ message: 'Cart updated' })
     }
 

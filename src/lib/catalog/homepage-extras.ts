@@ -209,6 +209,7 @@ export async function getBackInStock(section: SectionShape, gstEnabled: boolean)
 export async function getValueStats(section: SectionShape): Promise<ValueStat[]> {
   const metrics = valueStatMetrics(section)
   if (metrics.length === 0) return []
+  // "Orders shipped" deliberately leaves out 'granted' (digital) orders — nothing was shipped.
   const row = await queryOne<Record<ValueStatMetric, string>>(
     `SELECT
        (SELECT count(*) FROM orders WHERE shipped_at IS NOT NULL OR status IN ('shipped', 'delivered')) AS orders_shipped,

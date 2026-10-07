@@ -150,6 +150,19 @@ export async function sendOrderDeliveredSMS(params: { phone?: string | null; ord
   )
 }
 
+export async function sendAccessGrantedSMS(params: {
+  phone?: string | null
+  orderNumber: string
+  vaultUrl: string
+}): Promise<boolean> {
+  const { name: STORE_NAME } = await storeSignature()
+  return sendSMS(
+    params.phone,
+    `${STORE_NAME}: Access granted for order ${params.orderNumber} — open your vault: ${params.vaultUrl}`,
+    'order_granted'
+  )
+}
+
 export async function sendOrderCancelledSMS(params: {
   phone?: string | null
   orderNumber: string

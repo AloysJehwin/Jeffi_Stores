@@ -1,4 +1,5 @@
 import { invoiceUrlForOrder } from '@/lib/shared/customer-links'
+import { isFulfilledStatus } from '@/lib/orders/fulfilled-status'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -31,14 +32,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       [id]
     )
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
-    const allowedStatuses = ['draft', 'confirmed', 'delivered', 'processing']
+    const allowedStatuses = ['draft', 'confirmed', 'delivered', 'granted', 'processing']
     if (!allowedStatuses.includes(order.status)) {
       return NextResponse.json({ error: 'Invoice is already finalized' }, { status: 400 })
     }
 
     const isOnlineOrder = order.source === 'online' || order.source === 'business'
-    // If already delivered, keep status unchanged; otherwise move online/business→processing, offline→delivered
-    const targetStatus = order.status === 'delivered' ? 'delivered' : isOnlineOrder ? 'processing' : 'delivered'
+    // If already fulfilled (delivered/granted), keep status unchanged; otherwise move online/business→processing, offline→delivered
+    const targetStatus = isFulfilledStatus(order.status) ? order.status : isOnlineOrder ? 'processing' : 'delivered'
 
     // Basic-plan tenants have no inventory module — the flag is locked off for them.
     // When off, skip stock deduction entirely (nothing to deduct), same as order-create.
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             order.customer_name,
             order.order_number,
             id,
-            'processing',
+            targetStatus === 'granted' ? 'granted' : 'processing',
             undefined,
             pdfBuffer
           )

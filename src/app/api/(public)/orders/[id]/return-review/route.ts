@@ -10,6 +10,7 @@ import { restoreOrderStock } from '@/lib/orders/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
 import { logActivity } from '@/lib/shared/activity'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
+import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -200,7 +201,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
       // Fetch the specific items being returned
       const returnItems: any[] = await queryMany(
-        `SELECT rri.*, oi.sub_variant_id
+        `SELECT rri.*, oi.sub_variant_id, oi.is_digital
          FROM return_request_items rri
          JOIN order_items oi ON oi.id = rri.order_item_id
          WHERE rri.return_request_id = $1`,
@@ -332,6 +333,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                   `UPDATE return_requests SET status = 'completed', reviewed_by = $1, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $2`,
                   [admin.adminId, returnRequest.id]
                 )
+                // Digital lines are not returnable, but a legacy whole-order refund (or a digital line
+                // that slipped in) must still lose vault access.
+                const digitalIds = returnItems.filter((i: any) => i.is_digital).map((i: any) => i.order_item_id)
+                if (!useItemLevel || digitalIds.length > 0) {
+                  await revokeOrderEntitlements(client, {
+                    orderId,
+                    orderItemIds: useItemLevel ? digitalIds : undefined,
+                    reason: 'refund',
+                  })
+                }
               })
 
               let stockWarnings: string[] = []

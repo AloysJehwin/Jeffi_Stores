@@ -1,4 +1,4 @@
-import { queryMany } from '@/lib/shared/db'
+import { query, queryMany } from '@/lib/shared/db'
 import { round2 } from '@/lib/catalog/gst'
 import {
   packIntoCartons,
@@ -31,11 +31,16 @@ export interface RateBreakdown {
   serviceCod?: boolean
   servicePrepaid?: boolean
   serviceError?: string
+  // Set when the cart holds digital lines. Digital lines never ship: they are excluded from
+  // weight and serviceability, and an all-digital cart quotes 0 without calling the carrier.
+  hasDigital?: boolean
+  digitalOnly?: boolean
 }
 
 export interface RateInput {
   destinationPin: string
   cartItems: Array<{ productId?: string; variantId?: string | null; subVariantId?: string | null; quantity?: number }>
+  /** Subtotal of the PHYSICAL lines (digital lines don't count towards the free-shipping threshold). */
   subtotal?: number
   isCod?: boolean
 }
@@ -110,6 +115,40 @@ function resolveShipWeight(raw: unknown, bv: BusinessValues): number {
 }
 
 export async function computeShippingRate(input: RateInput): Promise<RateBreakdown> {
+  const items = input.cartItems || []
+  const productIds = [...new Set(items.map(i => i.productId).filter((id): id is string => !!id))]
+  const digitalRes =
+    productIds.length > 0
+      ? await query<{ id: string }>(
+          `SELECT id::text AS id FROM products WHERE id = ANY($1::uuid[]) AND is_digital = TRUE`,
+          [productIds]
+        )
+      : null
+  const digitalIds = new Set((digitalRes?.rows ?? []).map(r => r.id))
+  if (digitalIds.size === 0) return computePhysicalShippingRate(input)
+
+  const physical = items.filter(i => !(i.productId && digitalIds.has(i.productId)))
+  if (physical.length === 0) {
+    return {
+      charge: 0,
+      codFee: 0,
+      totalCharge: 0,
+      zone: '',
+      source: 'free',
+      chargedWeightGrams: 0,
+      cartonCount: 0,
+      serviceable: true,
+      serviceCod: false,
+      servicePrepaid: true,
+      hasDigital: true,
+      digitalOnly: true,
+    }
+  }
+  const rate = await computePhysicalShippingRate({ ...input, cartItems: physical })
+  return { ...rate, hasDigital: true, digitalOnly: false }
+}
+
+async function computePhysicalShippingRate(input: RateInput): Promise<RateBreakdown> {
   const { destinationPin, cartItems, subtotal, isCod } = input
   const TOKEN = await resolveDelhiveryToken()
   const bv = await getBusinessValues()

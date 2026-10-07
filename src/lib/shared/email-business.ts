@@ -198,14 +198,17 @@ export async function sendBusinessOrderStatusEmail(
     processing: 'Processing',
     shipped: 'Shipped',
     delivered: 'Delivered',
+    granted: 'Access granted',
     cancelled: 'Cancelled',
   }
   const label = statusLabel[status] || status
+  const vaultUrl = status === 'granted' ? await import('@/lib/vault/links').then(m => m.vaultLibraryUrl()) : null
   const html = await baseLayout(
     `Order ${orderNumber} — ${label}`,
     `
     <p>Dear ${name},</p>
     <p>Your order <strong>${orderNumber}</strong> is now <strong>${label}</strong>.</p>
+    ${vaultUrl ? `<p>Access granted — open your vault to view your digital items.</p><div class="cta"><a href="${vaultUrl}" class="button" style="color:#ffffff;">Open my vault</a></div>` : ''}
     ${invoiceViewUrl ? `<div class="cta"><a href="${invoiceViewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>` : ''}
     <p>For any queries, contact us${contact ? ` at ${contact}` : ''}.</p>
   `

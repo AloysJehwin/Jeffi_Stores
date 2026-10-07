@@ -173,7 +173,7 @@ describe('POST /api/cart — item currently saved for later', () => {
     expect(sql).toContain('saved_for_later = FALSE')
     expect(sql).toContain('saved_at = NULL')
     expect(sql).toContain(
-      'CASE WHEN cart_items.saved_for_later THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END'
+      'CASE WHEN $9::boolean OR cart_items.saved_for_later THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END'
     )
     expect(sql).toContain(
       'CASE WHEN cart_items.saved_for_later THEN EXCLUDED.price_at_addition ELSE cart_items.price_at_addition END'
@@ -511,5 +511,60 @@ describe('PATCH /api/cart — cart item not found', () => {
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toBe('Cart item not found')
+  })
+})
+
+describe('POST /api/cart — digital product', () => {
+  const digitalProduct = { id: PRODUCT_ID, name: 'E-book', base_price: 499, is_active: true, is_digital: true }
+
+  beforeEach(() => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
+    vi.mocked(query)
+      .mockReset()
+      .mockResolvedValue({ rows: [{ quantity: 1, inserted: true }], rowCount: 1 } as any)
+  })
+
+  it('pins the line to qty 1 and never increments on re-add', async () => {
+    vi.mocked(queryOne)
+      .mockReset()
+      .mockResolvedValueOnce(digitalProduct as any)
+      .mockResolvedValue(null)
+    const res = await POST(
+      makeRequest('POST', 'http://localhost/api/cart', { productId: PRODUCT_ID, quantity: 5 }) as any
+    )
+    expect(res.status).toBe(200)
+    const [, params] = vi.mocked(query).mock.calls[0]! as [string, any[]]
+    expect(params[4]).toBe(1) // quantity
+    expect(params[8]).toBe(true) // digital → ON CONFLICT keeps EXCLUDED.quantity (1)
+  })
+
+  it('returns 409 alreadyOwned when the buyer holds an active entitlement', async () => {
+    vi.mocked(queryOne)
+      .mockReset()
+      .mockResolvedValueOnce(digitalProduct as any)
+      .mockResolvedValueOnce({ '?column?': 1 } as any)
+    const res = await POST(
+      makeRequest('POST', 'http://localhost/api/cart', { productId: PRODUCT_ID, quantity: 1 }) as any
+    )
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ alreadyOwned: true })
+    expect(vi.mocked(query)).not.toHaveBeenCalled()
+  })
+})
+
+describe('PATCH /api/cart — digital line', () => {
+  it('caps a digital line quantity at 1', async () => {
+    vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
+    vi.mocked(queryOne)
+      .mockReset()
+      .mockResolvedValueOnce({ id: CART_ITEM_ID, is_digital: true } as any)
+    vi.mocked(query)
+      .mockReset()
+      .mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    const res = await PATCH(
+      makeRequest('PATCH', 'http://localhost/api/cart', { cartItemId: CART_ITEM_ID, quantity: 4 }) as any
+    )
+    expect(res.status).toBe(200)
+    expect(vi.mocked(query).mock.calls[0]![1]).toEqual([1, CART_ITEM_ID])
   })
 })
