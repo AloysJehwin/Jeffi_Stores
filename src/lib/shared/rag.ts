@@ -57,7 +57,31 @@ function toVectorLiteral(vec: number[]): string {
   return `[${vec.join(',')}]`
 }
 
+// The tenant whose embeddings a RAG read may touch (#489). Resolved ALS-safely (header bridge when
+// ALS is empty). A tenant sees ONLY its own rows (tenant_id = its id); the platform/flagship sees
+// its own rows (tenant_id IS NULL). There is NO cross-tenant or platform fallback: a tenant with no
+// embeddings yet gets [] rather than another store's data. Returns the uuid, or null for platform.
+async function currentRagTenantId(): Promise<string | null> {
+  try {
+    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+    return await resolveTenantId()
+  } catch {
+    return null
+  }
+}
+
+// `tenant_id IS NOT DISTINCT FROM $n` matches a tenant's own rows, and NULL=NULL for the platform.
+// Appends the param and returns the SQL predicate referencing it.
+function tenantPredicate(params: unknown[], tenantId: string | null): string {
+  params.push(tenantId)
+  return `tenant_id IS NOT DISTINCT FROM $${params.length}`
+}
+
 export async function queryManyReplica<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
+  // Raw replica access runs opaque caller SQL against the platform-only replica, so it can't be
+  // tenant-filtered generically. On a tenant request it would leak platform data → refuse and
+  // return []. Platform (off-tenant) callers are unaffected. (#489)
+  if (await currentRagTenantId()) return []
   const client = await getPool().connect()
   try {
     const result = await client.query(sql, params)
@@ -85,9 +109,11 @@ export async function findSimilar(query: string, opts: FindSimilarOptions = {}):
 
   const vec = await embed(query)
   const vecLiteral = toVectorLiteral(vec)
+  const tenantId = await currentRagTenantId()
 
   const params: unknown[] = [vecLiteral]
-  const where: string[] = []
+  // A tenant reads only its own embeddings; the platform reads its own (NULL). No fallback.
+  const where: string[] = [tenantPredicate(params, tenantId)]
 
   if (tables && tables.length > 0) {
     params.push(tables)
@@ -151,25 +177,27 @@ export interface SimilarProductId {
 export async function findSimilarProductIds(query: string, limit = 20): Promise<SimilarProductId[]> {
   const vec = await embed(query)
   const vecLiteral = toVectorLiteral(vec)
+  const tenantId = await currentRagTenantId()
 
+  // $3 = tenant id; a tenant matches only its own rows, the platform matches NULL. No fallback.
   const productSql = `
     SELECT source_id, 1 - (embedding <=> $1::vector) AS similarity
       FROM embeddings
-     WHERE source_table = 'products'
+     WHERE source_table = 'products' AND tenant_id IS NOT DISTINCT FROM $3
      ORDER BY embedding <=> $1::vector
      LIMIT $2
   `
   const variantSql = `
     SELECT source_id, 1 - (embedding <=> $1::vector) AS similarity
       FROM embeddings
-     WHERE source_table = 'product_variants'
+     WHERE source_table = 'product_variants' AND tenant_id IS NOT DISTINCT FROM $3
      ORDER BY embedding <=> $1::vector
      LIMIT $2
   `
   const [productResult, variantResult, keywordRows] = await Promise.all([
-    runWithHnswTuning(productSql, [vecLiteral, limit]),
-    runWithHnswTuning(variantSql, [vecLiteral, limit]),
-    keywordProductIds(query, limit),
+    runWithHnswTuning(productSql, [vecLiteral, limit, tenantId]),
+    runWithHnswTuning(variantSql, [vecLiteral, limit, tenantId]),
+    keywordProductIds(query, limit, tenantId),
   ])
 
   const merged: SimilarProductId[] = []
@@ -217,7 +245,11 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
  * fastener/hardware terms surface even when embeddings drift off-topic. Uses the
  * products.search_vector when available, falling back to name/description ILIKE.
  */
-async function keywordProductIds(query: string, limit: number): Promise<string[]> {
+async function keywordProductIds(query: string, limit: number, tenantId: string | null): Promise<string[]> {
+  // The replica's `products` table is the platform's catalog (no tenant column), so the keyword
+  // fallback can only return platform rows. For a tenant, skip it — vector search over the tenant's
+  // own embeddings is the only tenant-safe path. No platform products ever reach a tenant answer.
+  if (tenantId) return []
   // Salient tokens: drop stopwords / connectors, keep words >= 3 chars.
   const STOP = new Set([
     'for',

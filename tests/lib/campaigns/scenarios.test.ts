@@ -31,6 +31,10 @@ vi.mock('@/lib/shared/automation-emails', () => ({
   renderHeroProduct: vi.fn(),
 }))
 
+vi.mock('@/lib/campaigns/whatsapp-dispatch', () => ({
+  sendCampaignWhatsApp: vi.fn().mockResolvedValue({ ok: true }),
+}))
+
 // ---------------------------------------------------------------------------
 // Mock @/lib/shared/email-campaigns (used by review-request)
 // ---------------------------------------------------------------------------
@@ -74,6 +78,7 @@ import {
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
+import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { generateReviewToken } from '@/lib/auth/jwt'
 
 // Typed mocks
@@ -165,8 +170,9 @@ describe('abandonedCart scenario', () => {
 
   it('has all required defaultParams', () => {
     const p = abandonedCart.defaultParams
+    // lookbackDays/secondEmailDelayHours now hold canonical minutes; the cooldown is injected universally.
     expect(typeof p.lookbackDays).toBe('number')
-    expect(typeof p.sendCooldownDays).toBe('number')
+    expect(typeof p.secondEmailDelayHours).toBe('number')
     expect(typeof p.maxRecipientsPerSweep).toBe('number')
     expect(typeof p.maxItemsPerEmail).toBe('number')
   })
@@ -174,7 +180,7 @@ describe('abandonedCart scenario', () => {
   it('defaultParams have sensible bounds', () => {
     const p = abandonedCart.defaultParams
     expect(p.lookbackDays).toBeGreaterThan(0)
-    expect(p.sendCooldownDays).toBeGreaterThan(0)
+    expect(p.secondEmailDelayHours).toBeGreaterThan(0)
     expect(p.maxRecipientsPerSweep).toBeGreaterThan(0)
     expect(p.maxItemsPerEmail).toBeGreaterThan(0)
   })
@@ -232,10 +238,10 @@ describe('abandonedCart scenario', () => {
     const [sql, args] = mockQueryMany.mock.calls[0]
     expect(typeof sql).toBe('string')
     expect(args).toContain('abandoned_cart')
-    // delay_hours
+    // delay_hours (passed raw, not a scenario duration param)
     expect(args).toContain(2)
-    // lookbackDays
-    expect(args).toContain(abandonedCart.defaultParams.lookbackDays)
+    // lookbackDays — now canonical minutes, bound to SQL as a String
+    expect(args).toContain(String(abandonedCart.defaultParams.lookbackDays))
   })
 
   // --- send — no items → ok: false ---
@@ -350,6 +356,15 @@ describe('postPurchase scenario', () => {
     expect(postPurchase.findSuppressed).toBeUndefined()
   })
 
+  it('findEligible counts granted (digital) orders as fulfilled', async () => {
+    mockQueryMany.mockResolvedValueOnce([])
+    await postPurchase.findEligible({
+      campaign: makeCampaign({ kind: 'post_purchase' }) as any,
+      params: postPurchase.defaultParams,
+    })
+    expect(String(mockQueryMany.mock.calls[0][0])).toContain("o.status IN ('delivered', 'granted')")
+  })
+
   it('findEligible returns rows from queryMany', async () => {
     const rows = [{ id: 'ord-1', user_id: 'usr-1', order_number: 'ORD001' }]
     mockQueryMany.mockResolvedValueOnce(rows as any)
@@ -441,7 +456,7 @@ describe('priceDrop scenario', () => {
 
   it('findEligible passes computed factor to queryMany', async () => {
     mockQueryMany.mockResolvedValueOnce([])
-    const params = { priceDropThresholdPct: 10, maxWatchesPerSweep: 100 }
+    const params = { priceDropThresholdPct: 10, maxWatchesPerSweep: 100, whatsappEnabled: false }
 
     await priceDrop.findEligible({
       campaign: makeCampaign({ kind: 'price_drop' }) as any,
@@ -450,8 +465,7 @@ describe('priceDrop scenario', () => {
 
     const [, args] = mockQueryMany.mock.calls[0]
     // factor = (100 - 10) / 100 = 0.9
-    expect(args).toContain(0.9)
-    expect(args).toContain(100)
+    expect(args).toEqual(['price_drop', 0.9, 100])
   })
 
   it('findEligible returns rows unchanged', async () => {
@@ -463,7 +477,6 @@ describe('priceDrop scenario', () => {
         product_slug: 'drill',
         snapshot_price: '500',
         current_price: '400',
-        current_in_stock: true,
       },
     ]
     mockQueryMany.mockReset()
@@ -488,7 +501,6 @@ describe('priceDrop scenario', () => {
         product_slug: 'drill',
         snapshot_price: '500',
         current_price: '400',
-        current_in_stock: true,
       },
       { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
     )
@@ -505,7 +517,6 @@ describe('priceDrop scenario', () => {
       product_slug: 'drill',
       snapshot_price: '500.00',
       current_price: '399.99',
-      current_in_stock: true,
     }
 
     await priceDrop.send(row, {
@@ -519,7 +530,7 @@ describe('priceDrop scenario', () => {
     expect(payload.vars.newPrice).toBe('400')
     expect(payload.vars.productName).toBe('Drill')
     expect(payload.vars.ctaUrl).toContain('/products/drill')
-    expect(payload.referenceId).toBe('p1')
+    expect(payload.referenceId).toBe('p1:500.00')
   })
 
   it('send calls renderHeroProduct with name, imageUrl, productUrl, oldPrice, newPrice', async () => {
@@ -530,7 +541,6 @@ describe('priceDrop scenario', () => {
       product_slug: 'drill',
       snapshot_price: '500',
       current_price: '400',
-      current_in_stock: true,
     }
 
     await priceDrop.send(row, {
@@ -548,6 +558,36 @@ describe('priceDrop scenario', () => {
     )
   })
 
+  it('send also fires WhatsApp when enabled and the email went out', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: true })
+    const row = {
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Drill',
+      product_slug: 'drill',
+      snapshot_price: '500',
+      current_price: '400',
+    }
+    await priceDrop.send(row, {
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: { ...priceDrop.defaultParams, whatsappEnabled: true },
+    })
+    expect(vi.mocked(sendCampaignWhatsApp)).toHaveBeenCalledWith(
+      'price_drop',
+      'u1',
+      expect.objectContaining({ headline: expect.stringContaining('Drill') })
+    )
+  })
+
+  it('send skips WhatsApp when disabled', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: true })
+    await priceDrop.send(
+      { user_id: 'u1', product_id: 'p1', product_name: 'Drill', product_slug: 'drill', snapshot_price: '500', current_price: '400' },
+      { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
+    )
+    expect(vi.mocked(sendCampaignWhatsApp)).not.toHaveBeenCalled()
+  })
+
   it('send updates wishlist snapshot after sending', async () => {
     const row = {
       user_id: 'u1',
@@ -556,7 +596,6 @@ describe('priceDrop scenario', () => {
       product_slug: 'drill',
       snapshot_price: '500',
       current_price: '400',
-      current_in_stock: true,
     }
 
     await priceDrop.send(row, {
@@ -579,7 +618,6 @@ describe('priceDrop scenario', () => {
       product_slug: 'drill',
       snapshot_price: '500',
       current_price: '400',
-      current_in_stock: true,
     }
 
     const result = await priceDrop.send(row, {
@@ -587,8 +625,97 @@ describe('priceDrop scenario', () => {
       params: priceDrop.defaultParams,
     })
 
-    // The catch(() => {}) in source means the update error is swallowed
     expect(result.ok).toBe(true)
+  })
+
+  it('findEligible syncs the wishlist snapshots before looking for rows', async () => {
+    const order: string[] = []
+    mockQuery.mockImplementation(async () => {
+      order.push('sync')
+      return { rows: [], rowCount: 0 } as any
+    })
+    mockQueryMany.mockImplementation(async () => {
+      order.push('select')
+      return []
+    })
+
+    await priceDrop.findEligible({
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
+
+    expect(order).toEqual(['sync', 'sync', 'sync', 'sync', 'sync', 'select'])
+    const syncSql = mockQuery.mock.calls.map(c => String(c[0]))
+    expect(syncSql.some(sql => sql.includes('snapshot_taken_at IS NULL'))).toBe(true)
+    expect(syncSql.some(sql => sql.includes('snapshot_in_stock = FALSE'))).toBe(true)
+    // Reads the saved set (wishlist + saved-for-later cart items), not the wishlist table alone.
+    expect(String(mockQueryMany.mock.calls[0][0])).toContain('saved_for_later = TRUE')
+  })
+
+  it('findEligible judges stock by status, not inventory quantity', async () => {
+    await priceDrop.findEligible({
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
+
+    const sql = String(mockQueryMany.mock.calls[0][0])
+    expect(sql).toContain("stock_status IS DISTINCT FROM 'Out of Stock'")
+    expect(sql).not.toContain('inventory_quantity')
+    expect(sql).toContain('p.is_active = TRUE')
+  })
+
+  it('findEligible skips users inside the 72 hour cap and takes the oldest snapshots first', async () => {
+    await priceDrop.findEligible({
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: priceDrop.defaultParams,
+    })
+
+    const sql = String(mockQueryMany.mock.calls[0][0])
+    expect(sql).toContain("INTERVAL '72 hours'")
+    expect(sql).toContain('ORDER BY wi.snapshot_taken_at ASC')
+  })
+
+  it('send keeps the snapshot when the email hit the frequency cap, so the event is retried', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: false, reason: 'frequency_cap' } as any)
+
+    const result = await priceDrop.send(
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Drill',
+        product_slug: 'drill',
+        snapshot_price: '500',
+        current_price: '400',
+      },
+      {
+        campaign: makeCampaign({ kind: 'price_drop' }) as any,
+        params: priceDrop.defaultParams,
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'frequency_cap' })
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('send refreshes the snapshot when this event was already emailed', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: false, reason: 'already_sent' } as any)
+
+    await priceDrop.send(
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Drill',
+        product_slug: 'drill',
+        snapshot_price: '500',
+        current_price: '400',
+      },
+      {
+        campaign: makeCampaign({ kind: 'price_drop' }) as any,
+        params: priceDrop.defaultParams,
+      }
+    )
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE wishlist_items'), ['u1', 'p1'])
   })
 })
 
@@ -619,7 +746,7 @@ describe('restock scenario', () => {
     expect(typeof restock.send).toBe('function')
   })
 
-  it('findEligible passes maxWatchesPerSweep as $1 arg', async () => {
+  it('findEligible passes the campaign kind and the row limit', async () => {
     mockQueryMany.mockResolvedValueOnce([])
     const params = { maxWatchesPerSweep: 200, whatsappEnabled: false }
 
@@ -629,7 +756,7 @@ describe('restock scenario', () => {
     })
 
     const [, args] = mockQueryMany.mock.calls[0]
-    expect(args).toContain(200)
+    expect(args).toEqual(['restock', 200])
   })
 
   it('findEligible returns rows from queryMany', async () => {
@@ -639,8 +766,7 @@ describe('restock scenario', () => {
         product_id: 'p1',
         product_name: 'Bolt',
         product_slug: 'bolt',
-        current_price: '50',
-        current_in_stock: true,
+        out_of_stock_since: '1700000000',
       },
     ]
     mockQueryMany.mockReset()
@@ -663,8 +789,7 @@ describe('restock scenario', () => {
         product_id: 'p1',
         product_name: 'Bolt',
         product_slug: 'bolt',
-        current_price: '50',
-        current_in_stock: true,
+        out_of_stock_since: '1700000000',
       },
       { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams }
     )
@@ -679,8 +804,7 @@ describe('restock scenario', () => {
       product_id: 'p1',
       product_name: 'Bolt',
       product_slug: 'bolt',
-      current_price: '50',
-      current_in_stock: true,
+      out_of_stock_since: '1700000000',
     }
 
     await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
@@ -702,8 +826,7 @@ describe('restock scenario', () => {
       product_id: 'p1',
       product_name: 'Bolt',
       product_slug: 'bolt',
-      current_price: '50',
-      current_in_stock: true,
+      out_of_stock_since: '1700000000',
     }
 
     await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
@@ -711,7 +834,7 @@ describe('restock scenario', () => {
     const [payload] = mockSendEmail.mock.calls[0]
     expect(payload.vars.productName).toBe('Bolt')
     expect(payload.vars.ctaUrl).toContain('/products/bolt')
-    expect(payload.referenceId).toBe('p1')
+    expect(payload.referenceId).toBe('p1:1700000000')
   })
 
   it('send updates wishlist snapshot after sending', async () => {
@@ -720,8 +843,7 @@ describe('restock scenario', () => {
       product_id: 'p1',
       product_name: 'Bolt',
       product_slug: 'bolt',
-      current_price: '50',
-      current_in_stock: true,
+      out_of_stock_since: '1700000000',
     }
 
     await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
@@ -739,8 +861,7 @@ describe('restock scenario', () => {
       product_id: 'p1',
       product_name: 'Bolt',
       product_slug: 'bolt',
-      current_price: '50',
-      current_in_stock: true,
+      out_of_stock_since: '1700000000',
     }
 
     const result = await restock.send(row, {
@@ -749,6 +870,94 @@ describe('restock scenario', () => {
     })
 
     expect(result.ok).toBe(true)
+  })
+
+  it('findEligible syncs the wishlist snapshots before looking for rows', async () => {
+    const order: string[] = []
+    mockQuery.mockImplementation(async () => {
+      order.push('sync')
+      return { rows: [], rowCount: 0 } as any
+    })
+    mockQueryMany.mockImplementation(async () => {
+      order.push('select')
+      return []
+    })
+
+    await restock.findEligible({
+      campaign: makeCampaign({ kind: 'restock' }) as any,
+      params: restock.defaultParams,
+    })
+
+    expect(order).toEqual(['sync', 'sync', 'sync', 'sync', 'sync', 'select'])
+    const syncSql = mockQuery.mock.calls.map(c => String(c[0]))
+    expect(syncSql.some(sql => sql.includes('snapshot_taken_at IS NULL'))).toBe(true)
+    expect(syncSql.some(sql => sql.includes('snapshot_in_stock = FALSE'))).toBe(true)
+    // Reads the saved set (wishlist + saved-for-later cart items), not the wishlist table alone.
+    expect(String(mockQueryMany.mock.calls[0][0])).toContain('saved_for_later = TRUE')
+  })
+
+  it('findEligible judges stock by status, not inventory quantity', async () => {
+    await restock.findEligible({
+      campaign: makeCampaign({ kind: 'restock' }) as any,
+      params: restock.defaultParams,
+    })
+
+    const sql = String(mockQueryMany.mock.calls[0][0])
+    expect(sql).toContain("stock_status IS DISTINCT FROM 'Out of Stock'")
+    expect(sql).not.toContain('inventory_quantity')
+    expect(sql).toContain('p.is_active = TRUE')
+  })
+
+  it('findEligible skips users inside the 72 hour cap and takes the oldest snapshots first', async () => {
+    await restock.findEligible({
+      campaign: makeCampaign({ kind: 'restock' }) as any,
+      params: restock.defaultParams,
+    })
+
+    const sql = String(mockQueryMany.mock.calls[0][0])
+    expect(sql).toContain("INTERVAL '72 hours'")
+    expect(sql).toContain('ORDER BY wi.snapshot_taken_at ASC')
+  })
+
+  it('send keeps the snapshot when the email hit the frequency cap, so the event is retried', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: false, reason: 'frequency_cap' } as any)
+
+    const result = await restock.send(
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Bolt',
+        product_slug: 'bolt',
+        out_of_stock_since: '1700000000',
+      },
+      {
+        campaign: makeCampaign({ kind: 'restock' }) as any,
+        params: restock.defaultParams,
+      }
+    )
+
+    expect(result).toEqual({ ok: false, reason: 'frequency_cap' })
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('send refreshes the snapshot when this event was already emailed', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: false, reason: 'already_sent' } as any)
+
+    await restock.send(
+      {
+        user_id: 'u1',
+        product_id: 'p1',
+        product_name: 'Bolt',
+        product_slug: 'bolt',
+        out_of_stock_since: '1700000000',
+      },
+      {
+        campaign: makeCampaign({ kind: 'restock' }) as any,
+        params: restock.defaultParams,
+      }
+    )
+
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE wishlist_items'), ['u1', 'p1'])
   })
 })
 
@@ -780,6 +989,15 @@ describe('reviewReminder scenario', () => {
     expect(typeof reviewReminder.send).toBe('function')
   })
 
+  it('findEligible counts granted (digital) orders as fulfilled', async () => {
+    mockQueryMany.mockResolvedValueOnce([])
+    await reviewReminder.findEligible({
+      campaign: makeCampaign({ kind: 'review_reminder' }) as any,
+      params: reviewReminder.defaultParams,
+    })
+    expect(String(mockQueryMany.mock.calls[0][0])).toContain("o.status IN ('delivered', 'granted')")
+  })
+
   it('findEligible passes campaign.kind and params to queryMany', async () => {
     mockQueryMany.mockResolvedValueOnce([])
     const campaign = makeCampaign({ kind: 'review_reminder', delay_hours: 48 })
@@ -792,7 +1010,8 @@ describe('reviewReminder scenario', () => {
     const [sql, args] = mockQueryMany.mock.calls[0]
     expect(typeof sql).toBe('string')
     expect(args).toContain('review_reminder')
-    expect(args).toContain(reviewReminder.defaultParams.lookbackDays)
+    expect(args).toContain(String(reviewReminder.defaultParams.lookbackDays))
+    expect(sql).toContain("ecs.campaign_kind = 'review_request'")
   })
 
   it('findEligible returns rows from queryMany', async () => {
@@ -836,32 +1055,27 @@ describe('reviewReminder scenario', () => {
     expect(payload.referenceId).toBe('ord-xyz')
   })
 
-  it('send appends ?review=1 to product URLs via renderItemRows', async () => {
+  it("links each item to its own signed review page, not the product page's dead ?review=1", async () => {
     const items = [{ name: 'Product A', product_id: 'p1', product_slug: 'product-a', image_url: null }]
     mockQueryMany.mockReset()
     mockQueryMany.mockResolvedValue(items as any)
+    mockGenerateReviewToken.mockResolvedValue('tok-1')
 
     await reviewReminder.send(
       { id: 'ord-1', user_id: 'usr-123', order_number: 'RR-1' },
       { campaign: makeCampaign({ kind: 'review_reminder' }) as any, params: reviewReminder.defaultParams }
     )
 
-    // renderItemRows should have been called with productUrl containing ?review=1
-    expect(mockRenderItemRows).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          productUrl: expect.stringContaining('?review=1'),
-        }),
-      ])
-    )
+    expect(mockGenerateReviewToken).toHaveBeenCalledWith({ orderId: 'ord-1', productId: 'p1', userId: 'usr-123' })
+    const [rows] = mockRenderItemRows.mock.calls.at(-1)!
+    expect(rows[0].productUrl).toMatch(/\/review\?token=tok-1$/)
+    expect(rows[0].productUrl).not.toContain('?review=1')
   })
 
-  it('send handles items with null product_slug (no review URL)', async () => {
-    // Explicitly override the default mock for this test so no slug-bearing
-    // data from a previous mockResolvedValueOnce can bleed through.
+  it('leaves an item with no product (deleted) unlinked', async () => {
     mockQueryMany.mockReset()
     mockQueryMany.mockResolvedValueOnce([
-      { name: 'Unknown', product_id: 'p1', product_slug: null, image_url: null },
+      { name: 'Unknown', product_id: null, product_slug: null, image_url: null },
     ] as any)
 
     await reviewReminder.send(
@@ -888,7 +1102,6 @@ describe('priceDrop scenario — branch coverage', () => {
       product_slug: 'drill',
       snapshot_price: '500',
       current_price: '400',
-      current_in_stock: true,
     }
 
     await priceDrop.send(row, {
@@ -912,8 +1125,7 @@ describe('restock scenario — branch coverage', () => {
       product_id: 'p1',
       product_name: 'Bolt',
       product_slug: 'bolt',
-      current_price: '50',
-      current_in_stock: true,
+      out_of_stock_since: '1700000000',
     }
 
     await restock.send(row, { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams })
@@ -963,8 +1175,9 @@ describe('reviewRequest scenario', () => {
     const [sql, args] = mockQueryMany.mock.calls[0]
     expect(typeof sql).toBe('string')
     expect(args).toContain('review_request')
+    expect(sql).toContain("ecs.campaign_kind = 'review_reminder'")
     expect(args).toContain(24)
-    expect(args).toContain(reviewRequest.defaultParams.lookbackDays)
+    expect(args).toContain(String(reviewRequest.defaultParams.lookbackDays))
     expect(args).toContain(reviewRequest.defaultParams.maxRecipientsPerSweep)
   })
 

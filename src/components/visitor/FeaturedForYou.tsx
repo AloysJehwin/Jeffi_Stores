@@ -23,6 +23,7 @@ interface CardProps {
   discountPct: number
   extraDeliveryDays: number
   handlingDays: number
+  isDigital?: boolean
 }
 
 interface ApiResponse {

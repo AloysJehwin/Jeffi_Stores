@@ -259,12 +259,22 @@ describe('alreadySentForReference', () => {
     expect(sql).toContain('sent_at')
   })
 
-  it('does not add time filter when referenceId is non-null', async () => {
+  it('does not add a time filter for a non-null reference when NO cooldown is given (one-shot)', async () => {
     mockQueryOne.mockResolvedValue(null)
     await alreadySentForReference('abandoned_cart', 'user-2', 'ref-abc')
     const [sql] = mockQueryOne.mock.calls[0]
-    // No extra time filter — the timeFilter string is empty
+    // No extra time filter — the timeFilter string is empty (blocks forever for one-shot refs)
     expect(sql).not.toContain('sent_at > NOW()')
+  })
+
+  // #campaign: a recurring campaign passes its cooldown so the SAME reference re-qualifies after the
+  // window — fixing abandoned_cart day-2 never sending.
+  it('windows a non-null reference by cooldownDays when provided (recurring resend)', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    await alreadySentForReference('abandoned_cart', 'user-2', 'seq1', 1)
+    const [sql] = mockQueryOne.mock.calls[0]
+    expect(sql).toContain('days')
+    expect(sql).toContain('sent_at > NOW()')
   })
 })
 
@@ -347,6 +357,14 @@ describe('getAssignedCouponCode', () => {
     mockQueryOne.mockResolvedValue(null)
     expect(await getAssignedCouponCode('missing')).toBeNull()
   })
+
+  it('only returns an active, unexpired coupon', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    await getAssignedCouponCode('coupon-1')
+    const sql = String(mockQueryOne.mock.calls[0][0])
+    expect(sql).toContain('is_active = TRUE')
+    expect(sql).toContain('(valid_until IS NULL OR valid_until > NOW())')
+  })
 })
 
 describe('generateCouponForCampaign', () => {
@@ -405,7 +423,8 @@ describe('generateCouponForCampaign', () => {
     expect(code).toMatch(/^OFFER-/)
   })
 
-  it('returns null on DB insert error', async () => {
+  it('returns null on DB insert error, and logs it', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
     mockQueryOne.mockResolvedValue(null)
     mockQuery.mockRejectedValue(new Error('db error'))
     const code = await generateCouponForCampaign({
@@ -414,6 +433,8 @@ describe('generateCouponForCampaign', () => {
       expiresInDays: 7,
     })
     expect(code).toBeNull()
+    expect(err).toHaveBeenCalledWith('[marketing] coupon generation failed', 'post_purchase', expect.any(Error))
+    err.mockRestore()
   })
 
   it('skips UPDATE campaigns when insert returns no coupon id', async () => {

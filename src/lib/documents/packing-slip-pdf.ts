@@ -1,6 +1,7 @@
 import 'server-only'
 import { queryMany } from '@/lib/shared/db'
-import path from 'path'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
+import { tenantLogoBuffer } from '@/lib/documents/store-logo'
 
 const PDFDocument = eval('require')('pdfkit')
 const QRCode = eval('require')('qrcode')
@@ -70,15 +71,16 @@ export async function loadStoreSettings(): Promise<StoreSettings> {
   const rows = await queryMany("SELECT key, value FROM site_settings WHERE key LIKE 'business_%'", [])
   const s: Record<string, string> = {}
   for (const row of rows || []) s[row.key] = row.value || ''
+  const identity = await getStoreIdentity()
 
   return {
-    name: s.business_trade_name || s.business_legal_name || 'JEFFI STORES',
+    name: s.business_trade_name || s.business_legal_name || identity.name,
     address: s.business_address || '',
     city: s.business_state || '',
     phone: s.business_phone || '',
     email: s.business_email || '',
     gstin: s.business_gstin || '',
-    web: 'jeffistores.in',
+    web: s.business_web || identity.web,
   }
 }
 
@@ -161,17 +163,19 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   const QR_SIZE = 66
   const HEADER_H = 90
   const LOGO_SIZE = 58
-  const LOGO_PATH = path.join(process.cwd(), 'public', 'images', 'store-logo.png')
+  const logoBuf = await tenantLogoBuffer()
 
   // ── Header bar ──────────────────────────────────────────────────────────────
   box(doc, 0, 0, PAGE_W, HEADER_H, GREEN_DARK)
 
   const textZoneW = CW - LOGO_SIZE - QR_SIZE - 24
 
-  try {
-    doc.image(LOGO_PATH, ML, Math.floor((HEADER_H - LOGO_SIZE) / 2), { width: LOGO_SIZE, height: LOGO_SIZE })
-  } catch {
-    /* logo missing */
+  if (logoBuf) {
+    try {
+      doc.image(logoBuf, ML, Math.floor((HEADER_H - LOGO_SIZE) / 2), { width: LOGO_SIZE, height: LOGO_SIZE })
+    } catch {
+      /* unreadable tenant logo — store name text in the header stands in */
+    }
   }
 
   const textX = ML + LOGO_SIZE + 12

@@ -85,7 +85,7 @@ export default function HealthScoreCard({
             type="button"
             onClick={recompute}
             disabled={busy}
-            className="mt-3 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+            className="mt-3 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
           >
             {busy ? 'Computing…' : 'Compute now'}
           </button>

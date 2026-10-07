@@ -9,6 +9,7 @@ async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
     `SELECT o.id, o.order_number, o.created_at, o.customer_name, o.customer_phone,
             o.total_amount, o.discount_amount, o.business_discount_amount, o.shipping_amount,
             o.taxable_amount, o.cgst_amount, o.sgst_amount, o.igst_amount, o.is_igst,
+            (SELECT COUNT(*) FROM order_items d WHERE d.order_id = o.id AND d.is_digital)::int AS digital_item_count,
             row_to_json(a) AS shipping_address,
             json_agg(json_build_object(
               'product_name', COALESCE(oi.product_name, p.name, 'Product'),
@@ -30,7 +31,7 @@ async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
             ) ORDER BY oi.created_at) AS items
      FROM orders o
      LEFT JOIN addresses a ON a.id = o.shipping_address_id
-     LEFT JOIN order_items oi ON oi.order_id = o.id
+     LEFT JOIN order_items oi ON oi.order_id = o.id AND oi.is_digital IS NOT TRUE
      LEFT JOIN products p ON p.id = oi.product_id
      LEFT JOIN product_images pi ON pi.product_id = p.id AND pi.is_primary = true
      WHERE o.id = $1
@@ -52,6 +53,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
   // Filter null items that json_agg produces when there are no matching rows
   order.items = (order.items || []).filter(Boolean)
+  if (order.items.length === 0 && (order as any).digital_item_count > 0)
+    return NextResponse.json({ error: 'This order has only digital items — nothing to pack.' }, { status: 422 })
 
   try {
     const pdfBuffer = await generatePackingSlipPDF(order, store)

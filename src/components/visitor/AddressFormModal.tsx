@@ -9,10 +9,20 @@ declare global {
   interface Window {
     google: typeof google
     initGoogleMapsAutocomplete?: () => void
+    gm_authFailure?: () => void
   }
 }
 
+// On a host outside the key's referrer list Google rejects the key and disables every input it was attached to.
+let mapsAuthFailed = false
+const mapsAuthFailureListeners = new Set<() => void>()
+
 function loadGoogleMapsScript(apiKey: string, onLoad: () => void) {
+  if (mapsAuthFailed) return
+  window.gm_authFailure = () => {
+    mapsAuthFailed = true
+    mapsAuthFailureListeners.forEach(listener => listener())
+  }
   if (window.google?.maps?.places) {
     onLoad()
     return
@@ -68,9 +78,10 @@ export default function AddressFormModal({
   const pinDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const address1Ref = useRef<HTMLInputElement>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
+  const [mapsBlocked, setMapsBlocked] = useState(mapsAuthFailed)
 
   const initAutocomplete = useCallback(() => {
-    if (!address1Ref.current || autocompleteRef.current) return
+    if (!address1Ref.current || autocompleteRef.current || mapsAuthFailed) return
     const ac = new window.google.maps.places.Autocomplete(address1Ref.current, {
       componentRestrictions: { country: 'in' },
       fields: ['address_components', 'formatted_address'],
@@ -109,11 +120,31 @@ export default function AddressFormModal({
   }, [])
 
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen || mapsBlocked) return
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
     if (!apiKey) return
     loadGoogleMapsScript(apiKey, initAutocomplete)
-  }, [isOpen, initAutocomplete])
+  }, [isOpen, mapsBlocked, initAutocomplete])
+
+  useEffect(() => {
+    const onAuthFailure = () => setMapsBlocked(true)
+    mapsAuthFailureListeners.add(onAuthFailure)
+    return () => {
+      mapsAuthFailureListeners.delete(onAuthFailure)
+    }
+  }, [])
+
+  const wasMapsBlocked = useRef(mapsBlocked)
+  useEffect(() => {
+    const justBlocked = mapsBlocked && !wasMapsBlocked.current
+    wasMapsBlocked.current = mapsBlocked
+    if (!justBlocked) return
+    const input = address1Ref.current
+    const active = document.activeElement
+    if (!input || (active && active !== document.body)) return
+    input.focus()
+    input.setSelectionRange(input.value.length, input.value.length)
+  }, [mapsBlocked])
 
   useEffect(() => {
     autocompleteRef.current = null
@@ -310,6 +341,7 @@ export default function AddressFormModal({
                 Address Line 1 *
               </label>
               <input
+                key={mapsBlocked ? 'address-line1-plain' : 'address-line1'}
                 id="modal_address_line1"
                 ref={address1Ref}
                 type="text"

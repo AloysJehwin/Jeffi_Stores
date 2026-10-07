@@ -9,12 +9,13 @@ import {
   customerMailFromAsync,
   adminMailFrom,
   currentBrandNameAsync,
-  currentAdminBaseUrl,
+  currentAdminBaseUrlAsync,
   platformAdminEmail,
   storeContactLine,
   storeBaseUrlAsync,
   type AnnouncementProduct,
 } from './shared'
+import { customerBaseUrlForOrder, orderUrlById, orderUrlByNumber } from '@/lib/shared/customer-links'
 
 export async function sendOrderAutoCancelledEmail(
   customerEmail: string,
@@ -26,7 +27,8 @@ export async function sendOrderAutoCancelledEmail(
   redirectPath: string
 ) {
   const contactLine = await storeContactLine()
-  const baseUrl = await storeBaseUrlAsync()
+  // The cart or product on the customer's own store (business portal for a business customer).
+  const baseUrl = await customerBaseUrlForOrder(orderId)
   const brand = await currentBrandNameAsync()
   const isDirect = orderType === 'direct'
   const ctaLabel = isDirect ? 'Place Order Again' : 'Return to Cart'
@@ -98,7 +100,7 @@ export async function sendOrderAutoCancelledAdminNotification(order: any, redire
     severity: 'warning',
     scope: 'orders:read',
   }).catch(() => {})
-  const baseUrl = currentAdminBaseUrl()
+  const baseUrl = await currentAdminBaseUrlAsync()
   const total = parseFloat(order.total_amount || 0)
   const brand = await currentBrandNameAsync()
 
@@ -126,7 +128,7 @@ export async function sendOrderAutoCancelledAdminNotification(order: any, redire
         </table>
         <p>Stock has been released. ${order.order_type === 'direct' ? 'Items were not restored to a cart (direct order).' : 'Items were restored to the customer cart.'}</p>
         <div class="cta">
-          <a href="${baseUrl}/admin/orders/${order.id}" class="button" style="color:#ffffff;">View Order in Admin</a>
+          <a href="${baseUrl}/orders/${order.id}" class="button" style="color:#ffffff;">View Order in Admin</a>
         </div>
       `,
     }),
@@ -156,6 +158,7 @@ export async function sendOrderDelayNotification(args: {
   const { toEmail, customerName, orderNumber, delayDays, reason } = args
   const dayLabel = delayDays === 1 ? 'day' : 'days'
   const brand = await currentBrandNameAsync()
+  const orderLink = await orderUrlByNumber(orderNumber)
   const subject = `Update on your ${brand} order ${orderNumber}`
   const html = mailShell({
     brand,
@@ -166,6 +169,7 @@ export async function sendOrderDelayNotification(args: {
       <p>We're writing to let you know that your order <strong>${orderNumber}</strong> will be delayed by approximately <strong>${delayDays} ${dayLabel}</strong>.</p>
       <p><strong>Reason:</strong> ${reason}</p>
       <p>We're sorry for the inconvenience. We'll send you another update as soon as the situation changes, and your order is on its way.</p>
+      ${orderLink ? `<div class="cta"><a href="${orderLink}" class="button" style="color:#ffffff;">View Your Order</a></div>` : ''}
       <p>If you have any questions, just reply to this email and we'll get back to you.</p>
       <p style="margin:24px 0 0;color:#475569;">Thank you for your patience,<br>The ${brand} team</p>
     `,
@@ -179,7 +183,7 @@ Your order ${orderNumber} will be delayed by approximately ${delayDays} ${dayLab
 
 Reason: ${reason}
 
-We're sorry for the inconvenience. We'll send another update as soon as the situation changes.
+We're sorry for the inconvenience. We'll send another update as soon as the situation changes.${orderLink ? `\n\nView your order: ${orderLink}` : ''}
 
 If you have any questions, just reply to this email.
 
@@ -288,7 +292,7 @@ export async function sendVariantChangeRequestedEmail(params: {
 }): Promise<{ success: boolean; messageId?: string; error?: unknown }> {
   const from = await customerMailFromAsync()
   const brand = await currentBrandNameAsync()
-  const orderUrl = `${await storeBaseUrlAsync()}/account/orders/${params.orderId}`
+  const orderUrl = await orderUrlById(params.orderId)
   const absDiff = Math.abs(params.priceDiff)
   const diffLine =
     params.settlementType === 'refund'

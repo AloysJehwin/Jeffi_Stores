@@ -1,3 +1,4 @@
+import { catalogBaseUrl } from '@/lib/shared/customer-links'
 import { createSign } from 'crypto'
 import { queryMany } from '@/lib/shared/db'
 import { loadGoogleServiceAccount } from '@/lib/shared/google-credentials'
@@ -269,7 +270,7 @@ async function fetchAllProducts(limit?: number) {
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.is_draft = false
+    WHERE p.is_draft = false AND p.is_digital = false
     ORDER BY p.created_at DESC
     ${limit ? `LIMIT ${limit}` : ''}
   `)
@@ -301,7 +302,7 @@ async function fetchProduct(productId: string) {
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.id = $1
+    WHERE p.id = $1 AND p.is_digital = false
   `,
     [productId]
   )
@@ -311,7 +312,7 @@ export async function syncAllProductsToSheet(
   testLimit?: number
 ): Promise<{ inserted: number; updated: number; skipped: number }> {
   const token = await getAccessToken()
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
+  const baseUrl = await catalogBaseUrl()
   const products = await fetchAllProducts(testLimit)
 
   const existingRes = await fetch(
@@ -392,7 +393,7 @@ export async function syncAllProductsToSheet(
 export async function syncProductToSheet(productId: string): Promise<void> {
   try {
     const token = await getAccessToken()
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
+    const baseUrl = await catalogBaseUrl()
     const product = await fetchProduct(productId)
 
     // Inactive products are kept in the feed as out_of_stock (handled by productToSheetRows).

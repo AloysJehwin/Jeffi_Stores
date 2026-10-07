@@ -96,7 +96,7 @@ export function CodRemittanceTab() {
           <button
             onClick={() => markRemitted(Array.from(selected))}
             disabled={marking}
-            className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
+            className="px-4 h-control-sm bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
           >
             {marking ? 'Marking…' : `Mark ${selected.size} selected as Remitted`}
           </button>
@@ -141,7 +141,7 @@ export function CodRemittanceTab() {
                       <button
                         onClick={() => markRemitted(week.orders.map((o: any) => o.id))}
                         disabled={marking}
-                        className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 font-medium transition-colors"
+                        className="text-xs px-3 h-control-sm bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 font-medium transition-colors"
                       >
                         {marking ? '…' : 'Mark week remitted'}
                       </button>

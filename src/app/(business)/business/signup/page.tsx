@@ -7,6 +7,9 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { bp } from '@/lib/shared/business-path'
+import DatePicker from '@/components/ui/DatePicker'
+import PhoneVerifyModal from '@/components/visitor/PhoneVerifyModal'
+import { isValidDob } from '@/lib/shared/format'
 
 export default function BusinessSignUpWrapper() {
   return (
@@ -32,20 +35,45 @@ function BusinessSignUpPage() {
   const otpInputRef = useRef<HTMLInputElement>(null)
   const submittedOtpRef = useRef<string>('')
 
-  const googleAccessToken = searchParams.get('token')
-  const isGoogleFlow = searchParams.get('google') === '1' && !!googleAccessToken
-
-  useEffect(() => {
-    if (isGoogleFlow) setStep('details')
-  }, [isGoogleFlow])
+  const isGoogleParam = searchParams.get('google') === '1'
+  const [isGoogleFlow, setIsGoogleFlow] = useState(isGoogleParam)
+  const [googleAccessToken, setGoogleAccessToken] = useState('')
+  const googleHydratedRef = useRef(false)
+  const [showPhoneVerify, setShowPhoneVerify] = useState(false)
 
   // Business details
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
+  const [dob, setDob] = useState('')
   const [companyName, setCompanyName] = useState('')
   const [gstNumber, setGstNumber] = useState('')
   const [industry, setIndustry] = useState('')
+
+  // Not removed here: Strict Mode runs this effect twice in dev. Cleared once the account is created.
+  useEffect(() => {
+    if (!isGoogleParam || googleHydratedRef.current) return
+    googleHydratedRef.current = true
+    try {
+      const raw = sessionStorage.getItem('business_google_signup')
+      if (!raw) {
+        setError('Google sign-up session expired. Please try again.')
+        setIsGoogleFlow(false)
+        return
+      }
+      const { accessToken, profile } = JSON.parse(raw)
+      setGoogleAccessToken(accessToken)
+      setEmail(profile.email || '')
+      setFirstName(profile.firstName || '')
+      setLastName(profile.lastName || '')
+      setIsGoogleFlow(true)
+      setStep('details')
+    } catch {
+      setError('Google sign-up session expired. Please try again.')
+      setIsGoogleFlow(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Structured address
   const [addressLine1, setAddressLine1] = useState('')
@@ -214,7 +242,40 @@ function BusinessSignUpPage() {
       setGoogleLoading(false)
       return
     }
-    router.push(`${bp('/business/signup')}?google=1&token=${result.accessToken}`)
+    try {
+      const res = await fetch('/api/business/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ accessToken: result.accessToken }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Google sign-in failed')
+      if (data.newUser) {
+        try {
+          sessionStorage.setItem(
+            'business_google_signup',
+            JSON.stringify({ accessToken: result.accessToken, profile: data.profile })
+          )
+        } catch {}
+        setGoogleAccessToken(result.accessToken)
+        setEmail(data.profile.email || '')
+        setFirstName(data.profile.firstName || '')
+        setLastName(data.profile.lastName || '')
+        setIsGoogleFlow(true)
+        setStep('details')
+        return
+      }
+      if (data.approvalStatus === 'pending') {
+        router.push(bp('/business/pending'))
+        return
+      }
+      router.push(bp('/business/dashboard'))
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setGoogleLoading(false)
+    }
   }
 
   const handleDetailsSubmit = async (e: React.FormEvent) => {
@@ -240,45 +301,70 @@ function BusinessSignUpPage() {
       setError('Please select an industry')
       return
     }
-    if (!isGoogleFlow) {
-      if (!firstName.trim()) {
-        setError('First name is required')
-        return
-      }
-      if (phone.length !== 10) {
-        setError('Enter a valid 10-digit mobile number')
-        return
-      }
+    if (!firstName.trim()) {
+      setError('First name is required')
+      return
+    }
+    if (phone.length !== 10) {
+      setError('Enter a valid 10-digit mobile number')
+      return
+    }
+    if (!isValidDob(dob)) {
+      setError('Enter a valid date of birth')
+      return
     }
     const businessAddress = buildBusinessAddress()
     setIsLoading(true)
     try {
-      let res: Response
       if (isGoogleFlow) {
-        res = await fetch('/api/business/google', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ accessToken: googleAccessToken, companyName, gstNumber, businessAddress, industry }),
-        })
-      } else {
-        res = await fetch('/api/business/signup', {
+        const res = await fetch('/api/business/google/complete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({
-            email,
-            otp,
+            accessToken: googleAccessToken,
             firstName,
             lastName,
-            phone,
+            phone: `+91${phone}`,
+            dateOfBirth: dob,
             companyName,
             gstNumber,
             businessAddress,
             industry,
           }),
         })
+        const data = await res.json()
+        if (!res.ok) {
+          if (res.status === 409) {
+            router.push(`${bp('/business/signin')}?email=${encodeURIComponent(email)}&notice=already_registered`)
+            return
+          }
+          throw new Error(data.error || 'Signup failed')
+        }
+        try {
+          sessionStorage.removeItem('business_google_signup')
+        } catch {}
+        setShowPhoneVerify(true)
+        return
       }
+
+      const res = await fetch('/api/business/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          email,
+          otp,
+          firstName,
+          lastName,
+          phone,
+          dateOfBirth: dob,
+          companyName,
+          gstNumber,
+          businessAddress,
+          industry,
+        }),
+      })
       const data = await res.json()
       if (!res.ok) {
         if (res.status === 400 && data.error?.includes('already exists')) {
@@ -538,52 +624,72 @@ function BusinessSignUpPage() {
             {/* Step: Business Details */}
             {step === 'details' && (
               <form onSubmit={handleDetailsSubmit} className="space-y-4">
-                {!isGoogleFlow && (
-                  <>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-secondary mb-1">First Name *</label>
-                        <input
-                          type="text"
-                          required
-                          value={firstName}
-                          onChange={e => setFirstName(e.target.value)}
-                          className={inputCls}
-                          placeholder="First"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-secondary mb-1">Last Name</label>
-                        <input
-                          type="text"
-                          value={lastName}
-                          onChange={e => setLastName(e.target.value)}
-                          className={inputCls}
-                          placeholder="Last"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1">
-                        Mobile Number *
-                      </label>
-                      <div className="flex">
-                        <span className="inline-flex items-center px-3 py-2.5 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm">
-                          +91
-                        </span>
-                        <input
-                          type="tel"
-                          inputMode="numeric"
-                          maxLength={10}
-                          value={phone}
-                          onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                          className="w-full px-3 py-2.5 border border-border-secondary rounded-r-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                          placeholder="00000 00000"
-                        />
-                      </div>
-                    </div>
-                  </>
+                {isGoogleFlow && (
+                  <div>
+                    <label className="block text-xs font-medium text-foreground-secondary mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={email}
+                      readOnly
+                      disabled
+                      className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`}
+                    />
+                  </div>
                 )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground-secondary mb-1">First Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={firstName}
+                      onChange={e => setFirstName(e.target.value)}
+                      className={inputCls}
+                      placeholder="First"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground-secondary mb-1">Last Name</label>
+                    <input
+                      type="text"
+                      value={lastName}
+                      onChange={e => setLastName(e.target.value)}
+                      className={inputCls}
+                      placeholder="Last"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Mobile Number *</label>
+                  <div className="flex">
+                    <span className="inline-flex items-center px-3 py-2.5 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm">
+                      +91
+                    </span>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={phone}
+                      onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                      className="w-full px-3 py-2.5 border border-border-secondary rounded-r-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                      placeholder="00000 00000"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground-secondary mb-1">Date of Birth *</label>
+                  <DatePicker
+                    value={dob}
+                    onChange={setDob}
+                    max={new Date().toISOString().slice(0, 10)}
+                    placeholder="dd/mm/yyyy"
+                    className="w-full"
+                  />
+                  {dob.length > 0 && !isValidDob(dob) && (
+                    <p className="mt-1 text-xs text-red-500">Enter a valid date of birth</p>
+                  )}
+                </div>
 
                 <div>
                   <label className="block text-xs font-medium text-foreground-secondary mb-1">Company Name *</label>
@@ -790,6 +896,22 @@ function BusinessSignUpPage() {
           </div>
         </div>
       </div>
+
+      {showPhoneVerify && (
+        <PhoneVerifyModal
+          initialPhone={phone}
+          abandonOnCancel
+          title="Verify your mobile number"
+          onVerified={() => {
+            setShowPhoneVerify(false)
+            router.push(bp('/business/pending'))
+          }}
+          onCancel={() => {
+            setShowPhoneVerify(false)
+            router.push(bp('/business/signin'))
+          }}
+        />
+      )}
     </>
   )
 }

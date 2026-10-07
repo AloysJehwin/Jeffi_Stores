@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getProduct } from '@/lib/queries'
 import { query, withTransaction } from '@/lib/shared/db'
-import { deleteProductCascadeTx } from '@/lib/catalog/product-delete'
+import { deleteProductCascadeTx, productHasHistory } from '@/lib/catalog/product-delete'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
 import { revalidatePath } from 'next/cache'
@@ -69,8 +69,16 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (!isPlatformOwner(admin.role))
       return NextResponse.json({ error: 'Only platform owners can delete products' }, { status: 403 })
 
-    const product = await query(`SELECT id FROM products WHERE id = $1`, [id])
+    const product = await query<{ is_digital: boolean }>(`SELECT is_digital FROM products WHERE id = $1`, [id])
     if (!product.rowCount) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+
+    // Digital products with order/PO history are deactivated, not cascaded — their
+    // entitlements/vault rows must outlive the catalog entry (mirrors retireProduct).
+    if (product.rows[0]?.is_digital && (await productHasHistory(id))) {
+      await query(`UPDATE products SET is_active = false, updated_at = now() WHERE id = $1`, [id])
+      revalidatePath('/admin/products')
+      return NextResponse.json({ success: true, deactivated: true })
+    }
 
     // Collect S3 keys before the DB rows vanish, so we can clean the bucket after commit.
     const imgs = await query<{ s3_key: string | null; s3_thumbnail_key: string | null }>(

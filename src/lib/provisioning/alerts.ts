@@ -71,13 +71,20 @@ export async function findStuckJobs(): Promise<StuckJob[]> {
   return res.rows.map((r: any) => ({ ...r, stuck_minutes: Math.round(Number(r.stuck_minutes)) }))
 }
 
+// Absolute link to the platform admin's Ecom customers page (alerts are plain-text mail, where a
+// bare path is not clickable). The admin host serves pages at the root.
+async function ecomAdminUrl(): Promise<string> {
+  const { currentAdminBaseUrlAsync } = await import('@/lib/catalog/brand')
+  return `${await currentAdminBaseUrlAsync()}/ecom/customers`
+}
+
 export async function alertProvisioningFailure(
   tenantSlug: string,
   step: string,
   error: string,
   tenantId?: string
 ): Promise<void> {
-  const where = tenantId ? `/admin/ecom/customers/${tenantId}?tab=provisioning` : '/admin/ecom/customers'
+  const where = `${await ecomAdminUrl()}${tenantId ? `/${tenantId}?tab=provisioning` : ''}`
   // owner_admin_cert and mtls_fleet_refresh run AFTER the job is already `done` — the store is
   // live and nothing is rolled back. Only a failure in the job's own step machine is terminal,
   // so only that case may claim a rollback; the post-done hooks get a re-run instruction.
@@ -108,7 +115,7 @@ export async function alertStuckJobs(): Promise<number> {
   )
   await send(
     `[Jeffi] ${jobs.length} provisioning job(s) need attention`,
-    `Failed or stuck for over ${STUCK_AFTER_MIN} minutes:\n\n${lines.join('\n')}\n\n/admin/ecom/customers`
+    `Failed or stuck for over ${STUCK_AFTER_MIN} minutes:\n\n${lines.join('\n')}\n\n${await ecomAdminUrl()}`
   )
   return jobs.length
 }

@@ -59,6 +59,10 @@ describe('merchant/mapper', () => {
       expect(items).toHaveLength(1)
     })
 
+    it('excludes digital products from the feed', () => {
+      expect(productToGmcItems(makeProduct({ is_digital: true }))).toEqual([])
+    })
+
     it('sets offerId from sku (sanitized)', () => {
       const items = productToGmcItems(makeProduct({ sku: 'TW/001 test' }))
       expect(items[0].offerId).toBe('TW_001_test')

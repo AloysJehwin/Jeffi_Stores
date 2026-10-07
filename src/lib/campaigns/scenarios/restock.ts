@@ -1,4 +1,5 @@
-import { queryMany, query } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
+import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
 import {
   fetchUserContext,
   fetchProductImageUrl,
@@ -7,6 +8,12 @@ import {
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import {
+  NOT_RECENTLY_EMAILED_SQL,
+  SAVED_ITEMS_SQL,
+  settleWishlistEvent,
+  syncWishlistSnapshots,
+} from './_wishlist-base'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -19,8 +26,7 @@ interface Row {
   product_id: string
   product_name: string
   product_slug: string
-  current_price: string
-  current_in_stock: boolean
+  out_of_stock_since: string
 }
 
 export const restock: ScenarioModule<Params, Row> = {
@@ -28,7 +34,7 @@ export const restock: ScenarioModule<Params, Row> = {
   name: 'Back in Stock',
   description: 'Wishlisted product back in stock',
   trigger:
-    "Fires when a product on a customer's wishlist transitions from out-of-stock (snapshot_in_stock=false) back to in-stock (inventory_quantity>0). One send per product per restock event; the wishlist snapshot is updated after sending so the next out→in transition will trigger again.",
+    "Fires when a product on a customer's wishlist goes from Out of Stock back to in stock (by stock status, not inventory quantity). One send per product per restock event; the wishlist snapshot is refreshed once the email is sent so the next out-to-in transition notifies again.",
   defaultParams: { maxWatchesPerSweep: 100, whatsappEnabled: false },
   paramSchema: {
     maxWatchesPerSweep: {
@@ -45,22 +51,25 @@ export const restock: ScenarioModule<Params, Row> = {
     },
   },
 
-  async findEligible({ params }) {
+  async findEligible({ campaign, params }) {
+    await syncWishlistSnapshots()
     return queryMany<Row>(
       `
       SELECT wi.user_id, wi.product_id, p.name AS product_name, p.slug AS product_slug,
-             p.base_price::text AS current_price,
-             (p.inventory_quantity > 0) AS current_in_stock
-      FROM wishlist_items wi
+             EXTRACT(EPOCH FROM wi.snapshot_taken_at)::bigint::text AS out_of_stock_since
+      FROM ${SAVED_ITEMS_SQL} wi
       JOIN products p ON p.id = wi.product_id
       JOIN users u ON u.id = wi.user_id
       WHERE u.marketing_opt_out = FALSE AND u.is_active = TRUE AND u.is_guest = FALSE
+        AND p.is_active = TRUE
         AND wi.snapshot_taken_at IS NOT NULL
         AND wi.snapshot_in_stock = FALSE
-        AND p.inventory_quantity > 0
-      LIMIT $1
+        AND ${PRODUCT_IN_STOCK_SQL}
+        AND ${NOT_RECENTLY_EMAILED_SQL}
+      ORDER BY wi.snapshot_taken_at ASC
+      LIMIT $2
     `,
-      [params.maxWatchesPerSweep]
+      [campaign.kind, params.maxWatchesPerSweep]
     )
   },
 
@@ -80,7 +89,7 @@ export const restock: ScenarioModule<Params, Row> = {
     const result = await sendCampaignEmail({
       campaign,
       user,
-      referenceId: row.product_id,
+      referenceId: `${row.product_id}:${row.out_of_stock_since}`,
       vars: {
         firstName: user.first_name || 'there',
         productName: row.product_name,
@@ -92,12 +101,7 @@ export const restock: ScenarioModule<Params, Row> = {
       },
     })
 
-    await query(
-      `UPDATE wishlist_items
-       SET snapshot_price = $1, snapshot_in_stock = $2, snapshot_taken_at = NOW()
-       WHERE user_id = $3 AND product_id = $4`,
-      [parseFloat(row.current_price), row.current_in_stock, row.user_id, row.product_id]
-    ).catch(() => {})
+    await settleWishlistEvent(result, row.user_id, row.product_id)
 
     if ((params as any).whatsappEnabled) {
       sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }).catch(() => {})

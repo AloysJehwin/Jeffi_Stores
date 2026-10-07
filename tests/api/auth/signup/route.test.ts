@@ -43,6 +43,10 @@ vi.mock('@/lib/legals/policies', () => ({
   POLICY_VERSION: 'v1',
 }))
 
+vi.mock('@/lib/referrals/attribute', () => ({
+  attributeReferral: vi.fn().mockResolvedValue({ status: 'joined', referrerUserId: 'ref' }),
+}))
+
 vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue(mockCookieStore),
 }))
@@ -64,6 +68,7 @@ const VALID_BODY = {
   firstName: 'Jane',
   lastName: 'Doe',
   phone: '9876543210',
+  dateOfBirth: '1990-05-15',
 }
 
 const NEW_USER = {
@@ -99,6 +104,70 @@ describe('POST /api/auth/signup', () => {
       expect(res.status).toBe(400)
       const body = await res.json()
       expect(body.error).toMatch(/required/i)
+    })
+  })
+
+  describe('date of birth', () => {
+    it('returns 400 when date of birth is missing', async () => {
+      const res = await POST(makeRequest({ ...VALID_BODY, dateOfBirth: undefined }) as any)
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toMatch(/date of birth/i)
+      expect(otpLib.isOTPVerified).not.toHaveBeenCalled()
+    })
+
+    it('returns 400 for a date that does not exist', async () => {
+      const res = await POST(makeRequest({ ...VALID_BODY, dateOfBirth: '1990-02-30' }) as any)
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toMatch(/date of birth/i)
+    })
+
+    it('returns 400 when the customer is under three years old', async () => {
+      const lastYear = `${new Date().getUTCFullYear() - 1}-01-01`
+      const res = await POST(makeRequest({ ...VALID_BODY, dateOfBirth: lastYear }) as any)
+      expect(res.status).toBe(400)
+      expect(db.queryOne).not.toHaveBeenCalled()
+    })
+
+    it('stores the date of birth on the new account', async () => {
+      vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_USER)
+
+      const res = await POST(makeRequest(VALID_BODY) as any)
+      expect(res.status).toBe(200)
+      const insert = vi.mocked(db.queryOne).mock.calls.find(c => String(c[0]).includes('INSERT INTO users'))
+      expect(String(insert?.[0])).toContain('date_of_birth')
+      expect(insert?.[1]).toContain('1990-05-15')
+    })
+  })
+
+  describe('referral link', () => {
+    it('credits the referrer named in the ref_code cookie and clears it', async () => {
+      const { attributeReferral } = await import('@/lib/referrals/attribute')
+      const { NextRequest } = await import('next/server')
+      vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_USER)
+
+      const req = new NextRequest('http://localhost/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(VALID_BODY),
+      })
+      req.cookies.set('ref_code', 'ASHA7K2Q')
+      const res = await POST(req as any)
+
+      expect(res.status).toBe(200)
+      expect(attributeReferral).toHaveBeenCalledWith(
+        expect.objectContaining({ newUserId: NEW_USER.id, code: 'ASHA7K2Q' })
+      )
+      expect(res.headers.get('set-cookie')).toMatch(/ref_code=;.*Max-Age=0/i)
+    })
+
+    it('does not attribute a signup without the cookie', async () => {
+      const { attributeReferral } = await import('@/lib/referrals/attribute')
+      vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(NEW_USER)
+      await POST(makeRequest(VALID_BODY) as any)
+      expect(attributeReferral).not.toHaveBeenCalled()
     })
   })
 

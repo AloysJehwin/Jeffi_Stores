@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import Header from './visitor/Header'
 import { CartProvider } from '@/contexts/CartContext'
+import { WishlistProvider } from '@/contexts/WishlistContext'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
@@ -23,6 +24,7 @@ export default function ConditionalLayout({
   isAdminSubdomain,
   isEcomSubdomain,
   isCertPortalSubdomain,
+  isVaultSubdomain,
 }: {
   children: React.ReactNode
   initialStoreConfig?: StoreConfig
@@ -32,8 +34,11 @@ export default function ConditionalLayout({
   isAdminSubdomain?: boolean
   isEcomSubdomain?: boolean
   isCertPortalSubdomain?: boolean
+  isVaultSubdomain?: boolean
 }) {
   const pathname = usePathname()
+  // The vault brings its own chrome; host paths there are /library, not /vault/*.
+  if (isVaultSubdomain) return <>{children}</>
   const isAdminPage = isAdminSubdomain || pathname?.startsWith('/admin')
   const isBusinessPage = !isAdminPage && (isBusinessSubdomain || pathname?.startsWith('/business'))
   const isFormsPage = isFormsSubdomain || pathname?.startsWith('/forms')
@@ -69,20 +74,22 @@ export default function ConditionalLayout({
       <ThemeProvider>
         <AuthProvider>
           <CartProvider>
-            <ToastProvider>
-              <ConfirmProvider>
-                <CompareProvider>
-                  <NumberInputWheelGuard />
-                  <div className="flex flex-col min-h-[100dvh] bg-surface">
-                    <PageTracker />
-                    <Header />
-                    <main className="flex-1 bg-surface pt-16 lg:pt-20">{children}</main>
-                  </div>
-                  <CompareBar />
-                  <PolicyConsentGate />
-                </CompareProvider>
-              </ConfirmProvider>
-            </ToastProvider>
+            <WishlistProvider>
+              <ToastProvider>
+                <ConfirmProvider>
+                  <CompareProvider>
+                    <NumberInputWheelGuard />
+                    <div className="flex flex-col min-h-[100dvh] bg-surface">
+                      <PageTracker />
+                      <Header />
+                      <main className="flex-1 bg-surface pt-16 lg:pt-20">{children}</main>
+                    </div>
+                    <CompareBar />
+                    <PolicyConsentGate />
+                  </CompareProvider>
+                </ConfirmProvider>
+              </ToastProvider>
+            </WishlistProvider>
           </CartProvider>
         </AuthProvider>
       </ThemeProvider>

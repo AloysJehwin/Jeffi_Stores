@@ -1,56 +1,19 @@
 import { NextResponse } from 'next/server'
-import { queryOne } from '@/lib/shared/db'
-import { NextRequest } from 'next/server'
-import { authenticateAdmin } from '@/lib/auth/jwt'
-import { hasScope } from '@/lib/auth/scopes'
+import { certPortalUrl } from '@/lib/tenancy/cert-delivery'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
-  const admin = await authenticateAdmin(request)
-  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'settings:read'))
-    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-
-  try {
-    const { searchParams } = new URL(request.url)
-    const token = searchParams.get('token')
-
-    if (!token) {
-      return NextResponse.json({ error: 'Download token required' }, { status: 400 })
-    }
-
-    const cert = await queryOne(
-      `SELECT ac.*
-       FROM admin_certificates ac
-       WHERE ac.download_token = $1`,
-      [token]
-    )
-
-    if (!cert) {
-      return new NextResponse('Certificate not found', { status: 404 })
-    }
-
-    if (cert.downloaded_at) {
-      return new NextResponse('Certificate has already been downloaded. Contact a super admin to regenerate.', {
-        status: 410,
-      })
-    }
-
-    if (cert.is_revoked) {
-      return new NextResponse('Certificate has been revoked', { status: 410 })
-    }
-
-    await queryOne('UPDATE admin_certificates SET downloaded_at = NOW() WHERE id = $1 RETURNING id', [cert.id])
-
-    return NextResponse.json({
-      message: 'Certificate marked as downloaded. The certificate file was provided during admin creation.',
-      serialNumber: cert.serial_number,
-      commonName: cert.common_name,
-      expiresAt: cert.expires_at,
-    })
-  } catch (err) {
-    console.error('[route]', err)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
+// #487: admin certificates are NEVER downloadable from an admin/super-admin panel. The sole path is
+// the certificate portal (certificate.<root>). This endpoint is a permanent tombstone — it returns
+// 410 Gone unconditionally (no auth check, no token lookup, no .p12 ever served) so any cached link
+// or stale UI gets a clear redirect to the portal.
+export async function GET() {
+  return NextResponse.json(
+    {
+      error: 'Admin certificates are no longer downloadable here.',
+      message: `Download your certificate once from the certificate portal: ${certPortalUrl()}`,
+      portalUrl: certPortalUrl(),
+    },
+    { status: 410 }
+  )
 }

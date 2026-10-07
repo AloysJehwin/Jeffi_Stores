@@ -52,6 +52,8 @@ export default async function EditProductPage({
   const { hasPlanScope } = await import('@/lib/auth/plan-gate')
   const hasInventory = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
   const hasReturns = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'returns:read')
+  const { getFeatureFlags } = await import('@/lib/catalog/site-controls')
+  const flags = await getFeatureFlags()
 
   const draftRow = await queryOne<{
     product_id: string
@@ -239,6 +241,8 @@ export default async function EditProductPage({
         initialBsEntries={(draftRow?.fields as any)?._bsEntries ?? null}
         hasInventory={hasInventory}
         hasReturns={hasReturns}
+        subscriptionsEnabled={flags.subscriptionsEnabled}
+        digitalProductsEnabled={flags.digitalProductsEnabled}
       />
     </div>
     </MobileEditBlock>

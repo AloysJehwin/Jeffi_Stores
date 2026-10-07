@@ -23,6 +23,12 @@ vi.mock('@/lib/email', () => ({
   sendAdminCertificateEmail: vi.fn(),
 }))
 
+// Tenant path (#487): resolveTenant decides platform-CA vs tenant-CA issuance. Default null
+// (off-tenant / platform CA); a test overrides it to exercise the tenant-CA branch.
+vi.mock('@/lib/tenancy/tenant-context', () => ({ resolveTenant: vi.fn(async () => null) }))
+vi.mock('@/lib/tenancy/tenant-ca', () => ({ issueTenantAdminCert: vi.fn() }))
+vi.mock('@/lib/tenancy/portal-certs', () => ({ recordPortalCert: vi.fn(async () => undefined) }))
+
 vi.mock('@/lib/tenancy/request-tenant', () => ({ resolveRequestTenantId: vi.fn(async () => null) }))
 vi.mock('@/lib/auth/scopes', () => ({
   ALL_SCOPE_KEYS: ['products', 'orders', 'inventory', 'financial', 'customers', 'mailer', 'audit', 'agent'],
@@ -49,12 +55,16 @@ import { query } from '@/lib/shared/db'
 import { createAdminUser } from '@/lib/auth/auth'
 import { generateClientCertificate } from '@/lib/tenancy/certificates'
 import { sendAdminCertificateEmail } from '@/lib/email'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { issueTenantAdminCert } from '@/lib/tenancy/tenant-ca'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQuery = vi.mocked(query)
 const mockCreateAdminUser = vi.mocked(createAdminUser)
 const mockGenerateCert = vi.mocked(generateClientCertificate)
 const mockSendEmail = vi.mocked(sendAdminCertificateEmail)
+const mockResolveTenant = vi.mocked(resolveTenant)
+const mockIssueTenantCert = vi.mocked(issueTenantAdminCert)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -184,8 +194,41 @@ describe('POST /api/admin/users', () => {
     expect(body.success).toBe(true)
     expect(body.admin.email).toBe('newadmin@example.com')
     expect(body.certificate.serialNumber).toBe('SERIAL-001')
-    expect(body.certificate.p12Password).toBe('certpassword')
     expect(body.emailSent).toBe(true)
+    // #487 portal-only: the response carries ONLY non-secret metadata — never the p12/password.
+    expect(body.portalInvite).toBe(true)
+    expect(body.portalUrl).toContain('certificate.')
+    expect(body.certificate.p12Password).toBeUndefined()
+    expect(body.certificate.p12Base64).toBeUndefined()
+    expect(JSON.stringify(body)).not.toMatch(/certpassword|p12Base64/i)
+  })
+
+  // #487: on a TENANT admin host, the cert must be issued from the tenant's OWN CA (not the platform
+  // CA), or nginx — which validates client certs against the tenant CA — would reject it. This was
+  // the "team members page not working for tenants" bug.
+  it('issues the cert from the tenant CA on a tenant host (not the platform CA)', async () => {
+    mockAuth.mockResolvedValue(superAdmin)
+    mockCreateAdminUser.mockResolvedValue({ success: true, admin: mockCreatedAdmin })
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockSendEmail.mockResolvedValue({ success: true } as any)
+    mockResolveTenant.mockResolvedValue({ tenantId: 't-1', slug: 'acme', displayName: 'Acme' } as any)
+    mockIssueTenantCert.mockResolvedValue({
+      serial: 'TENANT-SERIAL',
+      expiresAt: new Date('2027-06-18'),
+      p12Buffer: Buffer.from('tenant-p12'),
+      p12Password: 'tenantpw',
+    } as any)
+
+    const res = await POST(makeRequest(validBody))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    // Tenant CA path taken; platform-CA generator NOT used.
+    expect(mockIssueTenantCert).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 't-1', slug: 'acme' }))
+    expect(mockGenerateCert).not.toHaveBeenCalled()
+    expect(body.certificate.serialNumber).toBe('TENANT-SERIAL')
+    // Still portal-only: no secret in the response.
+    expect(JSON.stringify(body)).not.toMatch(/tenantpw|p12Base64/i)
   })
 
   it('defaults role to admin when not specified', async () => {

@@ -44,6 +44,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/data-source', label: 'Data Source', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/social-posts', label: 'Social Posts', scope: 'campaigns:read', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders:read', group: 'Sales' },
+    { href: '/admin/subscriptions', label: 'Subscriptions', scope: 'subscriptions:read', group: 'Sales' },
     { href: '/admin/quotations', label: 'Quotations', scope: 'quotations:read', group: 'Sales' },
     { href: '/admin/invoices', label: 'Invoices', scope: 'invoices:read', group: 'Sales' },
     { href: '/admin/cash-sale', label: 'Cash Sale', scope: 'invoices:read', group: 'Sales' },
@@ -67,6 +68,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms:read', group: 'Marketing' },
     { href: '/admin/mailer', label: 'Mailer', scope: 'mailer:read', group: 'Marketing' },
     { href: '/admin/campaigns', label: 'Campaigns', scope: 'campaigns:read', group: 'Marketing' },
+    { href: '/admin/customer-programs', label: 'Customer Programs', scope: 'campaigns:read', group: 'Marketing' },
     { href: '/admin/reviews', label: 'Reviews', scope: 'reviews:read', group: 'Marketing' },
     { href: '/admin/agent', label: 'AI Agent', scope: 'agent:read', group: 'AI', exactMatch: true },
     { href: '/admin/agent/logs', label: 'Agent Logs', scope: 'agent:read', group: 'AI' },
@@ -132,7 +134,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <form key="admin-logout" action={logoutAction}>
       <button
         type="submit"
-        className="h-9 inline-flex items-center gap-2 text-white/70 hover:bg-white/10 hover:text-white px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"
+        className="h-control inline-flex items-center gap-2 text-white/70 hover:bg-white/10 hover:text-white px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"
         title="Log out"
       >
         <LogOut className="w-5 h-5" />

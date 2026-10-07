@@ -7,6 +7,7 @@ import OrdersTableRows from '@/components/admin/OrdersTableRows'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import { ap } from '@/lib/shared/admin-path'
+import { isFulfilledStatus } from '@/lib/orders/fulfilled-status'
 import { getHost } from '@/lib/tenancy/get-host'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
@@ -30,7 +31,7 @@ async function OrdersStats() {
   const totalOrders = allStats.total
   const pendingOrders = allStats.orders?.filter((o: any) => o.status === 'pending').length || 0
   const processingOrders = allStats.orders?.filter((o: any) => o.status === 'processing').length || 0
-  const completedOrders = allStats.orders?.filter((o: any) => o.status === 'delivered').length || 0
+  const completedOrders = allStats.orders?.filter((o: any) => isFulfilledStatus(o.status)).length || 0
   const totalRevenue =
     allStats.orders?.reduce((sum: number, order: any) => {
       return order.payment_status === 'paid' ? sum + Number(order.total_amount) : sum
@@ -247,6 +248,7 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
               { value: 'shipped', label: 'Shipped' },
               { value: 'out_for_delivery', label: 'Out for Delivery' },
               { value: 'delivered', label: 'Delivered' },
+              { value: 'granted', label: 'Access granted' },
               { value: 'cancel_requested', label: 'Cancel Requested' },
               { value: 'cancelled', label: 'Cancelled' },
               { value: 'return_requested', label: 'Return Requested' },

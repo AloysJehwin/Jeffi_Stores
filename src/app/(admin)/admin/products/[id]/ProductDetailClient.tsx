@@ -14,6 +14,13 @@ import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { formatINR, formatDate } from '@/lib/shared/format'
+import {
+  deriveSellableItems,
+  monthlyEquivalentLabel,
+  pickSubscriptionPrice,
+  subscriptionSavingsPct,
+} from '@/lib/subscriptions/sellable'
+import { SUBSCRIPTION_INTERVALS, SUBSCRIPTION_INTERVAL_LABELS, isSubscriptionInterval } from '@/lib/subscriptions/intervals'
 
 function TagBadge({ tag, accent }: { tag: string; accent?: boolean }) {
   return (
@@ -237,7 +244,7 @@ function AiPanel({
               <button
                 onClick={() => decide('approve')}
                 disabled={busy}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded text-sm font-semibold disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 h-control bg-accent-500 hover:bg-accent-600 text-white rounded text-sm font-semibold disabled:opacity-50"
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                 Approve
@@ -245,7 +252,7 @@ function AiPanel({
               <button
                 onClick={() => decide('reject')}
                 disabled={busy}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 border border-border-default text-foreground hover:bg-surface-secondary rounded text-sm font-semibold disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-1.5 px-3 h-control border border-border-default text-foreground hover:bg-surface-secondary rounded text-sm font-semibold disabled:opacity-50"
               >
                 <XCircle className="w-3.5 h-3.5" />
                 Reject
@@ -266,6 +273,83 @@ function Field({ label, value, mono }: { label: string; value?: any; mono?: bool
       <span className="text-foreground-secondary shrink-0">{label}</span>
       <span className={`text-foreground text-right ${mono ? 'font-mono text-xs' : ''}`}>{value}</span>
     </div>
+  )
+}
+
+function SubscriptionDetails({ p, variants }: { p: any; variants: any[] }) {
+  const intervals: string[] = Array.isArray(p.subscription_intervals) ? p.subscription_intervals : []
+  const offered = SUBSCRIPTION_INTERVALS.filter(i => intervals.includes(i))
+  const subsByVariant: Record<string, any[]> = {}
+  for (const v of variants) subsByVariant[String(v.id)] = v.sub_variants || []
+  const items = deriveSellableItems({
+    hasVariants: !!p.has_variants,
+    product: {
+      name: p.name,
+      sku: p.sku,
+      price: p.base_price,
+      subscription_price: p.subscription_price,
+      subscription_prices: p.subscription_prices,
+    },
+    variants: variants.map(v => ({
+      ...v,
+      sub_variant_type_on: !!v.sub_variant_type_on || (v.sub_variants || []).length > 0,
+    })),
+    subVariantsByVariant: subsByVariant,
+  })
+  return (
+    <>
+      <Field
+        label="Billing Intervals"
+        value={intervals.map(i => (isSubscriptionInterval(i) ? SUBSCRIPTION_INTERVAL_LABELS[i] : i)).join(', ') || '—'}
+      />
+      <Field label="Billing Cycles" value={p.subscription_total_cycles ?? 'Until cancelled'} />
+      <Field label="Minimum Billing Cycles" value={p.subscription_min_cycles ?? '—'} />
+      <div className="overflow-x-auto pt-1">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-foreground-secondary">
+              <th className="py-1.5 pr-2 text-left font-semibold">Item</th>
+              <th className="py-1.5 px-2 text-right font-semibold">One-time</th>
+              {offered.map(iv => (
+                <th key={iv} className="py-1.5 px-2 text-right font-semibold">
+                  {SUBSCRIPTION_INTERVAL_LABELS[iv]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-default">
+            {items.map(it => {
+              return (
+                <tr key={it.key}>
+                  <td className="py-1.5 pr-2 text-foreground">
+                    {it.name}
+                    {it.sku && <span className="block font-mono text-[10px] text-foreground-muted">{it.sku}</span>}
+                  </td>
+                  <td className="py-1.5 px-2 text-right text-foreground">
+                    {it.oneTimePrice != null ? formatINR(it.oneTimePrice) : '—'}
+                  </td>
+                  {offered.map(iv => {
+                    const sub = pickSubscriptionPrice(it.subscriptionPrices, it.subscriptionPrice, iv)
+                    const pct = sub != null && it.oneTimePrice != null ? subscriptionSavingsPct(it.oneTimePrice, sub) : 0
+                    const perMonth = sub != null ? monthlyEquivalentLabel(iv, sub) : null
+                    return (
+                      <td key={iv} className="py-1.5 px-2 text-right text-foreground" data-testid={`sub-price-${iv}`}>
+                        {sub != null ? formatINR(sub) : <span className="text-foreground-muted">Same as one-time</span>}
+                        {(perMonth || pct > 0) && (
+                          <span className="block text-[10px] text-foreground-muted">
+                            {[perMonth, pct > 0 ? `${pct}% off` : null].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   )
 }
 
@@ -873,7 +957,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
           {canEnrich && (
             <button
               onClick={() => setAiOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
               <Sparkles className="w-4 h-4 text-accent-500" />
               AI
@@ -888,7 +972,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
           <RequireWrite scope="products:write">
             <button
               onClick={() => setShowDraftModal(true)}
-              className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+              className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
             >
               Edit
             </button>
@@ -1052,17 +1136,14 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
               <Field label="Tax Class" value={p.tax_class} />
               <Field label="Inclusive Tax" value={p.inclusive_tax ? 'Yes' : 'No'} />
               <Field label="COD Allowed" value={p.is_cod_allowed ? 'Yes' : 'No'} />
-              {p.is_subscription && (
-                <>
-                  <Field label="Subscription" value="Yes" />
-                  <Field label="Interval" value={p.subscription_interval} />
-                  <Field
-                    label="Sub. Price"
-                    value={p.subscription_price != null ? formatINR(Number(p.subscription_price)) : null}
-                  />
-                </>
-              )}
+              {p.is_subscription && <Field label="Subscription" value="Yes" />}
             </CollapsibleCard>
+
+            {p.is_subscription && (
+              <CollapsibleCard title="Subscription">
+                <SubscriptionDetails p={p} variants={variants} />
+              </CollapsibleCard>
+            )}
 
             {/* — Description — */}
             {p.description && (

@@ -6,8 +6,12 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import CashSaleClient from './CashSaleClient'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
-export const metadata = { title: 'Cash Sale — Jeffi Admin' }
+export async function generateMetadata() {
+  const { name } = await getStoreIdentity()
+  return { title: `Cash Sale — ${name} Admin` }
+}
 
 export default async function CashSalePage() {
   const host = await getHost()

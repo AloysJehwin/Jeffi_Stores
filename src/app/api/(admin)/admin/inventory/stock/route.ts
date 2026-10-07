@@ -175,10 +175,13 @@ export async function PATCH(request: NextRequest) {
     // Batches and serials are the source of truth for tracked products; a bare
     // quantity written here would be overwritten at the next sync and could leave
     // units without serials.
-    const tracked = await queryOne<{ perishable: boolean; serialized: boolean }>(
-      `SELECT perishable, serialized FROM products WHERE id = $1`,
+    const tracked = await queryOne<{ perishable: boolean; serialized: boolean; is_digital: boolean }>(
+      `SELECT perishable, serialized, is_digital FROM products WHERE id = $1`,
       [product_id]
     )
+    if (tracked?.is_digital) {
+      return NextResponse.json({ error: 'Digital products do not track stock.' }, { status: 409 })
+    }
     if (tracked?.perishable || tracked?.serialized) {
       return NextResponse.json(
         {

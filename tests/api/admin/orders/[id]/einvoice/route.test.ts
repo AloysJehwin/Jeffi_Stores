@@ -167,6 +167,18 @@ describe('POST /api/admin/orders/[id]/einvoice', () => {
     expect(body.configured).toBe(true)
   })
 
+  it('marks digital lines as services', async () => {
+    mockQueryOne.mockResolvedValueOnce(sampleOrder as any).mockResolvedValueOnce(undefined as any)
+    mockQueryMany
+      .mockResolvedValueOnce([{ ...(sampleItems as any)[0], is_digital: true, hsn_code: '998431' }] as any)
+      .mockResolvedValueOnce(sampleSettings as any)
+    mockGenerateIRN.mockResolvedValueOnce(irnResult as any)
+    await POST(makePost('ord-1'), { params: Promise.resolve({ id: 'ord-1' }) })
+    const item = mockGenerateIRN.mock.calls[0][0].items[0]
+    expect(item.isService).toBe('Y')
+    expect(item.hsnCode).toBe('998431')
+  })
+
   it('builds B2B supply type when buyer_gstin present', async () => {
     mockQueryOne
       .mockResolvedValueOnce({ ...sampleOrder, buyer_gstin: '29ABCDE1234F1Z5' } as any)

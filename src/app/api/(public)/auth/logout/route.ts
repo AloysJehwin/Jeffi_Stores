@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { authenticateUser } from '@/lib/auth/jwt'
-import { revokeSession } from '@/lib/auth/auth-sessions'
+import { revokeSession, revokeVaultSessionsFor } from '@/lib/auth/auth-sessions'
 import { logActivity } from '@/lib/shared/activity'
 import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 
@@ -12,6 +12,7 @@ export async function POST(request: NextRequest) {
       logActivity({ userId: auth.userId, kind: 'logout', summary: 'Logged out' }).catch(() => {})
     }
     if (auth?.sid) await revokeSession(auth.sid)
+    if (auth?.userId) await revokeVaultSessionsFor('customer', auth.userId).catch(() => {})
 
     const store = await cookies()
     const baseOpts = {

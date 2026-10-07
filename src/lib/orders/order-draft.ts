@@ -27,6 +27,8 @@ export interface DraftBuyNowItem {
   buyMode: string
   buyUnit: string | null
   price: number
+  /** Hint only — commitOrder re-reads products.is_digital inside its transaction. */
+  isDigital?: boolean
 }
 
 export interface DraftPayload {

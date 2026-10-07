@@ -7,6 +7,9 @@ import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { logActivity } from '@/lib/shared/activity'
 import { cookieDomainOption } from '@/lib/auth/cookie-domain'
 import { POLICY_VERSION } from '@/lib/legals/policies'
+import { normalizeDob } from '@/lib/shared/format'
+import { attributeReferral } from '@/lib/referrals/attribute'
+import { clearReferralCookie, readReferralCookie } from '@/lib/referrals/cookie'
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -15,7 +18,7 @@ if (!process.env.JWT_SECRET) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, firstName, lastName, phone, channel } = body
+    const { email, firstName, lastName, phone, channel, dateOfBirth } = body
 
     if (!email || !firstName) {
       return NextResponse.json({ error: 'Email and first name are required' }, { status: 400 })
@@ -23,6 +26,11 @@ export async function POST(request: NextRequest) {
 
     if (!phone) {
       return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 })
+    }
+
+    const normalizedDob = normalizeDob(dateOfBirth)
+    if (!normalizedDob) {
+      return NextResponse.json({ error: 'Enter a valid date of birth' }, { status: 400 })
     }
 
     const otpValid = await isOTPVerified(email)
@@ -51,10 +59,19 @@ export async function POST(request: NextRequest) {
 
     const newUser = await queryOne(
       `INSERT INTO users (email, first_name, last_name, phone, is_active, last_login,
-                         policies_accepted_version, policies_accepted_at, notification_channel)
-       VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW(), $7)
+                         policies_accepted_version, policies_accepted_at, notification_channel, date_of_birth)
+       VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW(), $7, $8)
        RETURNING *`,
-      [email.toLowerCase(), firstName, lastName || null, normalizedPhone, true, POLICY_VERSION, channel || 'email']
+      [
+        email.toLowerCase(),
+        firstName,
+        lastName || null,
+        normalizedPhone,
+        true,
+        POLICY_VERSION,
+        channel || 'email',
+        normalizedDob,
+      ]
     )
 
     if (!newUser) {
@@ -71,6 +88,9 @@ export async function POST(request: NextRequest) {
     }).catch(() => {})
 
     const signals = extractSessionSignals(request)
+    const referralCode = readReferralCookie(request)
+    if (referralCode) await attributeReferral({ newUserId: newUser.id, code: referralCode, fpHash: signals.fpHash })
+
     const { sid } = await issueUserToken({
       userId: newUser.id,
       email: newUser.email,
@@ -105,6 +125,7 @@ export async function POST(request: NextRequest) {
     })
     res.cookies.set('user_sid', sid, cookieOpts)
     res.cookies.set('session_id', newUser.id, cookieOpts)
+    if (referralCode) clearReferralCookie(res.cookies)
     return res
   } catch {
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })

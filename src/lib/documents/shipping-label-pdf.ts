@@ -9,6 +9,7 @@
 import 'server-only'
 import { round2 } from '@/lib/catalog/gst'
 import { storeSignature } from '@/lib/catalog/brand'
+import { tenantLogoBuffer } from '@/lib/documents/store-logo'
 
 const PDFDocument = eval('require')('pdfkit')
 const bwipjs = eval('require')('bwip-js')
@@ -120,13 +121,13 @@ async function drawLabelPage(doc: any, input: LabelInput): Promise<void> {
     .font('Helvetica')
     .fillColor('#000')
     .text(sellerName, M + p + 24, y + 8, { lineBreak: false })
-  try {
-    doc.image(nodePath.join(process.cwd(), 'public', 'images', 'store-logo.png'), M + p, y + 4, {
-      width: 20,
-      height: 20,
-    })
-  } catch {
-    /* logo missing */
+  const sellerLogo = await tenantLogoBuffer()
+  if (sellerLogo) {
+    try {
+      doc.image(sellerLogo, M + p, y + 4, { width: 20, height: 20 })
+    } catch {
+      /* unreadable logo — seller name text already drawn */
+    }
   }
   try {
     const logoH = 18

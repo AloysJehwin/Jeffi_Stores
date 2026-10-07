@@ -1,6 +1,7 @@
 import { queryOne, queryMany, queryCount, type AnalyticsRange } from './shared'
 import { getDashboardInsights, rangeDays, type DashboardInsights } from '@/lib/shared/dashboard-insights'
 import { DashboardStats } from '@/types'
+import { fulfilledSql } from '@/lib/orders/fulfilled-status'
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
@@ -26,7 +27,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         ['paid']
       ),
       queryCount('SELECT COUNT(*) FROM users WHERE is_active = $1 AND is_guest = $2', [true, false]),
-      queryCount("SELECT COUNT(*) FROM products WHERE stock_status = 'Low Stock'"),
+      queryCount("SELECT COUNT(*) FROM products WHERE stock_status = 'Low Stock' AND is_digital = false"),
       queryCount('SELECT COUNT(*) FROM orders WHERE status = $1', ['pending']),
       queryCount(
         "SELECT COUNT(*) FROM users WHERE is_active = TRUE AND is_guest = FALSE AND created_at >= date_trunc('month', NOW())"
@@ -106,7 +107,7 @@ export async function getDashboardMetrics() {
         COUNT(CASE WHEN status IN ('confirmed','processing') THEN 1 END) AS processing,
         COUNT(CASE WHEN status = 'shipped' THEN 1 END) AS shipped,
         COUNT(CASE WHEN status = 'out_for_delivery' THEN 1 END) AS out_for_delivery,
-        COUNT(CASE WHEN status = 'delivered' THEN 1 END) AS delivered,
+        COUNT(CASE WHEN ${fulfilledSql('')} THEN 1 END) AS delivered,
         COUNT(CASE WHEN status = 'cancelled' THEN 1 END) AS cancelled
       FROM orders
     `),
@@ -375,7 +376,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
           )
           FROM product_variants pv
           JOIN products p2 ON p2.id = pv.product_id
-          WHERE p2.is_active = true AND pv.is_active = true
+          WHERE p2.is_active = true AND pv.is_active = true AND p2.is_digital = false
             AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
         ), 0) +
         COALESCE((
@@ -386,7 +387,7 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
           FROM product_sub_variants sv
           JOIN product_variants pv2 ON pv2.id = sv.variant_id
           JOIN products p3 ON p3.id = pv2.product_id
-          WHERE p3.is_active = true AND sv.is_active = true
+          WHERE p3.is_active = true AND sv.is_active = true AND p3.is_digital = false
         ), 0) +
         COALESCE((
           SELECT SUM(
@@ -394,9 +395,9 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
             COALESCE(NULLIF(cost_price,0), NULLIF(base_price,0), 0)
           )
           FROM products
-          WHERE is_active = true AND has_variants = false
+          WHERE is_active = true AND has_variants = false AND is_digital = false
         ), 0) AS stock_value
-      FROM products WHERE is_active = true
+      FROM products WHERE is_active = true AND is_digital = false
     `),
       // Returns / RTO
       queryOne<Record<string, string>>(`

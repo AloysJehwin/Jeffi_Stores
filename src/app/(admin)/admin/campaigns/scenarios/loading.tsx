@@ -1,5 +1,9 @@
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import { CampaignCardListSkeleton, CampaignPageSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 
 export default function Loading() {
-  return <AdminSkeleton variant="list" />
+  return (
+    <CampaignPageSkeleton title>
+      <CampaignCardListSkeleton />
+    </CampaignPageSkeleton>
+  )
 }

@@ -53,7 +53,9 @@ export async function cancelOrder(orderId: string, opts: CancelOptions): Promise
     const restoreToCart = opts.restoreToCart === true && order.order_type !== 'direct'
 
     const orderItems = await queryMany<any>(
-      'SELECT product_id, variant_id, quantity, unit_price FROM order_items WHERE order_id = $1',
+      `SELECT oi.product_id, oi.variant_id, oi.quantity, oi.unit_price FROM order_items oi
+         JOIN products p ON p.id = oi.product_id
+        WHERE oi.order_id = $1 AND COALESCE(p.is_digital, FALSE) = FALSE`,
       [orderId]
     )
 

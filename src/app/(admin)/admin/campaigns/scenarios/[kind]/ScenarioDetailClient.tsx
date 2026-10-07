@@ -2,17 +2,22 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ScenarioDetailSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
 import AdminSelect from '@/components/admin/AdminSelect'
+import DurationField from '@/components/admin/campaigns/DurationField'
+import type { DurationUnit } from '@/lib/campaigns/duration'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface ParamDef {
-  type: 'integer' | 'number' | 'boolean'
+  type: 'integer' | 'number' | 'boolean' | 'duration'
   label: string
   description?: string
   min?: number
   max?: number
+  recommendedUnit?: DurationUnit
+  allowedUnits?: DurationUnit[]
 }
 
 interface Scenario {
@@ -110,7 +115,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
     }
   }
 
-  if (loading) return <p className="text-sm text-foreground-muted">Loading scenario…</p>
+  if (!scenario && loading) return <ScenarioDetailSkeleton />
   if (!scenario) return <p className="text-sm text-foreground-muted">Scenario not found.</p>
 
   return (
@@ -285,6 +290,16 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                                   { value: 'false', label: 'false' },
                                 ]}
                               />
+                            ) : def.type === 'duration' ? (
+                              <DurationField
+                                canonicalMinutes={typeof overrideVal === 'number' ? overrideVal : undefined}
+                                defaultMinutes={typeof defaultVal === 'number' ? defaultVal : undefined}
+                                recommendedUnit={def.recommendedUnit || 'days'}
+                                allowedUnits={def.allowedUnits}
+                                min={def.min}
+                                max={def.max}
+                                onChange={m => setOverrideValue(c.kind, key, m === undefined ? null : m)}
+                              />
                             ) : (
                               <input
                                 type="number"
@@ -308,7 +323,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                             {def.description && (
                               <p className="text-[10px] text-foreground-muted mt-1">{def.description}</p>
                             )}
-                            {(def.min !== undefined || def.max !== undefined) && (
+                            {def.type !== 'duration' && (def.min !== undefined || def.max !== undefined) && (
                               <p className="text-[10px] text-foreground-muted mt-0.5">
                                 Range: {def.min ?? '-∞'} to {def.max ?? '∞'}
                               </p>
@@ -324,7 +339,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                           type="button"
                           onClick={() => saveOverrides(c.kind)}
                           disabled={savingKey === c.kind}
-                          className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                          className="px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
                         >
                           {savingKey === c.kind ? 'Saving…' : 'Save overrides'}
                         </button>

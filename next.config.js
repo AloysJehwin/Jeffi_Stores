@@ -6,12 +6,17 @@ const ALLOWED_ORIGINS = [
   'https://business.jeffistores.in',
 ].join(' ')
 
+// Private vault bucket (presigned uploads, media streams, PDF fetches). Baked in at build time.
+const VAULT_BUCKET = process.env.VAULT_S3_BUCKET || 'jeffi-stores-vault'
+const VAULT_ORIGINS = `https://${VAULT_BUCKET}.s3.us-east-1.amazonaws.com https://${VAULT_BUCKET}.s3.amazonaws.com`
+
 const CSP = [
   "default-src 'self' https://*.jeffistores.in",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://maps.googleapis.com https://www.googletagmanager.com https://dm9rri2wgl1e.cloudfront.net",
   "style-src 'self' 'unsafe-inline' https://*.jeffistores.in https://fonts.googleapis.com https://maps.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://oauth2.googleapis.com https://maps.googleapis.com https://dm9rri2wgl1e.cloudfront.net https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.merchant-center-analytics.goog",
+  `connect-src 'self' https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://oauth2.googleapis.com https://maps.googleapis.com https://dm9rri2wgl1e.cloudfront.net https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.merchant-center-analytics.goog ${VAULT_ORIGINS}`,
+  `media-src 'self' blob: ${VAULT_ORIGINS}`,
   "img-src 'self' data: blob: https://*.jeffistores.in https://*.razorpay.com https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com https://lh3.googleusercontent.com https://maps.gstatic.com https://maps.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com",
   'frame-src data: https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com',
   'child-src https://*.razorpay.com blob:',
@@ -19,6 +24,25 @@ const CSP = [
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self' https://*.jeffistores.in",
+].join('; ')
+
+// Vault hosts (vault. / vault-{slug}.) get a locked-down policy: no eval, no third-party scripts,
+// no framing, network limited to self + the vault bucket.
+const VAULT_HOST_RE = 'vault(-[a-z0-9-]+)?\\.jeffistores\\.in'
+const VAULT_CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  `connect-src 'self' ${VAULT_ORIGINS}`,
+  `media-src 'self' blob: ${VAULT_ORIGINS}`,
+  `img-src 'self' data: blob: https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com ${VAULT_ORIGINS}`,
+  "worker-src 'self' blob:",
+  "frame-src 'none'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
 ].join('; ')
 
 const nextConfig = {
@@ -30,6 +54,7 @@ const nextConfig = {
     instrumentationHook: true,
     outputFileTracingIncludes: {
       '/api/admin/orders/[id]/shipping-label': ['./node_modules/pdfkit/js/data/**/*'],
+      '/api/vault/pdf-worker': ['./node_modules/pdfjs-dist/build/pdf.worker.min.mjs'],
     },
   },
   serverExternalPackages: ['pdfkit', 'ioredis', 'pg'],
@@ -45,6 +70,11 @@ const nextConfig = {
       {
         source: '/(.*)',
         headers: [{ key: 'Content-Security-Policy', value: CSP }],
+      },
+      {
+        source: '/(.*)',
+        has: [{ type: 'host', value: VAULT_HOST_RE }],
+        headers: [{ key: 'Content-Security-Policy', value: VAULT_CSP }],
       },
       {
         source: '/api/gallery/:path*',

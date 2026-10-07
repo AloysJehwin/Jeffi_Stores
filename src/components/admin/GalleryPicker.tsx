@@ -230,7 +230,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
                 type="button"
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="px-2 py-1 rounded-md border border-border-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
+                className="px-2 h-control-sm rounded-md border border-border-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
               >
                 Prev
               </button>
@@ -241,7 +241,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
                 type="button"
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="px-2 py-1 rounded-md border border-border-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
+                className="px-2 h-control-sm rounded-md border border-border-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
               >
                 Next
               </button>
@@ -262,7 +262,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
               type="button"
               onClick={confirmMulti}
               disabled={selected.length === 0}
-              className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:bg-surface-secondary disabled:text-foreground-muted text-white rounded-lg text-sm font-semibold transition-colors"
+              className="px-4 h-control bg-accent-500 hover:bg-accent-600 disabled:bg-surface-secondary disabled:text-foreground-muted text-white rounded-lg text-sm font-semibold transition-colors"
             >
               {selected.length > 0 ? `Add ${selected.length} Image${selected.length > 1 ? 's' : ''}` : 'Add Images'}
             </button>

@@ -849,7 +849,7 @@ export default function LineItemsSection({
             type="button"
             onClick={() => setScanEnabled(v => !v)}
             title={scanEnabled ? 'Barcode scanning on — scan a product to add it' : 'Barcode scanning off'}
-            className={`flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-lg border transition-colors ${scanEnabled ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
+            className={`flex items-center gap-1.5 text-xs font-semibold px-2 h-control-sm rounded-lg border transition-colors ${scanEnabled ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path
@@ -1091,7 +1091,7 @@ export default function LineItemsSection({
                           type="button"
                           disabled={!categoryIds[item.id]}
                           onClick={() => openPicker(item.id, categoryIds[item.id] ?? '')}
-                          className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+                          className="px-3 h-control-sm bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
                         >
                           Select Product
                         </button>
@@ -1431,7 +1431,7 @@ export default function LineItemsSection({
         <button
           type="button"
           onClick={() => onChange([...items, newLineItem()])}
-          className="mt-3 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-border-default text-xs font-semibold text-secondary-500 dark:text-secondary-300 hover:bg-surface-secondary hover:border-secondary-400 transition-colors"
+          className="mt-3 w-full flex items-center justify-center gap-1.5 h-control-sm rounded-lg border border-dashed border-border-default text-xs font-semibold text-secondary-500 dark:text-secondary-300 hover:bg-surface-secondary hover:border-secondary-400 transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

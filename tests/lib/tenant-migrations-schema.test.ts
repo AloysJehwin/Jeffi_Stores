@@ -186,4 +186,15 @@ describe('parseCreateTables', () => {
     expect(cols).toEqual(expect.arrayContaining(['sku', 'color', 'barcode', 'fragile', 'meta_title', 'is_draft']))
     expect(sql).toContain('ALTER TABLE public.products ADD COLUMN IF NOT EXISTS color character varying(100);')
   })
+
+  // #488: the platform-only 'administrator' seed from database/users.sql must never reach a tenant.
+  it('strips the platform-only administrator seed UPDATE', () => {
+    expect(sql).not.toMatch(/SET\s+role\s*=\s*'administrator'\s+FROM\s+public\.users/i)
+    expect(sql).not.toMatch(/admin@jeffistores\.in/i)
+  })
+
+  // #488: existing tenants are cleaned up by demoting any leaked administrator to super_admin.
+  it('appends a tenant role cleanup demoting administrator to super_admin', () => {
+    expect(sql).toMatch(/UPDATE public\.admins SET role = 'super_admin' WHERE role = 'administrator';/)
+  })
 })

@@ -3,9 +3,10 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getCampaign } from '@/lib/shared/marketing'
 import { getScenario } from '@/lib/campaigns/scenarios/_registry'
-import { resolveParams } from '@/lib/campaigns/types'
+import { resolveScenarioParams } from '@/lib/campaigns/runner'
 import { queryMany, queryOne, getClient } from '@/lib/shared/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
+import { cooldownDays as resolveCooldownDays } from '@/lib/campaigns/duration'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,7 +64,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
 }
 
 async function runBuiltin(scenario: any, campaign: any, scenarioKind: string) {
-  const resolvedParams = resolveParams(scenario.defaultParams, campaign.parameters)
+  const resolvedParams = resolveScenarioParams(scenario, campaign.parameters)
 
   let rows: any[] = []
   try {
@@ -176,7 +177,12 @@ async function runCustom(
   }
 
   const params = (campaign as any).parameters || {}
-  const cooldownDays = typeof params.sendCooldownDays === 'number' ? params.sendCooldownDays : PREVIEW_COOLDOWN_DAYS
+  // Preview binds $2 as a cooldown in DAYS. Resolve from the canonical sendCooldown (minutes) or the
+  // legacy sendCooldownDays; keep PREVIEW_COOLDOWN_DAYS (no filtering) when neither is set.
+  const hasCooldown =
+    (params.sendCooldown !== undefined && params.sendCooldown !== null) ||
+    typeof params.sendCooldownDays === 'number'
+  const cooldownDays = hasCooldown ? resolveCooldownDays(params) : PREVIEW_COOLDOWN_DAYS
 
   let userIds: string[] = []
   let elapsedMs = 0

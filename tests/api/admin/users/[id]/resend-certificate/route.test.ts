@@ -3,16 +3,16 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
-vi.mock('@/lib/email', () => ({ sendAdminCertificateEmail: vi.fn() }))
+vi.mock('@/lib/email', () => ({ sendCertInviteEmail: vi.fn() }))
 
 import { POST } from '@/app/api/(admin)/admin/users/[id]/resend-certificate/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { queryOne } from '@/lib/shared/db'
-import { sendAdminCertificateEmail } from '@/lib/email'
+import { sendCertInviteEmail } from '@/lib/email'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryOne = vi.mocked(queryOne)
-const mockSendEmail = vi.mocked(sendAdminCertificateEmail)
+const mockSendInvite = vi.mocked(sendCertInviteEmail)
 
 const superAdmin = { adminId: 'a1', username: 'root', role: 'super_admin', scopes: [] }
 const regularAdmin = { adminId: 'a2', username: 'user', role: 'admin', scopes: [] }
@@ -60,39 +60,25 @@ describe('POST /api/admin/users/[id]/resend-certificate', () => {
     expect((await res.json()).error).toMatch(/not found/i)
   })
 
-  it('returns 422 when no certificate on file', async () => {
+  // #487 portal-only: resend sends the invite link; it needs NO stored .p12 (no 422 path),
+  // and never re-attaches a cert.
+  it('sends the portal invite (no stored p12 required) and returns success', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockQueryOne.mockResolvedValue({ ...sampleRow, p12_data: null })
-
-    const res = await POST(makeRequest(), { params })
-    expect(res.status).toBe(422)
-    expect((await res.json()).error).toMatch(/no certificate/i)
-  })
-
-  it('sends email and returns success when p12_data is a Buffer', async () => {
-    mockAuth.mockResolvedValue(superAdmin)
-    mockQueryOne.mockResolvedValue(sampleRow)
-    mockSendEmail.mockResolvedValue({ success: true } as any)
+    mockSendInvite.mockResolvedValue({ success: true } as any)
 
     const res = await POST(makeRequest(), { params })
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
-    expect(mockSendEmail).toHaveBeenCalledOnce()
+    expect(mockSendInvite).toHaveBeenCalledOnce()
+    // The invite takes no p12/password — only identity + role.
+    expect(mockSendInvite).toHaveBeenCalledWith('admin@example.com', 'targetadmin', 'admin')
   })
 
-  it('converts non-Buffer p12_data via Buffer.from', async () => {
-    mockAuth.mockResolvedValue(superAdmin)
-    mockQueryOne.mockResolvedValue({ ...sampleRow, p12_data: 'base64stringdata' })
-    mockSendEmail.mockResolvedValue({ success: true } as any)
-
-    const res = await POST(makeRequest(), { params })
-    expect(res.status).toBe(200)
-  })
-
-  it('returns 502 when sendAdminCertificateEmail reports failure', async () => {
+  it('returns 502 when the invite email reports failure', async () => {
     mockAuth.mockResolvedValue(superAdmin)
     mockQueryOne.mockResolvedValue(sampleRow)
-    mockSendEmail.mockResolvedValue({ success: false } as any)
+    mockSendInvite.mockResolvedValue({ success: false } as any)
 
     const res = await POST(makeRequest(), { params })
     expect(res.status).toBe(502)

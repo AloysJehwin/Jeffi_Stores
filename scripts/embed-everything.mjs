@@ -11,6 +11,11 @@ const OLLAMA_URL = process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434'
 const EMBED_MODEL = process.env.EMBED_MODEL || 'nomic-embed-text'
 const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10)
 const CONCURRENCY = parseInt(process.env.EMBED_CONCURRENCY || '4', 10)
+// Which tenant these embeddings belong to (#489). Default null = the platform/flagship's own rows.
+// Pass --tenant <uuid> or TENANT_ID=<uuid> to backfill one tenant's catalog into its own namespace,
+// so a tenant's RAG only ever sees its own vectors.
+const TENANT_ID =
+  (process.argv.find(a => a.startsWith('--tenant='))?.split('=')[1] ?? process.env.TENANT_ID) || null
 
 if (!PG_PASS) {
   console.error('ERROR: RAZER_PG_PASSWORD or RDS_MASTER_PASSWORD must be set')
@@ -119,8 +124,9 @@ async function processSource(src) {
   const existingHashes = new Map()
   {
     const r = await pool.query(
-      `SELECT source_id, content_hash FROM embeddings WHERE source_table = $1`,
-      [src.table]
+      `SELECT source_id, content_hash FROM embeddings
+        WHERE source_table = $1 AND tenant_id IS NOT DISTINCT FROM $2`,
+      [src.table, TENANT_ID]
     )
     for (const row of r.rows) existingHashes.set(row.source_id, row.content_hash)
   }
@@ -138,12 +144,12 @@ async function processSource(src) {
       try {
         const vec = await embed(content)
         await pool.query(
-          `INSERT INTO embeddings (source_table, source_id, content, content_hash, embedding, updated_at)
-           VALUES ($1, $2, $3, $4, $5::vector, NOW())
-           ON CONFLICT (source_table, source_id)
+          `INSERT INTO embeddings (tenant_id, source_table, source_id, content, content_hash, embedding, updated_at)
+           VALUES ($6, $1, $2, $3, $4, $5::vector, NOW())
+           ON CONFLICT (tenant_id, source_table, source_id)
            DO UPDATE SET content = EXCLUDED.content, content_hash = EXCLUDED.content_hash,
                          embedding = EXCLUDED.embedding, updated_at = NOW()`,
-          [src.table, String(row.id), content, hash, vectorLiteral(vec)]
+          [src.table, String(row.id), content, hash, vectorLiteral(vec), TENANT_ID]
         )
         embedded++
         if (embedded % BATCH_SIZE === 0) process.stdout.write(`    progress: ${embedded}/${rows.length}\r`)

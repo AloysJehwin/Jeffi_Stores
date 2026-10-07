@@ -124,10 +124,9 @@ export async function POST(request: NextRequest) {
       role || 'admin'
     )
 
-    // Hard-cutover mode: never hand the p12/password back to the browser; the new admin fetches it
-    // from certificate.jeffistores.in. In 'email'/'both' the blob still flows for the on-screen
-    // download during the transition window.
-    const { mayDeliverBlob, certPortalUrl } = await import('@/lib/tenancy/cert-delivery')
+    // Portal-only (#487): the p12/password are NEVER returned to the browser; the new admin
+    // fetches the cert once from certificate.jeffistores.in. Response carries only non-secret metadata.
+    const { certPortalUrl } = await import('@/lib/tenancy/cert-delivery')
     return NextResponse.json({
       success: true,
       emailSent: emailResult.success,
@@ -137,20 +136,12 @@ export async function POST(request: NextRequest) {
         role: role || 'admin',
         scopes: scopes || [],
       },
-      portalInvite: !mayDeliverBlob(),
+      portalInvite: true,
       portalUrl: certPortalUrl(),
-      certificate: mayDeliverBlob()
-        ? {
-            p12Base64: cert.p12Buffer.toString('base64'),
-            p12Password: cert.p12Password,
-            serialNumber: cert.serialNumber,
-            expiresAt: cert.expiresAt.toISOString(),
-            downloadToken: cert.downloadToken,
-          }
-        : {
-            serialNumber: cert.serialNumber,
-            expiresAt: cert.expiresAt.toISOString(),
-          },
+      certificate: {
+        serialNumber: cert.serialNumber,
+        expiresAt: cert.expiresAt.toISOString(),
+      },
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })

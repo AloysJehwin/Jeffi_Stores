@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Mail, Tag, Package, X, ChevronDown, Wand2 } from 'lucide-react'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
-import RichTextEditor from '@/components/admin/RichTextEditor'
+import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import { useToast } from '@/contexts/ToastContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
@@ -555,7 +555,7 @@ export default function CustomerMailerPanel({
             setSelectedProduct(null)
             setTab('compose')
           }}
-          className="mt-1 px-3 py-1.5 rounded-lg border border-border-secondary text-xs font-semibold text-foreground-muted hover:text-foreground transition-colors"
+          className="mt-1 px-3 h-control-sm rounded-lg border border-border-secondary text-xs font-semibold text-foreground-muted hover:text-foreground transition-colors"
         >
           Send another
         </button>
@@ -598,7 +598,7 @@ export default function CustomerMailerPanel({
                     setHeadline(tpl.headline)
                     setBody(tpl.body)
                   }}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-border-secondary bg-surface text-foreground-muted hover:text-foreground hover:border-accent-500 hover:bg-accent-500/5 transition-colors"
+                  className="px-3 h-control-sm rounded-lg text-xs font-semibold border border-border-secondary bg-surface text-foreground-muted hover:text-foreground hover:border-accent-500 hover:bg-accent-500/5 transition-colors"
                 >
                   {tpl.label}
                 </button>
@@ -613,7 +613,7 @@ export default function CustomerMailerPanel({
                 key={t.value}
                 type="button"
                 onClick={() => setTemplateKey(t.value as 'promotion' | 'announcement')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                className={`px-3 h-control-sm rounded-lg text-xs font-semibold border transition-colors ${
                   templateKey === t.value
                     ? 'bg-accent-500 border-accent-500 text-white'
                     : 'bg-surface border-border-secondary text-foreground-muted hover:text-foreground'
@@ -673,7 +673,7 @@ export default function CustomerMailerPanel({
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
               Message
             </label>
-            <RichTextEditor value={body} onChange={setBody} placeholder="Optional message body…" minHeight={180} />
+            <EmailComposer value={body} onChange={setBody} placeholder="Optional message body…" minHeight={180} />
             <p className="text-[11px] text-foreground-muted mt-1.5">
               Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
               are replaced with the actual customer details when the email is sent.
@@ -700,7 +700,7 @@ export default function CustomerMailerPanel({
                     setSelectedProduct(null)
                     setProductQuery('')
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 h-control-sm rounded-lg text-xs font-semibold border transition-colors ${
                     attachMode === mode
                       ? 'bg-accent-500 border-accent-500 text-white'
                       : 'bg-surface border-border-secondary text-foreground-muted hover:text-foreground'
@@ -846,7 +846,7 @@ export default function CustomerMailerPanel({
               type="button"
               onClick={handleSend}
               disabled={sending || !subject.trim() || !headline.trim()}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+              className="flex items-center gap-1.5 px-4 h-control-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
             >
               {sending ? (
                 <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />

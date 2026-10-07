@@ -6,8 +6,12 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import InvoicesClient from './InvoicesClient'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
-export const metadata = { title: 'Invoices — Jeffi Admin' }
+export async function generateMetadata() {
+  const { name } = await getStoreIdentity()
+  return { title: `Invoices — ${name} Admin` }
+}
 
 export default async function InvoicesPage() {
   const cookieStore = await cookies()

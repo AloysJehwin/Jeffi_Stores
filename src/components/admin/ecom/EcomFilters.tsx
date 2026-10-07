@@ -69,7 +69,7 @@ export default function EcomFilters({
       <div>
         <label className="block text-xs font-medium text-foreground-muted mb-1 uppercase tracking-wide">Search</label>
         <input
-          className="w-full rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+          className="w-full rounded-lg border border-border-default bg-surface-elevated px-3 h-control text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           placeholder="Search store name or subdomain…"
           value={q}
           onChange={e => setQ(e.target.value)}

@@ -109,7 +109,7 @@ export default function ProductSupplierList({ suppliers, value, onChange, note }
                         value={row.unit_cost}
                         onChange={e => update(i, { unit_cost: e.target.value })}
                         placeholder="Buy price"
-                        className="w-full pl-5 pr-2 py-1.5 text-sm rounded border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                        className="w-full pl-5 pr-2 h-control-sm text-sm rounded border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                       />
                     </div>
                   </div>

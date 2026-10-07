@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
       `SELECT o.id, o.order_number, o.created_at, o.customer_name, o.customer_phone,
               o.total_amount, o.discount_amount, o.shipping_amount,
               o.taxable_amount, o.cgst_amount, o.sgst_amount, o.igst_amount, o.is_igst,
+              (SELECT COUNT(*) FROM order_items d WHERE d.order_id = o.id AND d.is_digital)::int AS digital_item_count,
               row_to_json(a) AS shipping_address,
               json_agg(json_build_object(
                 'product_name', COALESCE(oi.product_name, p.name, 'Product'),
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
               ) ORDER BY oi.created_at) AS items
        FROM orders o
        LEFT JOIN addresses a ON a.id = o.shipping_address_id
-       LEFT JOIN order_items oi ON oi.order_id = o.id
+       LEFT JOIN order_items oi ON oi.order_id = o.id AND oi.is_digital IS NOT TRUE
        LEFT JOIN products p ON p.id = oi.product_id
        LEFT JOIN product_images pi ON pi.product_id = p.id AND pi.is_primary = true
        WHERE o.id = ANY($1::uuid[])
@@ -59,7 +60,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No orders found' }, { status: 404 })
   }
 
+  // Digital lines are excluded above; an all-digital order then has nothing to pack.
   const orders: PackingSlipOrder[] = rows
+    .map((o: any) => ({ ...o, items: (o.items || []).filter(Boolean) }))
+    .filter((o: any) => !(o.items.length === 0 && o.digital_item_count > 0))
+  if (orders.length === 0) return NextResponse.json({ error: 'No orders with items to pack' }, { status: 404 })
 
   try {
     const pdfBuffer = await generateBulkPackingSlipPDF(orders, store)

@@ -51,7 +51,7 @@ export default function AdminIntegrationsPopup({
         type="button"
         onClick={() => setOpen(true)}
         title="Configure credentials"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
+        className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
       >
         <Settings className="w-4 h-4" /> Configure
       </button>
@@ -202,7 +202,7 @@ function GoogleCard({
             <button
               type="button"
               onClick={() => setOpen(o => !o)}
-              className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
+              className="px-4 h-control rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
             >
               {open ? 'Hide' : connected ? 'Update credentials' : 'Enter credentials'}
             </button>
@@ -225,13 +225,13 @@ function GoogleCard({
                 <input
                   value={merchantId}
                   onChange={e => setMerchantId(e.target.value)}
-                  className="w-full text-sm rounded-lg border border-border-default bg-surface-secondary px-3 py-2 text-foreground"
+                  className="w-full text-sm rounded-lg border border-border-default bg-surface-secondary px-3 h-control text-foreground"
                 />
               </div>
               <button
                 onClick={save}
                 disabled={busy || !sa || !merchantId}
-                className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+                className="px-4 h-control rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
               >
                 {busy ? 'Saving…' : 'Save credentials'}
               </button>
@@ -317,7 +317,7 @@ function AmazonCard({
             <button
               type="button"
               onClick={() => setOpen(o => !o)}
-              className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
+              className="px-4 h-control rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors"
             >
               {open ? 'Hide' : 'Enter credentials'}
             </button>
@@ -331,14 +331,14 @@ function AmazonCard({
                   <input
                     value={f[fl.k]}
                     onChange={set(fl.k)}
-                    className="w-full text-sm rounded-lg border border-border-default bg-surface-secondary px-3 py-2 text-foreground"
+                    className="w-full text-sm rounded-lg border border-border-default bg-surface-secondary px-3 h-control text-foreground"
                   />
                 </div>
               ))}
               <button
                 onClick={save}
                 disabled={busy || !f.client_id || !f.client_secret || !f.refresh_token || !f.seller_id}
-                className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+                className="px-4 h-control rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
               >
                 {busy ? 'Saving…' : 'Save credentials'}
               </button>
@@ -426,7 +426,7 @@ function DisconnectButton({
       type="button"
       onClick={disconnect}
       disabled={busy}
-      className="px-4 py-2 rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 text-sm font-medium transition-colors"
+      className="px-4 h-control rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 text-sm font-medium transition-colors"
     >
       {busy ? 'Removing…' : 'Disconnect'}
     </button>

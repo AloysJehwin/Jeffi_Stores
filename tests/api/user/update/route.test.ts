@@ -13,6 +13,7 @@ vi.mock('@/lib/shared/validate', () => ({
   parseBody: vi.fn(),
   zNonEmpty: { optional: () => ({}) },
   zPhone: { optional: () => ({}) },
+  zDob: { optional: () => ({}) },
 }))
 
 import { PATCH } from '@/app/api/(public)/user/update/route'
@@ -145,6 +146,59 @@ describe('PATCH /api/user/update', () => {
     const res = await PATCH(makePatch({ phone: '12345' }) as any)
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/10-digit/i)
+  })
+
+  it('saves a new date of birth and returns it as YYYY-MM-DD', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(validate.parseBody).mockReturnValue({
+      ok: true,
+      data: { dateOfBirth: '1990-05-15' },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...EXISTING_USER, date_of_birth: null } as any)
+      .mockResolvedValueOnce({ ...UPDATED_USER, date_of_birth: new Date(1990, 4, 15) } as any)
+
+    const res = await PATCH(makePatch({ dateOfBirth: '1990-05-15' }) as any)
+    expect(res.status).toBe(200)
+    expect((await res.json()).user.dateOfBirth).toBe('1990-05-15')
+    expect(db.queryOne).toHaveBeenLastCalledWith(
+      expect.stringContaining('date_of_birth'),
+      expect.arrayContaining(['1990-05-15'])
+    )
+  })
+
+  it('keeps the stored date of birth unchanged when another field is edited', async () => {
+    const storedDob = new Date(1990, 4, 15)
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(validate.parseBody).mockReturnValue({
+      ok: true,
+      data: { lastName: 'Smith' },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...EXISTING_USER, date_of_birth: storedDob } as any)
+      .mockResolvedValueOnce({ ...UPDATED_USER, date_of_birth: storedDob } as any)
+
+    const res = await PATCH(makePatch({ lastName: 'Smith' }) as any)
+    expect(res.status).toBe(200)
+    expect((await res.json()).user.dateOfBirth).toBe('1990-05-15')
+    const params = vi.mocked(db.queryOne).mock.calls.at(-1)?.[1] as unknown[]
+    expect(params[4]).toBe('1990-05-15')
+  })
+
+  it('returns a null date of birth when none is stored', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(validate.parseBody).mockReturnValue({
+      ok: true,
+      data: { lastName: 'Smith' },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(EXISTING_USER as any)
+      .mockResolvedValueOnce(UPDATED_USER as any)
+
+    const res = await PATCH(makePatch({ lastName: 'Smith' }) as any)
+    expect((await res.json()).user.dateOfBirth).toBeNull()
+    const params = vi.mocked(db.queryOne).mock.calls.at(-1)?.[1] as unknown[]
+    expect(params[4]).toBeNull()
   })
 
   it('returns 500 when update queryOne returns null', async () => {

@@ -7,29 +7,46 @@ import {
   customerMailFromAsync,
   adminMailFrom,
   currentBrandNameAsync,
-  currentAdminBaseUrl,
+  currentAdminBaseUrlAsync,
   storeContactLine,
   storeAddressLine,
 } from './shared'
+import { orderUrlById } from '@/lib/shared/customer-links'
 
 export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[]) {
   const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
+  const orderLink = order?.id ? await orderUrlById(String(order.id)) : null
   const from = await customerMailFromAsync()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
   const subject = `Order Received - ${order.order_number}`
+  // Digital lines are delivered to the vault, not dispatched.
+  const allDigital = order.status === 'granted' || (orderItems.length > 0 && orderItems.every((i: any) => i.is_digital))
+  const hasDigital = allDigital || orderItems.some((i: any) => i.is_digital)
+  const vaultLink = hasDigital ? await import('@/lib/vault/links').then(m => m.vaultLibraryUrl()) : null
+  const nextSteps = allDigital
+    ? 'Your payment has been received and your digital items are ready. Open your vault to view them any time.'
+    : hasDigital
+      ? "Your payment has been received. Your digital items are ready in your vault now; we're preparing the rest of your order for dispatch and will email you once it's on its way."
+      : "Your payment has been received. We're now preparing your order for dispatch. You'll receive another email once your order is on its way."
   const html = mailShell({
     brand,
     kicker: 'Order Confirmation',
     title: 'Order Received!',
-    preheader: `Order confirmed! We've received your order and will keep you updated on dispatch.`,
+    preheader: allDigital
+      ? `Order confirmed! Your digital items are ready in your vault.`
+      : `Order confirmed! We've received your order and will keep you updated on dispatch.`,
     extraCss: `
       .order-box { background-color: #e3f2fd; border: 2px solid #2563eb; padding: 20px; border-radius: 8px; margin: 20px 0; }
       .total { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: right; }
     `,
     content: `
       <p>Hello ${order.customer_name},</p>
-      <p>Thank you for your order! We've received your order and payment — our team is preparing it and will keep you updated on dispatch.</p>
+      <p>${
+        allDigital
+          ? "Thank you for your order! We've received your payment and your access has been granted."
+          : "Thank you for your order! We've received your order and payment — our team is preparing it and will keep you updated on dispatch."
+      }</p>
 
       <div class="order-box">
         <h3 style="margin-top: 0;">Order Details</h3>
@@ -39,7 +56,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
           month: 'short',
           year: 'numeric',
         })}</p>
-        <p><strong>Status:</strong> <span style="color: #16a34a; font-weight: bold;">CONFIRMED</span></p>
+        <p><strong>Status:</strong> <span style="color: #16a34a; font-weight: bold;">${allDigital ? 'ACCESS GRANTED' : 'CONFIRMED'}</span></p>
         ${
           order.taxable_amount > 0
             ? `
@@ -93,8 +110,12 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
 
       <div class="success">
         <h4 style="margin-top: 0;">What happens next?</h4>
-        <p style="margin: 5px 0;">Your payment has been received. We're now preparing your order for dispatch. You'll receive another email once your order is on its way.</p>
+        <p style="margin: 5px 0;">${nextSteps}</p>
       </div>
+
+      ${vaultLink ? `<div class="cta"><a href="${vaultLink}" class="button" style="color:#ffffff;">Open my vault</a></div>` : ''}
+
+      ${orderLink ? `<div class="cta"><a href="${orderLink}" class="button" style="color:#ffffff;">View Your Order</a></div>` : ''}
 
       <p>If you have any questions, feel free to contact us:</p>
       ${contactLine}
@@ -199,7 +220,7 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
       </div>
 
       <div class="cta">
-        <a href="${currentAdminBaseUrl()}/orders/${order.id}" class="button">
+        <a href="${await currentAdminBaseUrlAsync()}/orders/${order.id}" class="button">
           View Order in Admin Panel
         </a>
       </div>

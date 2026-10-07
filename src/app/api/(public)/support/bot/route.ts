@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAnyUser } from '@/lib/auth/jwt'
 import { fetchUserOrders, getBotPayload } from '@/lib/shared/support-bot'
+import { currentBrandNameAsync } from '@/lib/catalog/brand'
 
 export async function GET(request: NextRequest) {
   const authUser = await authenticateAnyUser(request)
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const orders = await fetchUserOrders(authUser.userId)
-    const payload = getBotPayload(msg, orders)
+    const payload = getBotPayload(msg, orders, [], await currentBrandNameAsync())
     return NextResponse.json({ payload })
   } catch {
     return NextResponse.json({

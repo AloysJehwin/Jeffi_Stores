@@ -1,4 +1,5 @@
-import { queryMany, query } from '@/lib/shared/db'
+import { queryMany } from '@/lib/shared/db'
+import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
 import {
   fetchUserContext,
   fetchProductImageUrl,
@@ -6,11 +7,19 @@ import {
   sendCampaignEmail,
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
+import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import {
+  NOT_RECENTLY_EMAILED_SQL,
+  SAVED_ITEMS_SQL,
+  settleWishlistEvent,
+  syncWishlistSnapshots,
+} from './_wishlist-base'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
   priceDropThresholdPct: number
   maxWatchesPerSweep: number
+  whatsappEnabled: boolean
 }
 
 interface Row {
@@ -20,16 +29,15 @@ interface Row {
   product_slug: string
   snapshot_price: string
   current_price: string
-  current_in_stock: boolean
 }
 
 export const priceDrop: ScenarioModule<Params, Row> = {
   kind: 'price_drop',
   name: 'Price Drop',
-  description: 'Wishlisted product price dropped',
+  description: 'Saved product price dropped',
   trigger:
-    "Fires when a wishlisted product's base_price drops by at least the configured threshold % below the snapshot price. Skipped if the product just came back in stock (that's a restock event instead). Wishlist snapshot is updated after sending.",
-  defaultParams: { priceDropThresholdPct: 5, maxWatchesPerSweep: 100 },
+    "Fires when a product on the wishlist or saved for later in the cart has a base_price drops by at least the configured threshold % below the snapshot price. Only for active products that are in stock. The wishlist snapshot is refreshed once the email is sent, so a further drop notifies again.",
+  defaultParams: { priceDropThresholdPct: 5, maxWatchesPerSweep: 100, whatsappEnabled: false },
   paramSchema: {
     priceDropThresholdPct: {
       type: 'integer',
@@ -45,31 +53,39 @@ export const priceDrop: ScenarioModule<Params, Row> = {
       label: 'Max watches per run',
       description: 'Hard limit on wishlist rows scanned',
     },
+    whatsappEnabled: {
+      type: 'boolean',
+      label: 'Also send via WhatsApp',
+      description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
   },
 
-  async findEligible({ params }) {
+  async findEligible({ campaign, params }) {
+    await syncWishlistSnapshots()
     const factor = (100 - params.priceDropThresholdPct) / 100
     return queryMany<Row>(
       `
       SELECT wi.user_id, wi.product_id, p.name AS product_name, p.slug AS product_slug,
              wi.snapshot_price::text AS snapshot_price,
-             p.base_price::text AS current_price,
-             (p.inventory_quantity > 0) AS current_in_stock
-      FROM wishlist_items wi
+             p.base_price::text AS current_price
+      FROM ${SAVED_ITEMS_SQL} wi
       JOIN products p ON p.id = wi.product_id
       JOIN users u ON u.id = wi.user_id
       WHERE u.marketing_opt_out = FALSE AND u.is_active = TRUE AND u.is_guest = FALSE
+        AND p.is_active = TRUE
         AND wi.snapshot_taken_at IS NOT NULL
         AND wi.snapshot_price IS NOT NULL
-        AND p.base_price < wi.snapshot_price * $1
-        AND NOT (wi.snapshot_in_stock = FALSE AND p.inventory_quantity > 0)
-      LIMIT $2
+        AND p.base_price < wi.snapshot_price * $2
+        AND ${PRODUCT_IN_STOCK_SQL}
+        AND ${NOT_RECENTLY_EMAILED_SQL}
+      ORDER BY wi.snapshot_taken_at ASC
+      LIMIT $3
     `,
-      [factor, params.maxWatchesPerSweep]
+      [campaign.kind, factor, params.maxWatchesPerSweep]
     )
   },
 
-  async send(row, { campaign }) {
+  async send(row, { campaign, params }) {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
@@ -90,7 +106,7 @@ export const priceDrop: ScenarioModule<Params, Row> = {
     const result = await sendCampaignEmail({
       campaign,
       user,
-      referenceId: row.product_id,
+      referenceId: `${row.product_id}:${row.snapshot_price}`,
       vars: {
         firstName: user.first_name || 'there',
         productName: row.product_name,
@@ -104,12 +120,14 @@ export const priceDrop: ScenarioModule<Params, Row> = {
       },
     })
 
-    await query(
-      `UPDATE wishlist_items
-       SET snapshot_price = $1, snapshot_in_stock = $2, snapshot_taken_at = NOW()
-       WHERE user_id = $3 AND product_id = $4`,
-      [newPrice, row.current_in_stock, row.user_id, row.product_id]
-    ).catch(() => {})
+    await settleWishlistEvent(result, row.user_id, row.product_id)
+    if (params.whatsappEnabled && result.ok) {
+      sendCampaignWhatsApp(campaign.kind, row.user_id, {
+        headline: `${row.product_name} is now ₹${Math.round(newPrice).toLocaleString('en-IN')}`,
+        code: couponCode || '',
+        discount: discountPercent ? String(discountPercent) : '',
+      }).catch(() => {})
+    }
 
     return result
   },

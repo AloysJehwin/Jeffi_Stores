@@ -8,6 +8,14 @@ import { applyDiscount } from '@/lib/catalog/pricing'
 import { BusinessAccountNavBar } from '@/components/business/AccountSidebar'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import CopySku from '@/components/ui/CopySku'
+import { documentHostForHost, type DocumentApp } from '@/lib/tenancy/forms-host'
+
+// Quote/invoice pages live on this store's own document host (quotation-{slug}. on a tenant).
+// Only rendered after the client has loaded the data, so reading the host here is hydration-safe.
+function documentLink(app: DocumentApp, token: string): string {
+  const host = typeof window !== 'undefined' ? window.location.hostname : ''
+  return `https://${documentHostForHost(app, host)}/${encodeURIComponent(token)}`
+}
 
 interface RFQItem {
   id: string
@@ -432,7 +440,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
             <div className="flex items-center gap-2 flex-wrap">
               {rfq.status === 'converted' && rfq.quotation_view_token && (
                 <a
-                  href={`https://quotation.jeffistores.in/${rfq.quotation_view_token}`}
+                  href={documentLink('quotation', rfq.quotation_view_token)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 border border-accent-500 text-accent-400 text-sm font-semibold rounded-lg hover:bg-accent-900/20 transition-colors shrink-0"
@@ -1188,7 +1196,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                   </Link>
                   {linkedOrder.view_token && (
                     <a
-                      href={`https://invoice.jeffistores.in/${linkedOrder.view_token}`}
+                      href={documentLink('invoice', linkedOrder.view_token)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block w-full text-center text-xs bg-accent-500 hover:bg-accent-600 text-white font-semibold px-3 py-2 rounded-lg transition-colors"

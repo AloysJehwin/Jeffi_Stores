@@ -151,7 +151,7 @@ export default function OfferSliderControl({
                       <button
                         type="button"
                         onClick={() => setEditing(isEditing ? null : offer.id)}
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs shrink-0 hover:bg-surface-secondary ${isEditing ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted hover:text-foreground'}`}
+                        className={`inline-flex items-center gap-1 px-2 h-control-sm rounded text-xs shrink-0 hover:bg-surface-secondary ${isEditing ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted hover:text-foreground'}`}
                         aria-label={`Edit ${offer.title} card display`}
                         aria-expanded={isEditing}
                       >

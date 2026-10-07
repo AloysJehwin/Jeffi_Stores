@@ -270,7 +270,7 @@ export default function GSTPage() {
           <button
             onClick={handleFetch}
             disabled={loading}
-            className="px-4 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+            className="px-4 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
           >
             {loading ? (
               <span className="flex items-center gap-1.5">
@@ -380,7 +380,7 @@ export default function GSTPage() {
                 <h2 className="font-semibold text-foreground">Outward Supplies</h2>
                 <button
                   onClick={() => downloadCSV('gstr1')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
+                  className="flex items-center gap-1.5 px-3 h-control-sm text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -534,7 +534,7 @@ export default function GSTPage() {
                 <h2 className="font-semibold text-foreground">GSTR-3B Summary</h2>
                 <button
                   onClick={() => downloadCSV('gstr3b')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
+                  className="flex items-center gap-1.5 px-3 h-control-sm text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -735,7 +735,7 @@ export default function GSTPage() {
                 <h2 className="font-semibold text-foreground">Input Tax Credit Ledger</h2>
                 <button
                   onClick={() => downloadCSV('itc')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
+                  className="flex items-center gap-1.5 px-3 h-control-sm text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path

@@ -1970,3 +1970,84 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_product_serials_instock_global ON public.
 --
 
 CREATE INDEX idx_offer_display_settings_visible ON public.offer_display_settings USING btree (is_visible, display_order);
+
+
+--
+-- Name: idx_loyalty_ledger_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_loyalty_ledger_user ON public.loyalty_ledger USING btree (user_id, created_at DESC);
+
+
+--
+-- Name: idx_loyalty_ledger_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_loyalty_ledger_order ON public.loyalty_ledger USING btree (order_id) WHERE (order_id IS NOT NULL);
+
+
+--
+-- Name: idx_loyalty_ledger_coupon; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_loyalty_ledger_coupon ON public.loyalty_ledger USING btree (coupon_id) WHERE (coupon_id IS NOT NULL);
+
+
+--
+-- Name: idx_loyalty_accounts_tier; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_loyalty_accounts_tier ON public.loyalty_accounts USING btree (tier, tier_updated_at DESC);
+
+
+--
+-- Name: idx_referrals_referrer; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_referrals_referrer ON public.referrals USING btree (referrer_user_id, status);
+
+
+--
+-- Name: idx_referral_signups_referrer; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_referral_signups_referrer ON public.referral_signups USING btree (referrer_user_id, status);
+
+
+--
+-- Name: idx_subscriptions_renewal; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_subscriptions_renewal ON public.subscriptions USING btree (status, next_renewal_at);
+
+
+--
+-- Name: idx_subscriptions_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_subscriptions_user ON public.subscriptions USING btree (user_id, status);
+
+
+--
+-- Digital products, vault & customer subscriptions
+--
+
+CREATE INDEX idx_product_files_product ON public.product_files USING btree (product_id, display_order);
+
+CREATE INDEX idx_vault_entitlements_user ON public.vault_entitlements USING btree (user_id, status);
+CREATE INDEX idx_vault_entitlements_product ON public.vault_entitlements USING btree (product_id);
+CREATE INDEX idx_vault_entitlements_order ON public.vault_entitlements USING btree (order_id);
+CREATE INDEX idx_vault_entitlements_subscription ON public.vault_entitlements USING btree (subscription_id);
+
+CREATE INDEX idx_subscription_cycle_orders_sub ON public.subscription_cycle_orders USING btree (subscription_id, cycle_number);
+
+-- Only the legacy crons-era stubs feed the subscription_renewal campaign now.
+CREATE INDEX idx_subscriptions_rzp ON public.subscriptions USING btree (razorpay_subscription_id);
+CREATE INDEX idx_subscriptions_legacy_renewal ON public.subscriptions USING btree (status, next_renewal_at) WHERE razorpay_subscription_id IS NULL;
+
+CREATE INDEX idx_orders_subscription ON public.orders USING btree (subscription_id) WHERE subscription_id IS NOT NULL;
+
+CREATE INDEX idx_vault_tickets_expires ON public.vault_tickets USING btree (expires_at);
+
+CREATE INDEX idx_vault_access_log_user ON public.vault_access_log USING btree (user_id, created_at);
+CREATE INDEX idx_upload_sessions_product ON public.upload_sessions USING btree (product_id, status);

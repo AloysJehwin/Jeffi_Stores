@@ -1,15 +1,17 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
-import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { useRouter } from 'next/navigation'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import { digitalActive } from '@/lib/catalog/digital'
 import QuickAddButton from '@/components/visitor/QuickAddButton'
+import { useProductLikeShare } from '@/components/visitor/useProductLikeShare'
+import { applyDiscount, mrpDiscountPct } from '@/lib/catalog/pricing'
+import { bp } from '@/lib/shared/business-path'
 
 interface ProductCardProps {
   id: string
@@ -23,6 +25,7 @@ interface ProductCardProps {
   primaryImage?: { image_url: string; thumbnail_url?: string; blurhash?: string | null } | null
   brandName?: string | null
   categoryName?: string | null
+  categoryId?: string | null
   discountPct?: number
   extraDeliveryDays?: number
   handlingDays?: number
@@ -30,6 +33,8 @@ interface ProductCardProps {
   hazardous?: boolean | null
   flammable?: boolean | null
   badge?: string | null
+  isDigital?: boolean
+  portal?: 'storefront' | 'business'
 }
 
 export default function ProductCard({
@@ -44,6 +49,7 @@ export default function ProductCard({
   primaryImage,
   brandName,
   categoryName,
+  categoryId,
   discountPct = 0,
   extraDeliveryDays = 0,
   handlingDays = 2,
@@ -51,21 +57,30 @@ export default function ProductCard({
   hazardous,
   flammable,
   badge,
+  isDigital = false,
+  portal = 'storefront',
 }: ProductCardProps) {
   const { user } = useAuth()
-  const { showToast, showConfirm } = useToast()
-  const gstEnabled = useStoreConfig().flags.gstEnabled
-  const router = useRouter()
-  const [isInWishlist, setIsInWishlist] = useState(false)
-  const [wishlistLoading, setWishlistLoading] = useState(false)
+  const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
+  const digital = digitalActive(digitalProductsEnabled, isDigital)
+  const inStock = digital || effectiveStock > 0
   const [quickAddSignal, setQuickAddSignal] = useState(0)
   const [edd, setEdd] = useState<string | null>(null)
 
+  const isBusiness = portal === 'business'
+  const productHref = isBusiness ? bp(`/business/products/${slug}`) : `/products/${slug}`
+
+  const bizDiscountPct = isBusiness && categoryId ? (user?.businessDiscountMap?.[categoryId] ?? 0) : 0
+  const businessPrice = bizDiscountPct > 0 ? applyDiscount(displayPrice, bizDiscountPct) : null
+  const shownPrice = businessPrice ?? displayPrice
+  const shownMrpDiscount = businessPrice && mrp && mrp > 0 ? mrpDiscountPct(mrp, businessPrice) : mrpDiscount
+
   useEffect(() => {
-    resolveEdd(!!user, handlingDays, extraDeliveryDays).then(v => {
+    if (digital) return
+    resolveEdd(!!user, handlingDays, extraDeliveryDays, isBusiness ? 'business' : undefined).then(v => {
       if (v) setEdd(v)
     })
-  }, [user, handlingDays, extraDeliveryDays])
+  }, [digital, user, handlingDays, extraDeliveryDays, isBusiness])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
@@ -83,72 +98,17 @@ export default function ProductCard({
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
   }
 
-  const handleWishlist = useCallback(
-    async (e: React.MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      if (!user) {
-        showConfirm({
-          title: 'Sign In Required',
-          message: 'Please sign in to save items to your wishlist.',
-          confirmText: 'Sign In',
-          cancelText: 'Maybe Later',
-          type: 'info',
-          onConfirm: () => router.push(`/login?redirect=/products/${slug}`),
-        })
-        return
-      }
-      setWishlistLoading(true)
-      try {
-        if (isInWishlist) {
-          const res = await fetch(`/api/wishlist?productId=${id}`, { method: 'DELETE', credentials: 'include' })
-          if (res.ok) {
-            setIsInWishlist(false)
-            showToast('Removed from wishlist', 'success')
-          }
-        } else {
-          const res = await fetch('/api/wishlist', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productId: id }),
-            credentials: 'include',
-          })
-          if (res.ok) {
-            setIsInWishlist(true)
-            showToast('Added to wishlist!', 'success')
-          }
-        }
-      } catch {
-        showToast('Failed to update wishlist', 'error')
-      } finally {
-        setWishlistLoading(false)
-      }
-    },
-    [id, slug, isInWishlist, user]
-  )
-
-  const handleShare = useCallback(
-    async (e: React.MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      const url = `${window.location.origin}/products/${slug}`
-      const shareData = { title: name, text: `Check out ${name}`, url }
-      if (navigator.share) {
-        try {
-          await navigator.share(shareData)
-        } catch {}
-      } else {
-        await navigator.clipboard.writeText(url)
-        showToast('Link copied to clipboard!', 'success')
-      }
-    },
-    [slug, name]
-  )
+  const { isInWishlist, wishlistLoading, handleWishlist, handleShare } = useProductLikeShare({
+    id,
+    slug,
+    name,
+    href: productHref,
+  })
 
   return (
     <>
       <Link
-        href={`/products/${slug}`}
+        href={productHref}
         className="group"
         onTouchStart={e => startLongPress(e)}
         onTouchEnd={cancelLongPress}
@@ -195,19 +155,28 @@ export default function ProductCard({
               </div>
             )}
 
-            {/* Sale ribbon */}
-            {discountPct > 0 && (
-              <div className="absolute top-4 right-[-16px] w-20 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[8px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10 overflow-hidden">
-                SALE
+            {/* Business-offer ribbon takes precedence over SALE */}
+            {bizDiscountPct > 0 ? (
+              <div className="absolute top-5 right-[-22px] w-28 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[8px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10 overflow-hidden">
+                Business offer
               </div>
+            ) : (
+              discountPct > 0 && (
+                <div className="absolute top-4 right-[-16px] w-20 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[8px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10 overflow-hidden">
+                  SALE
+                </div>
+              )
             )}
 
-            {(mrpDiscount > 0 || badge) && (
+            {(shownMrpDiscount > 0 || badge || digital) && (
               <div className="absolute top-2 left-2 flex flex-col items-start gap-1">
-                {mrpDiscount > 0 && (
+                {shownMrpDiscount > 0 && (
                   <div className="bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
-                    {mrpDiscount}% off
+                    {shownMrpDiscount}% off
                   </div>
+                )}
+                {digital && (
+                  <div className="bg-violet-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">Digital</div>
                 )}
                 {badge && (
                   <div className="bg-primary-500 dark:bg-primary-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
@@ -234,41 +203,45 @@ export default function ProductCard({
                   productName={name}
                   slug={slug}
                   hasVariants={hasVariants}
-                  inStock={effectiveStock > 0}
+                  inStock={inStock}
                   imageUrl={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
                   brandName={brandName}
                   categoryName={categoryName}
-                  displayPrice={displayPrice}
+                  displayPrice={shownPrice}
                   mrp={mrp}
-                  discountPct={discountPct ?? mrpDiscount}
+                  discountPct={bizDiscountPct > 0 ? shownMrpDiscount : (discountPct ?? mrpDiscount)}
                   openSignal={quickAddSignal}
+                  isDigital={digital}
+                  portal={portal}
                 />
-                <div className="hidden sm:flex items-center gap-1.5">
-                  <button
-                    onClick={handleWishlist}
-                    disabled={wishlistLoading}
-                    aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-                    className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-red-500 hover:border-red-300 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
-                  >
-                    <svg
-                      className={`w-3.5 h-3.5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`}
-                      fill={isInWishlist ? 'currentColor' : 'none'}
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      style={{ color: isInWishlist ? '#ef4444' : undefined }}
+                <div className="flex items-center gap-1.5">
+                  {!isBusiness && (
+                    <button
+                      onClick={handleWishlist}
+                      disabled={wishlistLoading}
+                      aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+                      className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-red-500 hover:border-red-300 transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
-                      />
-                    </svg>
-                  </button>
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`}
+                        fill={isInWishlist ? 'currentColor' : 'none'}
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        style={{ color: isInWishlist ? '#ef4444' : undefined }}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                        />
+                      </svg>
+                    </button>
+                  )}
                   <button
                     onClick={handleShare}
                     aria-label="Share product"
-                    className="w-7 h-7 rounded-full bg-surface-secondary border border-border-default flex items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
+                    className="hidden sm:flex w-7 h-7 rounded-full bg-surface-secondary border border-border-default items-center justify-center text-foreground-muted hover:text-accent-500 hover:border-accent-400 transition-all hover:scale-110 active:scale-95"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path
@@ -289,26 +262,39 @@ export default function ProductCard({
               <div className="flex flex-col sm:flex-row sm:items-baseline sm:gap-2 mb-0.5 sm:mb-1">
                 <span className="text-base sm:text-xl font-bold text-primary-600 dark:text-primary-400 leading-tight">
                   {hasVariants ? 'From ' : ''}&#x20B9;
-                  {Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {Number(shownPrice).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                {mrp && mrp > Number(displayPrice) && (
+                {businessPrice ? (
+                  <span className="text-xs sm:text-sm text-foreground-muted line-through leading-tight">
+                    &#x20B9;
+                    {Number(displayPrice).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                ) : mrp && mrp > Number(displayPrice) ? (
                   <span className="text-xs sm:text-sm text-foreground-muted line-through leading-tight">
                     &#x20B9;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
-                )}
+                ) : null}
               </div>
+              {businessPrice && (
+                <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium mb-0.5">
+                  Your business price
+                </p>
+              )}
               {gstEnabled && <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>}
               <div className="flex items-center justify-between gap-1">
                 <span
-                  className={`text-xs font-medium whitespace-nowrap ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}
+                  className={`text-xs font-medium whitespace-nowrap ${inStock ? 'text-green-600' : 'text-red-600'}`}
                 >
-                  {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
+                  {digital ? 'Instant access' : inStock ? 'In Stock' : 'Out of Stock'}
                 </span>
                 <span className="text-accent-500 group-hover:text-accent-600 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all group-hover:translate-x-1">
                   View Details &#x2192;
                 </span>
               </div>
-              {edd && effectiveStock > 0 && (
+              {edd && !digital && inStock && (
                 <p className="text-[10px] text-foreground-muted mt-0.5">
                   Deliver by{' '}
                   <span className="font-medium text-foreground">
@@ -320,7 +306,6 @@ export default function ProductCard({
           </div>
         </div>
       </Link>
-
     </>
   )
 }

@@ -28,6 +28,7 @@ const SAMPLE_PROMPTS = [
 
 const STATUS_STYLES: Record<string, string> = {
   delivered: 'bg-green-500/15 text-green-600 dark:text-green-400',
+  granted: 'bg-green-500/15 text-green-600 dark:text-green-400',
   shipped: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
   processing: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400',
   confirmed: 'bg-accent-500/15 text-accent-600 dark:text-accent-400',
@@ -164,7 +165,7 @@ function parseContent(text: string, onClose: () => void): React.ReactNode {
               <span
                 className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize shrink-0 ${STATUS_STYLES[status] ?? STATUS_STYLES.pending}`}
               >
-                {status}
+                {status === 'granted' ? 'Access granted' : status}
               </span>
             </Link>
           ))}

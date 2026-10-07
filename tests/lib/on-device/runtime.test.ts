@@ -98,8 +98,8 @@ describe('generateRecap — worker lifecycle & result', () => {
     const promise = runtime.generateRecap({ cart: [], events: [] } as never, true)
     const w = FakeWorker.instances[0]
     expect(FakeWorker.instances).toHaveLength(1)
-    // init message first, then generate
-    expect(w.posted[0]).toEqual({ type: 'init', isMobile: true })
+    // init message first (carries isMobile + the tenant slug for LoRA namespacing, #489), then generate
+    expect(w.posted[0]).toEqual({ type: 'init', isMobile: true, slug: null })
     const gen = w.posted[1] as { type: string; id: number; prompt: string }
     expect(gen.type).toBe('generate')
     expect(gen.prompt).toBe('RECAP_PROMPT')
@@ -116,6 +116,16 @@ describe('generateRecap — worker lifecycle & result', () => {
     const w = FakeWorker.instances[0]
     const inits = w.posted.filter(m => (m as { type: string }).type === 'init')
     expect(inits).toHaveLength(1)
+  })
+
+  // #489: setOnDeviceStore threads the tenant slug into the worker init so it loads THIS store's
+  // LoRA adapter, not another tenant's.
+  it('passes the configured store slug in the worker init', async () => {
+    runtime.setOnDeviceStore('acme')
+    runtime.generateRecap({ cart: [] } as never, false)
+    const w = FakeWorker.instances[0]
+    expect(w.posted[0]).toEqual({ type: 'init', isMobile: false, slug: 'acme' })
+    runtime.setOnDeviceStore(null) // reset for other tests
   })
 
   it('streams tokens via onToken and falls back to accumulator when result has no text', async () => {

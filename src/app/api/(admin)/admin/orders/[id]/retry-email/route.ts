@@ -39,7 +39,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     order.customer_email,
     order.customer_name,
     order.order_number,
-    Number(order.total_amount)
+    Number(order.total_amount),
+    order.id
   )
 
   if (!result.success) {

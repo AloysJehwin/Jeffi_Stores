@@ -12,6 +12,7 @@
  *   { type: 'result', id, text } | { type: 'error', id, error }
  */
 import { AutoTokenizer, AutoModelForCausalLM, TextStreamer, env } from '@huggingface/transformers'
+import { onDeviceKeys } from './keys'
 
 // The model + ORT runtime are served either from our own origin (local dev) or
 // a CDN (prod), selected by NEXT_PUBLIC_ONDEVICE_MODEL_BASE. We present the host
@@ -57,6 +58,33 @@ let tokenizer: any = null
 let model: any = null
 let loading: Promise<void> | null = null
 let isMobile = false
+let slug: string | null = null
+
+const LORA_DB_NAME = 'jeffi-ondevice'
+const LORA_STORE = 'lora-weights'
+
+// Read this store's fine-tuned LoRA adapter from IndexedDB (tenant-namespaced key). Returns null when
+// there is none (no fine-tuning yet) or on any error — base weights then stand. (#489)
+async function readLoraWeights(): Promise<ArrayBuffer | null> {
+  try {
+    if (typeof indexedDB === 'undefined') return null
+    const key = onDeviceKeys(slug).loraKey
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const req = indexedDB.open(LORA_DB_NAME, 1)
+      req.onupgradeneeded = () => req.result.createObjectStore(LORA_STORE)
+      req.onsuccess = () => resolve(req.result)
+      req.onerror = () => reject(req.error)
+    })
+    return await new Promise<ArrayBuffer | null>((resolve, reject) => {
+      const tx = db.transaction(LORA_STORE, 'readonly')
+      const r = tx.objectStore(LORA_STORE).get(key)
+      r.onsuccess = () => resolve((r.result as ArrayBuffer) || null)
+      r.onerror = () => reject(r.error)
+    })
+  } catch {
+    return null
+  }
+}
 
 async function load() {
   if (loading) return loading
@@ -72,6 +100,15 @@ async function load() {
       dtype: 'q8',
       device: 'webgpu',
     })
+    // Apply this store's fine-tuned adapter so fine-tuning actually affects inference (#489). The
+    // fine-tune worker writes it under the same tenant-namespaced key; missing or an incompatible
+    // runtime (no load_lora_weights) silently falls back to base weights.
+    try {
+      const lora = await readLoraWeights()
+      if (lora && (model as any).load_lora_weights) await (model as any).load_lora_weights(lora)
+    } catch {
+      /* base weights stand */
+    }
   })()
   return loading
 }
@@ -119,6 +156,7 @@ self.addEventListener('message', async (e: MessageEvent) => {
   try {
     if (msg.type === 'init') {
       isMobile = !!msg.isMobile
+      if (typeof msg.slug === 'string') slug = msg.slug
     } else if (msg.type === 'load') {
       await load()
       ;(self as any).postMessage({ type: 'ready' })

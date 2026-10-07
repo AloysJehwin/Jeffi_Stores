@@ -40,7 +40,9 @@ export default function ReviewPage() {
   const [comment, setComment] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiOff, setAiOff] = useState(false)
-  const aiEnabled = useStoreConfig().flags.aiStorefrontEnabled && !aiOff
+  const storeConfig = useStoreConfig()
+  const aiEnabled = storeConfig.flags.aiStorefrontEnabled && !aiOff
+  const storeName = storeConfig.identity.name || 'Store'
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -220,7 +222,7 @@ export default function ReviewPage() {
       <div className="max-w-lg mx-auto">
         <div className="mb-6 text-center">
           <Link href="/" className="text-xl font-bold text-[#1a3a4a]">
-            Jeffi Store&apos;s
+            {storeName}
           </Link>
         </div>
 

@@ -1,8 +1,9 @@
 import ScanClient from './ScanClient'
+import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
-export const metadata = {
-  title: 'QuickScan — Jeffi Admin',
-  robots: 'noindex, nofollow',
+export async function generateMetadata() {
+  const { name } = await getStoreIdentity()
+  return { title: `QuickScan — ${name} Admin`, robots: 'noindex, nofollow' }
 }
 
 export default function ScanPage() {

@@ -213,7 +213,7 @@ export default function ProposedToolsPage() {
                         value={rejectReason}
                         onChange={e => setRejectReason(e.target.value)}
                         placeholder="Reason for rejecting (optional)"
-                        className="w-full px-3 py-1.5 text-xs border border-border-default rounded bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                        className="w-full px-3 h-control-sm text-xs border border-border-default rounded bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
                         onKeyDown={e => {
                           if (e.key === 'Enter') submitDecision(item.id, 'reject', rejectReason)
                           if (e.key === 'Escape') {
@@ -226,7 +226,7 @@ export default function ProposedToolsPage() {
                         <button
                           disabled={busyId === item.id}
                           onClick={() => submitDecision(item.id, 'reject', rejectReason)}
-                          className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
+                          className="flex-1 px-3 h-control-sm bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
                         >
                           {busyId === item.id ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -240,7 +240,7 @@ export default function ProposedToolsPage() {
                             setRejectingId(null)
                             setRejectReason('')
                           }}
-                          className="px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold border border-border-default"
+                          className="px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold border border-border-default"
                         >
                           Cancel
                         </button>
@@ -251,7 +251,7 @@ export default function ProposedToolsPage() {
                       <button
                         disabled={busyId === item.id}
                         onClick={() => decide(item.id, 'approve')}
-                        className="flex-1 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
+                        className="flex-1 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
                       >
                         {busyId === item.id ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -263,7 +263,7 @@ export default function ProposedToolsPage() {
                       <button
                         disabled={busyId === item.id}
                         onClick={() => decide(item.id, 'reject')}
-                        className="flex-1 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default disabled:opacity-50"
+                        className="flex-1 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default disabled:opacity-50"
                       >
                         <XCircle className="w-3.5 h-3.5" /> Reject
                       </button>
@@ -289,7 +289,7 @@ export default function ProposedToolsPage() {
             <button
               disabled={page <= 1}
               onClick={() => load(page - 1)}
-              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               Prev
             </button>
@@ -299,7 +299,7 @@ export default function ProposedToolsPage() {
             <button
               disabled={page >= totalPages}
               onClick={() => load(page + 1)}
-              className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
             >
               Next
             </button>

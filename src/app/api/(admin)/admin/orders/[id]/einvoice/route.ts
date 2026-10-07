@@ -20,7 +20,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         a.full_name, a.address_line1, a.city, a.state, a.postal_code,
         i.invoice_number
       FROM orders o
-      LEFT JOIN addresses a ON o.shipping_address_id = a.id
+      LEFT JOIN addresses a ON a.id = COALESCE(o.shipping_address_id, o.billing_address_id)
       LEFT JOIN invoices i ON i.order_id = o.id
       WHERE o.id = $1
     `,
@@ -53,10 +53,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return {
         slNo: String(idx + 1),
         productDesc: item.product_name,
-        isService: 'N' as const,
+        // Digital lines are supplies of services; hsn_code carries their SAC.
+        isService: (item.is_digital ? 'Y' : 'N') as 'Y' | 'N',
         hsnCode: item.hsn_code || '9999',
         qty: item.quantity,
-        unit: 'NOS',
+        unit: item.is_digital ? 'OTH' : 'NOS',
         unitPrice: parseFloat(item.unit_price),
         totalAmount: parseFloat(item.total_price),
         assAmt: taxable,

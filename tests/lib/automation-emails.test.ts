@@ -28,6 +28,10 @@ vi.mock('@/lib/shared/mail-audit', () => ({
   sendAuditedMail: vi.fn(),
 }))
 
+vi.mock('@/lib/shared/customer-links', () => ({
+  apiBaseUrl: vi.fn(),
+}))
+
 import {
   renderItemRows,
   renderHeroProduct,
@@ -50,6 +54,7 @@ import * as marketing from '@/lib/shared/marketing'
 import * as emailCampaigns from '@/lib/shared/email-campaigns'
 import * as db from '@/lib/shared/db'
 import * as mailAudit from '@/lib/shared/mail-audit'
+import * as customerLinks from '@/lib/shared/customer-links'
 
 const mockGetCampaign = vi.mocked(marketing.getCampaign)
 const mockCanSendMarketing = vi.mocked(marketing.canSendMarketing)
@@ -85,6 +90,7 @@ const mockUser = {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(customerLinks.apiBaseUrl).mockResolvedValue('https://acme.jeffistores.in')
 })
 
 // ---------------------------------------------------------------------------
@@ -304,11 +310,57 @@ describe('resolveCoupon', () => {
     expect(result).toEqual({ couponCode: 'AUTO10', discountPercent: 10 })
   })
 
-  it('returns empty couponCode when generation fails', async () => {
+  it('returns no code and no discount when generation fails, so no "10% off" without a code', async () => {
     mockGenerateCouponForCampaign.mockResolvedValue(null)
     const campaign = { ...mockCampaign, coupon_id: null, discount_percent: 10 }
     const result = await resolveCoupon(campaign as any, 'user-1')
-    expect(result).toEqual({ couponCode: '', discountPercent: 10 })
+    expect(result).toEqual({ couponCode: '', discountPercent: 0 })
+  })
+
+  it('auto-creates a coupon at the kind default when the campaign has no discount of its own', async () => {
+    mockGenerateCouponForCampaign.mockResolvedValue('OFFER-AB12CD')
+    const campaign = {
+      ...mockCampaign,
+      kind: 'birthday',
+      coupon_id: null,
+      discount_percent: 0,
+      body_template: '<p>{couponCode}</p>',
+    }
+    const result = await resolveCoupon(campaign as any, 'user-1')
+    expect(result).toEqual({ couponCode: 'OFFER-AB12CD', discountPercent: 15 })
+    expect(mockGenerateCouponForCampaign).toHaveBeenCalledWith({
+      campaignKind: 'birthday',
+      discountPercent: 15,
+      expiresInDays: 14,
+    })
+  })
+
+  it('does not mint a kind-default coupon when the template shows none', async () => {
+    const campaign = {
+      ...mockCampaign,
+      kind: 'birthday',
+      coupon_id: null,
+      discount_percent: 0,
+      body_template: '<p>Happy birthday</p>',
+    }
+    const result = await resolveCoupon(campaign as any, 'user-1')
+    expect(result).toEqual({ couponCode: '', discountPercent: 0 })
+    expect(mockGenerateCouponForCampaign).not.toHaveBeenCalled()
+  })
+
+  it('does not mint for kinds without a coupon default', async () => {
+    const campaign = { ...mockCampaign, kind: 'abandoned_cart', coupon_id: null, discount_percent: 0 }
+    await resolveCoupon(campaign as any, 'user-1')
+    expect(mockGenerateCouponForCampaign).not.toHaveBeenCalled()
+  })
+
+  it('falls through to a fresh coupon when the assigned one is expired or inactive', async () => {
+    mockGetAssignedCouponCode.mockResolvedValue(null)
+    mockGenerateCouponForCampaign.mockResolvedValue('BACK-NEW123')
+    const campaign = { ...mockCampaign, kind: 'winback_90', coupon_id: 'expired-id', discount_percent: 10 }
+    const result = await resolveCoupon(campaign as any, 'user-1')
+    expect(mockGetAssignedCouponCode).toHaveBeenCalledWith('expired-id')
+    expect(result).toEqual({ couponCode: 'BACK-NEW123', discountPercent: 10 })
   })
 
   it('returns empty couponCode and discount_percent when nothing configured', async () => {
@@ -357,6 +409,25 @@ describe('sendCampaignEmail', () => {
     expect(result).toEqual({ ok: false, reason: 'record_failed' })
   })
 
+  it("keeps unsubscribe and tracking on the store host for a business customer's /business base", async () => {
+    mockCanSendMarketing.mockResolvedValue({ ok: true })
+    mockAlreadySentForReference.mockResolvedValue(false)
+    mockRecordSent.mockResolvedValue('sent-id-2')
+    mockRenderTemplate.mockReturnValue('rendered')
+    mockBuildUnsubscribeUrl.mockReturnValue('https://acme.jeffistores.in/api/unsubscribe?token=t')
+    mockWrapWithTracking.mockReturnValue('<tracked/>')
+    mockBaseLayout.mockReturnValue('<html/>')
+    mockSendAuditedMail.mockResolvedValue({ messageId: 'm' })
+    const business = { ...mockUser, baseUrl: 'https://acme.jeffistores.in/business', is_business: true }
+
+    await sendCampaignEmail({ ...baseParams, user: business })
+
+    expect(mockBuildUnsubscribeUrl).toHaveBeenCalledWith('token-abc', 'abandoned_cart', 'https://acme.jeffistores.in')
+    expect(mockWrapWithTracking.mock.calls[0][3]).toBe('https://acme.jeffistores.in')
+    // Page links (the layout) still use the customer's own base.
+    expect(mockBaseLayout.mock.calls[0][2]).toBe('https://acme.jeffistores.in/business')
+  })
+
   it('sends mail and returns ok:true on success', async () => {
     mockCanSendMarketing.mockResolvedValue({ ok: true })
     mockAlreadySentForReference.mockResolvedValue(false)
@@ -370,6 +441,30 @@ describe('sendCampaignEmail', () => {
     const result = await sendCampaignEmail(baseParams)
     expect(result).toEqual({ ok: true, sentId: 'sent-id-1' })
     expect(mockSendAuditedMail).toHaveBeenCalledOnce()
+  })
+
+  it("fills the layout's store name and web placeholders for the customer's own store", async () => {
+    mockCanSendMarketing.mockResolvedValue({ ok: true })
+    mockAlreadySentForReference.mockResolvedValue(false)
+    mockRecordSent.mockResolvedValue('sent-id-1')
+    mockRenderTemplate.mockReturnValue('rendered')
+    mockBuildUnsubscribeUrl.mockReturnValue('https://example.com/unsub')
+    mockWrapWithTracking.mockReturnValue('<tracked>rendered</tracked>')
+    mockBaseLayout.mockReturnValue('<h1>{store_name}</h1><footer>© {store_name} • {store_web} {keep_me}</footer>')
+    mockSendAuditedMail.mockResolvedValue({ messageId: 'msg-1' })
+
+    const user = { ...mockUser, baseUrl: 'https://shop.example.in' }
+    await sendCampaignEmail({ ...baseParams, user })
+    expect(mockBaseLayout).toHaveBeenCalledWith(
+      expect.any(String),
+      '<tracked>rendered</tracked>',
+      'https://shop.example.in'
+    )
+    const html = mockSendAuditedMail.mock.calls[0][0].html as string
+    expect(html).not.toContain('{store_name}')
+    expect(html).not.toContain('{store_web}')
+    expect(html).toContain('• shop.example.in')
+    expect(html).toContain('{keep_me}') // unrelated tokens are left alone
   })
 
   it('returns ok:false with send_failed when sendAuditedMail throws', async () => {

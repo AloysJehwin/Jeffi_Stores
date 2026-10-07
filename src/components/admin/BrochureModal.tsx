@@ -539,7 +539,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                 onChange={e => setTitle(e.target.value)}
                 maxLength={120}
                 placeholder="e.g. Summer Fastener Catalogue"
-                className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
+                className="w-full px-3 h-control rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
               />
             </div>
             <div className="flex-1">
@@ -552,7 +552,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                 onChange={e => setPromo(e.target.value)}
                 maxLength={140}
                 placeholder="e.g. Monsoon Sale — up to 20% off fasteners"
-                className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
+                className="w-full px-3 h-control rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
               />
             </div>
             <div className="shrink-0">
@@ -577,7 +577,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
+              className="px-4 h-control text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
               Cancel
             </button>
@@ -586,7 +586,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                 onClick={handleGenerate}
                 disabled={!canGenerate}
                 title={selectedProducts.size === 0 ? 'Select at least one product' : ''}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
+                className="flex items-center gap-2 px-4 h-control bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path

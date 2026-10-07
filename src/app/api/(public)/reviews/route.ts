@@ -8,6 +8,7 @@ import { logActivity } from '@/lib/shared/activity'
 import { createAutoTask } from '@/lib/shared/auto-tasks'
 import { createAdminNotification } from '@/lib/shared/admin-notify'
 import { parseBody, zUuid } from '@/lib/shared/validate'
+import { FULFILLED_SQL } from '@/lib/orders/fulfilled-status'
 
 const CreateReviewSchema = z.object({
   productId: zUuid,
@@ -152,7 +153,8 @@ export async function POST(request: NextRequest) {
       `
       SELECT oi.id FROM order_items oi
       JOIN orders o ON oi.order_id = o.id
-      WHERE oi.product_id = $1 AND o.user_id = $2 AND o.status = 'delivered'
+      WHERE oi.product_id = $1 AND o.user_id = $2
+        AND (${FULFILLED_SQL} OR (oi.granted_at IS NOT NULL AND oi.access_revoked_at IS NULL))
       LIMIT 1
     `,
       [productId, user.userId]

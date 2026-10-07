@@ -21,25 +21,26 @@ export async function GET(request: NextRequest) {
     let queryParams: any[]
     let countParams: any[]
 
-    if (isBusiness) {
-      // Include orders placed via the storefront (user_id) AND orders converted from business quotations (matched by email/phone)
-      const bizUser = await queryOne<{ email: string; phone: string | null }>(
-        'SELECT email, phone FROM users WHERE id = $1',
-        [userId]
-      )
-      const email = bizUser?.email || ''
-      const phone = bizUser?.phone || null
+    // The fallback needs email AND phone to match, and a customer never matches business-source orders.
+    const me = await queryOne<{ email: string; phone: string | null }>('SELECT email, phone FROM users WHERE id = $1', [
+      userId,
+    ])
+    const email = me?.email || ''
+    const phone = me?.phone || null
 
-      whereClause = `WHERE (o.user_id = $1 OR (o.source = 'business' AND (o.customer_email = $2 OR ($3::text IS NOT NULL AND o.customer_phone = $3)))) AND o.status != 'draft'`
-      countClause = `SELECT COUNT(*) FROM orders o WHERE (o.user_id = $1 OR (o.source = 'business' AND (o.customer_email = $2 OR ($3::text IS NOT NULL AND o.customer_phone = $3)))) AND o.status != 'draft'`
-      queryParams = [userId, email, phone, limit, offset]
-      countParams = [userId, email, phone]
+    const emailPhoneMatch = `(o.customer_email = $2 AND $3::text IS NOT NULL AND o.customer_phone = $3)`
+
+    if (isBusiness) {
+      const cond = `(o.user_id = $1 OR ${emailPhoneMatch}) AND o.status != 'draft'`
+      whereClause = `WHERE ${cond}`
+      countClause = `SELECT COUNT(*) FROM orders o WHERE ${cond}`
     } else {
-      whereClause = `WHERE o.user_id = $1 AND o.status != 'draft'`
-      countClause = `SELECT COUNT(*) FROM orders WHERE user_id = $1 AND status != 'draft'`
-      queryParams = [userId, limit, offset]
-      countParams = [userId]
+      const cond = `(o.user_id = $1 OR (${emailPhoneMatch} AND (o.source IS DISTINCT FROM 'business'))) AND o.status != 'draft'`
+      whereClause = `WHERE ${cond}`
+      countClause = `SELECT COUNT(*) FROM orders o WHERE ${cond}`
     }
+    queryParams = [userId, email, phone, limit, offset]
+    countParams = [userId, email, phone]
 
     const limitIdx = queryParams.length - 1
     const offsetIdx = queryParams.length

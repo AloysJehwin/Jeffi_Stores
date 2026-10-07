@@ -41,6 +41,16 @@ export interface FeatureFlags {
   ondeviceSummaryDesktopEnabled: boolean
   ondeviceFinetuneMobileEnabled: boolean
   ondeviceFinetuneDesktopEnabled: boolean
+  // Birthday feature: the "add your birthday" prompt, the /birthday link page and the Birthday /
+  // Birthday Collection campaigns. On by default so existing stores keep their behaviour.
+  birthdayEnabled: boolean
+  // Digital products + the authenticated vault. On by default (ships on every plan incl. Basic).
+  digitalProductsEnabled: boolean
+  // Store-wide master switch for vault file downloads. Effective download = this && the product's
+  // own `downloadable` flag. Off by default: stream/read only until the store opts in.
+  vaultDownloadsEnabled: boolean
+  // Customer subscriptions (Razorpay recurring). On by default; available on every plan.
+  subscriptionsEnabled: boolean
 }
 
 export interface BusinessValues {
@@ -60,6 +70,8 @@ export interface BusinessValues {
   sellerName: string
   sellerAddress: string
   sellerPhone: string
+  // Site Controls > Delivery estimate, JSON parsed by parseEddSettings ('' = defaults).
+  eddSettingsJson: string
 }
 
 export interface StorefrontContent {
@@ -128,6 +140,10 @@ const DEFAULTS: SiteControls = {
     inventoryValidationEnabled: true,
     smsEnabled: process.env.SMS_DISABLED !== 'true',
     whatsappEnabled: process.env.WHATSAPP_DISABLED !== 'true',
+    birthdayEnabled: true,
+    digitalProductsEnabled: true,
+    vaultDownloadsEnabled: false,
+    subscriptionsEnabled: true,
     ondeviceSummaryEnabled:
       envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) ||
       process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
@@ -168,6 +184,7 @@ const DEFAULTS: SiteControls = {
     sellerAddress:
       process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur',
     sellerPhone: process.env.DELHIVERY_SELLER_PHONE || '07713585374',
+    eddSettingsJson: '',
   },
   storefront: {
     featuredLimit: 8,
@@ -217,6 +234,10 @@ const KEYS = [
   'feature_inventory_validation_enabled',
   'feature_sms_enabled',
   'feature_whatsapp_enabled',
+  'feature_birthday_enabled',
+  'feature_digital_products_enabled',
+  'feature_vault_downloads_enabled',
+  'feature_subscriptions_enabled',
   'feature_ondevice_summary_enabled',
   'feature_ondevice_finetune_enabled',
   'feature_ondevice_summary_mobile_enabled',
@@ -237,6 +258,7 @@ const KEYS = [
   'delhivery_seller_name',
   'delhivery_seller_address',
   'delhivery_seller_phone',
+  'edd_settings',
   'storefront_featured_limit',
   'storefront_new_arrivals_limit',
   'storefront_stats_json',
@@ -391,6 +413,10 @@ export async function getSiteControls(): Promise<SiteControls> {
         inventoryValidationEnabled: bool('feature_inventory_validation_enabled', d.flags.inventoryValidationEnabled),
         smsEnabled: bool('feature_sms_enabled', d.flags.smsEnabled),
         whatsappEnabled: bool('feature_whatsapp_enabled', d.flags.whatsappEnabled),
+        birthdayEnabled: bool('feature_birthday_enabled', d.flags.birthdayEnabled),
+        digitalProductsEnabled: bool('feature_digital_products_enabled', d.flags.digitalProductsEnabled),
+        vaultDownloadsEnabled: bool('feature_vault_downloads_enabled', d.flags.vaultDownloadsEnabled),
+        subscriptionsEnabled: bool('feature_subscriptions_enabled', d.flags.subscriptionsEnabled),
         ondeviceSummaryEnabled: bool('feature_ondevice_summary_enabled', d.flags.ondeviceSummaryEnabled),
         ondeviceFinetuneEnabled: bool('feature_ondevice_finetune_enabled', d.flags.ondeviceFinetuneEnabled),
         ondeviceSummaryMobileEnabled: bool(
@@ -425,6 +451,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         sellerName: str('delhivery_seller_name', d.values.sellerName),
         sellerAddress: str('delhivery_seller_address', d.values.sellerAddress),
         sellerPhone: str('delhivery_seller_phone', d.values.sellerPhone),
+        eddSettingsJson: str('edd_settings', d.values.eddSettingsJson),
       },
       storefront: {
         featuredLimit: Math.max(1, Math.round(num('storefront_featured_limit', d.storefront.featuredLimit))),

@@ -60,7 +60,8 @@ CREATE TABLE public.categories (
     replacement_window_days integer DEFAULT 7,
     hero_image_mobile text,
     hero_image_desktop text,
-    is_draft boolean DEFAULT false NOT NULL
+    is_draft boolean DEFAULT false NOT NULL,
+    reorder_interval_days integer
 );
 
 
@@ -128,6 +129,36 @@ CREATE TABLE public.product_images (
 
 
 --
+-- Name: product_files; Type: TABLE; Schema: public; Owner: -
+--
+-- Private digital files for a product, delivered through the authenticated vault host.
+-- Never joined by public/storefront product queries (unlike products.download_url, which leaked).
+-- storage_key is composed server-side as t/{tenantId}/products/{productId}/{fileId}; the bucket is
+-- private (Block Public Access) and files are served only via short-lived presigned GETs.
+
+CREATE TABLE public.product_files (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    product_id uuid NOT NULL,
+    kind character varying(10) DEFAULT 'other'::character varying NOT NULL,
+    status character varying(12) DEFAULT 'uploading'::character varying NOT NULL,
+    downloadable boolean DEFAULT false NOT NULL,
+    storage_driver character varying(8) DEFAULT 's3'::character varying NOT NULL,
+    storage_key character varying(512) NOT NULL,
+    display_name character varying(255) NOT NULL,
+    original_name character varying(255),
+    mime_type character varying(120) NOT NULL,
+    size_bytes bigint DEFAULT 0 NOT NULL,
+    checksum_sha256 character varying(64),
+    duration_seconds integer,
+    page_count integer,
+    display_order integer DEFAULT 0 NOT NULL,
+    uploaded_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: product_sub_variants; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -154,6 +185,8 @@ CREATE TABLE public.product_sub_variants (
     breadth_cm numeric(6,2),
     height_cm numeric(6,2),
     package_type character varying(30),
+    subscription_price numeric(12,2),
+    subscription_prices jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT product_sub_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 
@@ -243,6 +276,8 @@ CREATE TABLE public.product_variants (
     sell_unit_id uuid,
     supplier_id uuid,
     stock_status character varying(20) DEFAULT 'In Stock'::character varying NOT NULL,
+    subscription_price numeric(12,2),
+    subscription_prices jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT product_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 
@@ -351,6 +386,17 @@ CREATE TABLE public.products (
     is_subscription boolean DEFAULT false NOT NULL,
     subscription_interval character varying(20),
     subscription_price numeric(12,2),
+    subscription_price_ex_gst numeric(12,2),
+    subscription_prices jsonb DEFAULT '{}'::jsonb NOT NULL,
+    subscription_intervals text[] DEFAULT '{}'::text[] NOT NULL,
+    subscription_total_cycles integer,
+    subscription_min_cycles integer,
+    subscription_discount_type character varying(10),
+    subscription_discount_value numeric(12,2),
+    -- Digital delivery (vault). download_url is retained for back-compat but no longer written/exposed;
+    -- real digital files live in the private product_files table below.
+    downloadable boolean DEFAULT false NOT NULL,
+    age_rating character varying(16),
     -- Bundling
     is_bundle boolean DEFAULT false NOT NULL,
     bundle_items jsonb,

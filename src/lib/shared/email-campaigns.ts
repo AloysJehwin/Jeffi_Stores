@@ -1,8 +1,8 @@
 import nodemailer from 'nodemailer'
 import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
-import { buildVarMap, substituteVars } from '@/lib/shared/template-vars'
-import { getStoreIdentity } from '@/lib/catalog/site-controls'
+import { createTemplateVariableResolver, renderTemplate } from '@/lib/templates/variables'
+import { platformBrandName } from '@/lib/catalog/brand'
 import { mailShell } from '@/lib/shared/mail-template'
 
 const transporter = nodemailer.createTransport({
@@ -40,23 +40,52 @@ export function renderCampaignEmail(
   templateKey: string,
   data: TemplateData,
   recipientName?: string,
-  baseUrl?: string
+  baseUrl?: string,
+  storeName?: string,
+  vars?: Record<string, string>
+): { subject: string; html: string; ampHtml?: string } {
+  const out = renderCampaignEmailRaw(templateKey, data, recipientName, baseUrl, storeName)
+  if (!vars) return out
+  return {
+    subject: renderTemplate(out.subject, vars),
+    html: renderTemplate(out.html, vars, { escape: true }),
+    ...(out.ampHtml ? { ampHtml: renderTemplate(out.ampHtml, vars, { escape: true }) } : {}),
+  }
+}
+
+// Leaves {store_name} / {store_web} and any composer tokens for the caller's variables.
+function renderCampaignEmailRaw(
+  templateKey: string,
+  data: TemplateData,
+  recipientName?: string,
+  baseUrl?: string,
+  storeName?: string
 ): { subject: string; html: string; ampHtml?: string } {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
   const url = baseUrl || BASE_URL
+  const brand = storeName?.trim() || platformBrandName()
 
   switch (templateKey) {
     case 'review_request': {
       const subject = data.subject || 'How was your order? Share your thoughts ⭐'
-      const items: Array<{ name: string; imageUrl: string | null; starLinks: string[]; productUrl?: string }> =
-        JSON.parse(data.itemsJson || '[]')
+      const items: Array<{
+        name: string
+        imageUrl: string | null
+        starLinks: string[]
+        reviewUrl?: string
+        productUrl?: string
+      }> = JSON.parse(data.itemsJson || '[]')
       const appUrl = url
       const ampBaseUrl = url
+      // The AMP form posts to the sending store's API, so a tenant's reviews reach its own database.
+      const apiBase = data.apiBaseUrl || url
 
-      // Fallback HTML: one link per product to its detail page (non-Gmail clients)
+      // Fallback HTML (non-Gmail clients): each product opens its own review page.
       const fallbackLinks = items
         .map(item => {
-          const url = item.productUrl || item.starLinks[4] || `${appUrl}/products`
+          // Older item data has no reviewUrl: use its review link without a preselected rating.
+          const legacyReview = item.starLinks?.find(Boolean)?.replace(/&rating=\d+$/, '')
+          const url = item.reviewUrl || legacyReview || item.productUrl || `${appUrl}/products`
           const img = item.imageUrl
             ? `<img src="${item.imageUrl}" width="48" height="48" style="object-fit:cover;border-radius:6px;display:inline-block;vertical-align:middle;margin-right:10px;" alt="">`
             : ''
@@ -80,7 +109,7 @@ export function renderCampaignEmail(
         `
         <p style="font-size:16px;color:#333;margin:0 0 12px;">Hi ${data.firstName || 'there'},</p>
         <h2 style="font-size:22px;color:#1a3a4a;margin:0 0 8px;">How did we do?</h2>
-        <p style="color:#555;line-height:1.6;margin:0 0 20px;">We hope you love your recent purchase! Tap a product below to leave a quick review.</p>
+        <p style="color:#555;line-height:1.6;margin:0 0 20px;">We hope you love your recent purchase! Tap a product below to review it.</p>
         <table cellpadding="0" cellspacing="0" width="100%">${fallbackLinks}</table>
         ${couponBlock}
       `,
@@ -101,7 +130,7 @@ export function renderCampaignEmail(
             <td style="vertical-align:top;">
               <p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1a3a4a;">${item.name}</p>
               <form method="POST"
-                action-xhr="https://jeffistores.in/api/reviews/amp"
+                action-xhr="${apiBase}/api/reviews/amp"
                 id="review-form-${idx}">
                 <input type="hidden" name="token" value="${token}">
                 <div style="margin-bottom:10px;">
@@ -124,7 +153,7 @@ export function renderCampaignEmail(
                   <template type="amp-mustache"><p style="color:#22863a;font-size:14px;font-weight:600;margin:8px 0;">Thanks for your review!</p></template>
                 </div>
                 <div submit-error>
-                  <template type="amp-mustache">Something went wrong. <a href="${item.productUrl || ampBaseUrl + '/products'}">Open in browser</a></template>
+                  <template type="amp-mustache">Something went wrong. <a href="${item.reviewUrl || item.productUrl || ampBaseUrl + '/products'}">Open in browser</a></template>
                 </div>
               </form>
             </td>
@@ -228,7 +257,7 @@ export function renderCampaignEmail(
     }
 
     case 'announcement': {
-      const subject = data.subject || data.headline || "An update from Jeffi Store's"
+      const subject = data.subject || data.headline || `An update from ${brand}`
       const html = baseLayout(
         subject,
         `
@@ -243,7 +272,7 @@ export function renderCampaignEmail(
     }
 
     case 'custom': {
-      const subject = data.subject || "Message from Jeffi Store's"
+      const subject = data.subject || `Message from ${brand}`
       const body = data.htmlBody || ''
       const isFullDoc = /<html[\s>]/i.test(body) || /<!DOCTYPE/i.test(body)
       const html = isFullDoc
@@ -261,11 +290,12 @@ interface Recipient {
   user_id: string
   email: string
   first_name: string | null
+  last_name?: string | null
 }
 
 async function resolveAudience(audienceType: string, audienceFilter: Record<string, unknown>): Promise<Recipient[]> {
-  const base = `SELECT u.id AS user_id, u.email, u.first_name FROM users u`
-  const base_cp = `SELECT u.id AS user_id, u.email, u.first_name FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
+  const base = `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u`
+  const base_cp = `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
   const where = `WHERE u.is_active = true AND u.is_guest = false AND u.email IS NOT NULL`
 
   if (audienceType === 'customer_type') {
@@ -283,7 +313,7 @@ async function resolveAudience(audienceType: string, audienceFilter: Record<stri
   if (audienceType === 'specific_user') {
     const userId = audienceFilter.userId as string
     return queryMany<Recipient>(
-      `SELECT u.id AS user_id, u.email, u.first_name FROM users u WHERE u.id = $1 AND u.email IS NOT NULL`,
+      `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u WHERE u.id = $1 AND u.email IS NOT NULL`,
       [userId]
     )
   }
@@ -303,7 +333,7 @@ async function resolveAudience(audienceType: string, audienceFilter: Record<stri
     }
     const cond = segConditions[seg]
     if (cond) {
-      const from = `SELECT u.id AS user_id, u.email, u.first_name FROM users u LEFT JOIN (SELECT user_id, COUNT(*) AS order_count, SUM(total_amount) AS lifetime_value, MAX(created_at) AS last_order_at, COUNT(*) FILTER (WHERE payment_status='paid') AS paid_orders FROM orders GROUP BY user_id) o ON o.user_id=u.id LEFT JOIN customer_profiles cp ON cp.user_id=u.id`
+      const from = `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u LEFT JOIN (SELECT user_id, COUNT(*) AS order_count, SUM(total_amount) AS lifetime_value, MAX(created_at) AS last_order_at, COUNT(*) FILTER (WHERE payment_status='paid') AS paid_orders FROM orders GROUP BY user_id) o ON o.user_id=u.id LEFT JOIN customer_profiles cp ON cp.user_id=u.id`
       return queryMany<Recipient>(`${from} ${where} AND ${cond}`)
     }
   }
@@ -335,8 +365,8 @@ export async function sendCampaign(
 
   const recipients = await resolveAudience(campaign.audience_type, campaign.audience_filter)
 
-  // Store identity drives {store_*} vars. From sender and base URL are tenant-aware.
-  const store = await getStoreIdentity()
+  // Store identity + custom variables load once; From sender and base URL are tenant-aware.
+  const resolveVars = await createTemplateVariableResolver()
   const { campaignMailFromAsync, storeBaseUrlAsync } = await import('@/lib/catalog/brand')
   const fromAddr = await campaignMailFromAsync()
   const baseUrl = await storeBaseUrlAsync()
@@ -382,18 +412,17 @@ export async function sendCampaign(
             }
           }
 
-          const { subject, html } = renderCampaignEmail(
+          const vars = resolveVars({
+            recipient: { email: recipient.email, first_name: recipient.first_name, last_name: recipient.last_name },
+          })
+          const { subject: finalSubject, html: finalHtml } = renderCampaignEmail(
             campaign.template_key,
             templateData,
             recipient.first_name || undefined,
-            baseUrl
+            baseUrl,
+            vars.store_name,
+            vars
           )
-          const vars = buildVarMap({
-            recipient: { email: recipient.email, first_name: recipient.first_name },
-            store: { name: store.name, email: store.email, phone: store.phone, web: store.web },
-          })
-          const finalSubject = substituteVars(subject, vars)
-          const finalHtml = substituteVars(html, vars)
           await sendAuditedMail({
             from: fromAddr,
             to: recipient.email,

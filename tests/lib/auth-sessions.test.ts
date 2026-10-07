@@ -570,14 +570,23 @@ describe('revokeAllForPrincipal', () => {
   })
 
   it('issues bulk revoke and returns affected rowCount', async () => {
-    mockQuery.mockResolvedValue({ rowCount: 3 })
-    expect(await revokeAllForPrincipal('customer', 'u1')).toBe(3)
+    mockQuery.mockResolvedValueOnce({ rowCount: 3 }).mockResolvedValueOnce({ rowCount: 2 })
+    expect(await revokeAllForPrincipal('customer', 'u1')).toBe(5)
     expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('principal_type = $1'), ['customer', 'u1'])
   })
 
-  it('returns 0 when nothing revoked', async () => {
+  it("also revokes the buyer's vault sessions (store sign-out closes the vault)", async () => {
+    mockQuery.mockResolvedValueOnce({ rowCount: 1 }).mockResolvedValueOnce({ rowCount: 1 })
+    await revokeAllForPrincipal('business', 'b1')
+    const vault = mockQuery.mock.calls.find(c => String(c[0]).includes("principal_type = 'vault'"))
+    expect(vault?.[0]).toContain('role = $1')
+    expect(vault?.[1]).toEqual(['business', 'b1'])
+  })
+
+  it('returns 0 when nothing revoked, and never touches vault sessions for admins', async () => {
     mockQuery.mockResolvedValue({ rowCount: 0 })
     expect(await revokeAllForPrincipal('admin', 'a1')).toBe(0)
+    expect(mockQuery).toHaveBeenCalledTimes(1)
   })
 
   it('returns 0 when rowCount is null', async () => {

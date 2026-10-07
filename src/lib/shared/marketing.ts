@@ -1,5 +1,6 @@
 import { query, queryOne } from '@/lib/shared/db'
 import { currentBrandName } from '@/lib/catalog/brand'
+import { FREQUENCY_CAP_HOURS } from '@/lib/campaigns/duration'
 
 export type CampaignKind =
   | 'abandoned_cart'
@@ -10,6 +11,23 @@ export type CampaignKind =
   | 'winback_180'
   | 'restock'
   | 'price_drop'
+  | 'viewed_product'
+  | 'viewed_category'
+  | 'high_value_cart'
+  | 'cart_price_drop'
+  | 'wishlist_reminder'
+  | 'review_photo_followup'
+  | 'back_in_stock_wishlist'
+  | 'first_purchase_nudge'
+  | 'second_purchase_nudge'
+  | 'signup_anniversary'
+  | 'replenishment'
+  | 'subscription_renewal'
+  | 'loyalty_tier_upgrade'
+  | 'loyalty_points_reminder'
+  | 'referral_invite'
+  | 'birthday'
+  | 'birthday_collect'
   | string
 
 export interface Campaign {
@@ -24,8 +42,6 @@ export interface Campaign {
   body_template: string
   last_run_at: string | null
 }
-
-const FREQUENCY_CAP_HOURS = 72
 
 function resolveAppUrl(): string {
   const isLocalhost = (v: string | undefined) =>
@@ -87,9 +103,19 @@ export async function canSendMarketing(
 export async function alreadySentForReference(
   campaignKind: CampaignKind,
   userId: string,
-  referenceId: string | null
+  referenceId: string | null,
+  // Cooldown window (days) for a NON-null reference: the same reference re-qualifies after this many
+  // days, so a recurring campaign (e.g. abandoned_cart sendCooldownDays:1) resends on the next cycle
+  // instead of being blocked forever. Omit/undefined keeps the legacy "ever sent → blocked" behavior
+  // for one-shot references. A null reference always uses the global FREQUENCY_CAP_HOURS. (#campaign)
+  cooldownDays?: number | null
 ): Promise<boolean> {
-  const timeFilter = referenceId === null ? `AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'` : ''
+  const timeFilter =
+    referenceId === null
+      ? `AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'`
+      : typeof cooldownDays === 'number' && cooldownDays > 0
+        ? `AND sent_at > NOW() - (${Number(cooldownDays)}::text || ' days')::interval`
+        : ''
   const row = await queryOne<{ id: string }>(
     `SELECT id FROM email_campaigns_sent
      WHERE campaign_kind = $1 AND user_id = $2
@@ -195,7 +221,8 @@ export async function generateCouponForCampaign(params: {
       await query(`UPDATE campaigns SET coupon_id = $1 WHERE kind = $2`, [couponId, params.campaignKind])
     }
     return code
-  } catch {
+  } catch (err) {
+    console.error('[marketing] coupon generation failed', params.campaignKind, err)
     return null
   }
 }
@@ -205,7 +232,7 @@ export async function getAssignedCouponCode(
 ): Promise<{ code: string; discountValue: number; discountType: string } | null> {
   return queryOne<{ code: string; discountValue: number; discountType: string }>(
     `SELECT code, discount_value::float AS "discountValue", discount_type AS "discountType"
-     FROM coupons WHERE id = $1 AND is_active = TRUE`,
+     FROM coupons WHERE id = $1 AND is_active = TRUE AND (valid_until IS NULL OR valid_until > NOW())`,
     [couponId]
   )
 }

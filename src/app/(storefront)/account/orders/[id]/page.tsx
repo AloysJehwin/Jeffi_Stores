@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useToast } from '@/contexts/ToastContext'
-import { navItems } from '@/components/visitor/AccountSidebar'
+import { useAccountNavItems } from '@/components/visitor/AccountSidebar'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
@@ -34,6 +34,10 @@ interface OrderItem {
   returnWindowDays: number
   replacementAllowed: boolean
   replacementWindowDays: number
+  isDigital?: boolean
+  accessGranted?: boolean
+  accessRevoked?: boolean
+  vaultUrl?: string | null
   products: {
     slug: string
     extra_delivery_days?: number | null
@@ -69,9 +73,13 @@ interface OrderDetails {
   trackingUrl: string | null
   awbNumber: string | null
   estimatedDeliveryDate: string | null
+  courierEdd?: string | null
   originalOrderId: string | null
   originalOrderNumber: string | null
   orderType: string
+  isAllDigital?: boolean
+  hasDigital?: boolean
+  vaultUrl?: string | null
   canChangeAddress?: boolean
   addressChange?: AddressChangeInfo | null
   shippingAddress: {
@@ -145,6 +153,8 @@ function getEddDisplay(order: OrderDetails, edd: string): { label: string; sub: 
   if (diffDays === 1) return { label: 'Arriving Tomorrow', sub: edd, color: 'text-accent-500' }
   if (diffDays < 0)
     return { label: 'Expected by ' + edd, sub: 'Delivery delayed', color: 'text-orange-500 dark:text-orange-400' }
+  if (order.courierEdd && order.courierEdd === String(order.estimatedDeliveryDate).slice(0, 10))
+    return { label: 'Expected by ' + edd, sub: 'Courier estimate', color: 'text-foreground' }
   return { label: 'Estimated Delivery', sub: edd, color: 'text-foreground' }
 }
 
@@ -161,6 +171,7 @@ function getStatusColor(status: string) {
     case 'out_for_delivery':
       return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
     case 'delivered':
+    case 'granted':
       return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
     case 'cancel_requested':
       return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
@@ -207,6 +218,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const avatarUrl = user?.avatarUrl ?? null
   const router = useRouter()
   const pathname = usePathname()
+  const navItems = useAccountNavItems()
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -892,6 +904,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         ? 'Cancellation Rejected'
                         : order.status === 'out_for_delivery'
                           ? 'Out for Delivery'
+                          : order.status === 'granted'
+                            ? 'Access granted'
                           : order.status === 'return_requested'
                             ? 'Return Requested'
                             : order.status === 'return_approved'
@@ -909,14 +923,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   >
                     Payment: {order.paymentStatus}
                   </span>
-                  {(CANCELLABLE_STATUSES.includes(order.status) ||
+                  {((CANCELLABLE_STATUSES.includes(order.status) && !order.hasDigital) ||
                     (canReturn && !showReturnForm) ||
                     returnWindowExpired ||
                     monthlyLimitReached ||
                     (order.invoiceNumber && !order.originalOrderId)) && (
                     <span className="hidden sm:inline-block w-px h-5 bg-border-default mx-1" aria-hidden />
                   )}
-                  {CANCELLABLE_STATUSES.includes(order.status) && (
+                  {(CANCELLABLE_STATUSES.includes(order.status) && !order.hasDigital) && (
                     <button
                       type="button"
                       onClick={() => setShowCancelConfirm(true)}
@@ -979,6 +993,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       </svg>
                       Monthly return limit reached
                     </span>
+                  )}
+                  {order.hasDigital && order.vaultUrl && (
+                    <a
+                      href={order.vaultUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 hover:bg-green-700 text-white shadow-sm transition-colors"
+                    >
+                      Open my vault
+                    </a>
                   )}
                   {order.invoiceNumber &&
                     !order.originalOrderId &&
@@ -1484,6 +1508,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* Estimated Delivery */}
             {!['cancelled', 'returned'].includes(order.status) &&
+              !order.isAllDigital &&
               (() => {
                 const edd = resolveOrderEdd(order)
                 if (!edd) return null
@@ -1512,7 +1537,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               })()}
 
             {/* Tracking */}
-            {order.awbNumber && (
+            {order.awbNumber && !order.isAllDigital && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
                 <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center gap-2">
                   <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1616,6 +1641,32 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           flammable={item.products?.flammable}
                           size="xs"
                         />
+                        {item.isDigital && (
+                          <p className="text-xs mt-1">
+                            {item.accessGranted ? (
+                              <span className="text-green-700 dark:text-green-400 font-medium">
+                                Access granted
+                                {item.vaultUrl && (
+                                  <>
+                                    {' · '}
+                                    <a
+                                      href={item.vaultUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="underline hover:text-green-800 dark:hover:text-green-300"
+                                    >
+                                      Open in vault
+                                    </a>
+                                  </>
+                                )}
+                              </span>
+                            ) : item.accessRevoked ? (
+                              <span className="text-red-600 dark:text-red-400 font-medium">Access revoked</span>
+                            ) : (
+                              <span className="text-foreground-muted">Digital item · access on payment</span>
+                            )}
+                          </p>
+                        )}
                         {(() => {
                           const isFractional =
                             (item.buyMode && item.buyMode !== 'unit') || (item.buyUnit && item.buyUnit !== 'unit')
@@ -1714,7 +1765,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </div>
 
             {/* Rate Your Order */}
-            {order.status === 'delivered' && (
+            {(order.status === 'delivered' || order.status === 'granted') && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
                 <div className="flex items-center justify-between gap-4">
                   <div>
@@ -1801,7 +1852,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             {/* Shipping Address */}
             {order.shippingAddress && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-                <h3 className="text-lg font-bold text-foreground mb-4">Shipping Address</h3>
+                <h3 className="text-lg font-bold text-foreground mb-4">
+                  {order.isAllDigital ? 'Billing Address' : 'Shipping Address'}
+                </h3>
                 <div className="text-foreground-secondary">
                   <p className="font-semibold">{order.shippingAddress.full_name}</p>
                   <p className="mt-2">{order.shippingAddress.address_line1}</p>
@@ -1816,7 +1869,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <OrderAddressChange
                   orderId={order.id}
-                  canChange={!!order.canChangeAddress}
+                  canChange={!!order.canChangeAddress && !order.isAllDigital}
                   request={order.addressChange ?? null}
                   currentAddress={order.shippingAddress}
                   onChanged={fetchOrder}

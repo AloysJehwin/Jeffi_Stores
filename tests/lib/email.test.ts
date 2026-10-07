@@ -11,6 +11,17 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
+// Customer links resolve the order's own page (business-aware); stubbed to a fixed host here.
+vi.mock('@/lib/shared/customer-links', () => ({
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+  orderUrlByNumber: vi.fn(async (n: string) => `https://acme.jeffistores.in/account/orders/by-number-${n}`),
+  customerBaseUrlForOrder: vi.fn(async () => 'https://acme.jeffistores.in'),
+}))
+
+vi.mock('@/lib/vault/links', () => ({
+  vaultLibraryUrl: vi.fn(async () => 'https://vault.acme.example/library'),
+}))
+
 vi.mock('nodemailer', () => ({
   default: {
     createTransport: vi.fn(() => ({ sendMail: vi.fn() })),
@@ -144,6 +155,13 @@ describe('email.ts', () => {
       const opts = mockSendAuditedMail.mock.calls[0][0]
       expect(opts.to).toBe('cust@example.com')
       expect(opts.subject).toContain('ORD-001')
+    })
+
+    it("links the customer's order page", async () => {
+      await sendOrderConfirmationEmail('cust@example.com', mockOrder, mockOrderItems)
+      expect(mockSendAuditedMail.mock.calls[0][0].html).toContain(
+        `href="https://acme.jeffistores.in/account/orders/${mockOrder.id}"`
+      )
     })
 
     it('includes order items in html', async () => {
@@ -358,6 +376,32 @@ describe('email.ts', () => {
       expect(html).toContain('Thank You')
     })
 
+    it('granted status links the vault with "Access granted" copy', async () => {
+      await sendOrderStatusUpdate('cust@example.com', 'Alice', 'ORD-001', 'id-1', 'granted')
+      const { html, subject } = mockSendAuditedMail.mock.calls[0][0]
+      expect(subject).toContain('Access granted')
+      expect(html).toContain('open your vault')
+      expect(html).toContain('https://vault.acme.example/library')
+    })
+
+    it('order confirmation does not promise dispatch for an all-digital order', async () => {
+      await sendOrderConfirmationEmail(
+        'cust@example.com',
+        {
+          id: 'o1',
+          order_number: 'ORD-9',
+          customer_name: 'A',
+          created_at: new Date(),
+          total_amount: 100,
+          status: 'granted',
+        },
+        [{ product_name: 'Ebook', quantity: 1, total_price: 100, is_digital: true }]
+      )
+      const { html } = mockSendAuditedMail.mock.calls[0][0]
+      expect(html).not.toMatch(/dispatch/i)
+      expect(html).toContain('Open my vault')
+    })
+
     it('sends status update for cancelled status', async () => {
       await sendOrderStatusUpdate('cust@example.com', 'Alice', 'ORD-001', 'id-1', 'cancelled')
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
@@ -485,120 +529,52 @@ describe('email.ts', () => {
     })
   })
 
-  describe('sendAdminCertificateEmail', () => {
-    it('sends certificate email with attachment', async () => {
-      await sendAdminCertificateEmail(
+  // #487 portal-only: sendAdminCertificateEmail ALWAYS sends the no-attachment portal invite,
+  // regardless of its (now-ignored) p12/password/serial args. The email/both transition modes and
+  // the CERT_PORTAL_DELIVERY switch were removed — there is no way to email the .p12.
+  describe('sendAdminCertificateEmail (portal invite only)', () => {
+    const call = () =>
+      sendAdminCertificateEmail(
         'admin@example.com',
         'admin_user',
-        Buffer.from('p12data'),
-        'pass123',
-        'SN001',
-        '2027-01-01',
-        'admin'
-      )
-      expect(mockSendAuditedMail).toHaveBeenCalledOnce()
-      const opts = mockSendAuditedMail.mock.calls[0][0]
-      expect(opts.attachments?.length).toBeGreaterThan(0)
-    })
-
-    it('includes serial number in html', async () => {
-      await sendAdminCertificateEmail(
-        'admin@example.com',
-        'admin_user',
-        Buffer.from('p12data'),
-        'pass123',
+        Buffer.from('p12'),
+        'Plain-Text-Pass-9Q',
         'SN-UNIQUE-001',
         '2027-01-01',
         'admin'
       )
-      expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('SN-UNIQUE-001')
+
+    it('sends the invite with NO attachment and never the secret', async () => {
+      await call()
+      expect(mockSendAuditedMail).toHaveBeenCalledOnce()
+      const opts = mockSendAuditedMail.mock.calls[0][0]
+      expect(opts.templateName).toBe('admin_cert_invite')
+      expect(opts.attachments ?? []).toEqual([])
+      expect(opts.html).toContain('https://certificate.jeffistores.in')
+      // The p12 password and serial are never placed in the mail.
+      expect(opts.html).not.toContain('Plain-Text-Pass-9Q')
+      expect(opts.html).not.toContain('SN-UNIQUE-001')
+    })
+
+    it('ignores CERT_PORTAL_DELIVERY (no legacy email/both path remains)', async () => {
+      process.env.CERT_PORTAL_DELIVERY = 'email'
+      try {
+        await call()
+        const opts = mockSendAuditedMail.mock.calls[0][0]
+        expect(opts.attachments ?? []).toEqual([])
+        expect(opts.html).toContain('https://certificate.jeffistores.in')
+      } finally {
+        delete process.env.CERT_PORTAL_DELIVERY
+      }
     })
 
     it('returns success result', async () => {
-      const result = await sendAdminCertificateEmail(
-        'admin@example.com',
-        'admin_user',
-        Buffer.from('p12'),
-        'pw',
-        'SN1',
-        '2027-01-01',
-        'admin'
-      )
-      expect(result).toEqual({ success: true, messageId: 'msg-ok' })
+      expect(await call()).toEqual({ success: true, messageId: 'msg-ok' })
     })
 
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
-      const result = await sendAdminCertificateEmail(
-        'admin@example.com',
-        'admin_user',
-        Buffer.from('p12'),
-        'pw',
-        'SN1',
-        '2027-01-01',
-        'admin'
-      )
-      expect(result).toEqual({ success: false, error: expect.any(Error) })
-    })
-
-    it('default (both) mode: the attachment mail also carries the certificate portal link', async () => {
-      delete process.env.CERT_PORTAL_DELIVERY
-      await sendAdminCertificateEmail(
-        'admin@example.com',
-        'admin_user',
-        Buffer.from('p12'),
-        'pw',
-        'SN1',
-        '2027-01-01',
-        'admin'
-      )
-      const opts = mockSendAuditedMail.mock.calls[0][0]
-      expect(opts.attachments?.length).toBeGreaterThan(0)
-      expect(opts.html).toContain('https://certificate.jeffistores.in')
-      expect(opts.html).toContain('admin@example.com')
-    })
-
-    it('email mode: attachment only, no portal link', async () => {
-      process.env.CERT_PORTAL_DELIVERY = 'email'
-      try {
-        await sendAdminCertificateEmail(
-          'admin@example.com',
-          'admin_user',
-          Buffer.from('p12'),
-          'pw',
-          'SN1',
-          '2027-01-01',
-          'admin'
-        )
-        const opts = mockSendAuditedMail.mock.calls[0][0]
-        expect(opts.attachments?.length).toBeGreaterThan(0)
-        expect(opts.html).not.toContain('certificate.jeffistores.in')
-      } finally {
-        delete process.env.CERT_PORTAL_DELIVERY
-      }
-    })
-
-    it('portal mode: sends the invite instead, with no attachment', async () => {
-      process.env.CERT_PORTAL_DELIVERY = 'portal'
-      try {
-        await sendAdminCertificateEmail(
-          'admin@example.com',
-          'admin_user',
-          Buffer.from('p12'),
-          'Plain-Text-Pass-9Q',
-          'SN1',
-          '2027-01-01',
-          'admin'
-        )
-        expect(mockSendAuditedMail).toHaveBeenCalledOnce()
-        const opts = mockSendAuditedMail.mock.calls[0][0]
-        expect(opts.templateName).toBe('admin_cert_invite')
-        expect(opts.attachments).toEqual([])
-        expect(opts.html).toContain('https://certificate.jeffistores.in')
-        expect(opts.html).not.toContain('Plain-Text-Pass-9Q')
-      } finally {
-        delete process.env.CERT_PORTAL_DELIVERY
-      }
+      expect(await call()).toEqual({ success: false, error: expect.any(Error) })
     })
   })
 
@@ -928,12 +904,20 @@ describe('email.ts', () => {
       expect(opts.to).toContain('a@b.com')
     })
 
-    it('uses extra.appUrl when provided', async () => {
-      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'approved', {
-        appUrl: 'https://custom.example.com',
+    it("links the order's own page", async () => {
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'approved')
+      const { html } = mockSendAuditedMail.mock.calls[0][0]
+      expect(html).toContain('href="https://acme.jeffistores.in/account/orders/id-10"')
+    })
+
+    it('links the new replacement order, and the original as a secondary link', async () => {
+      await sendReturnStatusEmail('cust@example.com', 'Alice', 'ORD-010', 'id-10', 'replacement_created', {
+        replacementOrderNumber: 'ORD-011',
+        replacementOrderId: 'id-11',
       })
       const { html } = mockSendAuditedMail.mock.calls[0][0]
-      expect(html).toContain('custom.example.com')
+      expect(html).toContain('href="https://acme.jeffistores.in/account/orders/id-11"')
+      expect(html).toContain('href="https://acme.jeffistores.in/account/orders/id-10"')
     })
 
     it('returns error on failure', async () => {
@@ -945,21 +929,29 @@ describe('email.ts', () => {
 
   describe('sendPaymentRetryEmail', () => {
     it('sends payment retry email', async () => {
-      const result = await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 1500)
+      const result = await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 1500, 'id-20')
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       // sendPaymentRetryEmail returns { success: true } without messageId
       expect(result).toEqual({ success: true })
     })
 
     it('includes formatted amount in html', async () => {
-      await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 2500)
+      await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 2500, 'id-20')
       const { html } = mockSendAuditedMail.mock.calls[0][0]
       expect(html).toContain('2,500')
     })
 
+    it('sends the customer to the order page, where Retry Payment is', async () => {
+      await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 2500, 'id-20')
+      const { html, entityId } = mockSendAuditedMail.mock.calls[0][0]
+      expect(html).toContain('href="https://acme.jeffistores.in/account/orders/id-20"')
+      expect(html).not.toContain('/products"')
+      expect(entityId).toBe('id-20')
+    })
+
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
-      const result = await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 1000)
+      const result = await sendPaymentRetryEmail('cust@example.com', 'Alice', 'ORD-020', 1000, 'id-20')
       expect(result).toEqual({ success: false, error: expect.any(Error) })
     })
   })
@@ -1240,6 +1232,21 @@ describe('email.ts', () => {
       expect(mockSendAuditedMail.mock.calls[0][0].html).toContain('Return to Cart')
     })
 
+    it('sends the customer back to the cart or product on their own store', async () => {
+      await sendOrderAutoCancelledEmail(
+        'cust@example.com',
+        'Alice',
+        'ORD-053',
+        'id-53',
+        'direct',
+        900,
+        '/products/m12-bolt'
+      )
+      expect(mockSendAuditedMail.mock.calls[0][0].html).toContain(
+        'href="https://acme.jeffistores.in/products/m12-bolt"'
+      )
+    })
+
     it('returns error on failure', async () => {
       mockSendAuditedMail.mockRejectedValue(new Error('SMTP fail'))
       const result = await sendOrderAutoCancelledEmail(
@@ -1312,6 +1319,19 @@ describe('email.ts', () => {
       })
       expect(mockSendAuditedMail).toHaveBeenCalledOnce()
       expect(result).toEqual({ success: true, messageId: 'msg-ok' })
+    })
+
+    it('links the delayed order itself, in the html and the text', async () => {
+      await sendOrderDelayNotification({
+        toEmail: 'cust@example.com',
+        customerName: 'Alice',
+        orderNumber: 'ORD-071',
+        delayDays: 2,
+        reason: 'Courier backlog',
+      })
+      const { html, text } = mockSendAuditedMail.mock.calls[0][0]
+      expect(html).toContain('href="https://acme.jeffistores.in/account/orders/by-number-ORD-071"')
+      expect(text).toContain('https://acme.jeffistores.in/account/orders/by-number-ORD-071')
     })
 
     it('uses plural days label for multiple days', async () => {

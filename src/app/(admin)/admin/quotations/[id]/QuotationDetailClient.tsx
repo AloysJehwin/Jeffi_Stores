@@ -189,7 +189,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
           {q.status === 'draft' && !q.from_rfq && (
             <a
               href={ap(`/admin/quotations?view=editor&edit=${q.id}`)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
             >
               <Pencil className="w-4 h-4" />
               Edit
@@ -199,7 +199,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
             <button
               onClick={finalize}
               disabled={finalizing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-60"
             >
               {finalizing ? 'Finalizing…' : 'Finalize Quotation'}
             </button>
@@ -208,7 +208,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
             href={`/api/admin/quotations/${q.id}/pdf`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -223,14 +223,14 @@ export default function QuotationDetailClient({ id }: { id: string }) {
           {q.converted_order_id && (
             <a
               href={ap(`/admin/invoices/${q.converted_order_id}`)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
             >
               View Invoice →
             </a>
           )}
           <Link
             href={ap('/admin/quotations')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
           >
             ← All Quotations
           </Link>

@@ -409,14 +409,14 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
         <div className="px-6 py-4 border-t border-border-default flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+            className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
             disabled={!canConfirm}
-            className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+            className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
           >
             Confirm Batch Assignment
           </button>

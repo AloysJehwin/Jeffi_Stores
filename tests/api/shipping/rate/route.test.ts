@@ -39,7 +39,7 @@ const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
 import { POST } from '@/app/api/(public)/shipping/rate/route'
-import { queryMany } from '@/lib/shared/db'
+import { query, queryMany } from '@/lib/shared/db'
 import { packIntoCartons, fallbackShippingRate } from '@/lib/shipping/shipping'
 import { getDeliverySettings, applyDeliveryRules } from '@/lib/shipping/delivery-settings'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
@@ -126,6 +126,32 @@ describe('POST /api/shipping/rate', () => {
   it('returns 400 for empty cartItems', async () => {
     const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [] }) as any)
     expect(res.status).toBe(400)
+  })
+
+  it('all-digital cart quotes 0 and is serviceable without calling the carrier', async () => {
+    vi.mocked(query).mockResolvedValueOnce({ rows: [{ id: 'prod-1' }] } as any)
+    const res = await POST(
+      makeRequest({ destinationPin: '400053', cartItems: [productCartItem], subtotal: 999 }) as any
+    )
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json).toMatchObject({ charge: 0, codFee: 0, serviceable: true, digitalOnly: true, hasDigital: true })
+    expect(mockCheckServiceability).not.toHaveBeenCalled()
+    expect(mockQueryMany).not.toHaveBeenCalled()
+  })
+
+  it('mixed cart weighs only the physical lines', async () => {
+    vi.mocked(query).mockResolvedValueOnce({ rows: [{ id: 'prod-1' }] } as any)
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce({ ...defaultSettings, enabled: false } as any)
+
+    const res = await POST(
+      makeRequest({ destinationPin: '400053', cartItems: [productCartItem, variantCartItem] }) as any
+    )
+    const json = await res.json()
+    expect(json).toMatchObject({ source: 'admin_disabled', hasDigital: true, digitalOnly: false })
+    expect(json.chargedWeightGrams).toBe(1000) // 2 × 500g variant, digital product excluded
+    expect(mockQueryMany).toHaveBeenCalledTimes(1)
   })
 
   it('returns admin_disabled when delivery is disabled', async () => {

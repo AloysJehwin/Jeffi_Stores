@@ -5,6 +5,11 @@ import { NextRequest } from 'next/server'
 // Mocks
 // ---------------------------------------------------------------------------
 
+vi.mock('@/lib/shared/customer-links', () => ({
+  documentUrl: vi.fn(async (app: string, token: string) => `https://${app}-acme.jeffistores.in/${token}`),
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+  invoiceUrlForOrder: vi.fn(async () => 'https://invoice-acme.jeffistores.in/TOKEN'),
+}))
 vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
@@ -18,6 +23,10 @@ vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   query: vi.fn(),
   withTransaction: vi.fn(),
+}))
+
+vi.mock('@/lib/catalog/digital-guard', () => ({
+  findDigitalProductIds: vi.fn(async () => []),
 }))
 
 vi.mock('@/lib/catalog/gst', () => ({
@@ -83,6 +92,7 @@ import { sendBusinessInvoiceGeneratedEmail } from '@/lib/shared/email-business'
 import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/catalog/gst'
 import { lineItemExGst } from '@/lib/catalog/pricing'
 import { logStockMovement } from '@/lib/orders/inventory'
+import { findDigitalProductIds } from '@/lib/catalog/digital-guard'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -196,6 +206,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
       .mockResolvedValueOnce(null as any)
     vi.mocked(queryMany).mockResolvedValue(QUOT_ITEMS as any)
     vi.mocked(query).mockResolvedValue({ rows: [] } as any)
+    vi.mocked(findDigitalProductIds).mockResolvedValue([])
   })
 
   // --- Auth ---
@@ -249,6 +260,14 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/no line items/)
+  })
+
+  it('returns 400 when a line item is a digital product', async () => {
+    vi.mocked(findDigitalProductIds).mockResolvedValue(['111e4567-e89b-12d3-a456-426614174001'])
+    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Digital products cannot be sold through this channel')
+    expect(vi.mocked(withTransaction)).not.toHaveBeenCalled()
   })
 
   // --- Happy path ---

@@ -3,15 +3,16 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import { navItems } from '@/components/visitor/AccountSidebar'
+import { useAccountNavItems } from '@/components/visitor/AccountSidebar'
 
 export function AccountMobileTabBar() {
   const pathname = usePathname()
   const { user } = useAuth()
+  const baseItems = useAccountNavItems()
   const items =
     user?.isBusiness && user.approvalStatus === 'approved'
       ? [
-          ...navItems,
+          ...baseItems,
           {
             href: '/account/quotes',
             label: 'My Quotes',
@@ -28,7 +29,7 @@ export function AccountMobileTabBar() {
             ),
           },
         ]
-      : navItems
+      : baseItems
   return (
     <div className="lg:hidden mx-3 mt-3 mb-4">
       <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
@@ -39,16 +40,15 @@ export function AccountMobileTabBar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors border-b-2 ${
+                aria-label={item.label}
+                title={item.label}
+                className={`flex-1 flex items-center justify-center py-3.5 transition-colors border-b-2 [&_svg]:w-5 [&_svg]:h-5 ${
                   isActive
                     ? 'text-accent-600 border-accent-500 dark:text-accent-400'
                     : 'text-foreground-muted border-transparent'
                 }`}
               >
                 <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
-                <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
-                  {item.label}
-                </span>
               </Link>
             )
           })}
@@ -61,6 +61,7 @@ export function AccountMobileTabBar() {
 export default function AccountMobileHeader() {
   const { user } = useAuth()
   const pathname = usePathname()
+  const items = useAccountNavItems()
 
   if (!user) return null
 
@@ -92,22 +93,21 @@ export default function AccountMobileHeader() {
       <div className="lg:hidden relative z-10 mx-4 -mt-8 mb-4">
         <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
           <div className="flex">
-            {navItems.map(item => {
+            {items.map(item => {
               const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors border-b-2 ${
+                  aria-label={item.label}
+                  title={item.label}
+                  className={`flex-1 flex items-center justify-center py-3.5 transition-colors border-b-2 [&_svg]:w-5 [&_svg]:h-5 ${
                     isActive
                       ? 'text-accent-600 border-accent-500 dark:text-accent-400'
                       : 'text-foreground-muted border-transparent'
                   }`}
                 >
                   <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
-                  <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
-                    {item.label}
-                  </span>
                 </Link>
               )
             })}

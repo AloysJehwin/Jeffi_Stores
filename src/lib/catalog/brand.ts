@@ -79,6 +79,26 @@ export async function storeBaseUrlAsync(): Promise<string> {
   return process.env.APP_URL || `https://${PLATFORM_DOMAIN}`
 }
 
+/** Plans whose tenants get their own `{slug}.business.` host (provisioning/steps.ts tenantHostnames). */
+const BUSINESS_HOST_PLANS = ['pro', 'enterprise']
+
+/**
+ * Business-portal base URL for the current store, for links in mail to business customers. Paths
+ * appended to it carry no /business prefix (`/account/orders/<id>`, `/products/<slug>`):
+ * - platform: the business host (or localhost/business in dev), from businessBaseUrl();
+ * - a Pro/Enterprise tenant: its own `{slug}.business.` host, which serves the portal at the root;
+ * - any other tenant: its storefront plus /business, where the portal lives on that host.
+ */
+export async function businessBaseUrlAsync(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  if (!t?.slug) {
+    const { businessBaseUrl } = await import('@/lib/shared/business-path')
+    return businessBaseUrl()
+  }
+  if (t.plan && BUSINESS_HOST_PLANS.includes(t.plan)) return `https://${t.slug}.business.${PLATFORM_DOMAIN}`
+  return `https://${t.slug}.${PLATFORM_DOMAIN}/business`
+}
+
 /**
  * Admin base URL, resolved even before the first DB query (via the x-tenant-slug header). Prefer
  * this over currentAdminBaseUrl() on any path that has not queried yet — notably the OAuth
@@ -115,16 +135,22 @@ export function customerMailFrom(): string {
  * This falls back to the x-tenant-slug header middleware sets, the same fix identityDefaults
  * needed.
  */
-export async function resolveCurrentTenant(): Promise<{ slug: string; displayName: string | null } | null> {
+export async function resolveCurrentTenant(): Promise<{
+  slug: string
+  displayName: string | null
+  plan: string | null
+} | null> {
   const t = getCurrentTenant()
-  if (t?.slug) return { slug: t.slug, displayName: t.displayName ?? null }
+  if (t?.slug) return { slug: t.slug, displayName: t.displayName ?? null, plan: t.plan ?? null }
   try {
     const { headers } = await import('next/headers')
     const slug = (await headers()).get('x-tenant-slug')
     if (!slug) return null
     const { lookupTenantContextBySlug } = await import('@/lib/tenant-registry')
     const ctx = await lookupTenantContextBySlug(slug)
-    return ctx ? { slug: ctx.slug, displayName: ctx.displayName ?? null } : { slug, displayName: null }
+    return ctx
+      ? { slug: ctx.slug, displayName: ctx.displayName ?? null, plan: ctx.plan ?? null }
+      : { slug, displayName: null, plan: null }
   } catch {
     return null
   }
@@ -190,6 +216,24 @@ export async function storeAddressLine(): Promise<string> {
     return rows[0]?.value?.trim() || ''
   } catch {
     return ''
+  }
+}
+
+/**
+ * The current store's own city/state (site_settings business_city/business_state), for
+ * consignee/return-address DEFAULTS that previously fell back to the flagship's Raipur/Chhattisgarh.
+ * Empty strings when unset — never another store's location.
+ */
+export async function storeOrigin(): Promise<{ city: string; state: string }> {
+  try {
+    const { queryMany } = await import('@/lib/shared/db')
+    const rows = await queryMany<{ key: string; value: string }>(
+      `SELECT key, value FROM site_settings WHERE key IN ('business_city', 'business_state')`
+    )
+    const m = Object.fromEntries((rows || []).map(r => [r.key, (r.value || '').trim()]))
+    return { city: m.business_city || '', state: m.business_state || '' }
+  } catch {
+    return { city: '', state: '' }
   }
 }
 

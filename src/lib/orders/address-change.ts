@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg'
 import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import { isInterState, round2 } from '@/lib/catalog/gst'
-import { transitDays } from '@/lib/shipping/edd'
+import { transitDays, eddSettingsFromValues } from '@/lib/shipping/edd'
 import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
 
 export interface AddressSnapshot {
@@ -206,8 +206,10 @@ export async function applyAddressChange(params: {
     const newAddress = snapshotAddress(live)
 
     const oldPin = String(req.old_address_snapshot?.postal_code ?? '')
+    const eddSettings = eddSettingsFromValues(bv)
     const eddShift =
-      transitDays(newAddress.postal_code, bv.delhiveryOriginPincode) - transitDays(oldPin, bv.delhiveryOriginPincode)
+      transitDays(newAddress.postal_code, bv.delhiveryOriginPincode, eddSettings) -
+      transitDays(oldPin, bv.delhiveryOriginPincode, eddSettings)
 
     await client.query(
       `UPDATE orders SET

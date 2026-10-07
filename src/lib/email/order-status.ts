@@ -6,8 +6,8 @@ import {
   currentBrandNameAsync,
   storeContactLine,
   storeAddressLine,
-  storeBaseUrlAsync,
 } from './shared'
+import { orderUrlById } from '@/lib/shared/customer-links'
 
 export async function sendOrderStatusUpdate(
   customerEmail: string,
@@ -19,7 +19,8 @@ export async function sendOrderStatusUpdate(
   invoicePdfBuffer?: Buffer | null,
   cancellationNote?: string
 ) {
-  const baseUrl = await storeBaseUrlAsync()
+  // The order's own page, on the business portal for a business customer.
+  const orderLink = await orderUrlById(orderId)
   const contactLine = await storeContactLine()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
@@ -48,6 +49,11 @@ export async function sendOrderStatusUpdate(
       title: 'Out for Delivery',
       message: 'Your order is out for delivery today! Our delivery partner will arrive soon.',
       color: '#6366f1',
+    },
+    granted: {
+      title: 'Access granted',
+      message: 'Your digital purchase is ready. Open your vault to view it any time.',
+      color: '#10b981',
     },
     delivered: {
       title: 'Order Delivered',
@@ -79,6 +85,8 @@ export async function sendOrderStatusUpdate(
     color: '#6b7280',
   }
 
+  const vaultLink = newStatus === 'granted' ? await import('@/lib/vault/links').then(m => m.vaultLibraryUrl()) : null
+
   const from = await customerMailFromAsync()
   const subject = `${statusInfo.title} - Order ${orderNumber}`
   const html = mailShell({
@@ -104,7 +112,7 @@ export async function sendOrderStatusUpdate(
           : ''
       }
 
-      <div class="status-badge">${newStatus}</div>
+      <div class="status-badge">${newStatus === 'granted' ? 'Access granted' : newStatus}</div>
 
       <div class="card">
         <h3 style="margin-top: 0;">Order Details</h3>
@@ -124,8 +132,23 @@ export async function sendOrderStatusUpdate(
           <h4 style="margin-top: 0; color: #1e40af;">Your order is on its way!</h4>
           <p>Track your shipment live by visiting your order page:</p>
           <p style="text-align: center; margin: 0;">
-            <a href="${baseUrl}/account/orders/${orderId}" class="button" style="padding: 10px 24px; font-size: 14px;">
+            <a href="${orderLink}" class="button" style="padding: 10px 24px; font-size: 14px;">
               Track Your Order
+            </a>
+          </p>
+        </div>
+      `
+          : ''
+      }
+
+      ${
+        vaultLink
+          ? `
+        <div class="info">
+          <h4 style="margin-top: 0;">Access granted — open your vault</h4>
+          <p style="text-align: center; margin: 0;">
+            <a href="${vaultLink}" class="button" style="padding: 10px 24px; font-size: 14px; color:#ffffff;">
+              Open my vault
             </a>
           </p>
         </div>
@@ -145,7 +168,7 @@ export async function sendOrderStatusUpdate(
       }
 
       <div class="cta">
-        <a href="${baseUrl}/account/orders/${orderId}" class="button" style="color:#ffffff;">
+        <a href="${orderLink}" class="button" style="color:#ffffff;">
           View Order Details
         </a>
       </div>
@@ -190,7 +213,7 @@ export async function sendPaymentStatusUpdate(
   newPaymentStatus: string,
   orderTotal: number
 ) {
-  const baseUrl = await storeBaseUrlAsync()
+  const orderLink = await orderUrlById(orderId)
   const contactLine = await storeContactLine()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
@@ -304,7 +327,7 @@ export async function sendPaymentStatusUpdate(
       }
 
       <div class="cta">
-        <a href="${baseUrl}/account/orders/${orderId}" class="button" style="color:#ffffff;">
+        <a href="${orderLink}" class="button" style="color:#ffffff;">
           View Order Details
         </a>
       </div>

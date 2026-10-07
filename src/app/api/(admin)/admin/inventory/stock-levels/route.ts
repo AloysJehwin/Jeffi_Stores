@@ -11,14 +11,14 @@ const STOCK_LEVELS_SQL = `
       COALESCE(p.inventory_quantity, 0) AS qty,
       p.low_stock_threshold AS threshold
     FROM products p
-    WHERE p.has_variants = FALSE AND p.is_active = TRUE
+    WHERE p.has_variants = FALSE AND p.is_active = TRUE AND p.is_digital = FALSE
     UNION ALL
     SELECT
       COALESCE(pv.inventory_quantity, 0) AS qty,
       p.low_stock_threshold AS threshold
     FROM product_variants pv
     JOIN products p ON p.id = pv.product_id
-    WHERE p.is_active = TRUE AND pv.is_active = TRUE
+    WHERE p.is_active = TRUE AND pv.is_active = TRUE AND p.is_digital = FALSE
       AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = TRUE)
     UNION ALL
     SELECT
@@ -27,7 +27,7 @@ const STOCK_LEVELS_SQL = `
     FROM product_sub_variants sv
     JOIN product_variants pv ON pv.id = sv.variant_id
     JOIN products p ON p.id = pv.product_id
-    WHERE p.is_active = TRUE AND pv.is_active = TRUE AND sv.is_active = TRUE
+    WHERE p.is_active = TRUE AND pv.is_active = TRUE AND sv.is_active = TRUE AND p.is_digital = FALSE
   )
   SELECT
     COUNT(*) FILTER (WHERE qty <= 0) AS out_of_stock,

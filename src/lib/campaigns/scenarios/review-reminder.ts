@@ -1,6 +1,10 @@
 import { queryMany } from '@/lib/shared/db'
+import { FULFILLED_SQL } from '@/lib/orders/fulfilled-status'
+import { generateReviewToken } from '@/lib/auth/jwt'
+import { apiBaseUrl } from '@/lib/shared/customer-links'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
+import { days, readDurationParam } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -22,16 +26,17 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
   trigger:
     "Fires after delivery + the campaign's delay, but only if the customer hasn't already reviewed any product from that order. One send per order. Stops if a review is left after the email goes out.",
   defaultParams: {
-    lookbackDays: 30,
+    lookbackDays: days(30),
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
   },
   paramSchema: {
     lookbackDays: {
-      type: 'integer',
-      min: 1,
-      max: 90,
-      label: 'Lookback (days)',
+      type: 'duration',
+      min: days(1),
+      max: days(90),
+      recommendedUnit: 'days',
+      label: 'Lookback',
       description: 'Only consider orders delivered in the last N days',
     },
     maxRecipientsPerSweep: {
@@ -49,15 +54,16 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
   },
 
   async findEligible({ campaign, params }) {
+    const lookbackMin = readDurationParam(params, 'lookbackDays') ?? days(30)
     return queryMany<Row>(
       `
       SELECT o.id, o.user_id, o.order_number
       FROM orders o
       JOIN users u ON u.id = o.user_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
-      WHERE o.status = 'delivered'
+      WHERE ${FULFILLED_SQL}
         AND o.delivered_at < NOW() - ($2 || ' hours')::interval
-        AND o.delivered_at > NOW() - ($3 || ' days')::interval
+        AND o.delivered_at > NOW() - ($3 || ' minutes')::interval
         AND u.marketing_opt_out = FALSE AND u.is_active = TRUE
         AND (bp.user_id IS NULL OR bp.approval_status != 'approved')
         AND NOT EXISTS (
@@ -70,9 +76,15 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
           WHERE ecs.campaign_kind = $1
             AND ecs.reference_id = o.id::text
         )
+        -- review_request and review_reminder target the same orders; one review email per order.
+        AND NOT EXISTS (
+          SELECT 1 FROM email_campaigns_sent ecs
+          WHERE ecs.campaign_kind = 'review_request'
+            AND ecs.reference_id = o.id::text
+        )
       LIMIT $4
     `,
-      [campaign.kind, campaign.delay_hours, params.lookbackDays, params.maxRecipientsPerSweep]
+      [campaign.kind, campaign.delay_hours, String(lookbackMin), params.maxRecipientsPerSweep]
     )
   },
 
@@ -99,17 +111,25 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
       [row.id]
     )
 
+    // Each item opens its own review page (storefront only), signed for this order and customer.
+    const storeBase = await apiBaseUrl()
     const itemsHtml = renderItemRows(
-      items.map(i => ({
-        name: i.name,
-        imageUrl: i.image_url,
-        productUrl: i.product_slug ? `${user.baseUrl}/products/${i.product_slug}?review=1` : null,
-      }))
+      await Promise.all(
+        items.map(async i => ({
+          name: i.name,
+          imageUrl: i.image_url,
+          productUrl: i.product_id
+            ? `${storeBase}/review?token=${encodeURIComponent(
+                await generateReviewToken({ orderId: row.id, productId: i.product_id, userId: row.user_id })
+              )}`
+            : null,
+        }))
+      )
     )
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 
-    const ctaUrl = `${user.baseUrl}/account/orders/${row.id}`
+    const ctaUrl = `${user.baseUrl}/account/orders/${encodeURIComponent(row.id)}`
     const emailResult = await sendCampaignEmail({
       campaign,
       user,

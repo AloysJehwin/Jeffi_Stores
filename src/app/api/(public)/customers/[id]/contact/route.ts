@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getCustomerById } from '@/lib/queries'
 import { sendAdminContactEmail } from '@/lib/email'
+import { renderTemplate, resolveTemplateVariables } from '@/lib/templates/variables'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -21,7 +22,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const customer = await getCustomerById(id)
     const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Customer'
 
-    await sendAdminContactEmail(customer.email, name, subject, message)
+    const vars = await resolveTemplateVariables({
+      recipient: { email: customer.email, first_name: customer.first_name, last_name: customer.last_name },
+    })
+    // Plain text: sendAdminContactEmail escapes it, so values are not escaped here.
+    await sendAdminContactEmail(customer.email, name, renderTemplate(subject, vars), renderTemplate(message, vars))
 
     return NextResponse.json({ success: true })
   } catch (error: any) {

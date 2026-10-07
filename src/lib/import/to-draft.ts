@@ -1,4 +1,38 @@
 import type { ProductGroup, VariantGroup } from './validate-row'
+import { PRODUCT_COLUMNS } from './columns'
+
+// Optional PRODUCT columns an import row may leave blank. Blank → the key is omitted from the draft
+// (coerce.ts), and the shared publish SQL writes NULL for most columns via bare NULLIF — which would
+// WIPE the live value on re-import. For an EXISTING product we therefore carry its current value
+// back into the draft for every optional column the row left blank, so publish writes it unchanged.
+// Required columns (sku/name) and engine-resolved refs (category/brand/supplier → *_id) are excluded.
+const EXCLUDED_BACKFILL_KEYS = new Set(['sku', 'name', 'category', 'brand', 'supplier'])
+const BACKFILLABLE_PRODUCT_KEYS = PRODUCT_COLUMNS.filter(c => !c.required && !EXCLUDED_BACKFILL_KEYS.has(c.key)).map(
+  c => c.key
+)
+
+/**
+ * Preserve an existing product's values for optional fields a re-import left blank. For each
+ * backfillable product column absent from `fields`, copy the live row's non-null value in. New
+ * products (no live row) are untouched — they take the DB column defaults. #492.
+ */
+export function backfillBlankOptionalFields(
+  fields: Record<string, unknown>,
+  liveRow: Record<string, unknown> | null
+): Record<string, unknown> {
+  if (!liveRow) return fields
+  for (const key of BACKFILLABLE_PRODUCT_KEYS) {
+    if (fields[key] !== undefined) continue
+    const live = liveRow[key]
+    if (live !== null && live !== undefined) fields[key] = live
+  }
+  // Per-interval prices left blank keep their live value.
+  const livePrices = liveRow.subscription_prices
+  if (fields.subscription_prices && livePrices && typeof livePrices === 'object') {
+    fields.subscription_prices = { ...(livePrices as object), ...(fields.subscription_prices as object) }
+  }
+  return fields
+}
 
 export interface ResolvedIds {
   categoryId: string | null

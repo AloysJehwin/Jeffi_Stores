@@ -39,7 +39,7 @@ export default function DispatchCampaignButton({ id, scheduledAt }: { id: string
       type="button"
       onClick={dispatch}
       disabled={loading || done}
-      className="text-sm bg-accent-500 hover:bg-accent-600 text-white px-3 py-1 rounded-lg font-medium transition-colors disabled:opacity-50"
+      className="text-sm bg-accent-500 hover:bg-accent-600 text-white px-3 h-control-sm rounded-lg font-medium transition-colors disabled:opacity-50"
     >
       {loading ? 'Sending…' : done ? 'Sent!' : 'Dispatch'}
     </button>

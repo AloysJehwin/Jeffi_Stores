@@ -449,7 +449,7 @@ export default function ReviewFormForm({
                     value={field.label}
                     onChange={e => updateField(field.id, { label: e.target.value })}
                     placeholder="Field label"
-                    className="flex-1 basis-0 min-w-0 px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    className="flex-1 basis-0 min-w-0 px-3 h-control-sm border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
                   />
                   <AdminSelect
                     sm
@@ -494,7 +494,7 @@ export default function ReviewFormForm({
                   type="submit"
                   value="draft"
                   disabled={submitting}
-                  className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
+                  className="px-5 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
                 >
                   {submitting ? 'Saving…' : 'Save Draft'}
                 </button>
@@ -502,7 +502,7 @@ export default function ReviewFormForm({
                   type="submit"
                   value="publish"
                   disabled={submitting}
-                  className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
+                  className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
                 >
                   {submitting ? 'Publishing…' : 'Publish'}
                 </button>
@@ -515,7 +515,7 @@ export default function ReviewFormForm({
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
+                className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
               >
                 {submitting ? 'Saving…' : submitLabel || 'Save Changes'}
               </button>

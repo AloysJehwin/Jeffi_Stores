@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockQueryOne } = vi.hoisted(() => ({ mockQueryOne: vi.fn() }))
+const { mockQueryOne, mockQuery, mockResolveTenant } = vi.hoisted(() => ({
+  mockQueryOne: vi.fn(),
+  mockQuery: vi.fn(),
+  mockResolveTenant: vi.fn(),
+}))
 
 vi.mock('@/lib/shared/db', () => ({
   queryOne: mockQueryOne,
+  query: mockQuery,
+}))
+
+vi.mock('@/lib/tenancy/tenant-context', () => ({
+  resolveTenant: mockResolveTenant,
 }))
 
 import { resolveAdminByEmail, enforceCertGate } from '@/lib/auth/admin-identity'
@@ -17,6 +26,8 @@ function setNodeEnv(v: string | undefined) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockResolveTenant.mockResolvedValue(null) // off-tenant (platform host) by default
+  mockQuery.mockResolvedValue({ rows: [] })
 })
 
 afterEach(() => {
@@ -81,6 +92,27 @@ describe('resolveAdminByEmail', () => {
     })
     const res = await resolveAdminByEmail('a@b.com')
     expect(res!.scopes).toEqual([])
+  })
+
+  // #488: the 'administrator' role is platform-only. The owner email is promoted off-tenant, but
+  // on a tenant host it must stay super_admin (the top of the tenant hierarchy).
+  const ownerRow = (role: string) =>
+    baseAdmin({ id: 'owner-1', role, email: 'admin@jeffistores.in', scopes: [] })
+
+  it('promotes the platform owner to administrator OFF-tenant', async () => {
+    mockResolveTenant.mockResolvedValue(null)
+    mockQueryOne.mockResolvedValueOnce(ownerRow('super_admin'))
+    const res = await resolveAdminByEmail('admin@jeffistores.in')
+    expect(res!.role).toBe('administrator')
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining("role = 'administrator'"), ['owner-1'])
+  })
+
+  it('does NOT promote the platform owner on a TENANT host', async () => {
+    mockResolveTenant.mockResolvedValue({ tenantId: 't1', slug: 'acme' } as any)
+    mockQueryOne.mockResolvedValueOnce(ownerRow('super_admin'))
+    const res = await resolveAdminByEmail('admin@jeffistores.in')
+    expect(res!.role).toBe('super_admin')
+    expect(mockQuery).not.toHaveBeenCalled()
   })
 })
 

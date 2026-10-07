@@ -103,9 +103,15 @@ function longestMatch(text: string, orders: SupportOrder[]): SupportOrder | null
 }
 
 const CANCELLABLE = ['pending', 'confirmed', 'processing']
+// 'granted' (digital, access granted) is deliberately absent: digital items are never returnable.
 const RETURNABLE = ['delivered']
 
-export function getBotPayload(msg: string, orders: SupportOrder[], history: HistoryMessage[] = []): BotPayload {
+export function getBotPayload(
+  msg: string,
+  orders: SupportOrder[],
+  history: HistoryMessage[] = [],
+  botName = 'the assistant'
+): BotPayload {
   const m = msg.toLowerCase()
   const latest = orders[0]
   // Order the user just picked (named in this message) wins; else one referenced
@@ -145,6 +151,13 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
         type: 'text_actions',
         text: "you don't have any orders yet.",
         actions: [{ label: 'Browse Products', url: '/products' }],
+      }
+    }
+    if (contextOrder.status === 'granted' && (selectedOrder || orders.length === 1)) {
+      return {
+        type: 'text_actions',
+        text: `order #${contextOrder.order_number} is a digital order — access is already granted, so there's nothing to ship or track.`,
+        actions: [{ label: 'View Order', url: `/account/orders/${contextOrder.id}` }],
       }
     }
     // If a specific order was picked, always show its detail (don't re-prompt).
@@ -405,7 +418,7 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
   if (m.includes('hello') || m.includes('hi') || m.includes('hey') || m.includes('hiya')) {
     return {
       type: 'chips',
-      text: "hey! i'm Jeffi. what can i help you with today?",
+      text: `hey! i'm ${botName}. what can i help you with today?`,
       chips: [
         { label: 'Track my order', query: 'track my order' },
         { label: 'My orders', query: 'all my orders' },

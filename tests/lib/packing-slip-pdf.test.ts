@@ -23,6 +23,18 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
+// #486: loadStoreSettings now falls back to the CURRENT store's identity (tenant-aware) instead of
+// a hardcoded 'JEFFI STORES' / 'jeffistores.in'. Mock it to the platform default for determinism.
+vi.mock('@/lib/catalog/site-controls', () => ({
+  getStoreIdentity: vi.fn().mockResolvedValue({
+    name: 'Jeffi Stores',
+    email: '',
+    phone: '',
+    web: 'jeffistores.in',
+    logoUrl: '',
+  }),
+}))
+
 // Mock path.join for logo path resolution
 vi.mock('path', async importOriginal => {
   const actual = await importOriginal<typeof import('path')>()
@@ -116,7 +128,7 @@ describe('loadStoreSettings', () => {
   it('returns defaults when no settings rows', async () => {
     mockQueryMany.mockResolvedValue([])
     const result = await loadStoreSettings()
-    expect(result.name).toBe('JEFFI STORES')
+    expect(result.name).toBe('Jeffi Stores') // from getStoreIdentity fallback (#486)
     expect(result.web).toBe('jeffistores.in')
   })
 
@@ -155,7 +167,7 @@ describe('loadStoreSettings', () => {
       { key: 'business_phone', value: null },
     ])
     const result = await loadStoreSettings()
-    expect(result.name).toBe('JEFFI STORES')
+    expect(result.name).toBe('Jeffi Stores') // from getStoreIdentity fallback (#486)
     expect(result.phone).toBe('')
   })
 

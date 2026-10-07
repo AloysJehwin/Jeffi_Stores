@@ -42,14 +42,13 @@ describe('abandonedCheckout scenario', () => {
   it('has defaultParams with expected values', () => {
     expect(defaultParams.minMinutesAfterCancel).toBe(15)
     expect(defaultParams.autoCancelMaxMinutes).toBe(15)
-    expect(defaultParams.sendCooldownDays).toBe(1)
     expect(defaultParams.maxRecipientsPerSweep).toBe(50)
   })
 
-  it('has a paramSchema', () => {
+  it('has a paramSchema with duration-typed time fields', () => {
     expect(abandonedCheckout.paramSchema).toBeDefined()
     expect(abandonedCheckout.paramSchema.minMinutesAfterCancel).toBeDefined()
-    expect(abandonedCheckout.paramSchema.sendCooldownDays).toBeDefined()
+    expect(abandonedCheckout.paramSchema.minMinutesAfterCancel.type).toBe('duration')
   })
 
   describe('findEligible', () => {
@@ -137,6 +136,27 @@ describe('abandonedCheckout scenario', () => {
       expect(call.vars.orderNumber).toBe('ORD-999')
       expect(call.vars.total).toBe('1200.00')
       expect(call.vars.ctaUrl).toContain('/cart')
+    })
+
+    it('sends a "buy now" order back to its product, since its items never went into the cart', async () => {
+      mockFetchUser.mockResolvedValue({ id: 'u1', first_name: 'A', email: 'u@x.com', baseUrl: 'https://acme.jeffistores.in' })
+      mockQueryMany.mockResolvedValue([
+        { name: 'Drill bit', quantity: 1, unit_price: 99, product_slug: 'hss-drill-bit', image_url: null },
+      ])
+      mockResolveCoupon.mockResolvedValue({ couponCode: null, discountPercent: 0 })
+      mockSendEmail.mockResolvedValue({ ok: true })
+
+      await abandonedCheckout.send(
+        { id: 'o1', user_id: 'u1', order_number: 'ORD-1', total_amount: '99.00', order_type: 'direct' },
+        { campaign, params: defaultParams }
+      )
+      expect(mockSendEmail.mock.calls[0][0].vars.ctaUrl).toBe('https://acme.jeffistores.in/products/hss-drill-bit')
+
+      await abandonedCheckout.send(
+        { id: 'o2', user_id: 'u1', order_number: 'ORD-2', total_amount: '99.00', order_type: 'cart' },
+        { campaign, params: defaultParams }
+      )
+      expect(mockSendEmail.mock.calls[1][0].vars.ctaUrl).toBe('https://acme.jeffistores.in/cart')
     })
 
     it('formats total with 2 decimal places', async () => {

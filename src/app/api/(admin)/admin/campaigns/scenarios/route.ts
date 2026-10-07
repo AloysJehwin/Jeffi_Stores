@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany } from '@/lib/shared/db'
 import { listScenarios, getScenario } from '@/lib/campaigns/scenarios/_registry'
+import { UNIVERSAL_DEFAULTS, UNIVERSAL_SCHEMA } from '@/lib/campaigns/universal-params'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,30 +81,6 @@ export async function GET(req: NextRequest) {
     const arr = campaignsByScenario.get(c.scenario_kind) || []
     arr.push(c)
     campaignsByScenario.set(c.scenario_kind, arr)
-  }
-
-  const UNIVERSAL_DEFAULTS: Record<string, number | boolean | string> = {
-    sendCooldownDays: 1,
-    maxRecipientsPerSweep: 50,
-  }
-  const UNIVERSAL_SCHEMA: Record<
-    string,
-    { type: string; min?: number; max?: number; label: string; description?: string }
-  > = {
-    sendCooldownDays: {
-      type: 'integer',
-      min: 1,
-      max: 30,
-      label: 'Per-user cooldown (days)',
-      description: 'Skip users sent this campaign within N days',
-    },
-    maxRecipientsPerSweep: {
-      type: 'integer',
-      min: 1,
-      max: 500,
-      label: 'Max recipients per run',
-      description: 'Hard limit per sweep',
-    },
   }
 
   const scenarios = listScenarios().map(s => {

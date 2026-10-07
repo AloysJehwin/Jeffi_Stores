@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryOne, query } from '@/lib/shared/db'
 import { getScenario } from '@/lib/campaigns/scenarios/_registry'
+import { UNIVERSAL_DEFAULTS, UNIVERSAL_SCHEMA } from '@/lib/campaigns/universal-params'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,27 +42,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
   }
 
   let scenarioPayload: any = null
-
-  const UNIVERSAL_DEFAULTS = {
-    sendCooldownDays: 1,
-    maxRecipientsPerSweep: 50,
-  }
-  const UNIVERSAL_SCHEMA = {
-    sendCooldownDays: {
-      type: 'integer',
-      min: 1,
-      max: 30,
-      label: 'Per-user cooldown (days)',
-      description: 'Skip users sent this campaign within N days',
-    },
-    maxRecipientsPerSweep: {
-      type: 'integer',
-      min: 1,
-      max: 500,
-      label: 'Max recipients per run',
-      description: 'Hard limit per sweep',
-    },
-  }
 
   const builtin = getScenario(kind)
   if (builtin) {

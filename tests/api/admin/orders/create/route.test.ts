@@ -3,6 +3,11 @@ import { NextRequest } from 'next/server'
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+vi.mock('@/lib/shared/customer-links', () => ({
+  documentUrl: vi.fn(async (app: string, token: string) => `https://${app}-acme.jeffistores.in/${token}`),
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+  invoiceUrlForOrder: vi.fn(async () => 'https://invoice-acme.jeffistores.in/TOKEN'),
+}))
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({
@@ -38,6 +43,9 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
 }))
+vi.mock('@/lib/catalog/digital-guard', () => ({
+  findDigitalProductIds: vi.fn(async () => []),
+}))
 vi.mock('@/lib/email', () => ({
   sendInvoiceFinalizedEmail: vi.fn(),
 }))
@@ -62,6 +70,7 @@ import { logStockMovement } from '@/lib/orders/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { parseBody } from '@/lib/shared/validate'
 import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
+import { findDigitalProductIds } from '@/lib/catalog/digital-guard'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -173,6 +182,7 @@ describe('POST /api/admin/orders/create', () => {
         }) as any
     )
     vi.mocked(getBusinessValues).mockResolvedValue({ businessStateCode: '22' } as any)
+    vi.mocked(findDigitalProductIds).mockResolvedValue([])
   })
 
   it('returns 401 when unauthenticated', async () => {
@@ -199,6 +209,17 @@ describe('POST /api/admin/orders/create', () => {
     mockParseBody.mockReturnValue({ ok: false, response: errorResponse } as any)
     const res = await POST(makePost({}))
     expect(res.status).toBe(422)
+  })
+
+  it('returns 400 when an item is a digital product', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: parsedOrderData } as any)
+    vi.mocked(findDigitalProductIds).mockResolvedValue(['prod-1'])
+    const res = await POST(makePost(validOrderBody))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Digital products cannot be sold through this channel')
+    expect(mockWithTx).not.toHaveBeenCalled()
   })
 
   it('creates order successfully for product without variant', async () => {
@@ -360,7 +381,8 @@ describe('POST /api/admin/orders/create', () => {
       'John Doe',
       'JS/2024-25/0001',
       expect.any(Number),
-      'OFF-1234-ABCDE'
+      'OFF-1234-ABCDE',
+      'https://invoice-acme.jeffistores.in/TOKEN'
     )
     delete process.env.ENABLE_GST
   })

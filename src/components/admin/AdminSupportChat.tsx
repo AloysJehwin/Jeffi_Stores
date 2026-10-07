@@ -437,7 +437,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                     <button
                       onClick={closeStaleSession}
                       disabled={isClosingSession}
-                      className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="shrink-0 px-3 h-control-sm rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isClosingSession ? 'Closing…' : 'Close Session'}
                     </button>
@@ -447,7 +447,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                   <button
                     onClick={() => setShowQuickReplies(v => !v)}
                     title="Quick replies"
-                    className={`px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${
+                    className={`px-3 h-control rounded-xl border text-sm font-semibold transition-colors ${
                       showQuickReplies
                         ? 'bg-accent-500 border-accent-500 text-white'
                         : 'border-border-default text-foreground-secondary hover:border-accent-400 hover:text-accent-500'
@@ -473,7 +473,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                   <button
                     onClick={() => sendMessage(undefined, isClosingReply)}
                     disabled={isSending || !input.trim()}
-                    className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path

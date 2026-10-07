@@ -19,7 +19,11 @@ import LogoUploader from '@/components/admin/site-controls/LogoUploader'
 import CustomShortcutsCard, { CustomShortcut } from '@/components/admin/site-controls/CustomShortcutsCard'
 import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
 import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
+import TemplateVariablesPanel from '@/components/admin/site-controls/TemplateVariablesPanel'
+import DeliveryEstimateCard from '@/components/admin/site-controls/DeliveryEstimateCard'
 import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
+import { getLoyaltySettings } from '@/lib/loyalty/settings'
+import { getReferralSettings } from '@/lib/referrals/settings'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -97,7 +101,7 @@ export default async function SiteControlsPage() {
   }
 
   await seedBuiltinShortcuts()
-  const c = await getSiteControls()
+  const [c, loyalty, referral] = await Promise.all([getSiteControls(), getLoyaltySettings(), getReferralSettings()])
   const inv = await loadInvoiceKeys()
   const delivery = await getDeliverySettings()
   const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
@@ -278,6 +282,42 @@ export default async function SiteControlsPage() {
             </SectionCard>
           </div>
         )}
+
+        <div>
+          <SectionCard
+            title="Customer programs"
+            description="Switch customer-facing reward programs on or off for the whole store."
+            columns
+          >
+            <FullSpan>
+              <ToggleControl
+                settingKey="loyalty_enabled"
+                label="Loyalty"
+                hint="Customers earn points on delivered online orders, climb tiers and redeem points for coupons from a Rewards page. The first time it's switched on, past orders are counted without emailing anyone and tier-upgrade emails are switched on. Settings are under Marketing > Customer Programs."
+                initial={loyalty.enabled}
+                refreshOnSave
+              />
+            </FullSpan>
+            <FullSpan>
+              <ToggleControl
+                settingKey="referral_enabled"
+                label="Refer & Earn"
+                hint="Customers get a personal link and earn loyalty points when a friend's first order is delivered. Reward size and yearly limit are under Marketing > Customer Programs."
+                initial={referral.enabled}
+                locked={!loyalty.enabled && !referral.enabled}
+                lockedHint="Turn on Loyalty first. Referral rewards are paid in loyalty points."
+              />
+            </FullSpan>
+            <FullSpan>
+              <ToggleControl
+                settingKey="feature_birthday_enabled"
+                label="Birthday rewards"
+                hint="Shows the 'add your birthday' prompt and the birthday link page, and lets the Birthday and Birthday Collection campaigns run. Each campaign is still switched on in Marketing > Campaigns; coverage is under Marketing > Customer Programs."
+                initial={c.flags.birthdayEnabled}
+              />
+            </FullSpan>
+          </SectionCard>
+        </div>
 
         <div>
           <SectionCard
@@ -484,6 +524,10 @@ export default async function SiteControlsPage() {
         </div>
 
         <div>
+          <DeliveryEstimateCard />
+        </div>
+
+        <div>
           <SectionCard title="Storefront Content" description="Homepage layout and copy." columns>
             <NumberControl
               settingKey="storefront_featured_limit"
@@ -522,6 +566,10 @@ export default async function SiteControlsPage() {
 
         <div>
           <CustomerTagDefinitionsCard isSuperAdmin={isPlatformOwner(admin.role)} />
+        </div>
+
+        <div>
+          <TemplateVariablesPanel />
         </div>
 
         <div>

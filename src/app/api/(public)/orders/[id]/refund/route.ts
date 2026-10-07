@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, queryMany, query, resolveRequestTenant } from '@/lib/shared/db'
+import { queryOne, queryMany, query, withTransaction, resolveRequestTenant } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/payments/razorpay'
 import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/payments/razorpay-route'
@@ -8,6 +8,7 @@ import { sendPaymentStatusUpdate } from '@/lib/email'
 import { logActivity } from '@/lib/shared/activity'
 import { getReturnRequest } from '@/lib/queries'
 import { computeRefundableAmount } from '@/lib/payments/refund'
+import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -136,7 +137,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ])
     }
 
-    await query(`UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`, [orderId])
+    // A cancelled order is refunded in full, so every digital line loses vault access. A returned
+    // order only refunds its returned lines, and digital lines are never returnable.
+    await withTransaction(async client => {
+      await client.query(`UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`, [orderId])
+      if (order.status === 'cancelled') await revokeOrderEntitlements(client, { orderId, reason: 'refund' })
+    })
 
     const user = order.users
     const userEmail = user?.email || order.customer_email

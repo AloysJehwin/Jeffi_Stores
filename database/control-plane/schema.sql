@@ -718,3 +718,38 @@ ALTER TABLE ONLY public.portal_certs ADD CONSTRAINT portal_certs_tenant_id_fkey
 CREATE INDEX IF NOT EXISTS idx_portal_certs_issued_to ON public.portal_certs USING btree (lower(issued_to));
 CREATE INDEX IF NOT EXISTS idx_portal_certs_downloadable
     ON public.portal_certs USING btree (download_token) WHERE revoked_at IS NULL AND downloaded_at IS NULL;
+
+
+-- =====================================================================
+-- Vault storage quotas + customer-subscription webhook routing
+-- =====================================================================
+
+-- Per-plan vault storage limits. 10 GB / 50 GB / 200 GB / 1 TB seeded in seed-plans.sql;
+-- max_file_bytes caps a single upload (5 GB). egress_quota_bytes is NULL = log-only for now.
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS storage_quota_bytes bigint NOT NULL DEFAULT 10737418240;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS max_file_bytes      bigint NOT NULL DEFAULT 5368709120;
+ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS egress_quota_bytes  bigint;
+
+-- Own-key tenants verify their customer webhook with their own secret (platform secret can't).
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS razorpay_webhook_secret character varying(255);
+
+-- Running vault storage accounting, folded into the existing tenant_infra row (not a new table).
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS used_storage_bytes bigint NOT NULL DEFAULT 0;
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS file_count         integer NOT NULL DEFAULT 0;
+
+--
+-- razorpay_subscription_index: platform-account subscription events carry notes.tenant_id, but
+-- we verify them against this authoritative index (and the collecting account) before trusting
+-- the notes and entering the tenant DB. One row per Razorpay subscription on the platform account.
+--
+CREATE TABLE IF NOT EXISTS public.razorpay_subscription_index (
+    razorpay_subscription_id character varying(64) NOT NULL,
+    tenant_id                uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+    collecting_account       character varying(12) NOT NULL DEFAULT 'platform',
+    product_id               uuid,
+    local_subscription_id    uuid,
+    created_at               timestamp with time zone NOT NULL DEFAULT now(),
+    CONSTRAINT razorpay_subscription_index_pkey PRIMARY KEY (razorpay_subscription_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rzp_sub_index_tenant ON public.razorpay_subscription_index USING btree (tenant_id);

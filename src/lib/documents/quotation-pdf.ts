@@ -1,6 +1,7 @@
 import 'server-only'
 import path from 'path'
 import { numberToWords } from '@/lib/shared/format'
+import { tenantLogoBuffer } from '@/lib/documents/store-logo'
 const PDFDocument = eval('require')('pdfkit')
 
 export interface QuotationBusiness {
@@ -127,11 +128,12 @@ function rect(doc: any, x: number, y: number, w: number, h: number) {
   doc.rect(x, y, w, h).stroke()
 }
 
-export function generateQuotationPDF(
+export async function generateQuotationPDF(
   data: QuotationData,
   items: QuotationItem[],
   business: QuotationBusiness
 ): Promise<Buffer> {
+  const logoBuf = await tenantLogoBuffer()
   return new Promise((resolve, reject) => {
     const fontsDir = path.join(process.cwd(), 'public', 'fonts')
     const F = path.join(fontsDir, 'NotoSans-Regular.ttf')
@@ -166,11 +168,12 @@ export function generateQuotationPDF(
     const hw = Math.round(metaW / 2)
     const hw2 = metaW - hw
 
-    const logoPath = path.join(process.cwd(), 'public', 'images', 'logo.png')
     const logoSz = 38
-    try {
-      doc.image(logoPath, LM + 3, topY + 4, { width: logoSz, height: logoSz })
-    } catch {}
+    if (logoBuf) {
+      try {
+        doc.image(logoBuf, LM + 3, topY + 4, { width: logoSz, height: logoSz })
+      } catch {}
+    }
 
     const bizX = LM + 3 + logoSz + 6
     const bizW = leftW - logoSz - 16

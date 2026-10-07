@@ -53,10 +53,11 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
                'dimension', pu.dimension, 'min_qty', pu.min_qty, 'max_qty', pu.max_qty, 'qty_step', pu.qty_step
              ) ORDER BY pu.is_base DESC
            )
-           FROM product_units pu WHERE pu.product_id = p.id
+           FROM product_units pu WHERE pu.product_id = p.id AND NOT COALESCE(p.is_digital, FALSE)
           ),
           '[]'::json
-        ) AS product_units
+        ) AS product_units,
+        COALESCE(p.is_digital, FALSE) AS is_digital
       FROM products p
       WHERE p.slug = $1 AND p.is_active = true
     `,
@@ -73,6 +74,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       variant_min_price: product.variant_min_price ?? null,
       variant_min_mrp: product.variant_min_mrp ?? null,
       variant_stock_total: product.variant_stock_total ?? 0,
+      is_digital: !!product.is_digital,
     })
   } catch (err) {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })

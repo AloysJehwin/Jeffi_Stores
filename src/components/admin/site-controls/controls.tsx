@@ -2,6 +2,7 @@
 
 import { useState, ReactNode, useEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import Toggle from '@/components/ui/Toggle'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -119,7 +120,7 @@ export function TextControl({
         }}
         onBlur={save}
         disabled={saving || !canWrite}
-        className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60"
+        className="w-full px-3 h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60"
       />
     </div>
   )
@@ -252,7 +253,7 @@ export function NumberControl({
           }}
           onBlur={save}
           disabled={saving || !canWrite}
-          className={`w-full ${prefix ? 'pl-7' : 'pl-3'} ${suffix ? 'pr-12' : 'pr-3'} py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60`}
+          className={`w-full ${prefix ? 'pl-7' : 'pl-3'} ${suffix ? 'pr-12' : 'pr-3'} h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60`}
         />
         {suffix && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{suffix}</span>
@@ -269,6 +270,7 @@ export function ToggleControl({
   initial,
   locked,
   lockedHint,
+  refreshOnSave,
 }: {
   settingKey: string
   label: string
@@ -276,7 +278,10 @@ export function ToggleControl({
   initial: boolean
   locked?: boolean
   lockedHint?: string
+  /** Re-render the page after a save, for toggles that lock or unlock others. */
+  refreshOnSave?: boolean
 }) {
+  const router = useRouter()
   const { showToast } = useToast()
   const canWrite = useCanWrite('settings:write')
   const [checked, setChecked] = useState(initial)
@@ -291,7 +296,10 @@ export function ToggleControl({
     if (!ok) {
       setChecked(!next)
       showToast('Failed to save', 'error')
-    } else showToast('Saved', 'success')
+    } else {
+      showToast('Saved', 'success')
+      if (refreshOnSave) router.refresh()
+    }
   }
 
   return (
@@ -530,7 +538,7 @@ export function KeyboardShortcutControl({
             onKeyDown={handleKeyDown}
             placeholder="key"
             title="Click and press any letter or number"
-            className="w-full text-center px-2 py-1.5 text-sm font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 disabled:opacity-60 cursor-pointer caret-transparent"
+            className="w-full text-center px-2 h-control-sm text-sm font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 disabled:opacity-60 cursor-pointer caret-transparent"
           />
         )}
       </div>

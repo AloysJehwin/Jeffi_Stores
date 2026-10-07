@@ -5,7 +5,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
 import { sendAdminContactEmail } from '@/lib/email'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
-import { buildVarMap, substituteVars } from '@/lib/shared/template-vars'
+import { renderTemplate, resolveTemplateVariables } from '@/lib/templates/variables'
 
 const Schema = z.object({
   subject: zNonEmpty,
@@ -56,12 +56,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   if (!email) return NextResponse.json({ error: 'No customer email for this order' }, { status: 400 })
 
-  const vars = {
-    ...buildVarMap({ recipient: { email, first_name: firstName, last_name: lastName } }),
-    order_number: order.order_number || '',
-  }
-  const finalSubject = substituteVars(subject.trim(), vars)
-  const finalBody = substituteVars(body.trim(), vars)
+  const vars = await resolveTemplateVariables({
+    recipient: { email, first_name: firstName, last_name: lastName },
+    extra: { order_number: order.order_number || '' },
+  })
+  const finalSubject = renderTemplate(subject.trim(), vars)
+  const finalBody = renderTemplate(body.trim(), vars, { escape: !!isHtml })
 
   const result = await sendAdminContactEmail(email, name, finalSubject, finalBody, {
     isHtml: !!isHtml,

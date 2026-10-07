@@ -57,7 +57,7 @@ describe('validateCampaignBodyTemplate — input validation', () => {
 // 2. Single-product scenarios (restock, price_drop) — require {productCard}
 // ---------------------------------------------------------------------------
 describe('validateCampaignBodyTemplate — single-product scenarios', () => {
-  for (const kind of ['restock', 'price_drop']) {
+  for (const kind of ['restock', 'price_drop', 'back_in_stock_wishlist', 'review_photo_followup']) {
     describe(`kind=${kind}`, () => {
       it('passes when {productCard} is present', () => {
         const result = validateCampaignBodyTemplate(BODY_WITH_PRODUCT_CARD, { kind })
@@ -99,6 +99,13 @@ const MULTI_KINDS = [
   'review_reminder',
   'winback_90',
   'winback_180',
+  'viewed_product',
+  'viewed_category',
+  'high_value_cart',
+  'cart_price_drop',
+  'wishlist_reminder',
+  'replenishment',
+  'subscription_renewal',
 ]
 
 describe('validateCampaignBodyTemplate — multi-product scenarios', () => {

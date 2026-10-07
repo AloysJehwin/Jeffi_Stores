@@ -38,8 +38,11 @@ export function buildTenantSchemaSql(): string {
       parts.push(`-- ==== ${file} ====\n${stripPsqlMetaCommands(fs.readFileSync(p, 'utf8'))}`)
     }
   }
-  const raw = stripExtensionComments(parts.join('\n\n'))
-  return guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(syncTableColumns(raw))))
+  const raw = stripPlatformOnlySeeds(stripExtensionComments(parts.join('\n\n')))
+  const built = guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(syncTableColumns(raw))))
+  // Tenant-only cleanup: demote any pre-existing 'administrator' admin to 'super_admin' (the top of
+  // the tenant hierarchy). Idempotent; only reaches tenant DBs because this build is the tenant blob.
+  return `${built}\n\n-- ==== tenant role cleanup (#488) ====\nUPDATE public.admins SET role = 'super_admin' WHERE role = 'administrator';`
 }
 
 export interface DesiredColumn {
@@ -162,6 +165,20 @@ function splitTopLevel(body: string): string[] {
  */
 function stripExtensionComments(sql: string): string {
   return sql.replace(/^\s*COMMENT ON EXTENSION\b[^;]*;\s*$/gim, '')
+}
+
+/**
+ * Drop platform-only seed statements before the schema is applied to a TENANT DB. The
+ * `administrator` role exists only on the main store (admin.jeffistores.in), where it sits above
+ * super_admin and short-circuits every scope check via isPlatformAdmin(); the tenant hierarchy is
+ * only super_admin > admin > moderator. database/users.sql seeds that role onto admin@jeffistores.in
+ * — correct for the platform DB, but it must never run on a tenant (a tenant admin on that email
+ * would wrongly bypass all plan entitlements). The platform DB applies users.sql unstripped, so the
+ * seed still runs there. Matches the UPDATE ... SET role = 'administrator' ... block, which is the
+ * only platform-only seed in the tenant schema files.
+ */
+function stripPlatformOnlySeeds(sql: string): string {
+  return sql.replace(/UPDATE\s+public\.admins\s+a\s+SET\s+role\s*=\s*'administrator'[\s\S]*?;/gi, '')
 }
 
 /**

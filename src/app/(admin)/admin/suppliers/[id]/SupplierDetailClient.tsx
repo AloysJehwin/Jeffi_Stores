@@ -167,7 +167,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
         </div>
         <Link
           href={ap(`/admin/inventory?tab=suppliers`)}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
         >
           All Suppliers
         </Link>

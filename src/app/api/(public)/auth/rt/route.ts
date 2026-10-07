@@ -43,6 +43,7 @@ export async function POST(request: NextRequest) {
     ['business', request.cookies.get('business_sid')?.value],
     ['owner', request.cookies.get('owner_sid')?.value],
     ['admin', request.cookies.get(adminCookieNameForHost(host))?.value],
+    ['vault', request.cookies.get('vault_sid')?.value],
   ]
   const present = candidates.filter((c): c is [PrincipalType, string] => !!c[1])
   if (present.length === 0) return NextResponse.json({ ok: true, now, exp: null, bound: 0, types: [] })

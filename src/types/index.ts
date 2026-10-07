@@ -109,7 +109,7 @@ export interface Order {
   customer_email: string
   customer_phone: string
   customer_name: string
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'refunded'
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'granted' | 'cancelled' | 'refunded'
   payment_status: 'unpaid' | 'paid' | 'partial' | 'refunded'
   subtotal: number
   discount_amount: number

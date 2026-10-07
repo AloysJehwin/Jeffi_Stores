@@ -531,14 +531,14 @@ export default function AdvancedFilterPanel({
               <button
                 type="button"
                 onClick={reset}
-                className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors"
+                className="px-3 h-control-sm text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors"
               >
                 Reset All
               </button>
               <button
                 type="button"
                 onClick={apply}
-                className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
+                className="px-5 h-control-sm text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
               >
                 Apply Filters
               </button>
@@ -586,14 +586,14 @@ export default function AdvancedFilterPanel({
                 <button
                   type="button"
                   onClick={reset}
-                  className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors"
+                  className="px-3 h-control-sm text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors"
                 >
                   Reset All
                 </button>
                 <button
                   type="button"
                   onClick={apply}
-                  className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
+                  className="px-5 h-control-sm text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
                 >
                   Apply Filters
                 </button>

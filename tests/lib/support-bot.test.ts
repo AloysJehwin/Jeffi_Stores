@@ -124,6 +124,17 @@ describe('getBotPayload — all orders list', () => {
 })
 
 describe('getBotPayload — tracking', () => {
+  it('track a granted (digital) order → explains there is nothing to ship', () => {
+    const p = getBotPayload('track my order', [makeOrder({ status: 'granted' })])
+    expect(p.type).toBe('text_actions')
+    if (p.type === 'text_actions') expect(p.text).toMatch(/digital order/)
+  })
+
+  it('granted orders are not offered for return', () => {
+    const p = getBotPayload('return order #ORD-001', [makeOrder({ status: 'granted' })])
+    expect(JSON.stringify(p)).not.toMatch(/Request Return/i)
+  })
+
   it('track my order → order_detail with view action', () => {
     const p = getBotPayload('track my order', ONE_ORDER)
     expect(p.type).toBe('order_detail')

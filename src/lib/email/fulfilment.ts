@@ -4,12 +4,13 @@ import {
   mailShell,
   customerMailFromAsync,
   currentBrandNameAsync,
-  currentAdminBaseUrl,
+  currentAdminBaseUrlAsync,
   storeContactLine,
   storeAddressLine,
   storeBaseUrlAsync,
   type ReturnEmailEvent,
 } from './shared'
+import { orderUrlById } from '@/lib/shared/customer-links'
 
 export async function sendReturnStatusEmail(
   recipientEmail: string | string[],
@@ -20,13 +21,15 @@ export async function sendReturnStatusEmail(
   extra?: {
     adminNotes?: string
     replacementOrderNumber?: string
+    replacementOrderId?: string
     returnType?: string
     reason?: string
-    appUrl?: string
   }
 ): Promise<{ success: boolean; error?: unknown }> {
-  const appUrl = extra?.appUrl || (await storeBaseUrlAsync())
-  const orderLink = `${appUrl}/account/orders/${orderId}`
+  // Each order's own page, on the business portal for a business customer.
+  const orderLink = await orderUrlById(orderId)
+  const replacementLink = extra?.replacementOrderId ? await orderUrlById(extra.replacementOrderId) : null
+  const adminBase = await currentAdminBaseUrlAsync()
   const to = Array.isArray(recipientEmail) ? recipientEmail.join(', ') : recipientEmail
 
   const subjects: Record<ReturnEmailEvent, string> = {
@@ -45,7 +48,7 @@ export async function sendReturnStatusEmail(
         <p style="margin:0 0 6px"><strong>Type:</strong> ${extra?.returnType || 'N/A'}</p>
         <p style="margin:0"><strong>Reason:</strong> ${extra?.reason || 'N/A'}</p>
       </div>
-      <div class="cta"><a href="${currentAdminBaseUrl()}/orders/${orderId}" class="button">Review Request</a></div>
+      <div class="cta"><a href="${adminBase}/orders/${encodeURIComponent(orderId)}" class="button">Review Request</a></div>
     `,
     approved: `
       <p>Your return/replacement request for order <strong>#${orderNumber}</strong> has been <strong style="color:#16a34a;">approved</strong>.</p>
@@ -68,7 +71,12 @@ export async function sendReturnStatusEmail(
     replacement_created: `
       <p>Great news! Your replacement order has been created for original order <strong>#${orderNumber}</strong>.</p>
       ${extra?.replacementOrderNumber ? `<p>Your new order number is <strong>#${extra.replacementOrderNumber}</strong>. It has been confirmed and will be processed shortly.</p>` : ''}
-      <div class="cta"><a href="${orderLink}" class="button">View Original Order</a></div>
+      <div class="cta">${
+        replacementLink
+          ? `<a href="${replacementLink}" class="button">View Replacement Order</a></div>
+      <p class="muted" style="text-align:center;"><a href="${orderLink}">View the original order</a></p>`
+          : `<a href="${orderLink}" class="button">View Original Order</a></div>`
+      }
     `,
   }
 
@@ -110,10 +118,12 @@ export async function sendPaymentRetryEmail(
   customerEmail: string,
   customerName: string,
   orderNumber: string,
-  orderTotal: number
+  orderTotal: number,
+  orderId: string
 ) {
   const BASE_URL = await storeBaseUrlAsync()
-  const shopUrl = `${BASE_URL}/products`
+  // The order page carries the Retry Payment button for a failed payment.
+  const orderLink = await orderUrlById(orderId)
   const brand = await currentBrandNameAsync()
   const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(orderTotal)
 
@@ -124,8 +134,8 @@ export async function sendPaymentRetryEmail(
     content: `
       <p>Hi ${customerName},</p>
       <p>We're sorry your purchase didn't go through. It looks like the payment for order <strong>#${orderNumber}</strong> (${formatted}) could not be processed.</p>
-      <p>No worries — simply visit our store and place a new order whenever you're ready. Your cart items are still available.</p>
-      <div class="cta"><a href="${shopUrl}" class="button">Shop Again →</a></div>
+      <p>No worries — you can retry the payment from your order page, or place a new order whenever you're ready.</p>
+      <div class="cta"><a href="${orderLink}" class="button">Retry Payment →</a></div>
       <p class="muted">If you need any help or have questions, just reply to this email and we'll be happy to assist.</p>
     `,
     footerLines: [`© ${new Date().getFullYear()} ${brand} &bull; <a href="${BASE_URL}">${brand}</a>`],
@@ -140,7 +150,7 @@ export async function sendPaymentRetryEmail(
       kind: 'order',
       templateName: 'payment_retry',
       entityType: 'orders',
-      entityId: null,
+      entityId: orderId,
       metadata: { orderNumber, orderTotal },
     })
     return { success: true }

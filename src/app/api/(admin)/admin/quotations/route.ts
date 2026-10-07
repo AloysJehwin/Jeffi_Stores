@@ -207,6 +207,8 @@ export async function POST(request: NextRequest) {
     )
     const seq = (parseInt(maxRow?.max_seq || '0') || 0) + 1
     const quoteNumber = buildQuoteNumber(now, seq)
+    const { storeOrigin } = await import('@/lib/catalog/brand')
+    const storeState = (await storeOrigin()).state
 
     const qt = await queryOne<any>(
       `INSERT INTO quotations (
@@ -225,7 +227,7 @@ export async function POST(request: NextRequest) {
         fields.consignee_addr1 || '',
         fields.consignee_addr2 || null,
         fields.consignee_city || '',
-        fields.consignee_state || 'Chhattisgarh',
+        fields.consignee_state || storeState,
         fields.consignee_gstin || null,
         fields.consignee_phone || null,
         fields.consignee_pincode || null,

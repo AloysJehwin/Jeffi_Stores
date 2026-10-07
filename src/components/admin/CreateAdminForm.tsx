@@ -198,7 +198,7 @@ export default function CreateAdminForm({
             setCertInfo(null)
             setIsOpen(false)
           }}
-          className="mt-4 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          className="mt-4 bg-green-600 hover:bg-green-700 text-white px-4 h-control rounded-lg text-sm font-medium"
         >
           Done
         </button>
@@ -237,7 +237,7 @@ export default function CreateAdminForm({
             required
             value={form.first_name}
             onChange={e => setForm(prev => ({ ...prev, first_name: e.target.value }))}
-            className="w-full border border-border-secondary rounded-lg px-3 py-2 text-sm bg-surface text-foreground placeholder:text-foreground-muted focus:ring-accent-500 focus:border-accent-500"
+            className="w-full border border-border-secondary rounded-lg px-3 h-control text-sm bg-surface text-foreground placeholder:text-foreground-muted focus:ring-accent-500 focus:border-accent-500"
           />
         </div>
         <div>
@@ -250,7 +250,7 @@ export default function CreateAdminForm({
             required
             value={form.last_name}
             onChange={e => setForm(prev => ({ ...prev, last_name: e.target.value }))}
-            className="w-full border border-border-secondary rounded-lg px-3 py-2 text-sm bg-surface text-foreground placeholder:text-foreground-muted focus:ring-accent-500 focus:border-accent-500"
+            className="w-full border border-border-secondary rounded-lg px-3 h-control text-sm bg-surface text-foreground placeholder:text-foreground-muted focus:ring-accent-500 focus:border-accent-500"
           />
         </div>
       </div>
@@ -265,7 +265,7 @@ export default function CreateAdminForm({
           required
           value={form.email}
           onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
-          className="w-full border border-border-secondary rounded-lg px-3 py-2 text-sm bg-surface text-foreground placeholder:text-foreground-muted focus:ring-accent-500 focus:border-accent-500"
+          className="w-full border border-border-secondary rounded-lg px-3 h-control text-sm bg-surface text-foreground placeholder:text-foreground-muted focus:ring-accent-500 focus:border-accent-500"
         />
       </div>
 
@@ -277,7 +277,7 @@ export default function CreateAdminForm({
               key={r}
               type="button"
               onClick={() => setForm(prev => ({ ...prev, role: r }))}
-              className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              className={`flex-1 px-3 h-control rounded-lg border text-sm font-medium transition-colors ${
                 form.role === r
                   ? 'border-accent-500 bg-accent-500/10 text-accent-600 dark:text-accent-400'
                   : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'
@@ -304,14 +304,14 @@ export default function CreateAdminForm({
         <button
           type="submit"
           disabled={loading}
-          className="bg-accent-500 hover:bg-accent-600 disabled:bg-gray-400 text-white px-6 py-2 rounded-lg font-semibold text-sm transition-colors"
+          className="bg-accent-500 hover:bg-accent-600 disabled:bg-gray-400 text-white px-6 h-control rounded-lg font-semibold text-sm transition-colors"
         >
           {loading ? 'Creating...' : 'Create Admin & Generate Certificate'}
         </button>
         <button
           type="button"
           onClick={() => setIsOpen(false)}
-          className="bg-surface-secondary hover:bg-border-default text-foreground-secondary px-6 py-2 rounded-lg font-semibold text-sm transition-colors"
+          className="bg-surface-secondary hover:bg-border-default text-foreground-secondary px-6 h-control rounded-lg font-semibold text-sm transition-colors"
         >
           Cancel
         </button>

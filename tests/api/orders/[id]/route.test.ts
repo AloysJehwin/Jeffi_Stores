@@ -57,6 +57,10 @@ vi.mock('@/lib/shared/marketing', () => ({
 vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({ inventoryValidationEnabled: true }),
 }))
+vi.mock('@/lib/vault/links', () => ({
+  vaultLibraryUrl: vi.fn(async () => 'https://vault.x/library'),
+  vaultItemUrl: vi.fn(async (id: string) => `https://vault.x/item/${id}`),
+}))
 vi.mock('@/lib/shared/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
@@ -155,6 +159,39 @@ describe('GET /api/orders/[id]', () => {
     expect(body.order.id).toBe('order-1')
     expect(body.order.items).toHaveLength(1)
     expect(body.order.items[0].returnAllowed).toBe(true)
+  })
+
+  it('exposes vault links and blocks returns for digital lines', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ ...BASE_ORDER, status: 'granted' })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        product_id: 'p1',
+        product_name: 'Ebook',
+        quantity: '1',
+        unit_price: '500',
+        total_price: '500',
+        is_digital: true,
+        entitlement_status: 'active',
+        access_revoked_at: null,
+        products: { slug: 'ebook' },
+        return_allowed: true,
+        return_window_days: '7',
+        replacement_allowed: true,
+        replacement_window_days: '7',
+      },
+    ])
+    const body = await (await GET(makeReq('GET') as any, PARAMS)).json()
+    expect(body.order.isAllDigital).toBe(true)
+    expect(body.order.vaultUrl).toBe('https://vault.x/library')
+    expect(body.order.items[0]).toMatchObject({
+      isDigital: true,
+      accessGranted: true,
+      vaultUrl: 'https://vault.x/item/p1',
+      returnAllowed: false,
+      replacementAllowed: false,
+    })
   })
 
   it('takes business branch when x-auth-portal=business header set', async () => {
@@ -338,6 +375,29 @@ describe('PATCH /api/orders/[id]', () => {
     expect(res.status).toBe(200)
     const called = (vi.mocked(db.query).mock.calls[0]?.[0] || '') as string
     expect(called).toMatch(/delivered_at/)
+  })
+
+  it('treats granted as terminal for fulfilment transitions', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      status: 'granted',
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    const res = await PATCH(makeReq('PATCH', { status: 'return_requested' }) as any, PARAMS)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/cannot transition/i)
+  })
+
+  it('does not allow moving a processing order to granted without an override', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      status: 'processing',
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    const res = await PATCH(makeReq('PATCH', { status: 'granted' }) as any, PARAMS)
+    expect(res.status).toBe(400)
   })
 
   it('does NOT auto-refund or create a refund task when cancelling a paid order', async () => {

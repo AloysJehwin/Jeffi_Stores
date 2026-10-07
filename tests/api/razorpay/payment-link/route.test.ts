@@ -23,6 +23,9 @@ vi.mock('@/lib/shared/db', () => ({
 vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstanceFor: vi.fn(),
 }))
+vi.mock('@/lib/shared/customer-links', () => ({
+  orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
+}))
 
 import { POST } from '@/app/api/(public)/razorpay/payment-link/route'
 import * as jwt from '@/lib/auth/jwt'
@@ -112,6 +115,8 @@ describe('POST /api/razorpay/payment-link', () => {
     expect(body.paymentLinkId).toBe('plink_123')
     expect(body.paymentLinkUrl).toBe('https://rzp.io/l/abc')
     expect(body.expiresAt).toBeDefined()
+    // After paying, the customer returns to their order (there is no separate callback route).
+    expect(mockCreate.mock.calls[0][0].callback_url).toMatch(/^https:\/\/acme\.jeffistores\.in\/account\/orders\/[^/]+$/)
   })
 
   it('returns existing payment link when one is already created', async () => {

@@ -2,23 +2,16 @@ import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import {
   customerMailFromAsync,
   currentBrandNameAsync,
-  platformAdminEmail,
+  currentAdminBaseUrlAsync,
   storeContactLine,
-  resolveCurrentTenant,
+  businessBaseUrlAsync,
 } from '@/lib/catalog/brand'
+import { getAdminNotificationEmails } from '@/lib/email/shared'
 import { mailShell } from '@/lib/shared/mail-template'
 
-const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
-
-// Was 'admin@admin.jeffistores.in' — a typo'd host that does not exist, so the fallback
-// silently bounced whenever adminEmail() was unset.
-const adminEmail = () => platformAdminEmail()
-
-/** The business portal for whichever store this mail belongs to. */
-async function businessUrl(): Promise<string> {
-  const t = await resolveCurrentTenant()
-  return t?.slug ? `https://${t.slug}.business.${PLATFORM_DOMAIN}` : `https://business.${PLATFORM_DOMAIN}`
-}
+// The business portal for whichever store this mail belongs to ({slug}.business. only on the plans
+// that have that host; businessBaseUrlAsync knows which).
+const businessUrl = () => businessBaseUrlAsync()
 
 async function baseLayout(title: string, body: string) {
   const brand = await currentBrandNameAsync()
@@ -51,7 +44,10 @@ async function send(
 }
 
 // RFQ submitted — notify business user + admin
-export async function sendRfqSubmittedEmail(toEmail: string, name: string, rfqNumber: string) {
+export async function sendRfqSubmittedEmail(toEmail: string, name: string, rfqNumber: string, rfqId?: string) {
+  // The RFQ's own page: /quotes/<id> on the portal, /business/rfqs/<id> in admin.
+  const rfqPath = rfqId ? `/${encodeURIComponent(rfqId)}` : ''
+  const [portal, adminBase] = await Promise.all([businessUrl(), currentAdminBaseUrlAsync()])
   const userHtml = await baseLayout(
     `RFQ ${rfqNumber} submitted`,
     `
@@ -61,7 +57,7 @@ export async function sendRfqSubmittedEmail(toEmail: string, name: string, rfqNu
       <p style="margin:0 0 6px"><strong>RFQ No.:</strong> ${rfqNumber}</p>
     </div>
     <p>You can track the status of your RFQ by logging into your account.</p>
-    <div class="cta"><a href="${await businessUrl()}/rfqs" class="button" style="color:#ffffff;">View My RFQs</a></div>
+    <div class="cta"><a href="${portal}/quotes${rfqPath}" class="button" style="color:#ffffff;">${rfqId ? 'View Your RFQ' : 'View My RFQs'}</a></div>
   `
   )
 
@@ -73,7 +69,7 @@ export async function sendRfqSubmittedEmail(toEmail: string, name: string, rfqNu
       <p style="margin:0 0 6px"><strong>RFQ No.:</strong> ${rfqNumber}</p>
       <p style="margin:0"><strong>Submitted By:</strong> ${name} (${toEmail})</p>
     </div>
-    <div class="cta"><a href="https://admin.jeffistores.in/admin/business/rfqs" class="button" style="color:#ffffff;">View RFQs</a></div>
+    <div class="cta"><a href="${adminBase}/business/rfqs${rfqPath}" class="button" style="color:#ffffff;">${rfqId ? 'Review RFQ' : 'View RFQs'}</a></div>
   `
   )
 
@@ -82,7 +78,8 @@ export async function sendRfqSubmittedEmail(toEmail: string, name: string, rfqNu
     send(toEmail, `RFQ ${rfqNumber} submitted — ${brand}`, userHtml, {
       templateName: 'rfq_submitted_user',
     }),
-    send(adminEmail(), `New RFQ ${rfqNumber} from ${name}`, adminHtml, {
+    // This store's own admins (the platform's only off-tenant).
+    send(await getAdminNotificationEmails(), `New RFQ ${rfqNumber} from ${name}`, adminHtml, {
       templateName: 'rfq_submitted_admin',
     }),
   ])
@@ -108,7 +105,7 @@ export async function sendRfqConvertedToQuotationEmail(
       <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
     </div>
     <div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Quotation</a></div>
-    <p>Please review the quotation. If you have any questions, contact us at +91 96853 54099.</p>
+    <p>Please review the quotation. If you have any questions, just reply to this email.</p>
   `
   )
   const brand = await currentBrandNameAsync()
@@ -201,14 +198,17 @@ export async function sendBusinessOrderStatusEmail(
     processing: 'Processing',
     shipped: 'Shipped',
     delivered: 'Delivered',
+    granted: 'Access granted',
     cancelled: 'Cancelled',
   }
   const label = statusLabel[status] || status
+  const vaultUrl = status === 'granted' ? await import('@/lib/vault/links').then(m => m.vaultLibraryUrl()) : null
   const html = await baseLayout(
     `Order ${orderNumber} — ${label}`,
     `
     <p>Dear ${name},</p>
     <p>Your order <strong>${orderNumber}</strong> is now <strong>${label}</strong>.</p>
+    ${vaultUrl ? `<p>Access granted — open your vault to view your digital items.</p><div class="cta"><a href="${vaultUrl}" class="button" style="color:#ffffff;">Open my vault</a></div>` : ''}
     ${invoiceViewUrl ? `<div class="cta"><a href="${invoiceViewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>` : ''}
     <p>For any queries, contact us${contact ? ` at ${contact}` : ''}.</p>
   `

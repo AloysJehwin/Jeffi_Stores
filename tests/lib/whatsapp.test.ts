@@ -9,6 +9,11 @@ vi.mock('@/lib/shared/message-log', () => ({
   logMessage: vi.fn(),
 }))
 
+// Order links resolve to the exact order page on the customer's store.
+vi.mock('@/lib/shared/customer-links', () => ({
+  orderUrlByNumber: vi.fn(async (n: string) => (n === 'UNKNOWN' ? null : `https://acme.jeffistores.in/account/orders/id-${n}`)),
+}))
+
 import { logMessage } from '@/lib/shared/message-log'
 
 const mockLog = vi.mocked(logMessage)
@@ -67,7 +72,14 @@ describe('sendTemplate path', () => {
     const vars = JSON.parse(messagesCreate.mock.calls[0][0].contentVariables)
     expect(vars['1']).toBe('ORD2')
     expect(vars['2']).toBe('courier')
-    expect(vars['3']).toBe('jeffistores.in/orders')
+    // No AWB yet: the order's own page, not a made-up platform path.
+    expect(vars['3']).toBe('https://acme.jeffistores.in/account/orders/id-ORD2')
+  })
+
+  it('sendOrderShippedWhatsApp keeps the AWB when there is one', async () => {
+    const wa = await loadWa()
+    await wa.sendOrderShippedWhatsApp({ phone: '9876543210', orderNumber: 'ORD3', trackingId: 'AWB123' })
+    expect(JSON.parse(messagesCreate.mock.calls[0][0].contentVariables)['3']).toBe('AWB123')
   })
 
   it('sendOrderDeliveredWhatsApp / Cancelled / OutForDelivery return true', async () => {

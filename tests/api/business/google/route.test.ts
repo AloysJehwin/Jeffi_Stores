@@ -108,39 +108,28 @@ describe('POST /api/business/google', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns needsBusinessProfile=true for new user without profile fields', async () => {
+  it('returns newUser + profile for an unknown Google identity WITHOUT creating an account', async () => {
     mockIdTokenOk()
-    mockQueryOne.mockResolvedValue(null) // user not found
+    mockQueryOne.mockResolvedValue(null) // no existing business user
     const res = await POST(makePost({ idToken: 'token' }) as any)
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.needsBusinessProfile).toBe(true)
-    expect(body.email).toBe('biz@example.com')
+    // Account creation is deferred to /api/business/google/complete; this route only reports the profile.
+    expect(body.newUser).toBe(true)
+    expect(body.profile.email).toBe('biz@example.com')
+    // No INSERT / cookie issuance happened.
+    expect(mockQuery).not.toHaveBeenCalled()
+    expect(mockCookieStore.set).not.toHaveBeenCalled()
   })
 
-  it('creates new business user when profile fields provided', async () => {
+  it('does not create an account even when business fields are posted (deferred to complete)', async () => {
     mockIdTokenOk()
-    const newUser = { ...APPROVED_USER, approval_status: 'pending' }
-    mockQueryOne
-      .mockResolvedValueOnce(null) // no existing user
-      .mockResolvedValueOnce(newUser) // INSERT user
+    mockQueryOne.mockResolvedValue(null)
     const res = await POST(makePost({ idToken: 'token', ...BIZ_PROFILE_FIELDS }) as any)
     expect(res.status).toBe(200)
     const body = await res.json()
-    // New users pending approval get approvalStatus back, not a full login
-    expect(body.approvalStatus).toBe('pending')
-    expect(body.message).toMatch(/awaiting approval/i)
-  })
-
-  it('returns 500 when user insert fails', async () => {
-    mockIdTokenOk()
-    mockQueryOne
-      .mockResolvedValueOnce(null) // no existing user
-      .mockResolvedValueOnce(null) // insert fails
-    const res = await POST(makePost({ idToken: 'token', ...BIZ_PROFILE_FIELDS }) as any)
-    expect(res.status).toBe(500)
-    const body = await res.json()
-    expect(body.error).toMatch(/failed to create account/i)
+    expect(body.newUser).toBe(true)
+    expect(mockQuery).not.toHaveBeenCalled()
   })
 
   it('returns 403 for inactive existing user', async () => {

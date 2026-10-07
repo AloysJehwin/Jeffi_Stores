@@ -148,7 +148,7 @@ export default function CustomerTags({ customerId, initialTags, canWrite: canWri
             type="button"
             onClick={() => setOpen(o => !o)}
             disabled={busy || available.length === 0}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-foreground-muted border border-dashed border-border-secondary rounded-lg hover:border-border-default hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-2.5 h-control-sm text-xs font-medium text-foreground-muted border border-dashed border-border-secondary rounded-lg hover:border-border-default hover:text-foreground transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -173,7 +173,7 @@ export default function CustomerTags({ customerId, initialTags, canWrite: canWri
                         add(def.tag)
                         setOpen(false)
                       }}
-                      className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm hover:bg-surface-secondary transition-colors disabled:opacity-50 text-left"
+                      className="flex items-center gap-2 px-2 h-control-sm rounded-lg text-sm hover:bg-surface-secondary transition-colors disabled:opacity-50 text-left"
                     >
                       <span className={`w-2 h-2 rounded-full shrink-0 ${cls.pill}`} />
                       <span className="text-foreground">{def.tag}</span>

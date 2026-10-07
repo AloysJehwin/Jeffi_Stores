@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Mail, Tag, Package, X, ChevronDown, Wand2 } from 'lucide-react'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
-import RichTextEditor from '@/components/admin/RichTextEditor'
+import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
@@ -100,7 +100,7 @@ const QUICK_TEMPLATES: Record<string, QuickTemplate[]> = {
   new: [
     {
       label: 'Welcome',
-      subject: "Welcome to Jeffi Store's!",
+      subject: 'Welcome to {store_name}!',
       headline: 'Welcome to the family!',
       body: "We're thrilled to have you with us. Here's everything you need to know to get started, plus a special first-order offer.",
     },
@@ -154,7 +154,7 @@ const DEFAULT_TEMPLATES: QuickTemplate[] = [
   },
   {
     label: 'Announcement',
-    subject: "Important update from Jeffi Store's",
+    subject: 'Important update from {store_name}',
     headline: 'Exciting news!',
     body: 'We have some great news to share with you. Read on to find out more.',
   },
@@ -352,7 +352,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
         <button
           type="button"
           onClick={onClose}
-          className="mt-2 px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors"
+          className="mt-2 px-4 h-control rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors"
         >
           Close
         </button>
@@ -391,7 +391,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
                   key={tpl.label}
                   type="button"
                   onClick={() => applyQuickTemplate(tpl)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-border-secondary bg-surface text-foreground-muted hover:text-foreground hover:border-accent-500 hover:bg-accent-500/5 transition-colors"
+                  className="px-3 h-control-sm rounded-lg text-xs font-semibold border border-border-secondary bg-surface text-foreground-muted hover:text-foreground hover:border-accent-500 hover:bg-accent-500/5 transition-colors"
                 >
                   {tpl.label}
                 </button>
@@ -406,7 +406,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
                 key={t.value}
                 type="button"
                 onClick={() => setTemplateKey(t.value as 'promotion' | 'announcement')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                className={`px-3 h-control-sm rounded-lg text-xs font-semibold border transition-colors ${
                   templateKey === t.value
                     ? 'bg-accent-500 border-accent-500 text-white'
                     : 'bg-surface border-border-secondary text-foreground-muted hover:text-foreground'
@@ -466,7 +466,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
               Message
             </label>
-            <RichTextEditor value={body} onChange={setBody} placeholder="Optional message body…" minHeight={180} />
+            <EmailComposer value={body} onChange={setBody} placeholder="Optional message body…" minHeight={180} />
             <p className="text-[11px] text-foreground-muted mt-1.5">
               Tokens like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code>{' '}
               are replaced per recipient at send time.
@@ -493,7 +493,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
                     setSelectedProduct(null)
                     setProductQuery('')
                   }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                  className={`flex items-center gap-1.5 px-3 h-control-sm rounded-lg text-xs font-semibold border transition-colors ${
                     attachMode === mode
                       ? 'bg-accent-500 border-accent-500 text-white'
                       : 'bg-surface border-border-secondary text-foreground-muted hover:text-foreground'
@@ -635,7 +635,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
               type="button"
               onClick={handleSend}
               disabled={sending || !subject.trim() || !headline.trim()}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+              className="flex items-center gap-1.5 px-4 h-control-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
             >
               {sending ? (
                 <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />

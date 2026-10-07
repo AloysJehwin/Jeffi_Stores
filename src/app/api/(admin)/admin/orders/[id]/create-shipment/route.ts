@@ -10,6 +10,7 @@ import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { listDelhiveryPickupLocations } from '@/lib/shipping/delhivery'
 import { walletBlocksShipment, chargeDeliveryEstimate } from '@/lib/payments/wallet'
+import { applyCourierEdd } from '@/lib/shipping/courier-edd'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 
@@ -36,6 +37,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const SELLER_NAME = bv.sellerName
     const SELLER_ADD = bv.sellerAddress
     const SELLER_PHONE = bv.sellerPhone
+    const { storeOrigin } = await import('@/lib/catalog/brand')
+    const RETURN_ORIGIN = await storeOrigin()
 
     const order = await queryOne<any>(
       `
@@ -43,7 +46,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         o.*,
         sa.full_name, sa.address_line1, sa.address_line2, sa.landmark,
         sa.city, sa.state, sa.postal_code, sa.phone AS consignee_phone,
-        u.email AS user_email
+        u.email AS user_email,
+        (SELECT COUNT(*) FROM order_items oi WHERE oi.order_id = o.id AND oi.is_digital IS NOT TRUE)::int
+          AS physical_item_count
       FROM orders o
       LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
       LEFT JOIN users u ON u.id = o.user_id
@@ -55,6 +60,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (order.awb_number)
       return NextResponse.json({ error: 'Shipment already created', awb: order.awb_number }, { status: 409 })
+    if (order.physical_item_count === 0)
+      return NextResponse.json({ error: 'This order has only digital items — nothing to ship.' }, { status: 422 })
 
     // Prepaid-wallet gate: the platform fronts the real Delhivery cost for this tenant, so block
     // shipment creation when the wallet is below its minimum (own_delhivery tenants are exempt —
@@ -117,7 +124,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       LEFT JOIN products p ON p.id = oi.product_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
       LEFT JOIN product_sub_variants sv ON sv.id = oi.sub_variant_id
-      WHERE oi.order_id = $1
+      WHERE oi.order_id = $1 AND oi.is_digital IS NOT TRUE
     `,
       [id]
     )
@@ -162,10 +169,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           order: invoiceRef,
           payment_mode: deliveryPaymentMode,
           return_pin: ORIGIN_PIN,
-          return_city: 'Raipur',
+          return_city: RETURN_ORIGIN.city,
           return_phone: SELLER_PHONE,
           return_add: SELLER_ADD,
-          return_state: 'Chhattisgarh',
+          return_state: RETURN_ORIGIN.state,
           return_country: 'India',
           products_desc: productDesc,
           hsn_code: '7318',
@@ -230,33 +237,34 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'No AWB returned by Delhivery' }, { status: 502 })
     }
 
-    // Fetch TAT (turnaround days) from Delhivery serviceability API — non-fatal
+    // Courier TAT from Delhivery's expected-TAT API (read-only, non-fatal). Recorded as the courier
+    // EDD; the tracking sync replaces it with Delhivery's own expected date once the parcel moves.
     let estimatedDeliveryDate: string | null = null
     try {
       const tatRes = await fetch(
-        `https://track.delhivery.com/api/kinko/v0.2/pickup/serviceability/?md=S&ss=Delivered&d_pin=${pin}&o_pin=${ORIGIN_PIN}`,
+        `https://track.delhivery.com/api/dc/expected_tat?origin_pin=${ORIGIN_PIN}&destination_pin=${pin}&mot=S&pdt=B2C`,
         { headers: { Authorization: `Token ${TOKEN}` }, next: { revalidate: 0 } }
       )
       if (tatRes.ok) {
         const tatData = await tatRes.json()
-        const tat = tatData?.tat ?? tatData?.[0]?.tat ?? null
-        if (typeof tat === 'number' && tat > 0) {
+        const tat = Number(tatData?.data?.tat ?? tatData?.tat ?? tatData?.[0]?.tat ?? NaN)
+        if (Number.isFinite(tat) && tat > 0) {
           estimatedDeliveryDate = addBusinessDays(new Date(), tat).toISOString().slice(0, 10)
         }
       }
     } catch {
-      // TAT lookup failed — proceed without EDD
+      // TAT lookup failed — keep the promised EDD
     }
 
     await query(
       `UPDATE orders SET awb_number = $1, status = 'processing',
-        estimated_delivery_date = COALESCE($3::date, estimated_delivery_date),
         shipment_status = COALESCE(shipment_status, 'created'),
-        delhivery_quoted_weight_kg = $4,
+        delhivery_quoted_weight_kg = $3,
         updated_at = NOW()
        WHERE id = $2`,
-      [awb, id, estimatedDeliveryDate, weightKg]
+      [awb, id, weightKg]
     )
+    await applyCourierEdd(id, estimatedDeliveryDate, 'created').catch(() => {})
 
     // Charge the estimated delivery cost to the wallet NOW, keyed to this AWB (platform-Delhivery
     // tenants only; own_delhivery exempt). This is the single deduction point for a forward

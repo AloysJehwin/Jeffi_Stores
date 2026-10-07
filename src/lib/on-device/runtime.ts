@@ -19,6 +19,14 @@ let worker: Worker | null = null
 let workerMobile = false
 let nextId = 1
 let lastError: string | null = null
+// Current store slug, so the worker loads THIS tenant's LoRA adapter (#489). Set once from the
+// storefront's StoreConfig before the first generate call; null = platform.
+let storeSlug: string | null = null
+
+/** Set the current store slug so on-device inference + fine-tuning use this tenant's namespace. */
+export function setOnDeviceStore(slug: string | null): void {
+  storeSlug = slug || null
+}
 type Pending = {
   resolve: (s: string) => void
   reject: (e: Error) => void
@@ -52,8 +60,8 @@ function ensureWorker(isMobile: boolean): Worker {
   if (worker) return worker
   workerMobile = isMobile
   worker = new Worker(new URL('./summary.worker.ts', import.meta.url), { type: 'module' })
-  // Send mobile flag before any generate request
-  worker.postMessage({ type: 'init', isMobile })
+  // Send mobile flag + store slug before any generate request so the worker loads this tenant's LoRA.
+  worker.postMessage({ type: 'init', isMobile, slug: storeSlug })
   const failAll = (err: string) => {
     lastError = err
     for (const [id, p] of pending) {
@@ -180,6 +188,8 @@ export async function maybeRunFineTune(
     })
     ftWorker.addEventListener('error', cleanup)
     ftWorker.addEventListener('messageerror', cleanup)
+    // Namespace the adapter to the current store so training writes to this tenant's key (#489).
+    ftWorker.postMessage({ type: 'init', slug: storeSlug })
     ftWorker.postMessage({ type: 'finetune', examples })
   } catch {
     // best-effort — never surface fine-tune failures to the user

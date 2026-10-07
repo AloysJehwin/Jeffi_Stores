@@ -661,6 +661,7 @@ export default async function ProductDetailPage({
                     mrp={relatedMrp}
                     mrpDiscount={relatedMrpDiscount}
                     effectiveStock={relatedStock}
+                    isDigital={!!relatedProduct.is_digital}
                     primaryImage={relatedPrimaryImage || null}
                     brandName={relatedProduct.brands?.name || null}
                     categoryName={relatedProduct.categories?.name || null}

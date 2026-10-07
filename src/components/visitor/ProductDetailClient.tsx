@@ -10,7 +10,9 @@ import BusinessPriceBadge from './BusinessPriceBadge'
 import RazorpayOffers from './RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useWishlist } from '@/contexts/WishlistContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { digitalActive } from '@/lib/catalog/digital'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { useRouter } from 'next/navigation'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
@@ -149,6 +151,10 @@ interface ProductDetailClientProps {
     target_gender?: string | null
     target_audience?: string[] | null
     is_cod_allowed?: boolean | null
+    is_digital?: boolean | null
+    is_subscription?: boolean | null
+    subscription_intervals?: string[] | null
+    owned_in_vault?: boolean | null
   }
   initialSkuParam?: string
   freeShippingThreshold?: number
@@ -529,7 +535,8 @@ export default function ProductDetailClient({
   reviewSummary,
 }: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
-  const [isInWishlist, setIsInWishlist] = useState(false)
+  const { has: inWishlist, toggle: toggleWishlist } = useWishlist()
+  const isInWishlist = inWishlist(product.id)
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [selectedUnit, setSelectedUnit] = useState<{
     key: string
@@ -549,7 +556,27 @@ export default function ProductDetailClient({
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
   const gstEnabled = useStoreConfig().flags.gstEnabled
+  const digitalMaster = useStoreConfig().flags.digitalProductsEnabled
+  const isDigital = digitalActive(digitalMaster, product.is_digital ?? false)
   const router = useRouter()
+  const [vaultOwned, setVaultOwned] = useState<{ owned: boolean; url: string | null }>({
+    owned: product.owned_in_vault ?? false,
+    url: null,
+  })
+
+  useEffect(() => {
+    if (!isDigital || !user) return
+    let cancelled = false
+    fetch(`/api/vault/owned?productId=${encodeURIComponent(product.id)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!cancelled && d) setVaultOwned({ owned: !!d.owned, url: d.url ?? null })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [isDigital, user, product.id])
 
   useEffect(() => {
     if (user?.email) setNotifyEmail(user.email)
@@ -652,31 +679,12 @@ export default function ProductDetailClient({
       return
     }
     setWishlistLoading(true)
-    try {
-      if (isInWishlist) {
-        const res = await fetch(`/api/wishlist?productId=${product.id}`, { method: 'DELETE', credentials: 'include' })
-        if (res.ok) {
-          setIsInWishlist(false)
-          showToast('Removed from wishlist', 'success')
-        }
-      } else {
-        const res = await fetch('/api/wishlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId: product.id }),
-          credentials: 'include',
-        })
-        if (res.ok) {
-          setIsInWishlist(true)
-          showToast('Added to wishlist!', 'success')
-        }
-      }
-    } catch {
-      showToast('Failed to update wishlist', 'error')
-    } finally {
-      setWishlistLoading(false)
-    }
-  }, [user, isInWishlist, product.id, product.slug])
+    const result = await toggleWishlist(product.id)
+    setWishlistLoading(false)
+    if (result === 'added') showToast('Added to wishlist!', 'success')
+    else if (result === 'removed') showToast('Removed from wishlist', 'success')
+    else showToast('Failed to update wishlist', 'error')
+  }, [user, product.id, product.slug, toggleWishlist])
 
   const handleShare = useCallback(async () => {
     const url = window.location.href
@@ -711,16 +719,24 @@ export default function ProductDetailClient({
         />
 
         <div className="hidden lg:block mt-4">
-          <DeliveryInfo {...policy} />
-          <PincodeChecker
-            pincode={pincode}
-            setPincode={setPincode}
-            pincodeResult={pincodeResult}
-            setPincodeResult={setPincodeResult}
-            pincodeChecking={pincodeChecking}
-            checkPincode={checkPincode}
-            pincodeRef={pincodeRef}
-          />
+          {isDigital ? (
+            <div className="rounded-lg border border-border-default bg-surface-secondary/40 p-4 text-sm text-foreground-secondary">
+              Digital product — delivered instantly to your vault. No shipping.
+            </div>
+          ) : (
+            <>
+              <DeliveryInfo {...policy} />
+              <PincodeChecker
+                pincode={pincode}
+                setPincode={setPincode}
+                pincodeResult={pincodeResult}
+                setPincodeResult={setPincodeResult}
+                pincodeChecking={pincodeChecking}
+                checkPincode={checkPincode}
+                pincodeRef={pincodeRef}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -838,6 +854,11 @@ export default function ProductDetailClient({
           launchDate={product.launch_date ?? null}
           discontinueDate={product.discontinue_date ?? null}
           stickyImage={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
+          digital={isDigital}
+          alreadyOwned={vaultOwned.owned}
+          vaultUrl={vaultOwned.url}
+          isSubscription={product.is_subscription ?? false}
+          subscriptionIntervals={product.subscription_intervals ?? null}
         />
 
         <RazorpayOffers />
