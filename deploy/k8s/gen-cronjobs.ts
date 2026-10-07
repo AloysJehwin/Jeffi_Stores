@@ -41,7 +41,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, ${id}, ${method}, '${path}']
               env:
                 - name: CRON_SECRET

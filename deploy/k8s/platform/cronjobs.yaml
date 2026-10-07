@@ -26,7 +26,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, delhivery_sync, POST, '/api/admin/delhivery/sync-statuses']
               env:
                 - name: CRON_SECRET
@@ -62,7 +62,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, cancel_stale_orders, GET, '/api/cron/cancel-stale-orders']
               env:
                 - name: CRON_SECRET
@@ -98,7 +98,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, sweep_auto_tasks, GET, '/api/cron/sweep-auto-tasks']
               env:
                 - name: CRON_SECRET
@@ -134,7 +134,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, dispatch_mailer, GET, '/api/cron/dispatch-mailer']
               env:
                 - name: CRON_SECRET
@@ -170,7 +170,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, run_campaigns, GET, '/api/cron/run-campaigns']
               env:
                 - name: CRON_SECRET
@@ -206,7 +206,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, compute_health, GET, '/api/cron/compute-health']
               env:
                 - name: CRON_SECRET
@@ -242,7 +242,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, daily_briefing, GET, '/api/cron/daily-briefing']
               env:
                 - name: CRON_SECRET
@@ -278,7 +278,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, provisioning_worker, GET, '/api/internal/provisioning/worker']
               env:
                 - name: CRON_SECRET
@@ -314,7 +314,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, import_worker, GET, '/api/internal/import/worker']
               env:
                 - name: CRON_SECRET
@@ -350,7 +350,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, provisioning_reconcile, POST, '/api/internal/provisioning/reconcile']
               env:
                 - name: CRON_SECRET
@@ -386,7 +386,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, publish_social_posts, GET, '/api/cron/publish-social-posts']
               env:
                 - name: CRON_SECRET
@@ -422,7 +422,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, customer_notes_digest, GET, '/api/cron/customer-notes-digest']
               env:
                 - name: CRON_SECRET
@@ -458,7 +458,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, loyalty_reconcile, GET, '/api/cron/loyalty-reconcile']
               env:
                 - name: CRON_SECRET
@@ -494,7 +494,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, sweep_idle_sessions, GET, '/api/cron/sweep-sessions']
               env:
                 - name: CRON_SECRET
@@ -530,7 +530,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, merchant_sync, GET, '/api/admin/merchant/sync']
               env:
                 - name: CRON_SECRET
@@ -566,7 +566,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: ghcr.io/aloysjehwin/jeffi_stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               command: [node, deploy/k8s-cron.mjs, amazon_sync, GET, '/api/admin/merchant/amazon/sync']
               env:
                 - name: CRON_SECRET

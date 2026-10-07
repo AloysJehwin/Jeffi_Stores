@@ -14,5 +14,5 @@ resources:
   - cronjobs.yaml
 # CRD-backed resources (issuers, Coroot) are applied after their charts settle: see bootstrap/apply-platform.sh.
 images:
-  - name: ghcr.io/aloysjehwin/jeffi_stores
+  - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores
     newTag: latest
