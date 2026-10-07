@@ -2,10 +2,13 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
-import QuickAddPicker from '@/components/visitor/QuickAddPicker'
+import QuickAddPicker, { QuickAddHeaderActions } from '@/components/visitor/QuickAddPicker'
+import { startBuyNow } from '@/lib/client/buy-now'
+import { bp } from '@/lib/shared/business-path'
 
 interface QuickAddButtonProps {
   productId: string
@@ -21,6 +24,9 @@ interface QuickAddButtonProps {
   discountPct?: number
   // Increment to open the picker from outside (e.g. a card long-press). 0 = no external open.
   openSignal?: number
+  // Digital products are Buy Now only — the popup never adds them to the cart.
+  isDigital?: boolean
+  portal?: 'storefront' | 'business'
 }
 
 const MAX_QTY = 10
@@ -38,8 +44,12 @@ export default function QuickAddButton({
   mrp,
   discountPct,
   openSignal = 0,
+  isDigital = false,
+  portal = 'storefront',
 }: QuickAddButtonProps) {
   const { addToCart } = useCart()
+  const router = useRouter()
+  const productHref = portal === 'business' ? bp(`/business/products/${slug}`) : `/products/${slug}`
   const { showToast } = useToast()
   const prefersReduced = useReducedMotion()
 
@@ -74,13 +84,23 @@ export default function QuickAddButton({
     [adding, addToCart, productId, showToast]
   )
 
-  const onButtonClick = useCallback(
-    (e: React.MouseEvent) => {
-      stop(e)
-      setOpen(v => !v)
-    },
-    []
-  )
+  const buySimple = useCallback(async () => {
+    if (adding) return
+    setAdding(true)
+    const r = await startBuyNow({ productId, qty: 1 }, portal)
+    if (r.ok) {
+      setOpen(false)
+      router.push(r.href)
+    } else {
+      showToast(r.error, 'error')
+      setAdding(false)
+    }
+  }, [adding, portal, productId, router, showToast])
+
+  const onButtonClick = useCallback((e: React.MouseEvent) => {
+    stop(e)
+    setOpen(v => !v)
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -118,7 +138,11 @@ export default function QuickAddButton({
     )
   }
 
-  const label = hasVariants ? `Choose options for ${productName}` : `Quick add ${productName} to cart`
+  const label = hasVariants
+    ? `Choose options for ${productName}`
+    : isDigital
+      ? `Buy ${productName}`
+      : `Quick add ${productName} to cart`
 
   return (
     <div className="relative">
@@ -147,6 +171,9 @@ export default function QuickAddButton({
           mrp={mrp}
           discountPct={discountPct}
           inStock={inStock}
+          isDigital={isDigital}
+          portal={portal}
+          productHref={productHref}
         />
       )}
 
@@ -163,8 +190,13 @@ export default function QuickAddButton({
           mrp={mrp}
           discountPct={discountPct}
           inStock={inStock}
+          isDigital={isDigital}
+          productId={productId}
+          slug={slug}
+          productHref={productHref}
+          showWishlist={portal !== 'business'}
           onQty={setQty}
-          onAdd={() => addSimple(qty)}
+          onAdd={() => (isDigital ? buySimple() : addSimple(qty))}
           onClose={() => setOpen(false)}
           onStop={stop}
         />
@@ -185,6 +217,11 @@ interface SimplePickerProps {
   mrp?: number | null
   discountPct?: number
   inStock?: boolean
+  isDigital: boolean
+  productId: string
+  slug: string
+  productHref: string
+  showWishlist: boolean
   onQty: (n: number) => void
   onAdd: () => void
   onClose: () => void
@@ -203,6 +240,11 @@ function SimpleQtyPicker({
   mrp,
   discountPct,
   inStock,
+  isDigital,
+  productId,
+  slug,
+  productHref,
+  showWishlist,
   onQty,
   onAdd,
   onClose,
@@ -234,17 +276,15 @@ function SimpleQtyPicker({
           {brandName && <p className="text-sm text-foreground-secondary truncate">{brandName}</p>}
           {categoryName && <p className="text-sm text-foreground-secondary truncate">{categoryName}</p>}
         </div>
-        <button
-          type="button"
-          onClick={e => {
-            onStop(e)
-            onClose()
-          }}
-          aria-label="Close"
-          className="flex-shrink-0 w-7 h-7 rounded-full text-foreground-muted hover:text-foreground flex items-center justify-center"
-        >
-          &#215;
-        </button>
+        <QuickAddHeaderActions
+          productId={productId}
+          productName={productName}
+          slug={slug}
+          href={productHref}
+          showWishlist={showWishlist}
+          onClose={onClose}
+          onStop={onStop}
+        />
       </div>
 
       {displayPrice != null && (
@@ -265,18 +305,20 @@ function SimpleQtyPicker({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-foreground">Quantity</span>
-        <div className="flex items-center gap-1">
-          <StepButton onClick={dec} disabled={qty <= 1} label="Decrease quantity">
-            &#8722;
-          </StepButton>
-          <span className="w-8 text-center text-sm font-semibold text-foreground tabular-nums">{qty}</span>
-          <StepButton onClick={inc} disabled={qty >= MAX_QTY} label="Increase quantity">
-            &#43;
-          </StepButton>
+      {!isDigital && (
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-foreground">Quantity</span>
+          <div className="flex items-center gap-1">
+            <StepButton onClick={dec} disabled={qty <= 1} label="Decrease quantity">
+              &#8722;
+            </StepButton>
+            <span className="w-8 text-center text-sm font-semibold text-foreground tabular-nums">{qty}</span>
+            <StepButton onClick={inc} disabled={qty >= MAX_QTY} label="Increase quantity">
+              &#43;
+            </StepButton>
+          </div>
         </div>
-      </div>
+      )}
       <button
         type="button"
         onClick={e => {
@@ -286,7 +328,7 @@ function SimpleQtyPicker({
         disabled={adding || inStock === false}
         className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
       >
-        {adding ? 'Adding...' : 'Add to cart'}
+        {isDigital ? (adding ? 'Processing...' : 'Buy Now') : adding ? 'Adding...' : 'Add to cart'}
       </button>
     </div>
   )
@@ -299,7 +341,7 @@ function SimpleQtyPicker({
       onClick={onStop}
       role="dialog"
       aria-modal="true"
-      aria-label="Quick add to cart"
+      aria-label={isDigital ? 'Quick buy' : 'Quick add to cart'}
     >
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <motion.div

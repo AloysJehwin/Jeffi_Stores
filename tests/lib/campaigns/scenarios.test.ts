@@ -31,6 +31,10 @@ vi.mock('@/lib/shared/automation-emails', () => ({
   renderHeroProduct: vi.fn(),
 }))
 
+vi.mock('@/lib/campaigns/whatsapp-dispatch', () => ({
+  sendCampaignWhatsApp: vi.fn().mockResolvedValue({ ok: true }),
+}))
+
 // ---------------------------------------------------------------------------
 // Mock @/lib/shared/email-campaigns (used by review-request)
 // ---------------------------------------------------------------------------
@@ -74,6 +78,7 @@ import {
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
+import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { generateReviewToken } from '@/lib/auth/jwt'
 
 // Typed mocks
@@ -451,7 +456,7 @@ describe('priceDrop scenario', () => {
 
   it('findEligible passes computed factor to queryMany', async () => {
     mockQueryMany.mockResolvedValueOnce([])
-    const params = { priceDropThresholdPct: 10, maxWatchesPerSweep: 100 }
+    const params = { priceDropThresholdPct: 10, maxWatchesPerSweep: 100, whatsappEnabled: false }
 
     await priceDrop.findEligible({
       campaign: makeCampaign({ kind: 'price_drop' }) as any,
@@ -551,6 +556,36 @@ describe('priceDrop scenario', () => {
         newPrice: 400,
       })
     )
+  })
+
+  it('send also fires WhatsApp when enabled and the email went out', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: true })
+    const row = {
+      user_id: 'u1',
+      product_id: 'p1',
+      product_name: 'Drill',
+      product_slug: 'drill',
+      snapshot_price: '500',
+      current_price: '400',
+    }
+    await priceDrop.send(row, {
+      campaign: makeCampaign({ kind: 'price_drop' }) as any,
+      params: { ...priceDrop.defaultParams, whatsappEnabled: true },
+    })
+    expect(vi.mocked(sendCampaignWhatsApp)).toHaveBeenCalledWith(
+      'price_drop',
+      'u1',
+      expect.objectContaining({ headline: expect.stringContaining('Drill') })
+    )
+  })
+
+  it('send skips WhatsApp when disabled', async () => {
+    mockSendEmail.mockResolvedValueOnce({ ok: true })
+    await priceDrop.send(
+      { user_id: 'u1', product_id: 'p1', product_name: 'Drill', product_slug: 'drill', snapshot_price: '500', current_price: '400' },
+      { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
+    )
+    expect(vi.mocked(sendCampaignWhatsApp)).not.toHaveBeenCalled()
   })
 
   it('send updates wishlist snapshot after sending', async () => {
@@ -976,6 +1011,7 @@ describe('reviewReminder scenario', () => {
     expect(typeof sql).toBe('string')
     expect(args).toContain('review_reminder')
     expect(args).toContain(String(reviewReminder.defaultParams.lookbackDays))
+    expect(sql).toContain("ecs.campaign_kind = 'review_request'")
   })
 
   it('findEligible returns rows from queryMany', async () => {
@@ -1139,6 +1175,7 @@ describe('reviewRequest scenario', () => {
     const [sql, args] = mockQueryMany.mock.calls[0]
     expect(typeof sql).toBe('string')
     expect(args).toContain('review_request')
+    expect(sql).toContain("ecs.campaign_kind = 'review_reminder'")
     expect(args).toContain(24)
     expect(args).toContain(String(reviewRequest.defaultParams.lookbackDays))
     expect(args).toContain(reviewRequest.defaultParams.maxRecipientsPerSweep)

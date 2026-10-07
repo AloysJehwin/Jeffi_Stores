@@ -186,6 +186,7 @@ CREATE TABLE public.product_sub_variants (
     height_cm numeric(6,2),
     package_type character varying(30),
     subscription_price numeric(12,2),
+    subscription_prices jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT product_sub_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 
@@ -276,6 +277,7 @@ CREATE TABLE public.product_variants (
     supplier_id uuid,
     stock_status character varying(20) DEFAULT 'In Stock'::character varying NOT NULL,
     subscription_price numeric(12,2),
+    subscription_prices jsonb DEFAULT '{}'::jsonb NOT NULL,
     CONSTRAINT product_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 
@@ -385,6 +387,7 @@ CREATE TABLE public.products (
     subscription_interval character varying(20),
     subscription_price numeric(12,2),
     subscription_price_ex_gst numeric(12,2),
+    subscription_prices jsonb DEFAULT '{}'::jsonb NOT NULL,
     subscription_intervals text[] DEFAULT '{}'::text[] NOT NULL,
     subscription_total_cycles integer,
     subscription_min_cycles integer,

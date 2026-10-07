@@ -8,6 +8,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import QuantityInput from '@/components/shared/QuantityInput'
+import InCartQtyHint from '@/components/shared/InCartQtyHint'
+import { inCartQuantity, pickerQtyCap, unitCapError } from '@/lib/catalog/cart-unit-cap'
 import { round2 } from '@/lib/catalog/gst'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
 import StickyAddToCartBar from './pdp/StickyAddToCartBar'
@@ -499,6 +501,18 @@ export default function ProductActions({
           : 1
   const qtyMin = sellUnit?.min_qty != null ? Number(sellUnit.min_qty) : 1
   const qtyMax = sellUnit?.max_qty != null ? Number(sellUnit.max_qty) : undefined
+  // Input stays at max_qty for Buy Now; Add to Cart is capped by what this line already holds.
+  const cartCap = pickerQtyCap(
+    qtyMax,
+    inCartQuantity(cartItems, {
+      productId,
+      variantId: selectedVariantId,
+      subVariantId: selectedSubVariantId,
+      buyMode: effectiveUnitKey,
+    }),
+    qtyMin
+  )
+  const addBlocked = cartCap.full || (cartCap.max != null && quantity > cartCap.max)
 
   useEffect(() => {
     setQuantity(qtyMin)
@@ -522,6 +536,10 @@ export default function ProductActions({
   }, [effectiveUnitKey, effectiveUnitLabel, qtyMin, qtyMax, qtyStep, unitFactor, sellUnit?.dimension])
 
   const handleAddToCart = async () => {
+    if (addBlocked) {
+      showToast(unitCapError(qtyMax, cartCap.inCart, quantity) ?? 'Max quantity already in cart', 'error')
+      return
+    }
     setIsAddingToCart(true)
     try {
       if (selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && !selectedSubVariantId) {
@@ -897,6 +915,9 @@ export default function ProductActions({
                 }}
               />
             )}
+            {!subscribing && !digital && (
+              <InCartQtyHint cap={cartCap} unitLabel={effectiveUnitLabel} adding={quantity} />
+            )}
           </div>
         </>
       )}
@@ -1077,6 +1098,9 @@ export default function ProductActions({
                 }}
               />
             )}
+            {!subscribing && !digital && (
+              <InCartQtyHint cap={cartCap} unitLabel={effectiveUnitLabel} adding={quantity} />
+            )}
           </div>
         </>
       )}
@@ -1146,32 +1170,36 @@ export default function ProductActions({
               )}
             </button>
 
-            <button
-              onClick={handleAddToCart}
-              disabled={!is_active || effectiveStock === 0 || isAddingToCart || isPreLaunch || isDiscontinued}
-              className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
-            >
-              {isAddingToCart ? (
-                <>
-                  <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
-                  Adding...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
-                  Add to Cart
-                </>
-              )}
-            </button>
+            {!digital && (
+              <button
+                onClick={handleAddToCart}
+                disabled={
+                  !is_active || effectiveStock === 0 || isAddingToCart || isPreLaunch || isDiscontinued || addBlocked
+                }
+                className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
+              >
+                {isAddingToCart ? (
+                  <>
+                    <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
+                      />
+                    </svg>
+                    {cartCap.full ? 'Max quantity already in cart' : 'Add to Cart'}
+                  </>
+                )}
+              </button>
+            )}
 
-            {inCart && (
+            {inCart && !digital && (
               <a
                 href="/cart"
                 className="w-full border border-primary-600 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
@@ -1195,13 +1223,14 @@ export default function ProductActions({
         name={productName}
         image={selectedVariant?.variant_images?.[0]?.thumbnail_url || stickyImage}
         quantity={quantity}
-        adding={isAddingToCart}
-        onAdd={handleAddToCart}
+        adding={digital ? isBuyingNow : isAddingToCart}
+        onAdd={digital ? handleBuyNow : handleAddToCart}
+        buyNow={digital}
         price={effectivePrice}
         mrp={effectiveMrp}
         unitLabel={showPerUnit ? perUnitLabel : null}
         action={stickyBarAction({
-          purchasable: is_active && !isPreLaunch && !isDiscontinued,
+          purchasable: is_active && !isPreLaunch && !isDiscontinued && !(digital && alreadyOwned),
           hasVariants,
           variants,
           selectionInStock: effectiveStock > 0,

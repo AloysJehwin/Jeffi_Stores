@@ -1,8 +1,16 @@
 'use client'
 
+import {
+  renderConditionals,
+  renderTemplate as renderVars,
+  sampleVariableMap,
+  stripDoubleBraceTokens,
+} from '@/lib/templates/variables-shared'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import EmailComposer from '@/components/admin/email-composer/EmailComposer'
+import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { MessageCircle, ChevronDown } from 'lucide-react'
@@ -175,8 +183,11 @@ const SAMPLE_VARS: Record<string, string | number> = {
   ctaUrl: '#',
 }
 
+// Same pipeline as the send: scenario vars, then registered variables (samples), then unset vars collapse.
 function renderTemplate(template: string, vars: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (_m, k) => (vars[k] != null ? String(vars[k]) : ''))
+  const samples = sampleVariableMap()
+  const filled = renderVars(renderVars(renderConditionals(template || '', { ...samples, ...vars }), vars), samples)
+  return stripDoubleBraceTokens(filled).replace(/\{(\w+)\}/g, (_m, k) => (vars[k] != null ? String(vars[k]) : ''))
 }
 
 export default function CampaignDetailClient({ kind }: { kind: string }) {
@@ -687,13 +698,14 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
           <div className="mt-4">
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-              HTML body
+              Email body
             </label>
-            <textarea
+            <EmailComposer
               value={form.body_template}
-              onChange={e => setForm({ ...form, body_template: e.target.value })}
-              rows={10}
-              className="field-normal text-xs font-mono w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              onChange={v => setForm(f => (f ? { ...f, body_template: v } : f))}
+              extraVariables={CAMPAIGN_VARIABLES}
+              ctaHref="{ctaUrl}"
+              minHeight={260}
             />
             <p className="text-[10px] text-foreground-muted mt-1">
               Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code>{' '}

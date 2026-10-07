@@ -6,12 +6,10 @@ import { BookOpen, Clock, File, Film, Headphones, Infinity as InfinityIcon, Repe
 import { useVaultSearch } from './VaultShell'
 import {
   KIND_LABEL,
-  LIBRARY_FILTERS,
   accessLabel,
-  countByKind,
+  facetCounts,
   filterLibrary,
   primaryKind,
-  type LibraryFilter,
   type LibraryItem,
   type LibraryKind,
 } from '@/lib/vault/library-filter'
@@ -28,15 +26,24 @@ export default function LibraryGrid({
   initialQuery?: string
 }) {
   const { query, setQuery } = useVaultSearch()
-  const [kind, setKind] = useState<LibraryFilter>('all')
+  const [category, setCategory] = useState<string | null>(null)
+  const [brand, setBrand] = useState<string | null>(null)
 
   useEffect(() => {
     if (initialQuery) setQuery(initialQuery)
   }, [initialQuery, setQuery])
 
-  const counts = useMemo(() => countByKind(items), [items])
-  const visible = useMemo(() => filterLibrary(items, { kind, query }), [items, kind, query])
-  const filtering = kind !== 'all' || query.trim() !== ''
+  const categories = useMemo(() => facetCounts(items, it => it.category), [items])
+  // Brand chips reflect the chosen category so a pick never leads to an empty grid.
+  const brands = useMemo(
+    () => facetCounts(category ? items.filter(it => it.category === category) : items, it => it.brand),
+    [items, category]
+  )
+  const visible = useMemo(
+    () => filterLibrary(items, { query, category, brand }),
+    [items, query, category, brand]
+  )
+  const filtering = !!category || !!brand || query.trim() !== ''
 
   return (
     <main className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pt-10">
@@ -55,28 +62,22 @@ export default function LibraryGrid({
         <EmptyState storeUrl={storeUrl} />
       ) : (
         <>
-          <div role="tablist" aria-label="Filter by type" className="-mx-4 mb-6 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-            {LIBRARY_FILTERS.filter(f => f.id === 'all' || counts[f.id] > 0).map(f => {
-              const active = kind === f.id
-              return (
-                <button
-                  key={f.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  onClick={() => setKind(f.id)}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-                    active
-                      ? 'bg-white text-neutral-950'
-                      : 'bg-white/[0.05] text-neutral-300 ring-1 ring-inset ring-white/[0.08] hover:bg-white/[0.09]'
-                  }`}
-                >
-                  {f.label}
-                  <span className="text-xs tabular-nums text-neutral-500">{counts[f.id]}</span>
-                </button>
-              )
-            })}
-          </div>
+          {categories.length > 0 && (
+            <ChipRow
+              label="Filter by category"
+              allCount={items.length}
+              options={categories}
+              value={category}
+              onChange={v => {
+                setCategory(v)
+                setBrand(null)
+              }}
+            />
+          )}
+          {brands.length > 1 && (
+            <ChipRow label="Filter by brand" allLabel="All brands" options={brands} value={brand} onChange={setBrand} subtle />
+          )}
+          <div className="mb-4" />
 
           {visible.length === 0 ? (
             <div className="flex flex-col items-center rounded-2xl border border-dashed border-white/10 px-6 py-16 text-center">
@@ -86,7 +87,8 @@ export default function LibraryGrid({
               <button
                 type="button"
                 onClick={() => {
-                  setKind('all')
+                  setCategory(null)
+                  setBrand(null)
                   setQuery('')
                 }}
                 className="mt-5 rounded-lg bg-white/[0.08] px-4 py-2 text-sm text-neutral-100 hover:bg-white/[0.12] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
@@ -148,6 +150,11 @@ function LibraryCard({ item }: { item: LibraryItem }) {
           </div>
         </div>
         <div className="p-3">
+          {item.category || item.brand ? (
+            <p className="mb-0.5 truncate text-[11px] uppercase tracking-wide text-neutral-500">
+              {[item.category, item.brand].filter(Boolean).join(' · ')}
+            </p>
+          ) : null}
           <p className="line-clamp-2 text-sm font-medium leading-snug text-neutral-100 group-hover:text-white">{item.title}</p>
           <p className={`mt-1.5 flex items-center gap-1 text-xs ${lifetime ? 'text-neutral-500' : 'text-amber-300/90'}`}>
             {lifetime ? <InfinityIcon className="h-3.5 w-3.5" aria-hidden /> : <Clock className="h-3.5 w-3.5" aria-hidden />}
@@ -157,6 +164,48 @@ function LibraryCard({ item }: { item: LibraryItem }) {
         </div>
       </Link>
     </li>
+  )
+}
+
+function ChipRow({
+  label,
+  allLabel = 'All',
+  allCount,
+  options,
+  value,
+  onChange,
+  subtle = false,
+}: {
+  label: string
+  allLabel?: string
+  allCount?: number
+  options: { value: string; count: number }[]
+  value: string | null
+  onChange: (v: string | null) => void
+  subtle?: boolean
+}) {
+  const chip = (key: string, text: string, count: number | undefined, active: boolean, onClick: () => void) => (
+    <button
+      key={key}
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3.5 ${subtle ? 'py-1 text-xs' : 'py-1.5 text-sm'} transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
+        active
+          ? 'bg-white text-neutral-950'
+          : 'bg-white/[0.05] text-neutral-300 ring-1 ring-inset ring-white/[0.08] hover:bg-white/[0.09]'
+      }`}
+    >
+      {text}
+      {count !== undefined ? <span className="text-xs tabular-nums text-neutral-500">{count}</span> : null}
+    </button>
+  )
+  return (
+    <div role="tablist" aria-label={label} className="-mx-4 mb-2 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+      {chip('__all', allLabel, allCount, value === null, () => onChange(null))}
+      {options.map(o => chip(o.value, o.value, o.count, value === o.value, () => onChange(o.value)))}
+    </div>
   )
 }
 

@@ -54,6 +54,7 @@ describe('customer subscription routes', () => {
     vi.mocked(deriveSubscriptionOffer).mockResolvedValue({
       product: { name: 'Coffee' },
       unitPrice: 450,
+      intervalPrices: { monthly: 450, yearly: 4800 },
       oneTimePrice: 500,
       totalCycles: 12,
       minCycles: 3,
@@ -62,7 +63,13 @@ describe('customer subscription routes', () => {
       amount: 450,
     } as any)
     const res = await quote(post({ productId: PID, interval: 'monthly', quantity: 1, unitPrice: 1 }))
-    expect(await res.json()).toMatchObject({ unitPrice: 450, oneTimePrice: 500, totalCycles: 12, minCycles: 3 })
+    expect(await res.json()).toMatchObject({
+      unitPrice: 450,
+      intervalPrices: { monthly: 450, yearly: 4800 },
+      oneTimePrice: 500,
+      totalCycles: 12,
+      minCycles: 3,
+    })
   })
 
   it('create requires explicit consent', async () => {

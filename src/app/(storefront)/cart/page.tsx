@@ -94,7 +94,7 @@ export default function CartPage() {
     try {
       await updateQuantity(cartItemId, newQuantity)
     } catch (error) {
-      showToast('Failed to update quantity', 'error')
+      showToast(error instanceof Error && error.message ? error.message : 'Failed to update quantity', 'error')
     } finally {
       setUpdatingItems(prev => {
         const newSet = new Set(prev)

@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       productName: offer.product.name,
       unitPrice: offer.unitPrice,
+      intervalPrices: offer.intervalPrices,
       oneTimePrice: offer.oneTimePrice,
       quantity: offer.quantity,
       shipping: offer.shipping,

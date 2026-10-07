@@ -26,6 +26,11 @@ export function backfillBlankOptionalFields(
     const live = liveRow[key]
     if (live !== null && live !== undefined) fields[key] = live
   }
+  // Per-interval prices left blank keep their live value.
+  const livePrices = liveRow.subscription_prices
+  if (fields.subscription_prices && livePrices && typeof livePrices === 'object') {
+    fields.subscription_prices = { ...(livePrices as object), ...(fields.subscription_prices as object) }
+  }
   return fields
 }
 

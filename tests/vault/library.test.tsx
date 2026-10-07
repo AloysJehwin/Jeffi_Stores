@@ -6,7 +6,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
 
-import { filterLibrary, primaryKind, countByKind, accessLabel, type LibraryItem } from '@/lib/vault/library-filter'
+import { filterLibrary, primaryKind, countByKind, accessLabel, facetCounts, type LibraryItem } from '@/lib/vault/library-filter'
 import VaultShell from '@/components/vault/VaultShell'
 import LibraryGrid from '@/components/vault/LibraryGrid'
 
@@ -22,10 +22,10 @@ const item = (over: Partial<LibraryItem>): LibraryItem => ({
 })
 
 const items = [
-  item({ product_id: 'v', title: 'Woodworking Masterclass', kinds: ['video', 'pdf'], file_count: 3 }),
-  item({ product_id: 'a', title: 'Shop Talk Podcast', kinds: ['audio'], source: 'subscription', access_expires_at: '2099-01-01T00:00:00Z' }),
-  item({ product_id: 'p', title: 'Joinery Handbook', kinds: ['pdf'] }),
-  item({ product_id: 'o', title: 'CAD Templates', kinds: ['other', 'image'] }),
+  item({ product_id: 'v', title: 'Woodworking Masterclass', kinds: ['video', 'pdf'], file_count: 3, category: 'Courses', brand: 'Acme' }),
+  item({ product_id: 'a', title: 'Shop Talk Podcast', kinds: ['audio'], source: 'subscription', access_expires_at: '2099-01-01T00:00:00Z', category: 'Podcasts', brand: 'Acme' }),
+  item({ product_id: 'p', title: 'Joinery Handbook', kinds: ['pdf'], category: 'Books', brand: 'Timber Press' }),
+  item({ product_id: 'o', title: 'CAD Templates', kinds: ['other', 'image'], category: 'Courses', brand: 'Draftly' }),
 ]
 
 describe('library-filter', () => {
@@ -41,6 +41,13 @@ describe('library-filter', () => {
     expect(filterLibrary(items, { kind: 'pdf' }).map(i => i.product_id)).toEqual(['p'])
     expect(filterLibrary(items, { query: '  JOIN hand ' }).map(i => i.product_id)).toEqual(['p'])
     expect(filterLibrary(items, { kind: 'video', query: 'join' })).toEqual([])
+    expect(filterLibrary(items, { category: 'Courses', brand: 'Acme' }).map(i => i.product_id)).toEqual(['v'])
+    expect(filterLibrary(items, { query: 'timber' }).map(i => i.product_id)).toEqual(['p'])
+    expect(facetCounts(items, i => i.category)).toEqual([
+      { value: 'Courses', count: 2 },
+      { value: 'Books', count: 1 },
+      { value: 'Podcasts', count: 1 },
+    ])
     expect(filterLibrary(items, {}).length).toBe(4)
   })
 
@@ -69,16 +76,22 @@ describe('LibraryGrid', () => {
     expect(screen.getByRole('link', { name: /Browse the store/ }).getAttribute('href')).toBe('https://acme.example')
   })
 
-  it('filters with type chips and the shell search box, and shows a no-results state', () => {
+  it('filters by the product category and brand, the shell search box, and shows a no-results state', () => {
     mountGrid(items)
     expect(screen.getByText('4 items')).toBeTruthy()
     expect(titles().length).toBe(4)
 
-    fireEvent.click(screen.getByRole('tab', { name: /Books & PDFs/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /^Courses/ }))
+    expect(titles()).toHaveLength(2)
+    // Brand chips narrow to the chosen category.
+    expect(screen.queryByRole('tab', { name: /Timber Press/ })).toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: /^Draftly/ }))
     expect(titles()).toHaveLength(1)
-    expect(titles()[0]).toMatch(/Joinery Handbook/)
+    expect(titles()[0]).toMatch(/CAD Templates/)
 
-    fireEvent.click(screen.getByRole('tab', { name: /All/ }))
+    fireEvent.click(screen.getByRole('tab', { name: /^All 4/ }))
+    expect(titles()).toHaveLength(4)
+    expect(screen.getAllByText('Books · Timber Press').length).toBe(1)
     const search = screen.getAllByRole('searchbox', { name: 'Search your library' })[0]
     fireEvent.change(search, { target: { value: 'podcast' } })
     expect(titles()).toHaveLength(1)

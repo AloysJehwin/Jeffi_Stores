@@ -149,6 +149,42 @@ describe('publishProductDraft — subscription pricing & cycles', () => {
     expect(upd[1][17]).toBe(30)
   })
 
+  it('publishes per-interval prices: product map normalized, kept when absent, cleared on variant products', async () => {
+    await run({ fields: fields({ subscription_prices: { monthly: '499', yearly: '4999.999', weekly: '' } }) })
+    expect(productUpdateJson().subscription_prices).toEqual({ monthly: 499, yearly: 5000 })
+    const upd = mockClientQuery.mock.calls.find((c: any[]) => String(c[0]).includes('subscription_total_cycles'))
+    expect(String(upd[0])).toContain("ELSE subscription_prices END")
+    vi.clearAllMocks()
+    await run({ fields: fields() })
+    expect('subscription_prices' in productUpdateJson()).toBe(false)
+    vi.clearAllMocks()
+    await run({
+      fields: fields({ has_variants: true, subscription_prices: { monthly: '9' } }),
+      variants: [{ sku: 'S-A', variant_name: 'A', subscription_prices: { quarterly: '1200', daily: 3 } }],
+    })
+    expect(productUpdateJson().subscription_prices).toEqual({})
+    const upsert = mockClientQuery.mock.calls.find((c: any[]) => String(c[0]).includes('INSERT INTO product_variants'))
+    expect(String(upsert[0])).toContain('subscription_prices = EXCLUDED.subscription_prices')
+    expect(JSON.parse(upsert[1][1])[0].subscription_prices).toEqual({ quarterly: 1200 })
+  })
+
+  it('writes edited sub-variant interval prices, keeping stored ones when the draft row lacks them', async () => {
+    const base = { variant_id: 'v1', sub_variant_name: 'Red', sku: 'S-A-RED', _edited: true }
+    await run({
+      fields: fields({ has_variants: true }),
+      variants: [{ sku: 'S-A', variant_name: 'A' }],
+      sub_variants: [
+        { ...base, id: '11111111-1111-4111-8111-111111111111', subscription_prices: { monthly: '80' } },
+        { ...base, id: '22222222-2222-4222-8222-222222222222', sku: 'S-A-BLUE', sub_variant_name: 'Blue' },
+      ],
+    })
+    const upds = mockClientQuery.mock.calls.filter((c: any[]) =>
+      String(c[0]).includes('UPDATE product_sub_variants SET\n')
+    )
+    expect(String(upds[0][0])).toContain('subscription_prices = COALESCE($19::jsonb, subscription_prices)')
+    expect(upds.map((c: any[]) => c[1][18])).toEqual([JSON.stringify({ monthly: 80 }), null])
+  })
+
   it('rejects a minimum above the number of cycles', async () => {
     await expect(run({ fields: fields({ subscription_total_cycles: 3, subscription_min_cycles: 6 }) })).rejects.toThrow(
       'Minimum billing cycles cannot exceed'

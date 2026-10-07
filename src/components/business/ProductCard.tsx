@@ -12,6 +12,7 @@ import { resolveEdd } from '@/lib/shipping/edd-cache'
 import { digitalActive } from '@/lib/catalog/digital'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import QuickAddButton from '@/components/visitor/QuickAddButton'
+import { QuickAddHeaderActions } from '@/components/visitor/QuickAddPicker'
 
 interface ProductCardProps {
   id: string
@@ -215,6 +216,8 @@ export default function ProductCard({
                   displayPrice={shownPrice}
                   mrp={mrp}
                   discountPct={shownDiscount}
+                  isDigital={digital}
+                  portal="business"
                 />
                 <button
                   onClick={handleShare}
@@ -328,6 +331,15 @@ export default function ProductCard({
                 {brandName && <p className="text-xs text-foreground-muted">{brandName}</p>}
                 {categoryName && <p className="text-xs text-foreground-muted">{categoryName}</p>}
               </div>
+              <QuickAddHeaderActions
+                productId={id}
+                productName={name}
+                slug={slug}
+                href={bp(`/business/products/${slug}`)}
+                showWishlist={false}
+                onClose={() => setShowQuickView(false)}
+                onStop={e => e.stopPropagation()}
+              />
             </div>
 
             <div className="flex items-center gap-3 mb-4">

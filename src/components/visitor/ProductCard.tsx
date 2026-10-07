@@ -1,17 +1,15 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
-import { useToast } from '@/contexts/ToastContext'
-import { useWishlist } from '@/contexts/WishlistContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { useRouter } from 'next/navigation'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { digitalActive } from '@/lib/catalog/digital'
 import QuickAddButton from '@/components/visitor/QuickAddButton'
+import { useProductLikeShare } from '@/components/visitor/useProductLikeShare'
 import { applyDiscount, mrpDiscountPct } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
 
@@ -63,14 +61,9 @@ export default function ProductCard({
   portal = 'storefront',
 }: ProductCardProps) {
   const { user } = useAuth()
-  const { showToast, showConfirm } = useToast()
   const { gstEnabled, digitalProductsEnabled } = useStoreConfig().flags
   const digital = digitalActive(digitalProductsEnabled, isDigital)
   const inStock = digital || effectiveStock > 0
-  const router = useRouter()
-  const { has: inWishlist, toggle: toggleWishlist } = useWishlist()
-  const isInWishlist = inWishlist(id)
-  const [wishlistLoading, setWishlistLoading] = useState(false)
   const [quickAddSignal, setQuickAddSignal] = useState(0)
   const [edd, setEdd] = useState<string | null>(null)
 
@@ -105,48 +98,12 @@ export default function ProductCard({
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
   }
 
-  const handleWishlist = useCallback(
-    async (e: React.MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      if (!user) {
-        showConfirm({
-          title: 'Sign In Required',
-          message: 'Please sign in to save items to your wishlist.',
-          confirmText: 'Sign In',
-          cancelText: 'Maybe Later',
-          type: 'info',
-          onConfirm: () => router.push(`/login?redirect=/products/${slug}`),
-        })
-        return
-      }
-      setWishlistLoading(true)
-      const result = await toggleWishlist(id)
-      setWishlistLoading(false)
-      if (result === 'added') showToast('Added to wishlist!', 'success')
-      else if (result === 'removed') showToast('Removed from wishlist', 'success')
-      else showToast('Failed to update wishlist', 'error')
-    },
-    [id, slug, user, toggleWishlist]
-  )
-
-  const handleShare = useCallback(
-    async (e: React.MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      const url = `${window.location.origin}${productHref}`
-      const shareData = { title: name, text: `Check out ${name}`, url }
-      if (navigator.share) {
-        try {
-          await navigator.share(shareData)
-        } catch {}
-      } else {
-        await navigator.clipboard.writeText(url)
-        showToast('Link copied to clipboard!', 'success')
-      }
-    },
-    [productHref, name]
-  )
+  const { isInWishlist, wishlistLoading, handleWishlist, handleShare } = useProductLikeShare({
+    id,
+    slug,
+    name,
+    href: productHref,
+  })
 
   return (
     <>
@@ -254,6 +211,8 @@ export default function ProductCard({
                   mrp={mrp}
                   discountPct={bizDiscountPct > 0 ? shownMrpDiscount : (discountPct ?? mrpDiscount)}
                   openSignal={quickAddSignal}
+                  isDigital={digital}
+                  portal={portal}
                 />
                 <div className="flex items-center gap-1.5">
                   {!isBusiness && (

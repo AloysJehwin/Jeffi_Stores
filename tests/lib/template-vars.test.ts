@@ -109,7 +109,7 @@ describe('TEMPLATE_VARS', () => {
       expect(tv.key).toBeTruthy()
       expect(tv.label).toBeTruthy()
       expect(tv.description).toBeTruthy()
-      expect(['customer', 'store', 'date']).toContain(tv.group)
+      expect(['customer', 'store', 'date', 'order']).toContain(tv.group)
       expect(tv.sample).toBeDefined()
     }
   })

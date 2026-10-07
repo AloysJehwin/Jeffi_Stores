@@ -92,6 +92,22 @@ describe('updateProduct (live edit)', () => {
     expect(at('subscription_min_cycles')).toBe(3)
   })
 
+  it('saves product-level per-interval subscription prices, dropping blanks and junk', async () => {
+    await expect(
+      updateProduct(
+        PID,
+        form({
+          is_subscription: 'true',
+          subscription_intervals: 'monthly,yearly',
+          subscription_prices: JSON.stringify({ monthly: '499', yearly: '4999.999', weekly: '', daily: '5' }),
+        })
+      )
+    ).rejects.toThrow('NEXT_REDIRECT')
+    const [sql, params] = productUpdate()
+    const idx = Number(String(sql).match(/subscription_prices = \$(\d+)/)![1]) - 1
+    expect(JSON.parse((params as unknown[])[idx] as string)).toEqual({ monthly: 499, yearly: 5000 })
+  })
+
   it('rejects a minimum above the number of cycles', async () => {
     const r = await updateProduct(
       PID,
@@ -106,10 +122,23 @@ describe('updateProduct (live edit)', () => {
       async (sql: string) => (String(sql).includes('SELECT sku FROM products') ? { sku: 'EB' } : null) as any
     )
     const variants = [
-      { id: '33333333-3333-4333-8333-333333333333', variant_name: 'A', price: '100', subscription_price: '80' },
+      {
+        id: '33333333-3333-4333-8333-333333333333',
+        variant_name: 'A',
+        price: '100',
+        subscription_price: '80',
+        subscription_prices: { monthly: '75', yearly: '800' },
+      },
       { id: 'temp-1', variant_name: 'B', price: '120', subscription_price: '' },
     ]
-    const subs = [{ variant_id: variants[0].id, id: '44444444-4444-4444-8444-444444444444', subscription_price: '70' }]
+    const subs = [
+      {
+        variant_id: variants[0].id,
+        id: '44444444-4444-4444-8444-444444444444',
+        subscription_price: '70',
+        subscription_prices: { quarterly: '200' },
+      },
+    ]
     await expect(
       updateProduct(
         PID,
@@ -128,11 +157,16 @@ describe('updateProduct (live edit)', () => {
     expect(at('subscription_price')).toBeNull() // variant products price per variant
     const upd = vi.mocked(query).mock.calls.find(c => String(c[0]).startsWith('UPDATE product_variants SET sku'))!
     expect((upd[1] as unknown[])[24]).toBe(80)
+    expect(JSON.parse((upd[1] as unknown[])[25] as string)).toEqual({ monthly: 75, yearly: 800 })
     const ins = vi.mocked(query).mock.calls.find(c => String(c[0]).includes('INSERT INTO product_variants'))!
     expect((ins[1] as unknown[])[23]).toBeNull()
+    expect((ins[1] as unknown[])[24]).toBe('{}')
     const sv = vi
       .mocked(query)
-      .mock.calls.find(c => String(c[0]).includes('UPDATE product_sub_variants SET subscription_price'))!
-    expect(sv[1]).toEqual([70, subs[0].id, PID])
+      .mock.calls.find(c => /UPDATE product_sub_variants\s+SET subscription_price/.test(String(c[0])))!
+    expect(sv[1]).toEqual([70, subs[0].id, PID, JSON.stringify({ quarterly: 200 })])
+    const [psql, pparams] = productUpdate()
+    const pidx = Number(String(psql).match(/subscription_prices = \$(\d+)/)![1]) - 1
+    expect((pparams as unknown[])[pidx]).toBe('{}')
   })
 })

@@ -789,8 +789,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       buy_mode: string
       buy_unit: string | null
     }>(
-      `SELECT product_id, variant_id, sub_variant_id, quantity, unit_price, buy_mode, buy_unit
-       FROM order_items WHERE order_id = $1`,
+      `SELECT oi.product_id, oi.variant_id, oi.sub_variant_id, oi.quantity, oi.unit_price, oi.buy_mode, oi.buy_unit
+       FROM order_items oi JOIN products p ON p.id = oi.product_id
+       WHERE oi.order_id = $1 AND COALESCE(p.is_digital, FALSE) = FALSE`,
       [id]
     )
     for (const item of orderItems) {

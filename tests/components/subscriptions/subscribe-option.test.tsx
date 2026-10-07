@@ -83,6 +83,24 @@ describe('SubscribeOption subscribe mode', () => {
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).interval).toBe('quarterly')
   })
 
+  it('shows each interval chip\'s price from the quote', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        unitPrice: 499,
+        quantity: 1,
+        shipping: 0,
+        amount: 499,
+        intervalLabel: 'Monthly',
+        intervalPrices: { monthly: 499, quarterly: 1299.5 },
+      }),
+    })
+    render(<Harness />)
+    fireEvent.click(screen.getByRole('tab', { name: 'Subscribe' }))
+    await waitFor(() => expect(screen.getByTestId('interval-price-monthly').textContent).toContain('₹499'))
+    expect(screen.getByTestId('interval-price-quarterly').textContent).toContain('₹1,299.5')
+  })
+
   it('shows the quote error (e.g. over the cap)', async () => {
     fetchMock.mockResolvedValue({ ok: false, json: async () => ({ error: 'Subscriptions are limited to ₹15,000 per cycle' }) })
     render(<Harness />)

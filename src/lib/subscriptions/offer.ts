@@ -14,6 +14,7 @@ import {
   normalizeCycleCount,
   type SubscriptionInterval,
 } from './intervals'
+import { pickSubscriptionPrice } from './sellable'
 import { SubscriptionError } from './types'
 
 export const MAX_SUBSCRIPTION_QTY = 10
@@ -38,6 +39,7 @@ export interface SubscriptionProduct {
   subscription_intervals: string[] | null
   subscription_price: string | number | null
   subscription_price_ex_gst: string | number | null
+  subscription_prices: Record<string, unknown> | null
   subscription_total_cycles: number | null
   subscription_min_cycles: number | null
   gst_percentage: string | number | null
@@ -57,6 +59,8 @@ export interface SubscriptionOffer {
   minCycles: number | null
   quantity: number
   unitPrice: number
+  /** Per-unit price for every interval the product offers (same GST basis as unitPrice). */
+  intervalPrices: Partial<Record<SubscriptionInterval, number>>
   oneTimePrice: number
   unitPriceExGst: number
   gstRate: number
@@ -97,7 +101,7 @@ export async function deriveSubscriptionOffer(input: OfferInput): Promise<Subscr
 
   const product = await queryOne<SubscriptionProduct>(
     `SELECT id, name, slug, is_active, is_digital, is_subscription, subscription_intervals,
-            subscription_price, subscription_price_ex_gst, subscription_total_cycles, subscription_min_cycles,
+            subscription_price, subscription_price_ex_gst, subscription_prices, subscription_total_cycles, subscription_min_cycles,
             gst_percentage, hsn_code
        FROM products WHERE id = $1`,
     [input.productId]
@@ -131,12 +135,16 @@ export async function deriveSubscriptionOffer(input: OfferInput): Promise<Subscr
     variant_has_subs: boolean
     variant_sub_price: string | number | null
     sub_variant_sub_price: string | number | null
+    variant_sub_prices: Record<string, unknown> | null
+    sub_variant_sub_prices: Record<string, unknown> | null
   }>(
     `SELECT EXISTS (SELECT 1 FROM product_variants WHERE product_id = $1 AND is_active = TRUE) AS has_variants,
             EXISTS (SELECT 1 FROM product_sub_variants
                      WHERE product_id = $1 AND variant_id = $2::uuid AND is_active = TRUE) AS variant_has_subs,
             (SELECT subscription_price FROM product_variants WHERE id = $2::uuid AND product_id = $1) AS variant_sub_price,
-            (SELECT subscription_price FROM product_sub_variants WHERE id = $3::uuid AND product_id = $1) AS sub_variant_sub_price`,
+            (SELECT subscription_price FROM product_sub_variants WHERE id = $3::uuid AND product_id = $1) AS sub_variant_sub_price,
+            (SELECT subscription_prices FROM product_variants WHERE id = $2::uuid AND product_id = $1) AS variant_sub_prices,
+            (SELECT subscription_prices FROM product_sub_variants WHERE id = $3::uuid AND product_id = $1) AS sub_variant_sub_prices`,
     [product.id, variantId, subVariantId]
   )
   if (sellable?.has_variants && !variantId) throw new SubscriptionError('Choose an option to subscribe')
@@ -153,16 +161,19 @@ export async function deriveSubscriptionOffer(input: OfferInput): Promise<Subscr
 
   const gstRate = Number(product.gst_percentage ?? 0)
   const oneTimePrice = round2(resolved.item.price)
-  const subPrice = Number(
-    (subVariantId
-      ? sellable?.sub_variant_sub_price
-      : variantId
-        ? sellable?.variant_sub_price
-        : product.subscription_price) ?? 0
-  )
-  // subscription_price is GST-inclusive like `price`; GST off charges its ex-GST value.
-  const unitPrice =
-    subPrice > 0 ? (flags.gstEnabled ? round2(subPrice) : round2(subPrice / (1 + gstRate / 100))) : oneTimePrice
+  const [prices, legacy] = subVariantId
+    ? [sellable?.sub_variant_sub_prices, sellable?.sub_variant_sub_price]
+    : variantId
+      ? [sellable?.variant_sub_prices, sellable?.variant_sub_price]
+      : [product.subscription_prices, product.subscription_price]
+  // Subscription prices are GST-inclusive like `price`; GST off charges the ex-GST value.
+  const priceFor = (iv: SubscriptionInterval) => {
+    const p = pickSubscriptionPrice(prices, legacy, iv)
+    return p != null ? (flags.gstEnabled ? round2(p) : round2(p / (1 + gstRate / 100))) : oneTimePrice
+  }
+  const intervalPrices: Partial<Record<SubscriptionInterval, number>> = {}
+  for (const iv of product.subscription_intervals ?? []) if (isSubscriptionInterval(iv)) intervalPrices[iv] = priceFor(iv)
+  const unitPrice = priceFor(interval)
   const unitPriceExGst = flags.gstEnabled ? round2(unitPrice / (1 + gstRate / 100)) : unitPrice
 
   let address: Record<string, any> | null = null
@@ -204,6 +215,7 @@ export async function deriveSubscriptionOffer(input: OfferInput): Promise<Subscr
     minCycles,
     quantity,
     unitPrice,
+    intervalPrices,
     oneTimePrice,
     unitPriceExGst,
     gstRate,

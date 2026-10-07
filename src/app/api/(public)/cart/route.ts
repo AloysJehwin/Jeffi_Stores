@@ -9,7 +9,7 @@ import { recordImplicitSignal } from '@/lib/shared/ai-feedback'
 import { logActivity } from '@/lib/shared/activity'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { toSellingUnit, validatePurchaseQuantity } from '@/lib/catalog/selling-unit'
-import { digitalUnitError } from '@/lib/catalog/digital-units'
+import { unitCapError } from '@/lib/catalog/cart-unit-cap'
 
 const AddCartSchema = z
   .object({
@@ -43,12 +43,62 @@ async function resolveUserId(request: NextRequest) {
   return { userId, sessionId, authUserId }
 }
 
+async function activeLineQuantity(
+  userId: string,
+  productId: string,
+  variantId: string | null | undefined,
+  subVariantId: string | null | undefined,
+  buyMode: string
+): Promise<number> {
+  const row = await queryOne<{ quantity: string | number }>(
+    `SELECT quantity FROM cart_items
+      WHERE user_id = $1 AND product_id = $2
+        AND variant_id IS NOT DISTINCT FROM $3 AND sub_variant_id IS NOT DISTINCT FROM $4
+        AND buy_mode = $5 AND COALESCE(saved_for_later, FALSE) = FALSE`,
+    [userId, productId, variantId || null, subVariantId || null, buyMode]
+  )
+  return row ? Number(row.quantity) || 0 : 0
+}
+
+async function lineUnitConstraint(
+  productId: string,
+  buyUnit: string,
+  variantId: string | null,
+  subVariantId: string | null
+) {
+  return queryOne<{
+    unit: string
+    factor: string
+    dimension: string
+    qty_step: string
+    min_qty: string
+    max_qty: string | null
+  }>(
+    `SELECT unit, factor::text, dimension, qty_step::text, min_qty::text, max_qty::text
+       FROM product_units
+      WHERE product_id = $1 AND unit = $2
+        AND ( ($4::uuid IS NOT NULL AND sub_variant_id = $4::uuid)
+              OR (sub_variant_id IS NULL AND variant_id = $3)
+              OR (sub_variant_id IS NULL AND variant_id IS NULL) )
+      ORDER BY sub_variant_id NULLS LAST, variant_id NULLS LAST
+      LIMIT 1`,
+    [productId, buyUnit, variantId, subVariantId]
+  )
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { userId } = await resolveUserId(request)
     const url = new URL(request.url)
     const savedOnly = url.searchParams.get('saved') === '1'
     const savedFilter = savedOnly ? 'TRUE' : 'FALSE'
+
+    // Digital products are Buy Now only; purge legacy cart/saved lines so checkout never sees them.
+    await query(
+      `DELETE FROM cart_items ci USING products p
+        WHERE ci.product_id = p.id AND ci.user_id = $1 AND p.is_digital = TRUE`,
+      [userId]
+    )
 
     const cartItems = await queryMany(
       `
@@ -129,6 +179,7 @@ export async function GET(request: NextRequest) {
       LEFT JOIN product_variants pv ON ci.variant_id = pv.id
       LEFT JOIN product_sub_variants psv ON ci.sub_variant_id = psv.id
       WHERE ci.user_id = $1 AND COALESCE(ci.saved_for_later, FALSE) = ${savedFilter}
+        AND COALESCE(p.is_digital, FALSE) = FALSE
     `,
       [userId]
     )
@@ -145,9 +196,9 @@ export async function POST(request: NextRequest) {
     const parsedCart = parseBody(AddCartSchema, body)
     if (!parsedCart.ok) return parsedCart.response
     const { productId, variantId, subVariantId } = parsedCart.data
-    let buyMode = parsedCart.data.buyMode || 'unit'
-    let buyUnit = parsedCart.data.buyUnit
-    let quantity = parsedCart.data.quantity ?? 1
+    const buyMode = parsedCart.data.buyMode || 'unit'
+    const buyUnit = parsedCart.data.buyUnit
+    const quantity = parsedCart.data.quantity ?? 1
 
     const { userId } = await resolveUserId(request)
 
@@ -165,24 +216,12 @@ export async function POST(request: NextRequest) {
     if (product.discontinue_date && new Date(product.discontinue_date) <= today) {
       return NextResponse.json({ error: 'This product has been discontinued' }, { status: 410 })
     }
-    // A digital title is owned once: one copy per cart, and none if the buyer already owns it.
-    const isDigital = product.is_digital === true
-    if (isDigital) {
-      const unitErr = digitalUnitError(buyMode, buyUnit)
-      if (unitErr) return NextResponse.json({ error: unitErr }, { status: 400 })
-      buyMode = 'unit'
-      buyUnit = null
-      quantity = 1
-      const owned = await queryOne(
-        `SELECT 1 FROM vault_entitlements
-          WHERE user_id = $1 AND product_id = $2 AND status = 'active'
-            AND (access_expires_at IS NULL OR access_expires_at > NOW())
-          LIMIT 1`,
-        [userId, productId]
+    // Digital titles skip the cart entirely; Buy Now grants access at payment.
+    if (product.is_digital === true) {
+      return NextResponse.json(
+        { error: 'Digital products are bought directly — use Buy Now', code: 'DIGITAL_BUY_NOW_ONLY' },
+        { status: 409 }
       )
-      if (owned) {
-        return NextResponse.json({ error: 'You already own this item', alreadyOwned: true }, { status: 409 })
-      }
     }
 
     let priceAtAddition: number
@@ -251,26 +290,18 @@ export async function POST(request: NextRequest) {
     // Enforce the selling unit's min/max/qty_step server-side (previously UI-only).
     // Resolve the unit constraints for the chosen buyUnit; validate the quantity.
     const constraintRow = buyUnit
-      ? await queryOne<{
-          unit: string
-          factor: string
-          dimension: string
-          qty_step: string
-          min_qty: string
-          max_qty: string | null
-        }>(
-          `SELECT unit, factor::text, dimension, qty_step::text, min_qty::text, max_qty::text
-             FROM product_units
-            WHERE product_id = $1 AND unit = $2
-              AND ( ($4::uuid IS NOT NULL AND sub_variant_id = $4::uuid)
-                    OR (sub_variant_id IS NULL AND variant_id = $3)
-                    OR (sub_variant_id IS NULL AND variant_id IS NULL) )
-            ORDER BY sub_variant_id NULLS LAST, variant_id NULLS LAST
-            LIMIT 1`,
-          [productId, buyUnit, variantId || null, subVariantId || null]
-        )
+      ? await lineUnitConstraint(productId, buyUnit, variantId || null, subVariantId || null)
       : null
-    const qtyCheck = validatePurchaseQuantity(Number(quantity), toSellingUnit(constraintRow))
+    // Adds merge into the existing line, so max_qty caps in-cart + adding (rejected, never clamped).
+    const sellingUnit = toSellingUnit(constraintRow)
+    const existingQty = sellingUnit ? await activeLineQuantity(userId, productId, variantId, subVariantId, buyMode) : 0
+    if (sellingUnit) {
+      const capErr = unitCapError(sellingUnit.max_qty, existingQty, Number(quantity))
+      if (capErr) {
+        return NextResponse.json({ error: capErr, code: 'UNIT_MAX_EXCEEDED' }, { status: 400 })
+      }
+    }
+    const qtyCheck = validatePurchaseQuantity(Number(quantity) + existingQty, sellingUnit)
     if (!qtyCheck.ok) {
       return NextResponse.json({ error: qtyCheck.reason }, { status: 400 })
     }
@@ -286,24 +317,14 @@ export async function POST(request: NextRequest) {
          buy_mode
        )
        DO UPDATE SET
-         quantity = CASE WHEN $9::boolean OR cart_items.saved_for_later THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END,
+         quantity = CASE WHEN cart_items.saved_for_later THEN EXCLUDED.quantity ELSE cart_items.quantity + EXCLUDED.quantity END,
          price_at_addition = CASE WHEN cart_items.saved_for_later THEN EXCLUDED.price_at_addition ELSE cart_items.price_at_addition END,
          buy_unit = CASE WHEN cart_items.saved_for_later THEN EXCLUDED.buy_unit ELSE cart_items.buy_unit END,
          saved_for_later = FALSE,
          saved_at = NULL,
          updated_at = NOW()
        RETURNING quantity, (xmax = 0) AS inserted`,
-      [
-        userId,
-        productId,
-        variantId || null,
-        subVariantId || null,
-        quantity,
-        priceAtAddition,
-        buyMode,
-        buyUnit || null,
-        isDigital,
-      ]
+      [userId, productId, variantId || null, subVariantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]
     )
     const newQuantity = upsertResult.rows[0]?.quantity
     const wasInserted = upsertResult.rows[0]?.inserted
@@ -353,6 +374,14 @@ export async function PATCH(request: NextRequest) {
 
     if (!cartItem) return NextResponse.json({ error: 'Cart item not found' }, { status: 404 })
 
+    if (cartItem.is_digital === true) {
+      await query('DELETE FROM cart_items WHERE id = $1 AND user_id = $2', [cartItemId, userId])
+      return NextResponse.json(
+        { error: 'Digital products are bought directly — use Buy Now', code: 'DIGITAL_BUY_NOW_ONLY' },
+        { status: 409 }
+      )
+    }
+
     if (typeof savedForLater === 'boolean') {
       await query(
         'UPDATE cart_items SET saved_for_later = $1, saved_at = CASE WHEN $1 THEN NOW() ELSE NULL END, updated_at = NOW() WHERE id = $2',
@@ -362,8 +391,18 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (typeof quantity === 'number') {
-      const qty = cartItem.is_digital === true ? Math.min(quantity, 1) : quantity
-      await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [qty, cartItemId])
+      if (quantity > 0 && cartItem.buy_unit) {
+        const unit = toSellingUnit(
+          await lineUnitConstraint(cartItem.product_id, cartItem.buy_unit, cartItem.variant_id, cartItem.sub_variant_id)
+        )
+        if (unit?.max_qty != null && quantity > unit.max_qty) {
+          return NextResponse.json(
+            { error: `Maximum quantity is ${unit.max_qty} ${unit.unit}.`, code: 'UNIT_MAX_EXCEEDED' },
+            { status: 400 }
+          )
+        }
+      }
+      await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [quantity, cartItemId])
       return NextResponse.json({ message: 'Cart updated' })
     }
 

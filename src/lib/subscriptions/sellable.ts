@@ -1,3 +1,11 @@
+import {
+  INTERVAL_SPEC,
+  MAX_CYCLE_AMOUNT_INR,
+  SUBSCRIPTION_INTERVALS,
+  isSubscriptionInterval,
+  type SubscriptionInterval,
+} from './intervals'
+
 // Sellable rule: no variants → the product; variants → each variant, except a variant
 // with active sub-variants, which sells only its sub-variants.
 
@@ -12,6 +20,8 @@ export interface SellableItem {
   sku: string
   oneTimePrice: number | null
   subscriptionPrice: string
+  /** interval → admin input string (blank = fall back). */
+  subscriptionPrices: Record<string, string>
 }
 
 interface VariantLike {
@@ -20,6 +30,7 @@ interface VariantLike {
   sku?: string | null
   price?: string | number | null
   subscription_price?: string | number | null
+  subscription_prices?: unknown
   sub_variant_type_on?: boolean | null
   _isDeleted?: boolean
   is_active?: boolean | null
@@ -31,6 +42,7 @@ interface SubVariantLike {
   sku?: string | null
   price?: string | number | null
   subscription_price?: string | number | null
+  subscription_prices?: unknown
   is_active?: boolean | null
   _cleared?: boolean
 }
@@ -44,7 +56,7 @@ const num = (x: unknown): number | null => {
 
 export function deriveSellableItems(input: {
   hasVariants: boolean
-  product: { name?: string | null; sku?: string | null; price?: string | number | null; subscription_price?: unknown }
+  product: { name?: string | null; sku?: string | null; price?: string | number | null; subscription_price?: unknown; subscription_prices?: unknown }
   variants: VariantLike[]
   subVariantsByVariant: Record<string, SubVariantLike[] | undefined>
 }): SellableItem[] {
@@ -60,6 +72,7 @@ export function deriveSellableItems(input: {
         sku: str(input.product.sku),
         oneTimePrice: num(input.product.price),
         subscriptionPrice: str(input.product.subscription_price),
+        subscriptionPrices: priceInputs(input.product.subscription_prices),
       },
     ]
   }
@@ -82,6 +95,7 @@ export function deriveSellableItems(input: {
           sku: str(sv.sku),
           oneTimePrice: num(sv.price) ?? num(v.price),
           subscriptionPrice: str(sv.subscription_price),
+          subscriptionPrices: priceInputs(sv.subscription_prices),
         })
       }
     } else {
@@ -94,6 +108,7 @@ export function deriveSellableItems(input: {
         sku: str(v.sku),
         oneTimePrice: num(v.price),
         subscriptionPrice: str(v.subscription_price),
+        subscriptionPrices: priceInputs(v.subscription_prices),
       })
     }
   }
@@ -120,4 +135,67 @@ export function normalizeSubscriptionPrice(x: unknown): number | null {
   const n = num(typeof x === 'string' ? x.trim() : x)
   if (n == null || n <= 0) return null
   return Math.round(n * 100) / 100
+}
+
+function parseMap(x: unknown): Record<string, unknown> {
+  let v = x
+  if (typeof v === 'string') {
+    try {
+      v = JSON.parse(v)
+    } catch {
+      return {}
+    }
+  }
+  return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+}
+
+/** Stored/DB map → form input strings per interval. */
+export function priceInputs(x: unknown): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, v] of Object.entries(parseMap(x))) if (isSubscriptionInterval(k) && v != null && v !== '') out[k] = String(v)
+  return out
+}
+
+/** Admin input (object or JSON) → stored jsonb: known intervals with a positive amount, rounded to paise. */
+export function normalizeSubscriptionPrices(x: unknown): Partial<Record<SubscriptionInterval, number>> {
+  const out: Partial<Record<SubscriptionInterval, number>> = {}
+  const m = parseMap(x)
+  for (const k of SUBSCRIPTION_INTERVALS) {
+    const n = normalizeSubscriptionPrice(m[k])
+    if (n != null) out[k] = n
+  }
+  return out
+}
+
+/** Per-cycle GST-inclusive price for an interval: per-interval, else legacy scalar, else null (one-time). */
+export function pickSubscriptionPrice(
+  prices: unknown,
+  legacy: unknown,
+  interval: SubscriptionInterval
+): number | null {
+  return normalizeSubscriptionPrices(prices)[interval] ?? normalizeSubscriptionPrice(legacy)
+}
+
+/** Admin cell validation; null when OK or blank. */
+export function subscriptionPriceError(x: unknown): string | null {
+  if (x == null || (typeof x === 'string' && x.trim() === '')) return null
+  const n = Number(typeof x === 'string' ? x.trim() : x)
+  if (!Number.isFinite(n) || n < 0) return 'Enter a non-negative amount'
+  if (n > MAX_CYCLE_AMOUNT_INR) return `Max ₹${MAX_CYCLE_AMOUNT_INR.toLocaleString('en-IN')} per cycle`
+  return null
+}
+
+const MONTHS_PER_CYCLE: Record<SubscriptionInterval, number | null> = {
+  weekly: null,
+  monthly: null,
+  quarterly: INTERVAL_SPEC.quarterly.interval,
+  yearly: 12,
+}
+
+/** "₹1,333/mo" for quarterly/yearly cycles; null otherwise. */
+export function monthlyEquivalentLabel(interval: SubscriptionInterval, perCycle: unknown): string | null {
+  const months = MONTHS_PER_CYCLE[interval]
+  const n = normalizeSubscriptionPrice(perCycle)
+  if (!months || n == null) return null
+  return `₹${Math.round(n / months).toLocaleString('en-IN')}/mo`
 }

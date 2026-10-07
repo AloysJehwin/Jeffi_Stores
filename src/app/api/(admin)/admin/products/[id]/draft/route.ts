@@ -3,7 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
 import { deleteProductImage } from '@/lib/shared/s3'
-import { normalizeSubscriptionPrice } from '@/lib/subscriptions/sellable'
+import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
 import { applyDraftSubVariantPrices, parseSubVariantPriceEntries } from '@/lib/subscriptions/sub-variant-prices'
 
 export const dynamic = 'force-dynamic'
@@ -142,6 +142,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           variantsFromBody.map((v: any) => ({
             ...v,
             subscription_price: normalizeSubscriptionPrice(v?.subscription_price),
+            subscription_prices: normalizeSubscriptionPrices(v?.subscription_prices),
           }))
         )
       : null

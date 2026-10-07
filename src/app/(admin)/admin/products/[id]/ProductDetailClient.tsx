@@ -14,8 +14,13 @@ import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { formatINR, formatDate } from '@/lib/shared/format'
-import { deriveSellableItems, subscriptionSavingsPct } from '@/lib/subscriptions/sellable'
-import { SUBSCRIPTION_INTERVAL_LABELS, isSubscriptionInterval } from '@/lib/subscriptions/intervals'
+import {
+  deriveSellableItems,
+  monthlyEquivalentLabel,
+  pickSubscriptionPrice,
+  subscriptionSavingsPct,
+} from '@/lib/subscriptions/sellable'
+import { SUBSCRIPTION_INTERVALS, SUBSCRIPTION_INTERVAL_LABELS, isSubscriptionInterval } from '@/lib/subscriptions/intervals'
 
 function TagBadge({ tag, accent }: { tag: string; accent?: boolean }) {
   return (
@@ -273,11 +278,18 @@ function Field({ label, value, mono }: { label: string; value?: any; mono?: bool
 
 function SubscriptionDetails({ p, variants }: { p: any; variants: any[] }) {
   const intervals: string[] = Array.isArray(p.subscription_intervals) ? p.subscription_intervals : []
+  const offered = SUBSCRIPTION_INTERVALS.filter(i => intervals.includes(i))
   const subsByVariant: Record<string, any[]> = {}
   for (const v of variants) subsByVariant[String(v.id)] = v.sub_variants || []
   const items = deriveSellableItems({
     hasVariants: !!p.has_variants,
-    product: { name: p.name, sku: p.sku, price: p.base_price, subscription_price: p.subscription_price },
+    product: {
+      name: p.name,
+      sku: p.sku,
+      price: p.base_price,
+      subscription_price: p.subscription_price,
+      subscription_prices: p.subscription_prices,
+    },
     variants: variants.map(v => ({
       ...v,
       sub_variant_type_on: !!v.sub_variant_type_on || (v.sub_variants || []).length > 0,
@@ -298,14 +310,15 @@ function SubscriptionDetails({ p, variants }: { p: any; variants: any[] }) {
             <tr className="text-foreground-secondary">
               <th className="py-1.5 pr-2 text-left font-semibold">Item</th>
               <th className="py-1.5 px-2 text-right font-semibold">One-time</th>
-              <th className="py-1.5 px-2 text-right font-semibold">Subscription</th>
-              <th className="py-1.5 pl-2 text-right font-semibold">Savings</th>
+              {offered.map(iv => (
+                <th key={iv} className="py-1.5 px-2 text-right font-semibold">
+                  {SUBSCRIPTION_INTERVAL_LABELS[iv]}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-border-default">
             {items.map(it => {
-              const sub = it.subscriptionPrice ? Number(it.subscriptionPrice) : null
-              const pct = sub != null && it.oneTimePrice != null ? subscriptionSavingsPct(it.oneTimePrice, sub) : 0
               return (
                 <tr key={it.key}>
                   <td className="py-1.5 pr-2 text-foreground">
@@ -315,10 +328,21 @@ function SubscriptionDetails({ p, variants }: { p: any; variants: any[] }) {
                   <td className="py-1.5 px-2 text-right text-foreground">
                     {it.oneTimePrice != null ? formatINR(it.oneTimePrice) : '—'}
                   </td>
-                  <td className="py-1.5 px-2 text-right text-foreground">
-                    {sub != null ? formatINR(sub) : <span className="text-foreground-muted">Same as one-time</span>}
-                  </td>
-                  <td className="py-1.5 pl-2 text-right text-foreground">{pct > 0 ? `${pct}%` : '—'}</td>
+                  {offered.map(iv => {
+                    const sub = pickSubscriptionPrice(it.subscriptionPrices, it.subscriptionPrice, iv)
+                    const pct = sub != null && it.oneTimePrice != null ? subscriptionSavingsPct(it.oneTimePrice, sub) : 0
+                    const perMonth = sub != null ? monthlyEquivalentLabel(iv, sub) : null
+                    return (
+                      <td key={iv} className="py-1.5 px-2 text-right text-foreground" data-testid={`sub-price-${iv}`}>
+                        {sub != null ? formatINR(sub) : <span className="text-foreground-muted">Same as one-time</span>}
+                        {(perMonth || pct > 0) && (
+                          <span className="block text-[10px] text-foreground-muted">
+                            {[perMonth, pct > 0 ? `${pct}% off` : null].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
+                      </td>
+                    )
+                  })}
                 </tr>
               )
             })}

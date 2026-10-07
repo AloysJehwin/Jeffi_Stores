@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -13,6 +14,7 @@ import { AccountSearchProvider } from '@/contexts/AccountSearchContext'
 import FeaturedProducts from '@/components/visitor/FeaturedProducts'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { wishlistBadges } from '@/components/visitor/account/wishlist-badges'
+import { startBuyNow } from '@/lib/client/buy-now'
 
 interface WishlistItem {
   id: string
@@ -28,6 +30,7 @@ interface WishlistItem {
     price_ex_gst: number | null
     mrp: number | null
     has_variants: boolean
+    is_digital?: boolean
     stock_status: string
     variant_stock_total: number
     variant_min_price: number | null
@@ -58,6 +61,7 @@ function WishlistInner() {
   const confirm = useConfirm()
   const { user } = useAuth()
   const { remove: removeFromWishlist } = useWishlist()
+  const router = useRouter()
   const [addingToCart, setAddingToCart] = useState<Set<string>>(new Set())
   const [filterStock, setFilterStock] = useState<'all' | 'in' | 'out'>('all')
 
@@ -103,6 +107,26 @@ function WishlistInner() {
     } else {
       showToast('Failed to remove item', 'error')
     }
+  }
+
+  // Digital products never enter the cart: Buy Now, or pick options on the product page.
+  const handleBuyNow = async (productId: string, slug: string, hasVariants: boolean) => {
+    if (hasVariants) {
+      router.push(`/products/${slug}`)
+      return
+    }
+    setAddingToCart(prev => new Set(prev).add(productId))
+    const r = await startBuyNow({ productId, qty: 1 })
+    if (r.ok) {
+      router.push(r.href)
+      return
+    }
+    showToast(r.error, 'error')
+    setAddingToCart(prev => {
+      const next = new Set(prev)
+      next.delete(productId)
+      return next
+    })
   }
 
   const handleAddToCart = async (productId: string) => {
@@ -229,7 +253,8 @@ function WishlistInner() {
               : item.products.stock_status !== 'Out of Stock'
                 ? 1
                 : 0
-            const isInStock = effectiveStock > 0
+            const isDigital = !!item.products.is_digital
+            const isInStock = isDigital || effectiveStock > 0
             const mrp = item.products.mrp
               ? Number(item.products.mrp)
               : item.products.variant_min_mrp
@@ -374,14 +399,18 @@ function WishlistInner() {
                     </div>
 
                     <button
-                      onClick={() => handleAddToCart(item.product_id)}
+                      onClick={() =>
+                        isDigital
+                          ? handleBuyNow(item.product_id, item.products.slug, hasVariants)
+                          : handleAddToCart(item.product_id)
+                      }
                       disabled={!isInStock || isAddingToCart}
                       className="w-full bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-lg font-semibold transition-colors disabled:bg-border-default disabled:text-foreground-muted disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
                     >
                       {isAddingToCart ? (
                         <>
                           <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>
-                          Adding...
+                          {isDigital ? 'Processing...' : 'Adding...'}
                         </>
                       ) : (
                         <>
@@ -393,7 +422,7 @@ function WishlistInner() {
                               d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
                             />
                           </svg>
-                          Add to Cart
+                          {isDigital ? 'Buy Now' : 'Add to Cart'}
                         </>
                       )}
                     </button>

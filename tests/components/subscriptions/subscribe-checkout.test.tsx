@@ -110,6 +110,17 @@ describe('SubscribeCheckout', () => {
     expect(screen.getByText(/₹15,000/)).toBeTruthy()
   })
 
+  it('shows the selected interval\'s per-unit price', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === '/api/user/addresses') return json({ addresses: [ADDRESS] })
+      if (url === '/api/subscriptions/quote')
+        return json({ ...QUOTE, interval: 'monthly', intervalPrices: { monthly: 400, yearly: 4000 } })
+      return json({}, false)
+    })
+    render(<SubscribeCheckout isBusiness={false} />)
+    await waitFor(() => expect(screen.getByTestId('subscribe-interval-price').textContent).toContain('₹400.00 each'))
+  })
+
   it('shows the one-time comparison and states a fixed term and minimum commitment in the consent', async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === '/api/user/addresses') return json({ addresses: [ADDRESS] })

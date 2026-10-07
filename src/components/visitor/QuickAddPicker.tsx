@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import { motion, useReducedMotion } from 'motion/react'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -9,6 +10,10 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { round2 } from '@/lib/catalog/gst'
 import QuantityInput from '@/components/shared/QuantityInput'
+import InCartQtyHint from '@/components/shared/InCartQtyHint'
+import { inCartQuantity, pickerQtyCap } from '@/lib/catalog/cart-unit-cap'
+import { startBuyNow } from '@/lib/client/buy-now'
+import { useProductLikeShare } from '@/components/visitor/useProductLikeShare'
 
 interface VariantImage {
   id: string
@@ -80,9 +85,94 @@ interface QuickAddPickerProps {
   mrp?: number | null
   discountPct?: number
   inStock?: boolean
+  isDigital?: boolean
+  portal?: 'storefront' | 'business'
+  productHref?: string
 }
 
 const GENERIC_UNITS = new Set(['unit', 'units', 'pc', 'pcs', 'piece', 'pieces', 'nos', 'no', 'each'])
+
+const ICON_BTN =
+  'flex-shrink-0 w-8 h-8 rounded-full border border-border-default bg-surface-secondary flex items-center justify-center text-foreground-muted transition-colors disabled:opacity-60'
+
+/** Like (storefront only) + Share + Close for the quick-add popup header. */
+export function QuickAddHeaderActions({
+  productId,
+  productName,
+  slug,
+  href,
+  showWishlist,
+  onClose,
+  onStop,
+}: {
+  productId: string
+  productName: string
+  slug: string
+  href: string
+  showWishlist: boolean
+  onClose: () => void
+  onStop: (e: React.MouseEvent) => void
+}) {
+  const { isInWishlist, wishlistLoading, handleWishlist, handleShare } = useProductLikeShare({
+    id: productId,
+    slug,
+    name: productName,
+    href,
+  })
+  return (
+    <div className="flex-shrink-0 flex items-center gap-1.5">
+      {showWishlist && (
+        <button
+          type="button"
+          onClick={handleWishlist}
+          disabled={wishlistLoading}
+          aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+          aria-pressed={isInWishlist}
+          className={`${ICON_BTN} ${isInWishlist ? 'text-red-500 border-red-300' : 'hover:text-red-500 hover:border-red-300'}`}
+        >
+          <svg
+            className="w-4 h-4"
+            fill={isInWishlist ? 'currentColor' : 'none'}
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+            />
+          </svg>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={handleShare}
+        aria-label="Share product"
+        className={`${ICON_BTN} hover:text-accent-500 hover:border-accent-400`}
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+          />
+        </svg>
+      </button>
+      <button
+        type="button"
+        onClick={e => {
+          onStop(e)
+          onClose()
+        }}
+        aria-label="Close"
+        className="flex-shrink-0 w-7 h-7 rounded-full text-foreground-muted hover:text-foreground flex items-center justify-center"
+      >
+        &#215;
+      </button>
+    </div>
+  )
+}
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -110,9 +200,13 @@ export default function QuickAddPicker({
   mrp,
   discountPct,
   inStock,
+  isDigital: isDigitalProp = false,
+  portal = 'storefront',
+  productHref,
 }: QuickAddPickerProps) {
   const prefersReduced = useReducedMotion()
-  const { addToCart } = useCart()
+  const router = useRouter()
+  const { addToCart, cartItems } = useCart()
   const { showToast } = useToast()
   const gstEnabled = useStoreConfig().flags.gstEnabled
 
@@ -126,7 +220,8 @@ export default function QuickAddPicker({
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
   const [quantity, setQuantity] = useState(1)
   const [quantityRaw, setQuantityRaw] = useState('1')
-  const [isDigital, setIsDigital] = useState(false)
+  const [apiDigital, setApiDigital] = useState(false)
+  const isDigital = isDigitalProp || apiDigital
 
   useEffect(() => {
     let cancelled = false
@@ -139,7 +234,7 @@ export default function QuickAddPicker({
         const vs = data.product_variants ?? []
         setVariants(vs)
         setProductUnits(data.product_units ?? [])
-        setIsDigital(!!data.is_digital)
+        setApiDigital(!!data.is_digital)
         const firstVariant = vs.find(v => v.stock_status !== 'Out of Stock') ?? vs[0] ?? null
         if (firstVariant) {
           setSelectedVariantId(firstVariant.id)
@@ -237,10 +332,21 @@ export default function QuickAddPicker({
     return 0
   }, [gstEnabled, selectedSubVariant, selectedVariant])
 
+  const cap = pickerQtyCap(
+    qtyMax,
+    inCartQuantity(cartItems, {
+      productId,
+      variantId: selectedVariantId,
+      subVariantId: selectedSubVariantId,
+      buyMode: effectiveUnitKey,
+    }),
+    qtyMin
+  )
+
   useEffect(() => {
-    setQuantity(qtyMin)
-    setQuantityRaw(isContinuous ? Number(qtyMin.toFixed(6)).toString() : String(qtyMin))
-  }, [selectedVariantId, effectiveUnitKey, qtyMin, isContinuous])
+    setQuantity(cap.min)
+    setQuantityRaw(isContinuous ? Number(cap.min.toFixed(6)).toString() : String(cap.min))
+  }, [selectedVariantId, selectedSubVariantId, effectiveUnitKey, cap.min, isContinuous])
 
   useEffect(() => {
     const subs = selectedVariant?.sub_variants ?? []
@@ -269,6 +375,20 @@ export default function QuickAddPicker({
       return
     }
     setAdding(true)
+    if (isDigital) {
+      const r = await startBuyNow(
+        { productId, variantId: selectedVariantId, subVariantId: selectedSubVariantId, qty: 1 },
+        portal
+      )
+      if (r.ok) {
+        onClose()
+        router.push(r.href)
+      } else {
+        showToast(r.error, 'error')
+        setAdding(false)
+      }
+      return
+    }
     try {
       await addToCart(
         productId,
@@ -289,6 +409,9 @@ export default function QuickAddPicker({
     adding,
     addToCart,
     effectiveUnitKey,
+    isDigital,
+    portal,
+    router,
     onClose,
     productId,
     quantity,
@@ -316,17 +439,15 @@ export default function QuickAddPicker({
           {brandName && <p className="text-sm text-foreground-secondary truncate">{brandName}</p>}
           {categoryName && <p className="text-sm text-foreground-secondary truncate">{categoryName}</p>}
         </div>
-        <button
-          type="button"
-          onClick={e => {
-            onStop(e)
-            onClose()
-          }}
-          aria-label="Close"
-          className="flex-shrink-0 w-7 h-7 rounded-full text-foreground-muted hover:text-foreground flex items-center justify-center"
-        >
-          &#215;
-        </button>
+        <QuickAddHeaderActions
+          productId={productId}
+          productName={productName}
+          slug={slug}
+          href={productHref ?? `/products/${slug}`}
+          showWishlist={portal !== 'business'}
+          onClose={onClose}
+          onStop={onStop}
+        />
       </div>
 
       {(displayPrice != null || inStock != null) && (
@@ -452,7 +573,7 @@ export default function QuickAddPicker({
             )}
           </div>
 
-          {!isDigital && (
+          {!isDigital && !cap.full && (
             <QuantityInput
               dimension={sellUnit?.dimension ?? 'count'}
               quantity={quantity}
@@ -461,8 +582,8 @@ export default function QuickAddPicker({
               unitKey={effectiveUnitKey}
               effectiveStock={pickerStock}
               qtyStep={qtyStep}
-              qtyMin={qtyMin}
-              qtyMax={qtyMax}
+              qtyMin={cap.min}
+              qtyMax={cap.max}
               onChange={(qty, raw) => {
                 setQuantity(qty)
                 setQuantityRaw(raw)
@@ -470,16 +591,26 @@ export default function QuickAddPicker({
             />
           )}
 
+          {!isDigital && <InCartQtyHint cap={cap} unitLabel={effectiveUnitLabel} />}
+
           <button
             type="button"
             onClick={e => {
               onStop(e)
               onConfirm()
             }}
-            disabled={adding}
+            disabled={adding || (!isDigital && cap.full)}
             className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
           >
-            {adding ? 'Adding...' : 'Add to cart'}
+            {isDigital
+              ? adding
+                ? 'Processing...'
+                : 'Buy Now'
+              : adding
+                ? 'Adding...'
+                : cap.full
+                  ? 'Max quantity already in cart'
+                  : 'Add to cart'}
           </button>
         </>
       )}
@@ -494,7 +625,7 @@ export default function QuickAddPicker({
       onClick={onStop}
       role="dialog"
       aria-modal="true"
-      aria-label="Quick add to cart"
+      aria-label={isDigital ? 'Quick buy' : 'Quick add to cart'}
     >
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <motion.div

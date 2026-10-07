@@ -3,7 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { getCampaign } from '@/lib/shared/marketing'
 import { getScenario } from '@/lib/campaigns/scenarios/_registry'
-import { resolveParams } from '@/lib/campaigns/types'
+import { resolveScenarioParams } from '@/lib/campaigns/runner'
 import { queryMany, queryOne, getClient } from '@/lib/shared/db'
 import { validateScenarioSql } from '@/lib/campaigns/sql-safety'
 import { cooldownDays as resolveCooldownDays } from '@/lib/campaigns/duration'
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
 }
 
 async function runBuiltin(scenario: any, campaign: any, scenarioKind: string) {
-  const resolvedParams = resolveParams(scenario.defaultParams, campaign.parameters)
+  const resolvedParams = resolveScenarioParams(scenario, campaign.parameters)
 
   let rows: any[] = []
   try {

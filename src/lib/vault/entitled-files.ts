@@ -32,6 +32,8 @@ export interface EntitledProduct {
   /** Distinct kinds of the product's ready files (drives the library type filter). */
   kinds: string[]
   file_count: number
+  category: string | null
+  brand: string | null
 }
 
 export interface EntitlementSummary {
@@ -52,9 +54,11 @@ export async function listEntitlements(userId: string): Promise<EntitledProduct[
       e.product_id, p.name AS title, e.source, e.granted_at, e.access_expires_at,
       (SELECT pi.image_url FROM product_images pi
         WHERE pi.product_id = e.product_id ORDER BY pi.display_order, pi.id LIMIT 1) AS cover_url,
-      f.kinds, f.file_count
+      f.kinds, f.file_count, c.name AS category, b.name AS brand
     FROM vault_entitlements e
     JOIN products p ON p.id = e.product_id
+    LEFT JOIN categories c ON c.id = p.category_id
+    LEFT JOIN brands b ON b.id = p.brand_id
     CROSS JOIN LATERAL (
       SELECT COALESCE(array_agg(DISTINCT pf.kind), '{}') AS kinds, COUNT(*)::int AS file_count
         FROM product_files pf WHERE pf.product_id = e.product_id AND pf.status = 'ready'

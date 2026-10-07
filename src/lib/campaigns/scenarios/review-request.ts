@@ -76,6 +76,12 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
           WHERE ecs.campaign_kind = $1
             AND ecs.reference_id = o.id::text
         )
+        -- review_request and review_reminder target the same orders; one review email per order.
+        AND NOT EXISTS (
+          SELECT 1 FROM email_campaigns_sent ecs
+          WHERE ecs.campaign_kind = 'review_reminder'
+            AND ecs.reference_id = o.id::text
+        )
       LIMIT $4
     `,
       [campaign.kind, campaign.delay_hours, String(lookbackMin), params.maxRecipientsPerSweep]

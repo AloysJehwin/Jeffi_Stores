@@ -11,6 +11,8 @@ export interface LibraryItem {
   access_expires_at: string | null
   kinds: string[]
   file_count: number
+  category?: string | null
+  brand?: string | null
 }
 
 export const LIBRARY_FILTERS: { id: LibraryFilter; label: string }[] = [
@@ -37,16 +39,33 @@ export function primaryKind(kinds: readonly string[] | null | undefined): Librar
   return 'other'
 }
 
-export function filterLibrary<T extends Pick<LibraryItem, 'title' | 'kinds'>>(
+export function filterLibrary<T extends Pick<LibraryItem, 'title' | 'kinds' | 'category' | 'brand'>>(
   items: readonly T[],
-  { kind = 'all', query = '' }: { kind?: LibraryFilter; query?: string }
+  { kind = 'all', query = '', category = null, brand = null }: {
+    kind?: LibraryFilter
+    query?: string
+    category?: string | null
+    brand?: string | null
+  }
 ): T[] {
   const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   return items.filter(it => {
     if (kind !== 'all' && primaryKind(it.kinds) !== kind) return false
-    const title = it.title.toLowerCase()
-    return terms.every(t => title.includes(t))
+    if (category && it.category !== category) return false
+    if (brand && it.brand !== brand) return false
+    const hay = [it.title, it.category, it.brand].filter(Boolean).join(' ').toLowerCase()
+    return terms.every(t => hay.includes(t))
   })
+}
+
+/** Distinct non-empty values of a facet with counts, most common first. */
+export function facetCounts<T>(items: readonly T[], pick: (it: T) => string | null | undefined) {
+  const m = new Map<string, number>()
+  for (const it of items) {
+    const v = pick(it)?.trim()
+    if (v) m.set(v, (m.get(v) ?? 0) + 1)
+  }
+  return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([value, count]) => ({ value, count }))
 }
 
 /** Per-filter counts for the chips. */

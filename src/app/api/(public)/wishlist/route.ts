@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
           'id', p.id, 'name', p.name, 'slug', p.slug,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'mrp', p.mrp, 'has_variants', p.has_variants,
+          'is_digital', COALESCE(p.is_digital, FALSE),
           'stock_status', p.stock_status,
           'variant_stock_total', ${VARIANT_STOCK_TOTAL_SQL},
           'variant_min_price', ${MIN_PRICE_SQL},

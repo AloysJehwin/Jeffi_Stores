@@ -9,7 +9,7 @@ import { publishProductDraft, openOrdersForProduct } from '@/lib/catalog/product
 import { generateVariantSku } from '@/lib/catalog/sku'
 import { round2 } from '@/lib/catalog/gst'
 import { normalizeDigitalProduct } from '@/lib/catalog/digital-units'
-import { normalizeSubscriptionPrice } from '@/lib/subscriptions/sellable'
+import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
 import { cycleLimitsError, normalizeCycleCount } from '@/lib/subscriptions/intervals'
 import {
   applyDraftSubVariantPrices,
@@ -368,6 +368,7 @@ export async function updateProduct(productId: string, formData: FormData) {
     : []
   const subscriptionInterval = subscriptionIntervals[0] ?? null
   const subscriptionPrice = hasVariants ? null : normalizeSubscriptionPrice(formData.get('subscription_price'))
+  const subscriptionPrices = hasVariants ? {} : normalizeSubscriptionPrices(formData.get('subscription_prices'))
   const subVariantPrices = hasVariants
     ? parseSubVariantPriceEntries(formData.get('sub_variant_subscription_prices'))
     : []
@@ -488,6 +489,7 @@ export async function updateProduct(productId: string, formData: FormData) {
         subscription_intervals: subscriptionIntervals,
         subscription_interval: subscriptionInterval,
         subscription_price: subscriptionPrice,
+        subscription_prices: subscriptionPrices,
         subscription_total_cycles: subscriptionTotalCycles,
         subscription_min_cycles: subscriptionMinCycles,
         is_bundle: isBundle,
@@ -511,7 +513,11 @@ export async function updateProduct(productId: string, formData: FormData) {
       const draftVariants = variantsJsonRaw
         ? JSON.parse(variantsJsonRaw)
             .filter((v: any) => !v._isDeleted)
-            .map((v: any) => ({ ...v, subscription_price: normalizeSubscriptionPrice(v.subscription_price) }))
+            .map((v: any) => ({
+              ...v,
+              subscription_price: normalizeSubscriptionPrice(v.subscription_price),
+              subscription_prices: normalizeSubscriptionPrices(v.subscription_prices),
+            }))
         : null
 
       await query(
@@ -685,7 +691,8 @@ export async function updateProduct(productId: string, formData: FormData) {
       `subscription_interval = $${params.length + 3}`,
       `subscription_price = $${params.length + 4}`,
       `subscription_total_cycles = $${params.length + 5}`,
-      `subscription_min_cycles = $${params.length + 6}`
+      `subscription_min_cycles = $${params.length + 6}`,
+      `subscription_prices = $${params.length + 7}::jsonb`
     )
     params.push(
       isSubscription,
@@ -693,7 +700,8 @@ export async function updateProduct(productId: string, formData: FormData) {
       subscriptionInterval,
       subscriptionPrice,
       subscriptionTotalCycles,
-      subscriptionMinCycles
+      subscriptionMinCycles,
+      JSON.stringify(subscriptionPrices)
     )
     setClauses.push(`is_bundle = $${params.length + 1}`)
     params.push(isBundle)
@@ -1072,7 +1080,8 @@ export async function updateProduct(productId: string, formData: FormData) {
                    WHEN asin_match IN ('gtin','listed') AND asin IS NOT DISTINCT FROM $21::text THEN asin_match
                    ELSE 'manual' END,
                  isbn = $22,
-                 subscription_price = $25
+                 subscription_price = $25,
+                 subscription_prices = $26::jsonb
                WHERE id = $23 AND product_id = $24`,
               [
                 variantSku,
@@ -1104,6 +1113,7 @@ export async function updateProduct(productId: string, formData: FormData) {
                 variant.id,
                 productId,
                 normalizeSubscriptionPrice(variant.subscription_price),
+                JSON.stringify(normalizeSubscriptionPrices(variant.subscription_prices)),
               ]
             )
             const subVariants = await queryMany<{ id: string; sub_variant_name: string }>(
@@ -1123,8 +1133,8 @@ export async function updateProduct(productId: string, formData: FormData) {
             if (!variant.variant_name) continue
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, asin_match, isbn, is_active, subscription_price)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22::text, CASE WHEN $22::text IS NOT NULL THEN 'manual' ELSE NULL END, $23, true, $24)`,
+              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, asin_match, isbn, is_active, subscription_price, subscription_prices)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22::text, CASE WHEN $22::text IS NOT NULL THEN 'manual' ELSE NULL END, $23, true, $24, $25::jsonb)`,
               [
                 productId,
                 variantSku,
@@ -1154,6 +1164,7 @@ export async function updateProduct(productId: string, formData: FormData) {
                 variant.asin || null,
                 variant.isbn || null,
                 normalizeSubscriptionPrice(variant.subscription_price),
+                JSON.stringify(normalizeSubscriptionPrices(variant.subscription_prices)),
               ]
             )
           }
