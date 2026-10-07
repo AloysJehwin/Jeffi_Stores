@@ -123,9 +123,20 @@ interface ProductFormProps {
   // Basic plan: no returns module (hide return/replacement policy fields).
   hasInventory?: boolean // default true (Growth+)
   hasReturns?: boolean // default true (Growth+)
+  // Site Controls master switches (effective = master && the product's own flag).
+  subscriptionsEnabled?: boolean // default true
+  digitalProductsEnabled?: boolean // default true
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
+
+// Razorpay-backable billing intervals (no 'daily' — Razorpay needs period>=weekly).
+const SUBSCRIPTION_INTERVALS = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'yearly', label: 'Yearly' },
+]
 const PACKAGE_TYPES = [
   'flat_poly_auto',
   'flat_poly_s',
@@ -350,6 +361,8 @@ export default function ProductForm({
   initialBsEntries = null,
   hasInventory = true,
   hasReturns = true,
+  subscriptionsEnabled = true,
+  digitalProductsEnabled = true,
 }: ProductFormProps) {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -535,7 +548,6 @@ export default function ProductForm({
   const [isOversized, setIsOversized] = useState(product?.is_oversized ?? false)
   // Digital / Content
   const [isDigital, setIsDigital] = useState(product?.is_digital ?? false)
-  const [downloadUrl, setDownloadUrl] = useState(product?.download_url || '')
   const [licenseType, setLicenseType] = useState(product?.license_type || '')
   const [fileFormat, setFileFormat] = useState(product?.file_format || '')
   const [platformCompatibility, setPlatformCompatibility] = useState(
@@ -543,10 +555,20 @@ export default function ProductForm({
   )
   // Subscriptions
   const [isSubscription, setIsSubscription] = useState(product?.is_subscription ?? false)
-  const [subscriptionInterval, setSubscriptionInterval] = useState(product?.subscription_interval || '')
+  const [subscriptionIntervals, setSubscriptionIntervals] = useState<string[]>(
+    Array.isArray(product?.subscription_intervals) && product.subscription_intervals.length
+      ? product.subscription_intervals
+      : product?.subscription_interval
+        ? [product.subscription_interval]
+        : []
+  )
   const [subscriptionPrice, setSubscriptionPrice] = useState(
     product?.subscription_price != null ? String(product.subscription_price) : ''
   )
+  // A digital product is single-SKU with no variants (and no shipping).
+  useEffect(() => {
+    if (isDigital && hasVariants) setHasVariants(false)
+  }, [isDigital, hasVariants])
   // Bundling
   const [isBundle, setIsBundle] = useState(product?.is_bundle ?? false)
   // SEO
@@ -887,11 +909,11 @@ export default function ProductForm({
     fields.sort_order = sortOrderVal
     fields.handling_days = handlingDays
     fields.shipping_class = shippingClass
-    fields.download_url = downloadUrl || null
     fields.license_type = licenseType || null
     fields.file_format = fileFormat || null
     fields.platform_compatibility = platformCompatibility
-    fields.subscription_interval = subscriptionInterval || null
+    fields.subscription_intervals = subscriptionIntervals
+    fields.subscription_interval = subscriptionIntervals[0] ?? null
     fields.subscription_price = subscriptionPrice || null
     fields.meta_title = metaTitle || null
     fields.meta_description = metaDescription || null
@@ -1010,13 +1032,12 @@ export default function ProductForm({
     weightGrams,
     // digital
     isDigital,
-    downloadUrl,
     licenseType,
     fileFormat,
     platformCompatibility,
     // subscription & bundle
     isSubscription,
-    subscriptionInterval,
+    subscriptionIntervals,
     subscriptionPrice,
     isBundle,
     // seo & tax
@@ -1918,7 +1939,7 @@ export default function ProductForm({
     // Weight & packaging validation — enforced on publish only, so a partial
     // draft can still be saved. Simple products validate the product-level weight
     // and (for box package types) the stored dims; variant products validate each.
-    if (isPublishIntent) {
+    if (isPublishIntent && !isDigital) {
       const failValidation = (msg: string) => {
         setError(msg)
         setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
@@ -2097,13 +2118,13 @@ export default function ProductForm({
       formData.set('is_oversized', String(isOversized))
       // Digital / Content
       formData.set('is_digital', String(isDigital))
-      formData.set('download_url', downloadUrl)
       formData.set('license_type', licenseType)
       formData.set('file_format', fileFormat)
       formData.set('platform_compatibility', platformCompatibility)
       // Subscriptions
       formData.set('is_subscription', String(isSubscription))
-      formData.set('subscription_interval', subscriptionInterval)
+      formData.set('subscription_intervals', subscriptionIntervals.join(','))
+      formData.set('subscription_interval', subscriptionIntervals[0] ?? '')
       formData.set('subscription_price', subscriptionPrice)
       // Bundling
       formData.set('is_bundle', String(isBundle))
@@ -2954,12 +2975,14 @@ export default function ProductForm({
                 <input type="hidden" name="is_featured" value={isFeatured ? 'true' : ''} />
                 <Toggle id="is_featured" checked={isFeatured} onChange={setIsFeatured} label="Featured Product" />
               </div>
-              <Toggle
-                id="has_variants_toggle"
-                checked={hasVariants}
-                onChange={setHasVariants}
-                label="This product has variants"
-              />
+              {!isDigital && (
+                <Toggle
+                  id="has_variants_toggle"
+                  checked={hasVariants}
+                  onChange={setHasVariants}
+                  label="This product has variants"
+                />
+              )}
             </div>
 
             {/* Identification & Compliance */}
@@ -3089,27 +3112,21 @@ export default function ProductForm({
               {digitalExpanded && (
                 <div className="p-4 space-y-4 border-t border-border-default">
                   <div className="flex flex-wrap gap-6">
-                    <Toggle id="is_digital" checked={isDigital} onChange={setIsDigital} label="Digital Product" />
+                    {digitalProductsEnabled && (
+                      <Toggle id="is_digital" checked={isDigital} onChange={setIsDigital} label="Digital Product" />
+                    )}
                     <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
-                    <Toggle
-                      id="is_subscription"
-                      checked={isSubscription}
-                      onChange={setIsSubscription}
-                      label="Subscription"
-                    />
+                    {subscriptionsEnabled && (
+                      <Toggle
+                        id="is_subscription"
+                        checked={isSubscription}
+                        onChange={setIsSubscription}
+                        label="Subscription"
+                      />
+                    )}
                   </div>
                   {isDigital && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
-                      <div>
-                        <label className="block text-xs font-medium text-foreground-muted mb-1">Download URL</label>
-                        <input
-                          type="url"
-                          value={downloadUrl}
-                          onChange={e => setDownloadUrl(e.target.value)}
-                          placeholder="https://..."
-                          className={inputCls}
-                        />
-                      </div>
                       <div>
                         <label className="block text-xs font-medium text-foreground-muted mb-1">License Type</label>
                         <input
@@ -3142,31 +3159,40 @@ export default function ProductForm({
                           className={inputCls}
                         />
                       </div>
+                      <p className="sm:col-span-2 text-xs text-foreground-muted">
+                        Files are uploaded in the Digital Files panel. Buyers open them in the vault.
+                      </p>
                     </div>
                   )}
-                  {isSubscription && (
+                  {subscriptionsEnabled && isSubscription && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
                       <div>
                         <label className="block text-xs font-medium text-foreground-muted mb-1">
-                          Subscription Interval
+                          Billing intervals offered
                         </label>
-                        <AdminSelect
-                          value={subscriptionInterval}
-                          onChange={v => setSubscriptionInterval(v)}
-                          className="w-full"
-                          options={[
-                            { value: '', label: '— select —' },
-                            { value: 'daily', label: 'Daily' },
-                            { value: 'weekly', label: 'Weekly' },
-                            { value: 'monthly', label: 'Monthly' },
-                            { value: 'quarterly', label: 'Quarterly' },
-                            { value: 'yearly', label: 'Yearly' },
-                          ]}
-                        />
+                        <div className="flex flex-wrap gap-3">
+                          {SUBSCRIPTION_INTERVALS.map(opt => {
+                            const on = subscriptionIntervals.includes(opt.value)
+                            return (
+                              <label key={opt.value} className="flex items-center gap-1.5 text-sm text-foreground">
+                                <input
+                                  type="checkbox"
+                                  checked={on}
+                                  onChange={() =>
+                                    setSubscriptionIntervals(prev =>
+                                      on ? prev.filter(v => v !== opt.value) : [...prev, opt.value]
+                                    )
+                                  }
+                                />
+                                {opt.label}
+                              </label>
+                            )
+                          })}
+                        </div>
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-foreground-muted mb-1">
-                          Subscription Price (₹)
+                          Subscription Price (₹ per cycle)
                         </label>
                         <input
                           type="number"

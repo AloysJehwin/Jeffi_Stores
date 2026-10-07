@@ -14,6 +14,8 @@ export default async function AddProductPage() {
   const session = await getAdminSession()
   const { hasPlanScope } = await import('@/lib/auth/plan-gate')
   const hasInventory = await hasPlanScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
+  const { getFeatureFlags } = await import('@/lib/catalog/site-controls')
+  const flags = await getFeatureFlags()
 
   return (
     <MobileEditBlock>
@@ -40,6 +42,8 @@ export default async function AddProductPage() {
         brands={brands || []}
         action={createProduct}
         hasInventory={hasInventory}
+        subscriptionsEnabled={flags.subscriptionsEnabled}
+        digitalProductsEnabled={flags.digitalProductsEnabled}
       />
     </div>
     </MobileEditBlock>
