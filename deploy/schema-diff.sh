@@ -7,7 +7,7 @@
 #   bash deploy/schema-diff.sh --dry-run   # diff only, print SQL, do not apply
 #
 # Requirements (set in environment):
-#   RDS_HOST, RDS_PORT, RDS_USER, RDS_DB, AWS_REGION
+#   RDS_HOST, RDS_PORT, RDS_USER, RDS_DB, AWS_REGION (RDS_CONNECT_HOST overrides the address, e.g. a port-forward)
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -39,7 +39,7 @@ seed_control_plane() {
     --username "$RDS_USER")
   SEED_LOG=$(mktemp /tmp/schema_seed_XXXXXX.log)
   PGPASSWORD="$SEED_TOKEN" PGSSLMODE=require psql \
-    -h "$RDS_HOST" \
+    -h "${RDS_CONNECT_HOST:-$RDS_HOST}" \
     -p "${RDS_PORT:-5432}" \
     -U "$RDS_USER" \
     -d "$RDS_DB" \
@@ -136,7 +136,7 @@ RDS_TOKEN=$(aws rds generate-db-auth-token \
 RDS_TOKEN_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))" <<< "$RDS_TOKEN")
 
 DESIRED_URL="postgresql://postgres:temp@${CONTAINER_IP}:5432/desired"
-LIVE_URL="postgresql://$RDS_USER:${RDS_TOKEN_ENC}@$RDS_HOST:${RDS_PORT:-5432}/$RDS_DB?sslmode=require"
+LIVE_URL="postgresql://$RDS_USER:${RDS_TOKEN_ENC}@${RDS_CONNECT_HOST:-$RDS_HOST}:${RDS_PORT:-5432}/$RDS_DB?sslmode=require"
 
 # migra <from=live> <to=desired> — generates SQL to transform live into desired
 RAW_DIFF=$(migra --unsafe --ignore-extension-versions "$LIVE_URL" "$DESIRED_URL" 2>/dev/null || true)
@@ -291,7 +291,7 @@ RDS_TOKEN=$(aws rds generate-db-auth-token \
 # drift loudly without rolling back a good release.
 APPLY_LOG=$(mktemp /tmp/schema_apply_XXXXXX.log)
 echo "$DIFF" | PGPASSWORD="$RDS_TOKEN" PGSSLMODE=require psql \
-  -h "$RDS_HOST" \
+  -h "${RDS_CONNECT_HOST:-$RDS_HOST}" \
   -p "${RDS_PORT:-5432}" \
   -U "$RDS_USER" \
   -d "$RDS_DB" 2>&1 | tee "$APPLY_LOG"

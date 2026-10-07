@@ -28,7 +28,7 @@ if [[ -n "${RDS_HOST:-}" ]]; then
     --region "${AWS_REGION:-us-east-1}" \
     --username "$RDS_USER")
   export PGPASSWORD
-  PSQL_ARGS="-h $RDS_HOST -p ${RDS_PORT:-5432} -U $RDS_USER -d $RDS_DB"
+  PSQL_ARGS="-h ${RDS_CONNECT_HOST:-$RDS_HOST} -p ${RDS_PORT:-5432} -U $RDS_USER -d $RDS_DB"
   SSL_ENV="PGSSLMODE=require"
 else
   PSQL_ARGS="-d ${DATABASE_URL}"
