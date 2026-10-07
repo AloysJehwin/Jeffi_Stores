@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../platform"
 TAG=${1:-}
 if [ -n "$TAG" ]; then
-  kubectl kustomize . | sed "s#708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest#708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:${TAG}#g" | kubectl apply -f -
+  kubectl kustomize . | sed -E "s#(708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com/jeffi-stores):[A-Za-z0-9._-]+#\1:${TAG}#g" | kubectl apply -f -
 else
   kubectl apply -k .
 fi

@@ -15,4 +15,4 @@ resources:
 # CRD-backed resources (issuers, Coroot) are applied after their charts settle: see bootstrap/apply-platform.sh.
 images:
   - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores
-    newTag: latest
+    newTag: local-014e65e4
