@@ -300,8 +300,9 @@ function TableRow({
   )
 }
 
-// How often to inject a category banner row (every N cards)
-const BANNER_EVERY = 9
+// How often to inject a category banner row (every N cards). A multiple of both grid widths (2 and 3)
+// so the rows between full-width inserts are always complete.
+const BANNER_EVERY = 12
 // A multiple of both grid widths (2 and 3 columns) and ahead of the first category banner row,
 // so the full-width promo never leaves a hole in the row above it.
 const PROMO_AFTER = 6
