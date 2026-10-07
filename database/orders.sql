@@ -114,7 +114,11 @@ CREATE TABLE public.order_items (
     package_type    varchar(30),
     length_cm       numeric(6,2),
     breadth_cm      numeric(6,2),
-    height_cm       numeric(6,2)
+    height_cm       numeric(6,2),
+    is_digital      boolean DEFAULT false NOT NULL,
+    is_returnable   boolean DEFAULT true NOT NULL,
+    granted_at      timestamp with time zone,
+    access_revoked_at timestamp with time zone
 );
 
 
@@ -212,10 +216,58 @@ CREATE TABLE public.orders (
     estimated_delivery_date date,
     cod_remitted_at timestamp with time zone,
     draft_of_id uuid,
+    granted_at timestamp with time zone,
+    subscription_id uuid,
+    subscription_cycle integer,
     CONSTRAINT orders_shipment_status_check CHECK (((shipment_status IS NULL) OR (shipment_status = ANY (ARRAY['created'::text, 'picked_up'::text, 'in_transit'::text, 'out_for_delivery'::text, 'delivery_attempted'::text, 'delivered'::text, 'rto_initiated'::text, 'rto_in_transit'::text, 'rto_out_for_return'::text, 'rto_delivered'::text]))))
 );
 
 COMMENT ON COLUMN public.orders.shipment_status IS 'Stable internal shipment progress enum, resolved from Delhivery scan history. Set to created when AWB is assigned; updated on each track API call.';
+
+
+--
+-- Name: vault_entitlements; Type: TABLE; Schema: public; Owner: -
+--
+-- One row per granted digital order_item. The vault checks (user_id, status='active', not expired)
+-- before serving a file. access_expires_at is NULL for one-time purchases and set for subscription
+-- access (paid-period end + grace).
+
+CREATE TABLE public.vault_entitlements (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    product_id uuid NOT NULL,
+    order_id uuid NOT NULL,
+    order_item_id uuid NOT NULL,
+    source character varying(12) DEFAULT 'one_time'::character varying NOT NULL,
+    status character varying(10) DEFAULT 'active'::character varying NOT NULL,
+    subscription_id uuid,
+    granted_at timestamp with time zone DEFAULT now() NOT NULL,
+    access_expires_at timestamp with time zone,
+    revoked_at timestamp with time zone,
+    revoke_reason character varying(40),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: subscription_cycle_orders; Type: TABLE; Schema: public; Owner: -
+--
+-- Idempotency ledger linking a Razorpay subscription charge to the order we minted for that cycle.
+-- UNIQUE (subscription_id, cycle_number) and UNIQUE razorpay_payment_id both guard double-commit
+-- when the verify endpoint and the webhook race.
+
+CREATE TABLE public.subscription_cycle_orders (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    subscription_id uuid NOT NULL,
+    cycle_number integer NOT NULL,
+    order_id uuid,
+    razorpay_payment_id character varying(64) NOT NULL,
+    razorpay_invoice_id character varying(64),
+    amount_paise bigint NOT NULL,
+    status character varying(16) DEFAULT 'committed'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
 
 
 --

@@ -129,6 +129,36 @@ CREATE TABLE public.product_images (
 
 
 --
+-- Name: product_files; Type: TABLE; Schema: public; Owner: -
+--
+-- Private digital files for a product, delivered through the authenticated vault host.
+-- Never joined by public/storefront product queries (unlike products.download_url, which leaked).
+-- storage_key is composed server-side as t/{tenantId}/products/{productId}/{fileId}; the bucket is
+-- private (Block Public Access) and files are served only via short-lived presigned GETs.
+
+CREATE TABLE public.product_files (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    product_id uuid NOT NULL,
+    kind character varying(10) DEFAULT 'other'::character varying NOT NULL,
+    status character varying(12) DEFAULT 'uploading'::character varying NOT NULL,
+    downloadable boolean DEFAULT false NOT NULL,
+    storage_driver character varying(8) DEFAULT 's3'::character varying NOT NULL,
+    storage_key character varying(512) NOT NULL,
+    display_name character varying(255) NOT NULL,
+    original_name character varying(255),
+    mime_type character varying(120) NOT NULL,
+    size_bytes bigint DEFAULT 0 NOT NULL,
+    checksum_sha256 character varying(64),
+    duration_seconds integer,
+    page_count integer,
+    display_order integer DEFAULT 0 NOT NULL,
+    uploaded_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: product_sub_variants; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -352,6 +382,14 @@ CREATE TABLE public.products (
     is_subscription boolean DEFAULT false NOT NULL,
     subscription_interval character varying(20),
     subscription_price numeric(12,2),
+    subscription_price_ex_gst numeric(12,2),
+    subscription_intervals text[] DEFAULT '{}'::text[] NOT NULL,
+    subscription_discount_type character varying(10),
+    subscription_discount_value numeric(12,2),
+    -- Digital delivery (vault). download_url is retained for back-compat but no longer written/exposed;
+    -- real digital files live in the private product_files table below.
+    downloadable boolean DEFAULT false NOT NULL,
+    age_rating character varying(16),
     -- Bundling
     is_bundle boolean DEFAULT false NOT NULL,
     bundle_items jsonb,

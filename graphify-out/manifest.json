@@ -960,13 +960,13 @@
     "semantic_hash": ""
   },
   "database/catalog.sql": {
-    "mtime": 1791313690.0260315,
-    "ast_hash": "3572836a0b81e6996ef9ef24fd03f24d",
+    "mtime": 1791355174.189288,
+    "ast_hash": "f4d3ddaab216b3501a8fe984c14cce2a",
     "semantic_hash": ""
   },
   "database/constraints.sql": {
-    "mtime": 1791313690.026612,
-    "ast_hash": "7a1c11b88be038d7f74c1b6fc3321128",
+    "mtime": 1791355813.1311615,
+    "ast_hash": "ea6dec3eccfa1a4999496ff5d49a819e",
     "semantic_hash": ""
   },
   "database/crm.sql": {
@@ -980,13 +980,13 @@
     "semantic_hash": ""
   },
   "database/functions.sql": {
-    "mtime": 1787763971.5691428,
-    "ast_hash": "c7062934d70776be80290116aa2efed0",
+    "mtime": 1791355388.2880292,
+    "ast_hash": "caf9884fb968896495b9c066b1841fe4",
     "semantic_hash": ""
   },
   "database/indexes.sql": {
-    "mtime": 1791306678.0653439,
-    "ast_hash": "888077a6cf09970e915d115783249d09",
+    "mtime": 1791355359.9675808,
+    "ast_hash": "330e2e97c707fe7628e359b63906be8b",
     "semantic_hash": ""
   },
   "database/inventory.sql": {
@@ -1000,23 +1000,23 @@
     "semantic_hash": ""
   },
   "database/logs.sql": {
-    "mtime": 1788374296.6835825,
-    "ast_hash": "12cf36c6a3e4ad1c0fae5e7f161a9992",
+    "mtime": 1791355285.265085,
+    "ast_hash": "00ec612c252c0d8884175fc6d16eab13",
     "semantic_hash": ""
   },
   "database/marketing.sql": {
-    "mtime": 1791306660.980351,
-    "ast_hash": "5010244f2c7ea2e4ba72385e086bb5b4",
+    "mtime": 1791355232.4519064,
+    "ast_hash": "12bcebfc29178f2432efc33f45d4a5fd",
     "semantic_hash": ""
   },
   "database/orders.sql": {
-    "mtime": 1791311160.0671916,
-    "ast_hash": "c2fd912299a48c2260df46e282598162",
+    "mtime": 1791355218.0572228,
+    "ast_hash": "31592d598ec55bfd9c2d155e8714d4dd",
     "semantic_hash": ""
   },
   "database/payments.sql": {
-    "mtime": 1787763971.7059374,
-    "ast_hash": "6a4f336bf2d9f2a2f88cc85c16f69270",
+    "mtime": 1791355259.438635,
+    "ast_hash": "ba963c32fab2d97effc95f2050b5fe78",
     "semantic_hash": ""
   },
   "database/quotations.sql": {
@@ -3060,8 +3060,8 @@
     "semantic_hash": ""
   },
   "database/auth.sql": {
-    "mtime": 1790931247.5981178,
-    "ast_hash": "52ea5ca374cc3e5feed5f5ea8cfe6a56",
+    "mtime": 1791355272.4540446,
+    "ast_hash": "9362ea68802894c859e7cd9c8a49a6a3",
     "semantic_hash": ""
   },
   "tests/lib/auth-sessions.test.ts": {
@@ -3130,8 +3130,8 @@
     "semantic_hash": ""
   },
   "database/control-plane/schema.sql": {
-    "mtime": 1790931247.5991442,
-    "ast_hash": "a7457c44bf70dd65733c2ab9c71d7b99",
+    "mtime": 1791355438.7488582,
+    "ast_hash": "60761aac2ec9ee795b2062ce12506c9a",
     "semantic_hash": ""
   },
   "src/components/admin/BatchSerialLabelPicker.tsx": {
@@ -3615,8 +3615,8 @@
     "semantic_hash": ""
   },
   "database/control-plane/seed-plans.sql": {
-    "mtime": 1790931247.599434,
-    "ast_hash": "0f14b9b949b24e81fd0665f2ef68cbf7",
+    "mtime": 1791355486.6819901,
+    "ast_hash": "97c75930a66fa55996129a87e05aa074",
     "semantic_hash": ""
   },
   "src/app/api/internal/migrations/fanout/route.ts": {
@@ -3675,8 +3675,8 @@
     "semantic_hash": ""
   },
   "tests/lib/platform-only-scopes.test.ts": {
-    "mtime": 1790931257.4192662,
-    "ast_hash": "40fe5d719a456b4dbfe41e5c9ca84033",
+    "mtime": 1791356069.5101686,
+    "ast_hash": "a601d3ea8ceb4a594491708692ceaa94",
     "semantic_hash": ""
   },
   "tests/lib/razorpay-route-payload.test.ts": {
@@ -11460,8 +11460,8 @@
     "semantic_hash": ""
   },
   "src/lib/auth/scopes.ts": {
-    "mtime": 1791312381.2264261,
-    "ast_hash": "c54e415905f8221ce1b0731915796ca3",
+    "mtime": 1791355786.4916499,
+    "ast_hash": "ced47f90e715c14919c096a4c70f70d3",
     "semantic_hash": ""
   },
   "src/lib/auth/session-binding-gate.ts": {
@@ -11660,8 +11660,8 @@
     "semantic_hash": ""
   },
   "src/lib/catalog/site-controls.ts": {
-    "mtime": 1791310121.0279982,
-    "ast_hash": "922993759b89d9231d1abb92cc838709",
+    "mtime": 1791355921.1818056,
+    "ast_hash": "d0815071932b93a4a0de1f5e7390ca16",
     "semantic_hash": ""
   },
   "src/lib/catalog/sku.ts": {
@@ -13222,6 +13222,31 @@
   "tests/lib/tenancy/forms-host.test.ts": {
     "mtime": 1791317891.1871822,
     "ast_hash": "e7ce3cf76c261adf59d45c8442f4e5d8",
+    "semantic_hash": ""
+  },
+  "src/lib/orders/entitlements.ts": {
+    "mtime": 1791355875.5177994,
+    "ast_hash": "dc71251ede03c418d2f2dca6f66ad672",
+    "semantic_hash": ""
+  },
+  "src/lib/orders/fulfilled-status.ts": {
+    "mtime": 1791355846.1081522,
+    "ast_hash": "56db93387c741c7a45c176093e87b706",
+    "semantic_hash": ""
+  },
+  "tests/lib/orders/entitlements.test.ts": {
+    "mtime": 1791356007.3215415,
+    "ast_hash": "4f91abb9a60f573f59be7210333b964c",
+    "semantic_hash": ""
+  },
+  "tests/lib/orders/fulfilled-status.test.ts": {
+    "mtime": 1791355989.7032115,
+    "ast_hash": "a4f40ce49d6ac02878db0e8f09535573",
+    "semantic_hash": ""
+  },
+  "docs/DIGITAL_SUBSCRIPTIONS_VAULT_PLAN.md": {
+    "mtime": 1791356123.4094388,
+    "ast_hash": "341e6021ceef409f32651f476c84069e",
     "semantic_hash": ""
   }
 }

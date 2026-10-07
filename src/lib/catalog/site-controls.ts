@@ -44,6 +44,13 @@ export interface FeatureFlags {
   // Birthday feature: the "add your birthday" prompt, the /birthday link page and the Birthday /
   // Birthday Collection campaigns. On by default so existing stores keep their behaviour.
   birthdayEnabled: boolean
+  // Digital products + the authenticated vault. On by default (ships on every plan incl. Basic).
+  digitalProductsEnabled: boolean
+  // Store-wide master switch for vault file downloads. Effective download = this && the product's
+  // own `downloadable` flag. Off by default: stream/read only until the store opts in.
+  vaultDownloadsEnabled: boolean
+  // Customer subscriptions (Razorpay recurring). On by default; available on every plan.
+  subscriptionsEnabled: boolean
 }
 
 export interface BusinessValues {
@@ -132,6 +139,9 @@ const DEFAULTS: SiteControls = {
     smsEnabled: process.env.SMS_DISABLED !== 'true',
     whatsappEnabled: process.env.WHATSAPP_DISABLED !== 'true',
     birthdayEnabled: true,
+    digitalProductsEnabled: true,
+    vaultDownloadsEnabled: false,
+    subscriptionsEnabled: true,
     ondeviceSummaryEnabled:
       envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) ||
       process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
@@ -222,6 +232,9 @@ const KEYS = [
   'feature_sms_enabled',
   'feature_whatsapp_enabled',
   'feature_birthday_enabled',
+  'feature_digital_products_enabled',
+  'feature_vault_downloads_enabled',
+  'feature_subscriptions_enabled',
   'feature_ondevice_summary_enabled',
   'feature_ondevice_finetune_enabled',
   'feature_ondevice_summary_mobile_enabled',
@@ -397,6 +410,9 @@ export async function getSiteControls(): Promise<SiteControls> {
         smsEnabled: bool('feature_sms_enabled', d.flags.smsEnabled),
         whatsappEnabled: bool('feature_whatsapp_enabled', d.flags.whatsappEnabled),
         birthdayEnabled: bool('feature_birthday_enabled', d.flags.birthdayEnabled),
+        digitalProductsEnabled: bool('feature_digital_products_enabled', d.flags.digitalProductsEnabled),
+        vaultDownloadsEnabled: bool('feature_vault_downloads_enabled', d.flags.vaultDownloadsEnabled),
+        subscriptionsEnabled: bool('feature_subscriptions_enabled', d.flags.subscriptionsEnabled),
         ondeviceSummaryEnabled: bool('feature_ondevice_summary_enabled', d.flags.ondeviceSummaryEnabled),
         ondeviceFinetuneEnabled: bool('feature_ondevice_finetune_enabled', d.flags.ondeviceFinetuneEnabled),
         ondeviceSummaryMobileEnabled: bool(

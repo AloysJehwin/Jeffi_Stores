@@ -350,6 +350,37 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/campaigns', '/admin/social-posts', '/admin/customer-programs', '/admin/loyalty', '/admin/referrals'],
     group: 'Marketing',
   },
+  // Customer subscriptions (Razorpay recurring). On every plan; the renewal-reminder campaign
+  // still needs campaigns:read (Pro+).
+  {
+    key: 'subscriptions:read',
+    label: 'Subscriptions (Read)',
+    description: 'View customer subscriptions and their cycles',
+    routes: ['/admin/subscriptions'],
+    group: 'Orders',
+  },
+  {
+    key: 'subscriptions:write',
+    label: 'Subscriptions (Write)',
+    description: 'Cancel, pause, resume and sync customer subscriptions',
+    routes: ['/admin/subscriptions'],
+    group: 'Orders',
+  },
+  // Vault — private digital files served through the authenticated vault host. On every plan.
+  {
+    key: 'vault:read',
+    label: 'Vault (Read)',
+    description: 'View digital files and vault access logs',
+    routes: ['/admin/vault'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'vault:write',
+    label: 'Vault (Write)',
+    description: 'Upload, replace and delete digital files; set download permissions',
+    routes: ['/admin/vault'],
+    group: 'Catalogue',
+  },
   // Traffic analytics — previously piggybacked on dashboard:read. Dedicated key.
   {
     key: 'traffic:read',

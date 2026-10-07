@@ -283,3 +283,61 @@ CREATE TABLE public.websocket_connections (
     role character varying(10) NOT NULL,
     connected_at timestamp with time zone DEFAULT now()
 );
+
+
+--
+-- Name: vault_access_log; Type: TABLE; Schema: public; Owner: -
+--
+-- One row per vault stream/download URL mint. action = 'stream' | 'download'. bytes is an
+-- approximation (file size at mint time) for later bandwidth billing. bigint id via sequence —
+-- the add-only tenant pipeline cannot introduce GENERATED-AS-IDENTITY, so follow _debug_log.
+
+CREATE TABLE public.vault_access_log (
+    id bigint NOT NULL,
+    user_id uuid NOT NULL,
+    product_id uuid,
+    product_file_id uuid,
+    entitlement_id uuid,
+    action character varying(10) NOT NULL,
+    bytes bigint DEFAULT 0 NOT NULL,
+    ip_net character varying(64),
+    user_agent text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: vault_access_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.vault_access_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.vault_access_log_id_seq OWNED BY public.vault_access_log.id;
+ALTER TABLE ONLY public.vault_access_log ALTER COLUMN id SET DEFAULT nextval('public.vault_access_log_id_seq'::regclass);
+
+
+--
+-- Name: upload_sessions; Type: TABLE; Schema: public; Owner: -
+--
+-- Tracks an in-progress multipart upload of a product file so an abandoned upload can be
+-- reconciled/aborted and quota reservations released.
+
+CREATE TABLE public.upload_sessions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    product_id uuid NOT NULL,
+    storage_driver character varying(8) DEFAULT 's3'::character varying NOT NULL,
+    storage_key character varying(512) NOT NULL,
+    upload_id character varying(255),
+    display_name character varying(255) NOT NULL,
+    mime_type character varying(120) NOT NULL,
+    declared_bytes bigint DEFAULT 0 NOT NULL,
+    status character varying(12) DEFAULT 'open'::character varying NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);

@@ -2026,3 +2026,28 @@ CREATE INDEX idx_subscriptions_renewal ON public.subscriptions USING btree (stat
 --
 
 CREATE INDEX idx_subscriptions_user ON public.subscriptions USING btree (user_id, status);
+
+
+--
+-- Digital products, vault & customer subscriptions
+--
+
+CREATE INDEX idx_product_files_product ON public.product_files USING btree (product_id, display_order);
+
+CREATE INDEX idx_vault_entitlements_user ON public.vault_entitlements USING btree (user_id, status);
+CREATE INDEX idx_vault_entitlements_product ON public.vault_entitlements USING btree (product_id);
+CREATE INDEX idx_vault_entitlements_order ON public.vault_entitlements USING btree (order_id);
+CREATE INDEX idx_vault_entitlements_subscription ON public.vault_entitlements USING btree (subscription_id);
+
+CREATE INDEX idx_subscription_cycle_orders_sub ON public.subscription_cycle_orders USING btree (subscription_id, cycle_number);
+
+-- Only the legacy crons-era stubs feed the subscription_renewal campaign now.
+CREATE INDEX idx_subscriptions_rzp ON public.subscriptions USING btree (razorpay_subscription_id);
+CREATE INDEX idx_subscriptions_legacy_renewal ON public.subscriptions USING btree (status, next_renewal_at) WHERE razorpay_subscription_id IS NULL;
+
+CREATE INDEX idx_orders_subscription ON public.orders USING btree (subscription_id) WHERE subscription_id IS NOT NULL;
+
+CREATE INDEX idx_vault_tickets_expires ON public.vault_tickets USING btree (expires_at);
+
+CREATE INDEX idx_vault_access_log_user ON public.vault_access_log USING btree (user_id, created_at);
+CREATE INDEX idx_upload_sessions_product ON public.upload_sessions USING btree (product_id, status);
