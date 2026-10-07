@@ -347,8 +347,31 @@ jobs:
             });
             return dep.data.id;
 
+      # ── k3s (vars.K8S_DEPLOY == 'true'): CI joins the tailnet and talks to the API privately ──
+      - uses: actions/checkout@v4
+        if: vars.K8S_DEPLOY == 'true'
+
+      - name: Join tailnet
+        if: vars.K8S_DEPLOY == 'true'
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Roll out to k3s (flagship, CronJobs, tenants)
+        if: vars.K8S_DEPLOY == 'true'
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/aloysjehwin/jeffi_stores:main-${GITHUB_SHA::7}"
+          mkdir -p ~/.kube && echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config && chmod 600 ~/.kube/config
+          bash deploy/k8s/bootstrap/rollout.sh "$IMAGE"
+
       - name: Get EC2 public IP
         id: ec2
+        if: vars.K8S_DEPLOY != 'true'
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -361,6 +384,7 @@ jobs:
           echo "host=$IP" >> $GITHUB_OUTPUT
 
       - name: Blue-green deploy (zero downtime)
+        if: vars.K8S_DEPLOY != 'true'
         uses: appleboy/ssh-action@v1
         env:
           GH_DEPLOY_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
@@ -468,7 +492,7 @@ jobs:
     name: Schema Diff & Apply
     runs-on: ubuntu-latest
     needs: [deploy, detect-changes]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.schema_changed == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.schema_changed == 'true' && vars.K8S_DEPLOY != 'true'
     steps:
       - name: Get EC2 public IP
         id: ec2
@@ -629,7 +653,7 @@ jobs:
     name: Publish fleet config
     runs-on: ubuntu-latest
     needs: [docker]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.K8S_DEPLOY != 'true'
     env:
       FLEET: s3://jeffi-stores-mtls-truststore/fleet
     steps:
@@ -699,7 +723,7 @@ jobs:
     # Not [deploy]: the flagship and the fleet serve different hosts and share nothing but the
     # image, so they roll in parallel. Only the published config is a real prerequisite.
     needs: [docker, fleet-config]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.K8S_DEPLOY != 'true'
     steps:
       - name: Roll every pool instance
         env:
@@ -828,7 +852,7 @@ jobs:
     name: Run DB Migrations
     runs-on: ubuntu-latest
     needs: [deploy, detect-changes]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.migrations_changed == 'true'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.migrations_changed == 'true' && vars.K8S_DEPLOY != 'true'
     steps:
       - name: Get EC2 public IP
         id: ec2
@@ -952,6 +976,71 @@ jobs:
   # the post-blue-green failure). Runs after invalidate-cdn so the edge cache is
   # already cleared, and asserts 200 + {"status":"ok"} from /api/health.
   # ────────────────────────────────────────────────────────
+  # ────────────────────────────────────────────────────────
+  # k3s: schema diff + file migrations from the runner, reaching RDS through an in-cluster
+  # socat pod over the tailnet; fan-out to tenant DBs runs inside the flagship pod.
+  # ────────────────────────────────────────────────────────
+  db-k8s:
+    name: Schema + migrations (k3s)
+    runs-on: ubuntu-latest
+    needs: [deploy, detect-changes]
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.K8S_DEPLOY == 'true' &&
+      (needs.detect-changes.outputs.schema_changed == 'true' || needs.detect-changes.outputs.migrations_changed == 'true')
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: us-east-1
+      AWS_DEFAULT_REGION: us-east-1
+      RDS_HOST: jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
+      RDS_CONNECT_HOST: 127.0.0.1
+      RDS_PORT: '15432'
+      RDS_USER: app_user
+    steps:
+      - uses: actions/checkout@v4
+      - uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Tunnel to RDS
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+        run: |
+          mkdir -p ~/.kube && echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config && chmod 600 ~/.kube/config
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          kubectl -n jeffi delete pod rds-tunnel --ignore-not-found
+          kubectl -n jeffi run rds-tunnel --image=alpine/socat:1.8.0.0 --restart=Never \
+            --overrides='{"spec":{"nodeSelector":{"jeffi.io/role":"core"}}}' \
+            -- tcp-listen:5432,fork,reuseaddr tcp-connect:$RDS_HOST:5432
+          kubectl -n jeffi wait --for=condition=Ready pod/rds-tunnel --timeout=120s
+          nohup kubectl -n jeffi port-forward pod/rds-tunnel 15432:5432 >/tmp/pf.log 2>&1 &
+          sleep 5
+      - name: Schema diff (platform + control plane)
+        if: needs.detect-changes.outputs.schema_changed == 'true'
+        run: |
+          RDS_DB=jeffi_stores bash deploy/schema-diff.sh --set=platform
+          RDS_DB=jeffi_control_plane bash deploy/schema-diff.sh --set=control-plane
+      - name: File migrations
+        if: needs.detect-changes.outputs.migrations_changed == 'true'
+        run: |
+          RDS_DB=jeffi_stores bash deploy/run-migrations.sh --dry-run
+          RDS_DB=jeffi_stores bash deploy/run-migrations.sh
+      - name: Fan out to tenant databases
+        run: |
+          CRON_SECRET=$(kubectl -n jeffi get secret cron-secret -o jsonpath='{.data.CRON_SECRET}' | base64 -d)
+          echo "::add-mask::$CRON_SECRET"
+          kubectl -n jeffi exec deploy/flagship -- env CRON_SECRET="$CRON_SECRET" sh -c '
+            for p in /api/internal/migrations/fanout /api/internal/migrations/files-fanout; do
+              wget -qO- -T 300 --header "Host: jeffistores.in" --header "Authorization: Bearer $CRON_SECRET" \
+                --header "Content-Type: application/json" --post-data "{\"gitSha\":\"'"$GITHUB_SHA"'\"}" \
+                "http://localhost:3000$p" || exit 1
+              echo
+            done'
+      - name: Cleanup
+        if: always()
+        run: kubectl -n jeffi delete pod rds-tunnel --ignore-not-found || true
+
   smoke-test:
     name: Smoke Test
     runs-on: ubuntu-latest
