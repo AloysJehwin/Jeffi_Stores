@@ -131,14 +131,25 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants', () =
   })
 
   it('returns 404 when variant not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null)
+    mockQueryOne
+      .mockResolvedValueOnce({ is_digital: false } as any) // digital guard
+      .mockResolvedValueOnce(null) // variant lookup
     const res = await POST(makeReq('POST', { sub_variant_name: 'Red' }), PARAMS)
     expect(res.status).toBe(404)
     expect((await res.json()).error).toBe('Variant not found')
   })
 
+  it('returns 409 when product is digital', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_digital: true } as any)
+    const res = await POST(makeReq('POST', { sub_variant_name: 'Red' }), PARAMS)
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toBe('Digital products cannot have variants')
+  })
+
   it('returns 400 when body is invalid JSON', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'var-1', sku: 'PRD' } as any)
+    mockQueryOne
+      .mockResolvedValueOnce({ is_digital: false } as any) // digital guard
+      .mockResolvedValueOnce({ id: 'var-1', sku: 'PRD' } as any) // variant lookup
     const req = new NextRequest('http://localhost/test', {
       method: 'POST',
       body: 'not-json',
@@ -149,13 +160,16 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants', () =
   })
 
   it('returns 400 when required fields missing', async () => {
-    mockQueryOne.mockResolvedValueOnce({ id: 'var-1', sku: 'PRD' } as any)
+    mockQueryOne
+      .mockResolvedValueOnce({ is_digital: false } as any) // digital guard
+      .mockResolvedValueOnce({ id: 'var-1', sku: 'PRD' } as any) // variant lookup
     const res = await POST(makeReq('POST', {}), PARAMS)
     expect(res.status).toBe(400)
   })
 
   it('creates sub-variant successfully', async () => {
     mockQueryOne
+      .mockResolvedValueOnce({ is_digital: false } as any) // digital guard
       .mockResolvedValueOnce({ id: 'var-1', sku: 'PRD' } as any) // variant check
       .mockResolvedValueOnce({ sku: 'PRD' } as any) // product sku
       .mockResolvedValueOnce(sampleSubVariant as any) // insert returning
@@ -170,6 +184,7 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/sub-variants', () =
 
   it('uses provided sku instead of generated one', async () => {
     mockQueryOne
+      .mockResolvedValueOnce({ is_digital: false } as any) // digital guard
       .mockResolvedValueOnce({ id: 'var-1', sku: 'PRD' } as any)
       .mockResolvedValueOnce({ sku: 'PRD' } as any)
       .mockResolvedValueOnce({ ...sampleSubVariant, sku: 'CUSTOM-SKU' } as any)

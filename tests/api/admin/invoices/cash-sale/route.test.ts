@@ -17,6 +17,10 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(),
 }))
 
+vi.mock('@/lib/catalog/digital-guard', () => ({
+  findDigitalProductIds: vi.fn(async () => []),
+}))
+
 vi.mock('@/lib/catalog/gst', () => ({
   calculateGST: vi.fn(),
   getFinancialYear: vi.fn(),
@@ -72,6 +76,7 @@ import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/catalog/pricing'
 import { logStockMovement } from '@/lib/orders/inventory'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { parseBody } from '@/lib/shared/validate'
+import { findDigitalProductIds } from '@/lib/catalog/digital-guard'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -141,6 +146,7 @@ describe('POST /api/admin/invoices/cash-sale', () => {
       async () => ({ gstEnabled: process.env.ENABLE_GST === 'true' }) as any
     )
     vi.mocked(logStockMovement).mockResolvedValue(undefined)
+    vi.mocked(findDigitalProductIds).mockResolvedValue([])
     // Re-setup parseBody — resetAllMocks wipes the factory implementation
     vi.mocked(parseBody).mockImplementation((schema: any, data: any) => {
       const result = schema.safeParse(data)
@@ -171,6 +177,19 @@ describe('POST /api/admin/invoices/cash-sale', () => {
   it('returns 400 when items array is missing', async () => {
     const res = await POST(postReq({ paymentMode: 'cash' }))
     expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when an item is a digital product', async () => {
+    vi.mocked(findDigitalProductIds).mockResolvedValue(['111e4567-e89b-12d3-a456-426614174001'])
+    const res = await POST(
+      postReq({
+        paymentMode: 'cash',
+        items: [{ product_id: '111e4567-e89b-12d3-a456-426614174001', product_name: 'Ebook', unit_price: 100, quantity: 1, gst_rate: 18 }],
+      })
+    )
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Digital products cannot be sold through this channel')
+    expect(vi.mocked(withTransaction)).not.toHaveBeenCalled()
   })
 
   it('returns 400 when items array is empty', async () => {

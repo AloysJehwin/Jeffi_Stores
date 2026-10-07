@@ -10,6 +10,7 @@ import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { sendBusinessInvoiceGeneratedEmail } from '@/lib/shared/email-business'
 import { lineItemExGst } from '@/lib/catalog/pricing'
 import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
+import { findDigitalProductIds } from '@/lib/catalog/digital-guard'
 import { currentBrandNameAsync } from '@/lib/catalog/brand'
 import { getRazorpayInstance } from '@/lib/payments/razorpay'
 import sharp from 'sharp'
@@ -41,6 +42,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!qItems.length) {
       return NextResponse.json({ error: 'Quotation has no line items' }, { status: 400 })
     }
+
+    const digitalIds = await findDigitalProductIds(qItems.map((i: any) => i.product_id).filter(Boolean))
+    if (digitalIds.length)
+      return NextResponse.json({ error: 'Digital products cannot be sold through this channel' }, { status: 400 })
 
     const body = await request.json().catch(() => ({}))
     const paymentMode: string = body.paymentMode || 'cash'

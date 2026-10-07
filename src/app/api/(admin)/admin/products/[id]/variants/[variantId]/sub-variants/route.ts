@@ -4,6 +4,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { generateVariantSku } from '@/lib/catalog/sku'
+import { isDigitalProduct } from '@/lib/catalog/digital-guard'
 import { parseBody, zNonEmpty, zCurrency, zUuid } from '@/lib/shared/validate'
 
 const PostSchema = z.object({
@@ -65,6 +66,9 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'products:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+  if (await isDigitalProduct(id))
+    return NextResponse.json({ error: 'Digital products cannot have variants' }, { status: 409 })
 
   const variant = await queryOne<{ id: string; sku: string }>(
     `SELECT id, sku FROM product_variants WHERE id = $1 AND product_id = $2`,

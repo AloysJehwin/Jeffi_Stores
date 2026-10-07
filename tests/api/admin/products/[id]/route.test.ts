@@ -11,6 +11,16 @@ vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
+  withTransaction: vi.fn(),
+}))
+
+vi.mock('@/lib/catalog/product-delete', () => ({
+  deleteProductCascadeTx: vi.fn(),
+  productHasHistory: vi.fn(),
+}))
+
+vi.mock('@/lib/shared/s3', () => ({
+  deleteProductImage: vi.fn(),
 }))
 
 vi.mock('@/lib/queries', () => ({
@@ -19,6 +29,7 @@ vi.mock('@/lib/queries', () => ({
 
 vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
+  isPlatformOwner: vi.fn(),
 }))
 
 vi.mock('@/lib/shared/validate', () => ({
