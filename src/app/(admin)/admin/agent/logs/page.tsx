@@ -62,7 +62,7 @@ export default function AgentLogsPage() {
           type="button"
           onClick={() => load(page)}
           disabled={loading}
-          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
+          className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh

@@ -175,15 +175,20 @@
 
    text-sm and text-xs carry fixed line-heights (20px / 16px) even though the
    font-size is a clamp, so these hold at every breakpoint.
+
+   Height-only form: h-control (38px) / h-control-sm (34px) from tailwind.config.
+   Admin buttons and fields that keep their own padding/width/text use these to
+   pin height — h-control is the default, h-control-sm for dense toolbars,
+   table rows and pagination.
    ──────────────────────────────────────────────────────────────────────── */
 @layer components {
   .field-md,
   .field-normal {
-    @apply h-[38px] px-3 py-2 text-sm rounded-lg;
+    @apply h-control px-3 py-2 text-sm rounded-lg;
   }
   .field-sm,
   .field-compact {
-    @apply h-[34px] px-2 py-1.5 text-sm rounded-lg;
+    @apply h-control-sm px-2 py-1.5 text-sm rounded-lg;
   }
   .field-xs {
     @apply h-[26px] px-1.5 py-1 text-xs rounded leading-none;
@@ -192,10 +197,10 @@
   /* Buttons need the same box plus centring, since they have no text baseline
      of their own to sit on. */
   .control-md {
-    @apply h-[38px] inline-flex items-center justify-center gap-2 px-4 text-sm rounded-lg;
+    @apply h-control inline-flex items-center justify-center gap-2 px-4 text-sm rounded-lg;
   }
   .control-sm {
-    @apply h-[34px] inline-flex items-center justify-center gap-1.5 px-3 text-sm rounded-lg;
+    @apply h-control-sm inline-flex items-center justify-center gap-1.5 px-3 text-sm rounded-lg;
   }
   .control-xs {
     @apply h-[26px] inline-flex items-center justify-center gap-1 px-2 text-xs rounded leading-none;

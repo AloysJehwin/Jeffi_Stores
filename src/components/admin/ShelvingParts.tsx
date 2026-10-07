@@ -246,7 +246,7 @@ export function LocationForm({
                   <input
                     value={lvl.value}
                     onChange={e => lvl.onChange(e.target.value)}
-                    className="w-16 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
+                    className="w-16 px-2 h-control-sm rounded-lg border border-border-default bg-surface text-foreground text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
                     placeholder={lvl.placeholder}
                     maxLength={10}
                   />
@@ -497,7 +497,7 @@ export function StockRow({
                 if (isPerishableWithBatches) initBatchMove()
                 setMoving(!moving)
               }}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
+              className="px-2.5 h-control-sm rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
             >
               Move
             </button>
@@ -746,7 +746,7 @@ export function StockRow({
                 type="number"
                 value={moveQty}
                 onChange={e => setMoveQty(e.target.value)}
-                className="w-full px-2 py-2 rounded-lg border border-border-default bg-surface text-foreground text-xs text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors"
+                className="w-full px-2 h-control rounded-lg border border-border-default bg-surface text-foreground text-xs text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors"
                 min={unitStep}
                 step={unitStep}
                 max={Number(maxSellQty)}
@@ -758,13 +758,13 @@ export function StockRow({
             <button
               onClick={doMove}
               disabled={saving || (isPerishableWithBatches ? totalBatchMoveQty === 0 : false)}
-              className="px-4 py-2 rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50"
+              className="px-4 h-control-sm rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50"
             >
               {saving ? '…' : 'Move'}
             </button>
             <button
               onClick={() => setMoving(false)}
-              className="px-3 py-2 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary transition-colors"
+              className="px-3 h-control-sm rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary transition-colors"
             >
               Cancel
             </button>
@@ -1037,7 +1037,7 @@ export function AssignStockForm({
               <button
                 type="button"
                 onClick={() => setQty(String(unallocatedDisplay))}
-                className="shrink-0 px-3 py-2 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors whitespace-nowrap"
+                className="shrink-0 px-3 h-control-sm rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors whitespace-nowrap"
               >
                 All ({unallocatedDisplay})
               </button>

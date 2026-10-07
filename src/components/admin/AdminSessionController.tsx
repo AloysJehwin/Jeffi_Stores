@@ -346,13 +346,13 @@ export default function AdminSessionController() {
         <div className="flex gap-3 w-full">
           <button
             onClick={() => logout('logout', true)}
-            className="flex-1 px-4 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
+            className="flex-1 px-4 h-control border border-border-default rounded-lg text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
           >
             Log out
           </button>
           <button
             onClick={handleContinue}
-            className="flex-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-bold transition-colors"
+            className="flex-1 px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-bold transition-colors"
           >
             Continue working
           </button>

@@ -55,6 +55,11 @@ const config: Config = {
         'border-default': 'var(--color-border)',
         'border-secondary': 'var(--color-border-secondary)',
       },
+      // Admin control heights — the vertical standard for buttons, inputs and select triggers.
+      height: {
+        control: '38px',
+        'control-sm': '34px',
+      },
       fontFamily: {
         bebas: ['"Bebas Neue"', 'cursive'],
         inter: ['"Inter"', 'sans-serif'],

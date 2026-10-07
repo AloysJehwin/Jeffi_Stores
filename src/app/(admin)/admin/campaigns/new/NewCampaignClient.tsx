@@ -215,7 +215,7 @@ export default function NewCampaignClient() {
                 type="button"
                 onClick={generateWithAI}
                 disabled={aiGenerating || !aiPrompt.trim()}
-                className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
+                className="px-4 h-control bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
               >
                 {aiGenerating ? 'Generating…' : 'Generate'}
               </button>
@@ -268,7 +268,7 @@ export default function NewCampaignClient() {
               type="text"
               value={form.description}
               onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="w-full px-3 h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </div>
 
@@ -348,7 +348,7 @@ export default function NewCampaignClient() {
               type="text"
               value={form.subject_template}
               onChange={e => setForm(f => ({ ...f, subject_template: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="w-full px-3 h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </div>
 
@@ -380,7 +380,7 @@ export default function NewCampaignClient() {
                 type="button"
                 onClick={create}
                 disabled={creating || !form.name.trim() || !form.kind.trim()}
-                className="px-5 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                className="px-5 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
               >
                 {creating ? 'Creating…' : 'Save as Draft'}
               </button>
@@ -388,7 +388,7 @@ export default function NewCampaignClient() {
             <button
               type="button"
               onClick={() => router.push(ap('/admin/campaigns'))}
-              className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
+              className="px-5 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
             >
               Cancel
             </button>

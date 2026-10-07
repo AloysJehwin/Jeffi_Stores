@@ -371,7 +371,7 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
               <button
                 onClick={submit}
                 disabled={!selected || submitting}
-                className="px-4 py-2 text-sm font-semibold text-white bg-accent-600 hover:bg-accent-700 rounded-lg disabled:opacity-50"
+                className="px-4 h-control text-sm font-semibold text-white bg-accent-600 hover:bg-accent-700 rounded-lg disabled:opacity-50"
               >
                 {submitting ? 'Requesting…' : 'Request change & notify customer'}
               </button>

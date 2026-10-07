@@ -47,7 +47,7 @@ export default function PurgeCustomerButton({ tenantId, slug }: { tenantId: stri
           }
         }}
         disabled={busy}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-medium transition-colors"
+        className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-medium transition-colors"
         title="Permanently delete this deprovisioned store and its backup"
       >
         {busy ? 'Deleting…' : 'Delete'}

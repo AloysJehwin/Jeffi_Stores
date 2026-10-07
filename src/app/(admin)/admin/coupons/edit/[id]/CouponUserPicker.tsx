@@ -144,7 +144,7 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
           type="button"
           disabled={bulkLoading}
           onClick={() => bulkFetch('mode=all', 'all users')}
-          className="ml-auto px-3 py-1.5 text-xs font-medium bg-surface-secondary text-foreground-secondary hover:bg-border-default rounded-md transition-colors disabled:opacity-40"
+          className="ml-auto px-3 h-control-sm text-xs font-medium bg-surface-secondary text-foreground-secondary hover:bg-border-default rounded-md transition-colors disabled:opacity-40"
         >
           {bulkLoading ? 'Loading…' : 'All Users'}
         </button>
@@ -159,7 +159,7 @@ export default function CouponUserPicker({ onAdd, existingIds = new Set() }: Pro
               value={q}
               onChange={e => setQ(e.target.value)}
               placeholder="Search by name, email or phone…"
-              className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="w-full px-3 h-control text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             {loading && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">

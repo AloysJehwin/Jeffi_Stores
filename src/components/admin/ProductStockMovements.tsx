@@ -184,7 +184,7 @@ export default function ProductStockMovements({ productId }: { productId: string
                     <button
                       onClick={() => setPage(p => Math.max(1, p - 1))}
                       disabled={page === 1}
-                      className="px-3 py-1 rounded border border-border-secondary text-foreground-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
+                      className="px-3 h-control-sm rounded border border-border-secondary text-foreground-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
                     >
                       Prev
                     </button>
@@ -194,7 +194,7 @@ export default function ProductStockMovements({ productId }: { productId: string
                     <button
                       onClick={() => setPage(p => Math.min(pages, p + 1))}
                       disabled={page === pages}
-                      className="px-3 py-1 rounded border border-border-secondary text-foreground-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
+                      className="px-3 h-control-sm rounded border border-border-secondary text-foreground-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
                     >
                       Next
                     </button>

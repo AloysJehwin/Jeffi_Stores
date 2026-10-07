@@ -402,7 +402,7 @@ export default function EditSupplierPage() {
               type="button"
               onClick={publish}
               disabled={publishing || !form.name.trim()}
-              className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
+              className="px-4 h-control rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50"
             >
               {publishing ? 'Publishing…' : 'Publish'}
             </button>

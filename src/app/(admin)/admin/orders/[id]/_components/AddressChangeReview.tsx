@@ -219,7 +219,7 @@ export default function AddressChangeReview({
                     type="button"
                     onClick={() => review('reject')}
                     disabled={isProcessing || !rejectNote.trim()}
-                    className="px-4 py-2 bg-secondary-600 hover:bg-secondary-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 h-control bg-secondary-600 hover:bg-secondary-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isProcessing ? 'Sending...' : 'Confirm Rejection'}
                   </button>
@@ -230,7 +230,7 @@ export default function AddressChangeReview({
                       setRejectNote('')
                     }}
                     disabled={isProcessing}
-                    className="px-4 py-2 bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50"
+                    className="px-4 h-control bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50"
                   >
                     Back
                   </button>
@@ -243,7 +243,7 @@ export default function AddressChangeReview({
                     type="button"
                     onClick={() => review('approve')}
                     disabled={isProcessing}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 h-control bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isProcessing ? 'Processing...' : 'Approve Address Change'}
                   </button>
@@ -252,7 +252,7 @@ export default function AddressChangeReview({
                   type="button"
                   onClick={() => setShowRejectForm(true)}
                   disabled={isProcessing}
-                  className="px-4 py-2 bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 h-control bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Reject (Keep Address)
                 </button>

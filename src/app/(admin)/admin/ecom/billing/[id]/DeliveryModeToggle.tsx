@@ -52,7 +52,7 @@ export default function DeliveryModeToggle({
         type="button"
         onClick={toggle}
         disabled={busy || !canEnable}
-        className="mt-2 text-xs px-3 py-1.5 rounded-lg border border-border-default text-foreground hover:bg-surface-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+        className="mt-2 text-xs px-3 h-control-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {busy ? 'Saving…' : ownDelhivery ? 'Switch to platform' : 'Switch to own Delhivery'}
       </button>

@@ -328,7 +328,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           {o.status === 'draft' && o.source === 'offline' && (
             <a
               href={ap(`/admin/invoices?view=edit&edit=${o.id}`)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
             >
               <Pencil className="w-4 h-4" />
               Edit
@@ -338,7 +338,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             <button
               onClick={finalizeInvoice}
               disabled={finalizing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors disabled:opacity-50"
             >
               {finalizing ? 'Finalizing…' : 'Finalize Invoice'}
             </button>
@@ -347,7 +347,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             <button
               onClick={() => (qrImageUrl ? setQrModalOpen(true) : generateQr())}
               disabled={qrLoading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
             >
               <QrCode className="w-4 h-4" />
               {qrLoading ? 'Generating…' : 'QR'}
@@ -357,7 +357,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             <button
               onClick={createAmendmentDraft}
               disabled={amending}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
             >
               {amending ? 'Creating…' : 'Amend Invoice'}
             </button>
@@ -366,7 +366,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             href={`/api/orders/${o.id}/invoice`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg bg-accent-500 text-white text-sm font-medium hover:bg-accent-600 transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -380,7 +380,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           </a>
           <Link
             href={ap(`/admin/orders/${o.id}`)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
           >
             View Order
           </Link>

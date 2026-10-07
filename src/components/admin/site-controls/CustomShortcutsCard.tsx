@@ -205,7 +205,7 @@ function ShortcutRow({
             onKeyDown={handleKeyDown}
             placeholder="key"
             title="Click and press any letter or number"
-            className="w-full text-center px-2 py-1.5 text-sm font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 cursor-pointer caret-transparent disabled:opacity-60"
+            className="w-full text-center px-2 h-control-sm text-sm font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 cursor-pointer caret-transparent disabled:opacity-60"
           />
         )}
       </div>
@@ -304,7 +304,7 @@ export default function CustomShortcutsCard({ initial, isMac }: { initial: Custo
             if (e.key === 'Enter') handleAdd()
           }}
           placeholder="Label"
-          className="w-36 px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
+          className="w-36 px-3 h-control-sm text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
         <input
           type="text"
@@ -325,13 +325,13 @@ export default function CustomShortcutsCard({ initial, isMac }: { initial: Custo
             if (e.key === 'Enter') handleAdd()
           }}
           placeholder="/admin/... or paste full URL"
-          className="flex-1 px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 font-mono"
+          className="flex-1 px-3 h-control-sm text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 font-mono"
         />
         <button
           type="button"
           disabled={saving || !canWrite || !newLabel.trim() || !newPath.trim()}
           onClick={handleAdd}
-          className="shrink-0 px-3 py-1.5 text-sm font-medium rounded-lg bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50 transition-colors"
+          className="shrink-0 px-3 h-control-sm text-sm font-medium rounded-lg bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50 transition-colors"
         >
           Add
         </button>

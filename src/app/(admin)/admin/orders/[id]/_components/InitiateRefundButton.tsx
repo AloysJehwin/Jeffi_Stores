@@ -59,7 +59,7 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
                 type="button"
                 onClick={handleRefund}
                 disabled={isProcessing}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 h-control bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {isProcessing ? (
                   <>
@@ -74,7 +74,7 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
                 type="button"
                 onClick={() => setShowConfirm(false)}
                 disabled={isProcessing}
-                className="px-4 py-2 bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50"
+                className="px-4 h-control bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -85,7 +85,7 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
             <button
               type="button"
               onClick={() => setShowConfirm(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
+              className="px-4 h-control bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
             >
               Initiate Refund ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </button>

@@ -151,7 +151,7 @@ export default function OfferSlideDisplayEditor({
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={uploading || generating || !canWrite}
-            className="px-3 py-1.5 rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50"
+            className="px-3 h-control-sm rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50"
           >
             {uploading ? 'Uploading…' : offer.image_url ? 'Replace image' : 'Upload image'}
           </button>
@@ -187,7 +187,7 @@ export default function OfferSlideDisplayEditor({
               type="button"
               onClick={generateImage}
               disabled={generating || !aiPrompt.trim()}
-              className="mt-2 w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="mt-2 w-full h-control rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {generating ? (
                 <>
@@ -214,7 +214,7 @@ export default function OfferSlideDisplayEditor({
           onBlur={e => save({ subtitle: e.target.value || null })}
           placeholder="Short line shown under the title"
           disabled={!canWrite}
-          className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+          className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
         />
       </div>
 
@@ -228,7 +228,7 @@ export default function OfferSlideDisplayEditor({
             onBlur={e => save({ badgeText: e.target.value || null })}
             placeholder="Diwali"
             disabled={!canWrite}
-            className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+            className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
           />
         </div>
         <div>
@@ -261,7 +261,7 @@ export default function OfferSlideDisplayEditor({
           onBlur={e => save({ ctaLabel: e.target.value || null })}
           placeholder="Shop the offer"
           disabled={!canWrite}
-          className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+          className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
         />
       </div>
     </div>

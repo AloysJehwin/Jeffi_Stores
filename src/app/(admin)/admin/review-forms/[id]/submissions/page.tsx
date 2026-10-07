@@ -220,14 +220,14 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
                       <button
                         onClick={() => updateStatus(s.id, 'approved')}
                         disabled={updating === s.id}
-                        className="flex-1 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                        className="flex-1 h-control-sm text-xs bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                       >
                         Approve
                       </button>
                       <button
                         onClick={() => updateStatus(s.id, 'rejected')}
                         disabled={updating === s.id}
-                        className="flex-1 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                        className="flex-1 h-control-sm text-xs bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
                       >
                         Reject
                       </button>

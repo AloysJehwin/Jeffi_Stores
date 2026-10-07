@@ -149,7 +149,7 @@ export default function DigitalFilesPanel({ productId }: Props) {
               type="button"
               onClick={() => inputRef.current?.click()}
               disabled={busy}
-              className="px-3 py-1.5 text-sm rounded bg-accent-600 text-white disabled:opacity-50"
+              className="px-3 h-control-sm text-sm rounded bg-accent-600 text-white disabled:opacity-50"
             >
               {busy ? 'Uploading…' : 'Upload file'}
             </button>

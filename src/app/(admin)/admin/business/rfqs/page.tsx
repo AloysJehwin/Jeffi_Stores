@@ -184,11 +184,11 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
           name="search"
           defaultValue={search}
           placeholder="Search by RFQ number, company, email…"
-          className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+          className="flex-1 px-3 h-control-sm text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
         <button
           type="submit"
-          className="px-4 py-1.5 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
+          className="px-4 h-control-sm text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
         >
           Search
         </button>

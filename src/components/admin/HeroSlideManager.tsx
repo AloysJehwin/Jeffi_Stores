@@ -328,7 +328,7 @@ function SlideCard({
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading || generating || !canWrite}
-                className="px-3 py-1.5 rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50"
+                className="px-3 h-control-sm rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50"
               >
                 {uploading ? 'Uploading…' : slide.image_url ? 'Replace image' : 'Upload image'}
               </button>
@@ -352,7 +352,7 @@ function SlideCard({
                 type="button"
                 onClick={() => fileMobileRef.current?.click()}
                 disabled={uploadingMobile || generating || !canWrite}
-                className="px-3 py-1.5 rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50"
+                className="px-3 h-control-sm rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50"
               >
                 {uploadingMobile
                   ? 'Uploading…'
@@ -418,7 +418,7 @@ function SlideCard({
                     type="button"
                     onClick={generateAll}
                     disabled={generatingAll || generating || !aiPrompt.trim()}
-                    className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="flex-1 h-control rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {generatingAll || generating ? (
                       <>
@@ -434,7 +434,7 @@ function SlideCard({
                     onClick={() => generateImage()}
                     disabled={generating || generatingAll || !aiPrompt.trim()}
                     title="Only regenerate the banner image"
-                    className="px-3 py-2 rounded-lg border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 text-sm font-medium hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                    className="px-3 h-control rounded-lg border border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300 text-sm font-medium hover:bg-violet-100 dark:hover:bg-violet-900/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                   >
                     Image only
                   </button>
@@ -463,7 +463,7 @@ function SlideCard({
                   onChange={e => onChange({ title: e.target.value })}
                   onBlur={e => save({ title: e.target.value })}
                   disabled={!canWrite}
-                  className="w-full pr-9 px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+                  className="w-full pr-9 px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
                 />
               </AIEnrichButton>
             </div>
@@ -482,7 +482,7 @@ function SlideCard({
                   onChange={e => onChange({ subtitle: e.target.value })}
                   onBlur={e => save({ subtitle: e.target.value })}
                   disabled={!canWrite}
-                  className="w-full pr-9 px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+                  className="w-full pr-9 px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
                 />
               </AIEnrichButton>
             </div>
@@ -506,7 +506,7 @@ function SlideCard({
                   onBlur={e => save({ badgeText: e.target.value })}
                   placeholder="New Arrivals"
                   disabled={!canWrite}
-                  className="w-full pr-9 px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+                  className="w-full pr-9 px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
                 />
               </AIEnrichButton>
             </div>
@@ -589,7 +589,7 @@ function SlideCard({
                     )
                   }
                   disabled={!canWrite}
-                  className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+                  className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
                 />
               </div>
               <div>
@@ -604,7 +604,7 @@ function SlideCard({
                     )
                   }
                   disabled={!canWrite}
-                  className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+                  className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
                 />
               </div>
             </div>
@@ -640,7 +640,7 @@ function SlideCard({
                 placeholder="/categories/fasteners or https://…"
                 onBlur={e => field({ cta_url: e.target.value || null }, { ctaUrl: e.target.value || null })}
                 disabled={!canWrite}
-                className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+                className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
               />
             </div>
 
@@ -655,7 +655,7 @@ function SlideCard({
               <button
                 type="button"
                 onClick={onDelete}
-                className="px-3 py-1.5 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                className="px-3 h-control-sm rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
                 Delete slide
               </button>

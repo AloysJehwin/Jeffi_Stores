@@ -203,7 +203,7 @@ export default function CatalogEnrichmentPage() {
               <button
                 onClick={() => bulkAction('approve')}
                 disabled={bulkBusy}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold disabled:opacity-50"
               >
                 {bulkBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
                 Approve {selected.size}
@@ -211,7 +211,7 @@ export default function CatalogEnrichmentPage() {
               <button
                 onClick={() => bulkAction('reject')}
                 disabled={bulkBusy}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
               >
                 <XCircle className="w-3.5 h-3.5" />
                 Reject {selected.size}
@@ -223,7 +223,7 @@ export default function CatalogEnrichmentPage() {
             <button
               onClick={runAll}
               disabled={runningAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
             >
               {runningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
               Run All
@@ -478,7 +478,7 @@ export default function CatalogEnrichmentPage() {
                 <button
                   disabled={page <= 1}
                   onClick={() => load(page - 1)}
-                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                 >
                   Prev
                 </button>
@@ -488,7 +488,7 @@ export default function CatalogEnrichmentPage() {
                 <button
                   disabled={page >= totalPages}
                   onClick={() => load(page + 1)}
-                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                 >
                   Next
                 </button>

@@ -350,7 +350,7 @@ export default function BatchSerialLabelPicker({
                 key={m}
                 type="button"
                 onClick={() => setOutputMode(m)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
               >
                 {m === 'thermal' ? 'Thermal (1/page)' : 'A4 sheet'}
               </button>
@@ -371,7 +371,7 @@ export default function BatchSerialLabelPicker({
             type="button"
             onClick={() => setShowPrice(v => !v)}
             title="Print price on label"
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+            className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
           >
             Print Price: {showPrice ? 'On' : 'Off'}
           </button>
@@ -379,7 +379,7 @@ export default function BatchSerialLabelPicker({
             type="button"
             onClick={() => setQrAction(v => !v)}
             title="QR opens quick actions when scanned"
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+            className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
           >
             QR Action: {qrAction ? 'On' : 'Off'}
           </button>
@@ -387,7 +387,7 @@ export default function BatchSerialLabelPicker({
             type="button"
             onClick={download}
             disabled={downloading || selectedCount === 0}
-            className="ml-auto px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="ml-auto px-4 h-control rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {downloading ? 'Generating…' : `Download PDF — ${totalLabels} label${totalLabels === 1 ? '' : 's'}`}
           </button>

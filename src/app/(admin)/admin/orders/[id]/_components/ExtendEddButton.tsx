@@ -49,7 +49,7 @@ export default function ExtendEddButton({ orderId, currentEdd }: { orderId: stri
           <button
             onClick={save}
             disabled={!date || saving}
-            className="px-3 py-1 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors"
+            className="px-3 h-control-sm text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
@@ -58,7 +58,7 @@ export default function ExtendEddButton({ orderId, currentEdd }: { orderId: stri
               setOpen(false)
               setError('')
             }}
-            className="px-3 py-1 text-xs font-semibold rounded-lg bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors"
+            className="px-3 h-control-sm text-xs font-semibold rounded-lg bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors"
           >
             Cancel
           </button>

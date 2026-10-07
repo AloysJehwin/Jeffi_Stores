@@ -227,7 +227,7 @@ export default function ImageUpload({
             <button
               type="button"
               onClick={openGallery}
-              className="px-4 py-2 bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg text-sm font-semibold transition-colors"
+              className="px-4 h-control bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg text-sm font-semibold transition-colors"
             >
               Choose from Gallery
             </button>
@@ -314,7 +314,7 @@ export default function ImageUpload({
                     <button
                       type="button"
                       onClick={() => handleSetPrimary(index)}
-                      className="px-3 py-1 bg-white text-foreground-secondary rounded text-xs font-semibold hover:bg-surface-secondary transition-all sm:opacity-0 sm:group-hover:opacity-100"
+                      className="px-3 h-control-sm bg-white text-foreground-secondary rounded text-xs font-semibold hover:bg-surface-secondary transition-all sm:opacity-0 sm:group-hover:opacity-100"
                     >
                       Set Primary
                     </button>
@@ -322,7 +322,7 @@ export default function ImageUpload({
                   <button
                     type="button"
                     onClick={() => handleRemoveImage(index)}
-                    className="px-3 py-1 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-all sm:opacity-0 sm:group-hover:opacity-100"
+                    className="px-3 h-control-sm bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                   >
                     Remove
                   </button>

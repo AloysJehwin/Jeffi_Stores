@@ -219,7 +219,7 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                         <td className="px-4 py-3 text-center">
                           {canWrite && (
                             <button
-                              className="px-3 py-1 rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
+                              className="px-3 h-control-sm rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
                               disabled={markingPaid === r.order_id}
                               onClick={() => markPaid(r.order_id)}
                             >
@@ -297,7 +297,7 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                     </div>
                     {canWrite && (
                       <button
-                        className="w-full mt-1 py-1.5 rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
+                        className="w-full mt-1 h-control-sm rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
                         disabled={markingPaid === r.order_id}
                         onClick={() => markPaid(r.order_id)}
                       >
@@ -317,14 +317,14 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                     <button
                       onClick={() => load(page - 1)}
                       disabled={page === 1 || loading}
-                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       Previous
                     </button>
                     <button
                       onClick={() => load(page + 1)}
                       disabled={page === totalPages || loading}
-                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                       Next
                     </button>

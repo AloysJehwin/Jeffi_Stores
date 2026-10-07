@@ -134,7 +134,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <form key="admin-logout" action={logoutAction}>
       <button
         type="submit"
-        className="h-9 inline-flex items-center gap-2 text-white/70 hover:bg-white/10 hover:text-white px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"
+        className="h-control inline-flex items-center gap-2 text-white/70 hover:bg-white/10 hover:text-white px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"
         title="Log out"
       >
         <LogOut className="w-5 h-5" />

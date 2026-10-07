@@ -61,7 +61,7 @@ export default function ShipmentCorrection({
         type="button"
         onClick={() => setOpen(true)}
         disabled={!awb}
-        className="text-xs px-3 py-1.5 rounded-lg border border-border-default text-foreground hover:bg-surface-secondary disabled:opacity-50"
+        className="text-xs px-3 h-control-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary disabled:opacity-50"
       >
         {alreadyBilled ? 'Correct charge' : 'Set charge'}
       </button>
@@ -72,14 +72,14 @@ export default function ShipmentCorrection({
     <div className="text-left space-y-2 rounded-lg border border-border-default bg-surface p-3 w-64">
       <div className="text-xs text-foreground-muted">AWB {awb}</div>
       <input
-        className="w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground"
+        className="w-full rounded-lg border border-border-default bg-surface px-3 h-control text-sm text-foreground"
         inputMode="decimal"
         placeholder="Actual billed ₹"
         value={amount}
         onChange={e => setAmount(e.target.value.replace(/[^\d.]/g, ''))}
       />
       <input
-        className="w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground"
+        className="w-full rounded-lg border border-border-default bg-surface px-3 h-control text-sm text-foreground"
         placeholder="Proof / reference"
         value={note}
         onChange={e => setNote(e.target.value)}
@@ -90,7 +90,7 @@ export default function ShipmentCorrection({
           type="button"
           onClick={submit}
           disabled={busy}
-          className="text-xs px-3 py-1.5 rounded-lg bg-accent-600 text-white hover:bg-accent-700 disabled:opacity-50"
+          className="text-xs px-3 h-control-sm rounded-lg bg-accent-600 text-white hover:bg-accent-700 disabled:opacity-50"
         >
           {busy ? 'Saving…' : 'Apply'}
         </button>
@@ -101,7 +101,7 @@ export default function ShipmentCorrection({
             setErr(null)
           }}
           disabled={busy}
-          className="text-xs px-3 py-1.5 rounded-lg border border-border-default text-foreground hover:bg-surface-secondary"
+          className="text-xs px-3 h-control-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary"
         >
           Cancel
         </button>

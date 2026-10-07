@@ -264,7 +264,7 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
                     <Link
                       key={e.id}
                       href={link}
-                      className="flex gap-3 items-start hover:bg-surface-secondary/50 -mx-2 px-2 py-1 rounded transition-colors"
+                      className="flex gap-3 items-start hover:bg-surface-secondary/50 -mx-2 px-2 h-control-sm rounded transition-colors"
                     >
                       {content}
                     </Link>

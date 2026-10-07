@@ -253,7 +253,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
                 value={templateVars[field] || ''}
                 onChange={e => setTemplateVars(v => ({ ...v, [field]: e.target.value }))}
                 placeholder={field}
-                className="w-full px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+                className="w-full px-3 h-control rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
               />
             ))}
           {activeTemplate && (
@@ -266,7 +266,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
               <button
                 onClick={handleSendTemplate}
                 disabled={isSending || isSelectedUnavailable}
-                className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSending
                   ? 'Sending…'
@@ -290,12 +290,12 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
                 }
               }}
               placeholder="Free text message…"
-              className="flex-1 px-3.5 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+              className="flex-1 px-3.5 h-control rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
             />
             <button
               onClick={handleSendFreeText}
               disabled={isSending || !freeText.trim()}
-              className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-4 h-4" />
             </button>

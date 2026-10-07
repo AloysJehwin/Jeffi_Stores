@@ -1400,7 +1400,7 @@ export default function ControlsClient({
                     type="button"
                     onClick={() => handleRollback(lastLogId, lastLogLabel)}
                     disabled={rollingBack}
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 text-xs font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-50 transition-colors"
+                    className="shrink-0 flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 text-xs font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-50 transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />

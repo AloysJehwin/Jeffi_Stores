@@ -92,7 +92,7 @@ export default function CodRemittanceButton({ orderId, remittedAt, codAmount }: 
         <button
           onClick={() => setRemitted(true)}
           disabled={saving}
-          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors flex-shrink-0"
+          className="px-3 h-control-sm text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors flex-shrink-0"
         >
           {saving ? 'Saving…' : 'Mark as remitted'}
         </button>

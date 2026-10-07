@@ -183,20 +183,20 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                         onChange={e => setDraftTitle(e.target.value)}
                         placeholder={o.title}
                         maxLength={200}
-                        className="flex-1 min-w-[16rem] px-2.5 py-1.5 text-sm rounded-lg border border-border-default bg-surface-secondary text-foreground"
+                        className="flex-1 min-w-[16rem] px-2.5 h-control-sm text-sm rounded-lg border border-border-default bg-surface-secondary text-foreground"
                       />
                       <button
                         onClick={() => {
                           patch(o.id, { titleOverride: draftTitle })
                           setEditing(null)
                         }}
-                        className="px-3 py-1.5 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-medium"
+                        className="px-3 h-control-sm text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-medium"
                       >
                         Save
                       </button>
                       <button
                         onClick={() => setEditing(null)}
-                        className="px-3 py-1.5 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary"
+                        className="px-3 h-control-sm text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary"
                       >
                         Cancel
                       </button>

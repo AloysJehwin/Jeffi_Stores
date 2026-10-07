@@ -125,7 +125,7 @@ export default function MisassignedProductsBanner({
                 <button
                   onClick={() => reassign(product)}
                   disabled={!selections[product.id] || saving[product.id]}
-                  className="text-xs bg-accent-500 hover:bg-accent-600 text-white px-2.5 py-1 rounded font-semibold transition-colors disabled:opacity-40"
+                  className="text-xs bg-accent-500 hover:bg-accent-600 text-white px-2.5 h-control-sm rounded font-semibold transition-colors disabled:opacity-40"
                 >
                   {saving[product.id] ? 'Moving…' : 'Move'}
                 </button>

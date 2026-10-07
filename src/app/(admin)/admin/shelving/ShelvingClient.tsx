@@ -704,7 +704,7 @@ export default function ShelvingClient() {
                         <button
                           onClick={() => deleteLocation(selectedLocation)}
                           title="Delete location"
-                          className="px-2 py-1 rounded-lg text-sm border border-border-default bg-surface hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-muted hover:text-red-500 transition-colors"
+                          className="px-2 h-control-sm rounded-lg text-sm border border-border-default bg-surface hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-muted hover:text-red-500 transition-colors"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path
@@ -1145,7 +1145,7 @@ function LabelsTab({
                 type="number"
                 value={labelCopies}
                 onChange={e => setLabelCopies(e.target.value)}
-                className="w-16 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-xs text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors"
+                className="w-16 px-2 h-control-sm rounded-lg border border-border-default bg-surface text-foreground text-xs text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors"
                 min={1}
                 max={50}
               />
@@ -1160,7 +1160,7 @@ function LabelsTab({
                   )
                 }
                 disabled={generating}
-                className="px-4 py-1.5 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-50 flex items-center gap-2"
+                className="px-4 h-control-sm rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -1182,7 +1182,7 @@ function LabelsTab({
                 )
               }
               disabled={generating || labelSelections.length === 0}
-              className="px-4 py-1.5 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 h-control-sm rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {generating ? (
                 <>

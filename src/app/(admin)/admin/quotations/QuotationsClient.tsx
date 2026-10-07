@@ -834,7 +834,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
           {canWrite && (
             <button
               onClick={newQuotation}
-              className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white font-semibold rounded-lg text-sm transition-colors"
+              className="px-4 h-control bg-secondary-500 hover:bg-secondary-600 text-white font-semibold rounded-lg text-sm transition-colors"
             >
               + New Quotation
             </button>
@@ -1170,7 +1170,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                             <button
                               onClick={() => startConvert(q)}
                               title="Convert to Invoice"
-                              className="px-2 py-1 rounded text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
+                              className="px-2 h-control-sm rounded text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
                             >
                               → Invoice
                             </button>
@@ -1251,7 +1251,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                 <button
                   disabled={page <= 1}
                   onClick={() => loadList(page - 1)}
-                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                 >
                   Prev
                 </button>
@@ -1261,7 +1261,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                 <button
                   disabled={page >= totalPages}
                   onClick={() => loadList(page + 1)}
-                  className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                  className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
                 >
                   Next
                 </button>
@@ -1340,7 +1340,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                         setShowConvertModal(false)
                         setConvertSavedAsDraft(false)
                       }}
-                      className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+                      className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
                     >
                       Close
                     </button>
@@ -1625,7 +1625,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                   <div className="px-6 py-4 border-t border-border-default flex justify-between gap-3">
                     <button
                       onClick={() => setConvertStep('payment')}
-                      className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+                      className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
                     >
                       ← Back
                     </button>
@@ -1678,7 +1678,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                               (item.required_serials ?? item.required_qty)
                           )
                       }
-                      className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                      className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
                     >
                       Confirm & Convert →
                     </button>
@@ -1783,7 +1783,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                     <button
                       onClick={() => setShowConvertModal(false)}
                       disabled={convertingInvoice}
-                      className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+                      className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
                     >
                       Cancel
                     </button>
@@ -1793,7 +1793,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                         convertToInvoice(convertPendingQuoteId, convertPaymentMode, convertEnableDelivery)
                       }
                       disabled={convertingInvoice || !convertPendingQuoteId}
-                      className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold disabled:opacity-50 transition-colors"
+                      className="px-4 h-control text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold disabled:opacity-50 transition-colors"
                     >
                       {convertingInvoice ? 'Converting…' : 'Convert →'}
                     </button>
@@ -1821,7 +1821,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                         setShowConvertModal(false)
                         setConvertQrImageUrl(null)
                       }}
-                      className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+                      className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
                     >
                       Done
                     </button>
@@ -1912,7 +1912,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                 setConvertSerialPickerItems(null)
                 setShowConvertModal(true)
               }}
-              className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
+              className="shrink-0 px-3 h-control-sm rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
             >
               {convertingInvoice ? 'Converting…' : '→ Convert to Invoice'}
             </button>
@@ -2214,7 +2214,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
           <button
             onClick={() => save('final')}
             disabled={saving}
-            className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            className="px-5 h-control bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Finalise & Save'}
           </button>
@@ -2222,7 +2222,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         <button
           onClick={downloadPDF}
           disabled={downloading || saving}
-          className="px-5 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          className="px-5 h-control bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
         >
           {downloading ? 'Generating…' : 'Download PDF'}
         </button>
@@ -2297,7 +2297,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                       setShowConvertModal(false)
                       setConvertSavedAsDraft(false)
                     }}
-                    className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+                    className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
                   >
                     Close
                   </button>
@@ -2577,7 +2577,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                 <div className="px-6 py-4 border-t border-border-default flex justify-between gap-3">
                   <button
                     onClick={() => setConvertStep('payment')}
-                    className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+                    className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
                   >
                     ← Back
                   </button>
@@ -2630,7 +2630,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                             (item.required_serials ?? item.required_qty)
                         )
                     }
-                    className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                    className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
                   >
                     Confirm & Convert →
                   </button>
@@ -2729,7 +2729,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                   <button
                     onClick={() => setShowConvertModal(false)}
                     disabled={convertingInvoice}
-                    className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+                    className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
                   >
                     Cancel
                   </button>
@@ -2739,7 +2739,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                       convertToInvoice(convertPendingQuoteId, convertPaymentMode, convertEnableDelivery)
                     }
                     disabled={convertingInvoice || !convertPendingQuoteId}
-                    className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold disabled:opacity-50 transition-colors"
+                    className="px-4 h-control text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold disabled:opacity-50 transition-colors"
                   >
                     {convertingInvoice ? 'Converting…' : 'Convert →'}
                   </button>
@@ -2767,7 +2767,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                       setShowConvertModal(false)
                       setConvertQrImageUrl(null)
                     }}
-                    className="px-4 py-2 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+                    className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
                   >
                     Done
                   </button>
@@ -2899,7 +2899,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
               href={`/api/admin/quotations/${q.id}/pdf`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
+              className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -2913,7 +2913,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
             </a>
             <a
               href={ap(`/admin/quotations/${q.id}`)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 text-white transition-colors"
+              className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 text-white transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

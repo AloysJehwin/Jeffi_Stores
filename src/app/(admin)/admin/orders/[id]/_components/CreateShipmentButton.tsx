@@ -96,7 +96,7 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
                 <button
                   onClick={handleCancel}
                   disabled={cancelling}
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                  className="px-3 h-control-sm text-xs font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
                 >
                   {cancelling ? 'Cancelling…' : 'Confirm Cancel'}
                 </button>
@@ -114,7 +114,7 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
             <button
               onClick={() => setCancelConfirming(true)}
               disabled={cancelling}
-              className="w-full px-4 py-2 text-sm font-medium rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              className="w-full px-4 h-control text-sm font-medium rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -150,7 +150,7 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
               <button
                 onClick={handleCreate}
                 disabled={loading}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
+                className="px-3 h-control-sm text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
               >
                 Confirm
               </button>
@@ -168,7 +168,7 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
           <button
             onClick={beginConfirm}
             disabled={loading}
-            className="w-full px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
+            className="w-full px-4 h-control text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
           >
             {loading ? (
               <>

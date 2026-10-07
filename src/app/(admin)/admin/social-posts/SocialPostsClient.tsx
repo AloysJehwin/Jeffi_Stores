@@ -255,7 +255,7 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
         {canWrite && (
           <button
             onClick={() => setShowComposer(v => !v)}
-            className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
+            className="flex items-center gap-2 px-4 h-control bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -432,7 +432,7 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
             <button
               type="submit"
               disabled={submitting}
-              className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+              className="px-6 h-control bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
             >
               {submitting ? 'Queuing…' : 'Queue Post'}
             </button>
@@ -442,7 +442,7 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
                 resetComposer()
                 setShowComposer(false)
               }}
-              className="px-6 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+              className="px-6 h-control border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
             >
               Cancel
             </button>
