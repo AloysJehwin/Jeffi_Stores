@@ -69,6 +69,12 @@ describe('subscriptionRenewal scenario', () => {
       expect(args[3]).toBe(defaultParams.maxRecipientsPerSweep)
     })
 
+    it('reads only legacy (non-Razorpay) subscriptions', async () => {
+      mockQueryMany.mockResolvedValue([])
+      await subscriptionRenewal.findEligible({ campaign, params: defaultParams })
+      expect(mockQueryMany.mock.calls[0][0]).toMatch(/s\.razorpay_subscription_id IS NULL/)
+    })
+
     it('honors an overridden {value,unit} windowBefore', async () => {
       mockQueryMany.mockResolvedValue([])
       await subscriptionRenewal.findEligible({
@@ -77,6 +83,14 @@ describe('subscriptionRenewal scenario', () => {
       })
       const [, args] = mockQueryMany.mock.calls[0]
       expect(args[1]).toBe(String(days(7)))
+    })
+  })
+
+  describe('findSuppressed', () => {
+    it('reads only legacy (non-Razorpay) subscriptions', async () => {
+      mockQueryMany.mockResolvedValue([])
+      await subscriptionRenewal.findSuppressed!({ campaign, params: defaultParams })
+      expect(mockQueryMany.mock.calls[0][0]).toMatch(/s\.razorpay_subscription_id IS NULL/)
     })
   })
 

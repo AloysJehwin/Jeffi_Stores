@@ -24,6 +24,7 @@ import { transferToLinkedAccount, recordTenantTransaction, recordRefundSettlemen
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { resolveSubscriptionTenant, runInTenant, type WebhookTenant } from '@/lib/payments/webhook-tenant'
+import { processSubscriptionEvent } from '@/lib/subscriptions/cycle'
 
 // Customer-subscription events we route to handleSubscriptionEvent. Kept as a Set so the POST
 // dispatch stays a single membership test and new states only touch this list.
@@ -118,36 +119,20 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Customer-subscription event handler. Runs with NO tenant context (the platform webhook URL has no
- * host, so getCurrentTenant() is empty and raw db helpers hit the PLATFORM pool), so it MUST resolve
- * the tenant from the authoritative control-plane index first and then run its body inside
- * runInTenant so every per-tenant read/write lands in the right DB.
- *
- * Phase 2 scope: prove routing + idempotency only. The in-tenant body is a STUB — it logs the event
- * and performs a DB-backed, event-safe no-op. The real cycle-order creation + subscription state
- * machine are Phase 6.
- *
- * TODO(P6): own-key tenants' subscription events are signed with the tenant's own
- * tenants.razorpay_webhook_secret and never touch the platform index, so they will arrive on a
- * dedicated per-tenant endpoint /webhooks/razorpay/[tenant] that verifies against that secret. This
- * platform endpoint keeps verifying against RAZORPAY_WEBHOOK_SECRET only.
+ * Customer-subscription event handler for PLATFORM-collect subscriptions. Runs with no tenant
+ * context (fixed URL, no host), so it resolves the tenant from the authoritative control-plane
+ * index and runs the cycle engine + state machine inside runInTenant. Own-key tenants arrive on
+ * /webhooks/razorpay/[tenant] instead, verified against their own webhook secret.
  */
-async function handleSubscriptionEvent(
-  eventType: string,
-  event: any,
-  eventId: string | null
-): Promise<void> {
+async function handleSubscriptionEvent(eventType: string, event: any, eventId: string | null): Promise<void> {
   const subscriptionEntity = event?.payload?.subscription?.entity
   const subId = (subscriptionEntity?.id ?? '').toString().trim()
 
-  // Resolve + verify the tenant against the control-plane index. A null result means the
-  // subscription is unknown to us (not in the index, no trustworthy notes) — benign, so ack-and-drop
-  // with a normal return (the shared 200), exactly like today's unrecognised events.
+  // Unknown subscription → benign ack-and-drop (shared 200). A control-plane failure → retry.
   let tenant: WebhookTenant | null
   try {
     tenant = await resolveSubscriptionTenant(subscriptionEntity)
   } catch (err) {
-    // The control-plane lookup itself failed to connect — transient, let Razorpay retry.
     throw new TransientWebhookError('subscription tenant resolution failed', err)
   }
   if (!tenant) {
@@ -157,24 +142,11 @@ async function handleSubscriptionEvent(
 
   await runInTenant(tenant, async () => {
     try {
-      // TODO(P6): mint one order per paid cycle and drive the subscription state machine, using the
-      // Phase-1 UNIQUE constraints on subscription_cycle_orders for idempotent INSERT ON CONFLICT.
-      const paymentId = (event?.payload?.payment?.entity?.id ?? '').toString().trim() || null
-      const alreadySeen = paymentId
-        ? await queryOne<{ id: string }>(
-            `SELECT id FROM subscription_cycle_orders WHERE razorpay_payment_id = $1 LIMIT 1`,
-            [paymentId]
-          )
-        : null
-
-      console.info('[webhook:subscription] routed', {
-        eventType,
-        subId,
-        eventId,
-        tenant: tenant.slug,
-        paymentId,
-        duplicate: !!alreadySeen,
+      const known = await processSubscriptionEvent(eventType, event, {
+        tenantId: tenant.tenantId,
+        slug: tenant.slug,
       })
+      if (!known) console.info('[webhook:subscription] no local row, ack-and-drop', { eventType, subId, eventId })
     } catch (err) {
       throw new TransientWebhookError('subscription in-tenant handler failed', err)
     }

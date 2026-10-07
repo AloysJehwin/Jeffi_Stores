@@ -7,6 +7,7 @@ import { useAccountSearch } from '@/contexts/AccountSearchContext'
 import AccountSearch from '@/components/visitor/AccountSearch'
 import { useLoyaltyEnabled } from '@/hooks/useLoyaltyEnabled'
 import { useReferralEnabled } from '@/hooks/useReferralEnabled'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 const navItems = [
   {
@@ -103,6 +104,22 @@ const businessNavItem = {
   ),
 }
 
+const subscriptionsNavItem = {
+  href: '/account/subscriptions',
+  label: 'Subscriptions',
+  exact: false,
+  icon: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+      />
+    </svg>
+  ),
+}
+
 const rewardsNavItem = {
   href: '/account/rewards',
   label: 'Rewards',
@@ -141,8 +158,10 @@ export function useAccountNavItems() {
   const { user } = useAuth()
   const loyaltyEnabled = useLoyaltyEnabled()
   const referralEnabled = useReferralEnabled()
-  if (!loyaltyEnabled || user?.isBusiness) return navItems
-  return referralEnabled ? [...navItems, rewardsNavItem, referralsNavItem] : [...navItems, rewardsNavItem]
+  const subscriptionsEnabled = useStoreConfig().flags.subscriptionsEnabled
+  const base = subscriptionsEnabled ? [...navItems.slice(0, 2), subscriptionsNavItem, ...navItems.slice(2)] : navItems
+  if (!loyaltyEnabled || user?.isBusiness) return base
+  return referralEnabled ? [...base, rewardsNavItem, referralsNavItem] : [...base, rewardsNavItem]
 }
 
 const accountBackLinkMap: Array<{ pattern: RegExp; label: string; href: string }> = [

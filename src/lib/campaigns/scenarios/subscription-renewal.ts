@@ -80,6 +80,7 @@ export const subscriptionRenewal: ScenarioModule<Params, Row> = {
       JOIN products p ON p.id = s.product_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE s.status = 'active'
+        AND s.razorpay_subscription_id IS NULL
         AND s.next_renewal_at > NOW()
         AND s.next_renewal_at <= NOW() + ($2::text || ' minutes')::interval
         AND u.is_active = TRUE
@@ -114,6 +115,7 @@ export const subscriptionRenewal: ScenarioModule<Params, Row> = {
         SELECT DISTINCT s.user_id
         FROM subscriptions s
         WHERE s.status = 'active'
+          AND s.razorpay_subscription_id IS NULL
           AND s.next_renewal_at > NOW()
           AND s.next_renewal_at <= NOW() + ($2::text || ' minutes')::interval
       )

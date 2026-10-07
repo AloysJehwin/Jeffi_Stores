@@ -9,6 +9,7 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
 import QuantityInput from '@/components/shared/QuantityInput'
+import SubscribeOption, { type PurchaseMode } from '@/components/subscriptions/SubscribeOption'
 import { round2 } from '@/lib/catalog/gst'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
 
@@ -92,6 +93,9 @@ interface ProductActionsProps {
   handlingDays?: number
   is_active?: boolean
   isCodAllowed?: boolean | null
+  digital?: boolean
+  isSubscription?: boolean
+  subscriptionIntervals?: string[] | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -146,6 +150,9 @@ export default function ProductActions({
   handlingDays = 2,
   is_active = true,
   isCodAllowed,
+  digital = false,
+  isSubscription = false,
+  subscriptionIntervals = null,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -193,6 +200,8 @@ export default function ProductActions({
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [quantityRaw, setQuantityRaw] = useState('1')
+  const [purchaseMode, setPurchaseMode] = useState<PurchaseMode>('once')
+  const subscribing = purchaseMode === 'subscribe'
 
   const pricingTypes = Array.from(new Set(variants.map(v => v.pricing_type || 'unit')))
   const hasMultipleModes = pricingTypes.length > 1
@@ -893,6 +902,7 @@ export default function ProductActions({
                 )}
               </div>
             </div>
+            {!subscribing && (
             <QuantityInput
               dimension={sellUnit?.dimension ?? 'count'}
               quantity={quantity}
@@ -908,6 +918,7 @@ export default function ProductActions({
                 setQuantityRaw(raw)
               }}
             />
+            )}
           </div>
         </>
       )}
@@ -1128,6 +1139,7 @@ export default function ProductActions({
                 )}
               </div>
             </div>
+            {!subscribing && (
             <QuantityInput
               dimension={sellUnit?.dimension ?? 'count'}
               quantity={quantity}
@@ -1143,10 +1155,32 @@ export default function ProductActions({
                 setQuantityRaw(raw)
               }}
             />
+            )}
           </div>
         </>
       )}
 
+      <SubscribeOption
+        productId={productId}
+        variantId={selectedVariantId}
+        subVariantId={selectedSubVariantId}
+        isSubscription={isSubscription}
+        intervals={subscriptionIntervals}
+        digital={digital}
+        isBusiness
+        mode={purchaseMode}
+        onModeChange={setPurchaseMode}
+        disabled={!is_active}
+        needsChoice={
+          hasVariants && !selectedVariant
+            ? 'Select an option to see the subscription price.'
+            : !!selectedVariant?.sub_variants?.length && !selectedSubVariantId
+              ? `Select a ${selectedVariant.sub_variant_type || 'sub-variant'} to see the subscription price.`
+              : null
+        }
+      />
+
+      {!subscribing && (
       <div className="space-y-3">
         <button
           onClick={handleBuyNow}
@@ -1193,6 +1227,7 @@ export default function ProductActions({
           )}
         </button>
       </div>
+      )}
     </div>
   )
 }

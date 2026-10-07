@@ -51,14 +51,22 @@ describe('fileFormats', () => {
 describe('resolveDigitalUi', () => {
   const allOn = { digitalProductsEnabled: true, subscriptionsEnabled: true, vaultDownloadsEnabled: true }
 
-  it('is inert when the product is not digital', () => {
+  it('is inert for digital fields on a physical product but still offers subscribe', () => {
     const ui = resolveDigitalUi(allOn, {
       isDigital: false,
       isSubscription: true,
       downloadable: true,
       fileFormat: 'PDF',
     })
-    expect(ui).toEqual({ isDigital: false, subscribe: false, download: false, formats: [] })
+    expect(ui).toEqual({ isDigital: false, subscribe: true, download: false, formats: [] })
+  })
+
+  it('does not offer subscribe on a physical product when the subscriptions master is off', () => {
+    const ui = resolveDigitalUi(
+      { ...allOn, subscriptionsEnabled: false },
+      { isDigital: false, isSubscription: true, downloadable: false }
+    )
+    expect(ui.subscribe).toBe(false)
   })
 
   it('is inert when the digital master is off even if the product is digital', () => {

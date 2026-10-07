@@ -9,7 +9,7 @@ import { bp } from '@/lib/shared/business-path'
 import { businessHostForHost } from '@/lib/tenancy/forms-host'
 
 // Account pages the business portal also has, at the same path.
-const BUSINESS_ACCOUNT_PATHS = ['/account/orders', '/account/addresses', '/account/transactions']
+const BUSINESS_ACCOUNT_PATHS = ['/account/orders', '/account/addresses', '/account/transactions', '/account/subscriptions']
 
 function PathnameClearer() {
   const pathname = usePathname()

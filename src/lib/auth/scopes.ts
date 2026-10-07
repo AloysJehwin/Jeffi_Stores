@@ -676,6 +676,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/invoices')) return 'invoices:read'
   if (pathname.startsWith('/api/admin/orders/create')) return 'invoices:read'
   if (pathname.startsWith('/api/admin/orders')) return 'orders:read'
+  if (pathname.startsWith('/api/admin/subscriptions')) return 'subscriptions:read'
   if (pathname.startsWith('/api/admin/data-source')) return 'products:read'
   if (pathname.startsWith('/api/admin/products')) return 'products:read'
   if (pathname.startsWith('/api/admin/categories')) return 'categories:read'
