@@ -1,0 +1,72 @@
+# Coroot (eBPF service map, per-endpoint latency/errors, logs) + Headlamp (cluster UI), both at
+# https://k8s.jeffistores.in behind the platform client CA. Razer's AI cluster ships to the same
+# Coroot over Tailscale (bootstrap/razer-agents.sh).
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata: { name: coroot-operator, namespace: kube-system }
+spec:
+  repo: https://coroot.github.io/helm-charts
+  chart: coroot-operator
+  targetNamespace: observability
+  valuesContent: |-
+    nodeSelector: { jeffi.io/role: core }
+---
+apiVersion: coroot.com/v1
+kind: Coroot
+metadata: { name: coroot, namespace: observability }
+spec:
+  metricsRefreshInterval: 15s
+  storage: { size: 5Gi }
+  prometheus:
+    retention: 7d
+    storage: { size: 10Gi }
+    resources: { requests: { memory: 256Mi }, limits: { memory: 768Mi } }
+  clickhouse:
+    shards: 1
+    replicas: 1
+    storage: { size: 15Gi }
+    resources: { requests: { memory: 512Mi }, limits: { memory: 1536Mi } }
+  resources: { requests: { memory: 128Mi }, limits: { memory: 512Mi } }
+  nodeAgent:
+    resources: { requests: { cpu: 20m, memory: 64Mi }, limits: { memory: 256Mi } }
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata: { name: headlamp, namespace: kube-system }
+spec:
+  repo: https://kubernetes-sigs.github.io/headlamp/
+  chart: headlamp
+  targetNamespace: observability
+  valuesContent: |-
+    config: { baseURL: /headlamp }
+    nodeSelector: { jeffi.io/role: core }
+    # Login needs a token: kubectl -n observability create token headlamp-viewer
+    clusterRoleBinding: { create: true, clusterRoleName: view }
+    resources: { requests: { cpu: 10m, memory: 48Mi }, limits: { memory: 192Mi } }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: headlamp-viewer, namespace: observability }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: { name: headlamp-viewer }
+roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: view }
+subjects: [{ kind: ServiceAccount, name: headlamp-viewer, namespace: observability }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: k8s-console, namespace: observability }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`k8s.jeffistores.in`) && PathPrefix(`/headlamp`)
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: headlamp, port: 80 }]
+    - match: Host(`k8s.jeffistores.in`)
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: coroot-coroot, port: 8080 }]
+  tls:
+    options: { name: platform-mtls, namespace: jeffi-edge }

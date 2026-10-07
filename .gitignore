@@ -41,6 +41,7 @@ next-env.d.ts
 # ...but CI helper scripts MUST be committed — the workflows check them out and
 # run them on the runner, so an ignored script means "No such file" in Actions.
 !.github/scripts/*.sh
+!deploy/k8s/**/*.sh
 /scripts/
 *.csv
 RDS_SECURITY_GROUP_FIX.md

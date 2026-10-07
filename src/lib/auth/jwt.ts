@@ -228,8 +228,9 @@ export async function authenticateServiceAccount(request: NextRequest): Promise<
   const { queryOne } = await import('@/lib/shared/db')
   const sa = await queryOne<ServiceAccountPayload>(
     `SELECT id, name, allowed_scopes FROM service_accounts
-     WHERE LOWER(serial_number) = $1 AND is_revoked = false`,
-    [certSerial.toLowerCase()]
+     WHERE LTRIM(LOWER(serial_number), '0') = $1 AND is_revoked = false`,
+    // Proxies print the minimal hex (no leading 00 bytes); stored serials keep the full 16 bytes.
+    [certSerial.toLowerCase().replace(/^0+/, '')]
   )
   if (!sa) return null
 

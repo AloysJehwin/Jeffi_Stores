@@ -1,0 +1,29 @@
+# k3s bundles Traefik; this overrides its chart values.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    nodeSelector: { jeffi.io/role: core }
+    service:
+      spec:
+        externalTrafficPolicy: Local
+    providers:
+      kubernetesCRD:
+        allowCrossNamespace: true
+      kubernetesIngress:
+        publishedService: { enabled: true }
+    ports:
+      web:
+        # CloudFront reaches the apex over HTTP and sends X-Forwarded-*; keep them on :80 only.
+        forwardedHeaders: { insecure: true }
+      websecure:
+        transport:
+          respondingTimeouts: { readTimeout: 300s, writeTimeout: 0s, idleTimeout: 180s }
+    logs:
+      access: { enabled: true }
+    resources:
+      requests: { cpu: 100m, memory: 96Mi }
+      limits: { memory: 256Mi }

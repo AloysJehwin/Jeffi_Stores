@@ -66,3 +66,12 @@ describe('compute tiers', () => {
     expect(computeTierFor('unknown')).toBe(COMPUTE_TIERS.basic)
   })
 })
+
+describe('generated k8s CronJobs', () => {
+  it('match the CRON_JOBS registry (run: npx jiti deploy/k8s/gen-cronjobs.ts)', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { renderCronJobs, CRONJOBS_PATH } = await import('../../../deploy/k8s/gen-cronjobs')
+    expect(readFileSync(CRONJOBS_PATH, 'utf8')).toBe(renderCronJobs())
+    for (const job of CRON_JOBS) expect(renderCronJobs()).toContain(`deploy/k8s-cron.mjs, ${job.id}, ${job.method}`)
+  })
+})

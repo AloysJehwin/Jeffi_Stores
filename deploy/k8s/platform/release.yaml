@@ -1,0 +1,7 @@
+# The image every tenant namespace should run. CI updates it before rolling tenants
+# (tenant-compute.releaseImage reads it for newly provisioned stores).
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: release, namespace: jeffi }
+data:
+  image: ghcr.io/aloysjehwin/jeffi_stores:latest

@@ -1,0 +1,14 @@
+# Only Traefik (kube-system), Coroot and pods in this namespace (crons, redis clients) may connect in.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: ingress-from-edge, namespace: jeffi }
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: observability } }
+        # Kubelet probes originate from node IPs (default VPC).
+        - ipBlock: { cidr: 172.31.0.0/16 }
