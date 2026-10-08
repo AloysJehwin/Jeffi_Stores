@@ -49,8 +49,9 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
   const adminHosts = input.hosts.filter(h => h.startsWith(`admin-${slug}.`))
   const publicHosts = input.hosts.filter(h => !adminHosts.includes(h))
   const customDomains = input.customDomains ?? []
-  // Probes must carry a tenant host: the app 404s unknown hosts, and /api/ready then checks this tenant's DB.
-  const probeHost = [{ name: 'Host', value: publicHosts[0] ?? `${slug}.jeffistores.in` }]
+  // Probes use localhost: the app 404s a tenant host until the tenant is active, which happens only
+  // after these pods are Ready. verify_serving checks readiness separately.
+  const probeHost = [{ name: 'Host', value: 'localhost' }]
 
   const objs: K8sObject[] = [
     {

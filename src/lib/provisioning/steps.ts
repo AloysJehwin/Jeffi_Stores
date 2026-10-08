@@ -415,17 +415,22 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             )
           }
         }
-        try {
-          const ctrl = new AbortController()
-          const timer = setTimeout(() => ctrl.abort(), 10000)
-          const resp = await fetch(`https://${primaryHost}/`, { redirect: 'manual', signal: ctrl.signal })
-          clearTimeout(timer)
-          // Any HTTP response (2xx/3xx/4xx) proves the app tier is answering this host.
-          // A network failure/timeout (host unreachable, TLS fail, no server_name) throws.
-          served = resp.status > 0
-        } catch {
-          served = false
-        }
+        if (res.computeMode === 'k8s') {
+          // The shared ingress answers every host (404/503), so an HTTP reply proves nothing here.
+          const { tenantWorkloadReady } = await import('@/lib/k8s/tenant-compute')
+          served = await tenantWorkloadReady(slug).catch(() => false)
+        } else
+          try {
+            const ctrl = new AbortController()
+            const timer = setTimeout(() => ctrl.abort(), 10000)
+            const resp = await fetch(`https://${primaryHost}/`, { redirect: 'manual', signal: ctrl.signal })
+            clearTimeout(timer)
+            // Any HTTP response (2xx/3xx/4xx) proves the app tier is answering this host.
+            // A network failure/timeout (host unreachable, TLS fail, no server_name) throws.
+            served = resp.status > 0
+          } catch {
+            served = false
+          }
         if (served) return await next(job.id, 'activate', res)
         if (attempts < MAX_VERIFY_ATTEMPTS) {
           // Not serving yet — stay on this step; the worker retries next tick (DNS/TLS lag).
@@ -638,7 +643,9 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   // DNS first (cheap, no dependency) — use recorded hosts, else derive from slug.
   // k8s tenants never get per-host records (the *.jeffistores.in wildcard serves them), so skip.
   const k8sDns = r.computeMode === 'k8s' || !!r.computeWaitStartedAt
-  const hosts = k8sDns ? [] : ((r.dnsHosts as string[] | undefined) ?? (tenant ? tenantHostnames(tenant.slug, tenant.plan) : []))
+  const hosts = k8sDns
+    ? []
+    : ((r.dnsHosts as string[] | undefined) ?? (tenant ? tenantHostnames(tenant.slug, tenant.plan) : []))
   // Best-effort but LOUD: a swallowed removeDns failure leaves zombie A-records pointing at a
   // torn-down box (records outliving the instance). Record it + flag the lingering hosts for a
   // reconciler instead of failing the rollback.
