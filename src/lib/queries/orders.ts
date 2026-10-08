@@ -1,5 +1,6 @@
 import { queryOne, queryMany, queryCount } from './shared'
 import { buildVectorSearchClause } from '@/lib/catalog/search'
+import { orderItemFactorSql, orderItemUnitSql } from '@/lib/orders/unit-conversion'
 
 export async function getAllOrders() {
   return queryMany(`
@@ -164,7 +165,8 @@ export async function getOrder(id: string) {
             'created_at', oi.created_at,
             'variant_id', oi.variant_id,
             'sub_variant_id', oi.sub_variant_id,
-            'sell_unit_factor', (SELECT pu.factor FROM product_units pu WHERE pu.unit = oi.buy_unit AND pu.product_id = oi.product_id LIMIT 1),
+            'sell_unit', ${orderItemUnitSql()},
+            'sell_unit_factor', COALESCE(${orderItemFactorSql()}, (SELECT pu.factor FROM product_units pu WHERE pu.unit = oi.buy_unit AND pu.product_id = oi.product_id LIMIT 1)),
             'sell_unit_dimension', (SELECT pu.dimension FROM product_units pu WHERE pu.unit = oi.buy_unit AND pu.product_id = oi.product_id LIMIT 1),
             'products', json_build_object(
               'id', pr.id, 'name', pr.name, 'sku', pr.sku,

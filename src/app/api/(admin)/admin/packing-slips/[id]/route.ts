@@ -3,6 +3,7 @@ import { queryOne } from '@/lib/shared/db'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { generatePackingSlipPDF, loadStoreSettings, PackingSlipOrder } from '@/lib/documents/packing-slip-pdf'
+import { orderItemFactorSql, orderItemUnitSql } from '@/lib/orders/unit-conversion'
 
 async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
   const row = await queryOne(
@@ -17,6 +18,8 @@ async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
               'quantity', oi.quantity,
               'buy_mode', oi.buy_mode,
               'buy_unit', oi.buy_unit,
+              'sell_unit', ${orderItemUnitSql()},
+              'sell_unit_factor', ${orderItemFactorSql()},
               'unit_price', oi.unit_price,
               'total_price', oi.total_price,
               'mrp', oi.mrp,

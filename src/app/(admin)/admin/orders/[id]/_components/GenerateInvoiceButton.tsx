@@ -34,7 +34,8 @@ export default function GenerateInvoiceButton({ orderId }: { orderId: string }) 
         href={`/api/orders/${orderId}/invoice`}
         target="_blank"
         rel="noopener noreferrer"
-        className="px-4 py-2 text-sm font-semibold rounded-full bg-accent-100 text-accent-800 hover:bg-accent-200 transition-colors inline-flex items-center gap-1.5"
+        className="w-full sm:w-48 h-9 px-3 text-sm font-semibold rounded-full bg-accent-100 text-accent-800 hover:bg-accent-200 transition-colors inline-flex items-center justify-center gap-1.5"
+        title={`Invoice ${invoiceNumber}`}
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -44,18 +45,18 @@ export default function GenerateInvoiceButton({ orderId }: { orderId: string }) 
             d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
           />
         </svg>
-        Invoice {invoiceNumber}
+        Invoice
       </a>
     )
   }
 
   return (
     <RequireWrite scope="orders:write">
-      <div className="inline-flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         <button
           onClick={handleGenerate}
           disabled={loading}
-          className="px-4 py-2 text-sm font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors inline-flex items-center gap-1.5 disabled:opacity-50"
+          className="w-full sm:w-48 h-9 px-3 text-sm font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path

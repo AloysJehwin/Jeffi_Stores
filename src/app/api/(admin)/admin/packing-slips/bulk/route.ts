@@ -3,6 +3,7 @@ import { queryMany } from '@/lib/shared/db'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { generateBulkPackingSlipPDF, loadStoreSettings, PackingSlipOrder } from '@/lib/documents/packing-slip-pdf'
+import { orderItemFactorSql, orderItemUnitSql } from '@/lib/orders/unit-conversion'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -31,6 +32,8 @@ export async function POST(request: NextRequest) {
                 'quantity', oi.quantity,
                 'buy_mode', oi.buy_mode,
                 'buy_unit', oi.buy_unit,
+                'sell_unit', ${orderItemUnitSql()},
+                'sell_unit_factor', ${orderItemFactorSql()},
                 'unit_price', oi.unit_price,
                 'total_price', oi.total_price,
                 'mrp', oi.mrp,

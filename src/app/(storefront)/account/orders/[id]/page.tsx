@@ -1,13 +1,13 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { use, useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useToast } from '@/contexts/ToastContext'
-import { useAccountNavItems } from '@/components/visitor/AccountSidebar'
+import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
@@ -215,10 +215,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     orderAutoCancelMinutes,
     identity: storeIdentity,
   } = useStoreConfig()
-  const avatarUrl = user?.avatarUrl ?? null
   const router = useRouter()
-  const pathname = usePathname()
-  const navItems = useAccountNavItems()
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -545,7 +542,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             setIsPayingNow(false)
           } catch (err: any) {
             showToast(
-              err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.',
+              err?.message ||
+                'Payment received but verification failed. Please contact support — your payment is safe.',
               'error'
             )
             setIsPayingNow(false)
@@ -785,60 +783,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       })
     })()
 
-  const MobileAccountHeader = () => (
-    <>
-      <div className="lg:hidden bg-accent-500 pt-8 pb-10 px-4">
-        <h1 className="text-lg font-semibold text-white/80 mb-4">My Account</h1>
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-white/20 flex items-center justify-center text-2xl font-bold text-white">
-                {user?.firstName?.[0]?.toUpperCase() || 'U'}
-              </div>
-            )}
-          </div>
-          <div>
-            <p className="text-xl font-bold text-white">
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="text-sm text-white/70 mt-0.5">{user?.email}</p>
-          </div>
-        </div>
-      </div>
-      <div className="lg:hidden relative z-10 mx-4 -mt-8 mb-4">
-        <div className="bg-surface-elevated rounded-xl shadow-md border border-border-default overflow-hidden">
-          <div className="flex">
-            {navItems.map(item => {
-              const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href)
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs font-medium transition-colors border-b-2 ${
-                    isActive
-                      ? 'text-accent-600 border-accent-500 dark:text-accent-400'
-                      : 'text-foreground-muted border-transparent'
-                  }`}
-                >
-                  <span className={isActive ? 'text-accent-500' : 'text-foreground-muted'}>{item.icon}</span>
-                  <span className="leading-tight text-center" style={{ fontSize: '10px' }}>
-                    {item.label}
-                  </span>
-                </Link>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-    </>
-  )
-
   if (error || !order) {
     return (
       <div className="bg-surface min-h-screen">
-        <MobileAccountHeader />
+        <AccountMobileHeader />
         <div className="container mx-auto px-4">
           <div className="py-4">
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
@@ -860,7 +808,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <>
       <div className="bg-surface min-h-screen">
-        <MobileAccountHeader />
+        <AccountMobileHeader />
         <div className="container mx-auto px-4 pb-8">
           <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
             {/* Order Header */}
@@ -906,17 +854,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           ? 'Out for Delivery'
                           : order.status === 'granted'
                             ? 'Access granted'
-                          : order.status === 'return_requested'
-                            ? 'Return Requested'
-                            : order.status === 'return_approved'
-                              ? 'Return Approved'
-                              : order.status === 'return_received'
-                                ? 'Return Received'
-                                : order.status === 'return_rejected'
-                                  ? 'Return Rejected'
-                                  : order.status === 'returned'
-                                    ? 'Returned'
-                                    : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                            : order.status === 'return_requested'
+                              ? 'Return Requested'
+                              : order.status === 'return_approved'
+                                ? 'Return Approved'
+                                : order.status === 'return_received'
+                                  ? 'Return Received'
+                                  : order.status === 'return_rejected'
+                                    ? 'Return Rejected'
+                                    : order.status === 'returned'
+                                      ? 'Returned'
+                                      : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                   </span>
                   <span
                     className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium capitalize ${getPaymentStatusColor(order.paymentStatus)}`}
@@ -930,7 +878,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     (order.invoiceNumber && !order.originalOrderId)) && (
                     <span className="hidden sm:inline-block w-px h-5 bg-border-default mx-1" aria-hidden />
                   )}
-                  {(CANCELLABLE_STATUSES.includes(order.status) && !order.hasDigital) && (
+                  {CANCELLABLE_STATUSES.includes(order.status) && !order.hasDigital && (
                     <button
                       type="button"
                       onClick={() => setShowCancelConfirm(true)}
