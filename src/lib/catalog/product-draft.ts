@@ -4,6 +4,14 @@ import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/catalog/sellin
 import { normalizeDigitalProduct } from '@/lib/catalog/digital-units'
 import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
 import { cycleLimitsError, normalizeCycleCount } from '@/lib/subscriptions/intervals'
+import { generateVariantSku } from '@/lib/catalog/sku'
+import {
+  duplicateSkuError,
+  friendlyProductDbError,
+  ProductValidationError,
+  skuConflictError,
+  uniqueProductSlug,
+} from '@/lib/catalog/product-validation'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -259,7 +267,7 @@ interface ProductDraft {
  * then deletes the draft. Called from both the API route and the
  * server action so the publish logic is never duplicated or bypassed.
  */
-export async function publishProductDraft(productId: string): Promise<void> {
+export async function publishProductDraft(productId: string, opts: { activate?: boolean } = {}): Promise<void> {
   const draft = await queryOne<ProductDraft>(`SELECT * FROM product_drafts WHERE product_id = $1`, [productId])
   if (!draft) throw new Error('Draft not found')
 
@@ -270,8 +278,8 @@ export async function publishProductDraft(productId: string): Promise<void> {
 
   // Capture the LIVE tracking flags before publishing so we can detect a toggle
   // from ON→OFF and clean up the now-orphaned batch/serial/shelf records below.
-  const liveFlags = await queryOne<{ perishable: boolean; serialized: boolean; has_variants: boolean }>(
-    `SELECT perishable, serialized, has_variants FROM products WHERE id = $1`,
+  const liveFlags = await queryOne<{ perishable: boolean; serialized: boolean; has_variants: boolean; sku: string }>(
+    `SELECT perishable, serialized, has_variants, sku FROM products WHERE id = $1`,
     [productId]
   )
   // Leaf structure BEFORE publish; compared with the post-upsert state below.
@@ -308,10 +316,17 @@ export async function publishProductDraft(productId: string): Promise<void> {
   // If draft variants/sub_variants are empty, fall back to live data — UNLESS the
   // product just became simple (then there are no intended variants; keep it empty
   // so the upsert doesn't re-persist/re-activate the old ones).
+  // A cleared SKU keeps the live one; a named variant without a SKU gets the generated one
+  // (the upsert below skips SKU-less variants, which would silently drop them).
+  const productSku = String(fields.sku ?? '').trim() || liveFlags?.sku || ''
+  const fillSku = (v: any) =>
+    !String(v?.sku ?? '').trim() && String(v?.variant_name ?? '').trim() && productSku
+      ? { ...v, sku: generateVariantSku(productSku, String(v.variant_name)) }
+      : v
   const variants = turnedOffVariants
     ? []
     : Array.isArray(draft.variants) && draft.variants.length > 0
-      ? draft.variants
+      ? draft.variants.map(fillSku)
       : await queryMany(`SELECT * FROM product_variants WHERE product_id = $1`, [productId])
 
   const subVariants =
@@ -329,12 +344,28 @@ export async function publishProductDraft(productId: string): Promise<void> {
   // under the current unit would be reinterpreted. Runs before the write tx.
   await assertStagedUnitChangesAllowed(productId, units as any[])
 
+  // SKU / slug clashes with other products surface as clear messages before anything is written.
+  // (The variant upsert is ON CONFLICT (sku) — an unchecked clash would rewrite another product's row.)
+  const draftVariantSkus = (variants as any[])
+    .filter(v => v?.sku && v.is_active !== false)
+    .map(v => ({ label: String(v.variant_name || v.sku), sku: String(v.sku) }))
+  const dupErr = duplicateSkuError(draftVariantSkus)
+  if (dupErr) throw new ProductValidationError(dupErr)
+  const subSkus = (subVariants as any[]).filter(sv => sv?.sku && !sv._cleared).map(sv => String(sv.sku))
+  const conflict = await skuConflictError(
+    { query },
+    { productSku, variantSkus: [...draftVariantSkus.map(v => v.sku), ...subSkus], productId }
+  )
+  if (conflict) throw new ProductValidationError(conflict)
+  // Only a staged slug is de-duplicated; no slug in the draft keeps the live one.
+  const slug = fields.slug ? await uniqueProductSlug({ query }, String(fields.slug), productId) : ''
+
   await withTransaction(async client => {
     await client.query(
       `UPDATE products SET
          category_id              = NULLIF(($2::jsonb)->>'category_id', '')::uuid,
          brand_id                 = NULLIF(($2::jsonb)->>'brand_id', '')::uuid,
-         sku                      = ($2::jsonb)->>'sku',
+         sku                      = COALESCE(NULLIF(($2::jsonb)->>'sku', ''), sku),
          name                     = ($2::jsonb)->>'name',
          slug                     = COALESCE(NULLIF(($2::jsonb)->>'slug', ''), slug),
          description              = ($2::jsonb)->>'description',
@@ -435,6 +466,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          serialized               = (($2::jsonb)->>'serialized')::boolean,
          grade                    = ($2::jsonb)->>'grade',
          specifications           = ($2::jsonb)->'specifications',
+         is_active                = CASE WHEN $3::boolean OR is_draft THEN true ELSE is_active END,
          is_draft                 = false,
          updated_at               = NOW()
        WHERE id = $1`,
@@ -442,6 +474,8 @@ export async function publishProductDraft(productId: string): Promise<void> {
         productId,
         JSON.stringify({
           ...fields,
+          sku: productSku || fields.sku,
+          slug: slug || fields.slug,
           // Variant products price subscriptions per variant / sub-variant.
           subscription_price: newHasVariants ? null : normalizeSubscriptionPrice(fields.subscription_price),
           subscription_prices: newHasVariants
@@ -460,6 +494,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
             stock_status: 'In Stock',
           }),
         }),
+        opts.activate === true,
       ]
     )
 
@@ -1409,7 +1444,11 @@ export async function publishProductDraft(productId: string): Promise<void> {
             `SELECT variant_id, sub_variant_id, SUM(q) AS total FROM (${s}) src${i} GROUP BY variant_id, sub_variant_id`
         )
         .join(' UNION ALL ')
-      const perGrain = await client.query<{ variant_id: string | null; sub_variant_id: string | null; total: string }>(
+      const perGrain = await client.query<{
+        variant_id: string | null
+        sub_variant_id: string | null
+        total: string
+      }>(
         `SELECT variant_id, sub_variant_id, MAX(total)::text AS total
          FROM (${unioned}) u GROUP BY variant_id, sub_variant_id`,
         [productId]
@@ -1515,5 +1554,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
     await recomputeStockStatusForProduct(client, productId)
 
     await client.query(`DELETE FROM product_drafts WHERE product_id = $1`, [productId])
+  }).catch(err => {
+    const friendly = friendlyProductDbError(err)
+    if (friendly) throw new ProductValidationError(friendly, { cause: err })
+    throw err
   })
 }

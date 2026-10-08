@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { Star, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
@@ -37,6 +37,8 @@ import { generateSerialNumber, generateLotNumber, generateSerialRun } from '@/li
 import { applyDiscount } from '@/lib/catalog/pricing'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useToast } from '@/contexts/ToastContext'
+import { gstError, priceErrors, publishShippingError } from '@/lib/catalog/product-validation'
 
 interface Category {
   id: string
@@ -124,7 +126,7 @@ type BsEntry = {
 interface ProductFormProps {
   categories: Category[]
   brands: Brand[]
-  action: (formData: FormData) => Promise<{ error?: string } | void>
+  action: (formData: FormData) => Promise<{ error?: string; details?: string[]; ok?: true; redirectTo?: string } | void>
   product?: any
   productId?: string
   backUrl?: string
@@ -389,7 +391,33 @@ export default function ProductForm({
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [errorDetails, setErrorDetails] = useState<string[]>([])
   const topErrorRef = useRef<HTMLDivElement | null>(null)
+  const router = useRouter()
+  const { showToast } = useToast()
+  // Unsaved-changes guard: set on edit, cleared by a successful save / autosave.
+  const dirtyRef = useRef(false)
+  const savedRef = useRef(false)
+  const [autosaveError, setAutosaveError] = useState<string | null>(null)
+  const autosaveToastShownRef = useRef(false)
+
+  // Every save-blocking failure: banner (scrolled into view, with the field list) + toast.
+  function reportError(msg: string, details: string[] = []) {
+    setError(msg)
+    setErrorDetails(details.length > 1 ? details : [])
+    showToast(msg, 'error')
+    setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
+  }
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!dirtyRef.current || savedRef.current) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [])
   const [productName, setProductName] = useState<string>(product?.name || '')
   const [description, setDescription] = useState<string>(product?.description || '')
   const [brandId, setBrandId] = useState<string>(product?.brand_id || '')
@@ -684,6 +712,7 @@ export default function ProductForm({
   const [hasDraft, setHasDraft] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const initialSnapshotRef = useRef<string | null>(null)
   const [serverSaveStatus, setServerSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const [variants, setVariants] = useState<VariantRow[]>(() => {
@@ -860,7 +889,13 @@ export default function ProductForm({
         bsEntries,
         weightGrams,
       }
-      localStorage.setItem(draftKey, JSON.stringify(snapshot))
+      const json = JSON.stringify(snapshot)
+      if (initialSnapshotRef.current == null) initialSnapshotRef.current = json
+      else if (json !== initialSnapshotRef.current) {
+        dirtyRef.current = true
+        savedRef.current = false
+      }
+      localStorage.setItem(draftKey, json)
       setHasDraft(true)
     }, 1000)
     return () => {
@@ -893,6 +928,16 @@ export default function ProductForm({
   const variantsRef = useRef(variants)
   variantsRef.current = variants // always sync — no useEffect delay
 
+  function failAutosave(msg: string) {
+    setServerSaveStatus('error')
+    setAutosaveError(msg)
+    // One toast per failure streak; the inline status keeps showing it.
+    if (!autosaveToastShownRef.current) {
+      showToast(`Autosave failed: ${msg}. Your edits are not saved yet.`, 'error')
+      autosaveToastShownRef.current = true
+    }
+  }
+
   async function serverSaveNow() {
     if (!isDraft || !productId) return
     const form = formRef.current
@@ -903,6 +948,7 @@ export default function ProductForm({
     }
     serverSaveInFlight.current = true
     setServerSaveStatus('saving')
+    let saved = false
     const formData = new FormData(form)
     const fields: Record<string, unknown> = {}
     for (const [k, v] of formData.entries()) {
@@ -1023,16 +1069,27 @@ export default function ProductForm({
             }),
         }),
       })
-      setServerSaveStatus(r.ok ? 'saved' : 'error')
-    } catch {
-      setServerSaveStatus('error')
+      if (r.ok) {
+        saved = true
+        setServerSaveStatus('saved')
+        setAutosaveError(null)
+        autosaveToastShownRef.current = false
+        if (!serverSavePending.current) dirtyRef.current = false
+      } else {
+        const j = await r.json().catch(() => ({}))
+        const ref = r.status >= 500 ? r.headers.get('x-trace-id') : null
+        failAutosave(`${j?.error || `HTTP ${r.status}`}${ref ? ` (ref ${ref})` : ''}`)
+      }
+    } catch (e: any) {
+      failAutosave(e?.message || 'network error')
     }
     serverSaveInFlight.current = false
     if (serverSavePending.current) {
       serverSavePending.current = false
       serverSaveNow()
     } else {
-      setTimeout(() => setServerSaveStatus('idle'), 2000)
+      // A failure stays visible until the next successful autosave.
+      if (saved) setTimeout(() => setServerSaveStatus(cur => (cur === 'saved' ? 'idle' : cur)), 2000)
     }
   }
 
@@ -1880,11 +1937,17 @@ export default function ProductForm({
         package_type: draft.package_type || null,
       }),
     })
-    if (res.ok) {
-      const data = await res.json()
-      setSubVariantsMap(m => ({ ...m, [variantId]: [...(m[variantId] || []), data.sub_variant] }))
-      setSubVariantDrafts(m => ({ ...m, [variantId]: emptySubVariantDraft() }))
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      const ref = res.status >= 500 ? res.headers.get('x-trace-id') : null
+      const msg = `Failed to add sub-variant: ${j?.error || res.status}${ref ? ` (ref ${ref})` : ''}`
+      setVariantImageError(msg)
+      showToast(msg, 'error')
+      return
     }
+    const data = await res.json()
+    setSubVariantsMap(m => ({ ...m, [variantId]: [...(m[variantId] || []), data.sub_variant] }))
+    setSubVariantDrafts(m => ({ ...m, [variantId]: emptySubVariantDraft() }))
   }
 
   async function deleteSubVariant(variantId: string, subId: string) {
@@ -1900,7 +1963,9 @@ export default function ProductForm({
       body: JSON.stringify({ id: subId }),
     })
     if (!res.ok) {
-      setVariantImageError(`Failed to delete sub-variant: ${(await res.json().catch(() => ({}))).error || res.status}`)
+      const msg = `Failed to delete sub-variant: ${(await res.json().catch(() => ({}))).error || res.status}`
+      setVariantImageError(msg)
+      showToast(msg, 'error')
       return
     }
     setSubVariantsMap(m => ({ ...m, [variantId]: (m[variantId] || []).filter((sv: any) => sv.id !== subId) }))
@@ -1956,7 +2021,9 @@ export default function ProductForm({
       body: JSON.stringify(payload),
     })
     if (!res.ok) {
-      setVariantImageError(`Failed to save sub-variant: ${(await res.json().catch(() => ({}))).error || res.status}`)
+      const msg = `Failed to save sub-variant: ${(await res.json().catch(() => ({}))).error || res.status}`
+      setVariantImageError(msg)
+      showToast(msg, 'error')
       return
     }
     const updated = await res.json().catch(() => ({}))
@@ -1998,11 +2065,11 @@ export default function ProductForm({
 
     // Clear any prior error up-front; validation below sets a fresh one if needed.
     setError(null)
+    setErrorDetails([])
     setBootstrapError(null)
 
     if (isSubscription && (cyclesError || subscriptionPricesError)) {
-      setError(cyclesError || subscriptionPricesError)
-      setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
+      reportError(`Subscription: ${cyclesError || subscriptionPricesError}`)
       return
     }
 
@@ -2012,8 +2079,7 @@ export default function ProductForm({
       // looks like "nothing happened" because the button gives no feedback.
       const failBootstrap = (msg: string) => {
         setBootstrapError(msg)
-        setError(msg)
-        setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
+        reportError(`Assign existing stock: ${msg}`)
       }
       const seenSerials = new Map<string, string>() // serial -> first grain label
       for (const g of bsGrains) {
@@ -2058,83 +2124,67 @@ export default function ProductForm({
       }
     }
 
-    // Weight & packaging validation — enforced on publish only, so a partial
-    // draft can still be saved. Simple products validate the product-level weight
-    // and (for box package types) the stored dims; variant products validate each.
-    if (isPublishIntent && !isDigital) {
-      const failValidation = (msg: string) => {
-        setError(msg)
-        setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
-      }
-      const blank = (v: string) => v == null || String(v).trim() === ''
+    // Prices: always sane (non-negative, selling ≤ MRP); a price is required only to publish.
+    {
+      const errs: string[] = []
+      const gstErr = gstError(String(gstRate))
+      if (gstErr) errs.push(gstErr)
       if (!hasVariants) {
-        if (blank(weightGrams) || !(parseFloat(weightGrams) > 0)) {
-          failValidation('Shipping weight is required and must be greater than 0.')
-          setIsSubmitting(false)
-          return
-        }
-        if (STORED_DIMS_TYPES.includes(productPackageType)) {
-          const l = (formRef.current?.elements.namedItem('length_cm') as HTMLInputElement | null)?.value
-          const b = (formRef.current?.elements.namedItem('breadth_cm') as HTMLInputElement | null)?.value
-          const h = (formRef.current?.elements.namedItem('height_cm') as HTMLInputElement | null)?.value
-          if (blank(l ?? '') || blank(b ?? '') || blank(h ?? '')) {
-            failValidation('Dimensions required for this package type')
-            setIsSubmitting(false)
-            return
-          }
-        }
+        errs.push(
+          ...priceErrors(
+            'Pricing',
+            { price: basePrice, mrp, priceExGst: salePrice, mrpExGst, cost: costPrice, discountPct },
+            { requirePrice: isPublishIntent }
+          )
+        )
       } else {
-        const filled = (...vals: any[]) => {
-          const hit = vals.find(x => !blank(x))
-          return hit == null ? '' : String(hit)
-        }
+        errs.push(...priceErrors('Pricing', { cost: costPrice, discountPct }))
         for (const v of activeVariants) {
-          const vLabel = v.variant_name || v.sku || ''
-          if (v.sub_variant_type_on) {
-            const svs = subVariantsMap[v.id || ''] || []
-            if (svs.length === 0) {
-              failValidation(
-                `Variant "${vLabel}" has sub-variants enabled but none added. Add a sub-variant or turn off "Has sub-variants".`
-              )
-              setIsSubmitting(false)
-              return
-            }
-            for (const sv of svs) {
-              if (!(parseFloat(filled(sv.weight_grams, v.weight_grams, weightGrams)) > 0)) {
-                failValidation(
-                  `Shipping weight is required for sub-variant "${sv.sub_variant_name}" of "${vLabel}" and must be greater than 0.`
-                )
-                setIsSubmitting(false)
-                return
-              }
-              const pt = filled(sv.package_type, v.package_type, productPackageType) || 'flat_poly_auto'
-              if (
-                STORED_DIMS_TYPES.includes(pt) &&
-                (blank(filled(sv.length_cm, v.length_cm)) ||
-                  blank(filled(sv.breadth_cm, v.breadth_cm)) ||
-                  blank(filled(sv.height_cm, v.height_cm)))
-              ) {
-                failValidation(
-                  `Dimensions required for this package type (sub-variant "${sv.sub_variant_name}" of "${vLabel}")`
-                )
-                setIsSubmitting(false)
-                return
-              }
-            }
+          if (!v.variant_name?.trim()) {
+            if (isPublishIntent) errs.push('Variants: every variant needs a name.')
             continue
           }
-          if (blank(v.weight_grams) || !(parseFloat(v.weight_grams) > 0)) {
-            failValidation(`Shipping weight is required for variant "${vLabel}" and must be greater than 0.`)
-            setIsSubmitting(false)
-            return
-          }
-          const pt = v.package_type || 'flat_poly_auto'
-          if (STORED_DIMS_TYPES.includes(pt) && (blank(v.length_cm) || blank(v.breadth_cm) || blank(v.height_cm))) {
-            failValidation(`Dimensions required for this package type (variant "${vLabel}")`)
-            setIsSubmitting(false)
-            return
-          }
+          errs.push(
+            ...priceErrors(
+              `Variant "${v.variant_name}"`,
+              { price: v.price, mrp: v.mrp, priceExGst: v.price_ex_gst, mrpExGst: v.mrp_ex_gst },
+              { requirePrice: isPublishIntent && !v.sub_variant_type_on }
+            )
+          )
         }
+        if (isPublishIntent && activeVariants.length === 0)
+          errs.push('Variants: add at least one, or turn off variants.')
+      }
+      if (errs.length > 0) {
+        reportError(errs[0], [...new Set(errs)])
+        return
+      }
+    }
+
+    // Weight & packaging — publish only, same shared rules as the server actions and publish route.
+    if (isPublishIntent && !isDigital) {
+      const dim = (n: string) => (formRef.current?.elements.namedItem(n) as HTMLInputElement | null)?.value ?? ''
+      const shipErr = publishShippingError({
+        isDigital: false,
+        hasVariants,
+        product: {
+          weight_grams: weightGrams,
+          package_type: productPackageType,
+          length_cm: dim('length_cm'),
+          breadth_cm: dim('breadth_cm'),
+          height_cm: dim('height_cm'),
+        },
+        variants: activeVariants.map(v => ({
+          ...v,
+          label: v.variant_name || v.sku || '',
+          subVariants: v.sub_variant_type_on
+            ? (subVariantsMap[v.id || ''] || []).map((sv: any) => ({ ...sv, label: sv.sub_variant_name }))
+            : null,
+        })),
+      })
+      if (shipErr) {
+        reportError(`Shipping: ${shipErr}`)
+        return
       }
     }
 
@@ -2164,7 +2214,7 @@ export default function ProductForm({
           const body = await res.json().catch(() => ({}))
           // Server failures carry a trace ref: quoting it finds the request in Coroot (Logs/Tracing).
           const ref = res.status >= 500 ? res.headers.get('x-trace-id') : null
-          setError(`${body?.error || `Failed to upload ${file.name}`}${ref ? ` (ref ${ref})` : ''}`)
+          reportError(`Images: ${body?.error || `Failed to upload ${file.name}`}${ref ? ` (ref ${ref})` : ''}`)
           setIsSubmitting(false)
           return
         }
@@ -2297,83 +2347,90 @@ export default function ProductForm({
       // an explicit Save-as-Draft/Publish does not wipe what autosave persisted.
       formData.set('bs_entries_json', JSON.stringify(bsEntries))
 
+      // The action returns { ok, redirectTo } instead of redirecting, so stock assignment runs
+      // reliably after a successful publish and before we navigate away.
+      formData.set('_no_redirect', '1')
       const result = await action(formData)
       if (result && typeof result === 'object' && 'error' in result && result.error) {
-        setError(result.error)
+        reportError(result.error, result.details || [])
         setIsSubmitting(false)
-        window.scrollTo({ top: 0, behavior: 'smooth' })
         return
       }
       localStorage.removeItem(draftKey)
       pendingPopupVariantIdRef.current = null
+      savedRef.current = true
+      dirtyRef.current = false
+      initialSnapshotRef.current = null
+      // Only register serials/batches on publish — a draft save keeps them in the
+      // draft snapshot and defers actual stock creation until publish.
+      if (showBootstrap && productId && isPublishIntent) await assignBootstrapStock(productId)
+      showToast(isPublishIntent ? 'Product published' : 'Draft saved', 'success')
+      const dest = result && typeof result === 'object' && 'redirectTo' in result ? result.redirectTo : undefined
+      if (dest) router.push(dest)
+      else setIsSubmitting(false)
     } catch (err: any) {
       if (err?.digest?.startsWith('NEXT_REDIRECT')) {
-        // Only register serials/batches on publish — a draft save keeps them in the
-        // draft snapshot and defers actual stock creation until publish.
-        if (showBootstrap && productId && isPublishIntent) {
-          try {
-            const assignments = bsGrains
-              .filter(g => {
-                const key = `${g.variant_id || ''}:${g.sub_variant_id || ''}`
-                return bsEntries[key]?.selected !== false
-              })
-              .map(g => {
-                const key = `${g.variant_id || ''}:${g.sub_variant_id || ''}`
-                const entry = bsEntries[key]
-                const assignQty = entry?.assignQty ?? g.qty
-                return {
-                  variant_id: g.variant_id,
-                  sub_variant_id: g.sub_variant_id,
-                  quantity: assignQty,
-                  lot_number: entry?.lot || null,
-                  manufacture_date: entry?.mfg || null,
-                  expiry_date: entry?.expiry || null,
-                  location_id: entry?.location || null,
-                  ...(serialized
-                    ? { serial_numbers: (entry?.serials || []).filter(Boolean).slice(0, bsSerialCount(g, assignQty)) }
-                    : {}),
-                }
-              })
-            const bsRes = await fetch(`/api/admin/products/${productId}/bootstrap-stock`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ assignments }),
-            })
-            if (!bsRes.ok) {
-              // Publish already succeeded (we're mid-redirect), but stock assignment
-              // failed (e.g. a serial already exists in stock). Stash the message so
-              // the product page can surface it after navigation instead of losing it.
-              const j = await bsRes.json().catch(() => ({}))
-              try {
-                sessionStorage.setItem(
-                  'bootstrap_stock_error',
-                  j?.error || 'Failed to assign existing stock (serial/lot conflict).'
-                )
-              } catch {
-                /* ignore */
-              }
-            } else {
-              const j = await bsRes.json().catch(() => ({}))
-              const skipped: string[] = Array.isArray(j?.skipped) ? j.skipped : []
-              if (skipped.length > 0) {
-                try {
-                  sessionStorage.setItem(
-                    'bootstrap_stock_error',
-                    `Existing stock was not assigned for ${skipped.length} item(s): after this publish they hold stock at their variants/sub-variants instead. Receive that stock at the new level.`
-                  )
-                } catch {
-                  /* ignore */
-                }
-              }
-            }
-          } catch {
-            // network error assigning stock — product was still saved
-          }
-        }
+        savedRef.current = true
         throw err
       }
-      setError(err?.message || 'Failed to save product. Please try again.')
+      console.error('[product-form] save failed', err)
+      reportError(err?.message || 'Failed to save product. Please try again.')
       setIsSubmitting(false)
+    }
+  }
+
+  // Publish succeeded; assign the captured existing stock. Failures are shown now (toast) and
+  // stashed for the product page, which surfaces them after navigation.
+  async function assignBootstrapStock(pid: string) {
+    const stash = (msg: string) => {
+      showToast(msg, 'error')
+      try {
+        sessionStorage.setItem('bootstrap_stock_error', msg)
+      } catch {
+        /* storage unavailable — the toast still shows */
+      }
+    }
+    try {
+      const assignments = bsGrains
+        .filter(g => bsEntries[`${g.variant_id || ''}:${g.sub_variant_id || ''}`]?.selected !== false)
+        .map(g => {
+          const entry = bsEntries[`${g.variant_id || ''}:${g.sub_variant_id || ''}`]
+          const assignQty = entry?.assignQty ?? g.qty
+          return {
+            variant_id: g.variant_id,
+            sub_variant_id: g.sub_variant_id,
+            quantity: assignQty,
+            lot_number: entry?.lot || null,
+            manufacture_date: entry?.mfg || null,
+            expiry_date: entry?.expiry || null,
+            location_id: entry?.location || null,
+            ...(serialized
+              ? { serial_numbers: (entry?.serials || []).filter(Boolean).slice(0, bsSerialCount(g, assignQty)) }
+              : {}),
+          }
+        })
+      const bsRes = await fetch(`/api/admin/products/${pid}/bootstrap-stock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignments }),
+      })
+      const j = await bsRes.json().catch(() => ({}))
+      if (!bsRes.ok) {
+        const ref = bsRes.status >= 500 ? bsRes.headers.get('x-trace-id') : null
+        stash(
+          `Product published, but existing stock was not assigned: ${j?.error || 'serial/lot conflict'}${ref ? ` (ref ${ref})` : ''}`
+        )
+        return
+      }
+      const skipped: string[] = Array.isArray(j?.skipped) ? j.skipped : []
+      if (skipped.length > 0) {
+        stash(
+          `Existing stock was not assigned for ${skipped.length} item(s): after this publish they hold stock at their variants/sub-variants instead. Receive that stock at the new level.`
+        )
+      }
+    } catch (e: any) {
+      console.error('[product-form] bootstrap stock failed', e)
+      stash(`Product published, but existing stock could not be assigned: ${e?.message || 'network error'}`)
     }
   }
 
@@ -2451,6 +2508,10 @@ export default function ProductForm({
       <form
         ref={formRef}
         onSubmit={handleSubmit}
+        onInput={() => {
+          dirtyRef.current = true
+          savedRef.current = false
+        }}
         onChange={
           isDraft
             ? () => {
@@ -2490,7 +2551,14 @@ export default function ProductForm({
               ref={topErrorRef}
               className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300"
             >
-              {error}
+              <p className="font-medium">{error}</p>
+              {errorDetails.length > 1 && (
+                <ul className="mt-2 list-disc pl-5 text-sm space-y-0.5">
+                  {errorDetails.map(d => (
+                    <li key={d}>{d}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
@@ -3241,7 +3309,12 @@ export default function ProductForm({
                 <div className="p-4 space-y-4 border-t border-border-default">
                   <div className="flex flex-wrap gap-6">
                     {digitalProductsEnabled && (
-                      <Toggle id="is_digital" checked={isDigital} onChange={handleDigitalToggle} label="Digital Product" />
+                      <Toggle
+                        id="is_digital"
+                        checked={isDigital}
+                        onChange={handleDigitalToggle}
+                        label="Digital Product"
+                      />
                     )}
                     <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
                     {subscriptionsEnabled && (
@@ -3291,8 +3364,8 @@ export default function ProductForm({
                         <DigitalFilesPanel productId={productId} />
                       ) : (
                         <p className="sm:col-span-2 text-xs text-foreground-muted">
-                          Save the product first, then upload files in the Digital Files panel. Buyers open them in
-                          the vault.
+                          Save the product first, then upload files in the Digital Files panel. Buyers open them in the
+                          vault.
                         </p>
                       )}
                     </div>
@@ -3403,8 +3476,13 @@ export default function ProductForm({
                                       const effective = raw.trim() !== '' ? raw : item.subscriptionPrice
                                       const err = subscriptionPriceError(raw)
                                       const hint = err ? null : subscriptionPriceHint(item.oneTimePrice, effective)
-                                      const perMonth = err || !isSubscriptionInterval(o.value) ? null : monthlyEquivalentLabel(o.value, effective)
-                                      const fallback = item.subscriptionPrice || (item.oneTimePrice != null ? item.oneTimePrice.toFixed(2) : '')
+                                      const perMonth =
+                                        err || !isSubscriptionInterval(o.value)
+                                          ? null
+                                          : monthlyEquivalentLabel(o.value, effective)
+                                      const fallback =
+                                        item.subscriptionPrice ||
+                                        (item.oneTimePrice != null ? item.oneTimePrice.toFixed(2) : '')
                                       return (
                                         <td key={o.value} className="px-3 py-2">
                                           <input
@@ -3446,7 +3524,9 @@ export default function ProductForm({
                             </table>
                           </div>
                         )}
-                        {subscriptionPricesError && <p className="text-xs text-red-600 mt-1">{subscriptionPricesError}</p>}
+                        {subscriptionPricesError && (
+                          <p className="text-xs text-red-600 mt-1">{subscriptionPricesError}</p>
+                        )}
                         <p className="text-xs text-foreground-muted mt-1">
                           GST-inclusive, like the one-time price. Leave blank to charge the one-time price each cycle.
                           Max ₹{MAX_CYCLE_AMOUNT_INR.toLocaleString('en-IN')} per cycle.
@@ -5075,7 +5155,11 @@ export default function ProductForm({
                     : 'text-red-500'
               }`}
             >
-              {serverSaveStatus === 'saving' ? 'Saving…' : serverSaveStatus === 'saved' ? 'Saved' : 'Save failed'}
+              {serverSaveStatus === 'saving'
+                ? 'Saving…'
+                : serverSaveStatus === 'saved'
+                  ? 'Saved'
+                  : `Autosave failed${autosaveError ? `: ${autosaveError}` : ''}`}
             </span>
           )}
           <Link
@@ -5089,8 +5173,9 @@ export default function ProductForm({
               type="submit"
               name="intent"
               value="draft"
+              // Drafts may be partial: skip native required checks (the server fills placeholders).
+              formNoValidate
               disabled={isSubmitting}
-              onClick={() => setIsActive(false)}
               className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Saving...' : 'Save as Draft'}
@@ -5100,7 +5185,6 @@ export default function ProductForm({
               name="intent"
               value="publish"
               disabled={isSubmitting}
-              onClick={() => setIsActive(true)}
               className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Saving...' : product ? 'Update & Publish' : 'Save & Publish'}
@@ -5647,9 +5731,9 @@ export default function ProductForm({
                               type="submit"
                               name="intent"
                               value="draft-stay"
+                              formNoValidate
                               disabled={isSubmitting}
                               onClick={() => {
-                                setIsActive(false)
                                 pendingPopupVariantIdRef.current = variantPopupId
                               }}
                               className="shrink-0 px-3 h-control-sm bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"

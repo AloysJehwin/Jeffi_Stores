@@ -36,7 +36,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const units = await getDraftUnits(id)
-  const body = await req.json()
+  const body = await req.json().catch(() => null)
+  if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   const override = body.override === true
   const idx = units.findIndex((u: any) => u.id === unitId)
   const existing = idx >= 0 ? units[idx] : null

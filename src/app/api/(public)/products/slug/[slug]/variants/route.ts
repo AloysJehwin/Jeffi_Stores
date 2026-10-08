@@ -59,7 +59,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         ) AS product_units,
         COALESCE(p.is_digital, FALSE) AS is_digital
       FROM products p
-      WHERE p.slug = $1 AND p.is_active = true
+      WHERE p.slug = $1 AND p.is_active = true AND p.is_draft = false
     `,
       [slug]
     )

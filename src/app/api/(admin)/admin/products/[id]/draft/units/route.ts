@@ -109,7 +109,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   const variantId = req.nextUrl.searchParams.get('variant_id')
   const subVariantId = req.nextUrl.searchParams.get('sub_variant_id')
 
-  const body = await req.json()
+  const body = await req.json().catch(() => null)
+  if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   const override = body.override === true
 
   // Block a base-unit change when stock recorded under the current unit would be
@@ -169,7 +170,9 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const { unitId } = await req.json()
+  const delBody = await req.json().catch(() => null)
+  if (!delBody?.unitId) return NextResponse.json({ error: 'unitId required' }, { status: 400 })
+  const { unitId } = delBody
   const all = await getAllDraftUnits(id)
   const updated = all.filter((u: any) => u.id !== unitId)
 

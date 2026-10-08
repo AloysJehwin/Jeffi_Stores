@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
 
     const conditions: string[] = [
       'p.is_active = true',
+      'p.is_draft = false',
       '(p.launch_date IS NULL OR p.launch_date <= CURRENT_DATE)',
       '(p.discontinue_date IS NULL OR p.discontinue_date > CURRENT_DATE)',
     ]

@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
-import { uploadVariantImage, getS3Url, currentBucket } from '@/lib/shared/s3'
+import { uploadVariantImage, getS3Url, currentBucket, UploadValidationError } from '@/lib/shared/s3'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 
 // Draft-scoped variant images. Uploads go to S3 immediately (a file must physically
@@ -138,7 +138,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     await saveStage(id, [...stage, staged])
     return NextResponse.json({ image: staged })
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
+    if (err instanceof UploadValidationError) return NextResponse.json({ error: err.message }, { status: 400 })
+    console.error('[draft-variant-images] upload failed for', id, err)
+    return NextResponse.json({ error: err?.message || 'Failed to upload variant image' }, { status: 500 })
   }
 }
 
