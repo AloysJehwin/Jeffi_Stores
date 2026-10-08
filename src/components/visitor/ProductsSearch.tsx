@@ -283,7 +283,10 @@ export default function ProductsSearch({
                             </p>
                             <p className="text-xs text-accent-600 dark:text-accent-400 font-semibold">
                               {product.has_variants ? 'From ' : ''}&#x20B9;
-                              {Number(displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              {Number(displayPrice).toLocaleString('en-IN', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                             </p>
                           </div>
                         </Link>

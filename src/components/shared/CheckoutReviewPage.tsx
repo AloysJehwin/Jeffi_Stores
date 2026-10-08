@@ -825,7 +825,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     }
     if (belowMinimum) {
       showToast(
-        `Minimum order value is ₹${minOrderAmount}. Add ₹${(minOrderAmount - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.`,
+        `Minimum order value is ₹${minOrderAmount}. Add ₹${(minOrderAmount - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} more to proceed.`,
         'warning'
       )
       return
@@ -1172,7 +1172,12 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                         return (
                           <div className="mt-2">
                             <p className="text-sm text-foreground-secondary">
-                              ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ×{' '}
+                              ₹
+                              {buyNowItem.price.toLocaleString('en-IN', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}{' '}
+                              ×{' '}
                               {isFractional ? (
                                 <>
                                   {Number(Number(buyNowItem.qty).toFixed(6)).toString()}
@@ -1192,7 +1197,11 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                                 <>
                                   {' '}
                                   <span className="line-through text-foreground-muted">
-                                    ₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    ₹
+                                    {buyNowItem.mrp.toLocaleString('en-IN', {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
                                   </span>{' '}
                                   <span className="text-accent-600 dark:text-accent-400 font-semibold">
                                     {mrpDiscountPct(buyNowItem.mrp, buyNowItem.price)}% off
@@ -1201,7 +1210,11 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                               )}
                             </p>
                             <p className="text-sm font-semibold text-foreground mt-0.5">
-                              ₹{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹
+                              {lineTotal.toLocaleString('en-IN', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                             </p>
                           </div>
                         )
@@ -1320,7 +1333,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                           </div>
                           <div className="mt-2">
                             <p className="text-sm text-foreground-secondary">
-                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               {isCustomQty ? (
                                 <>
                                   {' '}
@@ -1364,7 +1377,11 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                                 <>
                                   {' '}
                                   <span className="line-through text-foreground-muted">
-                                    ₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    ₹
+                                    {Number(mrp).toLocaleString('en-IN', {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
                                   </span>{' '}
                                   <span className="text-accent-600 dark:text-accent-400 font-semibold">
                                     {discountPct}% off
@@ -1373,12 +1390,18 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                               )}
                             </p>
                             <p className="text-sm font-semibold text-foreground mt-0.5">
-                              ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹
+                              {itemTotal.toLocaleString('en-IN', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                             </p>
                           </div>
                           {gstRate > 0 && (
                             <p className="text-[11px] text-foreground-muted mt-0.5">
-                              incl. ₹{itemGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })} GST @ {gstRate}%
+                              incl. ₹
+                              {itemGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{' '}
+                              GST @ {gstRate}%
                             </p>
                           )}
                         </div>
@@ -1516,24 +1539,38 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between text-foreground-secondary">
                   <span>Subtotal{!isBuyNow ? ` (${cartCount} items)` : ''}</span>
-                  <span>₹{cartSubtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span>
+                    ₹{cartSubtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
                 </div>
                 {!isBuyNow && gstEnabled && (
                   <div className="flex justify-between text-foreground-muted text-sm">
                     <span>Incl. GST</span>
-                    <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 )}
                 {appliedCoupon && (
                   <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                     <span>Coupon ({appliedCoupon.code})</span>
-                    <span>−₹{appliedCoupon.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>
+                      −₹
+                      {appliedCoupon.discountAmount.toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
                   </div>
                 )}
                 {businessDiscountAmount > 0 && (
                   <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                     <span>Business Discount</span>
-                    <span>−₹{businessDiscountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>
+                      −₹
+                      {businessDiscountAmount.toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between text-foreground-secondary">
@@ -1549,7 +1586,8 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                       <span className="font-medium text-green-600 dark:text-green-400">Free</span>
                     ) : (
                       <span className="font-medium">
-                        ₹{shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        ₹
+                        {shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     )
                   ) : (
@@ -1573,7 +1611,9 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                 <div className="border-t border-border-default pt-3">
                   <div className="flex justify-between text-xl font-bold text-foreground">
                     <span>Total</span>
-                    <span>₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>
+                      ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                   </div>
                   {gstEnabled && <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>}
                 </div>
@@ -1630,8 +1670,11 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
               {belowMinimum && (
                 <p className="text-xs text-red-500 mb-3 text-center font-medium">
                   Minimum order ₹{minOrderAmount} — add ₹
-                  {(minOrderAmount - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to
-                  proceed.
+                  {(minOrderAmount - cartSubtotal).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{' '}
+                  more to proceed.
                 </p>
               )}
 
@@ -1790,7 +1833,8 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                             d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
                           />
                         </svg>
-                        Pay ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        Pay ₹
+                        {finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </>
                     ) : paymentMethod === 'cod' ? (
                       <>

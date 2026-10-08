@@ -18,6 +18,7 @@ import { useRouter } from 'next/navigation'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ReviewSummaryLink from './pdp/ReviewSummaryLink'
 import type { ReviewSummary } from '@/lib/shared/review-summary-types'
+import { round2 } from '@/lib/catalog/gst'
 
 interface ProductImage {
   id: string
@@ -634,7 +635,7 @@ export default function ProductDetailClient({
   // Keep the MRP on the same basis as the shown price so the discount % is honest.
   const gstRatePdp = product.gst_percentage ? Number(product.gst_percentage) : 0
   const rawMrp = product.mrp ? Number(product.mrp) : null
-  const mrp = !gstEnabled && rawMrp != null && gstRatePdp > 0 ? rawMrp / (1 + gstRatePdp / 100) : rawMrp
+  const mrp = !gstEnabled && rawMrp != null && gstRatePdp > 0 ? round2(rawMrp / (1 + gstRatePdp / 100)) : rawMrp
   const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
 
   const brand = product.brands

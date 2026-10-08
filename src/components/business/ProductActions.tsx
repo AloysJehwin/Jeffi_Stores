@@ -714,7 +714,11 @@ export default function ProductActions({
               <>
                 <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                    Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.&nbsp;
+                    {(effectivePrice * unitFactor).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                   {showPerUnit && (
                     <span className="text-sm text-foreground-secondary">
@@ -723,7 +727,11 @@ export default function ProductActions({
                   )}
                   {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
-                      Rs.&nbsp;{(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      Rs.&nbsp;
+                      {(effectiveMrp * unitFactor).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </span>
                   )}
                 </div>
@@ -732,8 +740,11 @@ export default function ProductActions({
                     <span className="text-xs text-foreground-muted">
                       (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor}{' '}
                       <UnitLabel label={baseUnitLabel ?? 'pc'} /> · Rs.&nbsp;
-                      {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })} /{' '}
-                      <UnitLabel label={baseUnitLabel ?? 'pc'} />)
+                      {effectivePrice.toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{' '}
+                      / <UnitLabel label={baseUnitLabel ?? 'pc'} />)
                     </span>
                   </div>
                 )}
@@ -744,7 +755,10 @@ export default function ProductActions({
                   </span>
                   <span className="text-base font-semibold text-foreground tabular-nums">
                     Rs.&nbsp;
-                    {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
                 {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
@@ -756,6 +770,7 @@ export default function ProductActions({
                       You save Rs.&nbsp;
                       {((effectiveMrp - effectivePrice) * unitFactor).toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
                       })}
                     </span>
                     <span className="text-xs text-foreground-muted">
@@ -769,7 +784,11 @@ export default function ProductActions({
               <>
                 <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                    Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.&nbsp;
+                    {(effectivePrice * unitFactor).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                   {showPerUnit && (
                     <span className="text-sm text-foreground-secondary">
@@ -778,7 +797,11 @@ export default function ProductActions({
                   )}
                   {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
-                      Rs.&nbsp;{(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      Rs.&nbsp;
+                      {(effectiveMrp * unitFactor).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </span>
                   )}
                 </div>
@@ -787,8 +810,11 @@ export default function ProductActions({
                     <span className="text-xs text-foreground-muted">
                       (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor}{' '}
                       <UnitLabel label={baseUnitLabel ?? 'pc'} /> · Rs.&nbsp;
-                      {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })} /{' '}
-                      <UnitLabel label={baseUnitLabel ?? 'pc'} />)
+                      {effectivePrice.toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{' '}
+                      / <UnitLabel label={baseUnitLabel ?? 'pc'} />)
                     </span>
                   </div>
                 )}
@@ -799,7 +825,10 @@ export default function ProductActions({
                   </span>
                   <span className="text-base font-semibold text-foreground tabular-nums">
                     Rs.&nbsp;
-                    {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
                 {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
@@ -811,6 +840,7 @@ export default function ProductActions({
                       You save Rs.&nbsp;
                       {((effectiveMrp - effectivePrice) * unitFactor).toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
                       })}
                     </span>
                   </div>
@@ -951,7 +981,8 @@ export default function ProductActions({
               <>
                 <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                    Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.&nbsp;
+                    {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   {showPerUnit && (
                     <span className="text-sm text-foreground-secondary">
@@ -960,20 +991,25 @@ export default function ProductActions({
                   )}
                   {effectiveMrp && effectiveMrp > effectivePrice && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
-                      Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      Rs.&nbsp;
+                      {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   )}
                 </div>
                 {showPerBasePrice && (
                   <div className="mb-1">
                     <span className="text-base font-semibold text-foreground">
-                      Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} /{' '}
-                      <UnitLabel label={effectiveUnitLabel} />
+                      Rs.&nbsp;
+                      {(effectivePrice * unitFactor).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{' '}
+                      / <UnitLabel label={effectiveUnitLabel} />
                     </span>
                     <span className="text-xs text-foreground-muted ml-2">
                       (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor}{' '}
                       <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs.&nbsp;
-                      {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                      {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                     </span>
                   </div>
                 )}
@@ -984,7 +1020,10 @@ export default function ProductActions({
                   </span>
                   <span className="text-base font-semibold text-foreground">
                     Rs.&nbsp;
-                    {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
                 {effectiveMrp && effectiveMrp > effectivePrice && (
@@ -996,6 +1035,7 @@ export default function ProductActions({
                       You save Rs.&nbsp;
                       {((effectiveMrp - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
                       })}
                     </span>
                     <span className="text-xs text-foreground-muted">
@@ -1009,7 +1049,8 @@ export default function ProductActions({
               <>
                 <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                    Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.&nbsp;
+                    {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                   {showPerUnit && (
                     <span className="text-sm text-foreground-secondary">
@@ -1018,20 +1059,25 @@ export default function ProductActions({
                   )}
                   {effectiveMrp && effectiveMrp > effectivePrice && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
-                      Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      Rs.&nbsp;
+                      {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   )}
                 </div>
                 {showPerBasePrice && (
                   <div className="mb-1">
                     <span className="text-base font-semibold text-foreground">
-                      Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} /{' '}
-                      <UnitLabel label={effectiveUnitLabel} />
+                      Rs.&nbsp;
+                      {(effectivePrice * unitFactor).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}{' '}
+                      / <UnitLabel label={effectiveUnitLabel} />
                     </span>
                     <span className="text-xs text-foreground-muted ml-2">
                       (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor}{' '}
                       <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs.&nbsp;
-                      {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                      {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                     </span>
                   </div>
                 )}
@@ -1042,7 +1088,10 @@ export default function ProductActions({
                   </span>
                   <span className="text-base font-semibold text-foreground">
                     Rs.&nbsp;
-                    {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
                 {effectiveMrp && effectiveMrp > effectivePrice && (
@@ -1054,6 +1103,7 @@ export default function ProductActions({
                       You save Rs.&nbsp;
                       {((effectiveMrp - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
                       })}
                     </span>
                   </div>

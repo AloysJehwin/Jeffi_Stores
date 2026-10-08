@@ -168,7 +168,7 @@ export async function sendPaymentFailedAdminNotification(
 
         <div class="card">
           <h3>Payment Details</h3>
-          <p><strong>Order Amount:</strong> ₹${parseFloat(String(order.total_amount)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+          <p><strong>Order Amount:</strong> ₹${parseFloat(String(order.total_amount)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
           <p><strong>Status:</strong> <span style="color: #ef4444; font-weight: bold;">FAILED</span></p>
           ${errorDescription ? `<p><strong>Reason:</strong> ${errorDescription}</p>` : ''}
           <p><strong>Time:</strong> ${new Date().toLocaleString('en-IN', { dateStyle: 'long', timeStyle: 'short' })}</p>

@@ -489,7 +489,8 @@ export default function DelhiveryTracking({
         */}
         {(tracking.shippingAmount != null || tracking.chargedWeightKg != null || tracking.billedAmount != null) &&
           (() => {
-            const inr = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+            const inr = (n: number) =>
+              `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
             const hasBilled = tracking.billedAmount != null
             const quoted = tracking.shippingAmount != null ? Number(tracking.shippingAmount) : null
 

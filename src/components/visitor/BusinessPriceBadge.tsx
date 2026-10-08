@@ -26,7 +26,7 @@ export default function BusinessPriceBadge({ price, categoryId }: Props) {
           Business {discountPct}% extra off
         </span>
         <span className="text-lg font-bold text-accent-600 dark:text-accent-400">
-          Rs. {discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          Rs. {discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
       </div>
       <span className="text-xs text-foreground-muted">Your exclusive business price</span>

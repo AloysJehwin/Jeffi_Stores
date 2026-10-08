@@ -7,6 +7,7 @@ import Link from 'next/link'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { ap } from '@/lib/shared/admin-path'
 import CopySku from '@/components/ui/CopySku'
+import { fmtQty } from '@/lib/shared/number-display'
 
 // The stored EDD is the only source: computeEdd at order time, then courier/admin updates.
 function resolveOrderEdd(o: any): string | null {
@@ -196,14 +197,22 @@ export default function OrderDetailModal({ order, onClose }: Props) {
             <div>
               <p className="text-xs text-foreground-muted">Subtotal</p>
               <p className="text-sm font-semibold text-foreground">
-                ₹{Number(o.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹
+                {Number(o.subtotal || 0).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
             </div>
             {Number(o.discount_amount) > 0 && (
               <div>
                 <p className="text-xs text-foreground-muted">Discount</p>
                 <p className="text-sm font-semibold text-red-500">
-                  −₹{Number(o.discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  −₹
+                  {Number(o.discount_amount).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </p>
               </div>
             )}
@@ -211,7 +220,11 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               <div>
                 <p className="text-xs text-foreground-muted">Business Discount</p>
                 <p className="text-sm font-semibold text-red-500">
-                  −₹{Number(o.business_discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  −₹
+                  {Number(o.business_discount_amount).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </p>
               </div>
             )}
@@ -219,14 +232,19 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               <div>
                 <p className="text-xs text-foreground-muted">Shipping</p>
                 <p className="text-sm font-semibold text-foreground">
-                  ₹{Number(o.shipping_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹
+                  {Number(o.shipping_amount).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </p>
               </div>
             )}
             <div>
               <p className="text-xs text-foreground-muted">Total</p>
               <p className="text-sm font-bold text-foreground">
-                ₹{Number(o.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹
+                {Number(o.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             </div>
           </div>
@@ -274,7 +292,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                             {item.product_sku && <CopySku sku={item.product_sku} />}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-right text-foreground">{item.quantity}</td>
+                        <td className="px-3 py-2 text-right text-foreground">{fmtQty(item.quantity)}</td>
                         <td className="px-3 py-2 text-right text-foreground">
                           ₹{Number(item.unit_price).toLocaleString('en-IN')}
                         </td>

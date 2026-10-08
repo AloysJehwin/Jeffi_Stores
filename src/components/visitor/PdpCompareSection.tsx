@@ -176,7 +176,7 @@ export default function PdpCompareSection({ currentProduct, relatedProducts }: P
                     {/* Price */}
                     <div className="mb-1">
                       <span className="text-sm font-bold text-primary-600 dark:text-primary-400">
-                        ₹{p.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        ₹{p.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       {discount > 0 && (
                         <span className="ml-1 text-[10px] text-green-600 font-semibold">{discount}% off</span>
@@ -330,7 +330,7 @@ function SwapSelect({
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug">{o.name}</p>
                 <p className="text-[10px] text-foreground-muted">
-                  ₹{o.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹{o.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
               {o.id === current.id && (

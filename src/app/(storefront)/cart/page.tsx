@@ -206,7 +206,7 @@ export default function CartPage() {
         })
         setCouponCode('')
         showToast(
-          `Coupon "${data.code}" applied — saving ₹${data.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+          `Coupon "${data.code}" applied — saving ₹${data.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
           'success'
         )
       }
@@ -371,7 +371,7 @@ export default function CartPage() {
 
                           <div className="mt-2 flex items-center gap-3 flex-wrap">
                             <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               {isCustomQty ? (
                                 <>
                                   /&thinsp;
@@ -393,14 +393,18 @@ export default function CartPage() {
                                   item.sub_variant?.price ??
                                   item.variant?.price ??
                                   item.products.base_price
-                                ).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                ).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 /pc
                               </span>
                             )}
                             {showMrp && (
                               <>
                                 <span className="text-sm text-foreground-muted line-through">
-                                  ₹{(Number(mrp) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹
+                                  {(Number(mrp) * unitFactor).toLocaleString('en-IN', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
                                 </span>
                                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">
                                   {discountPct}% off
@@ -447,6 +451,7 @@ export default function CartPage() {
                                     @ ₹
                                     {Number(item.price_at_addition).toLocaleString('en-IN', {
                                       minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
                                     })}
                                     /&thinsp;
                                     <UnitLabel label={unitLabel || item.buy_unit || ''} />
@@ -575,7 +580,11 @@ export default function CartPage() {
                           <div className="mt-4">
                             <span className="text-sm text-foreground-secondary">Subtotal: </span>
                             <span className="text-lg font-bold text-foreground">
-                              ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹
+                              {itemTotal.toLocaleString('en-IN', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                             </span>
                           </div>
                         </div>
@@ -666,7 +675,11 @@ export default function CartPage() {
                             )}
                           </div>
                           <p className="text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">
-                            ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            ₹
+                            {Number(price).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                             {isCustomQty ? (
                               <>
                                 /&thinsp;
@@ -793,28 +806,38 @@ export default function CartPage() {
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between text-foreground-secondary">
                     <span>Subtotal ({cartCount} items)</span>
-                    <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>
+                      ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                   </div>
                   {gstEnabled && (
                     <div className="flex justify-between text-foreground-muted text-sm">
                       <span>Incl. GST</span>
-                      <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span>
+                        ₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </div>
                   )}
                   {discount > 0 && (
                     <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                       <span>Coupon ({appliedCoupon!.code})</span>
-                      <span>-₹{discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span>
+                        -₹{discount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </div>
                   )}
                   <div className="border-t border-border-default pt-3">
                     <div className="flex justify-between text-lg font-bold text-foreground">
                       <span>Total</span>
-                      <span>₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span>
+                        ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </div>
                     {discount > 0 && (
                       <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                        You save ₹{discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} with this coupon
+                        You save ₹
+                        {discount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} with
+                        this coupon
                       </p>
                     )}
                     {gstEnabled && <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>}

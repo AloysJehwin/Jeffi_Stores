@@ -9,7 +9,8 @@ import ReconcileButton from './ReconcileButton'
 
 export const dynamic = 'force-dynamic'
 
-const inr = (n: number | string) => '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+const inr = (n: number | string) =>
+  '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 const LEDGER_LABEL: Record<string, string> = {
   order_capture: 'Order capture (tenant share)',

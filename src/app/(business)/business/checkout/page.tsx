@@ -910,7 +910,12 @@ function CheckoutPage() {
                           return (
                             <div className="flex items-center justify-between mt-2">
                               <p className="text-sm text-foreground-secondary">
-                                ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} ×{' '}
+                                ₹
+                                {buyNowItem.price.toLocaleString('en-IN', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}{' '}
+                                ×{' '}
                                 {isBuyNowFractional ? (
                                   <>
                                     {Number(Number(buyNowItem.qty).toFixed(6)).toString()}
@@ -930,7 +935,11 @@ function CheckoutPage() {
                                   <>
                                     {' '}
                                     <span className="line-through text-foreground-muted">
-                                      ₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                      ₹
+                                      {buyNowItem.mrp.toLocaleString('en-IN', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
                                     </span>{' '}
                                     <span className="text-accent-600 dark:text-accent-400 font-semibold">
                                       {mrpDiscountPct(buyNowItem.mrp, buyNowItem.price)}% off
@@ -939,7 +948,11 @@ function CheckoutPage() {
                                 )}
                               </p>
                               <p className="text-sm font-semibold text-foreground">
-                                ₹{buyNowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                ₹
+                                {buyNowTotal.toLocaleString('en-IN', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
                               </p>
                             </div>
                           )
@@ -1048,7 +1061,7 @@ function CheckoutPage() {
                               )}
                             </div>
                             <p className="text-sm text-foreground-secondary mt-1">
-                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               {isCustomQty ? (
                                 <>
                                   {' '}
@@ -1092,7 +1105,11 @@ function CheckoutPage() {
                                 <>
                                   {' '}
                                   <span className="line-through text-foreground-muted">
-                                    ₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    ₹
+                                    {Number(mrp).toLocaleString('en-IN', {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}
                                   </span>{' '}
                                   <span className="text-accent-600 dark:text-accent-400 font-semibold">
                                     {discountPct}% off
@@ -1101,7 +1118,11 @@ function CheckoutPage() {
                               )}
                             </p>
                             <p className="text-sm font-semibold text-foreground mt-1">
-                              ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹
+                              {itemTotal.toLocaleString('en-IN', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                             </p>
                           </div>
                         </div>
@@ -1347,24 +1368,37 @@ function CheckoutPage() {
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between text-foreground-secondary">
                     <span>Subtotal{!isBuyNow ? ` (${cartCount} items)` : ''}</span>
-                    <span>₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span>
+                      ₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                   </div>
                   {!isBuyNow && gstEnabled && (
                     <div className="flex justify-between text-foreground-muted text-sm">
                       <span>Incl. GST</span>
-                      <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span>
+                        ₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </div>
                   )}
                   {couponCode && discountAmount > 0 && (
                     <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                       <span>Coupon ({couponCode})</span>
-                      <span>−₹{discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span>
+                        −₹
+                        {discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </div>
                   )}
                   {effectiveBusinessDiscount > 0 && (
                     <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                       <span>Business Discount</span>
-                      <span>−₹{effectiveBusinessDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span>
+                        −₹
+                        {effectiveBusinessDiscount.toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
                     </div>
                   )}
                   {shippingCharge != null && (
@@ -1373,14 +1407,16 @@ function CheckoutPage() {
                       <span>
                         {shippingCharge === 0
                           ? 'Free'
-                          : `₹${shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+                          : `₹${shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                       </span>
                     </div>
                   )}
                   <div className="border-t border-border-default pt-3">
                     <div className="flex justify-between text-lg font-bold text-foreground">
                       <span>Total</span>
-                      <span>₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span>
+                        ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
                     </div>
                     <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>
                   </div>
@@ -1446,7 +1482,7 @@ function CheckoutPage() {
                           d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                         />
                       </svg>
-                      Pay ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      Pay ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </>
                   ) : (
                     <>

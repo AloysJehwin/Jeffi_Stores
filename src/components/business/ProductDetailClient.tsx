@@ -12,6 +12,7 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { digitalActive } from '@/lib/catalog/digital'
 import { applyDiscount, mrpDiscountPct, pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import { round2 } from '@/lib/catalog/gst'
 
 interface ProductImage {
   id: string
@@ -324,7 +325,10 @@ export default function ProductDetailClient({
   const { user } = useAuth()
   const { showToast } = useToast()
   const gstEnabled = useStoreConfig().flags.gstEnabled
-  const isDigital = digitalActive(useStoreConfig().flags.digitalProductsEnabled, (product as { is_digital?: boolean }).is_digital ?? false)
+  const isDigital = digitalActive(
+    useStoreConfig().flags.digitalProductsEnabled,
+    (product as { is_digital?: boolean }).is_digital ?? false
+  )
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -342,7 +346,7 @@ export default function ProductDetailClient({
   const baseDisplayPrice = pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
   const gstRatePdp = product.gst_percentage ? Number(product.gst_percentage) : 0
   const rawMrp = product.mrp ? Number(product.mrp) : null
-  const mrp = !gstEnabled && rawMrp != null && gstRatePdp > 0 ? rawMrp / (1 + gstRatePdp / 100) : rawMrp
+  const mrp = !gstEnabled && rawMrp != null && gstRatePdp > 0 ? round2(rawMrp / (1 + gstRatePdp / 100)) : rawMrp
 
   // Apply per-category business discount
   const categoryId = product.categories?.id
@@ -420,9 +424,7 @@ export default function ProductDetailClient({
           />
         </div>
 
-        <div className="hidden lg:block mt-4">
-          {!isDigital && <DeliveryInfo {...policy} />}
-        </div>
+        <div className="hidden lg:block mt-4">{!isDigital && <DeliveryInfo {...policy} />}</div>
       </div>
 
       {/* Product info column — order-2 on mobile, natural on desktop */}
@@ -476,7 +478,9 @@ export default function ProductDetailClient({
           sellUnitId={product.sell_unit_id ?? null}
           digital={isDigital}
           isSubscription={(product as { is_subscription?: boolean }).is_subscription ?? false}
-          subscriptionIntervals={(product as { subscription_intervals?: string[] | null }).subscription_intervals ?? null}
+          subscriptionIntervals={
+            (product as { subscription_intervals?: string[] | null }).subscription_intervals ?? null
+          }
         />
 
         {(() => {
@@ -526,9 +530,7 @@ export default function ProductDetailClient({
         {/* Product Specifications — rendered in page.tsx Specifications card */}
       </div>
 
-      <div className="order-3 lg:hidden">
-        {!isDigital && <DeliveryInfo {...policy} />}
-      </div>
+      <div className="order-3 lg:hidden">{!isDigital && <DeliveryInfo {...policy} />}</div>
     </>
   )
 }

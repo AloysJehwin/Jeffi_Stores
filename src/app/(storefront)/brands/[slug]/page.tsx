@@ -11,6 +11,7 @@ import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import ProductCard from '@/components/visitor/ProductCard'
 import Pagination from '@/components/ui/Pagination'
+import { round2 } from '@/lib/catalog/gst'
 
 const PAGE_SIZE = 25
 
@@ -149,7 +150,8 @@ export default async function BrandDetailPage({
                       : null
                   const gstRate = Number(product.gst_percentage ?? 0)
                   // When GST is off, displayPrice is ex-GST — put MRP on the same ex-GST basis before computing the discount and passing it to the card.
-                  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? rawMrp / (1 + gstRate / 100) : rawMrp
+                  const mrp =
+                    !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
                   const priceForDiscount = Number(displayPrice)
                   const mrpDiscount =
                     mrp && mrp > priceForDiscount ? Math.round(((mrp - priceForDiscount) / mrp) * 100) : 0

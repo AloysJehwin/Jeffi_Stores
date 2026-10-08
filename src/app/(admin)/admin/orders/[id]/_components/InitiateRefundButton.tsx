@@ -47,7 +47,7 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
         <p className="text-sm text-foreground-secondary mb-4">
           This order was {isReturn ? 'returned' : 'cancelled'} but the payment of{' '}
           <span className="font-semibold text-foreground">
-            ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>{' '}
           has not yet been refunded. Initiating a refund will trigger it via Razorpay and notify the customer by email.
         </p>
@@ -87,7 +87,7 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
               onClick={() => setShowConfirm(true)}
               className="px-4 h-control bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
             >
-              Initiate Refund ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              Initiate Refund ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </button>
           </RequireWrite>
         )}

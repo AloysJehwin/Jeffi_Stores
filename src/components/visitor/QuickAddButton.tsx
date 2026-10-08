@@ -290,11 +290,11 @@ function SimpleQtyPicker({
       {displayPrice != null && (
         <div className="flex items-baseline gap-2 flex-wrap">
           <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-            Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
           {mrp != null && mrp > displayPrice && (
             <span className="text-sm text-foreground-muted line-through">
-              Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           )}
           {discountPct != null && discountPct > 0 && (

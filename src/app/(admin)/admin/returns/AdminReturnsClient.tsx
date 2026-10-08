@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { fmtQty } from '@/lib/shared/number-display'
 
 interface ReturnRow {
   id: string
@@ -186,7 +187,7 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
                   </div>
                   <div className="text-right flex-shrink-0 ml-4">
                     <p className="text-foreground-secondary text-xs">
-                      Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}
+                      Qty {fmtQty(item.quantity)} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}
                     </p>
                     <p className="font-medium text-foreground">₹{parseFloat(String(item.refund_amount)).toFixed(0)}</p>
                   </div>

@@ -1,4 +1,5 @@
 import 'server-only'
+import { fmtQty } from '@/lib/shared/number-display'
 // eslint-disable-next-line no-eval
 const PDFDocument = eval('require')('pdfkit')
 
@@ -117,15 +118,25 @@ export async function generatePurchaseOrderPDF(
         .fontSize(9)
         .font('Helvetica')
         .text(label, 60, y + 6, { width: 290 })
-        .text(String(item.quantity), 360, y + 6, { width: 50, align: 'right' })
-        .text(`₹${item.unit_cost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 420, y + 6, {
-          width: 70,
-          align: 'right',
-        })
-        .text(`₹${lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 500, y + 6, {
-          width: 40,
-          align: 'right',
-        })
+        .text(fmtQty(item.quantity), 360, y + 6, { width: 50, align: 'right' })
+        .text(
+          `₹${item.unit_cost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          420,
+          y + 6,
+          {
+            width: 70,
+            align: 'right',
+          }
+        )
+        .text(
+          `₹${lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          500,
+          y + 6,
+          {
+            width: 40,
+            align: 'right',
+          }
+        )
 
       doc
         .moveTo(50, y + rowH)
@@ -141,10 +152,15 @@ export async function generatePurchaseOrderPDF(
       .fontSize(10)
       .font('Helvetica-Bold')
       .text('Total', 410, y + 7)
-      .text(`₹${Number(po.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 430, y + 7, {
-        width: 105,
-        align: 'right',
-      })
+      .text(
+        `₹${Number(po.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        430,
+        y + 7,
+        {
+          width: 105,
+          align: 'right',
+        }
+      )
 
     if (po.notes) {
       y += 40

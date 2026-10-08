@@ -21,6 +21,7 @@ import ResponsiveList from '@/components/admin/ResponsiveList'
 import SuppliersMobileList from './_components/SuppliersMobileList'
 import PurchaseOrdersMobileList from './_components/PurchaseOrdersMobileList'
 import InventoryOverviewTab from './_components/InventoryOverviewTab'
+import { round3 } from '@/lib/shared/number-display'
 
 type Tab = 'overview' | 'suppliers' | 'po' | 'stock'
 
@@ -255,156 +256,18 @@ function SuppliersTab() {
         </div>
       ) : (
         <>
-        <div className="md:hidden space-y-3">
-          {sortedSuppliers.length === 0 ? (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center text-sm text-foreground-secondary">
-              {search ? `No suppliers matching "${search}"` : 'No suppliers yet'}
-            </div>
-          ) : (
-            <SuppliersMobileList
-              suppliers={sortedSuppliers}
-              canWrite={canWriteSuppliers}
-              onToggleActive={toggleActive}
-            />
-          )}
-          <ClientPagination
-            page={page}
-            total={total}
-            pageSize={PAGE_SIZE}
-            onChange={p => {
-              setPage(p)
-              setLoading(true)
-            }}
-          />
-        </div>
-        <div className="hidden md:block bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-secondary border-b border-border-default">
-                <tr>
-                  <SortableHeader
-                    label="Name"
-                    column="name"
-                    options={sortOptions('text')}
-                    currentSort={sortCol}
-                    currentDir={sortDir}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="GSTIN"
-                    column="gstin"
-                    options={sortOptions('text')}
-                    currentSort={sortCol}
-                    currentDir={sortDir}
-                    onSort={handleSort}
-                  />
-                  <SortableHeader
-                    label="Contact"
-                    column="contact"
-                    options={sortOptions('text')}
-                    currentSort={sortCol}
-                    currentDir={sortDir}
-                    onSort={handleSort}
-                    className="hidden sm:table-cell"
-                  />
-                  <SortableHeader
-                    label="Phone"
-                    column="phone"
-                    options={sortOptions('text')}
-                    currentSort={sortCol}
-                    currentDir={sortDir}
-                    onSort={handleSort}
-                    className="hidden md:table-cell"
-                  />
-                  <SortableHeader
-                    label="Terms"
-                    column="terms"
-                    options={sortOptions('number')}
-                    currentSort={sortCol}
-                    currentDir={sortDir}
-                    onSort={handleSort}
-                    className="hidden lg:table-cell"
-                    align="right"
-                  />
-                  <SortableHeader
-                    label="POs"
-                    column="pos"
-                    options={sortOptions('number')}
-                    currentSort={sortCol}
-                    currentDir={sortDir}
-                    onSort={handleSort}
-                    align="right"
-                  />
-                  <SortableHeader
-                    label="Status"
-                    column="status"
-                    options={sortOptions('text')}
-                    currentSort={sortCol}
-                    currentDir={sortDir}
-                    onSort={handleSort}
-                  />
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default">
-                {suppliers.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="py-12 text-center text-foreground-secondary text-sm">
-                      {search ? `No suppliers matching "${search}"` : 'No suppliers yet'}
-                    </td>
-                  </tr>
-                )}
-                {sortedSuppliers.map(s => (
-                  <tr key={s.id} className="hover:bg-surface-secondary/50 transition-colors">
-                    <td className="px-4 py-3 font-medium text-foreground">
-                      <Link href={ap(`/admin/suppliers/${s.id}`)} className="hover:text-accent-500 hover:underline">
-                        {s.name}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{s.gstin || '—'}</td>
-                    <td className="px-4 py-3 text-foreground-secondary hidden sm:table-cell">
-                      {s.contact_name || '—'}
-                    </td>
-                    <td className="px-4 py-3 text-foreground-secondary hidden md:table-cell">
-                      {s.phone ? `+91 ${s.phone}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-right text-foreground-secondary hidden lg:table-cell">
-                      {s.payment_terms}d
-                    </td>
-                    <td className="px-4 py-3 text-right text-foreground-secondary">{s.po_count}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${s.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/40 dark:text-gray-400'}`}
-                      >
-                        {s.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="hidden md:flex items-center justify-end gap-3">
-                        <RequireWrite scope="inventory">
-                          <Link
-                            href={ap(`/admin/suppliers/${s.id}/edit`)}
-                            className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium"
-                          >
-                            Edit
-                          </Link>
-                          <button
-                            className="text-xs text-foreground-secondary hover:text-foreground hover:underline"
-                            onClick={() => toggleActive(s)}
-                          >
-                            {s.is_active ? 'Deactivate' : 'Activate'}
-                          </button>
-                        </RequireWrite>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="px-4 pb-4">
+          <div className="md:hidden space-y-3">
+            {sortedSuppliers.length === 0 ? (
+              <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center text-sm text-foreground-secondary">
+                {search ? `No suppliers matching "${search}"` : 'No suppliers yet'}
+              </div>
+            ) : (
+              <SuppliersMobileList
+                suppliers={sortedSuppliers}
+                canWrite={canWriteSuppliers}
+                onToggleActive={toggleActive}
+              />
+            )}
             <ClientPagination
               page={page}
               total={total}
@@ -415,7 +278,145 @@ function SuppliersTab() {
               }}
             />
           </div>
-        </div>
+          <div className="hidden md:block bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-surface-secondary border-b border-border-default">
+                  <tr>
+                    <SortableHeader
+                      label="Name"
+                      column="name"
+                      options={sortOptions('text')}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="GSTIN"
+                      column="gstin"
+                      options={sortOptions('text')}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                    <SortableHeader
+                      label="Contact"
+                      column="contact"
+                      options={sortOptions('text')}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                      className="hidden sm:table-cell"
+                    />
+                    <SortableHeader
+                      label="Phone"
+                      column="phone"
+                      options={sortOptions('text')}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                      className="hidden md:table-cell"
+                    />
+                    <SortableHeader
+                      label="Terms"
+                      column="terms"
+                      options={sortOptions('number')}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                      className="hidden lg:table-cell"
+                      align="right"
+                    />
+                    <SortableHeader
+                      label="POs"
+                      column="pos"
+                      options={sortOptions('number')}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                      align="right"
+                    />
+                    <SortableHeader
+                      label="Status"
+                      column="status"
+                      options={sortOptions('text')}
+                      currentSort={sortCol}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {suppliers.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-foreground-secondary text-sm">
+                        {search ? `No suppliers matching "${search}"` : 'No suppliers yet'}
+                      </td>
+                    </tr>
+                  )}
+                  {sortedSuppliers.map(s => (
+                    <tr key={s.id} className="hover:bg-surface-secondary/50 transition-colors">
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        <Link href={ap(`/admin/suppliers/${s.id}`)} className="hover:text-accent-500 hover:underline">
+                          {s.name}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{s.gstin || '—'}</td>
+                      <td className="px-4 py-3 text-foreground-secondary hidden sm:table-cell">
+                        {s.contact_name || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-foreground-secondary hidden md:table-cell">
+                        {s.phone ? `+91 ${s.phone}` : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-foreground-secondary hidden lg:table-cell">
+                        {s.payment_terms}d
+                      </td>
+                      <td className="px-4 py-3 text-right text-foreground-secondary">{s.po_count}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${s.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-700/40 dark:text-gray-400'}`}
+                        >
+                          {s.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="hidden md:flex items-center justify-end gap-3">
+                          <RequireWrite scope="inventory">
+                            <Link
+                              href={ap(`/admin/suppliers/${s.id}/edit`)}
+                              className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium"
+                            >
+                              Edit
+                            </Link>
+                            <button
+                              className="text-xs text-foreground-secondary hover:text-foreground hover:underline"
+                              onClick={() => toggleActive(s)}
+                            >
+                              {s.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </RequireWrite>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-4 pb-4">
+              <ClientPagination
+                page={page}
+                total={total}
+                pageSize={PAGE_SIZE}
+                onChange={p => {
+                  setPage(p)
+                  setLoading(true)
+                }}
+              />
+            </div>
+          </div>
         </>
       )}
     </div>
@@ -718,7 +719,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
       const autoLot = generateLotNumber(it.sku || it.product_sku)
       return {
         ...it,
-        receive_qty: String(factor > 1 ? Math.round((remaining / factor) * 1000) / 1000 : remaining),
+        receive_qty: String(round3(factor > 1 ? remaining / factor : remaining)),
         receive_cost: it.unit_cost,
         purchase_unit_factor: factor,
         lot_number: autoLot,

@@ -542,7 +542,11 @@ export default async function CustomerDetailPage({
                           })}
                         </td>
                         <td className="px-5 py-3.5 text-sm font-semibold text-foreground whitespace-nowrap">
-                          ₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          ₹
+                          {Number(order.total_amount).toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </td>
                         <td className="px-5 py-3.5">
                           <span

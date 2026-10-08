@@ -5,6 +5,7 @@ import { variantLabel } from '@/lib/catalog/product-label'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { formatINR, formatDate } from '@/lib/shared/format'
+import { fmtQty } from '@/lib/shared/number-display'
 
 const PAYMENT_MODE_LABELS: Record<string, string> = {
   cash: 'Cash',
@@ -230,8 +231,8 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
                       <div className="text-xs text-foreground-secondary">{variantLabel(item)}</div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>
-                  <td className="px-4 py-3 text-center text-foreground">{item.quantity}</td>
+                  <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{Number(item.gst_rate)}%</td>
+                  <td className="px-4 py-3 text-center text-foreground">{fmtQty(item.quantity)}</td>
                   <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(item.unit_price))}</td>
                   <td className="px-4 py-3 text-right text-foreground-secondary">
                     {formatINR(parseFloat(item.taxable_amount || '0'))}

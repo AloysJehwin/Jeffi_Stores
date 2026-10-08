@@ -12,6 +12,7 @@ import { pickUnitPrice } from '@/lib/catalog/pricing'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/visitor/ProductCard'
+import { round2 } from '@/lib/catalog/gst'
 
 const PAGE_SIZE = 24
 
@@ -183,7 +184,8 @@ export default async function CategoryDetailPage({
                       ? Number(product.variant_min_mrp)
                       : null
                   const gstRate = Number(product.gst_percentage ?? 0)
-                  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? rawMrp / (1 + gstRate / 100) : rawMrp
+                  const mrp =
+                    !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
                   const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
 
                   return (

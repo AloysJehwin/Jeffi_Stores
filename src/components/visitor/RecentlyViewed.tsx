@@ -156,7 +156,7 @@ export default function RecentlyViewed({
                     </p>
                     <div className="flex items-baseline gap-1 mt-0.5">
                       <span className="text-xs font-bold text-primary-600 dark:text-primary-400">
-                        ₹{shownPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        ₹{shownPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       {businessPrice ? (
                         <span className="text-xs text-foreground-muted line-through leading-none">
@@ -221,7 +221,7 @@ export default function RecentlyViewed({
 
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                ₹{quickView.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹{quickView.price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               {quickView.mrp &&
                 quickView.mrp > quickView.price &&
@@ -230,7 +230,7 @@ export default function RecentlyViewed({
                   return (
                     <>
                       <span className="text-sm text-foreground-muted line-through">
-                        ₹{quickView.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        ₹{quickView.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       {d > 0 && (
                         <span className="text-xs font-semibold bg-accent-500 text-white px-2 py-0.5 rounded-full">

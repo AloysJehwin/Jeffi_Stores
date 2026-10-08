@@ -9,6 +9,7 @@ import { BusinessAccountNavBar } from '@/components/business/AccountSidebar'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import CopySku from '@/components/ui/CopySku'
 import { documentHostForHost, type DocumentApp } from '@/lib/tenancy/forms-host'
+import { fmtQty } from '@/lib/shared/number-display'
 
 // Quote/invoice pages live on this store's own document host (quotation-{slug}. on a tenant).
 // Only rendered after the client has loaded the data, so reading the host here is hydration-safe.
@@ -628,7 +629,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                               )}
                               {/* Qty badge */}
                               <span className="text-[11px] font-semibold text-foreground-secondary bg-surface-secondary px-2 py-0.5 rounded-full">
-                                {item.quantity} {item.unit}
+                                {fmtQty(item.quantity)} {item.unit}
                               </span>
                               {/* Offer badge */}
                               {hasOffer && (

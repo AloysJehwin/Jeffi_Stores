@@ -455,11 +455,11 @@ export default function QuickAddPicker({
           {displayPrice != null && (
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                From Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                From Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
               {mrp != null && mrp > displayPrice && (
                 <span className="text-sm text-foreground-muted line-through">
-                  Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               )}
               {discountPct != null && discountPct > 0 && (
@@ -564,7 +564,11 @@ export default function QuickAddPicker({
 
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
-              Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              Rs.{' '}
+              {(effectivePrice * unitFactor).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </span>
             {showPerUnit && (
               <span className="text-xs text-foreground-secondary">

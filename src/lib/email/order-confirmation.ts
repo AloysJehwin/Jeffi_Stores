@@ -82,7 +82,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
             <tr>
               <td>${item.product_name}</td>
               <td>${item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</td>
-              <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+              <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
           `
             )
@@ -94,18 +94,18 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
         ${
           order.taxable_amount > 0
             ? `
-        <p style="margin: 3px 0; font-size: 14px;">Taxable Amount: ₹${Number(order.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+        <p style="margin: 3px 0; font-size: 14px;">Taxable Amount: ₹${Number(order.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         ${
           order.is_igst
-            ? `<p style="margin: 3px 0; font-size: 14px;">IGST: ₹${Number(order.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
-            : `<p style="margin: 3px 0; font-size: 14px;">CGST: ₹${Number(order.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
-             <p style="margin: 3px 0; font-size: 14px;">SGST: ₹${Number(order.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>`
+            ? `<p style="margin: 3px 0; font-size: 14px;">IGST: ₹${Number(order.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>`
+            : `<p style="margin: 3px 0; font-size: 14px;">CGST: ₹${Number(order.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+             <p style="margin: 3px 0; font-size: 14px;">SGST: ₹${Number(order.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>`
         }
         <hr style="border: none; border-top: 1px solid #ccc; margin: 8px 0;">
         `
             : ''
         }
-        <h3 style="margin: 0;">Total Amount: ₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h3>
+        <h3 style="margin: 0;">Total Amount: ₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
       </div>
 
       <div class="success">
@@ -148,7 +148,10 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
     type: 'order_paid',
     category: 'orders',
     title: `New order ${order.order_number}`,
-    message: order.total_amount != null ? `Total ₹${order.total_amount}` : null,
+    message:
+      order.total_amount != null
+        ? `Total ₹${Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+        : null,
     link: order.id ? `/admin/orders/${order.id}` : '/admin/orders',
     entityType: 'order',
     entityId: order.id ? String(order.id) : null,
@@ -201,15 +204,15 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
               <td>${item.product_name}</td>
               <td>${item.product_sku}</td>
               <td>${item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</td>
-              <td>₹${item.unit_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
-              <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+              <td>₹${item.unit_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
           `
             )
             .join('')}
           <tr style="background-color: #fff3cd; font-weight: bold;">
             <td colspan="4" style="text-align: right;">Total:</td>
-            <td>₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+            <td>₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           </tr>
         </tbody>
       </table>
