@@ -49,6 +49,16 @@ Tenant namespaces are **not** in git. The provisioning engine renders them
 - `jeffi-stores-ec2-role`: `s3:PutObject/GetObject/ListBucket` on `jeffi-stores-mtls-truststore/k3s-etcd/*`. After that, add `--etcd-s3 --etcd-s3-bucket jeffi-stores-mtls-truststore --etcd-s3-folder k3s-etcd` to `core-node.sh` so etcd snapshots leave the box.
 - Replace the root access keys used locally and in GitHub `AWS_ACCESS_KEY_ID` with a scoped IAM user.
 
+## Deploying without CI (GitHub unavailable)
+
+Commit your changes, then run `bash deploy/k8s/bootstrap/deploy-local.sh`.
+
+It builds the committed `HEAD` on this Mac (arm64, from `git archive`, so uncommitted and local files never ship), pushes it to ECR, rolls it out with `rollout.sh`, then smoke-tests that the live `/api/health` reports the new commit.
+
+- **Preconditions:** a clean working tree, Docker Desktop running, and ≥15 GB free disk (Docker corrupts its disk when it runs out).
+- **Rollback:** `kubectl -n jeffi rollout undo deploy/flagship`.
+- **Never build on the core node:** the build needs ~4 GB RAM and starves production.
+
 ## Rollback
 
 - **App:** `kubectl -n jeffi rollout undo deploy/flagship`, or `-n tenant-<slug> … storefront`.
