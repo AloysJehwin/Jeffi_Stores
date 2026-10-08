@@ -7,12 +7,16 @@ ENV npm_config_maxsockets=6 npm_config_fetch_retries=5 npm_config_fetch_retry_mi
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+# xlsx is vendored: SheetJS ships it from its own CDN, which some networks can't reach.
+COPY vendor ./vendor
 RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci --omit=dev
 
 # ---- Builder ----
 FROM base AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
+# xlsx is vendored: SheetJS ships it from its own CDN, which some networks can't reach.
+COPY vendor ./vendor
 RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci
 COPY . .
 
