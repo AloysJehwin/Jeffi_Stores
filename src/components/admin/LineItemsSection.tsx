@@ -1549,7 +1549,7 @@ export default function LineItemsSection({
                     type="number"
                     min="0"
                     step="0.01"
-                    value={item.unit_price}
+                    value={typeof item.unit_price === 'number' ? round2(item.unit_price) : item.unit_price}
                     onChange={e => updateItem(item.id, 'unit_price', e.target.value)}
                     required
                     className={inputCls}

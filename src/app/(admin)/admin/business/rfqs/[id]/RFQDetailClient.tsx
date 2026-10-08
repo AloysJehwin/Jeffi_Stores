@@ -6,6 +6,7 @@ import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
+import { round2 } from '@/lib/catalog/gst'
 
 interface RFQMessage {
   id: string
@@ -107,15 +108,15 @@ function resolveItemMrp(item: RFQItem): number | null {
   const gstRate = item.product_gst != null ? Number(item.product_gst) : 18
   const priceExGstFromVariant = sellingInclGst != null ? sellingInclGst / (1 + gstRate / 100) : null
   if (priceExGstFromVariant != null && Math.abs(Number(rawMrp) - priceExGstFromVariant / unitFactor) < 1) {
-    return Number(rawMrp) * (1 + gstRate / 100) * unitFactor
+    return round2(Number(rawMrp) * (1 + gstRate / 100) * unitFactor)
   }
-  return mrp
+  return round2(mrp)
 }
 
 function resolveItemSellingPrice(item: RFQItem): number | null {
   const unitFactor = item.unit_factor > 1 ? item.unit_factor : 1
   const raw = item.sub_variant_price ?? item.variant_price ?? item.base_price ?? null
-  return raw != null ? Number(raw) * unitFactor : null
+  return raw != null ? round2(Number(raw) * unitFactor) : null
 }
 
 function resolveItemPrice(item: RFQItem): number | null {
