@@ -16,7 +16,9 @@ vi.mock('@/lib/catalog/product-draft', () => ({
 vi.mock('@/lib/shared/google-sheets', () => ({ syncProductToSheet: vi.fn(async () => {}) }))
 vi.mock('@/lib/merchant/sync', () => ({ syncProductToMerchant: vi.fn(async () => {}) }))
 vi.mock('@/lib/amazon/sync', () => ({ syncProductToAmazon: vi.fn(async () => {}) }))
+vi.mock('@/lib/catalog/product-action-auth', () => ({ productsWriteError: vi.fn(async () => null) }))
 vi.mock('@/lib/shared/db', () => ({
+  withTransaction: vi.fn(async (fn: any) => fn({ query: (...a: any[]) => (query as any)(...a) })),
   query: vi.fn(async () => ({ rows: [], rowCount: 0 })),
   queryOne: vi.fn(async () => null),
   queryMany: vi.fn(async () => []),
@@ -47,8 +49,15 @@ function form(over: Record<string, string> = {}) {
 const sqls = () => vi.mocked(query).mock.calls.map(c => String(c[0]))
 const productUpdate = () => vi.mocked(query).mock.calls.find(c => String(c[0]).startsWith('UPDATE products SET name'))!
 
+// A create-draft (is_draft = true) edited in place — the no-edit-draft path.
+const liveRow = (sql: string) =>
+  String(sql).includes('SELECT sku, is_draft FROM products') ? { sku: 'EB', is_draft: true } : null
+
 describe('updateProduct (live edit)', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(queryOne).mockImplementation(async (sql: string) => liveRow(sql) as any)
+  })
 
   it('normalizes a digital product: no tracking, In Stock, units and stock cleared', async () => {
     await expect(
@@ -119,7 +128,7 @@ describe('updateProduct (live edit)', () => {
 
   it('writes variant and sub-variant subscription prices', async () => {
     vi.mocked(queryOne).mockImplementation(
-      async (sql: string) => (String(sql).includes('SELECT sku FROM products') ? { sku: 'EB' } : null) as any
+      async (sql: string) => (String(sql).includes('SELECT sku FROM products') ? { sku: 'EB' } : liveRow(sql)) as any
     )
     const variants = [
       {

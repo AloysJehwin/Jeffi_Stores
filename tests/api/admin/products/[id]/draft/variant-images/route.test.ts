@@ -15,6 +15,7 @@ vi.mock('@/lib/shared/s3', () => ({
   uploadVariantImage: vi.fn(),
   getS3Url: vi.fn((key: string) => `https://cdn.example.com/${key}`),
   currentBucket: vi.fn().mockResolvedValue('jeffi-stores-bucket'),
+  UploadValidationError: class UploadValidationError extends Error {},
 }))
 
 import { GET, POST, DELETE, PATCH } from '@/app/api/(admin)/admin/products/[id]/draft/variant-images/route'

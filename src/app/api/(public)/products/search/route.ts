@@ -46,7 +46,7 @@ async function semanticSearch(q: string, limit: number, excludeId: string): Prom
        LEFT JOIN categories c ON p.category_id = c.id
        LEFT JOIN LATERAL (SELECT MIN(price) AS price FROM product_variants WHERE product_id = p.id AND is_active = true) pv_min ON true
        LEFT JOIN LATERAL (SELECT image_url, thumbnail_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, display_order LIMIT 1) pi ON true
-       WHERE p.is_active = true AND p.id = ANY($1::uuid[])
+       WHERE p.is_active = true AND p.is_draft = false AND p.id = ANY($1::uuid[])
          AND ($2::uuid IS NULL OR p.id != $2::uuid)`,
       [ids, excludeId || null]
     )
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
           SELECT image_url, thumbnail_url FROM product_images
           WHERE product_id = p.id ORDER BY is_primary DESC, display_order LIMIT 1
         ) pi ON true
-        WHERE p.is_active = true
+        WHERE p.is_active = true AND p.is_draft = false
           AND p.name ILIKE $1
           AND p.category_id = $3
           AND ($2::uuid IS NULL OR p.id != $2::uuid)
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
           SELECT image_url, thumbnail_url FROM product_images
           WHERE product_id = p.id ORDER BY is_primary DESC, display_order LIMIT 1
         ) pi ON true
-        WHERE p.is_active = true
+        WHERE p.is_active = true AND p.is_draft = false
           AND p.name ILIKE $1
           AND p.category_id != $3
           AND ($2::uuid IS NULL OR p.id != $2::uuid)
@@ -151,7 +151,7 @@ export async function GET(req: NextRequest) {
       SELECT image_url, thumbnail_url FROM product_images
       WHERE product_id = p.id ORDER BY is_primary DESC, display_order LIMIT 1
     ) pi ON true
-    WHERE p.is_active = true
+    WHERE p.is_active = true AND p.is_draft = false
       AND p.name ILIKE $1
       AND ($2::uuid IS NULL OR p.id != $2::uuid)
     ORDER BY name

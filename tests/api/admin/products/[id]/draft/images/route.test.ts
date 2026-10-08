@@ -7,13 +7,21 @@ vi.mock('@/lib/auth/jwt', () => ({
 vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
 }))
-vi.mock('@/lib/shared/db', () => ({
-  queryOne: vi.fn(),
-  query: vi.fn(),
-}))
+vi.mock('@/lib/shared/db', () => {
+  const queryOne = vi.fn()
+  const query = vi.fn()
+  // The FOR UPDATE read is served by queryOne's mocked stage row; writes go to query.
+  const client = {
+    query: async (sql: string, p?: unknown[]) =>
+      /FOR UPDATE/.test(sql) ? { rows: [await queryOne(sql, p)].filter(Boolean) } : query(sql, p),
+  }
+  return { queryOne, query, withTransaction: vi.fn(async (fn: any) => fn(client)) }
+})
 vi.mock('@/lib/shared/s3', () => ({
   uploadProductImage: vi.fn(),
   copyGalleryImageToProduct: vi.fn(),
+  deleteProductImage: vi.fn(async () => {}),
+  UploadValidationError: class UploadValidationError extends Error {},
 }))
 
 import { GET, POST, DELETE, PATCH } from '@/app/api/(admin)/admin/products/[id]/draft/images/route'
@@ -170,6 +178,7 @@ describe('POST /api/admin/products/[id]/draft/images', () => {
       width: 10,
       height: 20,
     } as any)
+    mockQueryOne.mockResolvedValueOnce({ images: [] } as any) // locked re-read
     mockCopy.mockResolvedValue({
       s3Bucket: 'bucket',
       s3Key: 'products/prod-1/img.jpg',
@@ -203,6 +212,7 @@ describe('POST /api/admin/products/[id]/draft/images', () => {
       width: 5,
       height: 6,
     } as any)
+    mockQueryOne.mockResolvedValueOnce({ images: [{ id: 'x' }] } as any)
     mockCopy.mockResolvedValue({
       s3Bucket: 'bucket',
       s3Key: 'products/prod-1/img2.jpg',
@@ -226,7 +236,7 @@ describe('POST /api/admin/products/[id]/draft/images', () => {
   })
 
   it('uploads a file and stages it as a fresh upload', async () => {
-    mockQueryOne.mockResolvedValueOnce({ images: [] } as any)
+    mockQueryOne.mockResolvedValueOnce({ images: [] } as any).mockResolvedValueOnce({ images: [] } as any)
     mockUpload.mockResolvedValue({
       url: 'https://cdn/u.jpg',
       thumbnailUrl: 'https://cdn/ut.jpg',
@@ -249,6 +259,38 @@ describe('POST /api/admin/products/[id]/draft/images', () => {
     expect(image.image_url).toBe('https://cdn/u.jpg')
     expect(image.s3_key).toBe('s3k')
     expect(mockUpload).toHaveBeenCalledWith(expect.any(File), PRODUCT_ID)
+  })
+
+  it('returns 400 with the reason when the upload is rejected', async () => {
+    const { UploadValidationError } = await import('@/lib/shared/s3')
+    mockQueryOne.mockResolvedValueOnce({ images: [] } as any)
+    mockUpload.mockRejectedValue(new (UploadValidationError as any)('Image is larger than 10 MB'))
+    const form = new FormData()
+    form.append('file', new File(['bytes'], 'big.jpg', { type: 'image/jpeg' }))
+    const res = await POST(formReq(form), params())
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toBe('Image is larger than 10 MB')
+  })
+
+  it('removes the uploaded file when the stage filled up meanwhile', async () => {
+    const { deleteProductImage } = await import('@/lib/shared/s3')
+    const full = { images: [1, 2, 3, 4, 5].map(i => ({ id: `i${i}` })) }
+    mockQueryOne.mockResolvedValueOnce({ images: [] } as any).mockResolvedValueOnce(full as any)
+    mockUpload.mockResolvedValue({ url: 'u', thumbnailUrl: 't', s3Key: 'k', s3ThumbnailKey: 'tk' } as any)
+    const form = new FormData()
+    form.append('file', new File(['bytes'], 'u.jpg', { type: 'image/jpeg' }))
+    const res = await POST(formReq(form), params())
+    expect(res.status).toBe(400)
+    expect(deleteProductImage).toHaveBeenCalledWith('k', 'tk')
+  })
+
+  it('returns 404 when the draft row is gone', async () => {
+    mockQueryOne.mockResolvedValueOnce({ images: [] } as any).mockResolvedValueOnce(null)
+    mockUpload.mockResolvedValue({ url: 'u', thumbnailUrl: 't', s3Key: 'k', s3ThumbnailKey: 'tk' } as any)
+    const form = new FormData()
+    form.append('file', new File(['bytes'], 'u.jpg', { type: 'image/jpeg' }))
+    const res = await POST(formReq(form), params())
+    expect(res.status).toBe(404)
   })
 
   it('returns 500 when upload throws', async () => {

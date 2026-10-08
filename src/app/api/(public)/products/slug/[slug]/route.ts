@@ -83,7 +83,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        LEFT JOIN brands b ON p.brand_id = b.id
-       WHERE p.slug = $1 AND p.is_active = true`,
+       WHERE p.slug = $1 AND p.is_active = true AND p.is_draft = false`,
       [slug]
     )
 

@@ -4,9 +4,24 @@ import { redirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { revalidatePath } from 'next/cache'
-import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { query, queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import { publishProductDraft, openOrdersForProduct } from '@/lib/catalog/product-draft'
-import { generateVariantSku } from '@/lib/catalog/sku'
+import { generateProductSku, generateVariantSku } from '@/lib/catalog/sku'
+import { productsWriteError } from '@/lib/catalog/product-action-auth'
+import {
+  DRAFT_NAME_PLACEHOLDER,
+  duplicateSkuError,
+  gstError,
+  parseJsonField,
+  priceErrors,
+  productErrorMessage,
+  publishShippingError,
+  skuConflictError,
+  toAmount,
+  txDb,
+  uniqueProductSlug,
+  variantSkuCollisionError,
+} from '@/lib/catalog/product-validation'
 import { round2 } from '@/lib/catalog/gst'
 import { normalizeDigitalProduct } from '@/lib/catalog/digital-units'
 import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
@@ -138,150 +153,179 @@ Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai
   })()
 }
 
-export async function updateProduct(productId: string, formData: FormData) {
-  const name = formData.get('name') as string
+const money = (v: unknown): number | null => {
+  const n = toAmount(v as string)
+  return n == null || Number.isNaN(n) ? null : round2(n)
+}
+const floatOrNull = (v: unknown): number | null => {
+  const n = toAmount(v as string)
+  return n == null || Number.isNaN(n) ? null : n
+}
+const intOrNull = (v: unknown): number | null => {
+  const n = floatOrNull(v)
+  return n == null ? null : Math.round(n)
+}
+
+type ProductActionResult = { error?: string; details?: string[]; ok?: true; redirectTo?: string } | void
+
+export async function updateProduct(productId: string, formData: FormData): Promise<ProductActionResult> {
+  const denied = await productsWriteError()
+  if (denied) return { error: denied }
+
+  const intent = formData.get('intent') as string | null
+  const isPublish = intent === 'publish'
+  const noRedirect = formData.get('_no_redirect') === '1'
+  const rawName = ((formData.get('name') as string) || '').trim()
+  const name = rawName || DRAFT_NAME_PLACEHOLDER
   const description = formData.get('description') as string
-  const categoryId = formData.get('category_id') as string
-  const brandId = formData.get('brand_id') as string
-  const hasVariants = formData.get('has_variants') === 'true' && formData.get('is_digital') !== 'true'
+  const categoryId = ((formData.get('category_id') as string) || '').trim() || null
+  const brandId = ((formData.get('brand_id') as string) || '').trim() || null
+  const isDigitalProduct = formData.get('is_digital') === 'true'
+  const hasVariants = formData.get('has_variants') === 'true' && !isDigitalProduct
   const variantType = (formData.get('variant_type') as string) || null
   const subVariantType = (formData.get('sub_variant_type') as string) || null
-  const basePrice = hasVariants ? 0 : round2(parseFloat(formData.get('base_price') as string))
-  const mrp = formData.get('mrp') ? round2(parseFloat(formData.get('mrp') as string)) : null
-  const mrpExGst = formData.get('mrp_ex_gst') ? round2(parseFloat(formData.get('mrp_ex_gst') as string)) : null
-  const salePrice = formData.get('price_ex_gst') ? round2(parseFloat(formData.get('price_ex_gst') as string)) : null
-  const costPrice = formData.get('cost_price') ? round2(parseFloat(formData.get('cost_price') as string)) : 0
+  const basePrice = hasVariants ? 0 : (money(formData.get('base_price')) ?? 0)
+  const mrp = money(formData.get('mrp'))
+  const mrpExGst = money(formData.get('mrp_ex_gst'))
+  const salePrice = money(formData.get('price_ex_gst'))
+  const costPrice = money(formData.get('cost_price')) ?? 0
   const supplierId = ((formData.get('supplier_id') as string) || '').trim() || null
-  // Multi-supplier: product-level supplier price list. The preferred row's supplier
-  // is denormalized onto products.supplier_id (legacy field) on publish.
-  const productSuppliersRaw = formData.get('product_suppliers_json') as string | null
-  let productSuppliers: any[] = []
-  try {
-    productSuppliers = productSuppliersRaw ? JSON.parse(productSuppliersRaw) : []
-  } catch {
-    productSuppliers = []
-  }
-  const preferredSupplierId = productSuppliers.find((s: any) => s.is_preferred)?.supplier_id || supplierId || null
-  const discountPct = formData.get('discount_pct')
-    ? parseFloat(parseFloat(formData.get('discount_pct') as string).toFixed(2))
-    : 0
-  const gstPercentage = parseFloat((formData.get('gst_percentage') as string) || '18')
+  const discountPct = money(formData.get('discount_pct')) ?? 0
+  const gstRaw = (formData.get('gst_percentage') as string) || '18'
+  const gstPercentage = parseFloat(gstRaw)
   const hsnCode = (formData.get('hsn_code') as string) || null
   const mpn = (formData.get('mpn') as string) || null
   const gtin = (formData.get('gtin') as string) || null
   // Digital stock is never tracked: always In Stock.
   const stockStatus =
-    hasVariants || formData.get('is_digital') === 'true' ? 'In Stock' : (formData.get('stock_status') as string)
-  const weight = formData.get('weight') ? parseFloat(formData.get('weight') as string) : null
+    hasVariants || isDigitalProduct ? 'In Stock' : (formData.get('stock_status') as string) || 'In Stock'
+  const weight = floatOrNull(formData.get('weight'))
   const dimensions = (formData.get('dimensions') as string) || null
-  const weightGrams = formData.get('weight_grams') ? parseInt(formData.get('weight_grams') as string) : null
+  const weightGrams = intOrNull(formData.get('weight_grams'))
   const packageType = (formData.get('package_type') as string) || null
-  const lengthCm = formData.get('length_cm') ? parseFloat(formData.get('length_cm') as string) : null
-  const breadthCm = formData.get('breadth_cm') ? parseFloat(formData.get('breadth_cm') as string) : null
-  const heightCm = formData.get('height_cm') ? parseFloat(formData.get('height_cm') as string) : null
-  const intent = formData.get('intent') as string | null
-  const isActive = intent === 'draft' || intent === 'draft-stay' ? false : formData.get('is_active') === 'true'
+  const lengthCm = floatOrNull(formData.get('length_cm'))
+  const breadthCm = floatOrNull(formData.get('breadth_cm'))
+  const heightCm = floatOrNull(formData.get('height_cm'))
+  // Publish always activates; any draft save keeps the product off the storefront.
+  const isActive = isPublish
   const isFeatured = formData.get('is_featured') === 'true'
-  const isDigitalProduct = formData.get('is_digital') === 'true'
 
-  // Server-side weight & packaging validation — enforced on publish only, so a
-  // partial draft can still be saved. Mirrors the client checks in ProductForm so
-  // a direct/programmatic submit can't slip a null/zero weight or missing box dims
-  // past the UI. See src/lib/shipping.ts STORED_DIMS_REQUIRED. Skipped for digital.
-  if (intent === 'publish' && !isDigitalProduct) {
-    const STORED_DIMS_TYPES = ['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube']
-    const errors: string[] = []
-    if (!hasVariants) {
-      if (weightGrams == null || !(weightGrams > 0)) {
-        errors.push('Shipping weight is required and must be greater than 0.')
-      }
-      if (
-        packageType &&
-        STORED_DIMS_TYPES.includes(packageType) &&
-        (lengthCm == null || breadthCm == null || heightCm == null)
-      ) {
-        errors.push('Dimensions required for this package type')
-      }
-    } else {
-      const variantsJsonRaw = formData.get('variants_json') as string | null
-      let parsedVariants: any[] = []
-      try {
-        parsedVariants = variantsJsonRaw ? JSON.parse(variantsJsonRaw) : []
-      } catch {
-        parsedVariants = []
-      }
-      const blank = (x: any) => x == null || String(x).trim() === ''
-      const filled = (...vals: any[]) => {
-        const hit = vals.find(x => !blank(x))
-        return hit == null ? '' : String(hit)
-      }
-      const subsOn = (v: any) => v?.sub_variant_type_on === true || v?.sub_variant_type_on === 'true'
-      const activeParsed = parsedVariants.filter(v => !v?._isDeleted)
-      let draftSubs: any[] = []
-      let liveSubs: any[] = []
-      if (activeParsed.some(subsOn)) {
-        const draftRow = await queryOne<{ sub_variants: any[] | null }>(
-          'SELECT sub_variants FROM product_drafts WHERE product_id = $1',
-          [productId]
-        )
-        draftSubs = Array.isArray(draftRow?.sub_variants) ? draftRow!.sub_variants : []
-        liveSubs = await queryMany<any>(
-          'SELECT variant_id, sub_variant_name, weight_grams, length_cm, breadth_cm, height_cm, package_type FROM product_sub_variants WHERE product_id = $1 AND is_active = true',
-          [productId]
-        )
-      }
-      for (const v of activeParsed) {
-        const vLabel = v?.variant_name || v?.sku || ''
-        if (subsOn(v)) {
-          const staged = draftSubs.filter(sv => sv?.variant_id === v?.id)
-          const effective =
-            staged.length > 0
-              ? staged.filter(sv => !sv._cleared && sv.sub_variant_name)
-              : liveSubs.filter(sv => sv.variant_id === v?.id)
-          if (effective.length === 0) {
-            errors.push(
-              `Variant "${vLabel}" has sub-variants enabled but none added. Add a sub-variant or turn off "Has sub-variants".`
-            )
-            break
-          }
-          for (const sv of effective) {
-            if (!(parseFloat(filled(sv.weight_grams, v?.weight_grams, weightGrams)) > 0)) {
-              errors.push(
-                `Shipping weight is required for sub-variant "${sv.sub_variant_name}" of "${vLabel}" and must be greater than 0.`
-              )
-              break
-            }
-            const pt = filled(sv.package_type, v?.package_type, packageType) || 'flat_poly_auto'
-            if (
-              STORED_DIMS_TYPES.includes(pt) &&
-              (blank(filled(sv.length_cm, v?.length_cm)) ||
-                blank(filled(sv.breadth_cm, v?.breadth_cm)) ||
-                blank(filled(sv.height_cm, v?.height_cm)))
-            ) {
-              errors.push(
-                `Dimensions required for this package type (sub-variant "${sv.sub_variant_name}" of "${vLabel}")`
-              )
-              break
-            }
-          }
-          if (errors.length > 0) break
-          continue
-        }
-        const w = v?.weight_grams != null && v.weight_grams !== '' ? parseFloat(v.weight_grams) : null
-        if (w == null || !(w > 0)) {
-          errors.push(`Shipping weight is required for variant "${vLabel}" and must be greater than 0.`)
-          break
-        }
-        const pt = v?.package_type || 'flat_poly_auto'
-        if (STORED_DIMS_TYPES.includes(pt) && (blank(v?.length_cm) || blank(v?.breadth_cm) || blank(v?.height_cm))) {
-          errors.push(`Dimensions required for this package type (variant "${vLabel}")`)
-          break
-        }
-      }
+  // Multi-supplier: product-level supplier price list. The preferred row's supplier
+  // is denormalized onto products.supplier_id (legacy field) on publish.
+  let productSuppliers: any[]
+  let rawVariants: any[] | null
+  let uploadedImages: any[]
+  let existingImagesToKeep: any[]
+  let galleryImageRefs: { id: string; isPrimary: boolean }[]
+  let imageOrder: string[]
+  let specifications: unknown
+  let bsEntriesFromForm: unknown
+  try {
+    productSuppliers = parseJsonField(formData.get('product_suppliers_json'), 'suppliers', [])
+    const variantsRaw = formData.get('variants_json')
+    rawVariants = variantsRaw ? parseJsonField<any[]>(variantsRaw, 'variants', []) : null
+    uploadedImages = parseJsonField(formData.get('uploaded_images'), 'uploaded images', [])
+    existingImagesToKeep = parseJsonField(formData.get('existing_images_to_keep'), 'images to keep', [])
+    galleryImageRefs = parseJsonField(formData.get('gallery_image_ids'), 'gallery images', [])
+    imageOrder = parseJsonField(formData.get('image_order'), 'image order', [])
+    specifications = parseJsonField(formData.get('specifications'), 'specifications', null)
+    // Bootstrap "assign existing stock" capture: optional, never blocks a save.
+    try {
+      bsEntriesFromForm = parseJsonField(formData.get('bs_entries_json'), 'stock assignment', undefined)
+    } catch {
+      bsEntriesFromForm = undefined
     }
-    if (errors.length > 0) {
-      return { error: errors[0] }
+  } catch (e: any) {
+    console.error('[product-edit] malformed form data for', productId, e)
+    return { error: e.message }
+  }
+  const preferredSupplierId = productSuppliers.find((s: any) => s?.is_preferred)?.supplier_id || supplierId || null
+  const activeVariants = (Array.isArray(rawVariants) ? rawVariants : []).filter(v => v && !v._isDeleted)
+
+  // Drafts accept partial data; publish needs the full product.
+  const errors: string[] = []
+  if (isPublish) {
+    if (!rawName || rawName === DRAFT_NAME_PLACEHOLDER) errors.push('Product name is required.')
+    if (!categoryId) errors.push('Category is required.')
+    if (hasVariants && rawVariants && activeVariants.length === 0)
+      errors.push('Add at least one variant, or turn off variants.')
+  }
+  const gstErr = gstError(gstRaw)
+  if (gstErr) errors.push(gstErr)
+  errors.push(
+    ...priceErrors(
+      'Pricing',
+      hasVariants
+        ? { cost: formData.get('cost_price') as string, discountPct: formData.get('discount_pct') as string }
+        : {
+            price: formData.get('base_price') as string,
+            mrp: formData.get('mrp') as string,
+            priceExGst: formData.get('price_ex_gst') as string,
+            mrpExGst: formData.get('mrp_ex_gst') as string,
+            cost: formData.get('cost_price') as string,
+            discountPct: formData.get('discount_pct') as string,
+          },
+      { requirePrice: isPublish && !hasVariants }
+    )
+  )
+  if (hasVariants) {
+    for (const v of activeVariants) {
+      if (!String(v.variant_name ?? '').trim()) {
+        if (isPublish) errors.push('Every variant needs a name.')
+        continue
+      }
+      // A variant with sub-variants is priced per sub-variant.
+      const subsOn = v.sub_variant_type_on === true || v.sub_variant_type_on === 'true'
+      errors.push(
+        ...priceErrors(
+          `Variant "${v.variant_name}"`,
+          { price: v.price, mrp: v.mrp, priceExGst: v.price_ex_gst, mrpExGst: v.mrp_ex_gst, cost: v.cost_price },
+          { requirePrice: isPublish && !subsOn }
+        )
+      )
     }
+  }
+  if (errors.length > 0) return { error: errors[0], details: [...new Set(errors)] }
+
+  // Server-side weight & packaging validation — enforced on publish only (shared with the
+  // form and the publish route). Skipped for digital.
+  if (isPublish && !isDigitalProduct) {
+    const subsOn = (v: any) => v?.sub_variant_type_on === true || v?.sub_variant_type_on === 'true'
+    let draftSubs: any[] = []
+    let liveSubs: any[] = []
+    if (hasVariants && activeVariants.some(subsOn)) {
+      const draftSubRow = await queryOne<{ sub_variants: any[] | null }>(
+        'SELECT sub_variants FROM product_drafts WHERE product_id = $1',
+        [productId]
+      )
+      draftSubs = Array.isArray(draftSubRow?.sub_variants) ? draftSubRow!.sub_variants : []
+      liveSubs = await queryMany<any>(
+        'SELECT variant_id, sub_variant_name, weight_grams, length_cm, breadth_cm, height_cm, package_type FROM product_sub_variants WHERE product_id = $1 AND is_active = true',
+        [productId]
+      )
+    }
+    const shipErr = publishShippingError({
+      isDigital: false,
+      hasVariants,
+      product: {
+        weight_grams: weightGrams,
+        package_type: packageType,
+        length_cm: lengthCm,
+        breadth_cm: breadthCm,
+        height_cm: heightCm,
+      },
+      variants: activeVariants.map(v => {
+        const label = v?.variant_name || v?.sku || ''
+        if (!subsOn(v)) return { ...v, label }
+        const staged = draftSubs.filter(sv => sv?.variant_id === v?.id)
+        const effective =
+          staged.length > 0
+            ? staged.filter(sv => !sv._cleared && sv.sub_variant_name)
+            : liveSubs.filter(sv => sv.variant_id === v?.id)
+        return { ...v, label, subVariants: effective.map(sv => ({ ...sv, label: sv.sub_variant_name })) }
+      }),
+    })
+    if (shipErr) return { error: shipErr }
 
     // Block publish while open (pending/confirmed) orders reference this product —
     // publishing could remove variants / rename SKUs and break their committed stock.
@@ -292,41 +336,22 @@ export async function updateProduct(productId: string, formData: FormData) {
       }
     }
   }
-  const uploadedImagesJson = formData.get('uploaded_images') as string
-  const uploadedImages: any[] = uploadedImagesJson ? JSON.parse(uploadedImagesJson) : []
-  const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
-  const existingImagesToKeep = existingImagesToKeepJson ? JSON.parse(existingImagesToKeepJson) : []
-  const galleryImageIdsJson = formData.get('gallery_image_ids') as string
-  const galleryImageRefs: { id: string; isPrimary: boolean }[] = galleryImageIdsJson
-    ? JSON.parse(galleryImageIdsJson)
-    : []
-  const imageOrderJson = formData.get('image_order') as string
-  const imageOrder: string[] = imageOrderJson ? JSON.parse(imageOrderJson) : []
 
-  const baseSlug = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-  const slug = baseSlug
-
-  const rawSku = ((formData.get('sku') as string) || '').trim().toUpperCase()
-  const skuFromForm = rawSku || null
+  const skuFromForm = ((formData.get('sku') as string) || '').trim().toUpperCase() || null
 
   // Extra fields collected for draft fields JSONB (mirrors all SET clauses below)
-  const extraDeliveryDays = parseInt((formData.get('extra_delivery_days') as string) || '0') || 0
+  const extraDeliveryDays = intOrNull(formData.get('extra_delivery_days')) ?? 0
   const barcode = (formData.get('barcode') as string) || null
   const isbn = (formData.get('isbn') as string) || null
   const asin = (formData.get('asin') as string) || null
   const brandPartNumber = (formData.get('brand_part_number') as string) || null
   const countryOfOrigin = ((formData.get('country_of_origin') as string) || '').slice(0, 2).toUpperCase() || null
-  const shelfLifeDays = formData.get('shelf_life_days') ? parseInt(formData.get('shelf_life_days') as string) : null
+  const shelfLifeDays = intOrNull(formData.get('shelf_life_days'))
   const grade = (formData.get('grade') as string) || null
-  const specificationsRaw = (formData.get('specifications') as string) || null
-  const specifications = specificationsRaw ? JSON.parse(specificationsRaw) : null
   const color = (formData.get('color') as string) || null
   const colorHex = (formData.get('color_hex') as string) || null
-  const volumeMl = formData.get('volume_ml') ? parseFloat(formData.get('volume_ml') as string) : null
-  const netWeightGrams = formData.get('net_weight_grams') ? parseInt(formData.get('net_weight_grams') as string) : null
+  const volumeMl = floatOrNull(formData.get('volume_ml'))
+  const netWeightGrams = intOrNull(formData.get('net_weight_grams'))
   const fragile = formData.get('fragile') === 'true'
   const hazardous = formData.get('hazardous') === 'true'
   const flammable = formData.get('flammable') === 'true'
@@ -340,14 +365,14 @@ export async function updateProduct(productId: string, formData: FormData) {
     : null
   const complianceStandard = (formData.get('compliance_standard') as string) || null
   const safetyRating = (formData.get('safety_rating') as string) || null
-  const warrantyMonths = formData.get('warranty_months') ? parseInt(formData.get('warranty_months') as string) : null
+  const warrantyMonths = intOrNull(formData.get('warranty_months'))
   const warrantyType = (formData.get('warranty_type') as string) || null
   const condition = (formData.get('condition') as string) || 'new'
   const isCodAllowed = formData.get('is_cod_allowed') !== 'false'
   const launchDate = (formData.get('launch_date') as string) || null
   const discontinueDate = (formData.get('discontinue_date') as string) || null
-  const sortOrderVal = formData.get('sort_order') ? parseInt(formData.get('sort_order') as string) : 0
-  const handlingDays = formData.get('handling_days') ? parseInt(formData.get('handling_days') as string) : 1
+  const sortOrderVal = intOrNull(formData.get('sort_order')) ?? 0
+  const handlingDays = intOrNull(formData.get('handling_days')) ?? 1
   const shippingClass = (formData.get('shipping_class') as string) || 'standard'
   const isOversized = formData.get('is_oversized') === 'true'
   const isDigital = formData.get('is_digital') === 'true'
@@ -381,13 +406,11 @@ export async function updateProduct(productId: string, formData: FormData) {
   const metaDescription = (formData.get('meta_description') as string) || null
   const isSearchable = formData.get('is_searchable') !== 'false'
   const inventorySync = !isDigitalProduct && formData.get('inventory_sync') === 'true'
-  const lowStockThreshold = formData.get('low_stock_threshold')
-    ? parseFloat(formData.get('low_stock_threshold') as string)
-    : null
+  const lowStockThreshold = floatOrNull(formData.get('low_stock_threshold'))
   const taxClass = (formData.get('tax_class') as string) || 'standard'
   const inclusiveTax = formData.get('inclusive_tax') === 'true'
-  const ageMin = formData.get('age_min') ? parseInt(formData.get('age_min') as string) : null
-  const ageMax = formData.get('age_max') ? parseInt(formData.get('age_max') as string) : null
+  const ageMin = intOrNull(formData.get('age_min'))
+  const ageMax = intOrNull(formData.get('age_max'))
   const targetGender = (formData.get('target_gender') as string) || null
   const targetAudience = (formData.get('target_audience') as string)
     ? (formData.get('target_audience') as string)
@@ -396,34 +419,93 @@ export async function updateProduct(productId: string, formData: FormData) {
         .filter(Boolean)
     : null
 
+  const host = await getHost()
+  const back = formData.get('_back') as string | null
+  const listDest = back && back.startsWith('/admin/products') ? back : '/admin/products'
+  const stayDest = () => {
+    const popupVariantId = formData.get('popup_variant_id') as string | null
+    return popupVariantId
+      ? `/admin/products/edit/${productId}?popup=${encodeURIComponent(popupVariantId)}`
+      : `/admin/products/edit/${productId}`
+  }
+  const finish = (dest: string): ProductActionResult => {
+    const url = ap(dest, host)
+    if (noRedirect) return { ok: true, redirectTo: url }
+    redirect(url)
+  }
+
+  // Gallery copies made by this attempt; removed again if the save fails.
+  const copiedS3: { key: string; thumb: string }[] = []
+  const removeS3 = async (keys: { key: string; thumb: string }[], why: string) => {
+    if (keys.length === 0) return
+    const { deleteProductImage } = await import('@/lib/shared/s3')
+    for (const k of keys) {
+      await deleteProductImage(k.key, k.thumb).catch(e =>
+        console.error('[product-edit]', why, 'S3 delete failed for', productId, k.key, e)
+      )
+    }
+  }
+
   try {
-    // Check if a product_drafts row exists for this product
     const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown> }>(
       `SELECT product_id, fields FROM product_drafts WHERE product_id = $1`,
       [productId]
     )
     const hasDraft = !!draftRow
-
-    // If draft exists: save form fields to product_drafts.fields first
-    if (hasDraft) {
-      // Bootstrap "assign existing stock" capture (per-grain lot/expiry/serials).
-      // The form emits it as a hidden JSON field; carry it through so an explicit
-      // Save-as-Draft/Publish through this action does not wipe what autosave stored.
-      let bsEntriesFromForm: unknown = undefined
-      const bsEntriesRaw = formData.get('bs_entries_json') as string | null
-      if (bsEntriesRaw) {
-        try {
-          bsEntriesFromForm = JSON.parse(bsEntriesRaw)
-        } catch {
-          /* ignore malformed */
-        }
+    const live = await queryOne<{ sku: string | null; is_draft: boolean }>(
+      'SELECT sku, is_draft FROM products WHERE id = $1',
+      [productId]
+    )
+    if (!live) return { error: 'This product no longer exists. It may have been deleted in another tab.' }
+    // A live product is only ever edited through a draft. No draft here means it was published or
+    // discarded elsewhere; a draft save must not write straight to the live row.
+    if (!hasDraft && !live.is_draft && !isPublish) {
+      return {
+        error:
+          'This product is live and has no pending draft (it may have been published or discarded in another tab). Reload the page before saving.',
       }
+    }
+
+    // Empty SKU keeps the current one; a product never has a NULL SKU.
+    let productSku = skuFromForm || live.sku || ''
+    if (!productSku) {
+      productSku = await generateProductSku(categoryId).catch(() => `PRD-${Date.now().toString(36).toUpperCase()}`)
+    }
+    const slug = await uniqueProductSlug({ query }, name, productId)
+
+    if (hasDraft) {
+      const draftVariants = rawVariants
+        ? activeVariants.map((v: any) => ({
+            ...v,
+            sku:
+              String(v.sku || '').trim() ||
+              (String(v.variant_name ?? '').trim() ? generateVariantSku(productSku, String(v.variant_name)) : ''),
+            subscription_price: normalizeSubscriptionPrice(v.subscription_price),
+            subscription_prices: normalizeSubscriptionPrices(v.subscription_prices),
+          }))
+        : null
+      if (draftVariants) {
+        const dup = duplicateSkuError(
+          draftVariants.filter(v => v.sku).map(v => ({ label: String(v.variant_name || v.sku), sku: v.sku }))
+        )
+        if (dup) return { error: dup }
+      }
+      const conflict = await skuConflictError(
+        { query },
+        {
+          productSku,
+          variantSkus: (draftVariants || []).map(v => v.sku).filter(Boolean),
+          productId,
+        }
+      )
+      if (conflict) return { error: conflict }
+
       const draftFields = {
         name,
         slug,
         description,
         category_id: categoryId,
-        brand_id: brandId || null,
+        brand_id: brandId,
         base_price: basePrice,
         mrp,
         mrp_ex_gst: mrpExGst,
@@ -447,7 +529,7 @@ export async function updateProduct(productId: string, formData: FormData) {
         discount_pct: discountPct,
         supplier_id: preferredSupplierId,
         product_suppliers: productSuppliers,
-        sku: skuFromForm,
+        sku: productSku,
         mpn: hasVariants ? null : mpn,
         gtin: hasVariants ? null : gtin,
         extra_delivery_days: extraDeliveryDays,
@@ -508,17 +590,6 @@ export async function updateProduct(productId: string, formData: FormData) {
         // existing draft value when the form didn't send one (so we never wipe it).
         _bsEntries: bsEntriesFromForm ?? (draftRow as any)?.fields?._bsEntries ?? undefined,
       }
-      // Snapshot variants from form and images/sub_variants/units from live DB
-      const variantsJsonRaw = formData.get('variants_json') as string | null
-      const draftVariants = variantsJsonRaw
-        ? JSON.parse(variantsJsonRaw)
-            .filter((v: any) => !v._isDeleted)
-            .map((v: any) => ({
-              ...v,
-              subscription_price: normalizeSubscriptionPrice(v.subscription_price),
-              subscription_prices: normalizeSubscriptionPrices(v.subscription_prices),
-            }))
-        : null
 
       await query(
         `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, updated_at)
@@ -541,301 +612,283 @@ export async function updateProduct(productId: string, formData: FormData) {
       )
       await applyDraftSubVariantPrices(productId, subVariantPrices)
       revalidatePath(`/admin/products/edit/${productId}`)
-      const host = await getHost()
 
       // Publish: draft fields just saved — call publishProductDraft directly (no HTTP roundtrip)
-      if (intent === 'publish') {
-        await publishProductDraft(productId)
+      if (isPublish) {
+        try {
+          await publishProductDraft(productId, { activate: true })
+        } catch (err: any) {
+          console.error('[product-edit] publishProductDraft failed for', productId, err)
+          return { error: `Draft saved, but publishing failed: ${productErrorMessage(err, 'unknown error')}` }
+        }
         revalidatePath('/admin/products')
         revalidatePath(`/admin/products/${productId}`)
-        redirect(ap(`/admin/products/${productId}`, host))
+        return finish(`/admin/products/${productId}`)
       }
+      return finish(intent === 'draft-stay' ? stayDest() : listDest)
+    }
 
-      if (intent === 'draft-stay') {
-        const popupVariantId = formData.get('popup_variant_id') as string | null
-        const dest = popupVariantId
-          ? `/admin/products/edit/${productId}?popup=${encodeURIComponent(popupVariantId)}`
-          : `/admin/products/edit/${productId}`
-        redirect(ap(dest, host))
+    // No edit-draft: a create-draft (is_draft = true) edited in place, or a stale live form publishing.
+    const persistedNames = activeVariants
+      .filter(v => String(v.variant_name ?? '').trim())
+      .map(v => String(v.variant_name))
+    if (hasVariants) {
+      const collision = variantSkuCollisionError(persistedNames, n => generateVariantSku(productSku, n))
+      if (collision) return { error: collision }
+    }
+    const conflict = await skuConflictError(
+      { query },
+      {
+        productSku,
+        variantSkus: hasVariants ? persistedNames.map(n => generateVariantSku(productSku, n)) : [],
+        productId,
       }
-      const back = formData.get('_back') as string | null
-      redirect(ap(back && back.startsWith('/admin/products') ? back : '/admin/products', host))
-    }
+    )
+    if (conflict) return { error: conflict }
 
-    // No draft — live product direct edit path
-    const setClauses: string[] = [
-      'name = $1',
-      'slug = $2',
-      'description = $3',
-      'category_id = $4',
-      'brand_id = $5',
-      'base_price = $6',
-      'mrp = $7',
-      'mrp_ex_gst = $8',
-      'price_ex_gst = $9',
-      'gst_percentage = $10',
-      'hsn_code = $11',
-      'stock_status = $12',
-      'weight = $13',
-      'dimensions = $14',
-      'is_active = $15',
-      'is_featured = $16',
-      'has_variants = $17',
-      'variant_type = $18',
-      'sub_variant_type = $19',
-      'weight_grams = $20',
-      'package_type = $21',
-      'length_cm = $22',
-      'breadth_cm = $23',
-      'height_cm = $24',
-      'cost_price = $25',
-      'discount_pct = $26',
-      'updated_at = $27',
-    ]
-    const params: any[] = [
-      name,
-      slug,
-      description,
-      categoryId,
-      brandId || null,
-      basePrice,
-      mrp,
-      mrpExGst,
-      salePrice,
-      gstPercentage,
-      hsnCode,
-      stockStatus,
-      weight,
-      dimensions,
-      isActive,
-      isFeatured,
-      hasVariants,
-      variantType,
-      subVariantType,
-      weightGrams,
-      packageType,
-      lengthCm,
-      breadthCm,
-      heightCm,
-      costPrice,
-      discountPct,
-      new Date().toISOString(),
-    ]
-    setClauses.push(`supplier_id = $${params.length + 1}`)
-    params.push(preferredSupplierId)
-    if (skuFromForm) {
-      setClauses.push(`sku = $${params.length + 1}`)
-      params.push(skuFromForm)
-    }
-    if (!hasVariants) {
-      setClauses.push(`mpn = $${params.length + 1}`, `gtin = $${params.length + 2}`)
-      params.push(mpn, gtin)
-    }
-    setClauses.push(`extra_delivery_days = $${params.length + 1}`)
-    params.push(extraDeliveryDays)
-    setClauses.push(
-      `barcode = $${params.length + 1}`,
-      `isbn = $${params.length + 2}`,
-      `asin = $${params.length + 3}`,
-      `brand_part_number = $${params.length + 4}`,
-      `country_of_origin = $${params.length + 5}`,
-      `shelf_life_days = $${params.length + 6}`
-    )
-    params.push(barcode, isbn, asin, brandPartNumber, countryOfOrigin, shelfLifeDays)
-    setClauses.push(`grade = $${params.length + 1}`, `specifications = $${params.length + 2}`)
-    params.push(grade, specifications)
-    setClauses.push(
-      `color = $${params.length + 1}`,
-      `color_hex = $${params.length + 2}`,
-      `volume_ml = $${params.length + 3}`,
-      `net_weight_grams = $${params.length + 4}`,
-      `fragile = $${params.length + 5}`,
-      `hazardous = $${params.length + 6}`,
-      `flammable = $${params.length + 7}`,
-      `perishable = $${params.length + 8}`,
-      `serialized = $${params.length + 9}`
-    )
-    params.push(color, colorHex, volumeMl, netWeightGrams, fragile, hazardous, flammable, perishable, serialized)
-    setClauses.push(
-      `certifications = $${params.length + 1}`,
-      `compliance_standard = $${params.length + 2}`,
-      `safety_rating = $${params.length + 3}`,
-      `warranty_months = $${params.length + 4}`,
-      `warranty_type = $${params.length + 5}`
-    )
-    params.push(certifications, complianceStandard, safetyRating, warrantyMonths, warrantyType)
-    setClauses.push(
-      `condition = $${params.length + 1}`,
-      `is_cod_allowed = $${params.length + 2}`,
-      `launch_date = $${params.length + 3}`,
-      `discontinue_date = $${params.length + 4}`,
-      `sort_order = $${params.length + 5}`
-    )
-    params.push(condition, isCodAllowed, launchDate, discontinueDate, sortOrderVal)
-    setClauses.push(
-      `handling_days = $${params.length + 1}`,
-      `shipping_class = $${params.length + 2}`,
-      `is_oversized = $${params.length + 3}`
-    )
-    params.push(handlingDays, shippingClass, isOversized)
-    setClauses.push(
-      `is_digital = $${params.length + 1}`,
-      `license_type = $${params.length + 2}`,
-      `file_format = $${params.length + 3}`,
-      `platform_compatibility = $${params.length + 4}`
-    )
-    params.push(isDigital, licenseType, fileFormat, platformCompatibility)
-    setClauses.push(
-      `is_subscription = $${params.length + 1}`,
-      `subscription_intervals = $${params.length + 2}`,
-      `subscription_interval = $${params.length + 3}`,
-      `subscription_price = $${params.length + 4}`,
-      `subscription_total_cycles = $${params.length + 5}`,
-      `subscription_min_cycles = $${params.length + 6}`,
-      `subscription_prices = $${params.length + 7}::jsonb`
-    )
-    params.push(
-      isSubscription,
-      subscriptionIntervals,
-      subscriptionInterval,
-      subscriptionPrice,
-      subscriptionTotalCycles,
-      subscriptionMinCycles,
-      JSON.stringify(subscriptionPrices)
-    )
-    setClauses.push(`is_bundle = $${params.length + 1}`)
-    params.push(isBundle)
-    setClauses.push(
-      `meta_title = $${params.length + 1}`,
-      `meta_description = $${params.length + 2}`,
-      `is_searchable = $${params.length + 3}`
-    )
-    params.push(metaTitle, metaDescription, isSearchable)
-    setClauses.push(`tax_class = $${params.length + 1}`, `inclusive_tax = $${params.length + 2}`)
-    params.push(taxClass, inclusiveTax)
-    setClauses.push(
-      `age_min = $${params.length + 1}`,
-      `age_max = $${params.length + 2}`,
-      `target_gender = $${params.length + 3}`,
-      `target_audience = $${params.length + 4}`
-    )
-    params.push(ageMin, ageMax, targetGender, targetAudience)
-
-    // Create-draft (is_draft=true, no product_drafts row) editing in place: Publish clears is_draft
-    // (is_active is already set to true via isActive on the publish intent above); Save keeps it a
-    // draft. A live product's is_draft is already false, so writing false is a no-op for it.
-    if (intent === 'publish') {
-      setClauses.push(`is_draft = $${params.length + 1}`)
-      params.push(false)
-    }
-
-    params.push(productId)
-    const prevRow = await queryOne<{ perishable: boolean; serialized: boolean }>(
-      'SELECT perishable, serialized FROM products WHERE id = $1',
-      [productId]
-    )
-    await query(`UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`, params)
-    // If perishable was toggled OFF, roll up remaining batch qty into inventory_quantity then clean up batches
-    if (prevRow?.perishable && !perishable) {
-      // Capture per-grain batch totals BEFORE deleting.
-      const batchSum = await queryOne<{ total: string }>(
-        `SELECT COALESCE(SUM(quantity_remaining), 0)::text AS total FROM product_batches WHERE product_id = $1`,
-        [productId]
-      )
-      const converted = parseFloat(batchSum?.total ?? '0') || 0
-      const variantBatch = await queryMany<{ variant_id: string | null; total: string }>(
-        `SELECT variant_id, COALESCE(SUM(quantity_remaining),0)::text AS total FROM product_batches
-         WHERE product_id = $1 AND variant_id IS NOT NULL GROUP BY variant_id`,
-        [productId]
-      )
-      const subVariantBatch = await queryMany<{ sub_variant_id: string | null; total: string }>(
-        `SELECT sub_variant_id, COALESCE(SUM(quantity_remaining),0)::text AS total FROM product_batches
-         WHERE product_id = $1 AND sub_variant_id IS NOT NULL GROUP BY sub_variant_id`,
-        [productId]
-      )
-
-      await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
-
-      // Write converted stock back at the correct grain.
-      const hasVariantsRow = await queryOne<{ has_variants: boolean }>(
-        'SELECT has_variants FROM products WHERE id = $1',
-        [productId]
-      )
-      if (hasVariantsRow?.has_variants && (variantBatch.length || subVariantBatch.length)) {
-        for (const sv of subVariantBatch) {
-          await query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [
-            parseFloat(sv.total) || 0,
-            sv.sub_variant_id,
-          ])
+    // S3 work stays outside the transaction: gallery copies happen first, deletes after commit.
+    const copiedGallery = new Map<string, any>()
+    if (galleryImageRefs.length > 0) {
+      const { copyGalleryImageToProduct } = await import('@/lib/shared/s3')
+      const galleryImages = await queryMany(`SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`, [
+        galleryImageRefs.map(r => r.id),
+      ])
+      for (const gimg of galleryImages || []) {
+        try {
+          const copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, productId)
+          copiedGallery.set(gimg.id, { ...copied, gimg })
+          copiedS3.push({ key: copied.s3Key, thumb: copied.s3ThumbnailKey || '' })
+        } catch (e) {
+          // Gallery source missing — skip rather than store a gallery/ path or abort.
+          console.error('[product-edit] gallery copy failed for', productId, gimg.id, e)
         }
-        for (const v of variantBatch) {
-          await query(
-            `UPDATE product_variants pv SET inventory_quantity = CASE
+      }
+    }
+    const s3Deletes: { key: string; thumb: string }[] = []
+
+    await withTransaction(async client => {
+      const { query, queryOne, queryMany } = txDb(client)
+      const setClauses: string[] = [
+        'name = $1',
+        'slug = $2',
+        'description = $3',
+        'category_id = $4',
+        'brand_id = $5',
+        'base_price = $6',
+        'mrp = $7',
+        'mrp_ex_gst = $8',
+        'price_ex_gst = $9',
+        'gst_percentage = $10',
+        'hsn_code = $11',
+        'stock_status = $12',
+        'weight = $13',
+        'dimensions = $14',
+        'is_active = $15',
+        'is_featured = $16',
+        'has_variants = $17',
+        'variant_type = $18',
+        'sub_variant_type = $19',
+        'weight_grams = $20',
+        'package_type = $21',
+        'length_cm = $22',
+        'breadth_cm = $23',
+        'height_cm = $24',
+        'cost_price = $25',
+        'discount_pct = $26',
+        'updated_at = $27',
+      ]
+      const params: any[] = [
+        name,
+        slug,
+        description,
+        categoryId,
+        brandId || null,
+        basePrice,
+        mrp,
+        mrpExGst,
+        salePrice,
+        gstPercentage,
+        hsnCode,
+        stockStatus,
+        weight,
+        dimensions,
+        isActive,
+        isFeatured,
+        hasVariants,
+        variantType,
+        subVariantType,
+        weightGrams,
+        packageType,
+        lengthCm,
+        breadthCm,
+        heightCm,
+        costPrice,
+        discountPct,
+        new Date().toISOString(),
+      ]
+      setClauses.push(`supplier_id = $${params.length + 1}`)
+      params.push(preferredSupplierId)
+      setClauses.push(`sku = $${params.length + 1}`)
+      params.push(productSku)
+      if (!hasVariants) {
+        setClauses.push(`mpn = $${params.length + 1}`, `gtin = $${params.length + 2}`)
+        params.push(mpn, gtin)
+      }
+      setClauses.push(`extra_delivery_days = $${params.length + 1}`)
+      params.push(extraDeliveryDays)
+      setClauses.push(
+        `barcode = $${params.length + 1}`,
+        `isbn = $${params.length + 2}`,
+        `asin = $${params.length + 3}`,
+        `brand_part_number = $${params.length + 4}`,
+        `country_of_origin = $${params.length + 5}`,
+        `shelf_life_days = $${params.length + 6}`
+      )
+      params.push(barcode, isbn, asin, brandPartNumber, countryOfOrigin, shelfLifeDays)
+      setClauses.push(`grade = $${params.length + 1}`, `specifications = $${params.length + 2}`)
+      params.push(grade, specifications)
+      setClauses.push(
+        `color = $${params.length + 1}`,
+        `color_hex = $${params.length + 2}`,
+        `volume_ml = $${params.length + 3}`,
+        `net_weight_grams = $${params.length + 4}`,
+        `fragile = $${params.length + 5}`,
+        `hazardous = $${params.length + 6}`,
+        `flammable = $${params.length + 7}`,
+        `perishable = $${params.length + 8}`,
+        `serialized = $${params.length + 9}`
+      )
+      params.push(color, colorHex, volumeMl, netWeightGrams, fragile, hazardous, flammable, perishable, serialized)
+      setClauses.push(
+        `certifications = $${params.length + 1}`,
+        `compliance_standard = $${params.length + 2}`,
+        `safety_rating = $${params.length + 3}`,
+        `warranty_months = $${params.length + 4}`,
+        `warranty_type = $${params.length + 5}`
+      )
+      params.push(certifications, complianceStandard, safetyRating, warrantyMonths, warrantyType)
+      setClauses.push(
+        `condition = $${params.length + 1}`,
+        `is_cod_allowed = $${params.length + 2}`,
+        `launch_date = $${params.length + 3}`,
+        `discontinue_date = $${params.length + 4}`,
+        `sort_order = $${params.length + 5}`
+      )
+      params.push(condition, isCodAllowed, launchDate, discontinueDate, sortOrderVal)
+      setClauses.push(
+        `handling_days = $${params.length + 1}`,
+        `shipping_class = $${params.length + 2}`,
+        `is_oversized = $${params.length + 3}`
+      )
+      params.push(handlingDays, shippingClass, isOversized)
+      setClauses.push(
+        `is_digital = $${params.length + 1}`,
+        `license_type = $${params.length + 2}`,
+        `file_format = $${params.length + 3}`,
+        `platform_compatibility = $${params.length + 4}`
+      )
+      params.push(isDigital, licenseType, fileFormat, platformCompatibility)
+      setClauses.push(
+        `is_subscription = $${params.length + 1}`,
+        `subscription_intervals = $${params.length + 2}`,
+        `subscription_interval = $${params.length + 3}`,
+        `subscription_price = $${params.length + 4}`,
+        `subscription_total_cycles = $${params.length + 5}`,
+        `subscription_min_cycles = $${params.length + 6}`,
+        `subscription_prices = $${params.length + 7}::jsonb`
+      )
+      params.push(
+        isSubscription,
+        subscriptionIntervals,
+        subscriptionInterval,
+        subscriptionPrice,
+        subscriptionTotalCycles,
+        subscriptionMinCycles,
+        JSON.stringify(subscriptionPrices)
+      )
+      setClauses.push(`is_bundle = $${params.length + 1}`)
+      params.push(isBundle)
+      setClauses.push(
+        `meta_title = $${params.length + 1}`,
+        `meta_description = $${params.length + 2}`,
+        `is_searchable = $${params.length + 3}`
+      )
+      params.push(metaTitle, metaDescription, isSearchable)
+      setClauses.push(`tax_class = $${params.length + 1}`, `inclusive_tax = $${params.length + 2}`)
+      params.push(taxClass, inclusiveTax)
+      setClauses.push(
+        `age_min = $${params.length + 1}`,
+        `age_max = $${params.length + 2}`,
+        `target_gender = $${params.length + 3}`,
+        `target_audience = $${params.length + 4}`
+      )
+      params.push(ageMin, ageMax, targetGender, targetAudience)
+
+      // Create-draft edited in place: Publish clears is_draft (and is_active = true above); a draft
+      // save keeps it a draft and inactive.
+      setClauses.push(`is_draft = $${params.length + 1}`)
+      params.push(!isPublish)
+
+      params.push(productId)
+      const prevRow = await queryOne<{ perishable: boolean; serialized: boolean }>(
+        'SELECT perishable, serialized FROM products WHERE id = $1',
+        [productId]
+      )
+      await query(`UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`, params)
+      // If perishable was toggled OFF, roll up remaining batch qty into inventory_quantity then clean up batches
+      if (prevRow?.perishable && !perishable) {
+        // Capture per-grain batch totals BEFORE deleting.
+        const batchSum = await queryOne<{ total: string }>(
+          `SELECT COALESCE(SUM(quantity_remaining), 0)::text AS total FROM product_batches WHERE product_id = $1`,
+          [productId]
+        )
+        const converted = parseFloat(batchSum?.total ?? '0') || 0
+        const variantBatch = await queryMany<{ variant_id: string | null; total: string }>(
+          `SELECT variant_id, COALESCE(SUM(quantity_remaining),0)::text AS total FROM product_batches
+         WHERE product_id = $1 AND variant_id IS NOT NULL GROUP BY variant_id`,
+          [productId]
+        )
+        const subVariantBatch = await queryMany<{ sub_variant_id: string | null; total: string }>(
+          `SELECT sub_variant_id, COALESCE(SUM(quantity_remaining),0)::text AS total FROM product_batches
+         WHERE product_id = $1 AND sub_variant_id IS NOT NULL GROUP BY sub_variant_id`,
+          [productId]
+        )
+
+        await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
+
+        // Write converted stock back at the correct grain.
+        const hasVariantsRow = await queryOne<{ has_variants: boolean }>(
+          'SELECT has_variants FROM products WHERE id = $1',
+          [productId]
+        )
+        if (hasVariantsRow?.has_variants && (variantBatch.length || subVariantBatch.length)) {
+          for (const sv of subVariantBatch) {
+            await query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [
+              parseFloat(sv.total) || 0,
+              sv.sub_variant_id,
+            ])
+          }
+          for (const v of variantBatch) {
+            await query(
+              `UPDATE product_variants pv SET inventory_quantity = CASE
                WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
                THEN COALESCE((SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
                ELSE $1 END
              WHERE pv.id = $2`,
-            [parseFloat(v.total) || 0, v.variant_id]
-          )
-        }
-        await query(
-          `UPDATE products SET inventory_quantity = COALESCE(
+              [parseFloat(v.total) || 0, v.variant_id]
+            )
+          }
+          await query(
+            `UPDATE products SET inventory_quantity = COALESCE(
              (SELECT SUM(inventory_quantity) FROM product_variants WHERE product_id = $1 AND is_active = true), 0)
            WHERE id = $1`,
-          [productId]
-        )
-      } else {
-        await query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [converted, productId])
-      }
+            [productId]
+          )
+        } else {
+          await query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [converted, productId])
+        }
 
-      // Keep shelf_stock rows — update total quantity across locations to match converted qty
-      const shelfRows = await queryOne<{ cnt: string }>(
-        `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`,
-        [productId]
-      )
-      const shelfCount = parseInt(shelfRows?.cnt ?? '0') || 0
-      if (shelfCount === 1) {
-        await query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE product_id = $2`, [
-          converted,
-          productId,
-        ])
-      } else if (shelfCount > 1) {
-        // Distribute proportionally; zero out if converted is 0
-        await query(
-          `UPDATE shelf_stock SET quantity = CASE WHEN $1::numeric = 0 THEN 0
-             ELSE ROUND(quantity / NULLIF((SELECT SUM(quantity) FROM shelf_stock WHERE product_id = $2), 0) * $1::numeric, 4)
-           END, updated_at = now() WHERE product_id = $2`,
-          [converted, productId]
-        )
-      }
-    }
-    // If serialized was toggled OFF, count in-stock serials → set as inventory_quantity, clean up serials + batches + shelf_stock
-    if (prevRow?.serialized && !serialized) {
-      // Capture per-grain counts BEFORE deleting the serials (order matters:
-      // deleting first would leave nothing to count and strand the stock).
-      const serialCount = await queryOne<{ total: string }>(
-        `SELECT COUNT(*)::text AS total FROM product_serials WHERE product_id = $1 AND status = 'in_stock'`,
-        [productId]
-      )
-      const converted = parseInt(serialCount?.total ?? '0') || 0
-      const variantCounts = await queryMany<{ variant_id: string | null; cnt: string }>(
-        `SELECT variant_id, COUNT(*)::text AS cnt FROM product_serials
-         WHERE product_id = $1 AND status = 'in_stock' AND variant_id IS NOT NULL
-         GROUP BY variant_id`,
-        [productId]
-      )
-      const subVariantCounts = await queryMany<{ sub_variant_id: string | null; cnt: string }>(
-        `SELECT sub_variant_id, COUNT(*)::text AS cnt FROM product_serials
-         WHERE product_id = $1 AND status = 'in_stock' AND sub_variant_id IS NOT NULL
-         GROUP BY sub_variant_id`,
-        [productId]
-      )
-
-      await query(`DELETE FROM product_serials WHERE product_id = $1`, [productId])
-      // Only delete batches if NOT still perishable (perishable cleanup above handles that case)
-      if (!perishable) {
-        await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
-        // Keep shelf_stock — update qty to match converted count
+        // Keep shelf_stock rows — update total quantity across locations to match converted qty
         const shelfRows = await queryOne<{ cnt: string }>(
           `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`,
           [productId]
@@ -847,118 +900,151 @@ export async function updateProduct(productId: string, formData: FormData) {
             productId,
           ])
         } else if (shelfCount > 1) {
+          // Distribute proportionally; zero out if converted is 0
           await query(
             `UPDATE shelf_stock SET quantity = CASE WHEN $1::numeric = 0 THEN 0
-               ELSE ROUND(quantity / NULLIF((SELECT SUM(quantity) FROM shelf_stock WHERE product_id = $2), 0) * $1::numeric, 4)
-             END, updated_at = now() WHERE product_id = $2`,
+             ELSE ROUND(quantity / NULLIF((SELECT SUM(quantity) FROM shelf_stock WHERE product_id = $2), 0) * $1::numeric, 4)
+           END, updated_at = now() WHERE product_id = $2`,
             [converted, productId]
           )
         }
       }
+      // If serialized was toggled OFF, count in-stock serials → set as inventory_quantity, clean up serials + batches + shelf_stock
+      if (prevRow?.serialized && !serialized) {
+        // Capture per-grain counts BEFORE deleting the serials (order matters:
+        // deleting first would leave nothing to count and strand the stock).
+        const serialCount = await queryOne<{ total: string }>(
+          `SELECT COUNT(*)::text AS total FROM product_serials WHERE product_id = $1 AND status = 'in_stock'`,
+          [productId]
+        )
+        const converted = parseInt(serialCount?.total ?? '0') || 0
+        const variantCounts = await queryMany<{ variant_id: string | null; cnt: string }>(
+          `SELECT variant_id, COUNT(*)::text AS cnt FROM product_serials
+         WHERE product_id = $1 AND status = 'in_stock' AND variant_id IS NOT NULL
+         GROUP BY variant_id`,
+          [productId]
+        )
+        const subVariantCounts = await queryMany<{ sub_variant_id: string | null; cnt: string }>(
+          `SELECT sub_variant_id, COUNT(*)::text AS cnt FROM product_serials
+         WHERE product_id = $1 AND status = 'in_stock' AND sub_variant_id IS NOT NULL
+         GROUP BY sub_variant_id`,
+          [productId]
+        )
 
-      // Write the converted stock back at the CORRECT grain so it shows in inventory.
-      const hasVariantsRow = await queryOne<{ has_variants: boolean }>(
-        'SELECT has_variants FROM products WHERE id = $1',
-        [productId]
-      )
-      if (hasVariantsRow?.has_variants && (variantCounts.length || subVariantCounts.length)) {
-        // Sub-variant-tracked stock
-        for (const sv of subVariantCounts) {
-          await query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [
-            parseFloat(sv.cnt) || 0,
-            sv.sub_variant_id,
-          ])
+        await query(`DELETE FROM product_serials WHERE product_id = $1`, [productId])
+        // Only delete batches if NOT still perishable (perishable cleanup above handles that case)
+        if (!perishable) {
+          await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
+          // Keep shelf_stock — update qty to match converted count
+          const shelfRows = await queryOne<{ cnt: string }>(
+            `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`,
+            [productId]
+          )
+          const shelfCount = parseInt(shelfRows?.cnt ?? '0') || 0
+          if (shelfCount === 1) {
+            await query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE product_id = $2`, [
+              converted,
+              productId,
+            ])
+          } else if (shelfCount > 1) {
+            await query(
+              `UPDATE shelf_stock SET quantity = CASE WHEN $1::numeric = 0 THEN 0
+               ELSE ROUND(quantity / NULLIF((SELECT SUM(quantity) FROM shelf_stock WHERE product_id = $2), 0) * $1::numeric, 4)
+             END, updated_at = now() WHERE product_id = $2`,
+              [converted, productId]
+            )
+          }
         }
-        // Variant-tracked stock (only for variants without sub-variants; those roll up separately)
-        for (const v of variantCounts) {
-          await query(
-            `UPDATE product_variants pv SET inventory_quantity = CASE
+
+        // Write the converted stock back at the CORRECT grain so it shows in inventory.
+        const hasVariantsRow = await queryOne<{ has_variants: boolean }>(
+          'SELECT has_variants FROM products WHERE id = $1',
+          [productId]
+        )
+        if (hasVariantsRow?.has_variants && (variantCounts.length || subVariantCounts.length)) {
+          // Sub-variant-tracked stock
+          for (const sv of subVariantCounts) {
+            await query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [
+              parseFloat(sv.cnt) || 0,
+              sv.sub_variant_id,
+            ])
+          }
+          // Variant-tracked stock (only for variants without sub-variants; those roll up separately)
+          for (const v of variantCounts) {
+            await query(
+              `UPDATE product_variants pv SET inventory_quantity = CASE
                WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
                THEN COALESCE((SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
                ELSE $1 END
              WHERE pv.id = $2`,
-            [parseFloat(v.cnt) || 0, v.variant_id]
-          )
-        }
-        // Product-level rollup = sum of variants
-        await query(
-          `UPDATE products SET inventory_quantity = COALESCE(
+              [parseFloat(v.cnt) || 0, v.variant_id]
+            )
+          }
+          // Product-level rollup = sum of variants
+          await query(
+            `UPDATE products SET inventory_quantity = COALESCE(
              (SELECT SUM(inventory_quantity) FROM product_variants WHERE product_id = $1 AND is_active = true), 0)
            WHERE id = $1`,
-          [productId]
-        )
-      } else {
-        // Simple product — serials were product-level
-        await query(`UPDATE products SET inventory_quantity = $1 WHERE id = $2`, [converted, productId])
-      }
-    }
-
-    // Runs after the tracking toggle-OFF cleanup above so nothing re-adds stock.
-    if (isDigital) await normalizeDigitalProduct({ query }, productId)
-
-    if (uploadedImages.length > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
-      const allExistingImages = await queryMany('SELECT * FROM product_images WHERE product_id = $1', [productId])
-
-      const existingIdsToKeep = new Set(existingImagesToKeep.map((img: any) => img.id))
-      const imagesToDelete = (allExistingImages || []).filter(img => !existingIdsToKeep.has(img.id))
-
-      if (imagesToDelete.length > 0) {
-        const { deleteProductImage } = await import('@/lib/shared/s3')
-        for (const img of imagesToDelete) {
-          if (img.s3_key) await deleteProductImage(img.s3_key, img.s3_thumbnail_key || '')
-          await query('DELETE FROM product_images WHERE id = $1', [img.id])
+            [productId]
+          )
+        } else {
+          // Simple product — serials were product-level
+          await query(`UPDATE products SET inventory_quantity = $1 WHERE id = $2`, [converted, productId])
         }
       }
 
-      const newFileIds: Record<number, string> = {}
-      for (let i = 0; i < uploadedImages.length; i++) {
-        const img = uploadedImages[i]
-        if (!img) continue
-        const inserted = await queryOne<{ id: string }>(
-          `INSERT INTO product_images (
+      // Runs after the tracking toggle-OFF cleanup above so nothing re-adds stock.
+      if (isDigital) await normalizeDigitalProduct({ query }, productId)
+
+      if (uploadedImages.length > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
+        const allExistingImages = await queryMany('SELECT * FROM product_images WHERE product_id = $1', [productId])
+
+        const existingIdsToKeep = new Set(existingImagesToKeep.map((img: any) => img.id))
+        const imagesToDelete = (allExistingImages || []).filter(img => !existingIdsToKeep.has(img.id))
+
+        for (const img of imagesToDelete) {
+          await query('DELETE FROM product_images WHERE id = $1', [img.id])
+          if (img.s3_key) s3Deletes.push({ key: img.s3_key, thumb: img.s3_thumbnail_key || '' })
+        }
+
+        const newFileIds: Record<number, string> = {}
+        for (let i = 0; i < uploadedImages.length; i++) {
+          const img = uploadedImages[i]
+          if (!img) continue
+          const inserted = await queryOne<{ id: string }>(
+            `INSERT INTO product_images (
             product_id, image_url, thumbnail_url, s3_bucket, s3_key,
             s3_thumbnail_key, file_name, file_size, mime_type, width,
             height, display_order, is_primary
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
-          [
-            productId,
-            img.url,
-            img.thumbnailUrl,
-            img.s3Bucket,
-            img.s3Key,
-            img.s3ThumbnailKey,
-            img.fileName,
-            img.fileSize,
-            img.mimeType,
-            img.width,
-            img.height,
-            999,
-            false,
-          ]
-        )
-        if (inserted) newFileIds[i] = inserted.id
-      }
+            [
+              productId,
+              img.url,
+              img.thumbnailUrl,
+              img.s3Bucket,
+              img.s3Key,
+              img.s3ThumbnailKey,
+              img.fileName,
+              img.fileSize,
+              img.mimeType,
+              img.width,
+              img.height,
+              999,
+              false,
+            ]
+          )
+          if (inserted) newFileIds[i] = inserted.id
+        }
 
-      const newGalleryIds: Record<string, string> = {}
-      if (galleryImageRefs.length > 0) {
-        const { copyGalleryImageToProduct } = await import('@/lib/shared/s3')
-        const galleryImages = await queryMany(`SELECT * FROM gallery_images WHERE id = ANY($1::uuid[])`, [
-          galleryImageRefs.map(r => r.id),
-        ])
-        for (const gimg of galleryImages || []) {
-          let copied
-          try {
-            copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, productId)
-          } catch (e) {
-            // Gallery source missing — skip rather than store a gallery/ path or abort.
-            continue
-          }
+        const newGalleryIds: Record<string, string> = {}
+        for (const [gid, copied] of copiedGallery) {
+          const gimg = copied.gimg
           const inserted = await queryOne<{ id: string }>(
             `INSERT INTO product_images (
-              product_id, image_url, thumbnail_url, s3_bucket, s3_key,
-              s3_thumbnail_key, file_name, file_size, mime_type, width,
-              height, display_order, is_primary
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+            product_id, image_url, thumbnail_url, s3_bucket, s3_key,
+            s3_thumbnail_key, file_name, file_size, mime_type, width,
+            height, display_order, is_primary
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 999, false) RETURNING id`,
             [
               productId,
               copied.url,
@@ -971,109 +1057,104 @@ export async function updateProduct(productId: string, formData: FormData) {
               gimg.mime_type,
               gimg.width,
               gimg.height,
-              999,
-              false,
             ]
           )
-          if (inserted) newGalleryIds[gimg.id] = inserted.id
+          if (inserted) newGalleryIds[gid] = inserted.id
         }
-      }
 
-      const applyOrder = async (keys: string[]) => {
-        const primaryKey =
-          keys.find(k => {
-            if (k.startsWith('existing:')) {
-              const id = k.slice(9)
-              return existingImagesToKeep.find((img: any) => img.id === id)?.is_primary
+        const applyOrder = async (keys: string[]) => {
+          const primaryKey =
+            keys.find(k => {
+              if (k.startsWith('existing:')) {
+                const id = k.slice(9)
+                return existingImagesToKeep.find((img: any) => img.id === id)?.is_primary
+              }
+              if (k.startsWith('gallery:')) {
+                const gid = k.slice(8)
+                return galleryImageRefs.find(r => r.id === gid)?.isPrimary
+              }
+              return false
+            }) || keys[0]
+
+          await query('UPDATE product_images SET is_primary = false WHERE product_id = $1', [productId])
+
+          for (let i = 0; i < keys.length; i++) {
+            const key = keys[i]
+            const isPrimary = key === primaryKey
+            if (key.startsWith('existing:')) {
+              const id = key.slice(9)
+              await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+                i,
+                isPrimary,
+                id,
+              ])
+            } else if (key.startsWith('gallery:')) {
+              const gid = key.slice(8)
+              const pid = newGalleryIds[gid]
+              if (pid)
+                await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+                  i,
+                  isPrimary,
+                  pid,
+                ])
+            } else if (key.startsWith('file:')) {
+              const fi = parseInt(key.slice(5))
+              const pid = newFileIds[fi]
+              if (pid)
+                await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+                  i,
+                  isPrimary,
+                  pid,
+                ])
             }
-            if (k.startsWith('gallery:')) {
-              const gid = k.slice(8)
-              return galleryImageRefs.find(r => r.id === gid)?.isPrimary
-            }
-            return false
-          }) || keys[0]
+          }
+        }
 
-        await query('UPDATE product_images SET is_primary = false WHERE product_id = $1', [productId])
-
-        for (let i = 0; i < keys.length; i++) {
-          const key = keys[i]
-          const isPrimary = key === primaryKey
-          if (key.startsWith('existing:')) {
-            const id = key.slice(9)
+        if (imageOrder.length > 0) {
+          await applyOrder(imageOrder)
+        } else {
+          await query('UPDATE product_images SET is_primary = false WHERE product_id = $1', [productId])
+          for (let i = 0; i < existingImagesToKeep.length; i++) {
+            const img = existingImagesToKeep[i]
             await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
               i,
-              isPrimary,
-              id,
+              img.is_primary || false,
+              img.id,
             ])
-          } else if (key.startsWith('gallery:')) {
-            const gid = key.slice(8)
-            const pid = newGalleryIds[gid]
-            if (pid)
-              await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
-                i,
-                isPrimary,
-                pid,
-              ])
-          } else if (key.startsWith('file:')) {
-            const fi = parseInt(key.slice(5))
-            const pid = newFileIds[fi]
-            if (pid)
-              await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
-                i,
-                isPrimary,
-                pid,
-              ])
+          }
+          let offset = existingImagesToKeep.length
+          for (const [fi, pid] of Object.entries(newFileIds)) {
+            await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+              offset,
+              offset === 0,
+              pid,
+            ])
+            offset++
+          }
+          for (const [, pid] of Object.entries(newGalleryIds)) {
+            await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
+              offset,
+              offset === 0,
+              pid,
+            ])
+            offset++
           }
         }
       }
 
-      if (imageOrder.length > 0) {
-        await applyOrder(imageOrder)
-      } else {
-        await query('UPDATE product_images SET is_primary = false WHERE product_id = $1', [productId])
-        for (let i = 0; i < existingImagesToKeep.length; i++) {
-          const img = existingImagesToKeep[i]
-          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
-            i,
-            img.is_primary || false,
-            img.id,
-          ])
-        }
-        let offset = existingImagesToKeep.length
-        for (const [fi, pid] of Object.entries(newFileIds)) {
-          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
-            offset,
-            offset === 0,
-            pid,
-          ])
-          offset++
-        }
-        for (const [, pid] of Object.entries(newGalleryIds)) {
-          await query('UPDATE product_images SET display_order = $1, is_primary = $2 WHERE id = $3', [
-            offset,
-            offset === 0,
-            pid,
-          ])
-          offset++
-        }
-      }
-    }
+      if (hasVariants) {
+        if (rawVariants) {
+          const variants = rawVariants
 
-    if (hasVariants) {
-      const variantsJson = formData.get('variants_json') as string
-      if (variantsJson) {
-        const productData = await queryOne<{ sku: string }>('SELECT sku FROM products WHERE id = $1', [productId])
-        const productSku = productData?.sku || 'PRD-000'
-        const variants = JSON.parse(variantsJson)
-
-        for (const variant of variants) {
-          const isPersisted = variant.id && !String(variant.id).startsWith('temp-')
-          if (variant._isDeleted && isPersisted) {
-            await query('DELETE FROM product_variants WHERE id = $1 AND product_id = $2', [variant.id, productId])
-          } else if (isPersisted && !variant._isDeleted) {
-            const variantSku = generateVariantSku(productSku, variant.variant_name)
-            await query(
-              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, stock_status = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_grams = $13, package_type = $14, length_cm = $15, breadth_cm = $16, height_cm = $17, sub_variant_type = $18, variant_type = $19, discount_pct = $20,
+          for (const variant of variants) {
+            const isPersisted = variant.id && !String(variant.id).startsWith('temp-')
+            if (variant._isDeleted && isPersisted) {
+              await query('DELETE FROM product_variants WHERE id = $1 AND product_id = $2', [variant.id, productId])
+            } else if (isPersisted && !variant._isDeleted) {
+              if (!String(variant.variant_name ?? '').trim()) continue
+              const variantSku = generateVariantSku(productSku, variant.variant_name)
+              await query(
+                `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, stock_status = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_grams = $13, package_type = $14, length_cm = $15, breadth_cm = $16, height_cm = $17, sub_variant_type = $18, variant_type = $19, discount_pct = $20,
                  asin = $21::text,
                  asin_match = CASE
                    WHEN $21::text IS NULL THEN NULL
@@ -1083,122 +1164,119 @@ export async function updateProduct(productId: string, formData: FormData) {
                  subscription_price = $25,
                  subscription_prices = $26::jsonb
                WHERE id = $23 AND product_id = $24`,
-              [
-                variantSku,
-                variant.variant_name,
-                variant.price ? round2(parseFloat(variant.price)) : null,
-                variant.mrp ? round2(parseFloat(variant.mrp)) : null,
-                variant.mrp_ex_gst ? round2(parseFloat(variant.mrp_ex_gst)) : null,
-                variant.price_ex_gst
-                  ? round2(parseFloat(variant.price_ex_gst))
-                  : variant.price
-                    ? round2(parseFloat(variant.price) / (1 + gstPercentage / 100))
-                    : null,
-                variant.stock_status || 'In Stock',
-                variant.mpn || null,
-                variant.gtin || null,
-                variant.pricing_type || 'unit',
-                variant.unit || null,
-                variant.numeric_value ? parseFloat(variant.numeric_value) : null,
-                variant.weight_grams ? parseInt(variant.weight_grams) : null,
-                variant.package_type || null,
-                variant.length_cm ? parseFloat(variant.length_cm) : null,
-                variant.breadth_cm ? parseFloat(variant.breadth_cm) : null,
-                variant.height_cm ? parseFloat(variant.height_cm) : null,
-                variant.sub_variant_type || null,
-                variant.variant_type || null,
-                variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
-                variant.asin || null,
-                variant.isbn || null,
-                variant.id,
-                productId,
-                normalizeSubscriptionPrice(variant.subscription_price),
-                JSON.stringify(normalizeSubscriptionPrices(variant.subscription_prices)),
-              ]
-            )
-            const subVariants = await queryMany<{ id: string; sub_variant_name: string }>(
-              'SELECT id, sub_variant_name FROM product_sub_variants WHERE variant_id = $1',
-              [variant.id]
-            )
-            for (const sv of subVariants || []) {
-              if (!sv.sub_variant_name) continue
-              const newSubSku = generateVariantSku(variantSku, sv.sub_variant_name)
-              await query('UPDATE product_sub_variants SET sku = $1, discount_pct = $2 WHERE id = $3', [
-                newSubSku,
-                discountPct,
-                sv.id,
-              ])
-            }
-          } else if (!isPersisted && !variant._isDeleted) {
-            if (!variant.variant_name) continue
-            const variantSku = generateVariantSku(productSku, variant.variant_name)
-            await query(
-              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, asin_match, isbn, is_active, subscription_price, subscription_prices)
+                [
+                  variantSku,
+                  variant.variant_name,
+                  money(variant.price),
+                  money(variant.mrp),
+                  money(variant.mrp_ex_gst),
+                  money(variant.price_ex_gst) ??
+                    (money(variant.price) != null ? round2(money(variant.price)! / (1 + gstPercentage / 100)) : null),
+                  variant.stock_status || 'In Stock',
+                  variant.mpn || null,
+                  variant.gtin || null,
+                  variant.pricing_type || 'unit',
+                  variant.unit || null,
+                  floatOrNull(variant.numeric_value),
+                  intOrNull(variant.weight_grams),
+                  variant.package_type || null,
+                  floatOrNull(variant.length_cm),
+                  floatOrNull(variant.breadth_cm),
+                  floatOrNull(variant.height_cm),
+                  variant.sub_variant_type || null,
+                  variant.variant_type || null,
+                  money(variant.discount_pct) ?? 0,
+                  variant.asin || null,
+                  variant.isbn || null,
+                  variant.id,
+                  productId,
+                  normalizeSubscriptionPrice(variant.subscription_price),
+                  JSON.stringify(normalizeSubscriptionPrices(variant.subscription_prices)),
+                ]
+              )
+              const subVariants = await queryMany<{ id: string; sub_variant_name: string }>(
+                'SELECT id, sub_variant_name FROM product_sub_variants WHERE variant_id = $1',
+                [variant.id]
+              )
+              for (const sv of subVariants || []) {
+                if (!sv.sub_variant_name) continue
+                const newSubSku = generateVariantSku(variantSku, sv.sub_variant_name)
+                await query('UPDATE product_sub_variants SET sku = $1, discount_pct = $2 WHERE id = $3', [
+                  newSubSku,
+                  discountPct,
+                  sv.id,
+                ])
+              }
+            } else if (!isPersisted && !variant._isDeleted) {
+              if (!variant.variant_name) continue
+              const variantSku = generateVariantSku(productSku, variant.variant_name)
+              await query(
+                `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, asin_match, isbn, is_active, subscription_price, subscription_prices)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22::text, CASE WHEN $22::text IS NOT NULL THEN 'manual' ELSE NULL END, $23, true, $24, $25::jsonb)`,
-              [
-                productId,
-                variantSku,
-                variant.variant_name,
-                variant.price ? round2(parseFloat(variant.price)) : null,
-                variant.mrp ? round2(parseFloat(variant.mrp)) : null,
-                variant.mrp_ex_gst ? round2(parseFloat(variant.mrp_ex_gst)) : null,
-                variant.price_ex_gst
-                  ? round2(parseFloat(variant.price_ex_gst))
-                  : variant.price
-                    ? round2(parseFloat(variant.price) / (1 + gstPercentage / 100))
-                    : null,
-                variant.stock_status || 'In Stock',
-                variant.mpn || null,
-                variant.gtin || null,
-                variant.pricing_type || 'unit',
-                variant.unit || null,
-                variant.numeric_value ? parseFloat(variant.numeric_value) : null,
-                variant.weight_grams ? parseInt(variant.weight_grams) : null,
-                variant.package_type || null,
-                variant.length_cm ? parseFloat(variant.length_cm) : null,
-                variant.breadth_cm ? parseFloat(variant.breadth_cm) : null,
-                variant.height_cm ? parseFloat(variant.height_cm) : null,
-                variant.sub_variant_type || null,
-                variant.variant_type || null,
-                variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
-                variant.asin || null,
-                variant.isbn || null,
-                normalizeSubscriptionPrice(variant.subscription_price),
-                JSON.stringify(normalizeSubscriptionPrices(variant.subscription_prices)),
-              ]
-            )
+                [
+                  productId,
+                  variantSku,
+                  variant.variant_name,
+                  money(variant.price),
+                  money(variant.mrp),
+                  money(variant.mrp_ex_gst),
+                  money(variant.price_ex_gst) ??
+                    (money(variant.price) != null ? round2(money(variant.price)! / (1 + gstPercentage / 100)) : null),
+                  variant.stock_status || 'In Stock',
+                  variant.mpn || null,
+                  variant.gtin || null,
+                  variant.pricing_type || 'unit',
+                  variant.unit || null,
+                  floatOrNull(variant.numeric_value),
+                  intOrNull(variant.weight_grams),
+                  variant.package_type || null,
+                  floatOrNull(variant.length_cm),
+                  floatOrNull(variant.breadth_cm),
+                  floatOrNull(variant.height_cm),
+                  variant.sub_variant_type || null,
+                  variant.variant_type || null,
+                  money(variant.discount_pct) ?? 0,
+                  variant.asin || null,
+                  variant.isbn || null,
+                  normalizeSubscriptionPrice(variant.subscription_price),
+                  JSON.stringify(normalizeSubscriptionPrices(variant.subscription_prices)),
+                ]
+              )
+            }
           }
         }
+      } else {
+        await query('DELETE FROM product_variants WHERE product_id = $1', [productId])
       }
-      await applyLiveSubVariantPrices(productId, subVariantPrices)
-    } else {
-      await query('DELETE FROM product_variants WHERE product_id = $1', [productId])
+    })
+    copiedS3.length = 0 // committed: the copies are referenced now
+    await removeS3(s3Deletes, 'removed-image')
+    if (hasVariants && subVariantPrices.length > 0) {
+      try {
+        await applyLiveSubVariantPrices(productId, subVariantPrices)
+      } catch (err: any) {
+        console.error('[product-edit] sub-variant subscription prices failed for', productId, err)
+        return {
+          error: `Product saved, but sub-variant subscription prices failed: ${productErrorMessage(err, 'unknown error')}`,
+        }
+      }
     }
 
     const { syncProductToSheet } = await import('@/lib/shared/google-sheets')
-    syncProductToSheet(productId).catch(() => {})
+    syncProductToSheet(productId).catch(e => console.error('[product-edit] sheet sync failed for', productId, e))
     const { syncProductToMerchant } = await import('@/lib/merchant/sync')
-    syncProductToMerchant(productId).catch(() => {})
+    syncProductToMerchant(productId).catch(e => console.error('[product-edit] merchant sync failed for', productId, e))
     const { syncProductToAmazon } = await import('@/lib/amazon/sync')
-    syncProductToAmazon(productId).catch(() => {})
-    await triggerEnrichment(productId).catch(() => {})
+    syncProductToAmazon(productId).catch(e => console.error('[product-edit] amazon sync failed for', productId, e))
+    await triggerEnrichment(productId).catch(e => console.error('[product-edit] enrichment failed for', productId, e))
 
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
-    const host = await getHost()
-
-    if (intent === 'draft-stay') {
-      const popupVariantId = formData.get('popup_variant_id') as string | null
-      const dest = popupVariantId
-        ? `/admin/products/edit/${productId}?popup=${encodeURIComponent(popupVariantId)}`
-        : `/admin/products/edit/${productId}`
-      redirect(ap(dest, host))
-    }
-    const back = formData.get('_back') as string | null
-    redirect(ap(back && back.startsWith('/admin/products') ? back : '/admin/products', host))
+    return finish(intent === 'draft-stay' ? stayDest() : listDest)
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     console.error('[product-edit] updateProduct failed for', productId, 'intent=', intent, err)
-    return { error: err?.message || 'Failed to update product' }
+    await removeS3(copiedS3, 'rollback')
+    return { error: productErrorMessage(err, 'Failed to update product. Please try again.') }
   }
 }

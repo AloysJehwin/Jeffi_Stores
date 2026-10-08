@@ -3,7 +3,17 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
 import { revalidatePath } from 'next/cache'
-import { publishProductDraft, openOrdersForProduct } from '@/lib/catalog/product-draft'
+import {
+  publishProductDraft,
+  openOrdersForProduct,
+  OpenOrdersBlockError,
+  UnitChangeBlockedError,
+} from '@/lib/catalog/product-draft'
+import {
+  productErrorMessage,
+  ProductValidationError,
+  storedProductPublishErrors,
+} from '@/lib/catalog/product-validation'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +42,15 @@ export async function POST(req: NextRequest, { params }: Params) {
         id,
       ])
       if (!createDraft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+
+      // Same publish rules as the form: name, category, prices, weight / package dims.
+      const errors = await storedProductPublishErrors({ query }, id)
+      if (errors.length > 0) {
+        return NextResponse.json(
+          { error: `Cannot publish yet: ${errors[0]} Open the draft to complete it.`, details: errors },
+          { status: 400 }
+        )
+      }
 
       const blockingCd = await openOrdersForProduct(id)
       if (blockingCd.length > 0) {
@@ -62,10 +81,17 @@ export async function POST(req: NextRequest, { params }: Params) {
       )
     }
 
-    await publishProductDraft(id)
+    await publishProductDraft(id, { activate: true })
+    revalidatePath('/admin/products')
     return NextResponse.json({ success: true, productId: id })
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: msg || 'Failed to publish draft' }, { status: 500 })
+    console.error('[product-publish] publish failed for', id, err)
+    const status =
+      err instanceof OpenOrdersBlockError || err instanceof UnitChangeBlockedError
+        ? 409
+        : err instanceof ProductValidationError
+          ? 400
+          : 500
+    return NextResponse.json({ error: productErrorMessage(err, 'Failed to publish draft') }, { status })
   }
 }

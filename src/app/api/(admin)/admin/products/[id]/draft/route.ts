@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
 import { deleteProductImage } from '@/lib/shared/s3'
+import { productErrorMessage } from '@/lib/catalog/product-validation'
 import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
 import { applyDraftSubVariantPrices, parseSubVariantPriceEntries } from '@/lib/subscriptions/sub-variant-prices'
 
@@ -64,8 +65,8 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({ success: true, productId: id })
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: msg || 'Failed to create draft' }, { status: 500 })
+    console.error('[product-draft] create failed for', id, err)
+    return NextResponse.json({ error: productErrorMessage(err, 'Failed to create draft') }, { status: 500 })
   }
 }
 
@@ -79,7 +80,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 
   try {
-    const body = await req.json()
+    const body = await req.json().catch(() => null)
+    if (!body) return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
     const fields = body?.fields
     if (!fields || typeof fields !== 'object') {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
@@ -158,8 +160,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: msg || 'Autosave failed' }, { status: 500 })
+    console.error('[product-draft] autosave failed for', id, err)
+    return NextResponse.json({ error: productErrorMessage(err, 'Autosave failed') }, { status: 500 })
   }
 }
 
@@ -195,23 +197,23 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     const stagedVI = Array.isArray(draft?.variant_images) ? draft!.variant_images : []
     for (const vi of stagedVI) {
       if (vi?._staged && vi?.s3_key && String(vi.id).startsWith('draft-vi-')) {
-        try {
-          await deleteProductImage(vi.s3_key, vi.s3_thumbnail_key || '')
-        } catch {}
+        await deleteProductImage(vi.s3_key, vi.s3_thumbnail_key || '').catch(e =>
+          console.error('[product-draft] staged variant image cleanup failed for', id, vi.s3_key, e)
+        )
       }
     }
     const stagedImages = Array.isArray(draft?.images) ? draft!.images : []
     for (const img of stagedImages) {
       if (img?._staged && img?.s3_key && String(img.id).startsWith('draft-img-')) {
-        try {
-          await deleteProductImage(img.s3_key, img.s3_thumbnail_key || '')
-        } catch {}
+        await deleteProductImage(img.s3_key, img.s3_thumbnail_key || '').catch(e =>
+          console.error('[product-draft] staged image cleanup failed for', id, img.s3_key, e)
+        )
       }
     }
     await query(`DELETE FROM product_drafts WHERE product_id = $1`, [id])
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Unknown error'
-    return NextResponse.json({ error: msg || 'Failed to discard draft' }, { status: 500 })
+    console.error('[product-draft] discard failed for', id, err)
+    return NextResponse.json({ error: productErrorMessage(err, 'Failed to discard draft') }, { status: 500 })
   }
 }

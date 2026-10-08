@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne, query } from '@/lib/shared/db'
-import { uploadProductImage, copyGalleryImageToProduct } from '@/lib/shared/s3'
+import { queryOne, withTransaction } from '@/lib/shared/db'
+import {
+  uploadProductImage,
+  copyGalleryImageToProduct,
+  deleteProductImage,
+  UploadValidationError,
+} from '@/lib/shared/s3'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 
 // Draft-scoped MAIN product images. Uploads go to S3 immediately, but the ROW is
@@ -31,11 +36,38 @@ async function getStage(productId: string): Promise<any[]> {
   return Array.isArray(row?.images) ? row!.images : []
 }
 
-async function saveStage(productId: string, stage: any[]): Promise<void> {
-  await query(`UPDATE product_drafts SET images = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
-    productId,
-    JSON.stringify(stage),
-  ])
+class StageError extends Error {
+  constructor(
+    message: string,
+    public status: number
+  ) {
+    super(message)
+  }
+}
+
+// Read-modify-write of the staged array under a row lock, so concurrent uploads/edits never
+// overwrite each other. `fn` returns the next array, or null for no change.
+async function mutateStage<T>(productId: string, fn: (stage: any[]) => { next: any[] | null; result: T }): Promise<T> {
+  return withTransaction(async client => {
+    const r = await client.query(`SELECT images FROM product_drafts WHERE product_id = $1 FOR UPDATE`, [productId])
+    if (!r.rows[0]) throw new StageError('No draft exists for this product. Reload the edit page and try again.', 404)
+    const stage = Array.isArray(r.rows[0].images) ? r.rows[0].images : []
+    const { next, result } = fn(stage)
+    if (next) {
+      await client.query(`UPDATE product_drafts SET images = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [
+        productId,
+        JSON.stringify(next),
+      ])
+    }
+    return result
+  })
+}
+
+function errorResponse(err: any, productId: string, action: string) {
+  if (err instanceof StageError) return NextResponse.json({ error: err.message }, { status: err.status })
+  if (err instanceof UploadValidationError) return NextResponse.json({ error: err.message }, { status: 400 })
+  console.error(`[draft-images] ${action} failed for`, productId, err)
+  return NextResponse.json({ error: err?.message || `Failed to ${action} image` }, { status: 500 })
 }
 
 export async function GET(request: NextRequest, { params }: Params) {
@@ -57,12 +89,12 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:write'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
+  let uploaded: { s3_key: string; s3_thumbnail_key: string } | null = null
   try {
-    const stage = await getStage(id)
-    if (stage.length >= MAX_IMAGES) {
+    // Fast fail before uploading; the locked append below re-checks.
+    if ((await getStage(id)).length >= MAX_IMAGES) {
       return NextResponse.json({ error: `Maximum ${MAX_IMAGES} images per product` }, { status: 400 })
     }
-    const isPrimary = stage.length === 0
     const contentType = request.headers.get('content-type') || ''
 
     let staged: any
@@ -88,8 +120,6 @@ export async function POST(request: NextRequest, { params }: Params) {
         width: gimg.width,
         height: gimg.height,
         alt_text: '',
-        display_order: stage.length,
-        is_primary: isPrimary,
         _staged: true,
         _fromGallery: true,
       }
@@ -111,15 +141,20 @@ export async function POST(request: NextRequest, { params }: Params) {
         width: result.width,
         height: result.height,
         alt_text: '',
-        display_order: stage.length,
-        is_primary: isPrimary,
         _staged: true,
       }
     }
-    await saveStage(id, [...stage, staged])
-    return NextResponse.json({ image: staged })
+    uploaded = { s3_key: staged.s3_key, s3_thumbnail_key: staged.s3_thumbnail_key || '' }
+    const image = await mutateStage(id, stage => {
+      if (stage.length >= MAX_IMAGES) throw new StageError(`Maximum ${MAX_IMAGES} images per product`, 400)
+      const img = { ...staged, display_order: stage.length, is_primary: stage.length === 0 }
+      return { next: [...stage, img], result: img }
+    })
+    return NextResponse.json({ image })
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
+    // The file reached S3 but was not staged — remove it so it doesn't orphan.
+    if (uploaded?.s3_key) await deleteProductImage(uploaded.s3_key, uploaded.s3_thumbnail_key).catch(() => {})
+    return errorResponse(err, id, 'upload')
   }
 }
 
@@ -136,15 +171,20 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!parsedDel.ok) return parsedDel.response
   const { imageId } = parsedDel.data
 
-  const stage = await getStage(id)
-  const removed = stage.find((img: any) => img.id === imageId)
-  let next = stage.filter((img: any) => img.id !== imageId)
-  if (removed?.is_primary) {
-    const rest = [...next].sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
-    if (rest[0]) next = next.map((img: any) => (img.id === rest[0].id ? { ...img, is_primary: true } : img))
+  try {
+    await mutateStage(id, stage => {
+      const removed = stage.find((img: any) => img.id === imageId)
+      let next = stage.filter((img: any) => img.id !== imageId)
+      if (removed?.is_primary) {
+        const rest = [...next].sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+        if (rest[0]) next = next.map((img: any) => (img.id === rest[0].id ? { ...img, is_primary: true } : img))
+      }
+      return { next, result: null }
+    })
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    return errorResponse(err, id, 'remove')
   }
-  await saveStage(id, next)
-  return NextResponse.json({ success: true })
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
@@ -160,12 +200,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (!parsedPatch.ok) return parsedPatch.response
   const { imageId, isPrimary, displayOrder } = parsedPatch.data
 
-  const stage = await getStage(id)
-  const next = stage.map((img: any) => {
-    if (isPrimary) return { ...img, is_primary: img.id === imageId }
-    if (displayOrder !== undefined && img.id === imageId) return { ...img, display_order: displayOrder }
-    return img
-  })
-  await saveStage(id, next)
-  return NextResponse.json({ success: true })
+  try {
+    await mutateStage(id, stage => ({
+      next: stage.map((img: any) => {
+        if (isPrimary) return { ...img, is_primary: img.id === imageId }
+        if (displayOrder !== undefined && img.id === imageId) return { ...img, display_order: displayOrder }
+        return img
+      }),
+      result: null,
+    }))
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    return errorResponse(err, id, 'update')
+  }
 }
