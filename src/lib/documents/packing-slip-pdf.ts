@@ -2,6 +2,7 @@ import 'server-only'
 import { queryMany } from '@/lib/shared/db'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 import { tenantLogoBuffer } from '@/lib/documents/store-logo'
+import { unitConversion } from '@/lib/orders/unit-conversion'
 
 const PDFDocument = eval('require')('pdfkit')
 const QRCode = eval('require')('qrcode')
@@ -13,6 +14,8 @@ export interface PackingSlipItem {
   quantity: number
   buy_mode?: string | null
   buy_unit?: string | null
+  sell_unit?: string | null
+  sell_unit_factor?: number | string | null
   unit_price: number
   mrp?: number | null
   total_price: number
@@ -24,6 +27,11 @@ export interface PackingSlipItem {
   sgst_amount?: number | null
   igst_amount?: number | null
   image_url?: string | null
+}
+
+function conversionText(item: PackingSlipItem): string | null {
+  const c = unitConversion(item.quantity, item.sell_unit || item.buy_unit, item.sell_unit_factor)
+  return c ? `${c.perUnit} · ${c.total} to pack` : null
 }
 
 export interface PackingSlipAddress {
@@ -308,6 +316,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     const nameH = doc.font('Helvetica').fontSize(8).heightOfString(item.product_name, { width: nameColW })
     let contentH = nameH + ROW_V_PAD
     if (item.variant_name) contentH += varLineH + 2
+    if (conversionText(item)) contentH += varLineH + 2
     return Math.max(contentH, IMG_SIZE + ROW_V_PAD)
   })
 
@@ -461,6 +470,13 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
       const afterName = doc.y + 2
       doc.font('Helvetica').fontSize(7).fillColor(TEXT_MUTED)
       doc.text(item.variant_name, tblX + COL_IMG + 4, afterName, { width: COL_PROD - 4, lineBreak: false })
+    }
+
+    const conv = conversionText(item)
+    if (conv) {
+      const afterPrev = doc.y + 2
+      doc.font('Helvetica-Bold').fontSize(7).fillColor(TEXT_DARK)
+      doc.text(conv, tblX + COL_IMG + 4, afterPrev, { width: COL_PROD - 4, lineBreak: false })
     }
 
     // Right-side columns — vertically centred

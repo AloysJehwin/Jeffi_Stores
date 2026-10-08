@@ -13,6 +13,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { unitConversion } from '@/lib/orders/unit-conversion'
 import UpdateOrderStatus from '@/app/(admin)/admin/orders/[id]/_components/UpdateOrderStatus'
 import CancelReview from '@/app/(admin)/admin/orders/[id]/_components/CancelReview'
 import ReturnReview from '@/app/(admin)/admin/orders/[id]/_components/ReturnReview'
@@ -204,97 +205,98 @@ export default async function OrderDetailsPage({
                 </Link>
               </p>
             )}
-            <p className="text-foreground-secondary mt-1">
-              Placed on {new Date(order.created_at).toLocaleDateString('en-IN')} at{' '}
-              {new Date(order.created_at).toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZone: 'Asia/Kolkata',
-              })}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 sm:gap-3 items-center">
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
-                order.payment_status === 'paid'
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
-                  : order.payment_status === 'pending'
-                    ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
-                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
-              }`}
-            >
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-1">
+              <p className="text-foreground-secondary">
+                Placed on {new Date(order.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} at{' '}
+                {new Date(order.created_at).toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  timeZone: 'Asia/Kolkata',
+                })}
+                {order.invoice_number && <span className="ml-2">· Invoice {order.invoice_number}</span>}
+              </p>
               <span
-                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
                   order.payment_status === 'paid'
-                    ? 'bg-green-500'
+                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
                     : order.payment_status === 'pending'
-                      ? 'bg-yellow-500'
-                      : 'bg-red-500'
+                      ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
+                      : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
                 }`}
-              />
-              Payment: {order.payment_status}
-            </span>
-            <span
-              className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
-                order.status === 'delivered' || order.status === 'granted'
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
-                  : order.status === 'processing' || order.status === 'shipped'
-                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                    : order.status === 'out_for_delivery'
-                      ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
-                      : order.status === 'cancelled' || order.status === 'return_rejected'
-                        ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
-                        : order.status === 'cancel_requested' || order.status === 'return_requested'
-                          ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800'
-                          : order.status === 'cancel_rejected'
-                            ? 'bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'
-                            : order.status === 'returned'
-                              ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                              : order.status === 'return_approved' || order.status === 'return_received'
-                                ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                                : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
-              }`}
-            >
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    order.payment_status === 'paid'
+                      ? 'bg-green-500'
+                      : order.payment_status === 'pending'
+                        ? 'bg-yellow-500'
+                        : 'bg-red-500'
+                  }`}
+                />
+                Payment: {order.payment_status}
+              </span>
               <span
-                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
                   order.status === 'delivered' || order.status === 'granted'
-                    ? 'bg-green-500'
-                    : order.status === 'processing' ||
-                        order.status === 'shipped' ||
-                        order.status === 'return_approved' ||
-                        order.status === 'return_received'
-                      ? 'bg-blue-500'
+                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
+                    : order.status === 'processing' || order.status === 'shipped'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
                       : order.status === 'out_for_delivery'
-                        ? 'bg-indigo-500'
+                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
                         : order.status === 'cancelled' || order.status === 'return_rejected'
-                          ? 'bg-red-500'
+                          ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
                           : order.status === 'cancel_requested' || order.status === 'return_requested'
-                            ? 'bg-orange-500'
+                            ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800'
                             : order.status === 'cancel_rejected'
-                              ? 'bg-gray-400'
+                              ? 'bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'
                               : order.status === 'returned'
-                                ? 'bg-purple-500'
-                                : 'bg-yellow-500'
+                                ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+                                : order.status === 'return_approved' || order.status === 'return_received'
+                                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                                  : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
                 }`}
-              />
-              {order.status === 'cancel_requested'
-                ? 'Cancellation Requested'
-                : order.status === 'cancel_rejected'
-                  ? 'Cancellation Rejected'
-                  : order.status === 'granted'
-                    ? 'Access granted'
-                    : order.status.replace(/_/g, ' ')}
-            </span>
-            {/* Divider between status pills and action buttons */}
-            <span className="w-px h-6 bg-border-default hidden sm:block" />
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    order.status === 'delivered' || order.status === 'granted'
+                      ? 'bg-green-500'
+                      : order.status === 'processing' ||
+                          order.status === 'shipped' ||
+                          order.status === 'return_approved' ||
+                          order.status === 'return_received'
+                        ? 'bg-blue-500'
+                        : order.status === 'out_for_delivery'
+                          ? 'bg-indigo-500'
+                          : order.status === 'cancelled' || order.status === 'return_rejected'
+                            ? 'bg-red-500'
+                            : order.status === 'cancel_requested' || order.status === 'return_requested'
+                              ? 'bg-orange-500'
+                              : order.status === 'cancel_rejected'
+                                ? 'bg-gray-400'
+                                : order.status === 'returned'
+                                  ? 'bg-purple-500'
+                                  : 'bg-yellow-500'
+                  }`}
+                />
+                {order.status === 'cancel_requested'
+                  ? 'Cancellation Requested'
+                  : order.status === 'cancel_rejected'
+                    ? 'Cancellation Rejected'
+                    : order.status === 'granted'
+                      ? 'Access granted'
+                      : order.status.replace(/_/g, ' ')}
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:justify-end gap-2 items-center">
             {/* Packing Slip — download + print combined pill */}
             {canPackingSlips && !isAllDigital && (
-              <div className="inline-flex rounded-full overflow-hidden border border-secondary-300 dark:border-secondary-700 text-sm font-semibold">
+              <div className="inline-flex w-full sm:w-48 h-9 rounded-full overflow-hidden border text-sm font-semibold border-secondary-300 dark:border-secondary-700">
                 <a
                   href={`/api/admin/packing-slips/${order.id}`}
                   download
                   title="Download Packing Slip"
-                  className="px-3 py-2 bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 transition-colors inline-flex items-center gap-1.5 border-r border-secondary-300 dark:border-secondary-700"
+                  className="flex-1 min-w-0 px-3 bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 transition-colors inline-flex items-center justify-center gap-1.5 border-r border-secondary-300 dark:border-secondary-700"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -311,7 +313,7 @@ export default async function OrderDetailsPage({
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Print Packing Slip"
-                  className="px-3 py-2 bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 transition-colors inline-flex items-center"
+                  className="w-10 shrink-0 bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 transition-colors inline-flex items-center justify-center"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -326,12 +328,12 @@ export default async function OrderDetailsPage({
             )}
             {/* Shipping Label — download + print combined pill */}
             {order.awb_number && (
-              <div className="inline-flex rounded-full overflow-hidden border border-blue-300 dark:border-blue-700 text-sm font-semibold">
+              <div className="inline-flex w-full sm:w-48 h-9 rounded-full overflow-hidden border text-sm font-semibold border-blue-300 dark:border-blue-700">
                 <a
                   href={`/api/admin/orders/${order.id}/shipping-label?size=4R`}
                   download
                   title="Download Shipping Label"
-                  className="px-3 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors inline-flex items-center gap-1.5 border-r border-blue-300 dark:border-blue-700"
+                  className="flex-1 min-w-0 px-3 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors inline-flex items-center justify-center gap-1.5 border-r border-blue-300 dark:border-blue-700"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -348,7 +350,7 @@ export default async function OrderDetailsPage({
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Print Shipping Label"
-                  className="px-3 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors inline-flex items-center"
+                  className="w-10 shrink-0 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors inline-flex items-center justify-center"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
@@ -363,38 +365,36 @@ export default async function OrderDetailsPage({
             )}
             {!order.original_order_id &&
               (order.invoice_number ? (
-                <div className="inline-flex rounded-full overflow-hidden border border-accent-300 dark:border-accent-700 text-sm font-semibold">
-                  {order.view_token && (
-                    <a
-                      href={`/invoice/${order.view_token}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="View Invoice"
-                      className="px-3 py-2 bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors inline-flex items-center gap-1.5 border-r border-accent-300 dark:border-accent-700"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                        />
-                      </svg>
-                      Invoice {order.invoice_number}
-                    </a>
-                  )}
+                <div className="inline-flex w-full sm:w-48 h-9 rounded-full overflow-hidden border text-sm font-semibold border-accent-300 dark:border-accent-700">
+                  <a
+                    href={order.view_token ? `/invoice/${order.view_token}` : `/api/orders/${order.id}/invoice`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`View Invoice ${order.invoice_number}`}
+                    className="flex-1 min-w-0 px-3 bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors inline-flex items-center justify-center gap-1.5 border-r border-accent-300 dark:border-accent-700"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
+                    </svg>
+                    Invoice
+                  </a>
                   <a
                     href={`/api/orders/${order.id}/invoice`}
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Download PDF"
-                    className="px-3 py-2 bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors inline-flex items-center"
+                    className="w-10 shrink-0 bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors inline-flex items-center justify-center"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path
@@ -533,6 +533,20 @@ export default async function OrderDetailsPage({
                             )
                           })()}
                         </p>
+                        {(() => {
+                          const conv = unitConversion(
+                            item.quantity,
+                            item.sell_unit || item.buy_unit,
+                            item.sell_unit_factor
+                          )
+                          return conv ? (
+                            <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-secondary-700 dark:text-secondary-300 bg-secondary-50 dark:bg-secondary-900/30 border border-secondary-200 dark:border-secondary-800 rounded-md px-2 py-0.5">
+                              {conv.perUnit}
+                              <span className="text-foreground-muted">·</span>
+                              {conv.total} total
+                            </p>
+                          ) : null
+                        })()}
                       </div>
                       <div className="text-right shrink-0">
                         <p className="font-semibold text-foreground">
