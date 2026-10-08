@@ -3,12 +3,15 @@ import { query } from '@/lib/shared/db'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 
+const PAGE_TYPES = new Set(['home', 'categories', 'category', 'product', 'cart', 'checkout', 'order_placed', 'search'])
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { sessionId, page, path, referrer } = body
 
-    if (!sessionId || !page || !path) {
+    // page is a type from PageTracker.classifyPage (varchar(32)), not a URL; reject anything else as 400.
+    if (!sessionId || !path || typeof page !== 'string' || !PAGE_TYPES.has(page) || String(sessionId).length > 64) {
       return NextResponse.json({ ok: false }, { status: 400 })
     }
 
