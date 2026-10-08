@@ -38,7 +38,7 @@ import { applyDiscount } from '@/lib/catalog/pricing'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useToast } from '@/contexts/ToastContext'
-import { gstError, priceErrors, publishShippingError } from '@/lib/catalog/product-validation'
+import { gstError, paiseString, priceErrors, publishShippingError } from '@/lib/catalog/product-validation'
 
 interface Category {
   id: string
@@ -89,7 +89,7 @@ interface VariantRow {
 function toSupplierRow(s: any): SupplierRow {
   return {
     supplier_id: s.supplier_id || '',
-    unit_cost: s.unit_cost != null ? String(s.unit_cost) : '',
+    unit_cost: paiseString(s.unit_cost),
     is_preferred: !!s.is_preferred,
     moq: s.moq != null ? String(s.moq) : '',
     lead_time_days: s.lead_time_days != null ? String(s.lead_time_days) : '',
@@ -499,14 +499,14 @@ export default function ProductForm({
   )
 
   const [basePrice, setBasePrice] = useState(() => {
-    if (product?.base_price != null) return String(product.base_price)
+    if (product?.base_price != null) return paiseString(product.base_price)
     if (product?.price_ex_gst != null) {
       const r = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
       return String(Math.round(Number(product.price_ex_gst) * (1 + r / 100) * 100) / 100)
     }
     return ''
   })
-  const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '')
+  const [costPrice, setCostPrice] = useState(paiseString(product?.cost_price))
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
   const [productSuppliers, setProductSuppliers] = useState<SupplierRow[]>(
     Array.isArray(product?.product_suppliers)
@@ -514,7 +514,7 @@ export default function ProductForm({
           .filter((s: any) => !s.variant_id && !s.sub_variant_id && !s.variant_sku && !s.sub_variant_sku)
           .map((s: any) => ({
             supplier_id: s.supplier_id || '',
-            unit_cost: s.unit_cost != null ? String(s.unit_cost) : '',
+            unit_cost: paiseString(s.unit_cost),
             is_preferred: !!s.is_preferred,
             moq: s.moq != null ? String(s.moq) : '',
             lead_time_days: s.lead_time_days != null ? String(s.lead_time_days) : '',
@@ -632,9 +632,7 @@ export default function ProductForm({
     }
     setIsDigital(next)
   }
-  const [subscriptionPrice, setSubscriptionPrice] = useState(
-    product?.subscription_price != null ? String(product.subscription_price) : ''
-  )
+  const [subscriptionPrice, setSubscriptionPrice] = useState(paiseString(product?.subscription_price))
   const [subscriptionPrices, setSubscriptionPrices] = useState<Record<string, string>>(() =>
     priceInputs(product?.subscription_prices)
   )
@@ -681,12 +679,12 @@ export default function ProductForm({
     Array.isArray(product?.target_audience) ? product.target_audience.join(', ') : ''
   )
 
-  const [mrp, setMrp] = useState(product?.mrp != null ? String(product.mrp) : '')
+  const [mrp, setMrp] = useState(paiseString(product?.mrp))
   const [mrpExGst, setMrpExGst] = useState(() => {
-    if (product?.mrp_ex_gst != null) return String(product.mrp_ex_gst)
+    if (product?.mrp_ex_gst != null) return paiseString(product.mrp_ex_gst)
     if (product?.mrp != null) {
       const r = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
-      return r > 0 ? String(Math.round((Number(product.mrp) / (1 + r / 100)) * 100) / 100) : String(product.mrp)
+      return r > 0 ? String(Math.round((Number(product.mrp) / (1 + r / 100)) * 100) / 100) : paiseString(product.mrp)
     }
     return ''
   })
@@ -694,7 +692,7 @@ export default function ProductForm({
     product?.mrp != null ? 'excl' : product?.mrp_ex_gst != null ? 'incl' : null
   )
   const [salePrice, setSalePrice] = useState(() => {
-    if (product?.price_ex_gst != null) return String(product.price_ex_gst)
+    if (product?.price_ex_gst != null) return paiseString(product.price_ex_gst)
     if (product?.base_price != null) {
       const r = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
       return String(Math.round((Number(product.base_price) / (1 + r / 100)) * 100) / 100)
@@ -730,7 +728,7 @@ export default function ProductForm({
         const discPct = product.discount_pct != null ? parseFloat(product.discount_pct) : 0
         const mrpEx =
           v.mrp_ex_gst != null
-            ? parseFloat(v.mrp_ex_gst)
+            ? Math.round(parseFloat(v.mrp_ex_gst) * 100) / 100
             : v.mrp != null
               ? Math.round((parseFloat(v.mrp) / (1 + rate / 100)) * 100) / 100
               : null
@@ -744,19 +742,23 @@ export default function ProductForm({
         } else {
           priceEx =
             v.price_ex_gst != null
-              ? String(v.price_ex_gst)
+              ? paiseString(v.price_ex_gst)
               : v.price != null
                 ? String(Math.round((parseFloat(v.price) / (1 + rate / 100)) * 100) / 100)
                 : ''
           price =
             v.price != null
-              ? String(v.price)
+              ? paiseString(v.price)
               : v.price_ex_gst != null
                 ? String(Math.round(parseFloat(v.price_ex_gst) * (1 + rate / 100) * 100) / 100)
                 : ''
         }
         const mrpInclStr =
-          mrpEx != null ? String(Math.round(mrpEx * (1 + rate / 100) * 100) / 100) : v.mrp != null ? String(v.mrp) : ''
+          mrpEx != null
+            ? String(Math.round(mrpEx * (1 + rate / 100) * 100) / 100)
+            : v.mrp != null
+              ? paiseString(v.mrp)
+              : ''
         const mrpExStr = mrpEx != null ? String(mrpEx) : ''
         return {
           id: v.id,
@@ -787,7 +789,7 @@ export default function ProductForm({
           variant_type: v.variant_type || '',
           use_own_images:
             v.use_own_images != null ? !!v.use_own_images : !!(v.variant_images && v.variant_images.length > 0),
-          subscription_price: v.subscription_price != null ? String(v.subscription_price) : '',
+          subscription_price: paiseString(v.subscription_price),
           subscription_prices: priceInputs(v.subscription_prices),
           product_suppliers: allSuppliers
             .filter(
@@ -1361,13 +1363,22 @@ export default function ProductForm({
         }
       }
       if (snap.hasVariants !== undefined) setHasVariants(snap.hasVariants)
-      if (snap.variants) setVariants(snap.variants)
+      if (snap.variants)
+        setVariants(
+          snap.variants.map((v: VariantRow) => ({
+            ...v,
+            price: paiseString(v.price),
+            mrp: paiseString(v.mrp),
+            price_ex_gst: paiseString(v.price_ex_gst),
+            mrp_ex_gst: paiseString(v.mrp_ex_gst),
+          }))
+        )
       if (snap.groups) setGroups(snap.groups)
-      if (snap.basePrice !== undefined) setBasePrice(snap.basePrice)
-      if (snap.mrp !== undefined) setMrp(snap.mrp)
-      if (snap.mrpExGst !== undefined) setMrpExGst(snap.mrpExGst)
-      if (snap.salePrice !== undefined) setSalePrice(snap.salePrice)
-      if (snap.costPrice !== undefined) setCostPrice(snap.costPrice)
+      if (snap.basePrice !== undefined) setBasePrice(paiseString(snap.basePrice))
+      if (snap.mrp !== undefined) setMrp(paiseString(snap.mrp))
+      if (snap.mrpExGst !== undefined) setMrpExGst(paiseString(snap.mrpExGst))
+      if (snap.salePrice !== undefined) setSalePrice(paiseString(snap.salePrice))
+      if (snap.costPrice !== undefined) setCostPrice(paiseString(snap.costPrice))
       if (snap.discountPct !== undefined) setDiscountPct(snap.discountPct)
       if (snap.topPriceLockSide !== undefined) setTopPriceLockSide(snap.topPriceLockSide)
       if (snap.topMrpLockSide !== undefined) setTopMrpLockSide(snap.topMrpLockSide)
@@ -1976,10 +1987,10 @@ export default function ProductForm({
     setSubVariantEditId(sv.id)
     setSubVariantEditDraft({
       name: sv.sub_variant_name || '',
-      price: str(sv.price),
-      mrp: str(sv.mrp),
-      price_ex_gst: str(sv.price_ex_gst),
-      mrp_ex_gst: str(sv.mrp_ex_gst),
+      price: paiseString(sv.price),
+      mrp: paiseString(sv.mrp),
+      price_ex_gst: paiseString(sv.price_ex_gst),
+      mrp_ex_gst: paiseString(sv.mrp_ex_gst),
       discount_pct: str(sv.discount_pct),
       stock: sv.stock_status || 'In Stock',
       sku: sv.sku || '',
@@ -5798,13 +5809,17 @@ export default function ProductForm({
                                             )}
                                           </td>
                                           <td className="px-3 py-2">
-                                            {sv.mrp_ex_gst != null ? `₹${sv.mrp_ex_gst}` : '—'}
+                                            {sv.mrp_ex_gst != null ? `₹${paiseString(sv.mrp_ex_gst)}` : '—'}
                                           </td>
                                           <td className="px-3 py-2">{discountPct ? `${discountPct}%` : '—'}</td>
-                                          <td className="px-3 py-2">{sv.mrp != null ? `₹${sv.mrp}` : '—'}</td>
-                                          <td className="px-3 py-2">{sv.price != null ? `₹${sv.price}` : '—'}</td>
                                           <td className="px-3 py-2">
-                                            {sv.price_ex_gst != null ? `₹${sv.price_ex_gst}` : '—'}
+                                            {sv.mrp != null ? `₹${paiseString(sv.mrp)}` : '—'}
+                                          </td>
+                                          <td className="px-3 py-2">
+                                            {sv.price != null ? `₹${paiseString(sv.price)}` : '—'}
+                                          </td>
+                                          <td className="px-3 py-2">
+                                            {sv.price_ex_gst != null ? `₹${paiseString(sv.price_ex_gst)}` : '—'}
                                           </td>
                                           <td className="px-3 py-2">
                                             <span

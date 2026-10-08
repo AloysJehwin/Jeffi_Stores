@@ -2,6 +2,7 @@
 // an executor (pool helper or a transaction client).
 
 import { STORED_DIMS_REQUIRED } from '@/lib/shipping/shipping'
+import { round2 } from '@/lib/catalog/gst'
 
 export interface Exec {
   query: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }>
@@ -66,6 +67,40 @@ export function toAmount(v: AmountInput): number | null {
   if (s === '' || s === 'null' || s === 'undefined') return null
   const n = Number(s)
   return Number.isFinite(n) ? n : NaN
+}
+
+// ── Paise rounding ───────────────────────────────────────────────────────────
+
+export const MONEY_KEYS = [
+  'price',
+  'mrp',
+  'price_ex_gst',
+  'mrp_ex_gst',
+  'base_price',
+  'cost_price',
+  'subscription_price',
+  'unit_cost',
+  'price_override',
+]
+
+/** Display string for a loaded money value, rounded to paise. A number (or float-noise string like
+ *  "999.9999679999") is rounded; anything else (typed "10.", "") passes through untouched. */
+export function paiseString(v: unknown): string {
+  if (v == null) return ''
+  if (typeof v === 'number') return Number.isFinite(v) ? String(round2(v)) : ''
+  const s = String(v)
+  return /^-?\d*\.\d{3,}$/.test(s.trim()) ? String(round2(Number(s))) : s
+}
+
+/** Copy of `row` with its money fields rounded to paise (blank / non-numeric left alone). */
+export function roundMoneyFields<T extends Record<string, any>>(row: T, keys: string[] = MONEY_KEYS): T {
+  if (!row || typeof row !== 'object') return row
+  const out: Record<string, any> = { ...row }
+  for (const k of keys) {
+    const n = toAmount(out[k])
+    if (n != null && !Number.isNaN(n)) out[k] = round2(n)
+  }
+  return out as T
 }
 
 export function gstError(rate: AmountInput): string | null {

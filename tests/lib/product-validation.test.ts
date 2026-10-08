@@ -4,11 +4,13 @@ import {
   friendlyProductDbError,
   gstError,
   MalformedFieldError,
+  paiseString,
   parseJsonField,
   pickUniqueSlug,
   priceErrors,
   productErrorMessage,
   publishShippingError,
+  roundMoneyFields,
   skuConflictError,
   slugify,
   storedProductPublishErrors,
@@ -323,5 +325,24 @@ describe('storedProductPublishErrors (create-draft publish)', () => {
         'p1'
       )
     ).toEqual(['Product not found.'])
+  })
+})
+
+describe('paise rounding', () => {
+  it('rounds loaded float noise but leaves typed input alone', () => {
+    expect(paiseString(999.9999679999999)).toBe('1000')
+    expect(paiseString('999.9999679999999')).toBe('1000')
+    expect(paiseString('847.457627')).toBe('847.46')
+    expect(paiseString('1000.00')).toBe('1000.00')
+    expect(paiseString('10.')).toBe('10.')
+    expect(paiseString('')).toBe('')
+    expect(paiseString(null)).toBe('')
+    expect(paiseString(NaN)).toBe('')
+  })
+
+  it('rounds the money fields of a row only', () => {
+    expect(
+      roundMoneyFields({ price: '999.9999679999', mrp: 1180.000001, cost_price: '', weight_grams: 12.3456, sku: 'X' })
+    ).toEqual({ price: 1000, mrp: 1180, cost_price: '', weight_grams: 12.3456, sku: 'X' })
   })
 })

@@ -4,7 +4,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import { isDigitalProduct } from '@/lib/catalog/digital-guard'
-import { priceErrors } from '@/lib/catalog/product-validation'
+import { priceErrors, roundMoneyFields } from '@/lib/catalog/product-validation'
 
 export const dynamic = 'force-dynamic'
 
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       const all = await ensureVariantSeeded(client, variantId, stored)
       nameClash(all, variantId, body.sub_variant_name)
       const sv = {
-        ...body,
+        ...roundMoneyFields(body),
         id: `draft-sv-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         variant_id: variantId,
       }
@@ -240,7 +240,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   try {
     const variantId = req.nextUrl.searchParams.get('variant_id')
     const body = await readBody(req, PatchSchema)
-    const { id: svId, ...updates } = body
+    const { id: svId, ...updates } = roundMoneyFields(body)
 
     const result = await mutateSubVariants(id, async (stored, client) => {
       const all = variantId ? await ensureVariantSeeded(client, variantId, stored) : stored
