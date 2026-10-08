@@ -636,7 +636,9 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   const tenant = await getTenant(tenantId)
   const r = (job?.created_resources as Record<string, any>) || {}
   // DNS first (cheap, no dependency) — use recorded hosts, else derive from slug.
-  const hosts = (r.dnsHosts as string[] | undefined) ?? (tenant ? tenantHostnames(tenant.slug, tenant.plan) : [])
+  // k8s tenants never get per-host records (the *.jeffistores.in wildcard serves them), so skip.
+  const k8sDns = r.computeMode === 'k8s' || !!r.computeWaitStartedAt
+  const hosts = k8sDns ? [] : ((r.dnsHosts as string[] | undefined) ?? (tenant ? tenantHostnames(tenant.slug, tenant.plan) : []))
   // Best-effort but LOUD: a swallowed removeDns failure leaves zombie A-records pointing at a
   // torn-down box (records outliving the instance). Record it + flag the lingering hosts for a
   // reconciler instead of failing the rollback.
@@ -847,9 +849,11 @@ export async function deprovisionTenant(
     // 3b. Remove the tenant's DNS records so the subdomains stop resolving. Best-effort but LOUD:
     // a swallowed failure leaves zombie A-records pointing at the just-terminated box (records
     // outliving the instance — a host that "resolves" to a dead IP). Record it + flag the hosts.
-    const dnsHosts = (created.dnsHosts as string[] | undefined) ?? tenantHostnames(slug, tenant.plan)
+    const dnsHosts = onK8s ? [] : ((created.dnsHosts as string[] | undefined) ?? tenantHostnames(slug, tenant.plan))
     let dnsRemovalFailed: string[] | null = null
-    const dnsResult = await retryTransient(() => provider.removeDns(dnsHosts), isTransientDnsError)
+    const dnsResult = dnsHosts.length
+      ? await retryTransient(() => provider.removeDns(dnsHosts), isTransientDnsError)
+      : { error: null as any, attempts: 0 }
     if (dnsResult.error) {
       dnsRemovalFailed = dnsHosts
       if (job)

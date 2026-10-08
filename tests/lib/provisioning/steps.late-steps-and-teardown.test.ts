@@ -334,6 +334,18 @@ describe('rollbackProvisioning', () => {
     expect(remove).toHaveBeenCalledWith(expect.arrayContaining(['acme.jeffistores.in']))
   })
 
+  it('skips DNS removal for a k8s tenant (wildcard DNS, no per-host records)', async () => {
+    const provider = new StubProvisioningProvider(0)
+    reg.getProvisioningJob.mockResolvedValue(
+      job({ created_resources: { computeWaitStartedAt: 1, dnsHosts: ['acme.jeffistores.in'] } })
+    )
+    const remove = vi.spyOn(provider, 'removeDns')
+    const { rollbackProvisioning } = await import('@/lib/provisioning/steps')
+    await rollbackProvisioning('t-1', provider)
+    expect(remove).not.toHaveBeenCalled()
+    expect(reg.setTenantStatus).toHaveBeenCalledWith('t-1', 'suspended')
+  })
+
   it('handles a missing job/tenant without throwing (no hosts to remove)', async () => {
     reg.getProvisioningJob.mockResolvedValue(null)
     reg.getTenant.mockResolvedValue(null)
