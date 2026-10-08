@@ -1,16 +1,19 @@
+# syntax=docker/dockerfile:1
 FROM node:20-alpine AS base
+# Gentler installs: fewer sockets + retries survive flaky links (Docker Desktop NAT drops bursts).
+ENV npm_config_maxsockets=6 npm_config_fetch_retries=5 npm_config_fetch_retry_mintimeout=20000 npm_config_fetch_retry_maxtimeout=120000
 
 # ---- Dependencies ----
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci --omit=dev
 
 # ---- Builder ----
 FROM base AS builder
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci
 COPY . .
 
 # Build the Next.js app in standalone mode
