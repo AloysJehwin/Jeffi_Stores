@@ -15,6 +15,7 @@ import {
   parseJsonField,
   priceErrors,
   productErrorMessage,
+  roundMoneyFields,
   publishShippingError,
   skuConflictError,
   toAmount,
@@ -476,7 +477,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     if (hasDraft) {
       const draftVariants = rawVariants
         ? activeVariants.map((v: any) => ({
-            ...v,
+            ...roundMoneyFields(v),
             sku:
               String(v.sku || '').trim() ||
               (String(v.variant_name ?? '').trim() ? generateVariantSku(productSku, String(v.variant_name)) : ''),

@@ -3,7 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
 import { deleteProductImage } from '@/lib/shared/s3'
-import { productErrorMessage } from '@/lib/catalog/product-validation'
+import { productErrorMessage, roundMoneyFields } from '@/lib/catalog/product-validation'
 import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
 import { applyDraftSubVariantPrices, parseSubVariantPriceEntries } from '@/lib/subscriptions/sub-variant-prices'
 
@@ -142,7 +142,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const variantsJson = Array.isArray(variantsFromBody)
       ? JSON.stringify(
           variantsFromBody.map((v: any) => ({
-            ...v,
+            ...roundMoneyFields(v),
             subscription_price: normalizeSubscriptionPrice(v?.subscription_price),
             subscription_prices: normalizeSubscriptionPrices(v?.subscription_prices),
           }))
@@ -154,7 +154,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
        images = COALESCE($3::jsonb, images),
        variants = COALESCE($4::jsonb, variants),
        updated_at = NOW() WHERE product_id = $1`,
-      [id, JSON.stringify(fields), imagesJson, variantsJson]
+      [id, JSON.stringify(roundMoneyFields(fields)), imagesJson, variantsJson]
     )
     await applyDraftSubVariantPrices(id, parseSubVariantPriceEntries(body?.subVariantSubscriptionPrices))
 
