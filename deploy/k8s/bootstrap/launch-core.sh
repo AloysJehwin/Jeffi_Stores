@@ -35,7 +35,7 @@ ID=$(aws ec2 run-instances --image-id $AMI --instance-type t4g.large --subnet-id
   --metadata-options HttpTokens=required,HttpPutResponseHopLimit=2 \
   --block-device-mappings 'DeviceName=/dev/xvda,Ebs={VolumeSize=40,VolumeType=gp3,Encrypted=true}' \
   --user-data file://"$(dirname "$0")/core-node.sh" \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=jeffi-k8s-core},{Key=app,Value=jeffi-k8s}]' \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=jeffi-k8s-core},{Key=app,Value=jeffi-k8s-core}]' \
   --query 'Instances[0].InstanceId' --output text)
 aws ec2 wait instance-running --instance-ids $ID
 aws ec2 associate-address --instance-id $ID --allocation-id eipalloc-025dccb8bfce1b857 >/dev/null
