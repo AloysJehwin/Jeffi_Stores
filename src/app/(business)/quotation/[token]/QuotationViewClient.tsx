@@ -173,10 +173,10 @@ export default function QuotationViewClient({ qt, items, settings, token }: Prop
                     <td className="px-4 py-3 text-right text-gray-600">₹{fmt(item.rate)}</td>
                     {items.some(i => Number(i.discount_pct) > 0) && (
                       <td className="px-4 py-3 text-right text-gray-500">
-                        {Number(item.discount_pct) > 0 ? `${item.discount_pct}%` : '—'}
+                        {Number(item.discount_pct) > 0 ? `${Number(item.discount_pct)}%` : '—'}
                       </td>
                     )}
-                    <td className="px-4 py-3 text-right text-gray-500">{item.gst_rate}%</td>
+                    <td className="px-4 py-3 text-right text-gray-500">{Number(item.gst_rate)}%</td>
                     <td className="px-4 py-3 text-right text-gray-800 font-semibold">₹{fmt(item.amount)}</td>
                   </tr>
                 ))}

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { BrowserQRCodeReader, IScannerControls } from '@zxing/browser'
 import CopySku from '@/components/ui/CopySku'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { fmtQty } from '@/lib/shared/number-display'
 
 interface OrderInfo {
   id: string
@@ -570,7 +571,7 @@ export default function ScanClient() {
                       >
                         <span className="font-mono text-white">{l.location_display_code}</span>
                         <span className="text-gray-500">·</span>
-                        <span className="font-semibold text-secondary-400">{l.quantity}</span>
+                        <span className="font-semibold text-secondary-400">{fmtQty(l.quantity)}</span>
                       </div>
                     ))}
                   </div>

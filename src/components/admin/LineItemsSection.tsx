@@ -6,6 +6,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { applyDiscount, mrpDiscountPct, lineItemInclGst } from '@/lib/catalog/pricing'
 import { round2 } from '@/lib/catalog/gst'
+import { round3 } from '@/lib/shared/number-display'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useToast } from '@/contexts/ToastContext'
 import { productLabel, variantLabel } from '@/lib/catalog/product-label'
@@ -614,7 +615,7 @@ export default function LineItemsSection({
       .map((it, i) => {
         if (i === dupIdx) {
           const existing = Number(it.quantity) || 0
-          return { ...it, quantity: String(existing + addQty) }
+          return { ...it, quantity: String(round3(existing + addQty)) }
         }
         return it
       })
@@ -775,7 +776,9 @@ export default function LineItemsSection({
         onChange([...items, withUnits])
       } else {
         onChange(
-          items.map((x, i) => (i === dupIdx ? { ...x, quantity: String((Number(x.quantity) || 0) + addQty) } : x))
+          items.map((x, i) =>
+            i === dupIdx ? { ...x, quantity: String(round3((Number(x.quantity) || 0) + addQty)) } : x
+          )
         )
       }
       // Auto-assign the scanned serial to the surviving line (parent dedupes).
@@ -1382,7 +1385,7 @@ export default function LineItemsSection({
                     const qStep = su ? (su.qty_step > 0 ? su.qty_step : 1) : custom ? 0.001 : 1
                     const qFloor = su ? su.min_qty : 0
                     // Smallest step-multiple that is still ≥ the min_qty floor.
-                    const qMin = Math.max(qStep, Math.ceil((qFloor - 1e-9) / qStep) * qStep)
+                    const qMin = Math.max(qStep, Math.round(Math.ceil((qFloor - 1e-9) / qStep) * qStep * 1e9) / 1e9)
                     // UI only caps at product_units.max_qty — stock is checked at finalization
                     const qMax: number | undefined = su?.max_qty != null ? su.max_qty : undefined
                     const clamp = (v: number) => {

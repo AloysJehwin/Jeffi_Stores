@@ -45,7 +45,7 @@ async function OrdersStats() {
           <div>
             <p className="text-white/80 text-sm">Total Revenue</p>
             <p className="text-3xl sm:text-4xl font-bold mt-1">
-              Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
           <div className="grid grid-cols-4 gap-2 sm:gap-3 mt-4">

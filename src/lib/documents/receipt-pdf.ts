@@ -1,4 +1,5 @@
 import 'server-only'
+import { fmtQty } from '@/lib/shared/number-display'
 const PDFDocument = eval('require')('pdfkit')
 
 export interface ReceiptBusinessSettings {
@@ -269,7 +270,7 @@ export async function generateReceiptPDF(
       const mrpTotal = hasDiscount ? item.unit_price * item.quantity : 0
       const nameH = doc.heightOfString(item.product_name, { width: colW.item })
       const discH = hasDiscount ? FS_SM + 1 : 0
-      const qtyStr = item.buy_unit ? `${parseFloat(String(item.quantity))} ${item.buy_unit}` : String(item.quantity)
+      const qtyStr = item.buy_unit ? `${fmtQty(item.quantity)} ${item.buy_unit}` : fmtQty(item.quantity)
       doc.text(item.product_name, col.item, ry, { width: colW.item, lineGap: 0 })
       if (hasDiscount) {
         doc

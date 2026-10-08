@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/shared/admin-path'
+import { fmtQty } from '@/lib/shared/number-display'
 
 type Tab = 'gstr1' | 'gstr3b' | 'irn' | 'itc'
 
@@ -842,7 +843,7 @@ export default function GSTPage() {
                                   {r.supplier_name}
                                 </td>
                                 <td className="px-4 py-2.5 text-foreground max-w-[160px] truncate">{r.product_name}</td>
-                                <td className="px-4 py-2.5 text-right text-foreground">{r.quantity}</td>
+                                <td className="px-4 py-2.5 text-right text-foreground">{fmtQty(r.quantity)}</td>
                                 <td className="px-4 py-2.5 text-right text-foreground">
                                   {INR(parseFloat(r.unit_cost))}
                                 </td>

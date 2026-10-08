@@ -53,16 +53,24 @@ export default function ProductMobileDetailBody({ product: p }: Props) {
         <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Price</p>
         {p.has_variants ? (
           <p className="text-xl font-bold text-primary-500">
-            From Rs. {Number(p.variant_min_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            From Rs.{' '}
+            {Number(p.variant_min_price || 0).toLocaleString('en-IN', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </p>
         ) : (
           <div className="flex items-baseline gap-3">
             <p className="text-xl font-bold text-primary-500">
-              Rs. {Number(p.base_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              Rs.{' '}
+              {Number(p.base_price || 0).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
             {p.mrp && Number(p.mrp) > Number(p.base_price) && (
               <p className="text-sm text-foreground-muted line-through">
-                Rs. {Number(p.mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                Rs. {Number(p.mrp).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </p>
             )}
           </div>

@@ -1050,12 +1050,19 @@ export default function CashSaleClient() {
                       <td className="px-4 py-3 text-sm text-foreground">Walk-in Customer</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="font-semibold text-foreground text-sm">
-                          ₹{parseFloat(sale.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          ₹
+                          {parseFloat(sale.total_amount).toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </div>
                         {parseFloat(sale.taxable_amount) > 0 && (
                           <div className="text-xs text-foreground-muted mt-0.5">
                             Taxable ₹
-                            {parseFloat(sale.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            {parseFloat(sale.taxable_amount).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </div>
                         )}
                       </td>
@@ -1294,22 +1301,38 @@ function SaleDetailModal({
             <div>
               <p className="text-xs text-foreground-muted">Taxable</p>
               <p className="text-sm font-semibold text-foreground">
-                ₹{parseFloat(sale.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹
+                {parseFloat(sale.taxable_amount).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
             </div>
             {parseFloat(sale.cgst_amount) > 0 && (
               <div>
                 <p className="text-xs text-foreground-muted">CGST + SGST</p>
                 <p className="text-sm font-semibold text-foreground">
-                  ₹{parseFloat(sale.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} + ₹
-                  {parseFloat(sale.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹
+                  {parseFloat(sale.cgst_amount).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{' '}
+                  + ₹
+                  {parseFloat(sale.sgst_amount).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </p>
               </div>
             )}
             <div>
               <p className="text-xs text-foreground-muted">Total</p>
               <p className="text-sm font-bold text-foreground">
-                ₹{parseFloat(sale.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹
+                {parseFloat(sale.total_amount).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
             </div>
           </div>

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { fmtQty } from '@/lib/shared/number-display'
 
 interface ReturnRequest {
   id: string
@@ -325,7 +326,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                 </div>
                 <div className="text-right flex-shrink-0 ml-4">
                   <p className="text-xs text-foreground-secondary">
-                    Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}
+                    Qty {fmtQty(item.quantity)} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}
                   </p>
                   <p className="font-medium text-foreground">₹{parseFloat(String(item.refund_amount)).toFixed(0)}</p>
                 </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { fmtQty } from '@/lib/shared/number-display'
 
 interface Props {
   order: any
@@ -212,7 +213,7 @@ export default function InvoiceViewClient({ order, items, settings, token }: Pro
                       <td className="px-4 py-3 text-gray-800 font-medium leading-snug">{item.product_name}</td>
                       <td className="px-4 py-3 text-right text-gray-500 text-xs">{item.hsn_code || '—'}</td>
                       <td className="px-4 py-3 text-right text-gray-600">
-                        {item.quantity} {item.unit || ''}
+                        {fmtQty(item.quantity)} {item.unit || ''}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-600">₹{fmt(unitExclGST)}</td>
                       <td className="px-4 py-3 text-right text-gray-500 text-xs">{discLabel}</td>

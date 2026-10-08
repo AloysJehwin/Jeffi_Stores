@@ -1,4 +1,5 @@
 import { pickUnitPrice } from '@/lib/catalog/pricing'
+import { round2 } from '@/lib/catalog/gst'
 
 export function productCardProps(product: any, gstEnabled: boolean) {
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
@@ -22,7 +23,7 @@ export function productCardProps(product: any, gstEnabled: boolean) {
   // MRP is stored GST-inclusive. When GST is off, displayPrice is ex-GST, so put
   // the MRP on the same ex-GST basis before computing the discount / strike-through.
   const gstRate = Number(product.gst_percentage ?? 0)
-  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? rawMrp / (1 + gstRate / 100) : rawMrp
+  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
   const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
   return {
     id: product.id,

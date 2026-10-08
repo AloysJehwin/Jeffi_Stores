@@ -156,7 +156,7 @@ export default function CompareAddButton({ currentIds, categoryId }: CompareAddB
                     <p className="text-sm font-medium text-foreground line-clamp-1">{r.name}</p>
                     <p className="text-xs text-foreground-muted">
                       {r.brand_name && <span>{r.brand_name} · </span>}₹
-                      {Number(r.price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      {Number(r.price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                   {r.category_id === categoryId && (

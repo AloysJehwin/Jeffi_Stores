@@ -112,7 +112,7 @@ function PriceBreakdown({
         <div className="pr-2 text-center">
           <p className="text-[9px] uppercase tracking-wide text-foreground-muted mb-0.5">Current</p>
           <p className="text-xs font-bold text-foreground">
-            ₹{currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            ₹{currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
         <div className="px-2 text-center">
@@ -120,7 +120,9 @@ function PriceBreakdown({
           <p
             className={`text-xs font-bold ${overLimit ? 'text-red-500' : derived != null ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted'}`}
           >
-            {derived != null ? `₹${derived.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—'}
+            {derived != null
+              ? `₹${derived.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : '—'}
           </p>
         </div>
         <div className="pl-2 text-center">
@@ -136,14 +138,15 @@ function PriceBreakdown({
         <div className="px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800 text-center">
           <p className="text-[10px] font-medium text-red-600 dark:text-red-400">
             Maximum discount is {MAX_DISCOUNT_PCT}% — minimum target price is ₹
-            {minAllowed.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            {minAllowed.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
       )}
       {!overLimit && saving != null && saving > 0 && (
         <div className="px-3 py-1.5 bg-green-50 dark:bg-green-900/20 border-t border-green-100 dark:border-green-900/40 text-center">
           <p className="text-[10px] font-medium text-green-700 dark:text-green-400">
-            Potential saving of ₹{saving.toLocaleString('en-IN', { minimumFractionDigits: 2 })} per{' '}
+            Potential saving of ₹
+            {saving.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} per{' '}
             {unitLabel || 'unit'} if approved
           </p>
         </div>
@@ -283,8 +286,9 @@ export default function RequestQuoteButton({
       prev.map((f, idx) => {
         if (idx !== i) return f
         if (key === 'discount_pct' && value !== '') {
-          const capped = Math.min(parseFloat(String(value)), MAX_DISCOUNT_PCT)
-          return { ...f, discount_pct: String(capped), requested_price: '' }
+          // keep the typed text (e.g. "10.") unless it exceeds the cap
+          const capped = parseFloat(String(value)) > MAX_DISCOUNT_PCT ? String(MAX_DISCOUNT_PCT) : String(value)
+          return { ...f, discount_pct: capped, requested_price: '' }
         }
         if (key === 'requested_price' && value !== '') return { ...f, requested_price: String(value), discount_pct: '' }
         return { ...f, [key]: value }
@@ -670,7 +674,11 @@ export default function RequestQuoteButton({
                               Current Price
                             </p>
                             <p className="text-xl font-bold text-primary-600 dark:text-primary-400">
-                              ₹{activeResolved.currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹
+                              {activeResolved.currentPrice.toLocaleString('en-IN', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                             </p>
                             {activeItem.businessDiscountPct && activeItem.businessDiscountPct > 0 && (
                               <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-0.5">
@@ -742,7 +750,11 @@ export default function RequestQuoteButton({
                               )}
                               {activeResolved.currentPrice != null && activeResolved.currentPrice > 0 && (
                                 <span className="text-xs font-bold text-primary-600 dark:text-primary-400">
-                                  ₹{activeResolved.currentPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹
+                                  {activeResolved.currentPrice.toLocaleString('en-IN', {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  })}
                                 </span>
                               )}
                             </div>
@@ -800,7 +812,7 @@ export default function RequestQuoteButton({
                                 onChange={e => updateField(activeIdx, 'requested_price', e.target.value)}
                                 placeholder={
                                   activeResolved.currentPrice
-                                    ? `e.g. ${(activeResolved.currentPrice * 0.9).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                                    ? `e.g. ${(activeResolved.currentPrice * 0.9).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                                     : 'e.g. 350.00'
                                 }
                                 className="w-full pl-7 pr-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"

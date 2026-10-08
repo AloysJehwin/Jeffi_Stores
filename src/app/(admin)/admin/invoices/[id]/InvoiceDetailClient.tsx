@@ -11,6 +11,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { formatINR, formatDate } from '@/lib/shared/format'
+import { fmtQty } from '@/lib/shared/number-display'
 
 const STATUS_COLORS: Record<string, string> = {
   paid: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
@@ -583,7 +584,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">
                     {item.hsn_code || '—'}
                   </td>
-                  <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>
+                  <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{Number(item.gst_rate)}%</td>
                   <td className="px-4 py-3 text-center text-foreground">
                     {(() => {
                       const orderedQty = Number(item.quantity)
@@ -591,12 +592,12 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                       const factor = item.sell_unit_factor ? Number(item.sell_unit_factor) : 1
                       const unitLabel = item.buy_unit && item.buy_unit !== 'unit' ? item.buy_unit : null
                       if (isCount && unitLabel && factor > 1) {
-                        return `${orderedQty} ${unitLabel} (${orderedQty * factor} pcs)`
+                        return `${fmtQty(orderedQty)} ${unitLabel} (${fmtQty(orderedQty * factor)} pcs)`
                       }
                       if (unitLabel && !isCount) {
-                        return `${orderedQty} ${unitLabel}`
+                        return `${fmtQty(orderedQty)} ${unitLabel}`
                       }
-                      return orderedQty
+                      return fmtQty(orderedQty)
                     })()}
                   </td>
                   <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(item.unit_price))}</td>

@@ -432,7 +432,11 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-foreground font-medium">
-                        ₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        ₹
+                        {Number(order.total_amount).toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <a

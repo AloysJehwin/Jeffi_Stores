@@ -374,11 +374,11 @@ function WishlistInner() {
                     <div className="flex items-baseline gap-2 mb-1">
                       <span className="text-xl font-bold text-primary-600 dark:text-primary-400">
                         {hasVariants ? 'From ' : ''}₹
-                        {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        {Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                       {mrp && mrp > Number(price) && (
                         <span className="text-sm text-foreground-muted line-through">
-                          ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       )}
                     </div>
@@ -386,7 +386,11 @@ function WishlistInner() {
                       <p className="text-xs text-rose-600 dark:text-rose-400 font-medium mb-1">
                         Was{' '}
                         <span className="line-through">
-                          ₹{badges.priceDrop.was.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          ₹
+                          {badges.priceDrop.was.toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </span>
                       </p>
                     )}

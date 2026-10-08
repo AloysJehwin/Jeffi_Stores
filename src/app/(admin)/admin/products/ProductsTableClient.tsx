@@ -305,23 +305,38 @@ export default function ProductsTableClient({
                     <div className="flex items-baseline gap-1.5">
                       <span>
                         From Rs.{' '}
-                        {Number(product.variant_min_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        {Number(product.variant_min_price || 0).toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </span>
                       {product.variant_min_mrp &&
                         Number(product.variant_min_mrp) > Number(product.variant_min_price || 0) && (
                           <span className="text-xs text-foreground-muted line-through font-normal">
-                            Rs. {Number(product.variant_min_mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            Rs.{' '}
+                            {Number(product.variant_min_mrp).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </span>
                         )}
                     </div>
                   ) : (
                     <div className="flex items-baseline gap-1.5">
                       <span>
-                        Rs. {Number(product.base_price || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        Rs.{' '}
+                        {Number(product.base_price || 0).toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </span>
                       {product.mrp && Number(product.mrp) > Number(product.base_price || 0) && (
                         <span className="text-xs text-foreground-muted line-through font-normal">
-                          Rs. {Number(product.mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          Rs.{' '}
+                          {Number(product.mrp).toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </span>
                       )}
                     </div>

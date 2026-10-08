@@ -14,6 +14,7 @@ import type { Metadata } from 'next'
 import CompareChangeButton from '@/components/visitor/CompareChangeButton'
 import CompareAddButton from '@/components/visitor/CompareAddButton'
 import CopySku from '@/components/ui/CopySku'
+import { round2 } from '@/lib/catalog/gst'
 
 export const dynamic = 'force-dynamic'
 
@@ -208,7 +209,8 @@ export default async function ComparePage({
                         )
                   const rawMrp = p.mrp ? Number(p.mrp) : p.variant_min_mrp ? Number(p.variant_min_mrp) : null
                   const gstRate = Number(p.gst_percentage ?? 0)
-                  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? rawMrp / (1 + gstRate / 100) : rawMrp
+                  const mrp =
+                    !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
                   const inStock = p.has_variants
                     ? Number(p.variant_stock_total ?? 0) > 0
                     : p.stock_status !== 'Out of Stock'
@@ -253,11 +255,11 @@ export default async function ComparePage({
                         <div>
                           <span className="text-base font-bold text-primary-600 dark:text-primary-400">
                             {p.has_variants ? 'From ' : ''}₹
-                            {price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            {price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                           {mrp && mrp > price && (
                             <span className="ml-1.5 text-xs text-foreground-muted line-through">
-                              ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           )}
                         </div>

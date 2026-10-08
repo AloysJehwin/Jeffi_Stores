@@ -33,7 +33,8 @@ function sourceBadge(source: string) {
 }
 
 function statusBadge(status: string) {
-  if (status === 'delivered' || status === 'granted') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+  if (status === 'delivered' || status === 'granted')
+    return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
   if (status === 'processing' || status === 'shipped')
     return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
   if (status === 'out_for_delivery') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
@@ -99,11 +100,7 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
         label: 'Shipping label',
         icon: <Truck className="w-4 h-4" />,
         onSelect: () =>
-          window.open(
-            `/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`,
-            '_blank',
-            'noopener,noreferrer'
-          ),
+          window.open(`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`, '_blank', 'noopener,noreferrer'),
       })
     }
     if (order.invoice_number) {
@@ -141,21 +138,29 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
                   </span>
                   <SubscriptionOrderBadge subscriptionId={order.subscription_id} cycle={order.subscription_cycle} />
                 </div>
-                <span className={`shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadge(order.status)}`}>
+                <span
+                  className={`shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadge(order.status)}`}
+                >
                   {statusLabel(order.status)}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="text-sm text-foreground truncate">{customerName(order)}</span>
                 <span className="text-sm font-semibold text-foreground shrink-0">
-                  Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  Rs.{' '}
+                  {Number(order.total_amount).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-foreground-muted">
                   {new Date(order.created_at).toLocaleDateString('en-IN')}
                 </span>
-                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${paymentBadge(order.payment_status)}`}>
+                <span
+                  className={`px-2 py-0.5 text-xs font-semibold rounded-full ${paymentBadge(order.payment_status)}`}
+                >
                   {order.payment_status}
                 </span>
               </div>
@@ -195,7 +200,11 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
                 <div>
                   <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Total</p>
                   <p className="text-xl font-bold text-primary-500">
-                    Rs. {Number(selected.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.{' '}
+                    {Number(selected.total_amount).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border-default pt-4">

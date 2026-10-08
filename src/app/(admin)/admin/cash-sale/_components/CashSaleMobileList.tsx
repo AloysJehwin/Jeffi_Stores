@@ -32,7 +32,7 @@ interface Props {
 }
 
 function fmt(n: number) {
-  return n.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function fmtDate(s: string) {
@@ -101,7 +101,9 @@ export default function CashSaleMobileList({ sales, canWrite, cancellingId, paym
               <span className="text-xs text-foreground-muted shrink-0">{fmtDate(sale.invoice_date)}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${paymentColors[sale.payment_status] || ''}`}>
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs font-medium ${paymentColors[sale.payment_status] || ''}`}
+              >
                 {sale.payment_status}
               </span>
               {sale.status === 'cancelled' && (
@@ -134,7 +136,9 @@ export default function CashSaleMobileList({ sales, canWrite, cancellingId, paym
         {active && (
           <div className="px-5 py-4 space-y-3 text-sm">
             <div className="flex flex-wrap gap-2">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${paymentColors[active.payment_status] || ''}`}>
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs font-medium ${paymentColors[active.payment_status] || ''}`}
+              >
                 {active.payment_status}
               </span>
               {active.status === 'cancelled' && (

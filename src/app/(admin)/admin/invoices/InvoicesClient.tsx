@@ -1248,8 +1248,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                       <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                       <span>
                         {creditWarning.creditLimit > 0
-                          ? `Credit limit warning: ₹${creditWarning.outstanding.toLocaleString('en-IN')} outstanding of ₹${creditWarning.creditLimit.toLocaleString('en-IN')} limit`
-                          : `₹${creditWarning.outstanding.toLocaleString('en-IN')} already outstanding for this customer`}
+                          ? `Credit limit warning: ₹${creditWarning.outstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })} outstanding of ₹${creditWarning.creditLimit.toLocaleString('en-IN', { maximumFractionDigits: 2 })} limit`
+                          : `₹${creditWarning.outstanding.toLocaleString('en-IN', { maximumFractionDigits: 2 })} already outstanding for this customer`}
                       </span>
                     </div>
                   )}
@@ -1900,7 +1900,11 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                             {draft.customer_phone ? `+91 ${draft.customer_phone}` : '—'}
                           </td>
                           <td className="px-4 py-3 text-sm font-semibold text-foreground">
-                            ₹{parseFloat(draft.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            ₹
+                            {parseFloat(draft.total_amount).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <DraftStockPill draft={draft} />
@@ -1990,7 +1994,11 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                           )}
                         </div>
                         <span className="text-sm font-semibold text-foreground">
-                          ₹{parseFloat(draft.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          ₹
+                          {parseFloat(draft.total_amount).toLocaleString('en-IN', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -2212,12 +2220,19 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="font-semibold text-foreground text-sm">
-                            ₹{parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            ₹
+                            {parseFloat(inv.total_amount).toLocaleString('en-IN', {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </div>
                           {parseFloat(inv.taxable_amount) > 0 && (
                             <div className="text-xs text-foreground-muted mt-0.5">
                               Taxable ₹
-                              {parseFloat(inv.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                              {parseFloat(inv.taxable_amount).toLocaleString('en-IN', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
                             </div>
                           )}
                         </td>
@@ -2529,15 +2544,27 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
             <div>
               <p className="text-xs text-foreground-muted">Taxable</p>
               <p className="text-sm font-semibold text-foreground">
-                ₹{parseFloat(inv.taxable_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹
+                {parseFloat(inv.taxable_amount).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
             </div>
             {parseFloat(inv.cgst_amount) > 0 && (
               <div>
                 <p className="text-xs text-foreground-muted">CGST + SGST</p>
                 <p className="text-sm font-semibold text-foreground">
-                  ₹{parseFloat(inv.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} + ₹
-                  {parseFloat(inv.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹
+                  {parseFloat(inv.cgst_amount).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{' '}
+                  + ₹
+                  {parseFloat(inv.sgst_amount).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </p>
               </div>
             )}
@@ -2545,14 +2572,22 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
               <div>
                 <p className="text-xs text-foreground-muted">IGST</p>
                 <p className="text-sm font-semibold text-foreground">
-                  ₹{parseFloat(inv.igst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  ₹
+                  {parseFloat(inv.igst_amount).toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </p>
               </div>
             )}
             <div>
               <p className="text-xs text-foreground-muted">Total</p>
               <p className="text-sm font-bold text-foreground">
-                ₹{parseFloat(inv.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹
+                {parseFloat(inv.total_amount).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
             </div>
           </div>

@@ -170,7 +170,7 @@ export async function sendInvoiceFinalizedEmail(
   const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
-  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const mailOptions = {
     from: await customerMailFromAsync(),
     to: toEmail,
@@ -221,14 +221,14 @@ export async function sendPurchaseOrderEmail(
   const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
-  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const itemRows = items
     .map(
       it =>
         `<tr>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${it.product_name}${it.variant_name ? ` / ${it.variant_name}` : ''}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${it.quantity}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">₹${it.unit_cost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">₹${it.unit_cost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
     </tr>`
     )
     .join('')
@@ -294,7 +294,7 @@ export async function sendPOReceiveNotificationEmail(
         `<tr>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${it.product_name}${it.variant_name ? ` / ${it.variant_name}` : ''}</td>
       <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${it.quantity_received}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">₹${it.unit_cost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">₹${it.unit_cost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
     </tr>`
     )
     .join('')
@@ -351,7 +351,7 @@ export async function sendQuotationFinalizedEmail(
   const contactLine = await storeContactLine().then(c => (c ? `<p>${c}</p>` : ''))
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
-  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const mailOptions = {
     from: await customerMailFromAsync(),
     to: toEmail,

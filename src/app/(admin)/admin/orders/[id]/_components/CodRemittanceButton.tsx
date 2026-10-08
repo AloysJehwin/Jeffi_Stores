@@ -38,7 +38,7 @@ export default function CodRemittanceButton({ orderId, remittedAt, codAmount }: 
     }
   }
 
-  const inr = `₹${codAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+  const inr = `₹${codAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   if (remittedAt) {
     return (

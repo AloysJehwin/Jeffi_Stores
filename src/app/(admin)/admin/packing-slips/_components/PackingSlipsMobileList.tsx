@@ -28,16 +28,10 @@ function fmtDate(s: string) {
 }
 
 function fmtAmount(n: number) {
-  return n.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export default function PackingSlipsMobileList({
-  orders,
-  statusColors,
-  statusLabel,
-  selectedIds,
-  onToggleOne,
-}: Props) {
+export default function PackingSlipsMobileList({ orders, statusColors, statusLabel, selectedIds, onToggleOne }: Props) {
   const [selected, setSelected] = useState<Order | null>(null)
   const [actionsOpen, setActionsOpen] = useState(false)
 

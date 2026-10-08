@@ -7,6 +7,7 @@ import ProductCard from './ProductCard'
 import SortDropdown from './SortDropdown'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
+import { round2 } from '@/lib/catalog/gst'
 
 interface ProductItem {
   is_digital?: boolean
@@ -88,7 +89,7 @@ function resolve(product: ProductItem, gstEnabled: boolean) {
       ? Number(product.mrp)
       : null
   const gstRate = Number(product.gst_percentage ?? 0)
-  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? rawMrp / (1 + gstRate / 100) : rawMrp
+  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
   const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
   return { primaryImage, hasVariants, displayPrice: Number(displayPrice), effectiveStock, mrp, mrpDiscount }
 }
@@ -271,11 +272,11 @@ function TableRow({
       </div>
       <div className="shrink-0 text-right min-w-[80px]">
         <span className="text-sm font-bold text-foreground">
-          ₹{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          ₹{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </span>
         {mrp && mrp > displayPrice && (
           <div className="text-[10px] text-foreground-muted line-through">
-            ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            ₹{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
         )}
       </div>

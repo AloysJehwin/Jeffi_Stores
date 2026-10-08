@@ -7,6 +7,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 import { round2 } from '@/lib/catalog/gst'
+import { fmtQty } from '@/lib/shared/number-display'
 
 interface RFQMessage {
   id: string
@@ -732,7 +733,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                               <span className="text-xs text-foreground-secondary">
                                 Qty:{' '}
                                 <span className="font-semibold text-foreground">
-                                  {item.quantity} {item.unit}
+                                  {fmtQty(item.quantity)} {item.unit}
                                 </span>
                               </span>
                             </div>

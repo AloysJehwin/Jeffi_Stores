@@ -25,6 +25,7 @@ import FrequentlyBoughtTogether from '@/components/visitor/pdp/FrequentlyBoughtT
 import CustomersAlsoViewed from '@/components/visitor/pdp/CustomersAlsoViewed'
 import { getApprovedReviewSummary } from '@/lib/shared/review-summary'
 import { PDP_REVIEWS_ID } from '@/components/visitor/pdp/pdp'
+import { round2 } from '@/lib/catalog/gst'
 
 const getProductBySlug = cache(async (slug: string) => {
   const { gstEnabled } = await getFeatureFlags()
@@ -350,7 +351,7 @@ export default async function ProductDetailPage({
   // ex-GST basis before computing the discount and before passing it to any card so the
   // discount % and struck-through MRP stay consistent with the shown price.
   const gstRate = Number(product.gst_percentage ?? 0)
-  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? rawMrp / (1 + gstRate / 100) : rawMrp
+  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
   const mrpDiscount = mrp && mrp > Number(displayPrice) ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100) : 0
 
   return (
@@ -504,7 +505,7 @@ export default async function ProductDetailPage({
                 : null
             // When GST is off, displayPrice is ex-GST — rebase the inclusive MRP to match.
             const gstRate = Number(product.gst_percentage ?? 0)
-            const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? rawMrp / (1 + gstRate / 100) : rawMrp
+            const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
             return (
               <PdpCompareSection
                 currentProduct={{
@@ -546,7 +547,8 @@ export default async function ProductDetailPage({
                   const rRawMrp = rp.mrp ? Number(rp.mrp) : rp.variant_min_mrp ? Number(rp.variant_min_mrp) : null
                   // When GST is off, rPrice is ex-GST — rebase the inclusive MRP to match.
                   const rGstRate = Number(rp.gst_percentage ?? 0)
-                  const rMrp = !gstEnabled && rRawMrp != null && rGstRate > 0 ? rRawMrp / (1 + rGstRate / 100) : rRawMrp
+                  const rMrp =
+                    !gstEnabled && rRawMrp != null && rGstRate > 0 ? round2(rRawMrp / (1 + rGstRate / 100)) : rRawMrp
                   return {
                     id: rp.id,
                     name: rp.name,
@@ -638,7 +640,7 @@ export default async function ProductDetailPage({
                 const relatedGstRate = Number(relatedProduct.gst_percentage ?? 0)
                 const relatedMrp =
                   !gstEnabled && relatedRawMrp != null && relatedGstRate > 0
-                    ? relatedRawMrp / (1 + relatedGstRate / 100)
+                    ? round2(relatedRawMrp / (1 + relatedGstRate / 100))
                     : relatedRawMrp
                 const relatedMrpDiscount =
                   relatedMrp && relatedMrp > relatedDisplayPrice

@@ -267,7 +267,7 @@ export async function sendPaymentStatusUpdate(
 
       <div class="amount-box">
         <p style="margin: 0; color: #666;">Order Amount</p>
-        <div class="amount">₹${orderTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+        <div class="amount">₹${orderTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
       </div>
 
       <div class="card">

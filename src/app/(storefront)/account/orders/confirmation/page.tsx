@@ -159,7 +159,7 @@ function OrderConfirmationPage() {
                       )}
                     </p>
                     <p className="text-sm text-foreground-secondary">
-                      ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       {unitLabel ? (
                         <>
                           {' '}
@@ -180,7 +180,11 @@ function OrderConfirmationPage() {
                     </p>
                   </div>
                   <p className="font-semibold text-foreground">
-                    ₹{(item.unitPrice * item.quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    ₹
+                    {(item.unitPrice * item.quantity).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </p>
                 </div>
               )
@@ -191,7 +195,7 @@ function OrderConfirmationPage() {
             <div className="flex justify-between items-center">
               <span className="text-lg font-bold text-foreground">Total</span>
               <span className="text-2xl font-bold text-accent-600 dark:text-accent-400">
-                ₹{order.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                ₹{order.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>
@@ -234,8 +238,8 @@ function OrderConfirmationPage() {
                 : order.status === 'granted'
                   ? 'Access granted'
                   : order.status === 'cancel_requested'
-                  ? 'Cancellation Requested'
-                  : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                    ? 'Cancellation Requested'
+                    : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
             </span>
             <span className="text-foreground-secondary">
               Placed on{' '}

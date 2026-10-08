@@ -200,7 +200,9 @@ export default async function CouponViewPage({
         </div>
         <div className="bg-surface-elevated rounded-lg border border-border-default p-4">
           <p className="text-xs text-foreground-secondary">Total Discount Given</p>
-          <p className="text-2xl font-bold text-foreground mt-1">₹{totalDiscount.toLocaleString('en-IN')}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">
+            ₹{totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+          </p>
         </div>
         <div className="bg-surface-elevated rounded-lg border border-border-default p-4">
           <p className="text-xs text-foreground-secondary">Eligible Users</p>

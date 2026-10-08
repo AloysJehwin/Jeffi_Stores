@@ -13,6 +13,7 @@ import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ReviewModal from './ReviewModal'
 import OrderAddressChange, { type AddressChangeInfo } from '@/components/shared/OrderAddressChange'
+import { fmtQty } from '@/lib/shared/number-display'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
@@ -1192,16 +1193,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </p>
                 ) : refundBreakdown && refundBreakdown.netRefund <= 0 && refundBreakdown.charge > 0 ? (
                   <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
-                    Your return has been accepted. A ₹{refundBreakdown.charge.toLocaleString('en-IN')} return handling
-                    charge applied to the ₹{refundBreakdown.grossRefund.toLocaleString('en-IN')} returnable amount, so
-                    no amount was refunded for this return.
+                    Your return has been accepted. A ₹
+                    {refundBreakdown.charge.toLocaleString('en-IN', { maximumFractionDigits: 2 })} return handling
+                    charge applied to the ₹
+                    {refundBreakdown.grossRefund.toLocaleString('en-IN', { maximumFractionDigits: 2 })} returnable
+                    amount, so no amount was refunded for this return.
                   </p>
                 ) : refundBreakdown && refundBreakdown.charge > 0 ? (
                   <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
-                    Your refund of ₹{refundBreakdown.netRefund.toLocaleString('en-IN')} has been processed (₹
-                    {refundBreakdown.grossRefund.toLocaleString('en-IN')} less a ₹
-                    {refundBreakdown.charge.toLocaleString('en-IN')} return handling charge). It may take 5–7 business
-                    days to reflect in your account.
+                    Your refund of ₹{refundBreakdown.netRefund.toLocaleString('en-IN', { maximumFractionDigits: 2 })}{' '}
+                    has been processed (₹
+                    {refundBreakdown.grossRefund.toLocaleString('en-IN', { maximumFractionDigits: 2 })} less a ₹
+                    {refundBreakdown.charge.toLocaleString('en-IN', { maximumFractionDigits: 2 })} return handling
+                    charge). It may take 5–7 business days to reflect in your account.
                   </p>
                 ) : (
                   <p className="text-purple-700 dark:text-purple-300 text-sm mt-1">
@@ -1241,7 +1245,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         </div>
                         <div className="text-right flex-shrink-0 ml-4">
                           <p className="text-xs text-foreground-secondary">
-                            Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toLocaleString('en-IN')}
+                            Qty {fmtQty(item.quantity)} × ₹{parseFloat(String(item.unit_price)).toLocaleString('en-IN')}
                           </p>
                           <p className="font-medium text-foreground">
                             ₹{parseFloat(String(item.refund_amount)).toLocaleString('en-IN')}
@@ -1339,7 +1343,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                                 </p>
                               )}
                               <p className="text-xs text-foreground-muted">
-                                Qty: {item.quantity} · ₹{item.unitPrice.toFixed(0)}
+                                Qty: {fmtQty(item.quantity)} · ₹{item.unitPrice.toFixed(0)}
                               </p>
                             </div>
                           </label>

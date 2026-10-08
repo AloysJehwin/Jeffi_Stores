@@ -9,7 +9,8 @@ import { ap } from '@/lib/shared/admin-path'
 import SubscriptionOrderBadge from '@/components/admin/SubscriptionOrderBadge'
 
 function statusBadgeClass(status: string) {
-  if (status === 'delivered' || status === 'granted') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+  if (status === 'delivered' || status === 'granted')
+    return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
   if (status === 'processing' || status === 'shipped')
     return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
   if (status === 'out_for_delivery') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
@@ -154,7 +155,11 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
                   </span>
                   <span className="text-foreground-muted">Total</span>
                   <span className="text-foreground font-semibold">
-                    ₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    ₹
+                    {Number(order.total_amount).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                   <span className="text-foreground-muted">Payment</span>
                   <span
@@ -233,7 +238,11 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <span className="text-sm font-medium text-foreground">
-              Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              Rs.{' '}
+              {Number(order.total_amount).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </span>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">

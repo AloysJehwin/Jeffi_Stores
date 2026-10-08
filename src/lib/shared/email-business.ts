@@ -94,7 +94,7 @@ export async function sendRfqConvertedToQuotationEmail(
   totalAmount: number,
   viewUrl: string
 ) {
-  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const html = await baseLayout(
     `Quotation ${quoteNumber} ready`,
     `
@@ -164,7 +164,7 @@ export async function sendBusinessInvoiceGeneratedEmail(
   invoiceViewUrl: string
 ) {
   const contact = await storeContactLine()
-  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
+  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const html = await baseLayout(
     `Invoice ${invoiceNumber}`,
     `
