@@ -1,6 +1,8 @@
 # Kubernetes migration: master plan
 
-_Last updated: 2026-10-08. Implementation: branch `feat/k8s-readiness`; bring-up runbook: [`deploy/k8s/README.md`](../deploy/k8s/README.md)._
+_Last updated: 2026-10-08. Future move to upstream Kubernetes (kubeadm): [`K8S_KUBEADM_MIGRATION.md`](K8S_KUBEADM_MIGRATION.md)._
+
+_ Implementation: branch `feat/k8s-readiness`; bring-up runbook: [`deploy/k8s/README.md`](../deploy/k8s/README.md)._
 
 
 ## Context
