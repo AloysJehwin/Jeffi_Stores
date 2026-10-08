@@ -100,11 +100,11 @@ describe('k8s helpers', () => {
 })
 
 describe('probes', () => {
-  it('send the tenant storefront host so the app does not 404 the pod IP', () => {
+  it('probe localhost: a tenant host 404s until activation', () => {
     const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme') }) as any[]
     const c = byKind(objs, 'Deployment', 'storefront')[0].spec.template.spec.containers[0]
     for (const p of [c.startupProbe, c.readinessProbe, c.livenessProbe])
-      expect(p.httpGet.httpHeaders).toEqual([{ name: 'Host', value: 'acme.jeffistores.in' }])
+      expect(p.httpGet.httpHeaders).toEqual([{ name: 'Host', value: 'localhost' }])
   })
 })
 
