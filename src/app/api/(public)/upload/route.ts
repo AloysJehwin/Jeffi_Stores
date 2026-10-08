@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { uploadProductImage } from '@/lib/shared/s3'
+import { uploadProductImage, UploadValidationError } from '@/lib/shared/s3'
 import { requireAdminScope } from '@/lib/auth/jwt'
 
 export async function POST(request: NextRequest) {
@@ -23,6 +23,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error: any) {
+    if (error instanceof UploadValidationError) return NextResponse.json({ error: error.message }, { status: 400 })
     console.error('Upload error:', error)
     return NextResponse.json({ error: error.message || 'Failed to upload image' }, { status: 500 })
   }

@@ -23,6 +23,7 @@ vi.mock('@/lib/auth/jwt', async () => {
 })
 
 vi.mock('@/lib/shared/s3', () => ({
+  UploadValidationError: class UploadValidationError extends Error {},
   uploadProductImage: vi.fn().mockResolvedValue({
     url: 'https://cdn.example.com/img.jpg',
     thumbnailUrl: 'https://cdn.example.com/img-thumb.jpg',
@@ -41,7 +42,7 @@ vi.mock('@/lib/shared/s3', () => ({
 
 import { POST } from '@/app/api/(public)/upload/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
-import { uploadProductImage } from '@/lib/shared/s3'
+import { uploadProductImage, UploadValidationError } from '@/lib/shared/s3'
 
 const mockAuthenticateAdmin = vi.mocked(authenticateAdmin)
 const mockUploadProductImage = vi.mocked(uploadProductImage)
@@ -141,5 +142,13 @@ describe('POST /api/upload', () => {
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.error).toMatch(/S3 unavailable/)
+  })
+
+  it('returns 400 with the reason when the file itself is rejected', async () => {
+    mockUploadProductImage.mockRejectedValueOnce(new UploadValidationError('Image is 7.2 MB; the limit is 5 MB.'))
+    const req = makeUploadRequest({ productId: 'prod-xyz', file: new File(['data'], 'big.jpg', { type: 'image/jpeg' }) })
+    const res = await POST(req as any)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/limit is 5 MB/)
   })
 })
