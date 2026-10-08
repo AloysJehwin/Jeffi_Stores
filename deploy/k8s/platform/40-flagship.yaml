@@ -34,12 +34,12 @@ spec:
             - { name: WEB_CONCURRENCY, value: '1' }
             - { name: IN_PROCESS_CRON, value: 'false' }
             - { name: CLIENT_CERT_PROXY, value: traefik }
-            # Traces → Coroot in-cluster (the public k8s. URL is behind mTLS). 20% head sampling.
+            # Traces → Coroot in-cluster (the public k8s. URL is behind mTLS). Every request is traced (14-day retention).
             - { name: OTEL_SERVICE_NAME, value: jeffi-flagship }
             - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: 'http://coroot-coroot.observability:8080/v1/traces' }
             - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
             - { name: OTEL_TRACES_SAMPLER, value: parentbased_traceidratio }
-            - { name: OTEL_TRACES_SAMPLER_ARG, value: '0.2' }
+            - { name: OTEL_TRACES_SAMPLER_ARG, value: '1.0' }
             - { name: NODE_OPTIONS, value: --max-old-space-size=640 }
             - name: REDIS_PASSWORD
               valueFrom: { secretKeyRef: { name: redis, key: password } }

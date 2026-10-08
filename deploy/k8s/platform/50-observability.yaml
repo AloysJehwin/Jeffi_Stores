@@ -16,6 +16,10 @@ kind: Coroot
 metadata: { name: coroot, namespace: observability }
 spec:
   metricsRefreshInterval: 15s
+  # Retention: ClickHouse drops logs/traces/profiles older than 14 days (TTL), so storage stays bounded.
+  logsTTL: 14d
+  tracesTTL: 14d
+  profilesTTL: 14d
   storage: { size: 5Gi }
   prometheus:
     retention: 7d

@@ -8,13 +8,13 @@ import type { K8sObject } from './client'
 export const DEFAULT_IMAGE = '708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest'
 const EDGE_NS = 'jeffi-edge'
 
-// Traces → Coroot in-cluster, 20% head sampling (see src/lib/shared/otel.ts).
+// Traces → Coroot in-cluster, every request (see src/lib/shared/otel.ts).
 const OTEL_ENV = [
   { name: 'OTEL_SERVICE_NAME', value: '' },
   { name: 'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT', value: 'http://coroot-coroot.observability:8080/v1/traces' },
   { name: 'OTEL_EXPORTER_OTLP_PROTOCOL', value: 'http/protobuf' },
   { name: 'OTEL_TRACES_SAMPLER', value: 'parentbased_traceidratio' },
-  { name: 'OTEL_TRACES_SAMPLER_ARG', value: '0.2' },
+  { name: 'OTEL_TRACES_SAMPLER_ARG', value: '1.0' },
 ]
 
 export interface TenantWorkloadInput {
