@@ -9,6 +9,7 @@ import { resolveTenantFromHost, appFromHost, slugFromHost, formsHostForSlug } fr
 import { runWithTenantContext } from './lib/tenancy/tenant-context'
 import { adminCookieNameForHost } from './lib/auth/admin-cookie'
 import { bindingGate } from './lib/auth/session-binding-gate'
+import { currentTraceId } from './lib/shared/otel'
 import { clientCertFromProxy, TRAEFIK_CERT_HEADER, TRAEFIK_CERT_INFO_HEADER } from './lib/tenancy/edge-client-cert'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
@@ -95,7 +96,15 @@ const STATIC_ASSET_RE = /\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf
 // On a vault host these must reach the authenticated vault branch, never the static passthrough.
 const VAULT_BLOCKED_STATIC_RE = /\.(?:mp4|webm|pdf)$/i
 
+// Every response carries the request's trace id: quote it to find the request's logs/trace in Coroot.
 export async function middleware(request: NextRequest) {
+  const response = await handle(request)
+  const traceId = currentTraceId()
+  if (traceId && response) response.headers.set('x-trace-id', traceId)
+  return response
+}
+
+async function handle(request: NextRequest) {
   const hostname = resolveTrustedHost(request)
   const pathname = request.nextUrl.pathname
 

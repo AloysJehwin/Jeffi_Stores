@@ -4,13 +4,14 @@
 // top level of instrumentation.ts (which Turbopack evaluates in both runtimes).
 
 import { CRON_JOBS, inProcessCronEnabled } from '@/lib/shared/cron-jobs'
-import { otelEnabled, otelOptions } from '@/lib/shared/otel'
+import { installTraceLogPrefix, otelEnabled, otelOptions } from '@/lib/shared/otel'
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
   if (otelEnabled()) {
     const { registerOTel } = await import('@vercel/otel')
     registerOTel(otelOptions())
+    installTraceLogPrefix()
   }
   if (!inProcessCronEnabled()) return
 
