@@ -41,7 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const items = await queryMany<any>(
-      `SELECT oi.product_name, oi.product_sku, oi.variant_name, oi.sub_variant_name, oi.hsn_code, oi.gst_rate,
+      `SELECT oi.product_id, oi.product_name, oi.product_sku, oi.variant_name, oi.sub_variant_name, oi.hsn_code, oi.gst_rate,
               oi.quantity, oi.unit_price, oi.total_price, oi.discount_amount,
               oi.taxable_amount, oi.cgst_amount, oi.sgst_amount, oi.igst_amount, oi.tax_amount,
               oi.buy_unit, oi.buy_mode,

@@ -5,20 +5,23 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
+const { txQuery } = vi.hoisted(() => ({ txQuery: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
+  withTransaction: vi.fn(async (fn: any) => fn({ query: txQuery })),
 }))
 vi.mock('@/lib/email', () => ({ sendQuotationFinalizedEmail: vi.fn() }))
-vi.mock('@/lib/catalog/pricing', () => ({ lineItemExGst: vi.fn().mockReturnValue(100) }))
+vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: async () => ({ gstEnabled: true }) }))
+vi.mock('@/lib/shared/customer-links', () => ({ documentUrl: async (_k: string, t: string) => `https://x/${t}` }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { GET, PATCH, DELETE } from '@/app/api/(admin)/admin/quotations/[id]/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { query, queryMany, queryOne } from '@/lib/shared/db'
+import { query, queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
 
 const mockAuth = vi.mocked(authenticateAdmin)
@@ -63,9 +66,17 @@ function makeDeleteReq() {
   return new NextRequest(`http://localhost/api/admin/quotations/${QT_ID}`, { method: 'DELETE' })
 }
 
+// resetAllMocks also drains leftover mockResolvedValueOnce queues between tests.
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
+  vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn({ query: txQuery }))
 })
+
+/** Fake tx client: UPDATE RETURNING yields `qt`; DELETE/INSERT return no rows. */
+function txReturns(qt: any) {
+  txQuery.mockImplementation(async (sql: string) => (sql.includes('UPDATE quotations') ? { rows: [qt] } : { rows: [] }))
+}
+const txSql = () => txQuery.mock.calls.map(([sql]) => String(sql))
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -150,40 +161,73 @@ describe('PATCH /api/admin/quotations/[id]', () => {
   it('updates fields without items on happy path', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
-    mockQueryOne.mockResolvedValueOnce(draftQt) // existing check
-    mockQueryOne.mockResolvedValueOnce({ ...draftQt, notes: 'updated' }) // UPDATE RETURNING
+    mockQueryOne.mockResolvedValueOnce(draftQt)
+    txReturns({ ...draftQt, notes: 'updated' })
     mockQueryMany.mockResolvedValueOnce([]) // savedItems
     const res = await PATCH(makePatchReq({ notes: 'updated' }), PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.quotation).toBeDefined()
+    expect(body.quotation.notes).toBe('updated')
     expect(body.items).toEqual([])
+    expect(txSql().some(q => q.includes('quotation_items'))).toBe(false)
   })
 
-  it('replaces items when items array supplied', async () => {
+  it('replaces items in one transaction (delete, inserts, header update) with server totals', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftQt)
-    mockQuery.mockResolvedValue({ rows: [] } as any) // DELETE + INSERT calls
-    mockQueryOne.mockResolvedValueOnce(draftQt) // UPDATE RETURNING
+    txReturns(draftQt)
     mockQueryMany.mockResolvedValueOnce([{ id: 'item1' }])
 
     const res = await PATCH(
       makePatchReq({
         items: [
           { description: 'Bolt M6', quantity: 10, rate: 10, discount_pct: 0, gst_rate: 18 },
-          { description: 'Nut M6', quantity: 5, rate: 5, discount_pct: 5, gst_rate: 12, product_id: 'p1' },
+          {
+            description: 'Nut M6',
+            quantity: 5,
+            rate: 5,
+            discount_pct: 0,
+            gst_rate: 0,
+            product_id: '11111111-1111-4111-8111-111111111111',
+          },
         ],
       }),
       PARAMS
     )
     expect(res.status).toBe(200)
-    // DELETE was called
-    const deleteCalls = mockQuery.mock.calls.filter(([sql]) => (sql as string).includes('DELETE FROM quotation_items'))
-    expect(deleteCalls).toHaveLength(1)
-    // INSERT was called for each item
-    const insertCalls = mockQuery.mock.calls.filter(([sql]) => (sql as string).includes('INSERT INTO quotation_items'))
-    expect(insertCalls).toHaveLength(2)
+    const sqls = txSql()
+    expect(sqls.filter(q => q.includes('DELETE FROM quotation_items'))).toHaveLength(1)
+    expect(sqls.filter(q => q.includes('INSERT INTO quotation_items'))).toHaveLength(2)
+    expect(sqls.findIndex(q => q.includes('DELETE'))).toBeLessThan(sqls.findIndex(q => q.includes('UPDATE quotations')))
+    expect(mockQuery).not.toHaveBeenCalled()
+    // 0% GST stays 0 (gst_rate is param index 4)
+    const inserts = txQuery.mock.calls.filter(([sql]) => String(sql).includes('INSERT INTO quotation_items'))
+    expect(inserts[1][1][4]).toBe(0)
+    // totals: 100 + 25 subtotal, 18 tax → 143
+    const update = txQuery.mock.calls.find(([sql]) => String(sql).includes('UPDATE quotations'))!
+    expect(update[1]).toEqual(expect.arrayContaining([125, 9, 143]))
+  })
+
+  it('returns 400 with field messages for an invalid line and touches nothing', async () => {
+    mockAuth.mockResolvedValue(ADMIN as any)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne.mockResolvedValueOnce(draftQt)
+    const res = await PATCH(makePatchReq({ items: [{ description: '', quantity: 0, rate: 5 }] }), PARAMS)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.fields['items.0.description']).toBeDefined()
+    expect(body.fields['items.0.quantity']).toBeDefined()
+    expect(withTransaction).not.toHaveBeenCalled()
+  })
+
+  it('returns 409 when items are changed on a converted quotation', async () => {
+    mockAuth.mockResolvedValue(ADMIN as any)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne.mockResolvedValueOnce({ ...draftQt, converted_order_id: 'ord-1' })
+    const res = await PATCH(makePatchReq({ items: [{ description: 'X', quantity: 1, rate: 5 }] }), PARAMS)
+    expect(res.status).toBe(409)
+    expect(withTransaction).not.toHaveBeenCalled()
   })
 
   it('recomputes totals from existing items when total_amount=0 and no items supplied', async () => {
@@ -194,21 +238,22 @@ describe('PATCH /api/admin/quotations/[id]', () => {
     mockQueryMany.mockResolvedValueOnce([
       { amount: 500, gst_rate: 18 },
       { amount: 300, gst_rate: 5 },
-    ]) // existing items for recompute
-    mockQueryOne.mockResolvedValueOnce(draftQt) // UPDATE RETURNING
-    mockQueryMany.mockResolvedValueOnce([]) // savedItems
+    ])
+    txReturns(draftQt)
+    mockQueryMany.mockResolvedValueOnce([])
 
     const res = await PATCH(makePatchReq({ notes: 'recomputed' }), PARAMS)
     expect(res.status).toBe(200)
-    // queryMany was called twice: once for existing items, once for savedItems
     expect(mockQueryMany).toHaveBeenCalledTimes(2)
+    const update = txQuery.mock.calls.find(([sql]) => String(sql).includes('UPDATE quotations'))!
+    expect(update[1]).toEqual(expect.arrayContaining([800, 52.5, 905]))
   })
 
   it('sends finalization email when status=final and consignee_email present', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftQt)
-    mockQueryOne.mockResolvedValueOnce(finalQt) // UPDATE RETURNING with status=final
+    txReturns(finalQt)
     mockQueryMany.mockResolvedValueOnce([])
     mockSendEmail.mockResolvedValueOnce(undefined as any)
 
@@ -227,20 +272,23 @@ describe('PATCH /api/admin/quotations/[id]', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftQt)
-    mockQueryOne.mockResolvedValueOnce(finalQt)
+    txReturns(finalQt)
     mockQueryMany.mockResolvedValueOnce([])
     mockSendEmail.mockRejectedValueOnce(new Error('SMTP down'))
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const res = await PATCH(makePatchReq({ status: 'final' }), PARAMS)
     expect(res.status).toBe(200)
     expect((await res.json()).quotation).toBeDefined()
+    expect(errSpy).toHaveBeenCalled()
+    errSpy.mockRestore()
   })
 
   it('skips email when status=final but no consignee_email', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftQt)
-    mockQueryOne.mockResolvedValueOnce({ ...finalQt, consignee_email: null })
+    txReturns({ ...finalQt, consignee_email: null })
     mockQueryMany.mockResolvedValueOnce([])
 
     const res = await PATCH(makePatchReq({ status: 'final' }), PARAMS)
@@ -252,16 +300,18 @@ describe('PATCH /api/admin/quotations/[id]', () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockRejectedValueOnce(new Error('Write failed'))
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const res = await PATCH(makePatchReq({}), PARAMS)
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Write failed')
+    errSpy.mockRestore()
   })
 
   it('updates all text fields when provided', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftQt)
-    mockQueryOne.mockResolvedValueOnce(draftQt)
+    txReturns(draftQt)
     mockQueryMany.mockResolvedValueOnce([])
 
     const res = await PATCH(
@@ -276,9 +326,18 @@ describe('PATCH /api/admin/quotations/[id]', () => {
       PARAMS
     )
     expect(res.status).toBe(200)
-    // The UPDATE was called with multiple $N params
-    const updateCall = mockQueryOne.mock.calls.find(([sql]) => (sql as string).includes('UPDATE quotations'))
-    expect(updateCall).toBeDefined()
+    const update = txQuery.mock.calls.find(([sql]) => String(sql).includes('UPDATE quotations'))!
+    expect(String(update[0])).toContain('consignee_name = $')
+    expect(update[1]).toEqual(expect.arrayContaining(['New Name', 'new@example.com', 'Revised', 'sent']))
+  })
+
+  it('returns 400 for an invalid consignee email', async () => {
+    mockAuth.mockResolvedValue(ADMIN as any)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne.mockResolvedValueOnce(draftQt)
+    const res = await PATCH(makePatchReq({ consignee_email: 'not-an-email' }), PARAMS)
+    expect(res.status).toBe(400)
+    expect((await res.json()).fields.consignee_email).toBeDefined()
   })
 })
 

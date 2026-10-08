@@ -11,6 +11,10 @@ vi.mock('@/lib/shared/customer-links', () => ({
   orderUrlById: vi.fn(async (id: string) => `https://acme.jeffistores.in/account/orders/${id}`),
   invoiceUrlForOrder: vi.fn(async () => 'https://invoice-acme.jeffistores.in/TOKEN'),
 }))
+vi.mock('@/lib/catalog/site-controls', () => ({
+  getFeatureFlags: async () => ({ gstEnabled: true, inventoryValidationEnabled: true }),
+  getBusinessValues: async () => ({ businessStateCode: '33' }),
+}))
 vi.mock('@/lib/auth/jwt', () => ({
   authenticateAdmin: vi.fn(),
 }))
@@ -38,7 +42,8 @@ vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
 }))
 
-vi.mock('@/lib/orders/inventory-deduct', () => ({
+vi.mock('@/lib/orders/inventory-deduct', async () => ({
+  ...(await vi.importActual<any>('@/lib/orders/inventory-deduct')),
   deductOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -149,35 +154,27 @@ const QUOT_ITEMS = [
   },
 ]
 
+// Answers by SQL shape (not call order); stock reads go to the most specific grain table.
 function makeTransactionClient(stockLevel = 100) {
   return {
-    query: vi
-      .fn()
-      // INSERT addresses RETURNING id
-      .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-      // stock check (products)
-      .mockResolvedValueOnce({ rows: [{ inventory_quantity: stockLevel }] })
-      // INSERT orders RETURNING id, order_number
-      .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-1', order_number: 'OFF-123' }] })
-      // site_settings for invoice_prefix
-      .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-      // getNextInvoiceSequence
-      .mockResolvedValueOnce({ rows: [{ seq: 1 }] })
-      // UPDATE orders invoice_number
-      .mockResolvedValueOnce({ rows: [] })
-      // INSERT invoices
-      .mockResolvedValueOnce({ rows: [] })
-      // INSERT order_items
-      .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-      // stock deduction SELECT
-      .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
-      // stock deduction UPDATE
-      .mockResolvedValueOnce({ rows: [] })
-      // UPDATE quotations
-      .mockResolvedValueOnce({ rows: [] }),
+    query: vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-uuid-1' }] }
+      if (sql.includes('FROM product_units')) return { rows: [] }
+      if (/SELECT inventory_quantity FROM \w+ WHERE id = \$1 FOR UPDATE/.test(sql))
+        return { rows: [{ inventory_quantity: String(stockLevel) }] }
+      if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-uuid-1', order_number: 'OFF-123' }] }
+      if (sql.includes('invoice_prefix')) return { rows: [{ value: 'JS' }] }
+      if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-1' }] }
+      return { rows: [] }
+    }),
     release: vi.fn(),
   }
 }
+
+const stockTables = (client: any): string[] =>
+  client.query.mock.calls
+    .map((c: any[]) => /SELECT inventory_quantity FROM (\w+)/.exec(String(c[0]))?.[1])
+    .filter(Boolean)
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -214,28 +211,12 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice stock checks and nu
       },
     ] as any)
 
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi
-          .fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-1', order_number: 'OFF-123' }] })
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-          .mockResolvedValueOnce({ rows: [{ seq: 1 }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '50' }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
+    const client = makeTransactionClient(50)
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
 
     const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
+    expect(stockTables(client)).toEqual(['product_variants'])
   })
 
   it('checks sub-variant stock when item has sub_variant_id', async () => {
@@ -247,28 +228,12 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice stock checks and nu
       },
     ] as any)
 
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi
-          .fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 200 }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-1', order_number: 'OFF-123' }] })
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-          .mockResolvedValueOnce({ rows: [{ seq: 1 }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '200' }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
+    const client = makeTransactionClient(200)
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
 
     const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
+    expect(stockTables(client)).toEqual(['product_sub_variants'])
   })
 
   it('skips stock check for items without product_id', async () => {
@@ -280,26 +245,13 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice stock checks and nu
       },
     ] as any)
 
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi
-          .fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-          // no stock-check call — goes straight to INSERT orders
-          .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-1', order_number: 'OFF-123' }] })
-          .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-          .mockResolvedValueOnce({ rows: [{ seq: 1 }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
+    const client = makeTransactionClient(0)
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
 
     const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(res.status).toBe(200)
+    expect((await res.json()).savedAsDraft).toBe(false)
+    expect(stockTables(client)).toEqual([])
   })
 
   // --- from_rfq prefix ---

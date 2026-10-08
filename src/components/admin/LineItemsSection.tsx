@@ -49,6 +49,118 @@ export interface LineItem {
   inventory_quantity: number | null
   serialized?: boolean
   perishable?: boolean
+  /** Ad-hoc line not in the store: free-text name/unit, never touches inventory. */
+  is_custom?: boolean
+}
+
+/** Max custom unit length — order_items.buy_unit is varchar(10). */
+export const CUSTOM_UNIT_MAX = 10
+
+export function isCustomLine(it: LineItem): boolean {
+  return !it.product_id && (!!it.is_custom || !!it.product_name.trim())
+}
+
+/** Untouched line (no product, no custom text) — dropped from save payloads. */
+export function isBlankLine(it: LineItem): boolean {
+  return !it.product_id && !it.is_custom && !it.product_name.trim()
+}
+
+export function newCustomLineItem(): LineItem {
+  return { ...newLineItem(), is_custom: true, gst_rate: '18', unit: 'PCS' }
+}
+
+/** Problems with one line, in admin wording. Empty array ⇒ valid. */
+export function lineItemIssues(it: LineItem): string[] {
+  const issues: string[] = []
+  const custom = isCustomLine(it)
+  if (!it.product_name.trim()) issues.push(custom ? 'Enter an item name' : 'Pick a product or add a custom item')
+  const qty = Number(it.quantity)
+  if (!(qty > 0)) issues.push('Quantity must be greater than 0')
+  const price = Number(it.unit_price)
+  if (!Number.isFinite(price) || price < 0) issues.push('Rate cannot be negative')
+  else if (!(price > 0)) issues.push('Enter a rate greater than 0')
+  const gst = Number(it.gst_rate)
+  if (!Number.isFinite(gst) || gst < 0 || gst > 40) issues.push('GST % must be between 0 and 40')
+  const disc = Number(it.discount_pct) || 0
+  if (disc < 0 || disc > 100) issues.push('Discount must be between 0 and 100%')
+  if (custom && (it.unit || '').trim().length > CUSTOM_UNIT_MAX)
+    issues.push(`Unit must be at most ${CUSTOM_UNIT_MAX} characters`)
+  return issues
+}
+
+/** First problem across non-blank lines as "Item N: …", or null when all valid. */
+export function validateLineItems(items: LineItem[]): string | null {
+  const live = items.filter(it => !isBlankLine(it))
+  if (live.length === 0) return 'Add at least one line item'
+  for (let i = 0; i < items.length; i++) {
+    if (isBlankLine(items[i])) continue
+    const issues = lineItemIssues(items[i])
+    if (issues.length) return `Item ${i + 1}: ${issues[0]}`
+  }
+  return null
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  product_name: 'name',
+  description: 'name',
+  unit_price: 'rate',
+  rate: 'rate',
+  quantity: 'quantity',
+  gst_rate: 'GST %',
+  unit: 'unit',
+  buy_unit: 'unit',
+  hsn_code: 'HSN',
+  discount_pct: 'discount',
+  product_id: 'product',
+}
+
+/**
+ * Human message for a failed API call: zod field errors as "Item 2 rate: …",
+ * and the x-trace-id as "ref …" on 5xx so support can find the server log.
+ */
+export function apiErrorMessage(res: Response, data: any, fallback: string): string {
+  let msg: string = data?.error || fallback
+  const fields = data?.fields as Record<string, string> | undefined
+  if (fields && Object.keys(fields).length) {
+    msg = Object.entries(fields)
+      .map(([k, v]) => {
+        const m = /^items\.(\d+)\.(\w+)$/.exec(k)
+        if (m) return `Item ${Number(m[1]) + 1} ${FIELD_LABELS[m[2]] ?? m[2]}: ${v}`
+        return `${k}: ${v}`
+      })
+      .join('; ')
+  }
+  const ref = res.status >= 500 ? res.headers.get('x-trace-id') : null
+  return ref ? `${msg} (ref ${ref})` : msg
+}
+
+/** Shortfall lines returned by the invoice APIs when stock is short. */
+export function insufficientMessage(prefix: string, items: string[] | undefined): string {
+  return `${prefix}: ${(items || []).join('; ')}`
+}
+
+/** Fields every line-items API needs; custom lines send their free-text unit. */
+export function lineItemPayload(it: LineItem) {
+  const custom = isCustomLine(it)
+  return {
+    product_id: custom ? null : it.product_id,
+    product_name: it.product_name.trim(),
+    product_sku: custom ? '' : it.product_sku,
+    variant_id: custom ? null : it.variant_id,
+    sub_variant_id: custom ? null : it.sub_variant_id || null,
+    variant_name: custom ? '' : it.variant_name,
+    hsn_code: it.hsn_code,
+    gst_rate: it.gst_rate,
+    quantity: it.quantity,
+    unit: custom ? (it.unit || 'PCS').trim().toUpperCase() : it.unit,
+    buy_unit: custom ? null : it.buy_unit || null,
+    sell_unit_factor: custom ? 1 : (it.sell_unit_factor ?? 1),
+    sell_unit_dimension: custom ? null : it.sell_unit_dimension,
+    unit_price: Number(it.mrp) > 0 && !custom ? Number(it.mrp) : Number(it.unit_price),
+    discount_pct: Number(it.discount_pct) || 0,
+    is_custom: custom,
+    temp_id: it.id,
+  }
 }
 
 interface Suggestion {
@@ -798,6 +910,40 @@ export default function LineItemsSection({
     })
   }
 
+  // Turn a line into a free-text custom item (keeps qty / GST / HSN already typed).
+  function makeCustom(itemId: string) {
+    freeScannedSerialsForLine(itemId)
+    onChange(
+      items.map(it =>
+        it.id !== itemId
+          ? it
+          : {
+              ...newCustomLineItem(),
+              id: it.id,
+              product_name: nameInputs[itemId] ?? '',
+              hsn_code: it.hsn_code,
+              gst_rate: it.gst_rate || '18',
+              quantity: it.quantity || 1,
+            }
+      )
+    )
+  }
+
+  // Custom line → back to store-product search.
+  function customToSearch(itemId: string) {
+    onChange(items.map(it => (it.id !== itemId ? it : { ...newLineItem(), id: it.id, quantity: it.quantity || 1 })))
+  }
+
+  function clearCustom(itemId: string) {
+    onChange(
+      items.map(it =>
+        it.id !== itemId
+          ? it
+          : { ...it, product_name: '', hsn_code: '', unit_price: 0, discount_pct: 0, unit: 'PCS', quantity: 1 }
+      )
+    )
+  }
+
   function updateItem(id: string, field: keyof LineItem, value: string) {
     if (field === 'quantity') {
       // If quantity drops, tell the parent so it can trim any serial assignments
@@ -862,6 +1008,14 @@ export default function LineItemsSection({
           </button>
           <button
             type="button"
+            onClick={() => onChange([...items.filter(it => !isBlankLine(it)), newCustomLineItem()])}
+            title="Add an item that is not in the store — it is billed but never touches inventory"
+            className="text-xs text-foreground-secondary font-semibold hover:text-foreground transition-colors"
+          >
+            + Custom item
+          </button>
+          <button
+            type="button"
             onClick={() => onChange([...items, newLineItem()])}
             className="flex items-center gap-1 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors"
           >
@@ -876,7 +1030,9 @@ export default function LineItemsSection({
       <div className="space-y-3">
         {items.map((item, idx) => {
           const mode = searchModes[item.id] ?? 'scanner'
-          const hasProduct = !!item.product_name
+          const custom = isCustomLine(item)
+          const hasProduct = !!item.product_id
+          const issues = custom && (item.product_name || Number(item.unit_price)) ? lineItemIssues(item) : []
 
           return (
             <div key={item.id} className="border border-border-default rounded-lg p-3 space-y-3 bg-surface-elevated">
@@ -899,7 +1055,45 @@ export default function LineItemsSection({
               </div>
 
               <div className="relative">
-                {hasProduct ? (
+                {custom ? (
+                  <div className="px-3 py-2 bg-surface-secondary rounded-lg border border-dashed border-amber-400 dark:border-amber-600 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                        Custom – not in inventory
+                      </span>
+                      <span className="flex items-center gap-3 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => clearCustom(item.id)}
+                          className="text-xs text-foreground-secondary font-semibold hover:text-foreground transition-colors"
+                        >
+                          Clear
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => customToSearch(item.id)}
+                          className="text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors"
+                        >
+                          Search store instead
+                        </button>
+                      </span>
+                    </div>
+                    <div>
+                      <label className={labelCls}>
+                        Item name / description <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={item.product_name}
+                        onChange={e => updateItem(item.id, 'product_name', e.target.value)}
+                        maxLength={255}
+                        className={inputCls}
+                        placeholder="e.g. Installation charges"
+                        autoFocus={!item.product_name}
+                      />
+                    </div>
+                  </div>
+                ) : hasProduct ? (
                   <div className="flex items-center justify-between gap-2 px-3 py-2 bg-surface-secondary rounded-lg border border-border-default">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
@@ -1002,6 +1196,14 @@ export default function LineItemsSection({
                           {m === 'name' ? 'Name' : m === 'sku' ? 'SKU' : m === 'category' ? 'Category' : 'Scanner'}
                         </button>
                       ))}
+                      <button
+                        type="button"
+                        onClick={() => makeCustom(item.id)}
+                        title="Not in the store? Bill it as a custom item (no inventory)"
+                        className="px-3 py-1 rounded-md text-xs font-medium text-amber-700 dark:text-amber-400 hover:text-amber-800 transition-colors"
+                      >
+                        + Custom item
+                      </button>
                     </div>
 
                     {mode === 'name' && (
@@ -1176,7 +1378,8 @@ export default function LineItemsSection({
                     // with min_qty a FLOOR — not a grid offset. (An earlier bug used
                     // `min + n·step`, so a stored min_qty like 0.001 made the browser
                     // reject clean integers such as 2 → "nearest valid 1.001, 2.001".)
-                    const qStep = su ? (su.qty_step > 0 ? su.qty_step : 1) : 1
+                    // Custom lines take any positive quantity (e.g. 2.5 m).
+                    const qStep = su ? (su.qty_step > 0 ? su.qty_step : 1) : custom ? 0.001 : 1
                     const qFloor = su ? su.min_qty : 0
                     // Smallest step-multiple that is still ≥ the min_qty floor.
                     const qMin = Math.max(qStep, Math.ceil((qFloor - 1e-9) / qStep) * qStep)
@@ -1245,13 +1448,13 @@ export default function LineItemsSection({
                           <input
                             type="number"
                             min={qMin}
-                            step={qStep}
+                            step={custom ? 'any' : qStep}
                             max={qMax}
                             value={item.quantity}
                             onChange={e => updateItem(item.id, 'quantity', e.target.value)}
                             onBlur={e => {
                               let v = parseFloat(e.target.value)
-                              if (isNaN(v) || v < qMin) v = qMin
+                              if (isNaN(v) || v < qMin) v = custom ? 1 : qMin
                               if (qMax != null && v > qMax) v = qMax
                               updateItem(item.id, 'quantity', String(v))
                             }}
@@ -1281,53 +1484,66 @@ export default function LineItemsSection({
                 </div>
                 <div>
                   <label className={labelCls}>Unit</label>
-                  {(() => {
-                    const countUnits = item.available_units.filter(u => u.dimension === 'count')
-                    if (countUnits.length > 1) {
-                      const selectedKey = item.selected_unit_key || countUnits[0].unit
-                      return (
-                        <AdminSelect
-                          sm
-                          value={selectedKey}
-                          onChange={v => {
-                            const picked = item.available_units.find(u => u.unit === v)
-                            if (!picked) return
-                            onChange(
-                              items.map(it =>
-                                it.id !== item.id
-                                  ? it
-                                  : {
-                                      ...it,
-                                      selected_unit_key: picked.unit,
-                                      buy_unit: picked.unit,
-                                      sell_unit_factor: picked.factor,
-                                      unit: picked.display_label.toUpperCase(),
-                                    }
+                  {custom ? (
+                    <input
+                      type="text"
+                      value={item.unit}
+                      onChange={e => updateItem(item.id, 'unit', e.target.value.toUpperCase())}
+                      maxLength={CUSTOM_UNIT_MAX}
+                      className={inputCls + ' uppercase'}
+                      placeholder="PCS"
+                      title={`Free-text unit, up to ${CUSTOM_UNIT_MAX} characters`}
+                    />
+                  ) : (
+                    (() => {
+                      const countUnits = item.available_units.filter(u => u.dimension === 'count')
+                      if (countUnits.length > 1) {
+                        const selectedKey = item.selected_unit_key || countUnits[0].unit
+                        return (
+                          <AdminSelect
+                            sm
+                            value={selectedKey}
+                            onChange={v => {
+                              const picked = item.available_units.find(u => u.unit === v)
+                              if (!picked) return
+                              onChange(
+                                items.map(it =>
+                                  it.id !== item.id
+                                    ? it
+                                    : {
+                                        ...it,
+                                        selected_unit_key: picked.unit,
+                                        buy_unit: picked.unit,
+                                        sell_unit_factor: picked.factor,
+                                        unit: picked.display_label.toUpperCase(),
+                                      }
+                                )
                               )
-                            )
-                          }}
-                          options={countUnits.map(u => ({
-                            value: u.unit,
-                            label: u.display_label + (u.factor > 1 ? ` (${u.factor} pcs)` : ''),
-                          }))}
-                        />
+                            }}
+                            options={countUnits.map(u => ({
+                              value: u.unit,
+                              label: u.display_label + (u.factor > 1 ? ` (${u.factor} pcs)` : ''),
+                            }))}
+                          />
+                        )
+                      }
+                      return (
+                        <div
+                          className={
+                            inputCls +
+                            ' flex items-center justify-center font-medium text-center select-none bg-surface-secondary text-foreground'
+                          }
+                        >
+                          {item.buy_unit ? (getSelectedUnit(item)?.display_label ?? item.buy_unit) : item.unit || '—'}
+                        </div>
                       )
-                    }
-                    return (
-                      <div
-                        className={
-                          inputCls +
-                          ' flex items-center justify-center font-medium text-center select-none bg-surface-secondary text-foreground'
-                        }
-                      >
-                        {item.buy_unit ? (getSelectedUnit(item)?.display_label ?? item.buy_unit) : item.unit || '—'}
-                      </div>
-                    )
-                  })()}
+                    })()
+                  )}
                 </div>
                 <div>
                   <label className={labelCls}>
-                    {gstEnabled ? 'MRP (incl. GST)' : 'MRP'} <span className="text-red-500">*</span>
+                    {custom ? (gstEnabled ? 'Rate (incl. GST)' : 'Rate') : gstEnabled ? 'MRP (incl. GST)' : 'MRP'}{' '}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
@@ -1354,6 +1570,12 @@ export default function LineItemsSection({
                   />
                 </div>
               </div>
+
+              {issues.length > 0 && (
+                <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+                  {issues.join(' · ')}
+                </p>
+              )}
 
               {Number(item.unit_price) > 0 && (
                 <div className="flex items-center justify-between text-xs text-foreground-secondary">

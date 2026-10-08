@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
-import { deductOrderStock } from '@/lib/orders/inventory-deduct'
+import { deductOrderStock, InsufficientStockError } from '@/lib/orders/inventory-deduct'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { sendInvoiceFinalizedEmail, sendOrderStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/documents/invoice'
@@ -56,7 +56,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
 
       if (inventoryValidationEnabled && hasScope(admin.role, admin.scopes, 'inventory:read')) {
-        await deductOrderStock(id, { batchAssignments, serialAssignments, requireSerialAssignments: true }, client)
+        // Store-product lines only (custom lines have no product_id). Online cart lines
+        // without a buy_unit are per base piece, so no default-unit fallback for them.
+        await deductOrderStock(
+          id,
+          {
+            batchAssignments,
+            serialAssignments,
+            requireSerialAssignments: true,
+            defaultUnitFallback: order.source !== 'online',
+          },
+          client
+        )
       }
 
       // Assign the invoice number (GST-gated, idempotent) via the shared helper,
@@ -105,6 +116,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       invoiceUrl: result.invoiceNumber ? `/api/orders/${result.orderId}/invoice` : null,
     })
   } catch (err: any) {
+    if (err instanceof InsufficientStockError)
+      return NextResponse.json({ error: `Cannot finalize — ${err.message}`, code: err.code }, { status: 409 })
+    console.error(`[admin/invoices/drafts/${(await params).id}/finalize] failed`, err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

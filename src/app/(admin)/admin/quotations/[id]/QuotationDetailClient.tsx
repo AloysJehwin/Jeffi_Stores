@@ -391,6 +391,11 @@ export default function QuotationDetailClient({ id }: { id: string }) {
                 <tr key={idx} className="hover:bg-surface-secondary/40 transition-colors">
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{item.description}</div>
+                    {!item.product_id && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                        Custom – not in inventory
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">
                     {item.hsn_code || '—'}

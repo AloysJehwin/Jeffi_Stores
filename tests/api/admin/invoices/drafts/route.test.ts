@@ -22,8 +22,9 @@ vi.mock('@/lib/catalog/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/catalog/pricing', () => ({
-  lineItemFromMrpIncl: vi.fn().mockReturnValue(100),
+vi.mock('@/lib/catalog/site-controls', () => ({
+  getFeatureFlags: async () => ({ gstEnabled: true, inventoryValidationEnabled: true }),
+  getBusinessValues: async () => ({ businessStateCode: '22' }),
 }))
 
 import { GET, POST } from '@/app/api/(admin)/admin/invoices/drafts/route'
@@ -111,7 +112,7 @@ describe('POST /api/admin/invoices/drafts', () => {
     const res = await POST(makePostReq({}))
     expect(res.status).toBe(400)
     const body = await res.json()
-    expect(body.error).toMatch(/customerName/)
+    expect(body.fields?.customerName).toMatch(/Customer name is required/)
   })
 
   it('creates draft order on happy path', async () => {
@@ -154,7 +155,7 @@ describe('POST /api/admin/invoices/drafts', () => {
         customerName: 'Jane',
         items: [
           {
-            product_id: 'p1',
+            product_id: '11111111-1111-4111-8111-111111111111',
             product_name: 'Bolt',
             product_sku: 'B1',
             quantity: '2',
@@ -162,7 +163,7 @@ describe('POST /api/admin/invoices/drafts', () => {
             gst_rate: '18',
           },
           {
-            product_id: 'p2',
+            product_id: '22222222-2222-4222-8222-222222222222',
             product_name: 'Nut',
             product_sku: 'N1',
             quantity: '5',

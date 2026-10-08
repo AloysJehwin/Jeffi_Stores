@@ -25,8 +25,9 @@ vi.mock('@/lib/catalog/gst', () => ({
   round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
-vi.mock('@/lib/catalog/pricing', () => ({
-  lineItemFromMrpIncl: vi.fn(),
+vi.mock('@/lib/catalog/site-controls', () => ({
+  getFeatureFlags: async () => ({ gstEnabled: true, inventoryValidationEnabled: true }),
+  getBusinessValues: async () => ({ businessStateCode: '33' }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -38,7 +39,6 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
 import { isInterState, calculateGST } from '@/lib/catalog/gst'
-import { lineItemFromMrpIncl } from '@/lib/catalog/pricing'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -161,7 +161,6 @@ describe('PATCH /api/admin/invoices/drafts/[id]', () => {
     // Re-setup lib mocks cleared by resetAllMocks
     vi.mocked(isInterState).mockReturnValue(false)
     vi.mocked(calculateGST).mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0 } as any)
-    vi.mocked(lineItemFromMrpIncl).mockReturnValue(100)
   })
 
   it('returns 401 when not authenticated', async () => {
@@ -195,7 +194,7 @@ describe('PATCH /api/admin/invoices/drafts/[id]', () => {
     const res = await PATCH(makeReq('PATCH', body), { params: Promise.resolve({ id: DRAFT_ID }) })
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toMatch(/customerName/)
+    expect(json.fields?.customerName).toMatch(/Customer name is required/)
   })
 
   it('updates draft and returns success', async () => {

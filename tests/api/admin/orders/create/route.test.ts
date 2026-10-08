@@ -42,6 +42,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({
 }))
 vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
+  recomputeStockStatusForProduct: async () => undefined,
 }))
 vi.mock('@/lib/catalog/digital-guard', () => ({
   findDigitalProductIds: vi.fn(async () => []),
@@ -64,7 +65,13 @@ import { POST } from '@/app/api/(admin)/admin/orders/create/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { withTransaction } from '@/lib/shared/db'
-import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/catalog/gst'
+import {
+  isInterState,
+  calculateGST,
+  getFinancialYear,
+  generateInvoiceNumber,
+  getNextInvoiceSequence,
+} from '@/lib/catalog/gst'
 import { lineItemFromMrpIncl } from '@/lib/catalog/pricing'
 import { logStockMovement } from '@/lib/orders/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
@@ -549,7 +556,10 @@ describe('POST /api/admin/orders/create', () => {
       query: vi.fn().mockImplementation((sql: string) => {
         if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
         if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-U2' }] }
-        if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: '5', dimension: 'count' }] }
+        if (sql.includes('FROM product_units'))
+          return {
+            rows: [{ unit: 'box', factor: '5', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }],
+          }
         if (sql.includes('SELECT inventory_quantity FROM products')) return { rows: [{ inventory_quantity: '10' }] }
         return { rows: [] }
       }),
@@ -668,7 +678,10 @@ describe('POST /api/admin/orders/create', () => {
       query: vi.fn().mockImplementation((sql: string) => {
         if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
         if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-UNIT' }] }
-        if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: '5', dimension: 'count' }] }
+        if (sql.includes('FROM product_units'))
+          return {
+            rows: [{ unit: 'box', factor: '5', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }],
+          }
         if (sql.includes('SELECT inventory_quantity FROM products')) return { rows: [{ inventory_quantity: '100' }] }
         if (sql.includes('SELECT value FROM site_settings')) return { rows: [{ value: 'JS' }] }
         return { rows: [] }
@@ -694,7 +707,10 @@ describe('POST /api/admin/orders/create', () => {
       query: vi.fn().mockImplementation((sql: string) => {
         if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
         if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-U2' }] }
-        if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: '5', dimension: 'count' }] }
+        if (sql.includes('FROM product_units'))
+          return {
+            rows: [{ unit: 'box', factor: '5', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }],
+          }
         if (sql.includes('SELECT inventory_quantity FROM products')) return { rows: [{ inventory_quantity: '10' }] }
         return { rows: [] }
       }),
@@ -735,5 +751,146 @@ describe('POST /api/admin/orders/create', () => {
     await POST(makePost(validOrderBody))
     const insertOrderCall = client.query.mock.calls.find((c: any) => c[0].includes('INSERT INTO orders'))
     expect(insertOrderCall![1]).toContain('paid')
+  })
+
+  describe('inventory flag gating', () => {
+    const sqlOf = (client: any): string[] => client.query.mock.calls.map((c: any[]) => String(c[0]))
+    const setFlag = (on: boolean) =>
+      vi.mocked(getFeatureFlags).mockResolvedValue({ gstEnabled: false, inventoryValidationEnabled: on } as any)
+
+    it('flag OFF: no stock check and no inventory transactions, even when stock is short', async () => {
+      setFlag(false)
+      mockAuth.mockResolvedValue(admin as any)
+      mockHasScope.mockReturnValue(true)
+      mockParseBody.mockReturnValue({ ok: true, data: parsedOrderData } as any)
+      setupGstMocks()
+      const client = buildMockTxClient({
+        query: vi.fn().mockImplementation((sql: string) => {
+          if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+          if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-1' }] }
+          if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-1' }] }
+          if (sql.includes('inventory_quantity')) return { rows: [{ inventory_quantity: '0' }] }
+          if (sql.includes('SELECT value FROM site_settings')) return { rows: [{ value: 'JS' }] }
+          return { rows: [] }
+        }),
+      })
+      mockWithTx.mockImplementation(async (fn: any) => fn(client))
+      const data = await (await POST(makePost(validOrderBody))).json()
+      expect(data.savedAsDraft).toBe(false)
+      expect(data.invoiceNumber).toBeTruthy()
+      const sqls = sqlOf(client)
+      expect(sqls.some(q => q.includes('inventory_quantity'))).toBe(false)
+      expect(sqls.some(q => q.includes('inventory_transactions'))).toBe(false)
+      expect(mockLogStock).not.toHaveBeenCalled()
+    })
+
+    it('flag ON: deducts base pieces (2 × SET of 10 = 20) and logs a sale', async () => {
+      setFlag(true)
+      mockAuth.mockResolvedValue(admin as any)
+      mockHasScope.mockReturnValue(true)
+      const item = { ...parsedOrderData.items[0], quantity: 2, buy_unit: 'SET', sell_unit_factor: 10 }
+      mockParseBody.mockReturnValue({ ok: true, data: { ...parsedOrderData, items: [item] } } as any)
+      setupGstMocks()
+      const unitRow = { unit: 'SET', factor: '10', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }
+      const client = buildMockTxClient({
+        query: vi.fn().mockImplementation((sql: string) => {
+          if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+          if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-2' }] }
+          if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-1' }] }
+          if (sql.includes('FROM product_units')) return { rows: [unitRow] }
+          if (sql.includes('FROM order_items WHERE order_id'))
+            return {
+              rows: [
+                {
+                  id: 'oi-1',
+                  product_id: 'prod-1',
+                  variant_id: null,
+                  sub_variant_id: null,
+                  product_name: 'Hex Bolt M6',
+                  variant_name: null,
+                  quantity: '2',
+                  buy_unit: 'SET',
+                  sold_unit: 'SET',
+                  sold_unit_factor: '10',
+                  base_quantity: '20',
+                },
+              ],
+            }
+          if (sql.includes('SELECT perishable, serialized')) return { rows: [{ perishable: false, serialized: false }] }
+          if (sql.includes('inventory_quantity FROM')) return { rows: [{ inventory_quantity: '100' }] }
+          if (sql.includes('SELECT value FROM site_settings')) return { rows: [{ value: 'JS' }] }
+          return { rows: [] }
+        }),
+      })
+      mockWithTx.mockImplementation(async (fn: any) => fn(client))
+      const data = await (await POST(makePost(validOrderBody))).json()
+      expect(data.savedAsDraft).toBe(false)
+      expect(mockLogStock).toHaveBeenCalledWith(
+        client,
+        expect.objectContaining({ transactionType: 'sale', quantityChange: -20, referenceId: 'order-1' })
+      )
+    })
+
+    it('flag ON: short stock → draft with the shortfall in selling unit and pieces', async () => {
+      setFlag(true)
+      mockAuth.mockResolvedValue(admin as any)
+      mockHasScope.mockReturnValue(true)
+      const item = { ...parsedOrderData.items[0], quantity: 2, buy_unit: 'SET', sell_unit_factor: 10 }
+      mockParseBody.mockReturnValue({ ok: true, data: { ...parsedOrderData, items: [item] } } as any)
+      setupGstMocks()
+      const unitRow = { unit: 'SET', factor: '10', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }
+      const client = buildMockTxClient({
+        query: vi.fn().mockImplementation((sql: string) => {
+          if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+          if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-3' }] }
+          if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-1' }] }
+          if (sql.includes('FROM product_units')) return { rows: [unitRow] }
+          if (sql.includes('inventory_quantity FROM')) return { rows: [{ inventory_quantity: '15' }] }
+          return { rows: [] }
+        }),
+      })
+      mockWithTx.mockImplementation(async (fn: any) => fn(client))
+      const data = await (await POST(makePost(validOrderBody))).json()
+      expect(data.savedAsDraft).toBe(true)
+      expect(data.insufficientItems[0]).toBe(
+        'Hex Bolt M6 — need 2 SET (20 pcs), available 15 pcs, short 5 pcs (0.5 SET)'
+      )
+      expect(mockLogStock).not.toHaveBeenCalled()
+    })
+
+    it('custom line (no product_id) is never stock-checked or deducted', async () => {
+      setFlag(true)
+      mockAuth.mockResolvedValue(admin as any)
+      mockHasScope.mockReturnValue(true)
+      const custom = {
+        product_id: null,
+        product_name: 'Site visit',
+        unit: 'visit',
+        quantity: 1,
+        unit_price: 500,
+        gst_rate: 18,
+      }
+      mockParseBody.mockReturnValue({ ok: true, data: { ...parsedOrderData, items: [custom] } } as any)
+      setupGstMocks()
+      const client = buildMockTxClient({
+        query: vi.fn().mockImplementation((sql: string) => {
+          if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+          if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-4' }] }
+          if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-1' }] }
+          if (sql.includes('FROM order_items WHERE order_id')) return { rows: [] }
+          if (sql.includes('SELECT value FROM site_settings')) return { rows: [{ value: 'JS' }] }
+          return { rows: [] }
+        }),
+      })
+      mockWithTx.mockImplementation(async (fn: any) => fn(client))
+      const data = await (await POST(makePost(validOrderBody))).json()
+      expect(data.savedAsDraft).toBe(false)
+      const sqls = sqlOf(client)
+      expect(sqls.some(q => q.includes('inventory_quantity'))).toBe(false)
+      const ins = client.query.mock.calls.find((c: any[]) => String(c[0]).includes('INSERT INTO order_items'))
+      expect(ins![1][1]).toBeNull()
+      expect(ins![1][11]).toBe('VISIT')
+      expect(mockLogStock).not.toHaveBeenCalled()
+    })
   })
 })

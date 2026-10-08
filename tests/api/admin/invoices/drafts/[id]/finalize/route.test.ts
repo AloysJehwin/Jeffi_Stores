@@ -222,7 +222,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     expect((await res.json()).success).toBe(true)
   })
 
-  it('returns 500 when sub-variant stock insufficient', async () => {
+  it('returns 409 when sub-variant stock insufficient', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
@@ -241,7 +241,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     })
     setupTx(client)
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(409)
     expect((await res.json()).error).toContain('Insufficient stock')
   })
 
@@ -271,7 +271,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     expect((await res.json()).success).toBe(true)
   })
 
-  it('returns 500 when variant stock insufficient', async () => {
+  it('returns 409 when variant stock insufficient', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
@@ -291,7 +291,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     })
     setupTx(client)
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(409)
     expect((await res.json()).error).toContain('Insufficient stock')
   })
 
@@ -321,7 +321,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     expect(res.status).toBe(200)
   })
 
-  it('returns 500 when aggregated sub-variant stock insufficient', async () => {
+  it('returns 409 when aggregated sub-variant stock insufficient', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
@@ -342,7 +342,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     })
     setupTx(client)
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(409)
     expect((await res.json()).error).toContain('Insufficient stock')
   })
 
@@ -370,7 +370,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     expect((await res.json()).success).toBe(true)
   })
 
-  it('returns 500 when product-level stock insufficient', async () => {
+  it('returns 409 when product-level stock insufficient', async () => {
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValueOnce(draftOrder)
@@ -388,7 +388,7 @@ describe('POST /api/admin/invoices/drafts/[id]/finalize', () => {
     })
     setupTx(client)
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'order-123' }) })
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(409)
     expect((await res.json()).error).toContain('Insufficient stock')
   })
 

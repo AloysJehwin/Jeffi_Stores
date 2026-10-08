@@ -184,7 +184,15 @@ describe('POST /api/admin/invoices/cash-sale', () => {
     const res = await POST(
       postReq({
         paymentMode: 'cash',
-        items: [{ product_id: '111e4567-e89b-12d3-a456-426614174001', product_name: 'Ebook', unit_price: 100, quantity: 1, gst_rate: 18 }],
+        items: [
+          {
+            product_id: '111e4567-e89b-12d3-a456-426614174001',
+            product_name: 'Ebook',
+            unit_price: 100,
+            quantity: 1,
+            gst_rate: 18,
+          },
+        ],
       })
     )
     expect(res.status).toBe(400)
@@ -367,7 +375,8 @@ describe('POST /api/admin/invoices/cash-sale', () => {
     expect(res.status).toBe(200)
   })
 
-  it('throws 500 when stock is insufficient', async () => {
+  it('returns 409 with the shortfall when stock is insufficient (inventory flag on)', async () => {
+    vi.mocked(getFeatureFlags).mockResolvedValue({ gstEnabled: true, inventoryValidationEnabled: true } as any)
     const bodyWithProduct = {
       ...VALID_BODY,
       items: [{ ...VALID_BODY.items[0], product_id: '111e4567-e89b-12d3-a456-426614174001', quantity: 99 }],
@@ -393,9 +402,56 @@ describe('POST /api/admin/invoices/cash-sale', () => {
     })
 
     const res = await POST(postReq(bodyWithProduct))
-    expect(res.status).toBe(500)
+    expect(res.status).toBe(409)
     const json = await res.json()
     expect(json.error).toMatch(/Insufficient stock/)
+  })
+
+  it('records the sale without touching stock when the inventory flag is off', async () => {
+    vi.mocked(getFeatureFlags).mockResolvedValue({ gstEnabled: true, inventoryValidationEnabled: false } as any)
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] })
+        .mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    }
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(
+      postReq({
+        ...VALID_BODY,
+        items: [{ ...VALID_BODY.items[0], product_id: '111e4567-e89b-12d3-a456-426614174001', quantity: 99 }],
+      })
+    )
+    expect(res.status).toBe(200)
+    const sqls: string[] = client.query.mock.calls.map((c: any[]) => String(c[0]))
+    expect(sqls.some(q => /inventory_quantity|product_units/.test(q))).toBe(false)
+    expect(logStockMovement).not.toHaveBeenCalled()
+  })
+
+  it('accepts a custom line (no product_id) and stores its unit', async () => {
+    vi.mocked(getFeatureFlags).mockResolvedValue({ gstEnabled: true, inventoryValidationEnabled: true } as any)
+    const client = {
+      query: vi
+        .fn()
+        .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'sale-1', sale_number: 'CS-1' }] })
+        .mockResolvedValue({ rows: [] }),
+      release: vi.fn(),
+    }
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(
+      postReq({
+        ...VALID_BODY,
+        items: [{ product_id: null, product_name: 'Fitting labour', unit: 'hr', unit_price: 300, quantity: 2 }],
+      })
+    )
+    expect(res.status).toBe(200)
+    const itemInsert = client.query.mock.calls.find((c: any[]) => String(c[0]).includes('INSERT INTO cash_sale_items'))
+    expect(itemInsert?.[1][1]).toBeNull() // product_id
+    expect(itemInsert?.[1][11]).toBe('HR') // buy_unit
+    expect(logStockMovement).not.toHaveBeenCalled()
   })
 
   // --- UPI payment mode ---

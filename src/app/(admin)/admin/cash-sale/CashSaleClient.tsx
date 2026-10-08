@@ -366,10 +366,6 @@ export default function CashSaleClient() {
       setFormError('All items need a name and price')
       return
     }
-    if (items.some(it => !it.product_id)) {
-      setFormError('All items must be selected from inventory — free-typed names are not allowed')
-      return
-    }
     // Serialized lines need assignments. The exact count is base/qty_step, which
     // this form does not carry — the picker sets it and the server enforces it.
     const missingSerial = items.find(
@@ -417,6 +413,7 @@ export default function CashSaleClient() {
             gst_rate: it.gst_rate,
             quantity: it.quantity,
             buy_unit: it.buy_unit || null,
+            unit: it.unit,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
             temp_id: it.id,
