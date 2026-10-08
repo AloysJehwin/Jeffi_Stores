@@ -36,6 +36,7 @@ import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
 import { lineItemExGst } from '@/lib/catalog/pricing'
 import QuotationsMobileList from './_components/QuotationsMobileList'
+import { round2 } from '@/lib/catalog/gst'
 
 export interface Quotation {
   id: string
@@ -368,7 +369,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         const gstRate = Number(i.gst_rate) || 0
         const rateExGst = Number(i.rate) || 0
         // rate is pre-discount ex-GST; show unit_price as pre-discount incl. GST so the discount field is meaningful
-        const unitPrice = rateExGst * (1 + gstRate / 100)
+        const unitPrice = round2(rateExGst * (1 + gstRate / 100))
         const discPct = Number(i.discount_pct) || 0
         const mrp = Number(i.mrp) || 0
         return {
