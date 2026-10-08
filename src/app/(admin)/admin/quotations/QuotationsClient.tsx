@@ -9,7 +9,15 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
-import LineItemsSection, { LineItem, newLineItem, fetchSeedLineItem } from '@/components/admin/LineItemsSection'
+import LineItemsSection, {
+  LineItem,
+  newLineItem,
+  fetchSeedLineItem,
+  isBlankLine,
+  isCustomLine,
+  validateLineItems,
+  apiErrorMessage,
+} from '@/components/admin/LineItemsSection'
 import BatchPickerModal, {
   type BatchPickerItem,
   type BatchAssignment,
@@ -321,6 +329,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
     try {
       const res = await fetch(`/api/admin/quotations/${id}`)
       const data = await res.json()
+      if (!res.ok) throw new Error(apiErrorMessage(res, data, 'Failed to load quotation'))
       const q: Quotation = data.quotation
       setEditId(id)
       setQuoteNumber(q.quote_number)
@@ -365,6 +374,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         return {
           id: i.id || Math.random().toString(36).slice(2),
           product_id: i.product_id || null,
+          is_custom: !i.product_id,
           product_name: i.description || '',
           product_sku: i.sku || '',
           variant_id: i.variant_id || null,
@@ -391,8 +401,9 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
       setAutoSaveStatus('idle')
       isEditorMounted.current = false
       navigateView('editor')
-    } catch {
-      setError('Failed to load quotation')
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load quotation')
+      showToast(e?.message || 'Failed to load quotation', 'error')
     }
   }
 
@@ -463,9 +474,9 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
           ...(serialAssignments && serialAssignments.length > 0 ? { serial_assignments: serialAssignments } : {}),
         }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        showToast(data.error || 'Conversion failed', 'error')
+        showToast(apiErrorMessage(res, data, 'Conversion failed'), 'error')
         return
       }
       setConvertedOrderId(data.orderId)
@@ -474,6 +485,10 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
       if (data.savedAsDraft) {
         setConvertSavedAsDraft(true)
         setConvertInsufficientItems(data.insufficientItems || [])
+        showToast(
+          `Saved as draft invoice — not enough stock for ${(data.insufficientItems || []).length} item(s)`,
+          'error'
+        )
       } else if (data.qrImageUrl) {
         setConvertQrImageUrl(data.qrImageUrl)
       } else {
@@ -520,10 +535,18 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
           return
         }
       }
-      if (items.every(i => !i.product_name.trim() || !i.unit_price)) {
-        setSaveError('At least one line item with a description and price is required')
-        return
+    }
+    // Explicit save (final) surfaces line problems; autosave just waits for valid lines.
+    const lineError = validateLineItems(items)
+    if (lineError) {
+      if (newStatus === 'final') {
+        setSaveError(lineError)
+        showToast(lineError, 'error')
+      } else if (items.some(i => !isBlankLine(i))) {
+        setSaveError(`Not saved yet — ${lineError}`)
       }
+      setAutoSaveStatus('idle')
+      return
     }
     setSaving(true)
     setSaveError('')
@@ -551,32 +574,31 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         buyer_phone: buyerSame ? null : bPhone || null,
         buyer_pincode: buyerSame ? null : bPincode || null,
         buyer_email: buyerSame ? null : bEmail || null,
-        items: items.map(i => {
-          const gstRate = Number(i.gst_rate) || 0
-          const unitPrice = Number(i.unit_price) || 0
-          const discPct = Number(i.discount_pct) || 0
-          // rate = MRP ex-GST (anchor); fall back to unit_price ex-GST if no MRP set
-          const mrpInclGst = Number(i.mrp) || unitPrice
-          const rateExGst = mrpInclGst / (1 + gstRate / 100)
-          // apply sell unit factor for count-dimension units (rate is per-piece)
-          const factor =
-            i.sell_unit_dimension === 'count' && (i.sell_unit_factor || 1) > 1 ? i.sell_unit_factor || 1 : 1
-          const effectiveQty = (Number(i.quantity) || 0) * factor
-          return {
-            description: i.product_name,
-            hsn_code: i.hsn_code || null,
-            gst_rate: gstRate,
-            quantity: i.quantity,
-            unit: i.unit,
-            buy_unit: i.buy_unit || null,
-            rate: rateExGst,
-            discount_pct: discPct,
-            amount: lineItemExGst(effectiveQty, rateExGst, discPct),
-            product_id: i.product_id || null,
-            variant_id: i.variant_id || null,
-            sub_variant_id: i.sub_variant_id || null,
-          }
-        }),
+        items: items
+          .filter(i => !isBlankLine(i))
+          .map(i => {
+            const custom = isCustomLine(i)
+            const gstRate = Number(i.gst_rate) || 0
+            const unitPrice = Number(i.unit_price) || 0
+            // rate = per-piece ex-GST; product lines anchor on MRP, custom lines on the entered rate
+            const inclGst = custom ? unitPrice : Number(i.mrp) || unitPrice
+            return {
+              description: i.product_name.trim(),
+              hsn_code: i.hsn_code || null,
+              gst_rate: gstRate,
+              quantity: i.quantity,
+              unit: custom ? (i.unit || 'PCS').trim().toUpperCase() : i.unit,
+              buy_unit: custom ? null : i.buy_unit || null,
+              rate: inclGst / (1 + gstRate / 100),
+              discount_pct: Number(i.discount_pct) || 0,
+              product_id: custom ? null : i.product_id,
+              variant_id: custom ? null : i.variant_id || null,
+              sub_variant_id: custom ? null : i.sub_variant_id || null,
+              sell_unit_factor: custom ? 1 : i.sell_unit_factor || 1,
+              sell_unit_dimension: custom ? null : i.sell_unit_dimension,
+              is_custom: custom,
+            }
+          }),
         ...(newStatus ? { status: newStatus } : {}),
       }
 
@@ -594,8 +616,8 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
           body: JSON.stringify(body),
         })
       }
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Save failed')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(apiErrorMessage(res, data, 'Save failed'))
       if (!editId) setEditId(data.quotation.id)
       setQuoteNumber(data.quotation.quote_number)
       setAutoSaveStatus('saved')
@@ -606,6 +628,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
       }
     } catch (e: any) {
       setSaveError(e.message || 'Save failed')
+      if (newStatus) showToast(e.message || 'Save failed', 'error')
       setAutoSaveStatus('idle')
     } finally {
       setSaving(false)
@@ -1899,10 +1922,13 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                 if (stockIssue) setConvertPaymentMode('credit')
                 setConvertQrTotal(
                   items.reduce((sum, i) => {
-                    const qty = parseFloat(String(i.quantity)) || 0
-                    const rate = parseFloat(String(i.unit_price)) || 0
-                    const disc = parseFloat(String(i.discount_pct)) || 0
                     const gst = parseFloat(String(i.gst_rate)) || 0
+                    // unit_price is per piece incl. GST; count units scale by factor
+                    const f = Number(i.sell_unit_factor) || 1
+                    const factor = i.product_id && i.sell_unit_dimension === 'count' && f > 1 ? f : 1
+                    const qty = (parseFloat(String(i.quantity)) || 0) * factor
+                    const rate = (parseFloat(String(i.unit_price)) || 0) / (1 + gst / 100)
+                    const disc = parseFloat(String(i.discount_pct)) || 0
                     const ex = lineItemExGst(qty, rate, disc)
                     return sum + ex + (ex * gst) / 100
                   }, 0)

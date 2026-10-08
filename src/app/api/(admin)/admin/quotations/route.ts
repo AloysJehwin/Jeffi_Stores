@@ -1,60 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { query, queryMany, queryOne } from '@/lib/shared/db'
-import { round2 } from '@/lib/catalog/gst'
+import { queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { buildVectorSearchClause } from '@/lib/catalog/search'
 import { z } from 'zod'
 import { parseBody, zNonEmpty, zEmail } from '@/lib/shared/validate'
-import { lineItemExGst } from '@/lib/catalog/pricing'
+import {
+  quotationLineSchema,
+  quotationLineRow,
+  quotationTotals,
+  insertQuotationItem,
+} from '@/lib/documents/invoice-line-items'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
-
-type UnitRow = { unit: string; dimension: string; min_qty: string; max_qty: string | null; qty_step: string }
-
-async function validateLineItemQty(
-  productId: string | null,
-  variantId: string | null,
-  qty: number
-): Promise<string | null> {
-  if (!productId && !variantId) return null
-  let unit: UnitRow | null = null
-  if (variantId) {
-    unit = await queryOne<UnitRow>(
-      `SELECT unit, dimension, min_qty, max_qty, qty_step FROM product_units
-       WHERE variant_id = $1 AND is_sell_default = true LIMIT 1`,
-      [variantId]
-    )
-  }
-  if (!unit && productId) {
-    unit = await queryOne<UnitRow>(
-      `SELECT unit, dimension, min_qty, max_qty, qty_step FROM product_units
-       WHERE product_id = $1 AND variant_id IS NULL AND is_sell_default = true LIMIT 1`,
-      [productId]
-    )
-  }
-  if (!unit) return null
-  const min = Number(unit.min_qty ?? 1)
-  const max = unit.max_qty != null ? Number(unit.max_qty) : null
-  const step = Number(unit.qty_step ?? 1)
-  if (qty < min) return `Quantity must be at least ${min} ${unit.unit}`
-  if (max !== null && qty > max) return `Quantity cannot exceed ${max} ${unit.unit}`
-  if (unit.dimension !== 'count' && step > 0) {
-    const steps = Math.round((qty - min) / step)
-    const snapped = Math.round((min + steps * step) * 1e6) / 1e6
-    if (Math.abs(snapped - qty) > 1e-9) return `Quantity must be in steps of ${step} from ${min}`
-  }
-  return null
-}
-
-function calcTotals(items: any[], gstEnabled: boolean = true) {
-  const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
-  // GST off ⇒ quotation shows no tax; total equals the ex-GST subtotal.
-  const cgst = gstEnabled ? items.reduce((s: number, i: any) => s + (i.amount * i.gst_rate) / 200, 0) : 0
-  const sgst = cgst
-  const rawTotal = subtotal + cgst + sgst
-  const total = round2(rawTotal)
-  return { subtotal, cgst_amount: cgst, sgst_amount: sgst, total_amount: total }
-}
 
 function buildQuoteNumber(now: Date, seq: number): string {
   const month = now.getMonth()
@@ -65,24 +22,10 @@ function buildQuoteNumber(now: Date, seq: number): string {
   return `QT/${fy}/${mon}/${seq}`
 }
 
-const quotationItemSchema = z.object({
-  description: z.string().default(''),
-  quantity: z.coerce.number().min(0),
-  rate: z.coerce.number().min(0),
-  hsn_code: z.string().nullish(),
-  gst_rate: z.coerce.number().min(0).default(18),
-  unit: z.string().default('PCS'),
-  buy_unit: z.string().nullish(),
-  discount_pct: z.coerce.number().min(0).default(0),
-  product_id: z.string().uuid().nullish(),
-  variant_id: z.string().uuid().nullish(),
-  sub_variant_id: z.string().uuid().nullish(),
-})
-
 const createQuotationSchema = z.object({
   consignee_name: zNonEmpty,
   consignee_email: zEmail.nullish(),
-  items: z.array(quotationItemSchema).min(1),
+  items: z.array(quotationLineSchema).min(1, 'Add at least one line item'),
 })
 
 export async function GET(request: NextRequest) {
@@ -184,13 +127,10 @@ export async function POST(request: NextRequest) {
     const { items } = parsed.data
     const fields = { ...body, items: undefined }
 
-    const computedItems = items.map((item: any) => ({
-      ...item,
-      amount:
-        Number(item.amount) || lineItemExGst(Number(item.quantity), Number(item.rate), Number(item.discount_pct) || 0),
-    }))
     const { gstEnabled } = await getFeatureFlags()
-    const totals = calcTotals(computedItems, gstEnabled)
+    // Server computes amounts (rate is per base piece; count units scale by factor).
+    const rows = items.map(item => quotationLineRow(item, gstEnabled))
+    const totals = quotationTotals(rows)
 
     const now = new Date()
     const month = now.getMonth()
@@ -210,8 +150,10 @@ export async function POST(request: NextRequest) {
     const { storeOrigin } = await import('@/lib/catalog/brand')
     const storeState = (await storeOrigin()).state
 
-    const qt = await queryOne<any>(
-      `INSERT INTO quotations (
+    const { qt, savedItems } = await withTransaction(async client => {
+      const qt = (
+        await client.query(
+          `INSERT INTO quotations (
         quote_number, quote_date, status,
         consignee_name, consignee_addr1, consignee_addr2, consignee_city, consignee_state, consignee_gstin,
         consignee_phone, consignee_pincode, consignee_email,
@@ -220,70 +162,49 @@ export async function POST(request: NextRequest) {
         notes, subtotal, cgst_amount, sgst_amount, total_amount, created_by
       ) VALUES ($1,$2,'draft',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
       RETURNING *`,
-      [
-        quoteNumber,
-        fields.quote_date || now.toISOString().slice(0, 10),
-        fields.consignee_name || '',
-        fields.consignee_addr1 || '',
-        fields.consignee_addr2 || null,
-        fields.consignee_city || '',
-        fields.consignee_state || storeState,
-        fields.consignee_gstin || null,
-        fields.consignee_phone || null,
-        fields.consignee_pincode || null,
-        fields.consignee_email || null,
-        fields.buyer_same !== false,
-        fields.buyer_name || null,
-        fields.buyer_addr1 || null,
-        fields.buyer_addr2 || null,
-        fields.buyer_city || null,
-        fields.buyer_state || null,
-        fields.buyer_gstin || null,
-        fields.buyer_phone || null,
-        fields.buyer_pincode || null,
-        fields.buyer_email || null,
-        fields.notes || null,
-        totals.subtotal,
-        totals.cgst_amount,
-        totals.sgst_amount,
-        totals.total_amount,
-        admin.adminId,
-      ]
-    )
+          [
+            quoteNumber,
+            fields.quote_date || now.toISOString().slice(0, 10),
+            fields.consignee_name || '',
+            fields.consignee_addr1 || '',
+            fields.consignee_addr2 || null,
+            fields.consignee_city || '',
+            fields.consignee_state || storeState,
+            fields.consignee_gstin || null,
+            fields.consignee_phone || null,
+            fields.consignee_pincode || null,
+            fields.consignee_email || null,
+            fields.buyer_same !== false,
+            fields.buyer_name || null,
+            fields.buyer_addr1 || null,
+            fields.buyer_addr2 || null,
+            fields.buyer_city || null,
+            fields.buyer_state || null,
+            fields.buyer_gstin || null,
+            fields.buyer_phone || null,
+            fields.buyer_pincode || null,
+            fields.buyer_email || null,
+            fields.notes || null,
+            totals.subtotal,
+            totals.cgst_amount,
+            totals.sgst_amount,
+            totals.total_amount,
+            admin.adminId,
+          ]
+        )
+      ).rows[0]
 
-    for (let idx = 0; idx < computedItems.length; idx++) {
-      const item = computedItems[idx]
-      await query(
-        `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, buy_unit, sold_unit_factor, base_quantity, rate, discount_pct, amount, product_id, variant_id, sub_variant_id, variant_name, sub_variant_name)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
-        [
-          qt!.id,
-          idx,
-          item.description,
-          item.hsn_code || null,
-          gstEnabled ? Number(item.gst_rate) || 18 : 0,
-          Number(item.quantity),
-          item.unit || 'PCS',
-          item.buy_unit || null,
-          item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : null,
-          item.sell_unit_factor && item.sell_unit_factor > 1 ? Number(item.quantity) * item.sell_unit_factor : null,
-          Number(item.rate),
-          Number(item.discount_pct) || 0,
-          item.amount,
-          item.product_id || null,
-          item.variant_id || null,
-          item.sub_variant_id || null,
-          item.variant_name || null,
-          item.sub_variant_name || null,
-        ]
-      )
-    }
-
-    const savedItems = await queryMany(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [
-      qt!.id,
-    ])
+      for (let idx = 0; idx < rows.length; idx++) {
+        await insertQuotationItem(client, qt.id, idx, rows[idx])
+      }
+      const savedItems = (
+        await client.query(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [qt.id])
+      ).rows
+      return { qt, savedItems }
+    })
     return NextResponse.json({ quotation: qt, items: savedItems }, { status: 201 })
   } catch (e: any) {
+    console.error('[admin/quotations POST] failed', e)
     return NextResponse.json({ error: e?.message || 'Failed to create quotation' }, { status: 500 })
   }
 }

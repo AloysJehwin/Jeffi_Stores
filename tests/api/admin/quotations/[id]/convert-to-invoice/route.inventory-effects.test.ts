@@ -4,6 +4,10 @@ import { NextRequest } from 'next/server'
 // ── Mocks (before imports) ────────────────────────────────────────────────────
 
 vi.mock('@/lib/catalog/digital-guard', () => ({ findDigitalProductIds: vi.fn(async () => []) }))
+vi.mock('@/lib/catalog/site-controls', () => ({
+  getFeatureFlags: async () => ({ gstEnabled: true, inventoryValidationEnabled: true }),
+  getBusinessValues: async () => ({ businessStateCode: '33' }),
+}))
 vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({
@@ -187,12 +191,12 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     expect((await res.json()).error).toMatch(/finalised/)
   })
 
-  it('returns 400 when already converted', async () => {
+  it('returns 409 when already converted', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryOne).mockResolvedValue({ ...FINAL_QUOTATION, converted_order_id: 'ord-9' } as any)
     const res = await POST(makePost(), PARAMS)
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(409)
     expect((await res.json()).error).toMatch(/already been converted/)
   })
 

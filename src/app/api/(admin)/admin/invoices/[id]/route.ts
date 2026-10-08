@@ -1,23 +1,24 @@
 import { invoiceUrlForOrder } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
-import { productLabel } from '@/lib/catalog/product-label'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, withTransaction } from '@/lib/shared/db'
-import {
-  isInterState,
-  calculateGST,
-  generateInvoiceNumber,
-  getNextInvoiceSequence,
-  getFinancialYear,
-  round2,
-} from '@/lib/catalog/gst'
-import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/catalog/pricing'
+import { isInterState, round2 } from '@/lib/catalog/gst'
 import { logStockMovement } from '@/lib/orders/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/catalog/shelf'
-import { deleteBatchIfEmpty } from '@/lib/orders/inventory-deduct'
-import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { deleteBatchIfEmpty, resolveLineUnit, readAvailableStock } from '@/lib/orders/inventory-deduct'
+import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
+import { parseBody } from '@/lib/shared/validate'
+import { productLabel } from '@/lib/catalog/product-label'
+import type { SellingUnit } from '@/lib/catalog/selling-unit'
+import {
+  editInvoiceSchema,
+  priceInvoiceLines,
+  buildShortfall,
+  formatShortfall,
+  type Shortfall,
+} from '@/lib/documents/invoice-line-items'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +35,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (order.source !== 'offline')
       return NextResponse.json({ error: 'Only offline invoices can be edited' }, { status: 400 })
 
-    const body = await request.json()
+    const parsed = parseBody(editInvoiceSchema, await request.json(), `PATCH /api/admin/invoices/${id}`)
+    if (!parsed.ok) return parsed.response
     const {
       customerName,
       customerPhone,
@@ -49,174 +51,56 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       invoiceDate,
       notes,
       items,
-    } = body
+    } = parsed.data
 
-    if (!customerName || !items?.length) {
-      return NextResponse.json({ error: 'customerName and items are required' }, { status: 400 })
-    }
-
-    const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
+    const sellerStateCode = (await getBusinessValues()).businessStateCode
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false
 
-    // GST + inventory flags read once. When GST is off, invoice lines carry NO tax
-    // (gst_rate 0, zero CGST/SGST/IGST) and are charged at the ex-GST equivalent —
-    // same rule as cash-sale / orders-create.
+    // GST off ⇒ lines carry no tax and are charged at the ex-GST equivalent.
     const { gstEnabled, inventoryValidationEnabled } = await getFeatureFlags()
+    const priced = priceInvoiceLines(items, { gstEnabled, orderIsIgst })
+    const processedItems = priced.lines
+    const { subtotal, taxAmount, totalAmount, totalTaxable, totalCgst, totalSgst, totalIgst } = priced
+    // A draft never deducted stock — the finalize route does that in full.
+    const wasDeducted = order.status !== 'draft'
 
-    let subtotal = 0
-    let totalTaxable = 0
-    let totalCgst = 0
-    let totalSgst = 0
-    let totalIgst = 0
-
-    const processedItems = items.map((item: any) => {
-      const unitPrice = parseFloat(item.unit_price)
-      const qty = parseFloat(item.quantity)
-      const factor = item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1
-      const baseQty = qty * factor
-      const discPct = parseFloat(item.discount_pct || '0') || 0
-      const gstRate = parseFloat(item.gst_rate || '18')
-
-      if (!gstEnabled) {
-        // GST off ⇒ strip tax from the incl-GST price, apply discount, write zero tax.
-        const exUnit = gstRate > 0 ? unitPrice / (1 + gstRate / 100) : unitPrice
-        const lineTotal = round2(lineItemExGst(baseQty, exUnit, discPct))
-        subtotal += lineTotal
-        return {
-          product_id: item.product_id || null,
-          product_name: item.product_name,
-          product_sku: item.product_sku || '',
-          variant_id: item.variant_id || null,
-          sub_variant_id: item.sub_variant_id || null,
-          variant_name: item.variant_name || null,
-          hsn_code: item.hsn_code || null,
-          gst_rate: 0,
-          quantity: qty,
-          buy_unit: item.buy_unit || null,
-          sold_unit_factor: factor > 1 ? factor : null,
-          base_quantity: factor > 1 ? baseQty : null,
-          unit_price: unitPrice,
-          mrp: unitPrice,
-          discount_pct: discPct,
-          discount_amount: discPct > 0 ? round2(baseQty * exUnit * (discPct / 100)) : 0,
-          total_price: lineTotal,
-          taxable_amount: 0,
-          cgst_amount: 0,
-          sgst_amount: 0,
-          igst_amount: 0,
-          tax_amount: 0,
-        }
-      }
-
-      const lineTotal = round2(lineItemFromMrpIncl(baseQty, unitPrice, discPct, gstRate))
-      const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
-
-      subtotal += lineTotal
-      totalTaxable += gst.taxableAmount
-      totalCgst += gst.cgst
-      totalSgst += gst.sgst
-      totalIgst += gst.igst
-
-      return {
-        product_id: item.product_id || null,
-        product_name: item.product_name,
-        product_sku: item.product_sku || '',
-        variant_id: item.variant_id || null,
-        sub_variant_id: item.sub_variant_id || null,
-        variant_name: item.variant_name || null,
-        hsn_code: item.hsn_code || null,
-        gst_rate: gstRate,
-        quantity: qty,
-        buy_unit: item.buy_unit || null,
-        sold_unit_factor: factor > 1 ? factor : null,
-        base_quantity: factor > 1 ? baseQty : null,
-        unit_price: unitPrice,
-        mrp: unitPrice,
-        discount_pct: discPct,
-        discount_amount: discPct > 0 ? round2(((baseQty * unitPrice) / (1 + gstRate / 100)) * (discPct / 100)) : 0,
-        total_price: lineTotal,
-        taxable_amount: round2(gst.taxableAmount),
-        cgst_amount: round2(gst.cgst),
-        sgst_amount: round2(gst.sgst),
-        igst_amount: round2(gst.igst),
-        tax_amount: round2(gst.cgst + gst.sgst + gst.igst),
-      }
-    })
-
-    const taxAmount = round2(totalCgst + totalSgst + totalIgst)
-    const totalAmount = round2(subtotal)
     const isPaid = paymentMode !== 'credit'
     const effectiveDate = invoiceDate || new Date().toISOString().slice(0, 10)
 
     const result = await withTransaction(async client => {
-      const existingResult = await client.query<{
-        product_id: string | null
-        variant_id: string | null
-        sub_variant_id: string | null
-        quantity: string
-      }>(`SELECT product_id, variant_id, sub_variant_id, quantity FROM order_items WHERE order_id = $1`, [id])
-
-      const existingQtyMap = new Map<string, number>()
-      for (const r of existingResult.rows) {
-        const key = `${r.product_id ?? ''}::${r.variant_id ?? ''}::${r.sub_variant_id ?? ''}`
-        existingQtyMap.set(key, (existingQtyMap.get(key) ?? 0) + parseFloat(r.quantity))
-      }
-
-      const insufficientItems: string[] = []
-
-      for (const item of inventoryValidationEnabled ? processedItems : []) {
-        if (!item.product_id) continue
-        const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`
-        const previousQty = existingQtyMap.get(key) ?? 0
-        const rawExtra = item.quantity - previousQty
-        if (rawExtra <= 0) continue
-
-        // Resolve unit factor: variant-scoped buy_unit → product-level buy_unit → sell_unit_id via variant → sell_unit_id via product
-        const unitRow = await client.query<{ factor: string; dimension: string }>(
-          `SELECT COALESCE(puv.factor, pup.factor, pu_sv.factor, pu_sp.factor)::text AS factor,
-                  COALESCE(puv.dimension, pup.dimension, pu_sv.dimension, pu_sp.dimension) AS dimension
-           FROM (SELECT 1) x
-           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3 AND $1 IS NOT NULL
-           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL AND $1 IS NOT NULL
-             AND ($3 IS NULL OR puv.id IS NULL)
-           LEFT JOIN product_variants pvar ON pvar.id = $3
-           LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL
-           LEFT JOIN products prod ON prod.id = $2 AND $3 IS NULL
-           LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL`,
-          [item.buy_unit || null, item.product_id, item.variant_id || null]
+      // Pieces already sold per grain (base qty, same resolution as deduction).
+      const keyOf = (r: { product_id: string | null; variant_id?: string | null; sub_variant_id?: string | null }) =>
+        `${r.product_id ?? ''}::${r.variant_id ?? ''}::${r.sub_variant_id ?? ''}`
+      const prevBase = new Map<string, number>()
+      if (inventoryValidationEnabled && wasDeducted) {
+        const existingResult = await client.query(
+          `SELECT product_id, variant_id, sub_variant_id, quantity, buy_unit, sold_unit, sold_unit_factor, base_quantity
+             FROM order_items WHERE order_id = $1 AND product_id IS NOT NULL`,
+          [id]
         )
-        const u = unitRow.rows[0]
-        const extraQty = u?.dimension === 'count' && u?.factor ? rawExtra * parseFloat(u.factor) : rawExtra
-
-        if (item.sub_variant_id) {
-          const inv = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
-            [item.sub_variant_id]
-          )
-          const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock < extraQty) {
-            insufficientItems.push(`${productLabel(item)} (available: ${stock}, extra needed: ${extraQty})`)
-          }
-        } else if (item.variant_id) {
-          const inv = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
-            [item.variant_id]
-          )
-          const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock < extraQty) {
-            insufficientItems.push(`${productLabel(item)} (available: ${stock}, extra needed: ${extraQty})`)
-          }
-        } else {
-          const inv = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
-            [item.product_id]
-          )
-          const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock < extraQty) {
-            insufficientItems.push(`${item.product_name} (available: ${stock}, extra needed: ${extraQty})`)
-          }
+        for (const r of existingResult.rows) {
+          const { baseQty } = await resolveLineUnit(client, r, { defaultUnitFallback: true })
+          prevBase.set(keyOf(r), (prevBase.get(keyOf(r)) ?? 0) + baseQty)
         }
       }
+
+      // Extra pieces each store-product line needs beyond what was already sold.
+      const extras = new Map<(typeof processedItems)[number], { extraBase: number; unit: SellingUnit | null }>()
+      const shortfalls: Shortfall[] = []
+      for (const item of inventoryValidationEnabled ? processedItems : []) {
+        if (!item.product_id) continue
+        const line = { ...item, product_id: item.product_id }
+        const { unit, baseQty, factor } = await resolveLineUnit(client, line, { defaultUnitFallback: true })
+        const prev = prevBase.get(keyOf(item)) ?? 0
+        prevBase.set(keyOf(item), Math.max(0, prev - baseQty))
+        const extraBase = baseQty - prev
+        if (extraBase <= 1e-6) continue
+        extras.set(item, { extraBase, unit })
+        const available = await readAvailableStock(client, line)
+        const s = buildShortfall(productLabel(item), unit?.unit ?? item.buy_unit, factor, extraBase, available)
+        if (s) shortfalls.push(s)
+      }
+      const insufficientItems = shortfalls.map(formatShortfall)
 
       const moveToDraft = insufficientItems.length > 0
 
@@ -269,15 +153,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       await client.query(`DELETE FROM order_items WHERE order_id = $1`, [id])
 
-      const savedItemIds: { product_id: string; variant_id: string | null; order_item_id: string }[] = []
+      const savedItemIds: { product_id: string | null; variant_id: string | null; order_item_id: string }[] = []
       for (const item of processedItems) {
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name, sub_variant_name,
-            hsn_code, gst_rate, quantity, buy_unit, sold_unit_factor, base_quantity,
+            hsn_code, gst_rate, quantity, buy_unit, sold_unit, sold_unit_factor, base_quantity,
             unit_price, mrp, discount_pct, discount_amount, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) RETURNING id`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) RETURNING id`,
           [
             id,
             item.product_id,
@@ -291,6 +175,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             item.gst_rate,
             item.quantity,
             item.buy_unit,
+            item.sold_unit,
             item.sold_unit_factor ?? null,
             item.base_quantity ?? null,
             item.unit_price,
@@ -312,30 +197,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         })
       }
 
-      if (!moveToDraft && inventoryValidationEnabled) {
+      if (!moveToDraft && inventoryValidationEnabled && wasDeducted) {
         for (const item of processedItems) {
-          if (!item.product_id) continue
-          const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`
-          const previousQty = existingQtyMap.get(key) ?? 0
-          const rawExtra = item.quantity - previousQty
-          if (rawExtra <= 0) continue
-
-          const unitRow2 = await client.query<{ factor: string; dimension: string; qty_step: string | null }>(
-            `SELECT COALESCE(puv.factor, pup.factor, pu_sv.factor, pu_sp.factor)::text AS factor,
-                    COALESCE(puv.dimension, pup.dimension, pu_sv.dimension, pu_sp.dimension) AS dimension,
-                    COALESCE(puv.qty_step, pup.qty_step, pu_sv.qty_step, pu_sp.qty_step)::text AS qty_step
-             FROM (SELECT 1) x
-             LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3 AND $1 IS NOT NULL
-             LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL AND $1 IS NOT NULL
-               AND ($3 IS NULL OR puv.id IS NULL)
-             LEFT JOIN product_variants pvar ON pvar.id = $3
-             LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL
-             LEFT JOIN products prod ON prod.id = $2 AND $3 IS NULL
-             LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL`,
-            [item.buy_unit || null, item.product_id, item.variant_id || null]
-          )
-          const u2 = unitRow2.rows[0]
-          const extraQty = u2?.dimension === 'count' && u2?.factor ? rawExtra * parseFloat(u2.factor) : rawExtra
+          const extra = extras.get(item)
+          if (!item.product_id || !extra) continue
+          const extraQty = extra.extraBase
 
           const prodRow = await client.query<{ perishable: boolean; serialized: boolean }>(
             `SELECT perishable, serialized FROM products WHERE id = $1`,
@@ -394,7 +260,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           } else if (serialized) {
             // Serial count follows the qty_step rule (round(baseQty / qty_step)),
             // matching the shared deduction helper — not Math.ceil(extraQty).
-            const stepVal = parseFloat(u2?.qty_step ?? '1') || 1
+            const stepVal = extra.unit?.qty_step || 1
             const serialCount = Math.round(extraQty / (stepVal > 0 ? stepVal : 1))
             // Take available serials FEFO, carrying each serial's own batch.
             const serials = await client.query<{ id: string; serial_number: string; batch_id: string | null }>(
@@ -419,7 +285,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             for (const serial of serials.rows) {
               await client.query(
                 `UPDATE product_serials SET status = 'sold', order_id = $1, order_item_id = $2, sold_at = NOW(), updated_at = NOW() WHERE id = $3`,
-                [id, item.id ?? null, serial.id]
+                [id, savedItemIds[processedItems.indexOf(item)]?.order_item_id ?? null, serial.id]
               )
               let lotNumber: string | null = null
               let expiryDate: string | null = null
@@ -504,7 +370,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         }
       }
 
-      return { moveToDraft, insufficientItems, savedItemIds }
+      return { moveToDraft, insufficientItems, shortfalls, savedItemIds }
     })
 
     if (result.moveToDraft) {
@@ -512,6 +378,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         success: true,
         movedToDraft: true,
         insufficientItems: result.insufficientItems,
+        insufficientDetails: result.shortfalls,
       })
     }
 
@@ -530,6 +397,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({ success: true, savedItemIds: result.savedItemIds })
   } catch (err: any) {
+    console.error(`[admin/invoices/${(await params).id} PATCH] failed`, err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

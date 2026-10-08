@@ -14,6 +14,11 @@ import LineItemsSection, {
   newLineItem,
   fetchSeedLineItem,
   type LineItem as LILineItem,
+  isBlankLine,
+  validateLineItems,
+  lineItemPayload,
+  apiErrorMessage,
+  insufficientMessage,
 } from '@/components/admin/LineItemsSection'
 import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
 import SerialEntryModal, {
@@ -379,9 +384,9 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
         method: 'POST',
         credentials: 'include',
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        showToast(data.error || 'Failed to publish amendment', 'error')
+        showToast(apiErrorMessage(res, data, 'Failed to publish amendment'), 'error')
         return
       }
       showToast(`Amendment published as ${data.invoiceNumber || ''}`, 'success')
@@ -407,9 +412,9 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ batch_assignments: batchAssignments, serial_assignments: serialAssignmentsArg }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        showToast(data.error || 'Failed to finalize', 'error')
+        showToast(apiErrorMessage(res, data, 'Failed to finalize'), 'error')
         return
       }
       showToast(`Invoice ${data.invoiceNumber || ''} finalized`, 'success')
@@ -586,16 +591,17 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           ? orderItems.map((it: any) => ({
               id: it.id || Math.random().toString(36).slice(2),
               product_id: it.product_id || null,
+              is_custom: !it.product_id,
               product_name: it.product_name || '',
               product_sku: it.product_sku || '',
               variant_id: it.variant_id || null,
               sub_variant_id: it.sub_variant_id || null,
               variant_name: it.variant_name || '',
               hsn_code: it.hsn_code || '',
-              gst_rate: String(Math.round(parseFloat(it.gst_rate ?? '18')) || 18),
+              gst_rate: String(Math.round(parseFloat(it.gst_rate ?? '18')) || 0),
               quantity: String(it.quantity ?? '1'),
-              unit: it.unit || 'pcs',
-              buy_unit: it.buy_unit || null,
+              unit: !it.product_id ? it.buy_unit || 'PCS' : it.unit || 'pcs',
+              buy_unit: it.product_id ? it.buy_unit || null : null,
               buy_mode: null,
               sell_unit_factor: it.sold_unit_factor && it.sold_unit_factor > 1 ? it.sold_unit_factor : 1,
               sell_unit_dimension: null,
@@ -663,6 +669,12 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       setFormError('Customer name is required')
       return
     }
+    const draftLineError = items.some(it => !isBlankLine(it)) ? validateLineItems(items) : null
+    if (draftLineError) {
+      setFormError(draftLineError)
+      showToast(draftLineError, 'error')
+      return
+    }
     setFormError('')
     setSubmitting(true)
     try {
@@ -683,27 +695,14 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           paymentMode,
           notes,
           saveAsDraft: true,
-          items: items.map(it => ({
-            product_id: it.product_id,
-            product_name: it.product_name,
-            product_sku: it.product_sku,
-            variant_id: it.variant_id,
-            sub_variant_id: it.sub_variant_id || null,
-            variant_name: it.variant_name,
-            hsn_code: it.hsn_code,
-            gst_rate: it.gst_rate,
-            quantity: it.quantity,
-            buy_unit: it.buy_unit || null,
-            sell_unit_factor: it.sell_unit_factor ?? 1,
-            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
-            discount_pct: Number(it.discount_pct) || 0,
-            temp_id: it.id,
-          })),
+          items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
         }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setFormError(data.error || 'Failed to save draft')
+        const msg = apiErrorMessage(res, data, 'Failed to save draft')
+        setFormError(msg)
+        showToast(msg, 'error')
         return
       }
       showToast('Invoice saved as draft', 'success')
@@ -720,6 +719,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   // Autosave existing draft — debounced
   async function autoSaveDraft() {
     if (!editId || !editIsDraft || autoSaveInFlight.current) return
+    // Wait for complete lines; the explicit Save/Finalize buttons report problems.
+    if (validateLineItems(items)) return
     autoSaveInFlight.current = true
     setAutoSaveStatus('saving')
     try {
@@ -740,24 +741,11 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           paymentMode,
           invoiceDate,
           notes,
-          items: items.map(it => ({
-            product_id: it.product_id,
-            product_name: it.product_name,
-            product_sku: it.product_sku,
-            variant_id: it.variant_id,
-            sub_variant_id: it.sub_variant_id || null,
-            variant_name: it.variant_name,
-            hsn_code: it.hsn_code,
-            gst_rate: it.gst_rate,
-            quantity: it.quantity,
-            buy_unit: it.buy_unit || null,
-            sell_unit_factor: it.sell_unit_factor ?? 1,
-            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
-            discount_pct: Number(it.discount_pct) || 0,
-          })),
+          items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
         }),
       })
       setAutoSaveStatus(res.ok ? 'saved' : 'error')
+      if (!res.ok) setFormError(apiErrorMessage(res, await res.json().catch(() => ({})), 'Draft autosave failed'))
       setTimeout(() => setAutoSaveStatus('idle'), 2000)
     } catch {
       setAutoSaveStatus('error')
@@ -785,8 +773,10 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       setFormError('Phone number is required')
       return
     }
-    if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
-      setFormError('All items need a name and price')
+    const lineError = validateLineItems(items)
+    if (lineError) {
+      setFormError(lineError)
+      showToast(lineError, 'error')
       return
     }
     setFormError('')
@@ -808,35 +798,22 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           buyerGstin,
           paymentMode,
           notes,
-          items: items.map(it => ({
-            product_id: it.product_id,
-            product_name: it.product_name,
-            product_sku: it.product_sku,
-            variant_id: it.variant_id,
-            sub_variant_id: it.sub_variant_id || null,
-            variant_name: it.variant_name,
-            hsn_code: it.hsn_code,
-            gst_rate: it.gst_rate,
-            quantity: it.quantity,
-            buy_unit: it.buy_unit || null,
-            sell_unit_factor: it.sell_unit_factor ?? 1,
-            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
-            discount_pct: Number(it.discount_pct) || 0,
-            temp_id: it.id,
-          })),
+          items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
           batch_assignments: Object.entries(batchAssignments).flatMap(([order_item_id, batches]) =>
             batches.map(b => ({ order_item_id, batch_id: b.batch_id, qty: b.qty }))
           ),
           serial_assignments: serialAssignments,
         }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setFormError(data.error || 'Failed')
+        const msg = apiErrorMessage(res, data, 'Failed to save invoice')
+        setFormError(msg)
+        showToast(msg, 'error')
         return
       }
       if (data.savedAsDraft) {
-        showToast(`Saved as draft — insufficient stock: ${data.insufficientItems.join(', ')}`, 'error')
+        showToast(insufficientMessage('Saved as draft — not enough stock', data.insufficientItems), 'error')
       } else {
         showToast(`Invoice ${data.invoiceNumber || ''} created`, 'success')
         if (data.invoiceUrl) window.open(data.invoiceUrl, '_blank')
@@ -871,8 +848,10 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       setFormError('Phone number is required')
       return
     }
-    if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
-      setFormError('All items need a name and price')
+    const lineError = validateLineItems(items)
+    if (lineError) {
+      setFormError(lineError)
+      showToast(lineError, 'error')
       return
     }
     setFormError('')
@@ -895,30 +874,18 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           paymentMode,
           invoiceDate,
           notes,
-          items: items.map(it => ({
-            product_id: it.product_id,
-            product_name: it.product_name,
-            product_sku: it.product_sku,
-            variant_id: it.variant_id,
-            sub_variant_id: it.sub_variant_id || null,
-            variant_name: it.variant_name,
-            hsn_code: it.hsn_code,
-            gst_rate: it.gst_rate,
-            quantity: it.quantity,
-            buy_unit: it.buy_unit || null,
-            sell_unit_factor: it.sell_unit_factor ?? 1,
-            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
-            discount_pct: Number(it.discount_pct) || 0,
-          })),
+          items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
         }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        setFormError(data.error || 'Failed')
+        const msg = apiErrorMessage(res, data, 'Failed to save invoice')
+        setFormError(msg)
+        showToast(msg, 'error')
         return
       }
       if (data.movedToDraft) {
-        showToast(`Invoice moved to draft — insufficient stock: ${data.insufficientItems.join(', ')}`, 'error')
+        showToast(insufficientMessage('Invoice moved to draft — not enough stock', data.insufficientItems), 'error')
       } else {
         showToast('Invoice updated', 'success')
       }
@@ -1043,8 +1010,10 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       setFormError('Phone number is required')
       return
     }
-    if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
-      setFormError('All items need a name and price')
+    const lineError = validateLineItems(items)
+    if (lineError) {
+      setFormError(lineError)
+      showToast(lineError, 'error')
       return
     }
     setFormError('')
@@ -1067,30 +1036,20 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           paymentMode,
           invoiceDate,
           notes,
-          items: items.map(it => ({
-            product_id: it.product_id,
-            product_name: it.product_name,
-            product_sku: it.product_sku,
-            variant_id: it.variant_id,
-            sub_variant_id: it.sub_variant_id || null,
-            variant_name: it.variant_name,
-            hsn_code: it.hsn_code,
-            gst_rate: it.gst_rate,
-            quantity: it.quantity,
-            buy_unit: it.buy_unit || null,
-            sell_unit_factor: it.sell_unit_factor ?? 1,
-            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
-            discount_pct: Number(it.discount_pct) || 0,
-          })),
+          items: items.filter(it => !isBlankLine(it)).map(lineItemPayload),
         }),
       })
-      const saveData = await saveRes.json()
+      const saveData = await saveRes.json().catch(() => ({}))
       if (!saveRes.ok) {
-        setFormError(saveData.error || 'Failed to save')
+        const msg = apiErrorMessage(saveRes, saveData, 'Failed to save')
+        setFormError(msg)
+        showToast(msg, 'error')
         return
       }
       if (saveData.movedToDraft) {
-        showToast(`Cannot finalize — insufficient stock: ${saveData.insufficientItems.join(', ')}`, 'error')
+        const msg = insufficientMessage('Cannot finalize — not enough stock', saveData.insufficientItems)
+        setFormError(msg)
+        showToast(msg, 'error')
         fetchDrafts()
         return
       }
@@ -1129,9 +1088,11 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               : [],
         }),
       })
-      const finalData = await finalRes.json()
+      const finalData = await finalRes.json().catch(() => ({}))
       if (!finalRes.ok) {
-        setFormError(finalData.error || 'Failed to finalize')
+        const msg = apiErrorMessage(finalRes, finalData, 'Failed to finalize')
+        setFormError(msg)
+        showToast(msg, 'error')
         return
       }
       showToast(`Invoice ${finalData.invoiceNumber || ''} finalized`, 'success')

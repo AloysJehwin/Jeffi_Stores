@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/shared/db'
-import { isInterState, calculateGST, round2 } from '@/lib/catalog/gst'
-import { lineItemFromMrpIncl } from '@/lib/catalog/pricing'
+import { isInterState, round2 } from '@/lib/catalog/gst'
+import { getBusinessValues, getFeatureFlags } from '@/lib/catalog/site-controls'
+import { parseBody } from '@/lib/shared/validate'
+import { draftInvoiceSchema, priceInvoiceLines } from '@/lib/documents/invoice-line-items'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,7 +59,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (order.status !== 'draft')
       return NextResponse.json({ error: 'Only drafts can be updated this way' }, { status: 400 })
 
-    const body = await request.json()
+    const parsed = parseBody(draftInvoiceSchema, await request.json(), `PATCH /api/admin/invoices/drafts/${id}`)
+    if (!parsed.ok) return parsed.response
     const {
       customerName,
       customerPhone,
@@ -71,58 +74,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       paymentMode,
       notes,
       items,
-    } = body
+    } = parsed.data
 
-    if (!customerName) {
-      return NextResponse.json({ error: 'customerName is required' }, { status: 400 })
-    }
-
-    const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
+    const sellerStateCode = (await getBusinessValues()).businessStateCode
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false
-
-    let subtotal = 0
-    let totalTaxable = 0
-    let totalCgst = 0
-    let totalSgst = 0
-    let totalIgst = 0
-
-    const processedItems = (items || []).map((item: any) => {
-      const unitPrice = parseFloat(item.unit_price) || 0
-      const qty = parseFloat(item.quantity) || 0
-      const discPct = parseFloat(item.discount_pct || '0') || 0
-      const gstRate = parseFloat(item.gst_rate || '18')
-      const lineTotal = round2(lineItemFromMrpIncl(qty, unitPrice, discPct, gstRate))
-      const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
-
-      subtotal += lineTotal
-      totalTaxable += gst.taxableAmount
-      totalCgst += gst.cgst
-      totalSgst += gst.sgst
-      totalIgst += gst.igst
-
-      return {
-        product_id: item.product_id || null,
-        product_name: item.product_name || '',
-        product_sku: item.product_sku || '',
-        variant_id: item.variant_id || null,
-        sub_variant_id: item.sub_variant_id || null,
-        variant_name: item.variant_name || null,
-        hsn_code: item.hsn_code || null,
-        gst_rate: gstRate,
-        quantity: qty,
-        unit_price: unitPrice,
-        mrp: unitPrice,
-        total_price: lineTotal,
-        taxable_amount: round2(gst.taxableAmount),
-        cgst_amount: round2(gst.cgst),
-        sgst_amount: round2(gst.sgst),
-        igst_amount: round2(gst.igst),
-        tax_amount: round2(gst.cgst + gst.sgst + gst.igst),
-      }
-    })
-
-    const taxAmount = round2(totalCgst + totalSgst + totalIgst)
-    const totalAmount = round2(subtotal)
+    const { gstEnabled } = await getFeatureFlags()
+    // Same pricing as create: keeps the selling unit / factor / discount on save.
+    const priced = priceInvoiceLines(items, { gstEnabled, orderIsIgst })
+    const processedItems = priced.lines
+    const { subtotal, taxAmount, totalAmount, totalTaxable, totalCgst, totalSgst, totalIgst } = priced
 
     await withTransaction(async client => {
       await client.query(
@@ -167,9 +127,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name, sub_variant_name,
-            hsn_code, gst_rate, quantity, unit_price, mrp, discount_amount, tax_amount,
+            hsn_code, gst_rate, quantity, buy_unit, sold_unit, sold_unit_factor, base_quantity,
+            unit_price, mrp, discount_pct, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,0,$14,$15,$16,$17,$18,$19)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
           [
             id,
             item.product_id,
@@ -182,8 +143,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             item.hsn_code,
             item.gst_rate,
             item.quantity,
+            item.buy_unit,
+            item.sold_unit,
+            item.sold_unit_factor,
+            item.base_quantity,
             item.unit_price,
             item.mrp,
+            item.discount_pct,
+            item.discount_amount,
             item.tax_amount,
             item.total_price,
             item.taxable_amount,
@@ -197,6 +164,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
+    console.error(`[admin/invoices/drafts/${(await params).id} PATCH] failed`, err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

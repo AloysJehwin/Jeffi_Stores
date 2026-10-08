@@ -8,38 +8,28 @@ import { findDigitalProductIds } from '@/lib/catalog/digital-guard'
 import { withTransaction } from '@/lib/shared/db'
 import {
   isInterState,
-  calculateGST,
   getFinancialYear,
   generateInvoiceNumber,
   getNextInvoiceSequence,
   round2,
 } from '@/lib/catalog/gst'
-import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/catalog/pricing'
-import { deductOrderStock } from '@/lib/orders/inventory-deduct'
+import {
+  deductOrderStock,
+  checkLineStock,
+  resolveLineUnit,
+  InsufficientStockError,
+} from '@/lib/orders/inventory-deduct'
+import {
+  invoiceLineSchema,
+  priceInvoiceLines,
+  formatShortfall,
+  type Shortfall,
+} from '@/lib/documents/invoice-line-items'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { z } from 'zod'
-import { parseBody, zUuid, zNonEmpty } from '@/lib/shared/validate'
+import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
 export const dynamic = 'force-dynamic'
-
-const orderItemSchema = z.object({
-  product_id: zUuid.nullish(),
-  variant_id: zUuid.nullish(),
-  sub_variant_id: zUuid.nullish(),
-  product_name: z.string().default(''),
-  product_sku: z.string().nullish(),
-  variant_name: z.string().nullish(),
-  sub_variant_name: z.string().nullish(),
-  hsn_code: z.string().nullish(),
-  gst_rate: z.coerce.number().min(0).default(18),
-  unit_price: z.coerce.number().min(0),
-  quantity: z.coerce.number().positive(),
-  discount_pct: z.coerce.number().min(0).max(100).default(0),
-  sell_unit_factor: z.coerce.number().min(1).default(1),
-  buy_unit: z.string().nullish(),
-  buy_mode: z.string().nullish(),
-  temp_id: z.string().nullish(),
-})
 
 const createOrderSchema = z.object({
   customerName: zNonEmpty,
@@ -52,7 +42,7 @@ const createOrderSchema = z.object({
   postalCode: z.string().nullish(),
   buyerGstin: z.string().nullish(),
   notes: z.string().nullish(),
-  items: z.array(orderItemSchema).min(1),
+  items: z.array(invoiceLineSchema).min(1, 'Add at least one line item'),
   paymentMode: z.string().nullish(),
 })
 
@@ -101,93 +91,9 @@ export async function POST(request: NextRequest) {
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false
     const { gstEnabled, inventoryValidationEnabled } = await getFeatureFlags()
 
-    let subtotal = 0
-    let totalTaxable = 0
-    let totalCgst = 0
-    let totalSgst = 0
-    let totalIgst = 0
-
-    const processedItems = items.map((item: any) => {
-      const unitPrice = parseFloat(item.unit_price)
-      const qty = parseFloat(item.quantity)
-      const factor = item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1
-      const baseQty = qty * factor
-      const discPct = parseFloat(item.discount_pct || '0') || 0
-      const gstRate = parseFloat(item.gst_rate || '18')
-
-      if (!gstEnabled) {
-        // GST off ⇒ charge the ex-GST equivalent, write zero tax.
-        const exUnit = gstRate > 0 ? unitPrice / (1 + gstRate / 100) : unitPrice
-        const lineTotal = round2(lineItemExGst(baseQty, exUnit, discPct))
-        subtotal += lineTotal
-        return {
-          product_id: item.product_id || null,
-          product_name: item.product_name,
-          product_sku: item.product_sku || '',
-          variant_id: item.variant_id || null,
-          sub_variant_id: item.sub_variant_id || null,
-          variant_name: item.variant_name || null,
-          sub_variant_name: item.sub_variant_name || null,
-          hsn_code: item.hsn_code || null,
-          gst_rate: 0,
-          quantity: qty,
-          buy_unit: item.buy_unit || null,
-          buy_mode: item.buy_mode || 'unit',
-          sold_unit_factor: factor > 1 ? factor : null,
-          base_quantity: factor > 1 ? baseQty : null,
-          unit_price: unitPrice,
-          mrp: unitPrice,
-          discount_pct: discPct,
-          discount_amount: discPct > 0 ? round2(baseQty * exUnit * (discPct / 100)) : 0,
-          total_price: lineTotal,
-          taxable_amount: 0,
-          cgst_amount: 0,
-          sgst_amount: 0,
-          igst_amount: 0,
-          tax_amount: 0,
-          temp_id: item.temp_id || null,
-        }
-      }
-
-      const lineTotal = round2(lineItemFromMrpIncl(baseQty, unitPrice, discPct, gstRate))
-      const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
-
-      subtotal += lineTotal
-      totalTaxable += gst.taxableAmount
-      totalCgst += gst.cgst
-      totalSgst += gst.sgst
-      totalIgst += gst.igst
-
-      return {
-        product_id: item.product_id || null,
-        product_name: item.product_name,
-        product_sku: item.product_sku || '',
-        variant_id: item.variant_id || null,
-        sub_variant_id: item.sub_variant_id || null,
-        variant_name: item.variant_name || null,
-        hsn_code: item.hsn_code || null,
-        gst_rate: gstRate,
-        quantity: qty,
-        buy_unit: item.buy_unit || null,
-        buy_mode: item.buy_mode || 'unit',
-        sold_unit_factor: factor > 1 ? factor : null,
-        base_quantity: factor > 1 ? baseQty : null,
-        unit_price: unitPrice,
-        mrp: unitPrice,
-        discount_pct: discPct,
-        discount_amount: discPct > 0 ? round2(((baseQty * unitPrice) / (1 + gstRate / 100)) * (discPct / 100)) : 0,
-        total_price: lineTotal,
-        taxable_amount: round2(gst.taxableAmount),
-        cgst_amount: round2(gst.cgst),
-        sgst_amount: round2(gst.sgst),
-        igst_amount: round2(gst.igst),
-        tax_amount: round2(gst.cgst + gst.sgst + gst.igst),
-        temp_id: item.temp_id || null,
-      }
-    })
-
-    const taxAmount = round2(totalCgst + totalSgst + totalIgst)
-    const totalAmount = round2(subtotal)
+    const priced = priceInvoiceLines(items, { gstEnabled, orderIsIgst })
+    const processedItems = priced.lines
+    const { subtotal, taxAmount, totalAmount, totalTaxable, totalCgst, totalSgst, totalIgst } = priced
 
     const result = await withTransaction(async client => {
       const addrResult = await client.query(
@@ -210,74 +116,41 @@ export async function POST(request: NextRequest) {
       const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
       const orderNumber = `OFF-${ts}-${rand}`
 
+      // Flag ON ⇒ check store-product stock (custom lines never touch inventory).
       const insufficientItems: string[] = []
+      const shortfalls: Shortfall[] = []
       if (inventoryValidationEnabled) {
         for (const item of processedItems) {
           if (!item.product_id) continue
-          // Resolve unit factor to get base-unit quantity for stock checks
-          const unitRow = await client.query<{ factor: string; dimension: string }>(
-            `SELECT COALESCE(puv.factor, pup.factor) AS factor,
-                  COALESCE(puv.dimension, pup.dimension) AS dimension
-           FROM (SELECT 1) x
-           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
-           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
-            [item.buy_unit, item.product_id, item.variant_id || null]
-          )
-          const u = unitRow.rows[0]
-          const baseQty = u?.dimension === 'count' && u?.factor ? item.quantity * parseFloat(u.factor) : item.quantity
-
           const itemBatches = batchAssignments.filter(a => a.order_item_id === item.temp_id)
+          if (itemBatches.length === 0) {
+            shortfalls.push(...(await checkLineStock(client, [item], { defaultUnitFallback: true })))
+            continue
+          }
+          const { baseQty } = await resolveLineUnit(client, item as typeof item & { product_id: string }, {
+            defaultUnitFallback: true,
+          })
           const totalBatchQty = itemBatches.reduce((s, a) => s + (a.qty || 0), 0)
-
-          // When batches are assigned, check each batch has enough and total covers requirement
-          if (itemBatches.length > 0) {
-            let batchShortfall = ''
-            for (const a of itemBatches) {
-              const br = await client.query<{ quantity_remaining: string }>(
-                `SELECT quantity_remaining FROM product_batches WHERE id = $1`,
-                [a.batch_id]
-              )
-              const avail = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
-              if (avail < a.qty) {
-                batchShortfall = `batch available: ${avail}, taking: ${a.qty}`
-                break
-              }
-            }
-            if (batchShortfall || totalBatchQty < baseQty) {
-              insufficientItems.push(
-                `${productLabel(item)} (${batchShortfall || `batch total: ${totalBatchQty}, required: ${baseQty}`})`
-              )
-            }
-          } else if (item.sub_variant_id) {
-            const inv = await client.query<{ inventory_quantity: string }>(
-              `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
-              [item.sub_variant_id]
+          let batchShortfall = ''
+          for (const a of itemBatches) {
+            const br = await client.query<{ quantity_remaining: string }>(
+              `SELECT quantity_remaining FROM product_batches WHERE id = $1`,
+              [a.batch_id]
             )
-            const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-            if (stock < baseQty) {
-              insufficientItems.push(`${productLabel(item)} (available: ${stock}, required: ${baseQty})`)
-            }
-          } else if (item.variant_id) {
-            const inv = await client.query<{ inventory_quantity: string }>(
-              `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
-              [item.variant_id]
-            )
-            const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-            if (stock < baseQty) {
-              insufficientItems.push(`${productLabel(item)} (available: ${stock}, required: ${baseQty})`)
-            }
-          } else {
-            const inv = await client.query<{ inventory_quantity: string }>(
-              `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
-              [item.product_id]
-            )
-            const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-            if (stock < baseQty) {
-              insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
+            const avail = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
+            if (avail < a.qty) {
+              batchShortfall = `batch available: ${avail} pcs, taking: ${a.qty} pcs`
+              break
             }
           }
+          if (batchShortfall || totalBatchQty < baseQty) {
+            insufficientItems.push(
+              `${productLabel(item)} (${batchShortfall || `batch total: ${totalBatchQty} pcs, required: ${baseQty} pcs`})`
+            )
+          }
         }
-      } // end inventoryValidationEnabled
+        insufficientItems.push(...shortfalls.map(formatShortfall))
+      }
 
       const saveAsDraft = insufficientItems.length > 0
 
@@ -376,17 +249,20 @@ export async function POST(request: NextRequest) {
           order_item_id: tempIdToItemId.get(a.order_item_id) ?? a.order_item_id,
         }))
 
-        // Deduct inventory (plain / perishable-FEFO / serialized), write the 'sale'
-        // ledger, and sync perishable shelf stock — all base-qty aware & idempotent.
-        await deductOrderStock(
-          orderId,
-          {
-            batchAssignments: batchAssignmentsForDb,
-            serialAssignments: serialAssignmentsForDb,
-            requireSerialAssignments: true,
-          },
-          client
-        )
+        // Flag ON ⇒ deduct store-product stock (plain / FEFO / serialized) and write
+        // the 'sale' ledger — base-qty aware & idempotent. Flag OFF ⇒ no inventory.
+        if (inventoryValidationEnabled) {
+          await deductOrderStock(
+            orderId,
+            {
+              batchAssignments: batchAssignmentsForDb,
+              serialAssignments: serialAssignmentsForDb,
+              requireSerialAssignments: true,
+              defaultUnitFallback: true,
+            },
+            client
+          )
+        }
 
         // Assign an invoice number regardless of GST — GST-off just means a tax-free
         // invoice, but it must still be numbered so it appears on the invoice list.
@@ -409,7 +285,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return { orderId, orderNumber: finalOrderNumber, invoiceNumber, saveAsDraft, insufficientItems }
+      return { orderId, orderNumber: finalOrderNumber, invoiceNumber, saveAsDraft, insufficientItems, shortfalls }
     })
 
     if (!result.saveAsDraft && result.invoiceNumber && customerEmail) {
@@ -433,8 +309,12 @@ export async function POST(request: NextRequest) {
       invoiceUrl: result.invoiceNumber ? `/api/orders/${result.orderId}/invoice` : null,
       savedAsDraft: result.saveAsDraft,
       insufficientItems: result.insufficientItems,
+      insufficientDetails: result.shortfalls,
     })
   } catch (err: any) {
+    if (err instanceof InsufficientStockError)
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 409 })
+    console.error('[admin/orders/create] failed', err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

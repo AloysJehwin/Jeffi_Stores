@@ -3,7 +3,8 @@ import { productLabel } from '@/lib/catalog/product-label'
 import type { PoolClient } from 'pg'
 import { logStockMovement, recomputeStockStatusForProduct } from '@/lib/orders/inventory'
 import { syncPerishableStock } from '@/lib/catalog/shelf'
-import { toSellingUnit, toBaseQuantity, serialCountForQuantity } from '@/lib/catalog/selling-unit'
+import { toSellingUnit, toBaseQuantity, serialCountForBaseQuantity, type SellingUnit } from '@/lib/catalog/selling-unit'
+import { buildShortfall, type Shortfall } from '@/lib/documents/invoice-line-items'
 
 /**
  * Thrown when a sale can't be fulfilled from available stock (batches/serials/
@@ -86,6 +87,12 @@ export interface DeductOptions {
    * serials are auto-picked FEFO. Batches always fall back to auto-FEFO.
    */
   requireSerialAssignments?: boolean
+  /**
+   * Allow the product/variant default `sell_unit_id` as the last unit fallback
+   * when neither buy_unit nor sold_unit resolves. Admin documents only — online
+   * cart lines with no buy_unit are priced per base piece.
+   */
+  defaultUnitFallback?: boolean
 }
 
 const FEFO_ORDER = 'ORDER BY expiry_date ASC NULLS LAST, manufacture_date ASC NULLS LAST, created_at ASC'
@@ -99,6 +106,9 @@ interface OrderItemRow {
   variant_name: string | null
   quantity: string
   buy_unit: string | null
+  sold_unit?: string | null
+  sold_unit_factor?: string | number | null
+  base_quantity?: string | number | null
 }
 
 export async function deductOrderStock(
@@ -137,6 +147,9 @@ export async function deductStockForLines(
       variant_name: l.variant_name ?? null,
       quantity: String(l.quantity),
       buy_unit: l.buy_unit ?? null,
+      sold_unit: l.sold_unit ?? null,
+      sold_unit_factor: l.sold_unit_factor ?? null,
+      base_quantity: l.base_quantity ?? null,
     })),
     opts
   )
@@ -151,6 +164,123 @@ export interface LineItem {
   variant_name?: string | null
   quantity: number | string
   buy_unit?: string | null
+  sold_unit?: string | null
+  sold_unit_factor?: number | string | null
+  base_quantity?: number | string | null
+}
+
+type UnitLookupRow = {
+  product_id: string
+  variant_id?: string | null
+  sub_variant_id?: string | null
+  quantity: number | string
+  buy_unit?: string | null
+  sold_unit?: string | null
+  sold_unit_factor?: number | string | null
+  base_quantity?: number | string | null
+}
+
+const posNum = (v: unknown): number | null => {
+  const n = typeof v === 'number' ? v : parseFloat(String(v ?? ''))
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+/**
+ * Selling unit + base-piece quantity for a sold line. Order of precedence:
+ *   1. order_items.base_quantity / sold_unit_factor (snapshotted at sale time)
+ *   2. buy_unit, 3. sold_unit (both at the most specific grain defining them)
+ *   4. variant/product default sell_unit_id (only with `defaultUnitFallback`)
+ * One query regardless of which branch wins. Shared by the stock check and the
+ * deduction so both see the same base quantity.
+ */
+export async function resolveLineUnit(
+  client: { query: (sql: string, params?: any[]) => Promise<any> },
+  item: UnitLookupRow,
+  opts: { defaultUnitFallback?: boolean } = {}
+): Promise<{ unit: SellingUnit | null; baseQty: number; factor: number }> {
+  const qty = parseFloat(String(item.quantity)) || 0
+  const r = await client.query(
+    `SELECT unit, factor::text AS factor, dimension,
+            qty_step::text AS qty_step, min_qty::text AS min_qty, max_qty::text AS max_qty
+       FROM (
+         SELECT pu.*, 1 AS pri FROM product_units pu
+          WHERE $1::text IS NOT NULL AND pu.unit = $1 AND pu.product_id = $2
+            AND ( ($4::uuid IS NOT NULL AND pu.sub_variant_id = $4::uuid)
+                  OR (pu.sub_variant_id IS NULL AND pu.variant_id = $3)
+                  OR (pu.sub_variant_id IS NULL AND pu.variant_id IS NULL) )
+         UNION ALL
+         SELECT pu.*, 2 FROM product_units pu
+          WHERE $5::text IS NOT NULL AND pu.unit = $5 AND pu.product_id = $2
+            AND ( ($4::uuid IS NOT NULL AND pu.sub_variant_id = $4::uuid)
+                  OR (pu.sub_variant_id IS NULL AND pu.variant_id = $3)
+                  OR (pu.sub_variant_id IS NULL AND pu.variant_id IS NULL) )
+         UNION ALL
+         SELECT pu.*, 3 FROM product_units pu JOIN product_variants v ON v.sell_unit_id = pu.id
+          WHERE $6::boolean AND v.id = $3
+         UNION ALL
+         SELECT pu.*, 4 FROM product_units pu JOIN products p ON p.sell_unit_id = pu.id
+          WHERE $6::boolean AND p.id = $2
+       ) x
+      ORDER BY pri, sub_variant_id NULLS LAST, variant_id NULLS LAST
+      LIMIT 1`,
+    [
+      item.buy_unit || null,
+      item.product_id,
+      item.variant_id || null,
+      item.sub_variant_id || null,
+      item.sold_unit || null,
+      !!opts.defaultUnitFallback,
+    ]
+  )
+  const unit = toSellingUnit(r?.rows?.[0])
+  const snapBase = posNum(item.base_quantity)
+  const snapFactor = posNum(item.sold_unit_factor)
+  const baseQty = snapBase ?? (snapFactor ? qty * snapFactor : toBaseQuantity(qty, unit))
+  const factor = qty > 0 ? baseQty / qty : 1
+  return { unit, baseQty, factor }
+}
+
+/** Available pieces at the most specific stock level the line targets. */
+export async function readAvailableStock(
+  client: { query: (sql: string, params?: any[]) => Promise<any> },
+  item: { product_id: string; variant_id?: string | null; sub_variant_id?: string | null }
+): Promise<number> {
+  const [table, target] = item.sub_variant_id
+    ? ['product_sub_variants', item.sub_variant_id]
+    : item.variant_id
+      ? ['product_variants', item.variant_id]
+      : ['products', item.product_id]
+  const inv = await client.query(`SELECT inventory_quantity FROM ${table} WHERE id = $1 FOR UPDATE`, [target])
+  return parseFloat(inv?.rows?.[0]?.inventory_quantity ?? '0') || 0
+}
+
+/** Stock check (base pieces) for store-product lines; custom lines are skipped. */
+export async function checkLineStock(
+  client: { query: (sql: string, params?: any[]) => Promise<any> },
+  lines: (Omit<UnitLookupRow, 'product_id'> & {
+    product_id: string | null
+    product_name?: string | null
+    variant_name?: string | null
+    sub_variant_name?: string | null
+  })[],
+  opts: { defaultUnitFallback?: boolean } = {}
+): Promise<Shortfall[]> {
+  const out: Shortfall[] = []
+  for (const line of lines) {
+    if (!line.product_id) continue
+    const { unit, baseQty, factor } = await resolveLineUnit(client, { ...line, product_id: line.product_id }, opts)
+    if (baseQty <= 1e-6) continue
+    const available = await readAvailableStock(client, { ...line, product_id: line.product_id })
+    const s = buildShortfall(
+      productLabel(line),
+      unit?.unit ?? line.buy_unit ?? line.sold_unit ?? null,
+      factor,
+      baseQty,
+      available
+    )
+    if (s) out.push(s)
+  }
+  return out
 }
 
 async function deductInTx(client: PoolClient, orderId: string, opts: DeductOptions): Promise<void> {
@@ -164,7 +294,8 @@ async function deductInTx(client: PoolClient, orderId: string, opts: DeductOptio
   if (already.rows.length > 0) return
 
   const items = await client.query<OrderItemRow>(
-    `SELECT id, product_id, variant_id, sub_variant_id, product_name, variant_name, quantity, buy_unit
+    `SELECT id, product_id, variant_id, sub_variant_id, product_name, variant_name, quantity, buy_unit,
+            sold_unit, sold_unit_factor, base_quantity
        FROM order_items WHERE order_id = $1 AND is_digital = FALSE`,
     [orderId]
   )
@@ -181,26 +312,8 @@ async function deductItems(
 
   for (const item of itemRows) {
     if (!item.product_id) continue
-    const qty = parseFloat(item.quantity)
-
-    // Resolve the selling unit at the MOST SPECIFIC grain that defines it:
-    // sub-variant, then variant, then product. Mirrors the cart's resolution
-    // (src/app/api/cart/route.ts) — a sub-variant with its own unit must not be
-    // deducted using its parent's factor.
-    const unitRow = await client.query(
-      `SELECT unit, factor::text AS factor, dimension,
-              qty_step::text AS qty_step, min_qty::text AS min_qty, max_qty::text AS max_qty
-         FROM product_units
-        WHERE product_id = $2 AND unit = $1
-          AND ( ($4::uuid IS NOT NULL AND sub_variant_id = $4::uuid)
-                OR (sub_variant_id IS NULL AND variant_id = $3)
-                OR (sub_variant_id IS NULL AND variant_id IS NULL) )
-        ORDER BY sub_variant_id NULLS LAST, variant_id NULLS LAST
-        LIMIT 1`,
-      [item.buy_unit || null, item.product_id, item.variant_id || null, item.sub_variant_id || null]
-    )
-    const unit = toSellingUnit(unitRow.rows[0])
-    const baseQty = toBaseQuantity(qty, unit)
+    // Same unit resolution as the stock checks (see resolveLineUnit).
+    const { unit, baseQty } = await resolveLineUnit(client, item, opts)
 
     const prod = await client.query<{ perishable: boolean; serialized: boolean }>(
       `SELECT perishable, serialized FROM products WHERE id = $1`,
@@ -214,7 +327,7 @@ async function deductItems(
     const label = `${productLabel(item)}`
 
     if (isSerialized) {
-      const needed = unit ? serialCountForQuantity(qty, unit) : Math.round(baseQty)
+      const needed = serialCountForBaseQuantity(baseQty, unit)
       // Exact, not >=: over-assignment silently marks the extra serials sold
       // (perSerialBase rescales the batch decrement, so nothing else complains).
       if (opts.requireSerialAssignments && manualSerials.length !== needed) {

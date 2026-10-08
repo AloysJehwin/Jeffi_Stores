@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { withTransaction, queryMany } from '@/lib/shared/db'
-import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, round2 } from '@/lib/catalog/gst'
+import {
+  calculateGST,
+  getFinancialYear,
+  generateInvoiceNumber,
+  getNextInvoiceSequence,
+  round2,
+} from '@/lib/catalog/gst'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { findDigitalProductIds } from '@/lib/catalog/digital-guard'
 import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/catalog/pricing'
-import { deductStockForLines, type LineItem } from '@/lib/orders/inventory-deduct'
+import { deductStockForLines, InsufficientStockError, type LineItem } from '@/lib/orders/inventory-deduct'
+import { invoiceLineSchema } from '@/lib/documents/invoice-line-items'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
 
@@ -14,26 +21,8 @@ export const dynamic = 'force-dynamic'
 
 const VALID_PAYMENT_MODES = ['cash', 'upi', 'upi_qr']
 
-const cashSaleItemSchema = z.object({
-  product_id: z.string().uuid().nullable().optional(),
-  product_name: z.string().default(''),
-  product_sku: z.string().optional(),
-  variant_id: z.string().uuid().nullable().optional(),
-  sub_variant_id: z.string().uuid().nullable().optional(),
-  variant_name: z.string().optional(),
-  sub_variant_name: z.string().nullish(),
-  hsn_code: z.string().optional(),
-  gst_rate: z.coerce.number().optional(),
-  unit_price: z.coerce.number().min(0),
-  quantity: z.coerce.number().positive(),
-  buy_unit: z.string().nullable().optional(),
-  buy_mode: z.string().optional(),
-  discount_pct: z.coerce.number().optional(),
-  temp_id: z.string().optional(),
-})
-
 const cashSaleSchema = z.object({
-  items: z.array(cashSaleItemSchema).min(1),
+  items: z.array(invoiceLineSchema).min(1, 'Add at least one line item'),
   paymentMode: z.string().nullish(),
   notes: z.string().nullish(),
 })
@@ -68,9 +57,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid payment mode for cash sale' }, { status: 400 })
     }
 
-    const digitalIds = await findDigitalProductIds(
-      items.map(i => i.product_id).filter((v): v is string => !!v)
-    )
+    const digitalIds = await findDigitalProductIds(items.map(i => i.product_id).filter((v): v is string => !!v))
     if (digitalIds.length)
       return NextResponse.json({ error: 'Digital products cannot be sold through this channel' }, { status: 400 })
 
@@ -108,14 +95,17 @@ export async function POST(request: NextRequest) {
 
     // GST off ⇒ charge the ex-GST equivalent of the admin-entered incl price and
     // write zero tax columns. GST on ⇒ existing MRP-incl behaviour.
-    const gstEnabled = (await getFeatureFlags()).gstEnabled
+    const { gstEnabled, inventoryValidationEnabled } = await getFeatureFlags()
 
     const processedItems = items.map((item: any) => {
       const unitPrice = parseFloat(item.unit_price) || 0
       const rawQty = parseFloat(item.quantity) || 0
       const discPct = parseFloat(item.discount_pct || '0') || 0
       const gstRate = parseFloat(item.gst_rate || '18')
-      const unitInfo = unitFactorMap.get(`${item.product_id}:${item.variant_id ?? ''}:${item.buy_unit}`)
+      const unitInfo = item.product_id
+        ? unitFactorMap.get(`${item.product_id}:${item.variant_id ?? ''}:${item.buy_unit}`)
+        : undefined
+      const unitCode = item.product_id ? item.buy_unit || null : (item.buy_unit || item.unit || 'PCS').toUpperCase()
       const effectiveQty = unitInfo?.dimension === 'count' && unitInfo.factor > 1 ? rawQty * unitInfo.factor : rawQty
 
       if (!gstEnabled) {
@@ -136,7 +126,7 @@ export async function POST(request: NextRequest) {
           hsn_code: item.hsn_code || null,
           gst_rate: 0,
           quantity: rawQty,
-          buy_unit: item.buy_unit || null,
+          buy_unit: unitCode,
           buy_mode: item.buy_mode || 'unit',
           unit_price: unitPrice,
           total_price: lineTotal,
@@ -172,7 +162,7 @@ export async function POST(request: NextRequest) {
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: rawQty,
-        buy_unit: item.buy_unit || null,
+        buy_unit: unitCode,
         buy_mode: item.buy_mode || 'unit',
         unit_price: unitPrice,
         total_price: lineTotal,
@@ -297,11 +287,15 @@ export async function POST(request: NextRequest) {
           buy_unit: item.buy_unit,
         }))
 
-      await deductStockForLines(client, saleId, lines, {
-        batchAssignments,
-        serialAssignments,
-        requireSerialAssignments: true,
-      })
+      // Flag OFF ⇒ no inventory module: record the sale without touching stock.
+      if (inventoryValidationEnabled) {
+        await deductStockForLines(client, saleId, lines, {
+          batchAssignments,
+          serialAssignments,
+          requireSerialAssignments: true,
+          defaultUnitFallback: true,
+        })
+      }
 
       return { invoiceNumber, saleId, saleNumber }
     })
@@ -313,6 +307,9 @@ export async function POST(request: NextRequest) {
       invoiceUrl: `/api/admin/cash-sale/${result.saleId}/receipt`,
     })
   } catch (err: any) {
+    if (err instanceof InsufficientStockError)
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 409 })
+    console.error('[admin/invoices/cash-sale] failed', err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

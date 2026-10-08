@@ -1,11 +1,17 @@
 import { documentUrl, orderUrlById } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
-import { productLabel } from '@/lib/catalog/product-label'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany, query, withTransaction } from '@/lib/shared/db'
-import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear, round2 } from '@/lib/catalog/gst'
-import { deductOrderStock } from '@/lib/orders/inventory-deduct'
+import {
+  isInterState,
+  generateInvoiceNumber,
+  getNextInvoiceSequence,
+  getFinancialYear,
+  round2,
+} from '@/lib/catalog/gst'
+import { deductOrderStock, checkLineStock, InsufficientStockError } from '@/lib/orders/inventory-deduct'
+import { CUSTOM_UNIT_MAX, formatShortfall, type Shortfall } from '@/lib/documents/invoice-line-items'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { sendBusinessInvoiceGeneratedEmail } from '@/lib/shared/email-business'
 import { lineItemExGst } from '@/lib/catalog/pricing'
@@ -35,12 +41,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Only finalised quotations can be converted to an invoice' }, { status: 400 })
     }
     if (quotation.converted_order_id) {
-      return NextResponse.json({ error: 'This quotation has already been converted to an invoice' }, { status: 400 })
+      return NextResponse.json({ error: 'This quotation has already been converted to an invoice' }, { status: 409 })
     }
 
     const qItems = await queryMany<any>(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [id])
     if (!qItems.length) {
       return NextResponse.json({ error: 'Quotation has no line items' }, { status: 400 })
+    }
+    // Custom lines carry their unit into order_items.buy_unit (varchar 10).
+    const longUnit = qItems.find((i: any) => !i.product_id && String(i.unit || '').trim().length > CUSTOM_UNIT_MAX)
+    if (longUnit) {
+      return NextResponse.json(
+        {
+          error: `Custom item "${longUnit.description}" has unit "${longUnit.unit}" — shorten it to ${CUSTOM_UNIT_MAX} characters or less before converting`,
+        },
+        { status: 400 }
+      )
     }
 
     const digitalIds = await findDigitalProductIds(qItems.map((i: any) => i.product_id).filter(Boolean))
@@ -135,12 +151,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let totalIgst = 0
 
     const processedItems = qItems.map((item: any) => {
+      const isCustom = !item.product_id
       const rawQty = parseFloat(item.quantity)
-      const unitInfo = unitFactorMap.get(item.id)
+      const unitInfo = isCustom ? undefined : unitFactorMap.get(item.id)
       const factor = unitInfo?.factor ?? 1
       const isCountWithFactor = unitInfo?.dimension === 'count' && factor > 1
-      // base_quantity is rawQty × factor (for stock deduction); line amount uses rawQty at the
-      // per-selling-unit rate (rate already incorporates the factor from the quotation)
+      // Quotation `rate` is ex-GST per BASE piece and its amount = qty × factor × rate,
+      // so the invoice line is priced on baseQty too — quote total == invoice total.
       const baseQty = isCountWithFactor ? rawQty * factor : rawQty
       const rate = parseFloat(item.rate)
       const exGstLineTotal = lineItemExGst(baseQty, rate, parseFloat(item.discount_pct) || 0)
@@ -169,7 +186,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
       const discountPct = parseFloat(item.discount_pct) || 0
       const discountedRate = rate * (1 - discountPct / 100)
-      const sellUnit = item.buy_unit || item.unit || null
+      const sellUnit = isCustom
+        ? String(item.unit || 'PCS')
+            .trim()
+            .toUpperCase()
+        : item.buy_unit || item.unit || null
 
       return {
         id: item.id,
@@ -186,7 +207,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         base_qty: baseQty,
         sell_unit: sellUnit,
         unit_factor: isCountWithFactor ? factor : null,
-        buy_unit: item.buy_unit || null,
+        buy_unit: isCustom ? sellUnit : item.buy_unit || null,
         buy_mode: 'unit',
         mrp: rate,
         unit_price: gstEnabled ? round2(discountedRate * (1 + gstRate / 100)) : round2(discountedRate),
@@ -200,7 +221,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     })
 
     const taxAmount = round2(totalCgst + totalSgst + totalIgst)
-    const totalAmount = round2(subtotal + taxAmount)
+    // Same formula as the quotation total (subtotal + unrounded tax, rounded once).
+    const totalAmount = round2(subtotal + totalCgst + totalSgst + totalIgst)
     // cash and bank_transfer are immediately paid; upi_qr and credit are unpaid until confirmed
     const isPaid = paymentMode === 'cash' || paymentMode === 'bank_transfer'
     const today = new Date().toISOString()
@@ -222,39 +244,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
       const addressId = addrResult.rows[0].id
 
-      // Check stock for all items first — if any are short, save as draft.
-      // Skipped entirely on Basic (flag off): no inventory module → never demote to draft.
-      const insufficientItems: string[] = []
-      for (const item of inventoryValidationEnabled ? processedItems : []) {
-        if (!item.product_id) continue
-        // base_qty already resolved from unitFactorMap in processedItems (handles NULL buy_unit)
-        const baseQty = item.base_qty
-        if (item.sub_variant_id) {
-          const inv = await client.query<{ inventory_quantity: number }>(
-            'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE',
-            [item.sub_variant_id]
+      // Flag ON ⇒ check store-product stock (base pieces); short ⇒ save as draft.
+      // Custom lines (product_id NULL) never touch inventory.
+      const shortfalls: Shortfall[] = inventoryValidationEnabled
+        ? await checkLineStock(
+            client,
+            processedItems.map(i => ({ ...i, base_quantity: i.base_qty, sold_unit_factor: i.unit_factor })),
+            { defaultUnitFallback: true }
           )
-          const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < baseQty)
-            insufficientItems.push(`${productLabel(item)} (available: ${stock}, required: ${baseQty})`)
-        } else if (item.variant_id) {
-          const inv = await client.query<{ inventory_quantity: number }>(
-            'SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE',
-            [item.variant_id]
-          )
-          const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < baseQty)
-            insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
-        } else {
-          const inv = await client.query<{ inventory_quantity: number }>(
-            'SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE',
-            [item.product_id]
-          )
-          const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < baseQty)
-            insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
-        }
-      }
+        : []
+      const insufficientItems = shortfalls.map(formatShortfall)
 
       const saveAsDraft = insufficientItems.length > 0
       const orderStatus = saveAsDraft
@@ -381,7 +380,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         await deductOrderStock(
           newOrder.id,
-          { batchAssignments: remappedBatches, serialAssignments: remappedSerials, requireSerialAssignments: true },
+          {
+            batchAssignments: remappedBatches,
+            serialAssignments: remappedSerials,
+            requireSerialAssignments: true,
+            defaultUnitFallback: true,
+          },
           client
         )
       }
@@ -397,6 +401,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         invoice_number: invoiceNumber,
         saveAsDraft,
         insufficientItems,
+        shortfalls,
       }
     })
 
@@ -495,10 +500,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       invoiceUrl: result.invoice_number ? `/api/orders/${result.id}/invoice` : null,
       savedAsDraft: result.saveAsDraft,
       insufficientItems: result.insufficientItems,
+      insufficientDetails: result.shortfalls,
       qrImageUrl,
       needsDelivery: enableDelivery && !result.saveAsDraft,
     })
   } catch (err: any) {
+    if (err instanceof InsufficientStockError)
+      return NextResponse.json({ error: err.message, code: err.code }, { status: 409 })
+    console.error(`[quotations/${id}/convert-to-invoice] failed`, err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }

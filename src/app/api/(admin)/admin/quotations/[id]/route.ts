@@ -2,19 +2,49 @@ import { documentUrl } from '@/lib/shared/customer-links'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { query, queryMany, queryOne } from '@/lib/shared/db'
-import { round2 } from '@/lib/catalog/gst'
+import { query, queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
-import { lineItemExGst } from '@/lib/catalog/pricing'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { z } from 'zod'
+import { parseBody } from '@/lib/shared/validate'
+import {
+  quotationLineSchema,
+  quotationLineRow,
+  quotationTotals,
+  insertQuotationItem,
+} from '@/lib/documents/invoice-line-items'
 
-function calcTotals(items: any[]) {
-  const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
-  const cgst = items.reduce((s: number, i: any) => s + (i.amount * i.gst_rate) / 200, 0)
-  const sgst = cgst
-  const rawTotal = subtotal + cgst + sgst
-  const total = round2(rawTotal)
-  return { subtotal, cgst_amount: cgst, sgst_amount: sgst, total_amount: total }
-}
+const zText = z.string().nullish()
+const patchQuotationSchema = z
+  .object({
+    quote_date: z.string().nullish(),
+    status: z.string().trim().max(20).nullish(),
+    consignee_name: z.string().trim().max(255).nullish(),
+    consignee_addr1: zText,
+    consignee_addr2: zText,
+    consignee_city: zText,
+    consignee_state: zText,
+    consignee_gstin: zText,
+    consignee_phone: zText,
+    consignee_pincode: zText,
+    consignee_email: z.string().email('Enter a valid email').or(z.literal('')).nullish(),
+    buyer_same: z.boolean().nullish(),
+    buyer_name: zText,
+    buyer_addr1: zText,
+    buyer_addr2: zText,
+    buyer_city: zText,
+    buyer_state: zText,
+    buyer_gstin: zText,
+    buyer_phone: zText,
+    buyer_pincode: zText,
+    buyer_email: z.string().email('Enter a valid email').or(z.literal('')).nullish(),
+    notes: zText,
+    items: z.array(quotationLineSchema).optional(),
+  })
+  .superRefine((b, ctx) => {
+    if (b.status === 'final' && b.items && b.items.length === 0)
+      ctx.addIssue({ code: 'custom', path: ['items'], message: 'Add at least one line item before finalising' })
+  })
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -81,11 +111,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!hasScope(admin.role, admin.scopes, 'quotations:write'))
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const existing = await queryOne<any>(`SELECT id, status FROM quotations WHERE id = $1`, [id])
+    const existing = await queryOne<any>(
+      `SELECT id, status, subtotal, cgst_amount, sgst_amount, total_amount, converted_order_id
+         FROM quotations WHERE id = $1`,
+      [id]
+    )
     if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-    const body = await request.json()
-    const { items, ...fields } = body
+    const parsed = parseBody(patchQuotationSchema, await request.json(), `PATCH /api/admin/quotations/${id}`)
+    if (!parsed.ok) return parsed.response
+    const { items, ...fields } = parsed.data as Record<string, any> & { items?: z.infer<typeof quotationLineSchema>[] }
+    if (existing.converted_order_id && Array.isArray(items))
+      return NextResponse.json(
+        { error: 'This quotation was already converted to an invoice — its line items can no longer change' },
+        { status: 409 }
+      )
 
     let totals = {
       subtotal: existing.subtotal,
@@ -94,48 +133,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       total_amount: existing.total_amount,
     }
 
+    let rows: ReturnType<typeof quotationLineRow>[] | null = null
     if (Array.isArray(items)) {
-      // amount is pre-computed client-side (applies sell_unit_factor for count dimensions)
-      const computedItems = items.map((item: any) => ({
-        ...item,
-        amount:
-          Number(item.amount) ||
-          lineItemExGst(Number(item.quantity), Number(item.rate), Number(item.discount_pct) || 0),
-      }))
-      totals = calcTotals(computedItems)
-
-      await query(`DELETE FROM quotation_items WHERE quotation_id = $1`, [id])
-      for (let idx = 0; idx < computedItems.length; idx++) {
-        const item = computedItems[idx]
-        await query(
-          `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, buy_unit, sold_unit_factor, base_quantity, rate, discount_pct, amount, product_id, variant_id, sub_variant_id, variant_name, sub_variant_name)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
-          [
-            id,
-            idx,
-            item.description,
-            item.hsn_code || null,
-            Number(item.gst_rate) || 18,
-            Number(item.quantity),
-            item.unit || 'PCS',
-            item.buy_unit || null,
-            item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : null,
-            item.sell_unit_factor && item.sell_unit_factor > 1 ? Number(item.quantity) * item.sell_unit_factor : null,
-            Number(item.rate),
-            Number(item.discount_pct) || 0,
-            item.amount,
-            item.product_id || null,
-            item.variant_id || null,
-            item.sub_variant_id || null,
-            item.variant_name || null,
-            item.sub_variant_name || null,
-          ]
-        )
-      }
+      const { gstEnabled } = await getFeatureFlags()
+      rows = items.map(item => quotationLineRow(item, gstEnabled))
+      totals = quotationTotals(rows)
     } else if (Number(existing.total_amount) === 0) {
       // Stored totals are zero (e.g. legacy RFQ-converted quotation) — recompute from existing items
-      const existingItems = await queryMany<any>(`SELECT * FROM quotation_items WHERE quotation_id = $1`, [id])
-      if (existingItems?.length) totals = calcTotals(existingItems)
+      const existingItems = await queryMany<any>(
+        `SELECT amount, gst_rate FROM quotation_items WHERE quotation_id = $1`,
+        [id]
+      )
+      if (existingItems?.length) totals = quotationTotals(existingItems)
     }
 
     const setClauses: string[] = ['updated_at = NOW()']
@@ -182,10 +191,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     updateParams.push(totals.subtotal, totals.cgst_amount, totals.sgst_amount, totals.total_amount)
     updateParams.push(id)
 
-    const qt = await queryOne<any>(
-      `UPDATE quotations SET ${setClauses.join(', ')} WHERE id = $${pi} RETURNING *`,
-      updateParams
-    )
+    // Header + line replace in one transaction so a failed insert never leaves an empty quote.
+    const qt = await withTransaction(async client => {
+      if (rows) {
+        await client.query(`DELETE FROM quotation_items WHERE quotation_id = $1`, [id])
+        for (let idx = 0; idx < rows.length; idx++) await insertQuotationItem(client, id, idx, rows[idx])
+      }
+      const r = await client.query(
+        `UPDATE quotations SET ${setClauses.join(', ')} WHERE id = $${pi} RETURNING *`,
+        updateParams
+      )
+      return r.rows[0]
+    })
 
     const savedItems = await queryMany(
       `
@@ -231,11 +248,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           Number(qt.total_amount),
           viewUrl
         )
-      } catch (_emailErr) {}
+      } catch (emailErr) {
+        console.error(`[admin/quotations/${id}] finalised email failed`, emailErr)
+      }
     }
 
     return NextResponse.json({ quotation: qt, items: savedItems })
   } catch (e: any) {
+    console.error(`[admin/quotations/${(await params).id} PATCH] failed`, e)
     return NextResponse.json({ error: e?.message || 'Failed to update' }, { status: 500 })
   }
 }

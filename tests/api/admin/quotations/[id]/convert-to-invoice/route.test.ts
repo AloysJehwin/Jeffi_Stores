@@ -41,7 +41,14 @@ vi.mock('@/lib/orders/inventory', () => ({
   logStockMovement: vi.fn(),
 }))
 
-vi.mock('@/lib/orders/inventory-deduct', () => ({
+const flags = vi.hoisted(() => ({ gstEnabled: true, inventoryValidationEnabled: true }))
+vi.mock('@/lib/catalog/site-controls', () => ({
+  getFeatureFlags: async () => ({ ...flags }),
+  getBusinessValues: async () => ({ businessStateCode: '33' }),
+}))
+
+vi.mock('@/lib/orders/inventory-deduct', async () => ({
+  ...(await vi.importActual<any>('@/lib/orders/inventory-deduct')),
   deductOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
 
@@ -153,35 +160,24 @@ const QUOT_ITEMS = [
   },
 ]
 
-function makeTransactionClient(stockLevel = 100) {
+// Answers by SQL shape, not call order. `unitRow` feeds the product_units lookup.
+function makeTransactionClient(stockLevel = 100, unitRow: any = null) {
   return {
-    query: vi
-      .fn()
-      // INSERT addresses RETURNING id
-      .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-      // stock check (products)
-      .mockResolvedValueOnce({ rows: [{ inventory_quantity: stockLevel }] })
-      // INSERT orders RETURNING id, order_number
-      .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-1', order_number: 'OFF-123' }] })
-      // site_settings for invoice_prefix
-      .mockResolvedValueOnce({ rows: [{ value: 'JS' }] })
-      // getNextInvoiceSequence
-      .mockResolvedValueOnce({ rows: [{ seq: 1 }] })
-      // UPDATE orders invoice_number
-      .mockResolvedValueOnce({ rows: [] })
-      // INSERT invoices
-      .mockResolvedValueOnce({ rows: [] })
-      // INSERT order_items
-      .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-      // stock deduction SELECT
-      .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
-      // stock deduction UPDATE
-      .mockResolvedValueOnce({ rows: [] })
-      // UPDATE quotations
-      .mockResolvedValueOnce({ rows: [] }),
+    query: vi.fn().mockImplementation(async (sql: string) => {
+      if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-uuid-1' }] }
+      if (sql.includes('FROM product_units')) return { rows: unitRow ? [unitRow] : [] }
+      if (/SELECT inventory_quantity FROM \w+ WHERE id = \$1 FOR UPDATE/.test(sql))
+        return { rows: [{ inventory_quantity: String(stockLevel) }] }
+      if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-uuid-1', order_number: 'OFF-123' }] }
+      if (sql.includes('invoice_prefix')) return { rows: [{ value: 'JS' }] }
+      if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-1' }] }
+      return { rows: [] }
+    }),
     release: vi.fn(),
   }
 }
+
+const sqlsOf = (client: any): string[] => client.query.mock.calls.map((c: any[]) => String(c[0]))
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -207,6 +203,8 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     vi.mocked(queryMany).mockResolvedValue(QUOT_ITEMS as any)
     vi.mocked(query).mockResolvedValue({ rows: [] } as any)
     vi.mocked(findDigitalProductIds).mockResolvedValue([])
+    flags.gstEnabled = true
+    flags.inventoryValidationEnabled = true
   })
 
   // --- Auth ---
@@ -241,11 +239,11 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     expect(json.error).toMatch(/finalised/)
   })
 
-  it('returns 400 when quotation already converted', async () => {
+  it('returns 409 when quotation already converted', async () => {
     vi.mocked(queryOne).mockReset()
     vi.mocked(queryOne).mockResolvedValueOnce({ ...FINAL_QUOTATION, converted_order_id: 'existing-order' } as any)
     const res = await POST(postReq(), { params: Promise.resolve({ id: QUOT_ID }) })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(409)
     const json = await res.json()
     expect(json.error).toMatch(/already been converted/)
   })
@@ -292,19 +290,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   // --- Draft fallback when insufficient stock ---
 
   it('saves as draft and returns savedAsDraft=true when stock is low', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi
-          .fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 0 }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-2', order_number: 'OFF-456' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient(0)))
 
     const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     const json = await res.json()
@@ -314,38 +300,14 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   })
 
   it('sets invoiceUrl to null when savedAsDraft (no invoice_number)', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi
-          .fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 0 }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-2', order_number: 'OFF-456' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient(0)))
     const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     const json = await res.json()
     expect(json.invoiceUrl).toBeNull()
   })
 
   it('does not send emails when result.saveAsDraft is true', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi
-          .fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 0 }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-2', order_number: 'OFF-456' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient(0)))
     await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(sendInvoiceFinalizedEmail).not.toHaveBeenCalled()
     expect(sendBusinessInvoiceGeneratedEmail).not.toHaveBeenCalled()
@@ -364,19 +326,7 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
   })
 
   it('saves as draft (processing) when insufficient stock + enableDelivery=true', async () => {
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi
-          .fn()
-          .mockResolvedValueOnce({ rows: [{ id: 'addr-uuid-1' }] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: 0 }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'order-uuid-3', order_number: 'OFF-789' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'oi-1' }] })
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient(0)))
     const res = await POST(postReq({ paymentMode: 'cash', enableDelivery: true }), {
       params: Promise.resolve({ id: QUOT_ID }),
     })
@@ -467,5 +417,126 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient()))
     await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(sendInvoiceFinalizedEmail).not.toHaveBeenCalled()
+  })
+
+  // --- Custom lines / unit conversion / flag gating ---
+
+  const CUSTOM_ITEM = {
+    ...QUOT_ITEMS[0],
+    id: 'qi-c',
+    product_id: null,
+    description: 'Site installation',
+    unit: 'JOB',
+    quantity: '1',
+    rate: '500',
+  }
+
+  it('custom line → order_items with NULL product, its unit as buy_unit, no inventory lookups', async () => {
+    vi.mocked(queryMany).mockResolvedValue([CUSTOM_ITEM] as any)
+    const client = makeTransactionClient(0)
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.savedAsDraft).toBe(false)
+    const sqls = sqlsOf(client)
+    expect(sqls.some(q => q.includes('FROM product_units') || q.includes('inventory_quantity'))).toBe(false)
+    const ins = client.query.mock.calls.find((c: any[]) => String(c[0]).includes('INSERT INTO order_items'))!
+    expect(ins[1][1]).toBeNull() // product_id
+    expect(ins[1][11]).toBe('JOB') // buy_unit
+    expect(ins[1][21]).toBe('JOB') // sold_unit
+  })
+
+  it('rejects a custom line whose unit is longer than 10 characters', async () => {
+    vi.mocked(queryMany).mockResolvedValue([{ ...CUSTOM_ITEM, unit: 'PERSON-DAYS' }] as any)
+    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/10 characters/)
+    expect(vi.mocked(withTransaction)).not.toHaveBeenCalled()
+  })
+
+  it('2 × SET (sold_unit_factor 10) at ₹5/pc → taxable 100, base qty 20; invoice total = quotation total', async () => {
+    const { lineItemExGst: real } = await vi.importActual<any>('@/lib/catalog/pricing')
+    vi.mocked(lineItemExGst).mockImplementation(real)
+    vi.mocked(queryMany).mockImplementation(async (sql: string) =>
+      sql.includes('AS item_id')
+        ? ([{ item_id: 'qi-s', factor: '10', dimension: 'count' }] as any)
+        : ([
+            {
+              ...QUOT_ITEMS[0],
+              id: 'qi-s',
+              quantity: '2',
+              rate: '5',
+              gst_rate: '18',
+              unit: 'SET',
+              buy_unit: 'SET',
+              sold_unit_factor: '10',
+            },
+          ] as any)
+    )
+    const client = makeTransactionClient(100)
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
+    expect(res.status).toBe(200)
+    const ins = client.query.mock.calls.find((c: any[]) => String(c[0]).includes('INSERT INTO order_items'))!
+    expect(ins[1][10]).toBe(2) // quantity in selling units
+    expect(ins[1][16]).toBe(100) // taxable_amount
+    expect(ins[1][23]).toBe(20) // base_quantity
+    const order = client.query.mock.calls.find((c: any[]) => String(c[0]).includes('INSERT INTO orders'))!
+    // quotation: amount 100, CGST+SGST 18 → 118
+    expect(order[1][17]).toBe(118)
+  })
+
+  it('short stock → draft with shortfall in selling unit and pieces, plus insufficientDetails', async () => {
+    vi.mocked(queryMany).mockImplementation(async (sql: string) =>
+      sql.includes('AS item_id')
+        ? ([{ item_id: 'qi-s', factor: '10', dimension: 'count' }] as any)
+        : ([
+            { ...QUOT_ITEMS[0], id: 'qi-s', quantity: '2', unit: 'SET', buy_unit: 'SET', sold_unit_factor: '10' },
+          ] as any)
+    )
+    const unitRow = { unit: 'SET', factor: '10', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient(15, unitRow)))
+    const json = await (
+      await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
+    ).json()
+    expect(json.savedAsDraft).toBe(true)
+    expect(json.insufficientItems).toEqual(['Widget A — need 2 SET (20 pcs), available 15 pcs, short 5 pcs (0.5 SET)'])
+    expect(json.insufficientDetails[0]).toMatchObject({ required_base: 20, available_base: 15, short_base: 5 })
+  })
+
+  it('inventory flag OFF: no stock queries and no deduction, even at zero stock', async () => {
+    flags.inventoryValidationEnabled = false
+    const { deductOrderStock } = await import('@/lib/orders/inventory-deduct')
+    const client = makeTransactionClient(0)
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(client))
+    const json = await (
+      await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
+    ).json()
+    expect(json.savedAsDraft).toBe(false)
+    expect(sqlsOf(client).some(q => q.includes('inventory_quantity') || q.includes('FROM product_units'))).toBe(false)
+    expect(deductOrderStock).not.toHaveBeenCalled()
+  })
+
+  it('inventory flag ON: deducts with the default-unit fallback enabled', async () => {
+    const { deductOrderStock } = await import('@/lib/orders/inventory-deduct')
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient(100)))
+    await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
+    expect(deductOrderStock).toHaveBeenCalledWith(
+      'order-uuid-1',
+      expect.objectContaining({ defaultUnitFallback: true, requireSerialAssignments: true }),
+      expect.anything()
+    )
+  })
+
+  it('maps InsufficientStockError from deduction to 409', async () => {
+    const mod = await import('@/lib/orders/inventory-deduct')
+    vi.mocked(mod.deductOrderStock).mockRejectedValueOnce(
+      new mod.InsufficientStockError('Insufficient stock for "Widget A"', 'x')
+    )
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeTransactionClient(100)))
+    const res = await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatch(/Insufficient stock/)
   })
 })

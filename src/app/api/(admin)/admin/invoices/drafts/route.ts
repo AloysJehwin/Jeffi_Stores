@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, withTransaction } from '@/lib/shared/db'
-import { isInterState, calculateGST, round2 } from '@/lib/catalog/gst'
-import { lineItemFromMrpIncl } from '@/lib/catalog/pricing'
+import { isInterState, round2 } from '@/lib/catalog/gst'
+import { getBusinessValues, getFeatureFlags } from '@/lib/catalog/site-controls'
+import { parseBody } from '@/lib/shared/validate'
+import { draftInvoiceSchema, priceInvoiceLines } from '@/lib/documents/invoice-line-items'
 
 export const dynamic = 'force-dynamic'
 
@@ -119,7 +121,8 @@ export async function POST(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'invoices:write'))
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const body = await request.json()
+    const parsed = parseBody(draftInvoiceSchema, await request.json(), 'POST /api/admin/invoices/drafts')
+    if (!parsed.ok) return parsed.response
     const {
       customerName,
       customerPhone,
@@ -133,65 +136,14 @@ export async function POST(request: NextRequest) {
       paymentMode,
       notes,
       items,
-    } = body
+    } = parsed.data
 
-    if (!customerName) {
-      return NextResponse.json({ error: 'customerName is required' }, { status: 400 })
-    }
-
-    const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
+    const sellerStateCode = (await getBusinessValues()).businessStateCode
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false
-
-    let subtotal = 0
-    let totalTaxable = 0
-    let totalCgst = 0
-    let totalSgst = 0
-    let totalIgst = 0
-
-    const processedItems = (items || []).map((item: any) => {
-      const unitPrice = parseFloat(item.unit_price) || 0
-      const qty = parseFloat(item.quantity) || 0
-      const factor = item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1
-      const baseQty = qty * factor
-      const discPct = parseFloat(item.discount_pct || '0') || 0
-      const gstRate = parseFloat(item.gst_rate || '18')
-      const lineTotal = round2(lineItemFromMrpIncl(baseQty, unitPrice, discPct, gstRate))
-      const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
-
-      subtotal += lineTotal
-      totalTaxable += gst.taxableAmount
-      totalCgst += gst.cgst
-      totalSgst += gst.sgst
-      totalIgst += gst.igst
-
-      return {
-        product_id: item.product_id || null,
-        product_name: item.product_name || '',
-        product_sku: item.product_sku || '',
-        variant_id: item.variant_id || null,
-        sub_variant_id: item.sub_variant_id || null,
-        variant_name: item.variant_name || null,
-        hsn_code: item.hsn_code || null,
-        gst_rate: gstRate,
-        quantity: qty,
-        buy_unit: item.buy_unit || null,
-        sold_unit_factor: factor > 1 ? factor : null,
-        base_quantity: factor > 1 ? baseQty : null,
-        unit_price: unitPrice,
-        mrp: unitPrice,
-        discount_pct: discPct,
-        discount_amount: discPct > 0 ? round2(((baseQty * unitPrice) / (1 + gstRate / 100)) * (discPct / 100)) : 0,
-        total_price: lineTotal,
-        taxable_amount: round2(gst.taxableAmount),
-        cgst_amount: round2(gst.cgst),
-        sgst_amount: round2(gst.sgst),
-        igst_amount: round2(gst.igst),
-        tax_amount: round2(gst.cgst + gst.sgst + gst.igst),
-      }
-    })
-
-    const taxAmount = round2(totalCgst + totalSgst + totalIgst)
-    const totalAmount = round2(subtotal)
+    const { gstEnabled } = await getFeatureFlags()
+    const priced = priceInvoiceLines(items, { gstEnabled, orderIsIgst })
+    const processedItems = priced.lines
+    const { subtotal, taxAmount, totalAmount, totalTaxable, totalCgst, totalSgst, totalIgst } = priced
 
     const result = await withTransaction(async client => {
       const addrResult = await client.query(
@@ -253,10 +205,10 @@ export async function POST(request: NextRequest) {
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name, sub_variant_name,
-            hsn_code, gst_rate, quantity, buy_unit, sold_unit_factor, base_quantity,
+            hsn_code, gst_rate, quantity, buy_unit, sold_unit, sold_unit_factor, base_quantity,
             unit_price, mrp, discount_pct, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
           [
             orderId,
             item.product_id,
@@ -270,6 +222,7 @@ export async function POST(request: NextRequest) {
             item.gst_rate,
             item.quantity,
             item.buy_unit,
+            item.sold_unit,
             item.sold_unit_factor ?? null,
             item.base_quantity ?? null,
             item.unit_price,
@@ -291,6 +244,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, draftId: result.orderId, orderNumber: result.orderNumber })
   } catch (err: any) {
+    console.error('[admin/invoices/drafts POST] failed', err)
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
 }
