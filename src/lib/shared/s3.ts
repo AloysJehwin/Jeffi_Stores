@@ -105,17 +105,29 @@ export interface UploadResult {
   blurhash: string | null
 }
 
+/** A problem with the uploaded file itself (type, size, unreadable image): a 400, not a server error. */
+export class UploadValidationError extends Error {}
+
 export async function uploadProductImage(file: File, productId: string): Promise<UploadResult> {
   const BUCKET_NAME = await resolveBucket()
   if (!ALLOWED_TYPES.includes(file.type)) {
-    throw new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.')
+    throw new UploadValidationError(
+      `Unsupported image type${file.type ? ` (${file.type})` : ''}. Upload a JPEG, PNG or WebP image.`
+    )
   }
   if (file.size > MAX_FILE_SIZE) {
-    throw new Error('File size exceeds 5MB limit.')
+    throw new UploadValidationError(
+      `Image is ${(file.size / 1024 / 1024).toFixed(1)} MB; the limit is 5 MB. Compress or resize it and try again.`
+    )
   }
 
   const buffer = Buffer.from(await file.arrayBuffer())
-  const metadata = await sharp(buffer).rotate().metadata()
+  const metadata = await sharp(buffer)
+    .rotate()
+    .metadata()
+    .catch(() => {
+      throw new UploadValidationError('This file could not be read as an image. Re-save it as JPEG or PNG and try again.')
+    })
   const { imageKey: s3Key, thumbnailKey: s3ThumbnailKey } = generateProductImageKeys(productId, file.name)
   const thumbnailBuffer = await sharp(buffer)
     .rotate()

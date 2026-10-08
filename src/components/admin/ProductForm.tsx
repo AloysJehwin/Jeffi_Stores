@@ -2162,7 +2162,9 @@ export default function ProductForm({
         const res = await fetch('/api/upload', { method: 'POST', body: uploadForm })
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
-          setError(body?.error || `Failed to upload ${file.name}`)
+          // Server failures carry a trace ref: quoting it finds the request in Coroot (Logs/Tracing).
+          const ref = res.status >= 500 ? res.headers.get('x-trace-id') : null
+          setError(`${body?.error || `Failed to upload ${file.name}`}${ref ? ` (ref ${ref})` : ''}`)
           setIsSubmitting(false)
           return
         }
