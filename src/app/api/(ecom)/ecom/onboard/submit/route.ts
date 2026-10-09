@@ -19,6 +19,7 @@ import {
 import { sendKycSubmittedEmail } from '@/lib/shared/ecom-emails'
 import { OnboardSchema } from '@/lib/catalog/onboard-schema'
 import { encryptToken } from '@/lib/crypto/token-cipher'
+import { dedicatedCapacityError } from '@/lib/k8s/capacity'
 import { verifyDelhiveryToken } from '@/lib/shipping/delhivery'
 
 export const dynamic = 'force-dynamic'
@@ -58,6 +59,9 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     )
   }
+
+  const capacityError = await dedicatedCapacityError(d.planSlug)
+  if (capacityError) return NextResponse.json({ error: capacityError, code: 'capacity' }, { status: 409 })
 
   // 1. Create tenant with status='pending_approval' (NOT provisioning yet).
   const result = await createTenant({
