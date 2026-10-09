@@ -18,6 +18,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // One tick at a time: the CronJob client gives up at 50s but the server keeps working, so without
+  // this a slow tick (schema load, rollback's param-group wait) overlaps the next and a step — e.g. a
+  // node launch — can run twice.
+  const lock = await controlPlanePool().connect()
+  try {
+    const got = await lock.query('SELECT pg_try_advisory_lock($1) AS ok', [WORKER_LOCK_KEY])
+    if (!got.rows[0]?.ok) return NextResponse.json({ success: true, skipped: 'previous tick still running' })
+    try {
+      return NextResponse.json(await tick())
+    } finally {
+      await lock.query('SELECT pg_advisory_unlock($1)', [WORKER_LOCK_KEY]).catch(() => {})
+    }
+  } finally {
+    lock.release()
+  }
+}
+
+const WORKER_LOCK_KEY = 0x6a656666 // arbitrary, app-wide
+
+async function tick() {
   const provider = getProvisioningProvider()
   const jobs = await activeProvisioningJobs()
   const results: Array<{ tenantId: string; step: string; status: string }> = []
@@ -37,7 +57,7 @@ export async function GET(request: NextRequest) {
     results.push({ tenantId, step: 'k8s_plan', status: r.ok ? (r.error ?? 'applied') : `error: ${r.error}` })
   }
 
-  return NextResponse.json({ success: true, advanced: results.length, results })
+  return { success: true, advanced: results.length, results }
 }
 
 async function fireOwnerAdmin(tenantId: string): Promise<void> {

@@ -5,7 +5,17 @@ const CONSOLE = 'https://k8s.jeffistores.in'
 
 // Live pods for a tenant running on k3s. Read straight from the API server, so it reflects the
 // cluster even when the provisioning job JSON is stale.
-export default async function K8sWorkloadSection({ slug, plan }: { slug: string; plan: string | null }) {
+export default async function K8sWorkloadSection({
+  slug,
+  plan,
+  pendingPlan,
+  planError,
+}: {
+  slug: string
+  plan: string | null
+  pendingPlan?: string | null
+  planError?: string | null
+}) {
   const tier = computeTierFor(plan)
   const { getTenantWorkloadStatus } = await import('@/lib/k8s/tenant-compute')
   const status = await getTenantWorkloadStatus(slug).catch(() => undefined)
@@ -41,6 +51,19 @@ export default async function K8sWorkloadSection({ slug, plan }: { slug: string;
           }
         />
         <Field wide label="Image" value={status?.image ? <Mono>{status.image.split('/').pop()}</Mono> : '—'} />
+        {(pendingPlan || planError) && (
+          <Field
+            wide
+            label="Plan change"
+            value={
+              <span className={planError ? 'text-red-600 dark:text-red-400' : undefined}>
+                {planError
+                  ? `Not applied${pendingPlan ? ' (retrying)' : ''}: ${planError}`
+                  : `Applying "${pendingPlan}"…`}
+              </span>
+            }
+          />
+        )}
       </FieldGrid>
       {status && status.pods.length > 0 && (
         <div className="mt-4 overflow-x-auto">

@@ -180,6 +180,37 @@ export async function tenantWorkloadReady(slug: string): Promise<boolean> {
   return (d?.status?.readyReplicas ?? 0) > 0
 }
 
+/** Rolled out: every replica is on the current template and ready (pods have left the old node). */
+export async function tenantRolloutComplete(slug: string): Promise<boolean> {
+  const d = await get<any>('Deployment', 'storefront', tenantNamespace(slug))
+  if (!d) return false
+  const want = d.spec?.replicas ?? 1
+  const s = d.status ?? {}
+  return (
+    (s.observedGeneration ?? 0) >= (d.metadata?.generation ?? 0) &&
+    (s.updatedReplicas ?? 0) >= want &&
+    (s.readyReplicas ?? 0) >= want &&
+    (s.replicas ?? 0) === (s.updatedReplicas ?? 0)
+  )
+}
+
+/**
+ * Terminate a tenant's OWN node instance (t-{slug}, or a legacy dedicated box). Anything else — the
+ * core node, a shared pool node — is refused, so a tenant teardown can never take the cluster down.
+ */
+export async function terminateTenantInstance(
+  slug: string,
+  instanceId: string,
+  terminate: (id: string) => Promise<void>
+): Promise<'terminated' | 'gone' | 'refused'> {
+  const { describeInstanceName } = await import('@/lib/shared/ec2-client')
+  const name = await describeInstanceName(instanceId)
+  if (name === null) return 'gone'
+  if (name !== `jeffi-k8s-${dedicatedNodeName(slug)}` && name !== `jeffi-tenant-${slug}`) return 'refused'
+  await terminate(instanceId)
+  return 'terminated'
+}
+
 /** Delete the namespace (everything in it). The caller terminates a dedicated EC2 separately. */
 export async function deleteTenantWorkload(slug: string): Promise<void> {
   await remove('Namespace', tenantNamespace(slug))

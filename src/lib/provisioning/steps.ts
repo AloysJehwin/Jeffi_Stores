@@ -1,5 +1,6 @@
 import type { ProvisioningProvider } from './provider'
 import { appBootUserData } from './user-data'
+import { dedicatedNodeName } from './tiers'
 import {
   getTenant,
   getProvisioningJob,
@@ -118,6 +119,12 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // password" at create_db_instance; unset TENANT_APP_TARGET_IP → dead DNS).
         const missing: string[] = []
         if (!process.env.RDS_MASTER_PASSWORD) missing.push('RDS_MASTER_PASSWORD')
+        // k8s serves every tenant through the cluster ingress; the EC2 target / flagship checks don't apply.
+        if (process.env.PROVISIONING_COMPUTE === 'k8s') {
+          if (!(process.env.CLUSTER_INGRESS_IP || '').trim()) missing.push('CLUSTER_INGRESS_IP')
+          if (missing.length) throw new Error(`preflight: missing required env: ${missing.join(', ')}`)
+          return await next(job.id, 'create_param_group', res)
+        }
         const target = process.env.TENANT_APP_TARGET_IP
         if (!target || !target.trim()) missing.push('TENANT_APP_TARGET_IP')
         if (missing.length) {
@@ -417,6 +424,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         }
         if (res.computeMode === 'k8s') {
           // The shared ingress answers every host (404/503), so an HTTP reply proves nothing here.
+          if (!res.verifyStartedAt) res.verifyStartedAt = Date.now()
           const { tenantWorkloadReady } = await import('@/lib/k8s/tenant-compute')
           served = await tenantWorkloadReady(slug).catch(() => false)
         } else
@@ -432,7 +440,12 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
             served = false
           }
         if (served) return await next(job.id, 'activate', res)
-        if (attempts < MAX_VERIFY_ATTEMPTS) {
+        // k8s: a fresh node's first image pull + startup can outlast 6 one-minute ticks; bound by time.
+        const withinBudget =
+          res.computeMode === 'k8s'
+            ? Date.now() - res.verifyStartedAt < K8S_VERIFY_DEADLINE_MS
+            : attempts < MAX_VERIFY_ATTEMPTS
+        if (withinBudget) {
           // Not serving yet — stay on this step; the worker retries next tick (DNS/TLS lag).
           await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
           return 'pending'
@@ -511,12 +524,13 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
 
 // Retry tuning for the provisioning state machine.
 const MAX_PROVISION_ATTEMPTS = 8
+const K8S_VERIFY_DEADLINE_MS = 12 * 60 * 1000
 const BACKOFF_BASE_MS = 15_000 // 15s, doubling
 const BACKOFF_CAP_MS = 600_000 // capped at 10 min
 
 /** Deterministic errors that won't fix themselves on retry → fail fast (no wasted retries). */
 function isTerminalError(msg: string): boolean {
-  return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|compute blocked|InvalidParameterCombination|missing required env/i.test(
+  return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|compute blocked|InvalidParameterCombination|missing required env|VcpuLimitExceeded|InstanceLimitExceeded|k8s node launch needs/i.test(
     msg
   )
 }
@@ -602,7 +616,7 @@ const STEP_OUTPUTS: Partial<Record<Step, string[]>> = {
   ensure_compute: ['ec2Target', 'ec2InstanceId', 'computeMode'],
   setup_delhivery: ['delhiveryPickup'],
   configure_dns: ['dnsHosts'],
-  verify_serving: ['verifyAttempts'],
+  verify_serving: ['verifyAttempts', 'verifyStartedAt'],
 }
 
 function resourcesFor(step: Step, res: Record<string, any>): Record<string, unknown> {
@@ -635,6 +649,27 @@ async function deleteParamGroupWhenDbGone(
   }
 }
 
+/** k8s compute: recorded by the job, or the engine is in k8s mode (a job can fail before ensure_compute). */
+function onK8sCompute(r: Record<string, any>): boolean {
+  return r.computeMode === 'k8s' || !!r.computeWaitStartedAt || process.env.PROVISIONING_COMPUTE === 'k8s'
+}
+
+/** Terminate a tenant's own instance. On k8s, refuses anything not named for this tenant (returns why). */
+async function terminateOwnInstance(
+  provider: ProvisioningProvider,
+  slug: string,
+  instanceId: string,
+  k8s: boolean
+): Promise<string | null> {
+  if (!k8s) {
+    await provider.deleteAppInstance(instanceId)
+    return null
+  }
+  const { terminateTenantInstance } = await import('@/lib/k8s/tenant-compute')
+  const out = await terminateTenantInstance(slug, instanceId, id => provider.deleteAppInstance(id))
+  return out === 'refused' ? `refused to terminate ${instanceId}: not this tenant's node` : null
+}
+
 /** Rollback a failed job's created resources (avoid leaked billing + leave a safe state). */
 export async function rollbackProvisioning(tenantId: string, provider: ProvisioningProvider): Promise<void> {
   const job = await getProvisioningJob(tenantId)
@@ -642,8 +677,8 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   const r = (job?.created_resources as Record<string, any>) || {}
   // DNS first (cheap, no dependency) — use recorded hosts, else derive from slug.
   // k8s tenants never get per-host records (the *.jeffistores.in wildcard serves them), so skip.
-  const k8sDns = r.computeMode === 'k8s' || !!r.computeWaitStartedAt
-  const hosts = k8sDns
+  const k8s = onK8sCompute(r)
+  const hosts = k8s
     ? []
     : ((r.dnsHosts as string[] | undefined) ?? (tenant ? tenantHostnames(tenant.slug, tenant.plan) : []))
   // Best-effort but LOUD: a swallowed removeDns failure leaves zombie A-records pointing at a
@@ -662,11 +697,14 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   // here, reclaimed by deletePoolIfEmpty on the final deprovision). Prefer the durably-persisted
   // instance id (tenant_infra.ec2_instance_id) over the job JSON, which can be trimmed/lost.
   const rollbackInstanceId = r.ec2InstanceId || tenant?.ec2_instance_id
-  if (r.computeMode === 'k8s' || r.computeWaitStartedAt) {
+  if (k8s && tenant?.slug) {
     const { deleteTenantWorkload } = await import('@/lib/k8s/tenant-compute')
-    if (tenant?.slug) await deleteTenantWorkload(tenant.slug).catch(() => {})
+    await deleteTenantWorkload(tenant.slug).catch(() => {})
   }
-  if (rollbackInstanceId) await provider.deleteAppInstance(rollbackInstanceId).catch(() => {})
+  if (rollbackInstanceId && tenant?.slug) {
+    const refused = await terminateOwnInstance(provider, tenant.slug, rollbackInstanceId, k8s).catch(() => null)
+    if (refused) r.manualCleanup = { ...((r.manualCleanup as Record<string, unknown>) || {}), instance: refused }
+  }
   // Billable resources.
   if (r.bucket) await provider.deleteBucket(r.bucket).catch(() => {})
   if (r.dbInstanceId) await provider.deleteDbInstance(r.dbInstanceId).catch(() => {})
@@ -722,7 +760,7 @@ export async function reprovisionDns(tenantId: string, provider: ProvisioningPro
   const added = desired.filter(h => !prevSet.has(h))
   const removed = prev.filter(h => !desiredSet.has(h))
 
-  if (created.computeMode === 'k8s') return reconcileK8sPlan(tenantId, provider)
+  if (created.computeMode === 'k8s') return reconcileK8sPlan(tenantId, provider, { force: true })
 
   try {
     // COMPUTE MOVE: if the new plan tier crosses the Basic↔dedicated boundary, the tenant's
@@ -840,14 +878,20 @@ export async function deprovisionTenant(
     // 3a. Compute teardown: a dedicated EC2 (higher plans) is terminated; a Basic tenant used
     // the shared pool — reclaim the pool only when this was the LAST active tenant. Prefer the
     // durably-persisted instance id over the job JSON (which can be trimmed/lost).
+    // On k8s the shared pool / core node is never reclaimed or terminated by a tenant teardown, and a
+    // failed namespace delete must not abort a teardown whose DB is already gone (a retry can't re-backup).
     const dedicatedInstanceId = created.ec2InstanceId || tenant.ec2_instance_id
-    const onK8s = created.computeMode === 'k8s'
+    const onK8s = onK8sCompute(created)
+    const computeCleanup: Record<string, unknown> = {}
     if (onK8s) {
       const { deleteTenantWorkload } = await import('@/lib/k8s/tenant-compute')
-      await deleteTenantWorkload(slug)
+      await deleteTenantWorkload(slug).catch((e: any) => {
+        computeCleanup.k8sNamespace = `delete failed: ${e?.message || e}`
+      })
     }
     if (dedicatedInstanceId) {
-      await provider.deleteAppInstance(dedicatedInstanceId).catch(() => {})
+      const refused = await terminateOwnInstance(provider, slug, dedicatedInstanceId, onK8s).catch(() => null)
+      if (refused) computeCleanup.instance = refused
     } else if (!onK8s) {
       const { deletePoolIfEmpty } = await import('@/lib/tenancy/pool-autoscale')
       await deletePoolIfEmpty().catch(() => {})
@@ -856,7 +900,11 @@ export async function deprovisionTenant(
     // 3b. Remove the tenant's DNS records so the subdomains stop resolving. Best-effort but LOUD:
     // a swallowed failure leaves zombie A-records pointing at the just-terminated box (records
     // outliving the instance — a host that "resolves" to a dead IP). Record it + flag the hosts.
-    const dnsHosts = onK8s ? [] : ((created.dnsHosts as string[] | undefined) ?? tenantHostnames(slug, tenant.plan))
+    // A k8s job wrote no per-host records; a legacy tenant's records are still removed.
+    const dnsHosts =
+      created.computeMode === 'k8s'
+        ? []
+        : ((created.dnsHosts as string[] | undefined) ?? tenantHostnames(slug, tenant.plan))
     let dnsRemovalFailed: string[] | null = null
     const dnsResult = dnsHosts.length
       ? await retryTransient(() => provider.removeDns(dnsHosts), isTransientDnsError)
@@ -883,7 +931,7 @@ export async function deprovisionTenant(
     // recorded for an operator to close by hand, rather than silently left behind. The Razorpay
     // id is kept: a second account on the same owner email is refused, so a re-onboarding has
     // to reuse this one.
-    const manualCleanup: Record<string, unknown> = {}
+    const manualCleanup: Record<string, unknown> = { ...computeCleanup }
     if (dnsRemovalFailed) manualCleanup.dnsHosts = dnsRemovalFailed
     try {
       if (tenant.razorpay_linked_account_id) {
@@ -931,6 +979,7 @@ export async function deprovisionTenant(
         status: 'done',
         created_resources: {
           ...created,
+          k8sPendingPlan: undefined,
           deprovisioned: true,
           backupKey,
           ...(routeAccount ? { manualCleanup: routeAccount } : {}),
@@ -954,11 +1003,18 @@ export { STEPS, MAX_CONNECTIONS, dbInstanceId, tenantHostnames }
 
 /**
  * k8s plan change: make sure the new tier's node exists, then re-apply the namespace (resources,
- * replicas, placement, hosts). A dedicated node that is still joining parks the change as
- * k8sPendingPlan; the provisioning worker retries it every tick until it lands. DNS is a wildcard,
- * so no records move. A downgrade off a dedicated node terminates that node after the pods move.
+ * replicas, placement, hosts). A node that is still joining parks the change as k8sPendingPlan; the
+ * worker retries it (backing off) until it lands or K8S_PLAN_DEADLINE_MS passes. Errors are recorded
+ * on the job (k8sPlanError) and alerted; a capacity/quota error is terminal. Until a change lands the
+ * tenant keeps serving from its current namespace. DNS is a wildcard, so no records move. A downgrade
+ * off a dedicated node terminates that node only once the pods have rolled onto the pool.
+ * `force` (a fresh plan change / operator resync) ignores the backoff and restarts the budget.
  */
-export async function reconcileK8sPlan(tenantId: string, provider: ProvisioningProvider): Promise<ReprovisionResult> {
+export async function reconcileK8sPlan(
+  tenantId: string,
+  provider: ProvisioningProvider,
+  opts: { force?: boolean } = {}
+): Promise<ReprovisionResult> {
   const tenant = await getTenant(tenantId)
   if (!tenant) return { ok: false, added: [], removed: [], error: 'tenant not found' }
   const job = await getProvisioningJob(tenantId)
@@ -969,6 +1025,54 @@ export async function reconcileK8sPlan(tenantId: string, provider: ProvisioningP
   const removed = prev.filter(h => !desired.includes(h))
   const save = (extra: Record<string, unknown>) =>
     job ? updateProvisioningJob(job.id, { created_resources: { ...created, ...extra } }) : Promise.resolve()
+  const now = Date.now()
+
+  // A deprovisioned/suspended store must never get a node launched for it.
+  if (tenant.status !== 'active') {
+    if (created.k8sPendingPlan) {
+      delete created.k8sPendingPlan
+      delete created.k8sPlanNextAt
+      await save({})
+    }
+    return { ok: false, added: [], removed: [], error: 'tenant not active' }
+  }
+  if (!opts.force && created.k8sPlanNextAt && now < created.k8sPlanNextAt) {
+    return { ok: true, added, removed, error: 'pending: backing off' }
+  }
+  if (opts.force || created.k8sPendingPlan !== tenant.plan) {
+    created.k8sPendingSince = now
+    created.k8sPlanAttempts = 0
+    delete created.k8sPlanLaunchedInstanceId
+  }
+
+  const fail = async (msg: string, retryable: boolean): Promise<ReprovisionResult> => {
+    const attempts = (created.k8sPlanAttempts || 0) + 1
+    const giveUp = !retryable || attempts >= K8S_PLAN_MAX_ATTEMPTS
+    const isNew = created.k8sPlanError !== msg
+    delete created.k8sPlanNextAt
+    if (giveUp) delete created.k8sPendingPlan
+    else {
+      created.k8sPendingPlan = tenant.plan
+      created.k8sPlanNextAt = now + Math.min(60_000 * 2 ** attempts, 30 * 60_000)
+    }
+    await save({ k8sPlanAttempts: attempts, k8sPlanError: msg, k8sPlanErrorAt: new Date(now).toISOString() }).catch(
+      () => {}
+    )
+    if (giveUp || isNew) {
+      try {
+        const { alertProvisioningFailure } = await import('./alerts')
+        await alertProvisioningFailure(
+          tenant.slug,
+          'k8s_plan_change',
+          `plan "${tenant.plan}" not applied${giveUp ? ' (gave up)' : ''}: ${msg}`,
+          tenantId
+        )
+      } catch {
+        /* alerting must never mask the failure */
+      }
+    }
+    return { ok: false, added, removed, error: msg }
+  }
 
   try {
     const k8s = await import('@/lib/k8s/tenant-compute')
@@ -981,10 +1085,26 @@ export async function reconcileK8sPlan(tenantId: string, provider: ProvisioningP
       async (id, kind) => {
         if (kind === 'dedicated') created.ec2InstanceId = id
         else created.poolInstanceId = id
+        created.k8sPlanLaunchedInstanceId = kind === 'dedicated' ? id : undefined
         await save({})
       }
     )
+    const overdue = now - (created.k8sPendingSince || now) > K8S_PLAN_DEADLINE_MS
     if (!placed.ready) {
+      if (overdue) {
+        // Abandon only the instance this change launched; never a pool node or a pre-existing one.
+        const launched = created.k8sPlanLaunchedInstanceId
+        if (launched && launched === created.ec2InstanceId) {
+          const { remove } = await import('@/lib/k8s/client')
+          await remove('Node', dedicatedNodeName(tenant.slug)).catch(() => {})
+          await terminateOwnInstance(provider, tenant.slug, launched, true).catch(() => null)
+          delete created.ec2InstanceId
+        }
+        delete created.k8sPlanLaunchedInstanceId
+        delete created.poolInstanceId
+        return await fail(`node for plan "${tenant.plan}" did not become Ready within 20 min`, false)
+      }
+      delete created.k8sPlanNextAt
       await save({ k8sPendingPlan: tenant.plan })
       return { ok: true, added, removed, error: 'pending: waiting for node to join' }
     }
@@ -996,21 +1116,41 @@ export async function reconcileK8sPlan(tenantId: string, provider: ProvisioningP
     await k8s.applyTenantWorkload({ slug: tenant.slug, plan: tenant.plan, hosts: desired, customDomains })
 
     if (oldDedicated) {
+      // Keep the dedicated node until every pod has rolled onto the pool, else the store drops.
+      if (!(await k8s.tenantRolloutComplete(tenant.slug))) {
+        if (overdue) return await fail('pods did not move off the dedicated node within 20 min', false)
+        delete created.k8sPlanNextAt
+        await save({ k8sPendingPlan: tenant.plan })
+        return { ok: true, added, removed, error: 'pending: waiting for pods to move to the pool' }
+      }
       const { remove } = await import('@/lib/k8s/client')
-      const { dedicatedNodeName } = await import('./tiers')
       await remove('Node', dedicatedNodeName(tenant.slug))
-      await provider.deleteAppInstance(oldDedicated).catch(() => {})
+      const refused = await terminateOwnInstance(provider, tenant.slug, oldDedicated, true).catch(() => null)
+      if (refused) created.manualCleanup = { ...(created.manualCleanup || {}), instance: refused }
       const { clearTenantEc2Instance } = await import('../tenant-registry/lifecycle')
       await clearTenantEc2Instance(tenantId)
       delete created.ec2InstanceId
     } else if (created.ec2InstanceId) {
       await writeTenantEc2(tenantId, k8s.clusterIngressIp(), created.ec2InstanceId)
     }
-    delete created.k8sPendingPlan
-    delete created.poolInstanceId
+    for (const k of [
+      'k8sPendingPlan',
+      'poolInstanceId',
+      'k8sPlanNextAt',
+      'k8sPlanError',
+      'k8sPlanErrorAt',
+      'k8sPlanAttempts',
+      'k8sPendingSince',
+      'k8sPlanLaunchedInstanceId',
+    ])
+      delete created[k]
     await save({ dnsHosts: desired })
     return { ok: true, added, removed }
   } catch (e: any) {
-    return { ok: false, added, removed, error: e?.message || 'k8s reconcile failed' }
+    const msg = e?.message || 'k8s reconcile failed'
+    return fail(msg, !isTerminalError(msg))
   }
 }
+
+const K8S_PLAN_DEADLINE_MS = 20 * 60 * 1000
+const K8S_PLAN_MAX_ATTEMPTS = 6

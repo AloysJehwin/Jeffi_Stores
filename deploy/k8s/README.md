@@ -28,6 +28,7 @@ Tenant namespaces are **not** in git. The provisioning engine renders them
 5. **Provisioner config** (from step 2):
    `kubectl -n jeffi patch cm provisioning --type merge -p '{"data":{"K8S_SERVER_URL":"https://<core-private-ip>:6443","K8S_NODE_SECURITY_GROUP":"<node-sg>","K8S_NODE_AMI_ID":"<al2023-arm64-ami>"}}'`
 6. **Apply:** `bash deploy/k8s/bootstrap/apply-platform.sh main-<sha>`
+   - Basic tenants schedule on any node labelled `jeffi.io/pool=basic`, capped per node by `jeffi.io/pool-capacity`. To host them on core: `kubectl label node <core> jeffi.io/pool=basic jeffi.io/pool-capacity=<n> --overwrite`. Core must have no NoSchedule taint (tenant pods carry no tolerations).
 7. **Verify before any DNS change**, with `curl --resolve`:
    - `curl --resolve jeffistores.in:443:32.196.38.130 https://jeffistores.in/api/ready`
    - `curl --resolve admin.jeffistores.in:443:32.196.38.130 https://admin.jeffistores.in/` → TLS handshake failure without a cert; works with `--cert certs/client-cert.pem --key certs/client-key.pem`
@@ -36,7 +37,7 @@ Tenant namespaces are **not** in git. The provisioning engine renders them
 8. **Cutover:**
    1. Stop the old in-process cron first: the old box must not double-run jobs. Stop its app containers, or set `IN_PROCESS_CRON=false` in `jeffi/production` and restart.
    2. Switch the CloudFront origin to `ec2-32-196-38-130.compute-1.amazonaws.com`.
-   3. Route53: point `*.jeffistores.in`, `admin`, `business`, `forms`, `quotation`, `invoice`, `purchaseorder`, `certificate`, `ecom`, `vault` and `k8s` at `32.196.38.130`. Delete the dangling per-tenant records (34.228.196.195 / 100.27.185.5).
+   3. Route53: point `*.jeffistores.in`, `*.business.jeffistores.in` (the `business` record stops the outer wildcard from covering Pro/Enterprise `{slug}.business` hosts), `admin`, `business`, `forms`, `quotation`, `invoice`, `purchaseorder`, `certificate`, `ecom`, `vault` and `k8s` at `32.196.38.130`. Delete the dangling per-tenant records (34.228.196.195 / 100.27.185.5).
    4. Watch Coroot for 5xx.
    5. **Stop (do not terminate)** `i-0b2466b2a540d6f23`. Keep it stopped for a week as the rollback path.
 9. **CI:** add the repo secrets `KUBECONFIG_B64`, `TS_OAUTH_CLIENT_ID` and `TS_OAUTH_SECRET` (a tag:ci OAuth client), then set the repo variable `K8S_DEPLOY=true`. That switches `deploy`, schema and migrations to k3s and skips the EC2/SSM jobs.
