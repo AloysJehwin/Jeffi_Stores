@@ -44,6 +44,29 @@ const RDS_SG = process.env.TENANT_RDS_SECURITY_GROUP || 'sg-0e361f0f1b093bd83'
 const RDS_SUBNET_GROUP = process.env.TENANT_RDS_SUBNET_GROUP || 'default'
 const RDS_INSTANCE_CLASS = process.env.TENANT_RDS_CLASS || 'db.t4g.micro'
 const RDS_ENGINE_VERSION = process.env.TENANT_RDS_PG_VERSION || '16'
+
+/** Class/storage combos tried in order when AWS reports no capacity (cheapest first). */
+export function rdsShapes(): Array<{ cls: string; storage: 'gp3' | 'gp2' }> {
+  const extra = (process.env.TENANT_RDS_FALLBACK_CLASSES || 'db.t3.micro,db.t4g.small')
+    .split(',')
+    .map(c => c.trim())
+    .filter(Boolean)
+  const classes = [RDS_INSTANCE_CLASS, ...extra.filter(c => c !== RDS_INSTANCE_CLASS)]
+  return classes.flatMap(cls => [
+    { cls, storage: 'gp3' as const },
+    { cls, storage: 'gp2' as const },
+  ])
+}
+
+export function isInsufficientCapacity(err: unknown): boolean {
+  const e = err as { name?: string; Code?: string; message?: string }
+  return (
+    e?.name === 'InsufficientDBInstanceCapacityFault' ||
+    e?.name === 'InsufficientDBInstanceCapacity' ||
+    e?.Code === 'InsufficientDBInstanceCapacity' ||
+    /sufficient capacity/i.test(e?.message || '')
+  )
+}
 const RDS_MASTER_USER = process.env.TENANT_RDS_MASTER_USER || 'postgres'
 const APP_IAM_USER = process.env.RDS_USER || 'app_user'
 
@@ -95,35 +118,43 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     // Best-effort — a failure here is logged, not fatal: the DB may still be reachable (IP
     // already allowed, or running in-VPC), and createDbInstance must stay retry-safe.
     if (publicTest) await this.openLocalRdsAccess()
-    try {
-      await this.rds.send(
-        new CreateDBInstanceCommand({
-          DBInstanceIdentifier: args.dbInstanceId,
-          DBInstanceClass: RDS_INSTANCE_CLASS,
-          Engine: 'postgres',
-          EngineVersion: RDS_ENGINE_VERSION,
-          AllocatedStorage: 20,
-          MasterUsername: RDS_MASTER_USER,
-          MasterUserPassword: process.env.RDS_MASTER_PASSWORD,
-          DBName: 'jeffi_stores',
-          VpcSecurityGroupIds: [RDS_SG],
-          DBSubnetGroupName: RDS_SUBNET_GROUP,
-          DBParameterGroupName: args.paramGroup,
-          PubliclyAccessible: publicTest,
-          EnableIAMDatabaseAuthentication: true,
-          StorageType: 'gp3',
-          StorageEncrypted: true,
-          BackupRetentionPeriod: 7,
-          Tags: [
-            { Key: 'app', Value: 'jeffi-stores' },
-            { Key: 'kind', Value: 'tenant-db' },
-          ],
-        })
-      )
-    } catch (err) {
-      if (!isAlreadyExists(err)) throw err
+    // AWS sometimes has no capacity for a class/storage combo in any AZ — fall through to the next.
+    let lastErr: unknown
+    for (const { cls, storage } of rdsShapes()) {
+      try {
+        await this.rds.send(
+          new CreateDBInstanceCommand({
+            DBInstanceIdentifier: args.dbInstanceId,
+            DBInstanceClass: cls,
+            Engine: 'postgres',
+            EngineVersion: RDS_ENGINE_VERSION,
+            AllocatedStorage: 20,
+            MasterUsername: RDS_MASTER_USER,
+            MasterUserPassword: process.env.RDS_MASTER_PASSWORD,
+            DBName: 'jeffi_stores',
+            VpcSecurityGroupIds: [RDS_SG],
+            DBSubnetGroupName: RDS_SUBNET_GROUP,
+            DBParameterGroupName: args.paramGroup,
+            PubliclyAccessible: publicTest,
+            EnableIAMDatabaseAuthentication: true,
+            StorageType: storage,
+            StorageEncrypted: true,
+            BackupRetentionPeriod: 7,
+            Tags: [
+              { Key: 'app', Value: 'jeffi-stores' },
+              { Key: 'kind', Value: 'tenant-db' },
+            ],
+          })
+        )
+        return { dbInstanceId: args.dbInstanceId }
+      } catch (err) {
+        if (isAlreadyExists(err)) return { dbInstanceId: args.dbInstanceId }
+        if (!isInsufficientCapacity(err)) throw err
+        console.error(`[provisioning] no RDS capacity for ${cls}/${storage} (${args.dbInstanceId}); trying next shape`)
+        lastErr = err
+      }
     }
-    return { dbInstanceId: args.dbInstanceId }
+    throw lastErr
   }
 
   /**
