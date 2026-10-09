@@ -8,6 +8,7 @@ const hosts = (slug: string) => [
   `admin-${slug}.jeffistores.in`,
   `vault-${slug}.jeffistores.in`,
 ]
+const appDep = (objs: any[]): any => objs.find(o => o.kind === 'Deployment' && o.metadata.name !== 'redis')
 const byKind = (objs: any[], kind: string, name?: string) =>
   objs.filter(o => o.kind === kind && (!name || o.metadata.name === name))
 
@@ -16,7 +17,8 @@ describe('renderTenantWorkload', () => {
     const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme') })
     expect(objs[0]).toMatchObject({ kind: 'Namespace', metadata: { name: 'tenant-acme' } })
     expect(objs.every(o => o.kind === 'Namespace' || o.metadata.namespace === 'tenant-acme')).toBe(true)
-    const app = byKind(objs, 'Deployment', 'storefront')[0] as any
+    const app = appDep(objs) as any
+    expect(app.metadata.name).toBe('acme')
     expect(app.spec.replicas).toBe(1)
     expect(app.spec.template.spec.nodeSelector).toEqual({ 'jeffi.io/pool': 'basic' })
     expect(app.spec.template.spec.automountServiceAccountToken).toBe(false)
@@ -34,7 +36,7 @@ describe('renderTenantWorkload', () => {
       const objs = renderTenantWorkload({ slug: 'acme', plan, hosts: hosts('acme') }) as any[]
       const quota = parseInt(byKind(objs, 'ResourceQuota')[0].spec.hard['limits.memory'])
       const hpa = byKind(objs, 'HorizontalPodAutoscaler')[0]
-      const app = byKind(objs, 'Deployment', 'storefront')[0]
+      const app = appDep(objs)
       const redis = byKind(objs, 'Deployment', 'redis')[0]
       const podMem = parseInt(app.spec.template.spec.containers[0].resources.limits.memory)
       const max = hpa?.spec.maxReplicas ?? app.spec.replicas
@@ -45,7 +47,7 @@ describe('renderTenantWorkload', () => {
 
   it('pro: dedicated node with toleration, HPA and PDB', () => {
     const objs = renderTenantWorkload({ slug: 'big', plan: 'pro', hosts: hosts('big') })
-    const spec = (byKind(objs, 'Deployment', 'storefront')[0] as any).spec.template.spec
+    const spec = (appDep(objs) as any).spec.template.spec
     expect(spec.nodeSelector).toEqual({ 'jeffi.io/tenant': 'big' })
     expect(spec.tolerations[0]).toMatchObject({ key: 'jeffi.io/tenant', value: 'big', effect: 'NoSchedule' })
     expect((byKind(objs, 'HorizontalPodAutoscaler')[0] as any).spec).toMatchObject({ minReplicas: 2, maxReplicas: 3 })
@@ -83,7 +85,7 @@ describe('renderTenantWorkload', () => {
       hosts: hosts('a'),
       image: '708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:main-abc',
     }) as any[]
-    expect(byKind(objs, 'Deployment', 'storefront')[0].spec.template.spec.containers[0].image).toBe(
+    expect(appDep(objs).spec.template.spec.containers[0].image).toBe(
       '708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:main-abc'
     )
   })
@@ -116,7 +118,7 @@ describe('k8s helpers', () => {
 describe('probes', () => {
   it('probe localhost: a tenant host 404s until activation', () => {
     const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme') }) as any[]
-    const c = byKind(objs, 'Deployment', 'storefront')[0].spec.template.spec.containers[0]
+    const c = appDep(objs).spec.template.spec.containers[0]
     for (const p of [c.startupProbe, c.readinessProbe, c.livenessProbe])
       expect(p.httpGet.httpHeaders).toEqual([{ name: 'Host', value: 'localhost' }])
   })
@@ -126,7 +128,7 @@ describe('tracing env', () => {
   it('sends each tenant as its own service to in-cluster Coroot', () => {
     const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme') }) as any[]
     const env = Object.fromEntries(
-      byKind(objs, 'Deployment', 'storefront')[0].spec.template.spec.containers[0].env.map((e: any) => [
+      appDep(objs).spec.template.spec.containers[0].env.map((e: any) => [
         e.name,
         e.value,
       ])
