@@ -176,6 +176,17 @@ export async function describeRunningTenantInstanceIds(): Promise<string[]> {
   return xmlTagAll(xml, 'instanceId')
 }
 
+/** Instance types of every running or pending instance in the account (for vCPU-quota headroom). */
+export async function describeActiveInstanceTypes(): Promise<string[]> {
+  const xml = await ec2({
+    Action: 'DescribeInstances',
+    'Filter.1.Name': 'instance-state-name',
+    'Filter.1.Value.1': 'running',
+    'Filter.1.Value.2': 'pending',
+  })
+  return xmlTagAll(xml, 'instanceType')
+}
+
 /** The instance's Name tag; null when the instance does not exist. */
 export async function describeInstanceName(instanceId: string): Promise<string | null> {
   try {

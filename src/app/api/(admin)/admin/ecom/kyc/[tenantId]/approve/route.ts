@@ -28,6 +28,7 @@ import { sendKycApprovedEmail } from '@/lib/shared/ecom-emails'
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
 import { isPaymentBypassed, bypassAuditNote } from '@/lib/payments/ecom-payment-bypass'
 import { setSubscriptionStatus } from '@/lib/tenant-registry'
+import { dedicatedCapacityError } from '@/lib/k8s/capacity'
 import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'
@@ -45,6 +46,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const owner = await getOwnerById(kyc.owner_id)
   if (!owner) return NextResponse.json({ error: 'Owner not found' }, { status: 404 })
+
+  // Don't start billing a plan we can't build yet.
+  const capacityError = await dedicatedCapacityError(tenant.plan)
+  if (capacityError) {
+    return NextResponse.json(
+      {
+        error: `Cannot approve yet: no EC2 capacity for a dedicated ${tenant.plan} node. Move the store to Basic or raise the vCPU quota.`,
+      },
+      { status: 409 }
+    )
+  }
 
   // Approve KYC — sets tenant status to 'provisioning'
   await approveKyc(tenantId, admin.email ?? 'admin')

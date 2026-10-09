@@ -47,3 +47,5 @@ data:
   PROVISIONING_COMPUTE: k8s
   CLUSTER_INGRESS_IP: 32.196.38.130
   K8S_NODE_IAM_PROFILE: jeffi-stores-ec2-profile
+  # Applied EC2 On-Demand vCPU quota; blocks Growth+ sign-ups/upgrades with no room for a node. Raise when AWS approves.
+  EC2_VCPU_QUOTA: '1'

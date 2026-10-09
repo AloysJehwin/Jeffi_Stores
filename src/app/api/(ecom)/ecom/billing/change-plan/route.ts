@@ -6,6 +6,7 @@ import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import { getOwnerTenants, listPlans, updateTenantPlan } from '@/lib/tenant-registry'
 import { upgradeSubscription, downgradeSubscription, type BillingInterval } from '@/lib/payments/razorpay-subscriptions'
 import { triggerProvisioning } from '@/lib/provisioning/trigger'
+import { dedicatedCapacityError } from '@/lib/k8s/capacity'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest) {
     (newTier === currentTier && billingInterval === 'yearly' && (tenant.billing_interval ?? 'monthly') === 'monthly')
 
   if (isUpgrade) {
+    const capacityError = await dedicatedCapacityError(planSlug)
+    if (capacityError) return NextResponse.json({ error: capacityError, code: 'capacity' }, { status: 409 })
+
     // Cancel old sub + create new sub immediately with prorated credit.
     const result = await upgradeSubscription({
       oldSubscriptionId: tenant.razorpay_subscription_id,
