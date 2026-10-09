@@ -1,7 +1,7 @@
 import { controlPlanePool } from './shared'
 import { clearTenantCache } from './host-resolution'
 import { getTenant } from './tenants'
-import { getDraft } from './kyc'
+import { getDraft, reopenDraft } from './kyc'
 
 /** Set a tenant's status (e.g. provisioning->active) or instance_state (running/stopped). */
 export async function setTenantStatus(tenantId: string, status: string): Promise<void> {
@@ -195,12 +195,15 @@ export async function clearTenantInfra(tenantId: string): Promise<void> {
  *
  * Refuses a tenant that still has live infra — the caller must deprovision first.
  */
+const PURGEABLE_STATUSES = new Set(['terminated', 'deprovisioned', 'suspended'])
+
 export async function purgeTenant(tenantId: string): Promise<{ ok: boolean; error?: string; deletedBackups?: number }> {
   const pool = controlPlanePool()
   const tenant = await getTenant(tenantId)
   if (!tenant) return { ok: false, error: 'Tenant not found' }
-  if (tenant.rds_endpoint || (tenant.status !== 'terminated' && tenant.status !== 'deprovisioned')) {
-    return { ok: false, error: 'Tenant must be deprovisioned before it can be deleted' }
+  // 'suspended' = a provisioning run that rolled back; deletable once no DB is left behind.
+  if (tenant.rds_endpoint || !PURGEABLE_STATUSES.has(tenant.status)) {
+    return { ok: false, error: 'Tenant must be deprovisioned (or rolled back) before it can be deleted' }
   }
 
   const ownerRow = await pool
@@ -229,7 +232,12 @@ export async function purgeTenant(tenantId: string): Promise<{ ok: boolean; erro
     deletedBackups = res.deleted
   }
 
+  const { k8sComputeEnabled, deleteTenantWorkload } = await import('@/lib/k8s/tenant-compute')
+  if (k8sComputeEnabled()) await deleteTenantWorkload(tenant.slug).catch(() => {})
+
   await pool.query(`DELETE FROM tenants WHERE id=$1`, [tenantId])
+  // Keep the owner's onboarding answers and let them submit again.
+  if (ownerId) await reopenDraft(ownerId).catch(() => {})
   clearTenantCache()
   return { ok: true, deletedBackups }
 }

@@ -27,6 +27,11 @@ export async function getDraft(ownerId: string): Promise<OnboardingDraft | null>
   return r.rows[0] ?? null
 }
 
+export async function reopenDraft(ownerId: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(`UPDATE onboarding_drafts SET status='draft', updated_at=now() WHERE owner_id=$1`, [ownerId])
+}
+
 export async function markDraftSubmitted(ownerId: string): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(`UPDATE onboarding_drafts SET status='submitted', updated_at=now() WHERE owner_id=$1`, [ownerId])

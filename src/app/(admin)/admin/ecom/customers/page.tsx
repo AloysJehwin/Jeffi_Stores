@@ -89,7 +89,7 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
                   {new Date(t.created_at).toLocaleDateString('en-IN')}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {(t.status === 'terminated' || t.status === 'deprovisioned') && (
+                  {['terminated', 'deprovisioned', 'suspended'].includes(t.status) && (
                     <PurgeCustomerButton tenantId={t.id} slug={t.slug} />
                   )}
                 </td>
