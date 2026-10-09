@@ -6,7 +6,7 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 
 // Hard-delete a deprovisioned tenant from the customers list: removes every control-plane row and
 // both S3 backup copies. Irreversible. The owner's bank + Razorpay linked account are kept for
-// re-onboarding. Only rendered for deprovisioned/terminated rows.
+// re-onboarding. Only rendered for deprovisioned/terminated/rolled-back rows.
 export default function PurgeCustomerButton({ tenantId, slug }: { tenantId: string; slug: string }) {
   const router = useRouter()
   const confirm = useConfirm()
@@ -21,7 +21,7 @@ export default function PurgeCustomerButton({ tenantId, slug }: { tenantId: stri
           const ok = await confirm({
             title: `Delete "${slug}" permanently?`,
             message:
-              'This erases all control-plane data for this store AND its S3 database backup — there is no restore. The owner’s bank account and Razorpay linked account are kept so they can re-onboard.',
+              'This erases all control-plane data for this store AND its S3 database backup — there is no restore. The owner account, their bank / Razorpay linked account and their onboarding form answers are kept, so they can submit again.',
             variant: 'danger',
             confirmLabel: 'Delete everything',
           })
@@ -48,7 +48,7 @@ export default function PurgeCustomerButton({ tenantId, slug }: { tenantId: stri
         }}
         disabled={busy}
         className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-medium transition-colors"
-        title="Permanently delete this deprovisioned store and its backup"
+        title="Permanently delete this store (deprovisioned or rolled back) and its backup"
       >
         {busy ? 'Deleting…' : 'Delete'}
       </button>

@@ -80,7 +80,7 @@ export default function TenantActions({
         </button>
       )}
 
-      {status === 'provisioning' && !inFlight && (
+      {(status === 'provisioning' || (status === 'suspended' && rolledBack)) && !inFlight && (
         <button
           onClick={() => call(`/api/admin/ecom/customers/${tenantId}/provision`, undefined, 'provision')}
           disabled={busy !== null}
