@@ -34,7 +34,7 @@ export function placement(slug: string, tier: ComputeTier) {
       tolerations: [{ key: 'jeffi.io/tenant', operator: 'Equal', value: slug, effect: 'NoSchedule' }],
     }
   }
-  return { nodeSelector: { 'jeffi.io/role': 'pool-basic' }, tolerations: [] as unknown[] }
+  return { nodeSelector: { 'jeffi.io/pool': 'basic' }, tolerations: [] as unknown[] }
 }
 
 const hostRule = (hosts: string[]) => hosts.map(h => `Host(\`${h}\`)`).join(' || ')

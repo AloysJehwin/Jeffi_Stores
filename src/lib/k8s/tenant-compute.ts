@@ -42,6 +42,14 @@ function nodeLaunchConfig() {
   }
 }
 
+export const POOL_LABEL = { 'jeffi.io/pool': 'basic' }
+const POOL_SELECTOR = 'jeffi.io/pool=basic'
+
+export function poolCapacity(node: any): number {
+  const n = Number(node?.metadata?.labels?.['jeffi.io/pool-capacity'])
+  return Number.isInteger(n) && n >= 0 ? n : POOL_NODE_CAPACITY
+}
+
 const isReady = (node: any) =>
   !!node?.status?.conditions?.some((c: any) => c.type === 'Ready' && c.status === 'True') && !node?.spec?.unschedulable
 
@@ -104,16 +112,19 @@ export async function ensureTenantNode(
     return { ready: false, instanceId: knownInstanceId }
   }
 
-  const nodes = await list('Node', undefined, 'jeffi.io/role=pool-basic')
+  // Any node labelled jeffi.io/pool=basic hosts Basic tenants (incl. core while EC2 quota is tight);
+  // jeffi.io/pool-capacity caps how many.
+  const nodes = await list('Node', undefined, POOL_SELECTOR)
   const basicTenants = (await list('Namespace', undefined, 'jeffi.io/tier=tenant,jeffi.io/plan=basic')).filter(
     (n: any) => n.metadata?.name !== tenantNamespace(slug)
   ).length
-  const readyNodes = nodes.filter(isReady).length
-  if (readyNodes * POOL_NODE_CAPACITY > basicTenants) return { ready: true }
+  const ready = nodes.filter(isReady)
+  if (ready.reduce((sum, n) => sum + poolCapacity(n), 0) > basicTenants) return { ready: true }
   // A pool node is already joining — wait for it rather than launching another.
-  if (nodes.length > readyNodes || knownPoolInstanceId) return { ready: false, poolInstanceId: knownPoolInstanceId }
-  const name = `pool-basic-${nodes.length + 1}`
-  const { instanceId } = await launchNode(name, POOL_NODE_TYPE, { 'jeffi.io/role': 'pool-basic' })
+  if (nodes.length > ready.length || knownPoolInstanceId) return { ready: false, poolInstanceId: knownPoolInstanceId }
+  const poolNodes = nodes.filter((n: any) => n.metadata?.labels?.['jeffi.io/role'] === 'pool-basic').length
+  const name = `pool-basic-${poolNodes + 1}`
+  const { instanceId } = await launchNode(name, POOL_NODE_TYPE, { 'jeffi.io/role': 'pool-basic', ...POOL_LABEL })
   await onLaunched(instanceId, 'pool')
   return { ready: false, poolInstanceId: instanceId }
 }

@@ -18,7 +18,7 @@ describe('renderTenantWorkload', () => {
     expect(objs.every(o => o.kind === 'Namespace' || o.metadata.namespace === 'tenant-acme')).toBe(true)
     const app = byKind(objs, 'Deployment', 'storefront')[0] as any
     expect(app.spec.replicas).toBe(1)
-    expect(app.spec.template.spec.nodeSelector).toEqual({ 'jeffi.io/role': 'pool-basic' })
+    expect(app.spec.template.spec.nodeSelector).toEqual({ 'jeffi.io/pool': 'basic' })
     expect(app.spec.template.spec.automountServiceAccountToken).toBe(false)
     const env = Object.fromEntries(app.spec.template.spec.containers[0].env.map((e: any) => [e.name, e.value]))
     expect(env).toMatchObject({ WEB_CONCURRENCY: '1', IN_PROCESS_CRON: 'false', CLIENT_CERT_PROXY: 'traefik' })
