@@ -3,10 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('server-only', () => ({}))
 const k8s = vi.hoisted(() => ({ list: vi.fn(), get: vi.fn(), apply: vi.fn(), remove: vi.fn() }))
 vi.mock('@/lib/k8s/client', () => k8s)
-const ec2 = vi.hoisted(() => ({ runInstance: vi.fn() }))
+const ec2 = vi.hoisted(() => ({ runInstance: vi.fn(), describeInstanceName: vi.fn() }))
 vi.mock('@/lib/shared/ec2-client', () => ec2)
 
-import { ensureTenantNode, poolCapacity } from '@/lib/k8s/tenant-compute'
+import { ensureTenantNode, poolCapacity, terminateTenantInstance } from '@/lib/k8s/tenant-compute'
 
 const node = (labels: Record<string, string>, ready = true) => ({
   metadata: { labels },
@@ -52,5 +52,30 @@ describe('ensureTenantNode – basic pool', () => {
   it('defaults to the pool node capacity', () => {
     expect(poolCapacity(node({ 'jeffi.io/pool': 'basic' }))).toBe(6)
     expect(poolCapacity(node({ 'jeffi.io/pool-capacity': 'x' }))).toBe(6)
+  })
+})
+
+describe('terminateTenantInstance', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it.each([
+    ['jeffi-k8s-t-acme', 'terminated'],
+    ['jeffi-tenant-acme', 'terminated'],
+    ['jeffi-k8s-core', 'refused'],
+    ['jeffi-k8s-pool-basic-1', 'refused'],
+    ['jeffi-k8s-t-other', 'refused'],
+    ['', 'refused'],
+  ])('%s → %s', async (name, want) => {
+    ec2.describeInstanceName.mockResolvedValue(name)
+    const terminate = vi.fn().mockResolvedValue(undefined)
+    expect(await terminateTenantInstance('acme', 'i-1', terminate)).toBe(want)
+    expect(terminate).toHaveBeenCalledTimes(want === 'terminated' ? 1 : 0)
+  })
+
+  it('an already-gone instance is a no-op', async () => {
+    ec2.describeInstanceName.mockResolvedValue(null)
+    const terminate = vi.fn()
+    expect(await terminateTenantInstance('acme', 'i-1', terminate)).toBe('gone')
+    expect(terminate).not.toHaveBeenCalled()
   })
 })

@@ -50,7 +50,14 @@ export default function InfrastructureTab({
         </Section>
       </div>
 
-      {onK8s && <K8sWorkloadSection slug={t.slug} plan={t.plan} />}
+      {onK8s && (
+        <K8sWorkloadSection
+          slug={t.slug}
+          plan={t.plan}
+          pendingPlan={str(res.k8sPendingPlan)}
+          planError={str(res.k8sPlanError)}
+        />
+      )}
 
       <Section
         title="Schema version"

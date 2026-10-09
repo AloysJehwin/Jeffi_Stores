@@ -58,6 +58,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Verified. In production, trigger ACM cert issuance + CloudFront attach here.
     await setCustomDomainStatus(id, 'verified')
+    // k8s: the domain's Certificate + IngressRoute exist only once the namespace is re-applied.
+    if (tenant.status === 'active') {
+      const { triggerProvisioning } = await import('@/lib/provisioning/trigger')
+      await triggerProvisioning({
+        action: 'reprovision',
+        tenantId: tenant.id,
+        slug: tenant.slug,
+        plan: tenant.plan ?? null,
+        ownerId: owner.id,
+        reason: 'operator',
+      }).catch(() => {})
+    }
     return NextResponse.json({
       ok: true,
       status: 'verified',

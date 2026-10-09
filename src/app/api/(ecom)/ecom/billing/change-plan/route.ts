@@ -75,20 +75,22 @@ export async function POST(request: NextRequest) {
 
     // Re-apply DNS to match the new (higher) tier — adds the tier's extra subdomains.
     // DNS-only; never recreates infra. Non-fatal if it fails (drift sweep would catch it).
-    await triggerProvisioning({
+    const prov = await triggerProvisioning({
       action: 'reprovision',
       tenantId,
       slug: tenant.slug,
       plan: planSlug,
       ownerId: owner.id,
       reason: 'plan_change',
-    }).catch(() => {})
+    }).catch((e: any) => ({ ok: false, error: e?.message || 'reprovision failed' }))
 
     return NextResponse.json({
       status: 'upgrade',
       checkoutUrl: result.shortUrl,
       proratedCreditInr: Math.round(result.proratedCreditPaise / 100),
       effectiveAt: 'now',
+      // The store keeps its current compute until this succeeds (an engine retry or admin resync).
+      provisioning: { ok: prov.ok, error: prov.error ?? null },
     })
   } else {
     // Schedule downgrade at end of current cycle.
@@ -103,19 +105,20 @@ export async function POST(request: NextRequest) {
 
     // Re-apply DNS to match the new (lower) tier — removes the higher-tier subdomains now
     // (D1: immediate, single path for up- and downgrades). DNS-only; never touches infra.
-    await triggerProvisioning({
+    const prov = await triggerProvisioning({
       action: 'reprovision',
       tenantId,
       slug: tenant.slug,
       plan: planSlug,
       ownerId: owner.id,
       reason: 'plan_change',
-    }).catch(() => {})
+    }).catch((e: any) => ({ ok: false, error: e?.message || 'reprovision failed' }))
 
     return NextResponse.json({
       status: 'downgrade_scheduled',
       scheduledAt: result.scheduledAt,
       effectiveAt: 'cycle_end',
+      provisioning: { ok: prov.ok, error: prov.error ?? null },
     })
   }
 }

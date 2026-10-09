@@ -29,6 +29,20 @@ describe('renderTenantWorkload', () => {
     expect(JSON.stringify(app)).not.toContain('platform-ca')
   })
 
+  it('quota leaves room for the rolling-update surge pod + redis', () => {
+    for (const plan of ['basic', 'growth', 'pro', 'enterprise']) {
+      const objs = renderTenantWorkload({ slug: 'acme', plan, hosts: hosts('acme') }) as any[]
+      const quota = parseInt(byKind(objs, 'ResourceQuota')[0].spec.hard['limits.memory'])
+      const hpa = byKind(objs, 'HorizontalPodAutoscaler')[0]
+      const app = byKind(objs, 'Deployment', 'storefront')[0]
+      const redis = byKind(objs, 'Deployment', 'redis')[0]
+      const podMem = parseInt(app.spec.template.spec.containers[0].resources.limits.memory)
+      const max = hpa?.spec.maxReplicas ?? app.spec.replicas
+      const redisMem = parseInt(redis.spec.template.spec.containers[0].resources.limits.memory)
+      expect(quota).toBeGreaterThanOrEqual(podMem * (max + 1) + redisMem)
+    }
+  })
+
   it('pro: dedicated node with toleration, HPA and PDB', () => {
     const objs = renderTenantWorkload({ slug: 'big', plan: 'pro', hosts: hosts('big') })
     const spec = (byKind(objs, 'Deployment', 'storefront')[0] as any).spec.template.spec

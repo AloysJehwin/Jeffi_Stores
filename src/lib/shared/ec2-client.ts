@@ -176,6 +176,18 @@ export async function describeRunningTenantInstanceIds(): Promise<string[]> {
   return xmlTagAll(xml, 'instanceId')
 }
 
+/** The instance's Name tag; null when the instance does not exist. */
+export async function describeInstanceName(instanceId: string): Promise<string | null> {
+  try {
+    const xml = await ec2({ Action: 'DescribeInstances', 'InstanceId.1': instanceId })
+    if (!xmlTag(xml, 'instanceId')) return null
+    return xml.match(/<key>Name<\/key>\s*<value>([^<]*)<\/value>/)?.[1] ?? ''
+  } catch (e) {
+    if (isInstanceNotFound(e)) return null
+    throw e
+  }
+}
+
 /** True once the instance no longer exists or is terminated (teardown ordering). */
 export async function isInstanceGone(instanceId: string): Promise<boolean> {
   try {

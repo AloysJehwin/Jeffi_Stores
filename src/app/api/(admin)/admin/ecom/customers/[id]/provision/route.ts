@@ -19,6 +19,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const tenant = await getTenant(id)
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+  // A fresh job on a live store would re-run load_schema / seed_data / seed_settings against its DB.
+  if (tenant.status === 'active') {
+    return NextResponse.json(
+      { error: 'Tenant is already active — use DNS re-sync for plan/host changes.' },
+      { status: 409 }
+    )
+  }
 
   const restoreFromKey = await resolveRestoreKey(id, tenant.slug)
   const result = await triggerProvisioning({

@@ -69,7 +69,9 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
       spec: {
         hard: {
           pods: String(tier.maxReplicas + 4),
-          'limits.memory': `${Math.ceil((parseInt(tier.limits.memory) * tier.maxReplicas + 512) / 256) * 256}Mi`,
+          // +1 app pod: a rolling update surges one (Basic has maxUnavailable 0, so without room for the
+          // surge pod every rollout stalls). +512Mi covers redis + an HTTP-01 solver pod.
+          'limits.memory': `${Math.ceil((parseInt(tier.limits.memory) * (tier.maxReplicas + 1) + 512) / 256) * 256}Mi`,
         },
       },
     },
