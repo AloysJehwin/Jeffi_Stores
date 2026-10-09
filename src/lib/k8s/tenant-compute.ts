@@ -1,7 +1,7 @@
 import 'server-only'
 import crypto from 'node:crypto'
 import { apply, get, list, remove, type K8sObject } from './client'
-import { renderTenantWorkload, type TenantWorkloadInput } from './tenant-workload'
+import { renderTenantWorkload, tenantAppName, LEGACY_APP_NAME, type TenantWorkloadInput } from './tenant-workload'
 import { agentNodeUserData } from './node-user-data'
 import {
   computeTierFor,
@@ -170,19 +170,41 @@ export async function applyTenantWorkload(input: TenantWorkloadInput): Promise<v
   // Downgrades drop the HPA/PDB the new tier no longer renders.
   const kinds = new Set(rest.map(o => o.kind))
   const ns = tenantNamespace(input.slug)
-  if (!kinds.has('HorizontalPodAutoscaler')) await remove('HorizontalPodAutoscaler', 'storefront', ns)
-  if (!kinds.has('PodDisruptionBudget')) await remove('PodDisruptionBudget', 'storefront', ns)
+  const app = tenantAppName(input.slug)
+  if (!kinds.has('HorizontalPodAutoscaler')) await remove('HorizontalPodAutoscaler', app, ns)
+  if (!kinds.has('PodDisruptionBudget')) await remove('PodDisruptionBudget', app, ns)
+  await retireLegacyApp(input.slug)
 }
 
-/** True once the storefront Deployment has at least one ready replica. */
+/** Drop the pre-rename `storefront` Deployment/HPA/PDB once the slug-named one serves. Idempotent. */
+async function retireLegacyApp(slug: string): Promise<void> {
+  const ns = tenantNamespace(slug)
+  if (tenantAppName(slug) === LEGACY_APP_NAME) return
+  if (!(await get('Deployment', LEGACY_APP_NAME, ns))) return
+  const d = await get<any>('Deployment', tenantAppName(slug), ns)
+  if ((d?.status?.readyReplicas ?? 0) < 1) return
+  for (const kind of ['HorizontalPodAutoscaler', 'PodDisruptionBudget', 'Deployment']) {
+    await remove(kind, LEGACY_APP_NAME, ns)
+  }
+}
+
+/** The store Deployment (slug-named, or the legacy name until migrated). */
+async function appDeployment(slug: string): Promise<any> {
+  const ns = tenantNamespace(slug)
+  return (await get<any>('Deployment', tenantAppName(slug), ns)) ?? (await get<any>('Deployment', LEGACY_APP_NAME, ns))
+}
+
+/** True once the store Deployment has at least one ready replica. */
 export async function tenantWorkloadReady(slug: string): Promise<boolean> {
-  const d = await get<any>('Deployment', 'storefront', tenantNamespace(slug))
-  return (d?.status?.readyReplicas ?? 0) > 0
+  const d = await get<any>('Deployment', tenantAppName(slug), tenantNamespace(slug))
+  const ready = (d?.status?.readyReplicas ?? 0) > 0
+  if (ready) await retireLegacyApp(slug).catch(() => {})
+  return ready
 }
 
 /** Rolled out: every replica is on the current template and ready (pods have left the old node). */
 export async function tenantRolloutComplete(slug: string): Promise<boolean> {
-  const d = await get<any>('Deployment', 'storefront', tenantNamespace(slug))
+  const d = await get<any>('Deployment', tenantAppName(slug), tenantNamespace(slug))
   if (!d) return false
   const want = d.spec?.replicas ?? 1
   const s = d.status ?? {}
@@ -235,7 +257,7 @@ export interface TenantWorkloadStatus {
 /** Live namespace status for the admin infrastructure tab; null when the namespace is absent. */
 export async function getTenantWorkloadStatus(slug: string): Promise<TenantWorkloadStatus | null> {
   const ns = tenantNamespace(slug)
-  const d = await get<any>('Deployment', 'storefront', ns)
+  const d = await appDeployment(slug)
   if (!d) return null
   const pods = await list<any>('Pod', ns, `app=storefront,jeffi.io/tenant=${slug}`)
   return {

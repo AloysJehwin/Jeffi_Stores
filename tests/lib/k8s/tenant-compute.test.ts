@@ -79,3 +79,26 @@ describe('terminateTenantInstance', () => {
     expect(terminate).not.toHaveBeenCalled()
   })
 })
+
+describe('legacy storefront Deployment retirement', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('removes the old storefront objects only once the slug-named Deployment is ready', async () => {
+    const { tenantWorkloadReady } = await import('@/lib/k8s/tenant-compute')
+    const state: Record<string, any> = {
+      'Deployment/acme': { status: { readyReplicas: 0 } },
+      'Deployment/storefront': { status: { readyReplicas: 1 } },
+    }
+    k8s.get.mockImplementation(async (kind: string, name: string) => state[`${kind}/${name}`] ?? null)
+    expect(await tenantWorkloadReady('acme')).toBe(false)
+    expect(k8s.remove).not.toHaveBeenCalled()
+
+    state['Deployment/acme'] = { status: { readyReplicas: 1 } }
+    expect(await tenantWorkloadReady('acme')).toBe(true)
+    expect(k8s.remove.mock.calls.map(c => `${c[0]}/${c[1]}`)).toEqual([
+      'HorizontalPodAutoscaler/storefront',
+      'PodDisruptionBudget/storefront',
+      'Deployment/storefront',
+    ])
+  })
+})

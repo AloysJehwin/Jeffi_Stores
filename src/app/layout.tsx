@@ -20,14 +20,16 @@ export async function generateMetadata() {
   const description = content.metaDescription?.trim()
 
   // A tenant that uploaded a logo should use it as the tab icon; /icon.png is the platform's.
-  const icon = identity.logoUrl?.trim() || '/icon.png'
+  // favicon.ico lives in public/ (not app/) so Next doesn't inject it ahead of the tenant logo.
+  const logo = identity.logoUrl?.trim()
+  const icon = logo || [{ url: '/favicon.ico', sizes: '32x32' }, { url: '/icon.png' }]
 
   return {
     title: tagline ? `${identity.name} - ${tagline}` : identity.name,
     description: description || `Shop online at ${identity.name}.`,
     icons: {
       icon,
-      apple: identity.logoUrl?.trim() || '/apple-icon.png',
+      apple: logo || '/apple-icon.png',
     },
   }
 }

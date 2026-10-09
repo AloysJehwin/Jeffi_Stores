@@ -27,6 +27,11 @@ export interface TenantWorkloadInput {
 
 const labels = (slug: string) => ({ app: 'storefront', 'jeffi.io/tenant': slug })
 
+/** Deployment/HPA/PDB name — the store's slug, so pods read `{slug}-<hash>`. */
+export const tenantAppName = (slug: string) => slug
+/** Pre-rename name, cleaned up once the slug-named Deployment is ready. */
+export const LEGACY_APP_NAME = 'storefront'
+
 export function placement(slug: string, tier: ComputeTier) {
   if (tier.placement === 'dedicated') {
     return {
@@ -119,7 +124,7 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
     {
       apiVersion: 'apps/v1',
       kind: 'Deployment',
-      metadata: { name: 'storefront', namespace: ns, labels: lbl },
+      metadata: { name: tenantAppName(input.slug), namespace: ns, labels: lbl },
       spec: {
         replicas: tier.replicas,
         revisionHistoryLimit: 3,
@@ -214,7 +219,7 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
     objs.push({
       apiVersion: 'policy/v1',
       kind: 'PodDisruptionBudget',
-      metadata: { name: 'storefront', namespace: ns },
+      metadata: { name: tenantAppName(input.slug), namespace: ns },
       spec: { minAvailable: 1, selector: { matchLabels: lbl } },
     })
   }
@@ -222,9 +227,9 @@ export function renderTenantWorkload(input: TenantWorkloadInput): K8sObject[] {
     objs.push({
       apiVersion: 'autoscaling/v2',
       kind: 'HorizontalPodAutoscaler',
-      metadata: { name: 'storefront', namespace: ns },
+      metadata: { name: tenantAppName(input.slug), namespace: ns },
       spec: {
-        scaleTargetRef: { apiVersion: 'apps/v1', kind: 'Deployment', name: 'storefront' },
+        scaleTargetRef: { apiVersion: 'apps/v1', kind: 'Deployment', name: tenantAppName(input.slug) },
         minReplicas: tier.replicas,
         maxReplicas: tier.maxReplicas,
         metrics: [
