@@ -34,6 +34,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'src/app/(admin)/admin/ecom/billing/[id]/DnsResyncButton.tsx',
   'src/app/(admin)/admin/ecom/billing/[id]/ReconcileButton.tsx',
   'src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
+  'src/components/admin/ecom/tabs/BillingReconcile.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
   'src/components/admin/CreateAdminForm.tsx',
   'src/components/admin/AdminUserActions.tsx',

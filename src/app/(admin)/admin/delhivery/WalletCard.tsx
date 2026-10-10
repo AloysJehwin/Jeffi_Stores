@@ -128,6 +128,12 @@ export default function WalletCard() {
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-muted">
             Using platform token
           </span>
+          <a
+            href="/admin/wallet"
+            className="ml-auto text-sm font-medium text-accent-600 dark:text-accent-400 hover:underline"
+          >
+            Manage wallet →
+          </a>
         </div>
         <p className="text-sm text-foreground-secondary">
           You ship on the platform&apos;s Delhivery account. Each shipment (and return pickup) holds an estimate from

@@ -111,3 +111,47 @@ describe('correctWalletDebitForAwb — post-pickup reprice', () => {
     expect(res).toEqual({ ok: true, outcome: 'exempt', delta: 0 })
   })
 })
+
+describe('debitWallet — generic categorised debit (campaigns/AI)', () => {
+  it('debits, is idempotent on externalRef, and blocks on insufficient balance', async () => {
+    // first call: not a duplicate, balance 1000 covers 200 + floor 500
+    client.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // lockWallet: ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '1000', min_balance: '0' }] }) // lockWallet SELECT
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // dup check — none
+      .mockResolvedValueOnce({ rows: [] }) // ledger insert
+      .mockResolvedValueOnce({ rows: [{ balance: '800' }] }) // moveBalance
+      .mockResolvedValueOnce({ rows: [] }) // COMMIT
+    const { debitWallet } = await import('@/lib/payments/wallet')
+    const r1 = await debitWallet({ tenantId: 't1', amountInr: 200, category: 'campaign', externalRef: 'c1', note: 'Campaign' })
+    expect(r1).toEqual({ ok: true, charged: true, balance: 800 })
+
+    // second call with same externalRef: dup found -> no charge, no balance move
+    client.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '800', min_balance: '0' }] }) // lockWallet
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }], rowCount: 1 }) // dup check — hit
+      .mockResolvedValueOnce({ rows: [] }) // COMMIT
+    const r2 = await debitWallet({ tenantId: 't1', amountInr: 200, category: 'campaign', externalRef: 'c1', note: 'Campaign' })
+    expect(r2).toEqual({ ok: true, charged: false, balance: 800 })
+
+    // third call would drop below floor -> blocked
+    client.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '600', min_balance: '500' }] }) // lockWallet, floor 500
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // dup check — none
+      .mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+    const { debitWallet: dw } = await import('@/lib/payments/wallet')
+    const r3 = await dw({ tenantId: 't1', amountInr: 200, category: 'ai', externalRef: 'a1', note: 'AI' })
+    expect(r3.ok).toBe(false)
+  })
+
+  it('exempts the flagship', async () => {
+    const { debitWallet, FLAGSHIP_TENANT_ID } = await import('@/lib/payments/wallet')
+    const r = await debitWallet({ tenantId: FLAGSHIP_TENANT_ID, amountInr: 200, category: 'ai', externalRef: 'x', note: 'n' })
+    expect(r).toEqual({ ok: true, charged: false, balance: 0 })
+  })
+})
