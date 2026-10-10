@@ -1042,23 +1042,6 @@ ALTER TABLE ONLY public.quotations
 
 
 
---
--- Name: replication_runs replication_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.replication_runs
-    ADD CONSTRAINT replication_runs_pkey PRIMARY KEY (id);
-
-
-
---
--- Name: replication_runs replication_runs_run_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.replication_runs
-    ADD CONSTRAINT replication_runs_run_id_key UNIQUE (run_id);
-
-
 
 --
 -- Name: return_requests return_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -

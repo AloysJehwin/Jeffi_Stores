@@ -204,25 +204,6 @@ CREATE TABLE public.price_inflation_log (
 
 
 --
--- Name: replication_runs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.replication_runs (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    run_id text NOT NULL,
-    source text DEFAULT 'razer'::text NOT NULL,
-    status text NOT NULL,
-    started_at timestamp with time zone,
-    duration_seconds integer,
-    row_count bigint,
-    dump_bytes bigint,
-    message text,
-    recorded_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT replication_runs_status_check CHECK ((status = ANY (ARRAY['ok'::text, 'failed'::text, 'partial'::text, 'started'::text])))
-);
-
-
---
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 

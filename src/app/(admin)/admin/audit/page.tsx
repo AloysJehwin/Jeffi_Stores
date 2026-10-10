@@ -22,7 +22,5 @@ export default async function AdminAuditPage() {
     return <AccessDenied scopeKey="audit" scopeLabel="Audit Log" />
   }
 
-  const canViewReplication = hasScope(role, scopes, 'replication:read')
-
-  return <AdminAuditClient canViewReplication={canViewReplication} />
+  return <AdminAuditClient />
 }
