@@ -23,10 +23,15 @@ if (!jobId || !method || !path || !process.env.CRON_SECRET) {
 
 // A new pod joins the k3s network-policy allow-list a moment after it starts, so the first
 // connection can be dropped; retry connection errors (not HTTP errors) briefly.
+// The fan-out endpoint reads the jobId from the POST body (one CronJob drives all tenants for a job).
+const isFanout = path === '/api/cron/fanout'
+const callHeaders = isFanout ? { ...headers, 'Content-Type': 'application/json' } : headers
+const callBody = isFanout ? JSON.stringify({ jobId }) : undefined
+
 async function call() {
   for (let attempt = 1; ; attempt++) {
     try {
-      return await fetch(`${base}${path}`, { method, headers, signal: AbortSignal.timeout(timeoutMs) })
+      return await fetch(`${base}${path}`, { method, headers: callHeaders, body: callBody, signal: AbortSignal.timeout(timeoutMs) })
     } catch (err) {
       if (attempt >= 5 || err?.name === 'TimeoutError') throw err
       await new Promise(r => setTimeout(r, attempt * 1000))

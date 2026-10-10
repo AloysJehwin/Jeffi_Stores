@@ -28,7 +28,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs delhivery_sync POST /api/admin/delhivery/sync-statuses']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs delhivery_sync POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
@@ -65,7 +65,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs cancel_stale_orders GET /api/cron/cancel-stale-orders']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs cancel_stale_orders POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
@@ -102,7 +102,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs sweep_auto_tasks GET /api/cron/sweep-auto-tasks']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs sweep_auto_tasks POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
@@ -139,7 +139,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs dispatch_mailer GET /api/cron/dispatch-mailer']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs dispatch_mailer POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
@@ -176,7 +176,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs run_campaigns GET /api/cron/run-campaigns']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs run_campaigns POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
@@ -213,7 +213,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs compute_health GET /api/cron/compute-health']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs compute_health POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
@@ -250,7 +250,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs daily_briefing GET /api/cron/daily-briefing']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs daily_briefing POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
@@ -398,7 +398,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs publish_social_posts GET /api/cron/publish-social-posts']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs publish_social_posts POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
@@ -435,7 +435,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs customer_notes_digest GET /api/cron/customer-notes-digest']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs customer_notes_digest POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
@@ -472,7 +472,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs loyalty_reconcile GET /api/cron/loyalty-reconcile']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs loyalty_reconcile POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
@@ -509,7 +509,7 @@ spec:
             - name: run
               image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
-              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs sweep_idle_sessions GET /api/cron/sweep-sessions']
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs sweep_idle_sessions POST /api/cron/fanout']
               env:
                 - name: CRON_SECRET
                   valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }

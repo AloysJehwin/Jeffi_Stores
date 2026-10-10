@@ -75,7 +75,16 @@ describe('generated k8s CronJobs', () => {
   it('match the CRON_JOBS registry (run: npx jiti deploy/k8s/gen-cronjobs.ts)', async () => {
     const { readFileSync } = await import('node:fs')
     const { renderCronJobs, CRONJOBS_PATH } = await import('../../../deploy/k8s/gen-cronjobs')
-    expect(readFileSync(CRONJOBS_PATH, 'utf8')).toBe(renderCronJobs())
-    for (const job of CRON_JOBS) expect(renderCronJobs()).toContain(`deploy/k8s-cron.mjs ${job.id} ${job.method}`)
+    const rendered = renderCronJobs()
+    expect(readFileSync(CRONJOBS_PATH, 'utf8')).toBe(rendered)
+    // Tenant-scoped jobs run through the per-tenant fan-out (POST /api/cron/fanout); platform-only
+    // jobs call their own route directly.
+    for (const job of CRON_JOBS) {
+      const expected =
+        job.tenantScope !== null
+          ? `deploy/k8s-cron.mjs ${job.id} POST /api/cron/fanout`
+          : `deploy/k8s-cron.mjs ${job.id} ${job.method} ${job.path}`
+      expect(rendered).toContain(expected)
+    }
   })
 })
