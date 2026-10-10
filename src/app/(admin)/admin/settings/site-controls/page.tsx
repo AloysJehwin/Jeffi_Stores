@@ -4,6 +4,7 @@ import { queryOne, queryMany, query } from '@/lib/shared/db'
 import { getSiteControls, SITE_CONTROLS_DEFAULTS, invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
 import { getDeliverySettings } from '@/lib/shipping/delivery-settings'
 import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
+import { hasPlanScope } from '@/lib/auth/plan-gate'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import {
@@ -106,6 +107,11 @@ export default async function SiteControlsPage() {
   const delivery = await getDeliverySettings()
   const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
   const hasInventory = hasScope(admin.role, admin.scopes || [], 'inventory:read')
+  // Customer reward programs (loyalty / refer & earn / birthday) ship on the campaigns scope — Pro+
+  // only. Gate on the PLAN, not the admin's role scopes: a tenant super_admin's stored scopes are a
+  // full set, so hasScope alone would never lock them. hasPlanScope folds in getTenantPlan (and
+  // returns true for the flagship, which has no plan limit).
+  const hasCustomerPrograms = await hasPlanScope(admin.role, admin.scopes || [], 'campaigns:read')
 
   let customShortcuts: CustomShortcut[] = []
   try {
@@ -294,7 +300,9 @@ export default async function SiteControlsPage() {
                 settingKey="loyalty_enabled"
                 label="Loyalty"
                 hint="Customers earn points on delivered online orders, climb tiers and redeem points for coupons from a Rewards page. The first time it's switched on, past orders are counted without emailing anyone and tier-upgrade emails are switched on. Settings are under Marketing > Customer Programs."
-                initial={loyalty.enabled}
+                initial={hasCustomerPrograms ? loyalty.enabled : false}
+                locked={!hasCustomerPrograms}
+                lockedHint="Requires the Pro plan — customer reward programs are not included in Basic or Growth."
                 refreshOnSave
               />
             </FullSpan>
@@ -303,9 +311,13 @@ export default async function SiteControlsPage() {
                 settingKey="referral_enabled"
                 label="Refer & Earn"
                 hint="Customers get a personal link and earn loyalty points when a friend's first order is delivered. Reward size and yearly limit are under Marketing > Customer Programs."
-                initial={referral.enabled}
-                locked={!loyalty.enabled && !referral.enabled}
-                lockedHint="Turn on Loyalty first. Referral rewards are paid in loyalty points."
+                initial={hasCustomerPrograms ? referral.enabled : false}
+                locked={!hasCustomerPrograms || (!loyalty.enabled && !referral.enabled)}
+                lockedHint={
+                  !hasCustomerPrograms
+                    ? 'Requires the Pro plan — customer reward programs are not included in Basic or Growth.'
+                    : 'Turn on Loyalty first. Referral rewards are paid in loyalty points.'
+                }
               />
             </FullSpan>
             <FullSpan>
@@ -313,7 +325,9 @@ export default async function SiteControlsPage() {
                 settingKey="feature_birthday_enabled"
                 label="Birthday rewards"
                 hint="Shows the 'add your birthday' prompt and the birthday link page, and lets the Birthday and Birthday Collection campaigns run. Each campaign is still switched on in Marketing > Campaigns; coverage is under Marketing > Customer Programs."
-                initial={c.flags.birthdayEnabled}
+                initial={hasCustomerPrograms ? c.flags.birthdayEnabled : false}
+                locked={!hasCustomerPrograms}
+                lockedHint="Requires the Pro plan — customer reward programs are not included in Basic or Growth."
               />
             </FullSpan>
           </SectionCard>

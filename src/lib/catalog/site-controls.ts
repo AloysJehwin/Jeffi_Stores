@@ -508,11 +508,12 @@ export async function getSiteControls(): Promise<SiteControls> {
       result.flags.codEnabled = false
     }
 
-    // Stock validation is a Growth+ feature. On a tenant whose plan lacks inventory:read the
-    // site-controls UI locks the toggle off, but the stored/default flag is otherwise true — so
-    // force it off here at the source, matching the UI, so no consumer (order create, processing
-    // transition, invoices, quotations, returns) enforces stock the tenant cannot manage.
-    if (result.flags.inventoryValidationEnabled) {
+    // Plan-gated feature flags: the site-controls UI locks these toggles off when the plan lacks the
+    // scope, but the stored/default flag is otherwise true — so force them off here at the source,
+    // matching the UI, so no consumer enforces a feature the tenant's plan does not include.
+    //   • Stock validation → inventory:read (Growth+)
+    //   • Birthday rewards  → campaigns:read (Pro+); loyalty/referral are gated in their own getters.
+    if (result.flags.inventoryValidationEnabled || result.flags.birthdayEnabled) {
       try {
         const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
         const tenantId = await resolveTenantId()
@@ -520,9 +521,10 @@ export async function getSiteControls(): Promise<SiteControls> {
           const { getTenantPlan } = await import('@/lib/auth/plan-gate')
           const { scopes } = await getTenantPlan(tenantId)
           if (!scopes.has('inventory:read')) result.flags.inventoryValidationEnabled = false
+          if (!scopes.has('campaigns:read')) result.flags.birthdayEnabled = false
         }
       } catch {
-        // Control-plane hiccup: leave the stored flag as-is (the UI lock remains the backstop).
+        // Control-plane hiccup: leave the stored flags as-is (the UI lock remains the backstop).
       }
     }
 
