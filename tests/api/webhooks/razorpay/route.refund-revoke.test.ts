@@ -9,10 +9,11 @@ vi.mock('@/lib/shared/db', () => ({
   withTransaction: vi.fn(async (fn: any) => fn({ query: txQuery })),
 }))
 vi.mock('@/lib/orders/entitlements', () => ({ revokeOrderEntitlements: vi.fn().mockResolvedValue(1) }))
-vi.mock('@/lib/payments/razorpay-route', () => ({
-  transferToLinkedAccount: vi.fn(),
-  recordTenantTransaction: vi.fn(),
-  recordRefundSettlement: vi.fn().mockResolvedValue(undefined),
+vi.mock('@/lib/payments/route-settlement', () => ({
+  recordCapturedPayment: vi.fn(),
+  applyTransferState: vi.fn().mockResolvedValue('noop'),
+  applySettlementProcessed: vi.fn().mockResolvedValue(0),
+  applyRouteRefund: vi.fn().mockResolvedValue({ status: 'recorded', reversedPaise: 0, unrecoveredPaise: 0 }),
 }))
 vi.mock('@/lib/payments/razorpay', () => ({ getRazorpayInstanceFor: vi.fn().mockRejectedValue(new Error('no keys')) }))
 vi.mock('@/lib/tenant-registry/host-resolution', () => ({
@@ -31,7 +32,7 @@ vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn().mockRes
 import { POST } from '@/app/api/(public)/webhooks/razorpay/route'
 import * as db from '@/lib/shared/db'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
-import { recordRefundSettlement } from '@/lib/payments/razorpay-route'
+import { applyRouteRefund } from '@/lib/payments/route-settlement'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 
 const SECRET = 'whsec'
@@ -58,20 +59,20 @@ describe('Razorpay refund webhook — vault revocation', () => {
     expect(res.status).toBe(200)
     expect(runWithTenantContext).toHaveBeenCalled()
     expect(revokeOrderEntitlements).toHaveBeenCalledWith(expect.anything(), { orderId: 'ord-1', reason: 'refund' })
-    expect(recordRefundSettlement).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 't-1', orderRef: 'JS-1' }))
+    expect(applyRouteRefund).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 't-1', paymentId: 'pay_1', orderRef: 'JS-1' }))
   })
 
   it('does not revoke on a partial refund', async () => {
     await POST(refundEvent({ payment_id: 'pay_1', amount: 10000, notes: { tenant_id: 't-1' } }))
     expect(revokeOrderEntitlements).not.toHaveBeenCalled()
-    expect(recordRefundSettlement).toHaveBeenCalled()
+    expect(applyRouteRefund).toHaveBeenCalled()
   })
 
   it('is a no-op when the app already recorded the refund', async () => {
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
     await POST(refundEvent({ payment_id: 'pay_1', amount: 50000, notes: { tenant_id: 't-1' } }))
     expect(revokeOrderEntitlements).not.toHaveBeenCalled()
-    expect(recordRefundSettlement).not.toHaveBeenCalled()
+    expect(applyRouteRefund).not.toHaveBeenCalled()
   })
 
   it('still returns 200 when the revoke throws', async () => {
@@ -79,6 +80,6 @@ describe('Razorpay refund webhook — vault revocation', () => {
     vi.mocked(db.queryOne).mockResolvedValueOnce({ order_number: 'JS-1' } as any)
     const res = await POST(refundEvent({ payment_id: 'pay_1', amount: 50000, notes: { tenant_id: 't-1' } }))
     expect(res.status).toBe(200)
-    expect(recordRefundSettlement).toHaveBeenCalled()
+    expect(applyRouteRefund).toHaveBeenCalled()
   })
 })
