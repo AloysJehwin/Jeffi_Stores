@@ -22,14 +22,16 @@ provisioner uses), and upserts the `tenants` + `tenant_infra` rows (status `acti
 
 ## One-time env for the tenant admin
 
-The `admin-{slug}` host requires a client cert in prod. For local use, skip that gate — add to
-`.env.local`:
+The `admin-{slug}` host requires a client cert in prod. For local use, skip that gate. Put it in
+`.env.local.overrides` (gitignored) — NOT `.env.local`, which `deploy/load-secrets.mjs` overwrites
+from Secrets Manager on every `predev`. The overrides file is merged on top and survives:
 
 ```
+# .env.local.overrides
 TENANT_MTLS_ENFORCED=false
 ```
 
-Restart `npm run dev` after changing env.
+Restart `npm run dev` after changing it.
 
 ## Open
 
