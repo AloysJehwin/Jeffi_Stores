@@ -23,6 +23,15 @@ export interface StuckJob {
  * plain text, unreadable next to every other mail the system produces.
  */
 async function send(subject: string, body: string): Promise<void> {
+  await sendPlatformAlert(subject, body)
+}
+
+/** Mail the platform admin through the audited mail service (shared by other platform monitors). */
+export async function sendPlatformAlert(
+  subject: string,
+  body: string,
+  opts: { kind?: string; kicker?: string; footer?: string } = {}
+): Promise<void> {
   const { platformAdminEmail, adminMailFrom, platformBrandName } = await import('@/lib/catalog/brand')
   const to = platformAdminEmail()
   if (!to) return
@@ -33,8 +42,8 @@ async function send(subject: string, body: string): Promise<void> {
       from: adminMailFrom(),
       subject,
       text: body,
-      html: alertHtml(subject, body, platformBrandName()),
-      kind: 'provisioning_alert',
+      html: alertHtml(subject, body, platformBrandName(), opts.kicker, opts.footer),
+      kind: opts.kind ?? 'provisioning_alert',
     })
   } catch (e: any) {
     console.error('[provisioning-alert] send failed:', e?.message || e)
@@ -42,14 +51,20 @@ async function send(subject: string, body: string): Promise<void> {
 }
 
 /** Operational alert: monospaced body so step names, ids and errors stay readable. */
-function alertHtml(subject: string, body: string, brand: string): string {
+function alertHtml(
+  subject: string,
+  body: string,
+  brand: string,
+  kicker = 'Provisioning Alert',
+  footer = 'Automated provisioning alert.'
+): string {
   const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   return mailShell({
     brand,
-    kicker: 'Provisioning Alert',
+    kicker,
     title: subject,
     content: `<div class="danger"><pre class="alert-body mono">${esc(body)}</pre></div>`,
-    footerLines: ['Automated provisioning alert.'],
+    footerLines: [footer],
     extraCss: `
   .alert-body { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.55; }
 `,
