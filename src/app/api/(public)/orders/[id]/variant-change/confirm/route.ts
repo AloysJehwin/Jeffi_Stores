@@ -3,8 +3,7 @@ import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { queryOne, query, resolveRequestTenant } from '@/lib/shared/db'
 import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/payments/razorpay'
 import { applyVariantChange } from '@/lib/orders/variant-change'
-import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/payments/razorpay-route'
-import { controlPlanePool } from '@/lib/tenant-registry'
+import { applyRouteRefund } from '@/lib/payments/route-settlement'
 import { logActivity } from '@/lib/shared/activity'
 
 export const dynamic = 'force-dynamic'
@@ -58,38 +57,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         return NextResponse.json({ error: 'No Razorpay payment found to refund against.' }, { status: 400 })
 
       const diffPaise = Math.round(Math.abs(priceDiff) * 100)
-      // Tenant-aware: an own_razorpay tenant collected on THEIR keys, so refunding from platform
-      // keys fails outright.
+      // Tenant-aware: getRazorpayInstanceFor refunds from the account that collected (own keys, else
+      // platform). applyRouteRefund decides own-vs-platform ledger effects and claws back the tenant's
+      // share of the diff. This usually runs BEFORE dispatch, so the transfer is still on_hold and the
+      // reversal is the cleanest of the three refund paths.
       const tenant = await resolveRequestTenant()
-      const ownRazorpay = tenant?.tenantId
-        ? await controlPlanePool()
-            .query(`SELECT own_razorpay FROM tenants WHERE id=$1`, [tenant.tenantId])
-            .then(r => r.rows[0]?.own_razorpay === true)
-            .catch(() => false)
-        : false
       const { instance: razorpay } = await getRazorpayInstanceFor(tenant?.tenantId)
       const refund = await razorpay.payments.refund(payment.transaction_id, { amount: diffPaise })
 
-      // Claw back the tenant's share of the diff. This usually runs BEFORE dispatch, so the
-      // transfer is still on_hold and the reversal is the cleanest of the three refund paths.
-      if (!ownRazorpay) {
-        const outcome = await reverseTransfersForRefund(payment.transaction_id, diffPaise)
-        if (outcome.unrecoveredPaise > 0) {
-          console.error(
-            `[variant-change] transfer reversal INCOMPLETE order=${orderId} payment=${payment.transaction_id} ` +
-              `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`
-          )
-        }
-        if (tenant?.tenantId && (outcome.reversedPaise > 0 || outcome.unrecoveredPaise > 0)) {
-          await recordRefundSettlement({
-            tenantId: tenant.tenantId,
-            orderRef: vcr.order_number,
-            refundedInr: Math.abs(priceDiff),
-            reversedInr: outcome.reversedPaise / 100,
-            unrecoveredInr: outcome.unrecoveredPaise / 100,
-            note: 'variant change',
-          })
-        }
+      const outcome = await applyRouteRefund({
+        tenantId: tenant?.tenantId,
+        paymentId: payment.transaction_id,
+        refundId: refund.id,
+        refundPaise: diffPaise,
+        orderRef: vcr.order_number,
+      })
+      if (outcome.unrecoveredPaise > 0) {
+        console.error(
+          `[variant-change] transfer reversal INCOMPLETE order=${orderId} payment=${payment.transaction_id} ` +
+            `unrecoveredPaise=${outcome.unrecoveredPaise}`
+        )
       }
 
       const existing =

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { getTenant } from '@/lib/tenant-registry'
-import { reconcileCapturedTransactions } from '@/lib/payments/razorpay-route'
+import { reconcileCapturedTransactions } from '@/lib/payments/route-settlement'
 
 export const dynamic = 'force-dynamic'
 

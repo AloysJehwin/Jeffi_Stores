@@ -4,8 +4,7 @@ import { requireAdminScope } from '@/lib/auth/jwt'
 import { sendReturnStatusEmail, sendPaymentStatusUpdate } from '@/lib/email'
 import { logStockMovement } from '@/lib/orders/inventory'
 import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/payments/razorpay'
-import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/payments/razorpay-route'
-import { controlPlanePool } from '@/lib/tenant-registry'
+import { applyRouteRefund } from '@/lib/payments/route-settlement'
 import { restoreOrderStock } from '@/lib/orders/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
 import { logActivity } from '@/lib/shared/activity'
@@ -247,15 +246,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
           if (refundable.length > 0) {
             try {
-              // Tenant-aware: an own_razorpay tenant collected on THEIR keys, so refunding from
-              // platform keys fails outright.
+              // Tenant-aware: getRazorpayInstanceFor refunds from the account that collected (an
+              // own_razorpay tenant's keys, else platform). applyRouteRefund decides own-vs-platform
+              // ledger effects itself and claws back the tenant's share proportionally.
               const tenant = await resolveRequestTenant()
-              const ownRazorpay = tenant?.tenantId
-                ? await controlPlanePool()
-                    .query(`SELECT own_razorpay FROM tenants WHERE id=$1`, [tenant.tenantId])
-                    .then(r => r.rows[0]?.own_razorpay === true)
-                    .catch(() => false)
-                : false
               const { instance: razorpay } = await getRazorpayInstanceFor(tenant?.tenantId)
 
               // Cap the spread at what was actually captured, so we never ask Razorpay to refund
@@ -263,8 +257,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               const capturedTotal = refundable.reduce((s: number, p: any) => s + (parseFloat(p.amount) || 0), 0)
               let remaining = Math.min(netRefundAmount, capturedTotal)
               const perPayment: { record: any; refund: any }[] = []
-              let reversedInr = 0
-              let unrecoveredInr = 0
 
               for (const paymentRecord of refundable) {
                 if (remaining <= 0) break
@@ -280,30 +272,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
                 // Claw back the tenant's share of this PARTIAL return. Without this the buyer was
                 // refunded from platform funds while the tenant kept 100% of their share.
-                if (!ownRazorpay) {
-                  const outcome = await reverseTransfersForRefund(paymentRecord.transaction_id, amountInPaise)
-                  reversedInr += outcome.reversedPaise / 100
-                  unrecoveredInr += outcome.unrecoveredPaise / 100
-                  if (outcome.unrecoveredPaise > 0) {
-                    console.error(
-                      `[return-review] transfer reversal INCOMPLETE order=${orderId} payment=${paymentRecord.transaction_id} ` +
-                        `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`
-                    )
-                  }
+                const outcome = await applyRouteRefund({
+                  tenantId: tenant?.tenantId,
+                  paymentId: paymentRecord.transaction_id,
+                  refundId: refund.id,
+                  refundPaise: amountInPaise,
+                  orderRef: order.order_number,
+                })
+                if (outcome.unrecoveredPaise > 0) {
+                  console.error(
+                    `[return-review] transfer reversal INCOMPLETE order=${orderId} payment=${paymentRecord.transaction_id} ` +
+                      `unrecoveredPaise=${outcome.unrecoveredPaise}`
+                  )
                 }
               }
-
-              if (!ownRazorpay && tenant?.tenantId && (reversedInr > 0 || unrecoveredInr > 0)) {
-                await recordRefundSettlement({
-                  tenantId: tenant.tenantId,
-                  orderRef: order.order_number,
-                  refundedInr: netRefundAmount,
-                  reversedInr,
-                  unrecoveredInr,
-                  note: 'return',
-                })
-              }
-
               await withTransaction(async client => {
                 await client.query(
                   `UPDATE orders SET status = 'returned', payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,

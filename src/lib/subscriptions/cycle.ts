@@ -7,8 +7,7 @@ import { grantOrderEntitlements } from '@/lib/orders/entitlements'
 import { afterOrderCommitted } from '@/lib/orders/after-commit'
 import { createDraftInvoice, generateOrderInvoice } from '@/lib/documents/invoice'
 import { notifyAccessGranted } from '@/lib/shared/notify'
-import { transferToLinkedAccount, recordTenantTransaction } from '@/lib/payments/razorpay-route'
-import { controlPlanePool } from '@/lib/tenant-registry'
+import { recordCapturedPayment } from '@/lib/payments/route-settlement'
 import {
   sendSubscriptionStartedEmail,
   sendSubscriptionPaymentFailedEmail,
@@ -348,38 +347,19 @@ export async function fireCycleTransfer(opts: {
   const t = opts.tenant
   if (!t?.tenantId || t.tenantId === NIL_TENANT_ID) return
 
-  if (opts.sub.collecting_account !== 'platform' || !opts.sub.linked_account_id) {
-    await recordTenantTransaction({
-      tenantId: t.tenantId,
-      orderRef: opts.orderRef,
-      grossAmountInr: opts.totalInr,
-      gatewayTxnId: opts.paymentId,
-    })
-    return
-  }
-
-  const row = await controlPlanePool()
-    .query(`SELECT daily_payout FROM tenants WHERE id = $1 AND status = 'active'`, [t.tenantId])
-    .catch(() => null)
-  if (!row?.rows[0]) return
-  const result = await transferToLinkedAccount({
-    paymentId: opts.paymentId,
-    grossAmountPaise: Math.round(opts.totalInr * 100),
-    linkedAccountId: opts.sub.linked_account_id,
-    orderId: opts.orderId,
-    tenantSlug: t.slug,
-    dailyPayout: row.rows[0].daily_payout === true,
-  })
-  await recordTenantTransaction({
+  // Platform-collect cycles with a snapshotted linked account split via Route; everything else
+  // (own-account, or no linked account yet) just records the sale. recordCapturedPayment fires the
+  // transfer and the real split itself using the subscription's snapshotted linked account.
+  const own = opts.sub.collecting_account !== 'platform'
+  await recordCapturedPayment({
     tenantId: t.tenantId,
+    tenantSlug: t.slug,
     orderRef: opts.orderRef,
-    grossAmountInr: opts.totalInr,
-    gatewayTxnId: result.transferId || opts.paymentId,
-    split: {
-      tenantShareInr: result.amount / 100,
-      platformCommissionInr: result.platformCommissionPaise / 100,
-      gatewayFeeInr: (result.gatewayFeePaise + result.transferFeePaise) / 100,
-    },
+    orderId: opts.orderId,
+    paymentId: opts.paymentId,
+    grossInr: opts.totalInr,
+    collectedOn: own ? 'own' : 'platform',
+    linkedAccountId: opts.sub.linked_account_id,
   })
 }
 

@@ -1,6 +1,8 @@
 import { query } from '@/lib/shared/db'
 import { getBusinessValues, invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import { rankOf, type ShipmentStatus } from '@/lib/shipping/shipment-status'
 
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
@@ -341,8 +343,22 @@ export async function setDefaultPickupLocation(
 }
 
 export async function cancelDelhiveryShipment(awbNumber: string, tenantId?: string): Promise<void> {
-  const token = await resolveDelhiveryToken(tenantId)
+  const tid = tenantId ?? (await resolveTenantId().catch(() => null)) ?? undefined
+  const token = await resolveDelhiveryToken(tid)
   if (!token) throw new Error('DELHIVERY_API_KEY not configured')
+
+  // Read before the AWB is cleared: a shipment Delhivery already picked up becomes an RTO, which
+  // Delhivery still bills, so its wallet hold must NOT be released here.
+  let priorStatus: string | null = null
+  try {
+    const r = await query<{ shipment_status: string | null }>(
+      'SELECT shipment_status FROM orders WHERE awb_number = $1 LIMIT 1',
+      [awbNumber]
+    )
+    priorStatus = r?.rows?.[0]?.shipment_status ?? null
+  } catch {
+    /* unknown status → treated as pre-pickup */
+  }
 
   const res = await fetch(DELHIVERY_EDIT_URL, {
     method: 'POST',
@@ -362,12 +378,11 @@ export async function cancelDelhiveryShipment(awbNumber: string, tenantId?: stri
 
   await query('UPDATE orders SET awb_number = NULL WHERE awb_number = $1', [awbNumber])
 
-  // The AWB is cancelled, so release any wallet delivery charge held for it (forward OR reverse).
-  // own_delhivery never had a debit → no-op. Best-effort: never fail the cancel on a wallet issue.
-  if (tenantId) {
+  // Release the wallet hold for a pre-pickup cancel (forward OR reverse AWB). Best-effort.
+  if (tid && rankOf(priorStatus as ShipmentStatus | null) < rankOf('picked_up')) {
     try {
       const { refundEstimateForAwbs } = await import('@/lib/payments/wallet')
-      await refundEstimateForAwbs({ tenantId, awbs: [awbNumber] })
+      await refundEstimateForAwbs({ tenantId: tid, awbs: [awbNumber] })
     } catch {
       /* wallet refund best-effort */
     }
