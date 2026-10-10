@@ -1,6 +1,11 @@
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
+import { verifyToken } from '@/lib/auth/jwt'
+import { hasPlanScope } from '@/lib/auth/plan-gate'
+import { adminCookieName } from '@/lib/auth/admin-cookie'
+import AccessDenied from '@/components/admin/AccessDenied'
 import LoyaltyProgram from './_components/LoyaltyProgram'
 import ReferralProgram from './_components/ReferralProgram'
 import BirthdayProgram from './_components/BirthdayProgram'
@@ -29,6 +34,24 @@ export default async function CustomerProgramsPage({
 }) {
   const params = await searchParams
   const host = await getHost()
+
+  // Customer reward programs ship on the campaigns scope (Pro+). Block direct-URL access on plans
+  // that don't include it — the nav link is already hidden, this is the server-side backstop.
+  const cookieStore = await cookies()
+  const token = cookieStore.get(await adminCookieName())
+  let role = ''
+  let scopes: string[] = []
+  try {
+    if (token) {
+      const payload = await verifyToken(token.value)
+      role = payload?.role || ''
+      scopes = payload?.scopes || []
+    }
+  } catch {}
+  if (!(await hasPlanScope(role, scopes, 'campaigns:read'))) {
+    return <AccessDenied scopeKey="campaigns" scopeLabel="Customer Programs" />
+  }
+
   const tab: TabKey = TABS.find(t => t.key === params.tab)?.key ?? 'loyalty'
   const basePath = ap(PROGRAMS_PATH, host)
   const search = params.search || ''

@@ -53,8 +53,9 @@ export async function getReferralSettings(): Promise<ReferralSettings> {
   }
   const stored = new Map(rows.map(row => [row.key, row.value]))
   const d = REFERRAL_DEFAULTS
+  const { customerProgramsAllowed } = await import('@/lib/loyalty/settings')
   return {
-    enabled: (stored.get(KEY.enabled) ?? '').toLowerCase() === 'true',
+    enabled: (stored.get(KEY.enabled) ?? '').toLowerCase() === 'true' && (await customerProgramsAllowed()),
     rewardPoints: boundedInt(stored.get(KEY.rewardPoints), d.rewardPoints, 1, 100_000),
     yearlyCap: boundedInt(stored.get(KEY.yearlyCap), d.yearlyCap, 1, 1000),
     qualifyDays: boundedInt(stored.get(KEY.qualifyDays), d.qualifyDays, 1, 365),

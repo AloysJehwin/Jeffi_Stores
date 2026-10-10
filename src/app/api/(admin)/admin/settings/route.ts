@@ -114,6 +114,18 @@ async function referralNeedsLoyalty(updates: Array<{ key: string; value: unknown
 }
 const REFERRAL_NEEDS_LOYALTY = 'Turn on the loyalty program first. Referral rewards are paid in loyalty points.'
 
+// Customer reward programs (loyalty / refer & earn / birthday) are a Pro+ feature (campaigns scope),
+// matching the Marketing > Customer Programs page. settings:write alone (which Basic/Growth hold) must
+// not let a tenant switch these on by hitting the API directly — fail closed to the plan.
+const CUSTOMER_PROGRAM_KEYS = new Set(['loyalty_enabled', 'referral_enabled', 'feature_birthday_enabled'])
+const CUSTOMER_PROGRAM_DENIED = 'Customer reward programs require the Pro plan.'
+// Block ENABLING a customer-program flag without the campaigns scope; turning a stale flag off (e.g.
+// after a downgrade) is always allowed.
+function enablesLockedProgram(updates: Array<{ key: string; value: unknown }>, hasCampaigns: boolean): boolean {
+  if (hasCampaigns) return false
+  return updates.some(u => CUSTOMER_PROGRAM_KEYS.has(u.key) && String(u.value) === 'true')
+}
+
 // The first time loyalty is switched on, past delivered orders are counted without emailing anyone,
 // then the tier-upgrade email is switched on so members hear about the upgrades that follow. The
 // silent pass stamps no upgrades, so this can't email anyone about tiers they already had.
@@ -139,6 +151,7 @@ export async function PATCH(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'settings:write'))
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
+    const hasCampaigns = hasScope(admin.role, admin.scopes, 'campaigns:read')
     const body = await request.json()
 
     // Batch mode: { updates: [{ key, value }, ...] }
@@ -146,6 +159,8 @@ export async function PATCH(request: NextRequest) {
       const updates = body.updates as Array<{ key: string; value: unknown }>
       const bad = updates.find(u => !EDITABLE_SET.has(u.key))
       if (bad) return NextResponse.json({ error: `Setting not editable: ${bad.key}` }, { status: 400 })
+      if (enablesLockedProgram(updates, hasCampaigns))
+        return NextResponse.json({ error: CUSTOMER_PROGRAM_DENIED }, { status: 403 })
       if (await referralNeedsLoyalty(updates)) return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
       for (const u of updates) await upsert(u.key, String(u.value))
       invalidateFor(updates.map(u => u.key))
@@ -157,6 +172,9 @@ export async function PATCH(request: NextRequest) {
     const { key, value } = body
     if (!EDITABLE_SET.has(key)) {
       return NextResponse.json({ error: 'Setting not editable via this endpoint' }, { status: 400 })
+    }
+    if (enablesLockedProgram([{ key, value }], hasCampaigns)) {
+      return NextResponse.json({ error: CUSTOMER_PROGRAM_DENIED }, { status: 403 })
     }
     if (await referralNeedsLoyalty([{ key, value }])) {
       return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })

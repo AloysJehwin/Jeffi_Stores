@@ -104,6 +104,18 @@ function parseTiers(raw: string | null | undefined): LoyaltyTier[] {
   }
 }
 
+// Customer reward programs (loyalty / referral / birthday) are a Pro+ feature (campaigns scope). The
+// flagship is never plan-limited (currentTenantPlanGate returns allowed for it). Gating the `enabled`
+// getter makes every runtime consumer fail closed even if a stale flag is left on after a downgrade.
+export async function customerProgramsAllowed(): Promise<boolean> {
+  try {
+    const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
+    return (await currentTenantPlanGate('campaigns:read')).allowed
+  } catch {
+    return false
+  }
+}
+
 export async function getLoyaltySettings(): Promise<LoyaltySettings> {
   let rows: { key: string; value: string | null }[]
   try {
@@ -118,7 +130,7 @@ export async function getLoyaltySettings(): Promise<LoyaltySettings> {
   const countFrom = stored.get(KEY.countFrom) || null
   const d = LOYALTY_DEFAULTS
   return {
-    enabled: (stored.get(KEY.enabled) ?? '').toLowerCase() === 'true',
+    enabled: (stored.get(KEY.enabled) ?? '').toLowerCase() === 'true' && (await customerProgramsAllowed()),
     rupeesPerPoint: boundedNumber(stored.get(KEY.rupeesPerPoint), d.rupeesPerPoint, 1, 100_000, true),
     pointValue: boundedNumber(stored.get(KEY.pointValue), d.pointValue, 0.01, 1000, false),
     creditDelayDays: boundedNumber(stored.get(KEY.creditDelayDays), d.creditDelayDays, 0, 90, true),

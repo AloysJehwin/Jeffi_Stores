@@ -8,19 +8,26 @@ import { recordCronRun } from '@/lib/shared/cron-record'
 
 export const dynamic = 'force-dynamic'
 
-// Resolve a job's route module from its registry path. Groups are literals so the bundler can trace
-// the dynamic imports; only the in-group tail is interpolated.
-//   /api/cron/<x>        -> (internal)/cron/<x>/route
-//   /api/internal/<rest> -> (internal)/internal/<rest>/route
-//   /api/admin/<rest>    -> (admin)/admin/<rest>/route
-async function importJobRoute(path: string): Promise<Record<string, any> | null> {
-  const cron = path.match(/^\/api\/cron\/(.+)$/)
-  if (cron) return import(`@/app/api/(internal)/cron/${cron[1]}/route`)
-  const internal = path.match(/^\/api\/internal\/(.+)$/)
-  if (internal) return import(`@/app/api/(internal)/internal/${internal[1]}/route`)
-  const admin = path.match(/^\/api\/admin\/(.+)$/)
-  if (admin) return import(`@/app/api/(admin)/admin/${admin[1]}/route`)
-  return null
+// Static jobId → route-module import map. Fully literal specifiers so both the webpack prod build and
+// Turbopack dev reliably bundle them (an interpolated import() is flagged by vite:dynamic-import-vars
+// and may not trace). Keep in sync with CRON_JOBS — the test asserts every job id resolves here.
+const JOB_ROUTE_IMPORTS: Record<string, () => Promise<Record<string, any>>> = {
+  delhivery_sync: () => import('@/app/api/(admin)/admin/delhivery/sync-statuses/route'),
+  cancel_stale_orders: () => import('@/app/api/(internal)/cron/cancel-stale-orders/route'),
+  sweep_auto_tasks: () => import('@/app/api/(internal)/cron/sweep-auto-tasks/route'),
+  dispatch_mailer: () => import('@/app/api/(internal)/cron/dispatch-mailer/route'),
+  run_campaigns: () => import('@/app/api/(internal)/cron/run-campaigns/route'),
+  compute_health: () => import('@/app/api/(internal)/cron/compute-health/route'),
+  daily_briefing: () => import('@/app/api/(internal)/cron/daily-briefing/route'),
+  provisioning_worker: () => import('@/app/api/(internal)/internal/provisioning/worker/route'),
+  import_worker: () => import('@/app/api/(internal)/internal/import/worker/route'),
+  provisioning_reconcile: () => import('@/app/api/(internal)/internal/provisioning/reconcile/route'),
+  publish_social_posts: () => import('@/app/api/(internal)/cron/publish-social-posts/route'),
+  customer_notes_digest: () => import('@/app/api/(internal)/cron/customer-notes-digest/route'),
+  loyalty_reconcile: () => import('@/app/api/(internal)/cron/loyalty-reconcile/route'),
+  sweep_idle_sessions: () => import('@/app/api/(internal)/cron/sweep-sessions/route'),
+  embed_sync: () => import('@/app/api/(internal)/cron/embed-sync/route'),
+  ai_health: () => import('@/app/api/(internal)/internal/ai/health/route'),
 }
 
 // Manually run ONE cron job for the CURRENT store, IN-PROCESS under that store's tenant context.
@@ -70,7 +77,9 @@ export async function POST(request: NextRequest) {
       let errorMsg: string | undefined
       let detail: unknown
       try {
-        const mod = await importJobRoute(job.path)
+        const loader = JOB_ROUTE_IMPORTS[jobId]
+        if (!loader) throw new Error(`No route module mapped for ${jobId}`)
+        const mod = await loader()
         const handler = mod?.[job.method]
         if (typeof handler !== 'function') throw new Error(`No ${job.method} handler for ${job.path}`)
         const res: Response = await handler(jobReq)
