@@ -21,30 +21,6 @@ type Wallet = {
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
-type ReconcileRow = { awb: string; billedAmount: number }
-
-// Delhivery's billing export is a plain CSV. Find the AWB column and the final-charge column by
-// header name (the panel labels vary), then pull those two per row. Anything unparseable is dropped.
-function parseBillingCsv(text: string): ReconcileRow[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '')
-  if (lines.length < 2) return []
-  const split = (line: string) => line.split(',').map(c => c.trim().replace(/^"|"$/g, ''))
-  const header = split(lines[0]).map(h => h.toLowerCase())
-  const awbCol = header.findIndex(h => h.includes('waybill') || h.includes('awb'))
-  const amtCol = header.findIndex(
-    h => h.includes('total') || h.includes('charged amount') || h.includes('amount') || h.includes('billed')
-  )
-  if (awbCol < 0 || amtCol < 0) return []
-  const rows: ReconcileRow[] = []
-  for (const line of lines.slice(1)) {
-    const cells = split(line)
-    const awb = (cells[awbCol] || '').trim()
-    const billedAmount = Number((cells[amtCol] || '').replace(/[^0-9.\-]/g, ''))
-    if (awb && Number.isFinite(billedAmount) && billedAmount >= 0) rows.push({ awb, billedAmount })
-  }
-  return rows
-}
-
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise(resolve => {
     if (typeof window !== 'undefined' && (window as any).Razorpay) return resolve(true)
@@ -67,9 +43,6 @@ export default function WalletCard() {
   const [amount, setAmount] = useState('')
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
-  const [period, setPeriod] = useState('')
-  const [reconciling, setReconciling] = useState(false)
-  const [reconcileSummary, setReconcileSummary] = useState<Record<string, number> | null>(null)
 
   const load = () => {
     fetch('/api/admin/financial/wallet/topup')
@@ -147,40 +120,6 @@ export default function WalletCard() {
     }
   }
 
-  const reconcile = async (file: File) => {
-    if (!period.trim()) {
-      setToast({ ok: false, text: 'Enter the billing period (e.g. 2026-08) first.' })
-      return
-    }
-    setReconciling(true)
-    setToast(null)
-    setReconcileSummary(null)
-    try {
-      const rows = parseBillingCsv(await file.text())
-      if (rows.length === 0) {
-        setToast({ ok: false, text: 'No AWB / charge rows found. Check the CSV has waybill and amount columns.' })
-        return
-      }
-      const res = await fetch('/api/admin/delhivery/reconcile-billing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ period: period.trim(), rows }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setToast({ ok: false, text: data.error || 'Reconciliation failed' })
-        return
-      }
-      setReconcileSummary(data.summary || {})
-      setToast({ ok: true, text: `Reconciled ${rows.length} row${rows.length !== 1 ? 's' : ''} for ${data.period}.` })
-      load()
-    } catch {
-      setToast({ ok: false, text: 'Could not read or upload the CSV.' })
-    } finally {
-      setReconciling(false)
-    }
-  }
-
   return (
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default mb-6">
       <div className="px-6 py-5 space-y-4">
@@ -191,9 +130,9 @@ export default function WalletCard() {
           </span>
         </div>
         <p className="text-sm text-foreground-secondary">
-          You ship on the platform&apos;s Delhivery account. Each shipment&apos;s actual Delhivery charge is deducted
-          from this wallet by AWB — even when you offer free delivery to your customer — so your real shipping cost
-          stays visible.
+          You ship on the platform&apos;s Delhivery account. Each shipment (and return pickup) holds an estimate from
+          this wallet when its AWB is created — even when you offer free delivery — and is settled to Delhivery&apos;s
+          real charge (weight, RTO, COD fee) later. A cancel before pickup refunds the hold.
         </p>
 
         <div className="flex flex-wrap items-end gap-6">
@@ -286,56 +225,6 @@ export default function WalletCard() {
           </div>
         )}
 
-        {canWrite && (
-          <div className="rounded-xl border border-border-default bg-surface-secondary/40 p-4 space-y-3">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Reconcile against Delhivery billing</h3>
-              <p className="text-xs text-foreground-secondary mt-0.5">
-                Delhivery re-weighs parcels at the hub, so the deducted estimate can differ from the final bill. Upload
-                the monthly billing CSV to post an adjustment per AWB for the difference. Re-uploading the same period
-                is safe — already-adjusted AWBs are skipped.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                value={period}
-                onChange={e => setPeriod(e.target.value)}
-                type="text"
-                placeholder="Billing period e.g. 2026-08"
-                className="w-48 text-sm rounded-lg border border-border-default bg-surface-elevated px-3 h-control text-foreground"
-              />
-              <label
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer ${
-                  reconciling || !period.trim()
-                    ? 'bg-surface-secondary text-foreground-muted pointer-events-none opacity-50'
-                    : 'bg-accent-600 hover:bg-accent-700 text-white'
-                }`}
-              >
-                {reconciling ? 'Reconciling…' : 'Upload billing CSV'}
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  disabled={reconciling || !period.trim()}
-                  onChange={e => {
-                    const f = e.target.files?.[0]
-                    if (f) reconcile(f)
-                    e.target.value = ''
-                  }}
-                />
-              </label>
-            </div>
-            {reconcileSummary && (
-              <div className="flex flex-wrap gap-3 text-xs text-foreground-secondary">
-                {Object.entries(reconcileSummary).map(([k, v]) => (
-                  <span key={k} className="capitalize">
-                    <span className="font-medium text-foreground">{v}</span> {k}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   )

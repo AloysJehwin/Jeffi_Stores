@@ -6,7 +6,7 @@ import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { listDelhiveryPickupLocations } from '@/lib/shipping/delhivery'
-import { walletBlocksShipment } from '@/lib/payments/wallet'
+import { walletBlocksShipment, chargeDeliveryEstimate } from '@/lib/payments/wallet'
 
 const DELHIVERY_PICKUP_URL = 'https://track.delhivery.com/fm/request/new/'
 
@@ -199,14 +199,26 @@ export async function PATCH(request: NextRequest) {
 
       const awb = (order[0] as any).awb_number as string
 
-      // Delivery is charged at AWB creation, not here — the added order's AWB already paid. Only
-      // gate on the wallet staying above its minimum before adding it to the pickup.
+      // Charged at AWB creation; this only catches an AWB that never got its hold (legacy).
       const addTenantId = (await resolveTenantId()) ?? undefined
-      if (addTenantId && (await walletBlocksShipment(addTenantId).catch(() => false))) {
-        return NextResponse.json(
-          { error: 'Wallet balance is below the minimum. Recharge the wallet before adding to a pickup.' },
-          { status: 402 }
-        )
+      if (addTenantId) {
+        if (await walletBlocksShipment(addTenantId).catch(() => false)) {
+          return NextResponse.json(
+            { error: 'Wallet balance is below the minimum. Recharge the wallet before adding to a pickup.' },
+            { status: 402 }
+          )
+        }
+        const held = await chargeDeliveryEstimate({
+          tenantId: addTenantId,
+          items: [
+            {
+              awb,
+              orderRef: (order[0] as any).order_number,
+              estimateInr: Number((order[0] as any).shipping_amount) || 0,
+            },
+          ],
+        })
+        if (!held.ok) return NextResponse.json({ error: held.error }, { status: 402 })
       }
 
       await query(
@@ -279,13 +291,24 @@ export async function POST(request: NextRequest) {
 
     const awbList = eligible.map((o: any) => o.awb_number as string)
 
-    // Delivery was charged when each AWB was created (create-shipment). At pickup we only CHECK the
-    // wallet is above its minimum — no second deduction. own_delhivery passes through.
-    if (tenantId && (await walletBlocksShipment(tenantId).catch(() => false))) {
-      return NextResponse.json(
-        { error: 'Wallet balance is below the minimum. Recharge the wallet before requesting pickups.' },
-        { status: 402 }
-      )
+    // Charged at AWB creation (no second deduction); AWBs that never got a hold (legacy) are
+    // charged now. own_delhivery / flagship pass through.
+    if (tenantId) {
+      if (await walletBlocksShipment(tenantId).catch(() => false)) {
+        return NextResponse.json(
+          { error: 'Wallet balance is below the minimum. Recharge the wallet before requesting pickups.' },
+          { status: 402 }
+        )
+      }
+      const held = await chargeDeliveryEstimate({
+        tenantId,
+        items: eligible.map((o: any) => ({
+          awb: o.awb_number,
+          orderRef: o.order_number,
+          estimateInr: Number(o.shipping_amount) || 0,
+        })),
+      })
+      if (!held.ok) return NextResponse.json({ error: held.error }, { status: 402 })
     }
 
     const res = await fetch(DELHIVERY_PICKUP_URL, {

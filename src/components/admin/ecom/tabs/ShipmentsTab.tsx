@@ -1,6 +1,7 @@
 import type { ShipmentRow } from '@/lib/orders/tenant-shipments-shared'
 import { Section } from '../EcomUI'
 import ShipmentCorrection from './ShipmentCorrection'
+import BillingReconcile from './BillingReconcile'
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 const num = (v: string | null) => (v == null ? null : Number(v))
@@ -20,7 +21,7 @@ export default function ShipmentsTab({
         <p className="text-xs text-foreground-muted mb-4">
           {ownDelhivery
             ? 'This tenant ships on their own Delhivery account and is billed directly — charges are read-only here.'
-            : 'Platform-Delhivery: the wallet is debited the real charge post-pickup. Correct a charge if Delhivery re-priced it after weight capture.'}
+            : 'Platform-Delhivery: the wallet holds an estimate at AWB creation and is netted to the real invoiced charge at delivery/RTO. Correct a charge if Delhivery re-priced it after weight capture.'}
         </p>
         <div className="overflow-x-auto rounded-lg border border-border-default">
           <table className="w-full text-sm">
@@ -81,6 +82,11 @@ export default function ShipmentsTab({
           </table>
         </div>
       </Section>
+      {!ownDelhivery && (
+        <Section title="Delhivery billing reconciliation">
+          <BillingReconcile tenantId={tenantId} />
+        </Section>
+      )}
     </div>
   )
 }

@@ -3,13 +3,14 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query, queryMany } from '@/lib/shared/db'
 import { round2 } from '@/lib/catalog/gst'
-import { computeShipmentDims, ShipmentItem, PackageType } from '@/lib/shipping/shipping'
+import { computeShipmentDims, fallbackShippingRate, ShipmentItem, PackageType } from '@/lib/shipping/shipping'
 import { sendOrderShippedSMS } from '@/lib/shared/sms'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
-import { listDelhiveryPickupLocations } from '@/lib/shipping/delhivery'
-import { walletBlocksShipment, chargeDeliveryEstimate } from '@/lib/payments/wallet'
+import { listDelhiveryPickupLocations, cancelDelhiveryShipment } from '@/lib/shipping/delhivery'
+import { checkWalletForShipment, chargeDeliveryEstimate } from '@/lib/payments/wallet'
+import { resolveShippingAccount } from '@/lib/shipping/delhivery-account'
 import { applyCourierEdd } from '@/lib/shipping/courier-edd'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
@@ -63,16 +64,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (order.physical_item_count === 0)
       return NextResponse.json({ error: 'This order has only digital items — nothing to ship.' }, { status: 422 })
 
-    // Prepaid-wallet gate: the platform fronts the real Delhivery cost for this tenant, so block
-    // shipment creation when the wallet is below its minimum (own_delhivery tenants are exempt —
-    // Delhivery bills them directly). Best-effort: a control-plane read failure must not wedge ops.
+    // Platform-account tenants pay from the prepaid wallet; own-account tenants and the flagship don't.
     const tenantId = (await resolveTenantId()) ?? undefined
-    if (tenantId && (await walletBlocksShipment(tenantId).catch(() => false))) {
-      return NextResponse.json(
-        { error: 'Wallet balance is below the minimum. Recharge the wallet before creating shipments.' },
-        { status: 402 }
-      )
-    }
+    const account = await resolveShippingAccount(tenantId)
+    if (!account.ok) return NextResponse.json({ error: account.error }, { status: 409 })
 
     const TOKEN = await resolveDelhiveryToken(tenantId)
     if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
@@ -155,6 +150,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     )
 
     const weightKg = Math.max(0.1, Math.round(dims.chargedWeightGrams / 10) / 100)
+
+    // Wallet hold = the quoted shipping, or a rate-card estimate when the customer shipped free.
+    // Checked BEFORE the AWB is minted so an unpaid shipment is never created.
+    let estimateInr = 0
+    if (account.mode === 'platform') {
+      estimateInr =
+        Number(order.shipping_amount) > 0
+          ? Number(order.shipping_amount)
+          : fallbackShippingRate({
+              chargedWeightGrams: dims.chargedWeightGrams,
+              destinationPin: pin,
+              originPin: String(ORIGIN_PIN || pin),
+              cartonCount: 1,
+            }).charge
+      const check = await checkWalletForShipment({ tenantId, estimateInr })
+      if (!check.ok) {
+        return NextResponse.json(
+          { error: check.error, neededInr: check.neededInr, balanceInr: check.balanceInr, floorInr: check.floorInr },
+          { status: 402 }
+        )
+      }
+    }
 
     const shipmentPayload = {
       shipments: [
@@ -256,6 +273,29 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // TAT lookup failed — keep the promised EDD
     }
 
+    // Single deduction point for a forward shipment, keyed to the AWB (idempotent). If a concurrent
+    // charge drained the wallet since the pre-check, cancel the AWB rather than ship unpaid.
+    if (account.mode === 'platform' && tenantId) {
+      const charge = await chargeDeliveryEstimate({
+        tenantId,
+        kind: 'forward',
+        items: [{ awb, orderRef: order.order_number, estimateInr }],
+      })
+      if (!charge.ok) {
+        const cancelled = await cancelDelhiveryShipment(awb, tenantId)
+          .then(() => true)
+          .catch(() => false)
+        return NextResponse.json(
+          {
+            error: cancelled
+              ? charge.error
+              : `${charge.error} AWB ${awb} was created but could not be cancelled automatically — cancel it in Delhivery.`,
+          },
+          { status: 402 }
+        )
+      }
+    }
+
     await query(
       `UPDATE orders SET awb_number = $1, status = 'processing',
         shipment_status = COALESCE(shipment_status, 'created'),
@@ -265,20 +305,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       [awb, id, weightKg]
     )
     await applyCourierEdd(id, estimatedDeliveryDate, 'created').catch(() => {})
-
-    // Charge the estimated delivery cost to the wallet NOW, keyed to this AWB (platform-Delhivery
-    // tenants only; own_delhivery exempt). This is the single deduction point for a forward
-    // shipment — pickup no longer deducts. Reconciled to the real invoiced amount at delivery. The
-    // walletBlocksShipment pre-check above already fast-failed a below-minimum wallet before the AWB
-    // was minted; this enforces the balance-stays->=Rs 500-after rule and records the hold. If it
-    // fails now the AWB still stands (refunded only on cancel), so surface it as a warning.
-    let walletCharge: { ok: boolean; error?: string } = { ok: true }
-    if (tenantId) {
-      walletCharge = await chargeDeliveryEstimate({
-        tenantId,
-        items: [{ awb, orderRef: order.order_number, estimateInr: Number(order.shipping_amount) || 0 }],
-      })
-    }
 
     const smsCustomer = await queryOne<{ phone: string | null; notification_channel: string | null }>(
       `SELECT u.phone, u.notification_channel FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
@@ -298,9 +324,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       sortCode: pkg.sort_code,
       estimatedDeliveryDate,
       message: `Shipment created. AWB: ${awb}`,
-      walletWarning: walletCharge.ok
-        ? undefined
-        : walletCharge.error || 'Delivery charge could not be applied to the wallet.',
+      walletChargedInr: account.mode === 'platform' ? estimateInr : undefined,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })

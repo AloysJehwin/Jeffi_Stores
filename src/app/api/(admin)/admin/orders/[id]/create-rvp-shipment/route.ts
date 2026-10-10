@@ -3,10 +3,12 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
 import { round2 } from '@/lib/catalog/gst'
-import { createRVPShipment, listDelhiveryPickupLocations } from '@/lib/shipping/delhivery'
+import { createRVPShipment, listDelhiveryPickupLocations, cancelDelhiveryShipment } from '@/lib/shipping/delhivery'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
-import { assertWalletCanCreateRvp } from '@/lib/payments/wallet'
+import { checkWalletForShipment, chargeDeliveryEstimate } from '@/lib/payments/wallet'
+import { resolveShippingAccount } from '@/lib/shipping/delhivery-account'
+import { fallbackShippingRate } from '@/lib/shipping/shipping'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,6 +19,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const tenantId = (await resolveTenantId()) ?? undefined
+    const account = await resolveShippingAccount(tenantId)
+    if (!account.ok) return NextResponse.json({ error: account.error }, { status: 409 })
     const TOKEN = await resolveDelhiveryToken(tenantId)
     if (!TOKEN) {
       return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
@@ -73,13 +77,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
     }
 
-    // Platform-Delhivery tenants must hold the minimum wallet balance before an RVP is created —
-    // the reverse leg's charge is debited from the wallet once the admin sets it (rvp-charge).
-    if (tenantId) {
-      const walletErr = await assertWalletCanCreateRvp(tenantId)
-      if (walletErr) return NextResponse.json({ error: walletErr }, { status: 402 })
-    }
-
     const consigneeName = order.full_name || 'Customer'
     const rawPhone = (order.consignee_phone || '9999999999').replace(/\D/g, '')
     const consigneePhone = rawPhone.length === 12 && rawPhone.startsWith('91') ? rawPhone.slice(2) : rawPhone.slice(-10)
@@ -104,6 +101,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const weightKg = Math.max(0.1, Math.round((orderItems?.total_weight || 500) / 10) / 100)
     const quantity = Math.max(1, Math.round(orderItems?.total_qty || 1))
 
+    // Reverse leg is charged a rate-card estimate at AWB creation (netted later by rvp-charge or the
+    // billing CSV). Checked before the AWB exists so an unpaid pickup is never created.
+    let estimateInr = 0
+    if (account.mode === 'platform') {
+      estimateInr = fallbackShippingRate({
+        chargedWeightGrams: weightKg * 1000,
+        originPin: pin,
+        destinationPin: String(returnWarehouse?.pin || pin),
+        cartonCount: 1,
+      }).charge
+      const check = await checkWalletForShipment({ tenantId, estimateInr, what: 'this return pickup' })
+      if (!check.ok) {
+        return NextResponse.json(
+          { error: check.error, neededInr: check.neededInr, balanceInr: check.balanceInr, floorInr: check.floorInr },
+          { status: 402 }
+        )
+      }
+    }
+
     const awb = await createRVPShipment({
       consigneeName,
       address,
@@ -120,6 +136,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       tenantId,
       returnWarehouse,
     })
+
+    if (account.mode === 'platform' && tenantId) {
+      const charge = await chargeDeliveryEstimate({
+        tenantId,
+        kind: 'rvp',
+        items: [{ awb, orderRef: order.order_number, estimateInr }],
+      })
+      if (!charge.ok) {
+        const cancelled = await cancelDelhiveryShipment(awb, tenantId)
+          .then(() => true)
+          .catch(() => false)
+        return NextResponse.json(
+          {
+            error: cancelled
+              ? charge.error
+              : `${charge.error} RVP AWB ${awb} was created but could not be cancelled automatically — cancel it in Delhivery.`,
+          },
+          { status: 402 }
+        )
+      }
+    }
 
     await query(`UPDATE return_requests SET rvp_awb_number = $1, rvp_created_at = NOW() WHERE id = $2`, [
       awb,
