@@ -395,7 +395,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'financial:read',
     label: 'Financial (Read)',
     description: 'View payables, receivables, P&L and financial summaries',
-    routes: ['/admin/financial'],
+    routes: ['/admin/financial', '/admin/wallet'],
     group: 'Finance',
   },
   {

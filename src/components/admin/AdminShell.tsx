@@ -5,6 +5,7 @@ import AdminSidebarNav from './AdminSidebarNav'
 import AdminMobileNav from './AdminMobileNav'
 import AdminAgentTrigger from './AdminAgentTrigger'
 import NotificationBell from './NotificationBell'
+import WalletBadge from './WalletBadge'
 import ScanActionPopup from './ScanActionPopup'
 import ThemeToggle from '@/components/ThemeToggle'
 import AdminSessionController from './AdminSessionController'
@@ -32,6 +33,7 @@ interface Props {
   canUseAgent: boolean
   logoutForm: React.ReactNode
   initialCollapsed: boolean
+  wallet?: { balance: number; minBalance: number } | null
 }
 
 export default function AdminShell({
@@ -47,6 +49,7 @@ export default function AdminShell({
   canUseAgent,
   logoutForm,
   initialCollapsed,
+  wallet,
 }: Props) {
   const [collapsed, setCollapsed] = useState(initialCollapsed)
 
@@ -108,6 +111,7 @@ export default function AdminShell({
             </div>
           </div>
           <NotificationBell />
+          {wallet && <WalletBadge initialBalance={wallet.balance} initialMinBalance={wallet.minBalance} />}
           <ThemeToggle variant="admin" />
           <AdminAgentTrigger canUse={canUseAgent} />
           {logoutForm}

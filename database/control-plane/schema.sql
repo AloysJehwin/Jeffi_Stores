@@ -241,6 +241,12 @@ CREATE TABLE IF NOT EXISTS public.wallet_ledger (
     occurred_at   timestamp with time zone NOT NULL DEFAULT now()
 );
 
+-- What the movement was, for the Wallet page's filters/export, independent of entry_type's money
+-- direction. Nullable: existing rows read as their entry_type. Future paid features (campaign, ai)
+-- debit with their own category via debitWallet().
+ALTER TABLE public.wallet_ledger ADD COLUMN IF NOT EXISTS category character varying(32);
+CREATE INDEX IF NOT EXISTS idx_wallet_ledger_tenant_time ON public.wallet_ledger USING btree (tenant_id, occurred_at DESC);
+
 ALTER TABLE ONLY public.tenant_wallets ADD CONSTRAINT tenant_wallets_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_wallets ADD CONSTRAINT tenant_wallets_tenant_id_key UNIQUE (tenant_id);
 ALTER TABLE ONLY public.wallet_ledger  ADD CONSTRAINT wallet_ledger_pkey PRIMARY KEY (id);

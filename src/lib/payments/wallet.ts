@@ -22,12 +22,25 @@ export function isFlagshipTenant(tenantId: string | null | undefined): boolean {
 
 export interface WalletLedgerEntry {
   entry_type: 'recharge' | 'debit' | 'adjustment'
+  category: string | null
   amount: string
   order_ref: string | null
   awb: string | null
   note: string | null
   occurred_at: string
 }
+
+/** What a wallet movement was (independent of entry_type's +/- direction). */
+export type WalletCategory =
+  | 'shipping_forward'
+  | 'shipping_rvp'
+  | 'shipping_correction'
+  | 'shipping_cancel_credit'
+  | 'recharge'
+  | 'goodwill_credit'
+  | 'campaign'
+  | 'ai'
+  | 'adjustment'
 
 export interface TenantWallet {
   balance: number
@@ -45,7 +58,7 @@ export async function getTenantWallet(tenantId: string, ledgerLimit = 50): Promi
   ])
   const row = w.rows[0]
   const ledger = await pool.query(
-    `SELECT entry_type, amount, order_ref, awb, note, occurred_at
+    `SELECT entry_type, category, amount, order_ref, awb, note, occurred_at
        FROM wallet_ledger WHERE tenant_id = $1
       ORDER BY occurred_at DESC LIMIT $2`,
     [tenantId, ledgerLimit]
@@ -211,8 +224,8 @@ export async function rechargeWallet(opts: {
     return await withWalletTx(opts.tenantId, async client => {
       const { balance } = await lockWallet(client, opts.tenantId)
       const ins = await client.query(
-        `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, external_ref, note)
-         VALUES ($1, 'recharge', $2, $3, $4)
+        `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, external_ref, note)
+         VALUES ($1, 'recharge', 'recharge', $2, $3, $4)
          ON CONFLICT (tenant_id, external_ref) WHERE external_ref IS NOT NULL DO NOTHING`,
         [opts.tenantId, opts.amountInr, opts.externalRef ?? null, opts.note ?? 'Wallet recharge']
       )
@@ -266,10 +279,10 @@ export async function chargeDeliveryEstimate(opts: {
       let charged = 0
       for (const i of toCharge) {
         const ins = await client.query(
-          `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, order_ref, awb, note)
-           VALUES ($1, 'debit', $2, $3, $4, $5)
+          `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, order_ref, awb, note)
+           VALUES ($1, 'debit', $6, $2, $3, $4, $5)
            ON CONFLICT (tenant_id, awb) WHERE awb IS NOT NULL AND entry_type = 'debit' DO NOTHING`,
-          [opts.tenantId, -Math.abs(i.estimateInr), i.orderRef ?? null, i.awb, `${label} — AWB ${i.awb}`]
+          [opts.tenantId, -Math.abs(i.estimateInr), i.orderRef ?? null, i.awb, `${label} — AWB ${i.awb}`, opts.kind === 'rvp' ? 'shipping_rvp' : 'shipping_forward']
         )
         if (ins.rowCount) charged += Math.abs(i.estimateInr)
       }
@@ -302,8 +315,8 @@ export async function refundEstimateForAwbs(opts: {
         if (net >= 0) continue
         const credit = round2(-net)
         await client.query(
-          `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, awb, note)
-           VALUES ($1, 'adjustment', $2, $3, $4)`,
+          `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, awb, note)
+           VALUES ($1, 'adjustment', 'shipping_cancel_credit', $2, $3, $4)`,
           [opts.tenantId, credit, awb, `Refund — AWB ${awb} ${opts.reason ?? 'cancelled before pickup'}`]
         )
         refunded += credit
@@ -346,8 +359,8 @@ export async function correctWalletDebitForAwb(opts: {
       // First movement on an AWB is its debit row (keeps the one-debit-per-AWB index meaningful).
       const entryType = rows === 0 ? 'debit' : 'adjustment'
       await client.query(
-        `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, order_ref, awb, note)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+        `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, order_ref, awb, note)
+         VALUES ($1, $2, 'shipping_correction', $3, $4, $5, $6)`,
         [
           opts.tenantId,
           entryType,
@@ -441,8 +454,8 @@ export async function reconcileDelhiveryBilling(
         const delta = round2(-billed - net)
         if (Math.abs(delta) < 0.01) return { awb, outcome: 'skipped' as const, delta: 0 }
         const ins = await client.query(
-          `INSERT INTO wallet_ledger (tenant_id, entry_type, amount, awb, external_ref, note)
-           VALUES ($1, 'adjustment', $2, $3, $4, $5)
+          `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, awb, external_ref, note)
+           VALUES ($1, 'adjustment', 'shipping_correction', $2, $3, $4, $5)
            ON CONFLICT (tenant_id, external_ref) WHERE external_ref IS NOT NULL DO NOTHING`,
           [tenantId, delta, awb, key, `Delhivery billing true-up (${period}) — AWB ${awb}`]
         )
@@ -456,4 +469,60 @@ export async function reconcileDelhiveryBilling(
     }
   }
   return results
+}
+
+/** Balance + floor only (no ledger) — for the top-nav badge. */
+export async function getWalletBalance(
+  tenantId: string
+): Promise<{ balance: number; minBalance: number; currency: string }> {
+  const pool = controlPlanePool()
+  const r = await pool
+    .query(`SELECT balance, min_balance, currency FROM tenant_wallets WHERE tenant_id = $1`, [tenantId])
+    .catch(() => null)
+  const row = r?.rows[0]
+  return {
+    balance: row ? Number(row.balance) : 0,
+    minBalance: row ? Number(row.min_balance) : 0,
+    currency: row ? String(row.currency).trim() : 'INR',
+  }
+}
+
+/**
+ * Generic categorised debit for future paid features (campaigns, AI, …). Not wired to any caller
+ * yet — the one call those features make. Idempotent on externalRef. Blocks when the balance would
+ * drop below max(Rs 500, min_balance). Flagship exempt; own-Delhivery tenants have no platform
+ * wallet, but a non-shipping charge still applies (the exemption is shipping-specific), so this does
+ * not gate on delivery mode.
+ */
+export async function debitWallet(opts: {
+  tenantId: string
+  amountInr: number
+  category: WalletCategory
+  externalRef: string
+  note: string
+}): Promise<{ ok: true; charged: boolean; balance: number } | { ok: false; error: string }> {
+  if (isFlagshipTenant(opts.tenantId)) return { ok: true, charged: false, balance: 0 }
+  if (!(opts.amountInr > 0)) return { ok: false, error: 'Debit amount must be positive.' }
+  try {
+    return await withWalletTx(opts.tenantId, async client => {
+      const { balance, floor } = await lockWallet(client, opts.tenantId)
+      const amount = round2(opts.amountInr)
+      const dup = await client.query(
+        `SELECT 1 FROM wallet_ledger WHERE tenant_id = $1 AND external_ref = $2 LIMIT 1`,
+        [opts.tenantId, opts.externalRef]
+      )
+      if (dup.rowCount) return { ok: true as const, charged: false, balance }
+      if (balance - amount < floor) {
+        return { ok: false as const, error: shortfallMessage(opts.note, amount, balance, floor) }
+      }
+      await client.query(
+        `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, external_ref, note)
+         VALUES ($1, 'debit', $2, $3, $4, $5)`,
+        [opts.tenantId, opts.category, -amount, opts.externalRef, opts.note]
+      )
+      return { ok: true as const, charged: true, balance: await moveBalance(client, opts.tenantId, -amount) }
+    })
+  } catch (e: any) {
+    return { ok: false, error: e?.message || 'Wallet debit failed.' }
+  }
 }

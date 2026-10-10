@@ -146,6 +146,31 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const sidebarCollapsed = cookieStore.get('sidebar_collapsed')?.value === 'true'
   const [controls, host] = await Promise.all([getSiteControls(), getHost()])
 
+  // Shipping wallet is a platform-Delhivery concept only. getSiteControls already resolved
+  // ownDelhivery (flagship reads as own). Show the balance badge + Wallet nav only for a
+  // platform-Delhivery tenant whose admin can see finances.
+  const showWallet = !controls.ownDelhivery && hasScope(role, scopes, 'financial:read')
+  let wallet: { balance: number; minBalance: number } | null = null
+  if (showWallet) {
+    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+    const tenantId = await resolveTenantId().catch(() => null)
+    if (tenantId) {
+      const { getWalletBalance } = await import('@/lib/payments/wallet')
+      const w = await getWalletBalance(tenantId).catch(() => null)
+      if (w) wallet = { balance: w.balance, minBalance: w.minBalance }
+    }
+  }
+
+  if (showWallet) {
+    const walletLink = { href: '/admin/wallet', label: 'Wallet', scope: 'financial:read', group: 'Finance' }
+    const at = (arr: typeof desktopNavLinks) => {
+      const i = arr.findIndex(l => l.href === '/admin/financial')
+      arr.splice(i >= 0 ? i + 1 : arr.length, 0, walletLink)
+    }
+    at(desktopNavLinks)
+    at(filteredNavLinks)
+  }
+
   return (
     <>
       <AdminShortcutHandler shortcuts={controls.shortcuts} host={host} role={role} scopes={scopes} />
@@ -161,6 +186,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         canUseAgent={hasScope(role, scopes, 'agent:write')}
         logoutForm={logoutForm}
         initialCollapsed={sidebarCollapsed}
+        wallet={wallet}
       >
         <DesktopRequiredBanner />
         {children}
