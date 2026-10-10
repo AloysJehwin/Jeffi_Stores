@@ -152,7 +152,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'delhivery:read',
     label: 'Pickup Requests (Read)',
     description: 'View Delhivery pickup requests and scheduling',
-    routes: ['/admin/delhivery'],
+    routes: ['/admin/delhivery', '/admin/wallet'],
     group: 'Fulfilment',
   },
   {
@@ -395,7 +395,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'financial:read',
     label: 'Financial (Read)',
     description: 'View payables, receivables, P&L and financial summaries',
-    routes: ['/admin/financial', '/admin/wallet'],
+    routes: ['/admin/financial'],
     group: 'Finance',
   },
   {

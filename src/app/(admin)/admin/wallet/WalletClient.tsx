@@ -43,7 +43,7 @@ function loadRazorpayScript(): Promise<boolean> {
 }
 
 export default function WalletClient({ initial }: { initial: Wallet | null }) {
-  const canWrite = useCanWrite('financial:write')
+  const canWrite = useCanWrite('delhivery:write')
   const [wallet, setWallet] = useState<Wallet | null>(initial)
   const [amount, setAmount] = useState('')
   const [busy, setBusy] = useState(false)

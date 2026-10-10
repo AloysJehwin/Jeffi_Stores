@@ -50,6 +50,13 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'ecom/[tenantId]/dns/resync',
   // Settle a tenant's captured-but-unsettled payments — platform-admin only (isPlatformAdmin).
   'ecom/[tenantId]/reconcile-settlements',
+  // Platform-admin shipping-wallet controls (admin.jeffistores.in): manual credit + Delhivery
+  // billing reconcile — gated on isPlatformAdmin, stronger than any tenant :write scope.
+  'ecom/[tenantId]/wallet',
+  'ecom/[tenantId]/wallet/reconcile-billing',
+  // Tenant self-recharge GET returns the wallet; its POST is a 403 stub (manual credits are a
+  // platform op) — it writes nothing. The real top-up is financial/wallet/topup (delhivery:write).
+  'financial/wallet/recharge',
   // Hard-delete of a deprovisioned tenant — gated on isPlatformAdmin (platform super-admin),
   // which is strictly stronger than any :write scope, so a read-only member can never reach it.
   'ecom/customers/[id]/purge',

@@ -45,7 +45,8 @@ movement was, so future features classify cleanly without overloading `entry_typ
 - New client component `src/components/admin/WalletBadge.tsx`: a pill next to `NotificationBell`
   showing `₹<balance>`, amber when `balance < minBalance`, linking to `/admin/wallet`. Hidden
   entirely for own-Delhivery tenants and the flagship (no platform wallet), and for admins without
-  `financial:read`.
+  `delhivery:read`. The shipping wallet applies to EVERY plan (not just Pro+), so it is gated on
+  `delhivery:read` (which every plan has), NOT `financial:*`.
 - Server passes the initial balance so there's no load flash: `AdminShell` gets a new optional prop
   `wallet?: { balance; minBalance; currency; show }`, computed in `layout.tsx` from
   `getTenantWallet(tenantId)` + the `own_delhivery` check (reuse `tenantShipsOnPlatform`).
@@ -61,9 +62,11 @@ movement was, so future features classify cleanly without overloading `entry_typ
   filtered set (client-side from the fetched rows).
 - Paginated read: extend `GET /api/admin/financial/wallet` to accept `?limit&before&category&…`
   (or a sibling `/ledger` route) returning rows + a `nextBefore` cursor.
-- Scope: `financial:read` to view, `financial:write` to recharge.
-- Add to `navLinks` under **Finance**: `{ href: '/admin/wallet', label: 'Wallet',
-  scope: 'financial:read', group: 'Finance' }`, shown only for platform-Delhivery tenants.
+- Scope: `delhivery:read` to view, `delhivery:write` to recharge (the same scopes the existing
+  Delhivery top-up uses, so Basic/Growth tenants can manage the wallet their shipments depend on).
+- Add to `navLinks` under **Fulfilment** (next to Delhivery): `{ href: '/admin/wallet',
+  label: 'Wallet', scope: 'delhivery:read', group: 'Fulfilment' }`, shown only for
+  platform-Delhivery tenants.
 
 ### 4. Leave the Delhivery `WalletCard` in place (links to `/admin/wallet`)
 Don't delete it — shrink it to a balance summary that links to the new page, so the Delhivery
