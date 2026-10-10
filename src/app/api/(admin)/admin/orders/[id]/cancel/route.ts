@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne, query } from '@/lib/shared/db'
+import { queryOne, query, resolveRequestTenant } from '@/lib/shared/db'
 import { restoreOrderStock } from '@/lib/orders/order-stock'
+import { cancelInvoicePaymentArtifacts } from '@/lib/payments/razorpay'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,7 +14,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(
-      `SELECT id, order_number, status, payment_status, source FROM orders WHERE id = $1`,
+      `SELECT id, order_number, status, payment_status, source,
+              payment_link_id, payment_link_status, razorpay_qr_id
+       FROM orders WHERE id = $1`,
       [id]
     )
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -31,7 +34,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       [id]
     )
 
-    return NextResponse.json({ success: true })
+    // Void the open payment artifacts so a buyer can no longer pay a cancelled invoice. Best-effort:
+    // never fails the cancel, and marks the payment link cancelled locally when the gateway confirms.
+    let paymentArtifacts: unknown = null
+    if (order.payment_link_id || order.razorpay_qr_id) {
+      const tenant = await resolveRequestTenant().catch(() => null)
+      const res = await cancelInvoicePaymentArtifacts({
+        tenantId: tenant?.tenantId,
+        paymentLinkId: order.payment_link_id,
+        paymentLinkStatus: order.payment_link_status,
+        qrId: order.razorpay_qr_id,
+      })
+      paymentArtifacts = res
+      if (res.paymentLink === 'cancelled') {
+        await query(`UPDATE orders SET payment_link_status = 'cancelled', updated_at = NOW() WHERE id = $1`, [id]).catch(
+          () => {}
+        )
+      }
+    }
+
+    return NextResponse.json({ success: true, paymentArtifacts })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Failed to cancel invoice' }, { status: 500 })
   }
