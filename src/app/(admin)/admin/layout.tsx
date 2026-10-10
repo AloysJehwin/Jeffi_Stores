@@ -146,10 +146,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const sidebarCollapsed = cookieStore.get('sidebar_collapsed')?.value === 'true'
   const [controls, host] = await Promise.all([getSiteControls(), getHost()])
 
-  // Shipping wallet is a platform-Delhivery concept only. getSiteControls already resolved
-  // ownDelhivery (flagship reads as own). Show the balance badge + Wallet nav only for a
-  // platform-Delhivery tenant whose admin can see finances.
-  const showWallet = !controls.ownDelhivery && hasScope(role, scopes, 'financial:read')
+  // The shipping wallet pays for Delhivery on the platform account, for EVERY plan — so gate the
+  // badge + Wallet nav on platform-Delhivery + delhivery:read (which every plan has), NOT on
+  // financial:* (Pro+ only). getSiteControls already resolved ownDelhivery (flagship reads as own).
+  const showWallet = !controls.ownDelhivery && hasScope(role, scopes, 'delhivery:read')
   let wallet: { balance: number; minBalance: number } | null = null
   if (showWallet) {
     const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
@@ -162,9 +162,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   if (showWallet) {
-    const walletLink = { href: '/admin/wallet', label: 'Wallet', scope: 'financial:read', group: 'Finance' }
+    const walletLink = { href: '/admin/wallet', label: 'Wallet', scope: 'delhivery:read', group: 'Fulfilment' }
     const at = (arr: typeof desktopNavLinks) => {
-      const i = arr.findIndex(l => l.href === '/admin/financial')
+      const i = arr.findIndex(l => l.href === '/admin/delhivery')
       arr.splice(i >= 0 ? i + 1 : arr.length, 0, walletLink)
     }
     at(desktopNavLinks)
