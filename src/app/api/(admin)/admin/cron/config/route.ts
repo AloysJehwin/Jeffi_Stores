@@ -2,30 +2,21 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { withTransaction } from '@/lib/shared/db'
+import { isCronJobId } from '@/lib/shared/cron-jobs'
 
 export const dynamic = 'force-dynamic'
-
-const VALID_JOB_IDS = [
-  'delhivery_sync',
-  'cancel_stale_orders',
-  'sweep_auto_tasks',
-  'dispatch_mailer',
-  'run_campaigns',
-  'compute_health',
-  'daily_briefing',
-]
 
 export async function PATCH(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'audit:write'))
+    if (!hasScope(admin.role, admin.scopes, 'audit:read'))
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const { jobId, enabled } = body
 
-    if (!VALID_JOB_IDS.includes(jobId)) {
+    if (!isCronJobId(jobId)) {
       return NextResponse.json({ error: 'Invalid job ID' }, { status: 400 })
     }
     if (typeof enabled !== 'boolean') {
