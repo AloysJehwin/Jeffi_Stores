@@ -81,11 +81,24 @@ async function loadSecrets() {
     const lines = Object.entries(secrets)
       .filter(([, v]) => typeof v === 'string')
       .map(([k, v]) => `${k}=${v.includes('\n') ? JSON.stringify(v) : v}`)
-      .join('\n')
+    // Local-only overrides that must survive this regeneration (e.g. TENANT_MTLS_ENFORCED=false
+    // for local tenant-admin access). .env.local.overrides is gitignored and NEVER read in prod.
+    // Appended last so its KEY=VALUE lines win over the Secrets Manager values above.
+    const overridePath = resolve(REPO_ROOT, '.env.local.overrides')
+    let overrideCount = 0
+    if (existsSync(overridePath)) {
+      const extra = readFileSync(overridePath, 'utf8')
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l && !l.startsWith('#') && l.includes('='))
+      overrideCount = extra.length
+      lines.push(...extra)
+    }
     const envPath = resolve(REPO_ROOT, '.env.local')
-    writeFileSync(envPath, lines + '\n', 'utf8')
+    writeFileSync(envPath, lines.join('\n') + '\n', 'utf8')
     process.stdout.write(
-      `[load-secrets] Wrote ${Object.keys(secrets).length} secrets from "${SECRET_ID}" → .env.local\n`
+      `[load-secrets] Wrote ${Object.keys(secrets).length} secrets from "${SECRET_ID}"` +
+        `${overrideCount ? ` + ${overrideCount} local override(s)` : ''} → .env.local\n`
     )
     return
   }
