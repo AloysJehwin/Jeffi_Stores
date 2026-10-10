@@ -10,9 +10,14 @@ const k8sName = (id: string) => `cron-${id.replace(/_/g, '-')}`
 
 function render(job: CronJob, extra?: { id: string; method: string; path: string; schedule: string }): string {
   const id = extra?.id ?? job.id
-  const method = extra?.method ?? job.method
-  const path = extra?.path ?? job.path
   const schedule = extra?.schedule ?? cronSchedule(job)
+  // Registry jobs with a tenantScope go through the per-tenant fan-out (flagship + every active
+  // tenant whose plan grants the scope). Platform-only registry jobs (tenantScope === null) and the
+  // FEED_SYNCS (not in CRON_JOBS, so the fan-out's isCronJobId would reject them) call their route
+  // directly.
+  const viaFanout = !extra && job.tenantScope !== null
+  const method = viaFanout ? 'POST' : (extra?.method ?? job.method)
+  const path = viaFanout ? `/api/cron/fanout` : (extra?.path ?? job.path)
   const deadline = Math.max(50, Math.round((job?.lockTtlMs ?? 300_000) / 1000))
   return `apiVersion: batch/v1
 kind: CronJob
