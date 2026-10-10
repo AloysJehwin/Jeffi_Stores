@@ -2,6 +2,18 @@
 
 import { useMemo, useState } from 'react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import AdminSelect from '@/components/admin/AdminSelect'
+import DatePicker from '@/components/ui/DatePicker'
+import {
+  inputCls,
+  labelCls,
+  btnPrimary,
+  btnSecondary,
+  SummaryCard,
+  Skeleton,
+  thCls,
+  thRight,
+} from '@/app/(admin)/admin/financial/_components/shared'
 
 type LedgerEntry = {
   entry_type: 'recharge' | 'debit' | 'adjustment'
@@ -27,9 +39,14 @@ const CATEGORY_LABEL: Record<string, string> = {
   ai: 'AI',
   adjustment: 'Adjustment',
 }
-// Fall back to entry_type when category is null (pre-category rows).
 const catOf = (e: LedgerEntry) => e.category || e.entry_type
 const catLabel = (c: string) => CATEGORY_LABEL[c] || c
+
+const DIRECTION_OPTIONS = [
+  { value: 'all', label: 'All directions' },
+  { value: 'in', label: 'In (credits)' },
+  { value: 'out', label: 'Out (debits)' },
+]
 
 function loadRazorpayScript(): Promise<boolean> {
   return new Promise(resolve => {
@@ -50,14 +67,17 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
 
   // filters
-  const [dir, setDir] = useState<'all' | 'in' | 'out'>('all')
-  const [cat, setCat] = useState<string>('all')
+  const [dir, setDir] = useState('all')
+  const [cat, setCat] = useState('all')
   const [q, setQ] = useState('')
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
 
   const ledger = useMemo(() => wallet?.ledger ?? [], [wallet])
-  const categories = useMemo(() => [...new Set(ledger.map(catOf))].sort(), [ledger])
+  const categoryOptions = useMemo(
+    () => [{ value: 'all', label: 'All categories' }, ...[...new Set(ledger.map(catOf))].sort().map(c => ({ value: c, label: catLabel(c) }))],
+    [ledger]
+  )
 
   const rows = useMemo(() => {
     return ledger.filter(e => {
@@ -74,6 +94,17 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
       return true
     })
   }, [ledger, dir, cat, q, from, to])
+
+  const totals = useMemo(() => {
+    let credit = 0
+    let debit = 0
+    for (const e of rows) {
+      const a = Number(e.amount)
+      if (a >= 0) credit += a
+      else debit += -a
+    }
+    return { credit, debit }
+  }, [rows])
 
   async function refresh() {
     try {
@@ -160,35 +191,33 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
 
   const balance = wallet?.balance ?? 0
   const low = balance < (wallet?.minBalance ?? 0)
-  const inputCls =
-    'h-9 px-3 rounded-lg border border-border-default bg-surface-elevated text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Shipping Wallet</h1>
         <p className="text-sm text-foreground-muted mt-1">
-          Prepaid balance the platform debits for Delhivery charges (forward, return pickups, and corrections).
+          Prepaid balance the platform debits for Delhivery charges — forward shipments, return pickups and corrections.
         </p>
       </div>
 
-      {/* Balance + recharge */}
-      <div className="flex flex-col sm:flex-row sm:items-end gap-4 bg-surface-elevated border border-border-default rounded-xl p-5">
-        <div className="flex-1">
-          <p className="text-xs text-foreground-muted uppercase tracking-wide">Balance</p>
-          <p className={`text-3xl font-bold ${low ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}>
-            {inr(balance)}
-          </p>
-          {low && (
-            <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-              Below the minimum of {inr(wallet?.minBalance ?? 0)} — top up to keep shipping.
-            </p>
-          )}
-        </div>
-        {canWrite && (
-          <div className="flex items-end gap-2">
-            <div>
-              <label className="block text-xs text-foreground-muted mb-1">Amount (₹)</label>
+      {/* Summary cards (shared SummaryCard, same as Financial) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <SummaryCard
+          label="Balance"
+          value={inr(balance)}
+          sub={low ? `below minimum ${inr(wallet?.minBalance ?? 0)}` : `minimum ${inr(wallet?.minBalance ?? 0)}`}
+        />
+        <SummaryCard label="Credits (filtered)" value={inr(totals.credit)} sub="recharges + credits" />
+        <SummaryCard label="Debits (filtered)" value={inr(totals.debit)} sub="shipping + charges" />
+      </div>
+
+      {/* Recharge */}
+      {canWrite && (
+        <div className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="w-40">
+              <label className={labelCls}>Top up amount (₹)</label>
               <input
                 type="number"
                 min="1"
@@ -196,125 +225,113 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 placeholder="2000"
-                className={`${inputCls} w-32`}
+                className={inputCls}
               />
             </div>
-            <button
-              onClick={topUp}
-              disabled={busy}
-              className="h-9 px-4 rounded-lg bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
-            >
-              {busy ? '…' : 'Top up'}
+            <button className={btnPrimary} onClick={topUp} disabled={busy}>
+              {busy ? 'Processing…' : 'Top up'}
             </button>
+            {low && <span className="text-xs text-amber-600 dark:text-amber-400 pb-1.5">Balance is below the minimum — shipments may be blocked.</span>}
           </div>
-        )}
-      </div>
-      {toast && (
-        <p className={`text-sm ${toast.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {toast.text}
-        </p>
+          {toast && (
+            <p className={`text-sm mt-2 ${toast.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+              {toast.text}
+            </p>
+          )}
+        </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-end gap-3">
-        <div>
-          <label className="block text-xs text-foreground-muted mb-1">Direction</label>
-          <select value={dir} onChange={e => setDir(e.target.value as any)} className={inputCls}>
-            <option value="all">All</option>
-            <option value="in">In (credits)</option>
-            <option value="out">Out (debits)</option>
-          </select>
+      {/* Filter bar (shared AdminSelect + DatePicker, same as Financial Transactions) */}
+      <div className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="w-40">
+            <AdminSelect label="Direction" value={dir} onChange={setDir} options={DIRECTION_OPTIONS} sm />
+          </div>
+          <div className="w-52">
+            <AdminSelect label="Category" value={cat} onChange={setCat} options={categoryOptions} sm />
+          </div>
+          <div>
+            <label className={labelCls}>From</label>
+            <DatePicker className="w-36" value={from} onChange={setFrom} />
+          </div>
+          <div>
+            <label className={labelCls}>To</label>
+            <DatePicker className="w-36" value={to} onChange={setTo} />
+          </div>
+          <div className="flex-1 min-w-[180px]">
+            <label className={labelCls}>Search order / AWB / note</label>
+            <input className={inputCls} value={q} onChange={e => setQ(e.target.value)} placeholder="JS-123, AWB…" />
+          </div>
+          <div className="pb-0.5">
+            <button className={btnSecondary} onClick={exportCsv} disabled={rows.length === 0}>
+              Export CSV
+            </button>
+          </div>
         </div>
-        <div>
-          <label className="block text-xs text-foreground-muted mb-1">Category</label>
-          <select value={cat} onChange={e => setCat(e.target.value)} className={inputCls}>
-            <option value="all">All</option>
-            {categories.map(c => (
-              <option key={c} value={c}>
-                {catLabel(c)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-foreground-muted mb-1">From</label>
-          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className={inputCls} />
-        </div>
-        <div>
-          <label className="block text-xs text-foreground-muted mb-1">To</label>
-          <input type="date" value={to} onChange={e => setTo(e.target.value)} className={inputCls} />
-        </div>
-        <div className="flex-1 min-w-[12rem]">
-          <label className="block text-xs text-foreground-muted mb-1">Search order / AWB / note</label>
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="JS-123, AWB…" className={`${inputCls} w-full`} />
-        </div>
-        <button
-          onClick={exportCsv}
-          disabled={rows.length === 0}
-          className="h-9 px-4 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary disabled:opacity-50 transition-colors"
-        >
-          Export CSV
-        </button>
       </div>
 
       {/* Ledger */}
-      <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-xs text-foreground-muted uppercase tracking-wide border-b border-border-default">
-              <th className="px-4 py-2.5">Date</th>
-              <th className="px-4 py-2.5">Category</th>
-              <th className="px-4 py-2.5">Reference</th>
-              <th className="px-4 py-2.5 text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
+      {!wallet ? (
+        <Skeleton />
+      ) : (
+        <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="border-b border-border-default">
               <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-foreground-muted">
-                  No matching entries.
-                </td>
+                <th className={thCls}>Date</th>
+                <th className={thCls}>Category</th>
+                <th className={thCls}>Reference</th>
+                <th className={thRight}>Amount</th>
               </tr>
-            ) : (
-              rows.map((e, i) => {
-                const amt = Number(e.amount)
-                return (
-                  <tr key={i} className="border-b border-border-default last:border-0">
-                    <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
-                      {new Date(e.occurred_at).toLocaleString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZone: 'Asia/Kolkata',
-                      })}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-surface-secondary text-foreground-secondary">
-                        {catLabel(catOf(e))}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-foreground-secondary">
-                      {e.order_ref && <span className="mr-2">{e.order_ref}</span>}
-                      {e.awb && <span className="text-foreground-muted">{e.awb}</span>}
-                      {e.note && <span className="block text-xs text-foreground-muted">{e.note}</span>}
-                    </td>
-                    <td
-                      className={`px-4 py-2.5 text-right font-semibold whitespace-nowrap ${
-                        amt >= 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground'
-                      }`}
-                    >
-                      {amt >= 0 ? '+' : '−'}
-                      {inr(Math.abs(amt))}
-                    </td>
-                  </tr>
-                )
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-4 py-10 text-center text-foreground-muted">
+                    No matching entries.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((e, i) => {
+                  const amt = Number(e.amount)
+                  return (
+                    <tr key={i} className="border-b border-border-default last:border-0">
+                      <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
+                        {new Date(e.occurred_at).toLocaleString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          timeZone: 'Asia/Kolkata',
+                        })}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-surface-secondary text-foreground-secondary">
+                          {catLabel(catOf(e))}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-foreground-secondary">
+                        {e.order_ref && <span className="mr-2">{e.order_ref}</span>}
+                        {e.awb && <span className="text-foreground-muted">{e.awb}</span>}
+                        {e.note && <span className="block text-xs text-foreground-muted">{e.note}</span>}
+                      </td>
+                      <td
+                        className={`px-4 py-2.5 text-right font-semibold whitespace-nowrap ${
+                          amt >= 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground'
+                        }`}
+                      >
+                        {amt >= 0 ? '+' : '−'}
+                        {inr(Math.abs(amt))}
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
       <p className="text-xs text-foreground-muted">Showing the most recent {ledger.length} entries.</p>
     </div>
   )

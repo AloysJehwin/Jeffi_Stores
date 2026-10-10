@@ -162,10 +162,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   if (showWallet) {
-    const walletLink = { href: '/admin/wallet', label: 'Wallet', scope: 'delhivery:read', group: 'Fulfilment' }
+    // Lives in the Finance group visually, but gated on delhivery:read (every plan) — not
+    // financial:* (Pro+) — because the shipping wallet applies to all platform-Delhivery tenants.
+    const walletLink = { href: '/admin/wallet', label: 'Wallet', scope: 'delhivery:read', group: 'Finance' }
     const at = (arr: typeof desktopNavLinks) => {
-      const i = arr.findIndex(l => l.href === '/admin/delhivery')
-      arr.splice(i >= 0 ? i + 1 : arr.length, 0, walletLink)
+      // Place it just before Financial when that link is present (Pro+), else at the group's head.
+      const i = arr.findIndex(l => l.href === '/admin/financial')
+      arr.splice(i >= 0 ? i : arr.length, 0, walletLink)
     }
     at(desktopNavLinks)
     at(filteredNavLinks)
