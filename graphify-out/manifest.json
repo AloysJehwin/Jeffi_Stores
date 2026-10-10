@@ -3615,8 +3615,8 @@
     "semantic_hash": ""
   },
   "database/control-plane/seed-plans.sql": {
-    "mtime": 1791650467.7848113,
-    "ast_hash": "7299d19a06e4f7c0f2c7418d74a17ec0",
+    "mtime": 1791653067.3128188,
+    "ast_hash": "b865a294b87b9e83ae0877bf25fdead5",
     "semantic_hash": ""
   },
   "src/app/api/internal/migrations/fanout/route.ts": {
@@ -11370,8 +11370,8 @@
     "semantic_hash": ""
   },
   "src/lib/auth/ai-scope.ts": {
-    "mtime": 1790931253.3752842,
-    "ast_hash": "b33d968a9106a625bbb2fc9243fa62db",
+    "mtime": 1791653073.7299929,
+    "ast_hash": "de7bc9ed178be5e0add891a89327abcb",
     "semantic_hash": ""
   },
   "src/lib/auth/audit-context.ts": {
@@ -11905,8 +11905,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/cron-jobs.ts": {
-    "mtime": 1791619183.8468874,
-    "ast_hash": "7fa9a0e61ac6b9cef13e89b7ce670ad5",
+    "mtime": 1791653717.205796,
+    "ast_hash": "3260787eab8851d8b5e57bfd2391a881",
     "semantic_hash": ""
   },
   "src/lib/shared/customer-conversations-ai.ts": {
@@ -12050,8 +12050,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/rag.ts": {
-    "mtime": 1790976740.4149222,
-    "ast_hash": "4a73b50b4eecd2c6915ab4fa3581f1b0",
+    "mtime": 1791653656.4442484,
+    "ast_hash": "2b4699c7cae9e9dc9f6133f8376d297b",
     "semantic_hash": ""
   },
   "src/lib/shared/rate-limit.ts": {
@@ -14130,8 +14130,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/platform/cronjobs.yaml": {
-    "mtime": 1791651798.2083035,
-    "ast_hash": "ab863460a98a28f9d9da1f69ffcbe618",
+    "mtime": 1791653745.1458797,
+    "ast_hash": "47085e4367e53445c541af3f96b8d232",
     "semantic_hash": ""
   },
   "deploy/k8s/platform/kustomization.yaml": {
@@ -14377,6 +14377,16 @@
   "docs/LOCAL_TENANT.md": {
     "mtime": 1791649741.0594141,
     "ast_hash": "0aa6f660089c0c3a06ffb02f9ad12823",
+    "semantic_hash": ""
+  },
+  "src/app/api/(internal)/cron/embed-sync/route.ts": {
+    "mtime": 1791653730.9658604,
+    "ast_hash": "62f012190d5429b3d4df5884e7f579eb",
+    "semantic_hash": ""
+  },
+  "src/lib/shared/embed-products.ts": {
+    "mtime": 1791653702.0189316,
+    "ast_hash": "9538126ef6824af7bfb0c1e9cd1beb75",
     "semantic_hash": ""
   }
 }

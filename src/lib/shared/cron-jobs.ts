@@ -181,6 +181,17 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'dashboard:read',
   },
   {
+    id: 'embed_sync',
+    name: 'Product embeddings sync',
+    path: '/api/cron/embed-sync',
+    method: 'GET',
+    intervalMs: 30 * MIN,
+    intervalLabel: 'every 30 min',
+    startDelayMs: 180 * SEC,
+    lockTtlMs: 30 * MIN - 30 * SEC,
+    tenantScope: 'ai:storefront',
+  },
+  {
     id: 'ai_health',
     name: 'AI platform health',
     path: '/api/internal/ai/health',

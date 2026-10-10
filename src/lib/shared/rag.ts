@@ -163,6 +163,27 @@ export async function runWithHnswTuning(sql: string, params: unknown[]) {
   }
 }
 
+// Same HNSW-tuned vector query, but on the CURRENT TENANT's pool (db.ts) instead of the shared
+// replica. Each tenant's product embeddings live in that tenant's own DB (written by the catalog-
+// enrichment approve path), so product search must read there. SET LOCAL only holds inside a
+// transaction, so wrap the tuning + SELECT in one. The flagship reads its own DB and is unaffected.
+async function tenantHnswQuery<T extends Record<string, any> = any>(sql: string, params: unknown[]): Promise<T[]> {
+  const { getClient } = await import('@/lib/shared/db')
+  const client = await getClient()
+  try {
+    await client.query('BEGIN')
+    await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH}`)
+    const r = await client.query(sql, params)
+    await client.query('COMMIT')
+    return r.rows as T[]
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {})
+    throw e
+  } finally {
+    client.release()
+  }
+}
+
 export async function findSimilarProducts(query: string, limit = 5): Promise<RagResult[]> {
   return findSimilar(query, { limit, sourceTables: ['products', 'product_variants'] })
 }
@@ -177,35 +198,35 @@ export interface SimilarProductId {
 export async function findSimilarProductIds(query: string, limit = 20): Promise<SimilarProductId[]> {
   const vec = await embed(query)
   const vecLiteral = toVectorLiteral(vec)
-  const tenantId = await currentRagTenantId()
 
-  // $3 = tenant id; a tenant matches only its own rows, the platform matches NULL. No fallback.
+  // Read the CURRENT TENANT's own embeddings table (flagship = its own DB). Within a tenant DB every
+  // row is that tenant's, so no tenant_id filter is needed — the pool itself is the isolation (#489).
   const productSql = `
     SELECT source_id, 1 - (embedding <=> $1::vector) AS similarity
       FROM embeddings
-     WHERE source_table = 'products' AND tenant_id IS NOT DISTINCT FROM $3
+     WHERE source_table = 'products'
      ORDER BY embedding <=> $1::vector
      LIMIT $2
   `
   const variantSql = `
     SELECT source_id, 1 - (embedding <=> $1::vector) AS similarity
       FROM embeddings
-     WHERE source_table = 'product_variants' AND tenant_id IS NOT DISTINCT FROM $3
+     WHERE source_table = 'product_variants'
      ORDER BY embedding <=> $1::vector
      LIMIT $2
   `
-  const [productResult, variantResult, keywordRows] = await Promise.all([
-    runWithHnswTuning(productSql, [vecLiteral, limit, tenantId]),
-    runWithHnswTuning(variantSql, [vecLiteral, limit, tenantId]),
-    keywordProductIds(query, limit, tenantId),
+  const [productRows, variantRows, keywordRows] = await Promise.all([
+    tenantHnswQuery<{ source_id: string; similarity: number | string }>(productSql, [vecLiteral, limit]),
+    tenantHnswQuery<{ source_id: string; similarity: number | string }>(variantSql, [vecLiteral, limit]),
+    keywordProductIds(query, limit),
   ])
 
   const merged: SimilarProductId[] = []
-  for (const row of productResult.rows) {
+  for (const row of productRows) {
     const sim = typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity
     merged.push({ productId: row.source_id, similarity: sim, matchedVia: 'products', variantId: null })
   }
-  for (const row of variantResult.rows) {
+  for (const row of variantRows) {
     const sim = typeof row.similarity === 'string' ? parseFloat(row.similarity) : row.similarity
     merged.push({ productId: '', similarity: sim, matchedVia: 'product_variants', variantId: row.source_id })
   }
@@ -245,11 +266,11 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
  * fastener/hardware terms surface even when embeddings drift off-topic. Uses the
  * products.search_vector when available, falling back to name/description ILIKE.
  */
-async function keywordProductIds(query: string, limit: number, tenantId: string | null): Promise<string[]> {
-  // The replica's `products` table is the platform's catalog (no tenant column), so the keyword
-  // fallback can only return platform rows. For a tenant, skip it — vector search over the tenant's
-  // own embeddings is the only tenant-safe path. No platform products ever reach a tenant answer.
-  if (tenantId) return []
+async function keywordProductIds(query: string, limit: number): Promise<string[]> {
+  // Full-text keyword match over the CURRENT TENANT's own `products` (via the tenant pool), so literal
+  // terms surface alongside the vector hits. Tenant-safe: `products.search_vector` is read from the
+  // tenant's own DB, same place findSimilarProductIds reads embeddings.
+  const { queryMany } = await import('@/lib/shared/db')
   // Salient tokens: drop stopwords / connectors, keep words >= 3 chars.
   const STOP = new Set([
     'for',
@@ -286,7 +307,7 @@ async function keywordProductIds(query: string, limit: number, tenantId: string 
   if (tokens.length === 0) return []
   const tsquery = tokens.join(' | ')
   try {
-    const r = await runWithHnswTuning(
+    const rows = await queryMany<{ source_id: string }>(
       `SELECT id::text AS source_id
          FROM products
         WHERE is_active = true
@@ -295,7 +316,7 @@ async function keywordProductIds(query: string, limit: number, tenantId: string 
         LIMIT $2`,
       [tsquery, limit]
     )
-    return r.rows.map((row: { source_id: string }) => row.source_id)
+    return rows.map(row => row.source_id)
   } catch {
     return []
   }
