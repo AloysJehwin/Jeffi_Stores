@@ -201,7 +201,13 @@ export default async function HomePage() {
   const identity = await getStoreIdentity()
   const aboutCopy = defaultAboutCopy(storefront.aboutCopy, identity.name)
 
-  const sections = await getConfiguredSections()
+  const allSections = await getConfiguredSections()
+  // The Business CTA promotes the B2B portal, which only exists on plans that sell it (Pro+). Drop
+  // the section for tenants whose plan lacks it so a Basic/Growth storefront doesn't advertise a
+  // portal it has no business host for. The flagship is never plan-limited (gate returns allowed).
+  const { currentTenantPlanGate } = await import('@/lib/auth/plan-gate')
+  const businessAllowed = (await currentTenantPlanGate('business_customers:read').catch(() => ({ allowed: false }))).allowed
+  const sections = businessAllowed ? allSections : allSections.filter(s => s.type !== 'business_cta')
   const needs = planDataNeeds(sections)
   const rowPlan = planProductRows(sections)
 
@@ -245,7 +251,10 @@ export default async function HomePage() {
 
   const host = await getHost()
   const isLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|$)/.test(host) || /\.local(:|$)/.test(host)
-  const businessOrigin = isLocal ? '' : 'https://business.jeffistores.in'
+  // Point the CTA at THIS tenant's business portal ({slug}.business.<root>), not the flagship's —
+  // businessHostForHost preserves the tenant of the current storefront host (and custom domains).
+  const { businessHostForHost } = await import('@/lib/tenancy/forms-host')
+  const businessOrigin = isLocal ? '' : `https://${businessHostForHost(host)}`
   const businessLandingUrl = isLocal ? '/business' : `${businessOrigin}/`
   const businessSignupUrl = isLocal ? '/business/signup' : `${businessOrigin}/signup`
 
