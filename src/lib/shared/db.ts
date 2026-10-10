@@ -94,6 +94,20 @@ function buildTenantPool(infra: NonNullable<ReturnType<typeof getCurrentTenant>>
   config.host = infra.rdsEndpoint
   config.port = infra.rdsPort
   config.database = infra.rdsDb
+  // Local-dev tenant (own isolated DB on localhost): plain connection, no TLS, no IAM. Guarded on
+  // the loopback host so prod/RDS behaviour is untouched. Credentials come from the dev DATABASE_URL.
+  const isLocal = infra.rdsEndpoint === 'localhost' || infra.rdsEndpoint === '127.0.0.1'
+  if (isLocal && process.env.NODE_ENV !== 'production') {
+    try {
+      const u = new URL(process.env.DATABASE_URL || '')
+      if (u.username) config.user = decodeURIComponent(u.username)
+      if (u.password) config.password = decodeURIComponent(u.password)
+    } catch {
+      /* no creds in DATABASE_URL — rely on PG* env / peer auth */
+    }
+    config.ssl = false
+    return createPgPool(config)
+  }
   config.ssl = rdsSslOption()
   if (infra.iamAuth) {
     const user = process.env.RDS_USER || 'app_user'
