@@ -7,7 +7,6 @@ import { ap } from '@/lib/shared/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { TextControl, TextAreaControl } from '@/components/admin/site-controls/controls'
-import WalletCard from './WalletCard'
 import EligibleOrdersMobileList from './_components/EligibleOrdersMobileList'
 import PickupHistoryMobileList from './_components/PickupHistoryMobileList'
 
@@ -609,10 +608,9 @@ export default function DelhiveryPageClient({
         </div>
       )}
 
-      {/* Platform-Delhivery tenants are billed by wallet per AWB. An own-account tenant is billed by
-          Delhivery and manages its token in the ecom portal. The flagship store ships on the
-          platform key and has no tenant wallet, so it shows neither. */}
-      {deliveryMode === 'platform' && <WalletCard />}
+      {/* An own-account tenant is billed by Delhivery and manages its token in the ecom portal.
+          Platform-Delhivery tenants are billed by wallet per AWB — the wallet lives on the common
+          Wallet page + top-nav badge now, so it is not duplicated here. */}
       {deliveryMode === 'own' && <OwnDelhiveryNote />}
 
       <WarehousesCard defaultWarehouse={defaultWarehouse} />
