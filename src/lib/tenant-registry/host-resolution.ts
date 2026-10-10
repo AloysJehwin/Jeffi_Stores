@@ -30,16 +30,20 @@ function isLocalHost(host: string): boolean {
 
 export function slugFromHost(hostname: string): { slug: string | null; isCustomDomain: boolean } {
   const host = hostname.toLowerCase().split(':')[0].trim()
+  // Local dev: treat `*.localhost` as an alternate platform root so {slug}.localhost,
+  // admin-{slug}.localhost, {slug}.business.localhost resolve exactly like the prod subdomains.
+  // `localhost` itself is the apex (platform). Never reachable in prod (RFC 6761).
+  const root = host === 'localhost' || host.endsWith('.localhost') ? 'localhost' : ROOT_DOMAIN
   // Custom domain: not under the platform root at all.
-  if (!host.endsWith('.' + ROOT_DOMAIN) && host !== ROOT_DOMAIN) {
+  if (!host.endsWith('.' + root) && host !== root) {
     // Could be a tenant's own domain — resolve by custom_domain lookup.
     if (host && !isLocalHost(host)) {
       return { slug: null, isCustomDomain: true }
     }
     return { slug: null, isCustomDomain: false }
   }
-  if (host === ROOT_DOMAIN) return { slug: null, isCustomDomain: false } // apex = platform
-  const label = host.slice(0, host.length - ROOT_DOMAIN.length - 1) // strip ".jeffistores.in"
+  if (host === root) return { slug: null, isCustomDomain: false } // apex = platform
+  const label = host.slice(0, host.length - root.length - 1) // strip ".<root>"
   // App subdomains like admin-{tenant} / invoice-{tenant}, plus {tenant}.business.
   const businessScoped = label.match(/^(.+)\.business$/)
   const appPrefixed = label.match(/^(admin|invoice|quotation|purchaseorder|forms|vault|www)-(.+)$/)
@@ -58,8 +62,10 @@ const APP_PREFIXES: HostApp[] = ['admin', 'invoice', 'quotation', 'purchaseorder
 /** Which app surface a host addresses: `admin.` (platform) and `admin-{slug}.` (tenant) both → 'admin'. */
 export function appFromHost(hostname: string): HostApp | null {
   const host = hostname.toLowerCase().split(':')[0].trim()
-  const underRoot = host.endsWith('.' + ROOT_DOMAIN)
-  const label = underRoot ? host.slice(0, host.length - ROOT_DOMAIN.length - 1) : host
+  // Local dev: `*.localhost` is an alternate root (see slugFromHost).
+  const root = host === 'localhost' || host.endsWith('.localhost') ? 'localhost' : ROOT_DOMAIN
+  const underRoot = host.endsWith('.' + root)
+  const label = underRoot ? host.slice(0, host.length - root.length - 1) : host
   const parts = label.split('.')
   if (underRoot && parts.length === 2 && parts[1] === 'business') return 'business'
   const first = parts[0]
