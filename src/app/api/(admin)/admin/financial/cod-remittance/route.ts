@@ -4,7 +4,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, query } from '@/lib/shared/db'
 import { generateOrderInvoice } from '@/lib/documents/invoice'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
-import { recordCodSettlement } from '@/lib/payments/razorpay-route'
+import { recordCodSettlement } from '@/lib/payments/route-settlement'
 
 export const dynamic = 'force-dynamic'
 

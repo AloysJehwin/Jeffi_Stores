@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryOne, queryMany, query, withTransaction, resolveRequestTenant } from '@/lib/shared/db'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/payments/razorpay'
-import { reverseTransfersForRefund, recordRefundSettlement } from '@/lib/payments/razorpay-route'
-import { controlPlanePool } from '@/lib/tenant-registry'
+import { applyRouteRefund } from '@/lib/payments/route-settlement'
 import { sendPaymentStatusUpdate } from '@/lib/email'
 import { logActivity } from '@/lib/shared/activity'
 import { getReturnRequest } from '@/lib/queries'
@@ -73,15 +72,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Nothing to refund after the return standard charge.' }, { status: 400 })
     }
 
-    // Refund from the SAME account that collected: the tenant's own keys when they use their own
-    // Razorpay, else the platform account. A platform refund of an own-account payment would fail.
+    // Refund from the SAME account that collected: getRazorpayInstanceFor resolves the tenant's own
+    // keys when they use their own Razorpay, else the platform account. A platform refund of an
+    // own-account payment would fail. applyRouteRefund decides own-vs-platform ledger effects itself.
     const tenant = await resolveRequestTenant()
-    const ownRazorpay = tenant?.tenantId
-      ? await controlPlanePool()
-          .query(`SELECT own_razorpay FROM tenants WHERE id=$1`, [tenant.tenantId])
-          .then(r => r.rows[0]?.own_razorpay === true)
-          .catch(() => false)
-      : false
 
     const { instance: razorpay } = await getRazorpayInstanceFor(tenant?.tenantId)
     const refundIds: string[] = []
@@ -98,32 +92,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       totalRefunded += thisRefund
       remaining = Math.round((remaining - thisRefund) * 100) / 100
 
-      // For platform-keys tenants the buyer money was Route-transferred to the linked account, so
-      // claw back the tenant's share. Own-account tenants were never transferred (the platform never
-      // held the money), so there is nothing to reverse. The helper caps each reversal at the
-      // transfer's own remaining amount and never throws — a failed clawback must not block the
-      // buyer's refund; the shortfall is recorded as tenant debt instead.
+      // Account for the refund in the control-plane ledger. For platform-keys tenants this also
+      // claws back the tenant's share of the Route transfer proportionally (commission + fee) and
+      // records any unrecovered amount as tenant debt for retry-reversals to top up later. For
+      // own-account tenants the platform never held the money, so only refunded_amount/status move.
+      // Never throws and never blocks the buyer's refund; the refund id makes it idempotent.
       let transferReversal: unknown = null
-      if (!ownRazorpay) {
-        const outcome = await reverseTransfersForRefund(paymentRecord.transaction_id, amountInPaise)
-        if (outcome.perTransfer.length > 0 || outcome.lookupError) {
-          transferReversal = outcome
-        }
-        if (outcome.unrecoveredPaise > 0) {
-          console.error(
-            `[refund] transfer reversal INCOMPLETE order=${orderId} payment=${paymentRecord.transaction_id} ` +
-              `unrecoveredPaise=${outcome.unrecoveredPaise}${outcome.lookupError ? ` lookupError=${outcome.lookupError}` : ''}`
-          )
-        }
-        if (tenant?.tenantId && (outcome.reversedPaise > 0 || outcome.unrecoveredPaise > 0)) {
-          await recordRefundSettlement({
-            tenantId: tenant.tenantId,
-            orderRef: order.order_number,
-            refundedInr: thisRefund,
-            reversedInr: outcome.reversedPaise / 100,
-            unrecoveredInr: outcome.unrecoveredPaise / 100,
-          })
-        }
+      const outcome = await applyRouteRefund({
+        tenantId: tenant?.tenantId,
+        paymentId: paymentRecord.transaction_id,
+        refundId: refund.id,
+        refundPaise: amountInPaise,
+        orderRef: order.order_number,
+      })
+      if (outcome.reversedPaise > 0 || outcome.unrecoveredPaise > 0) {
+        transferReversal = outcome
+      }
+      if (outcome.unrecoveredPaise > 0) {
+        console.error(
+          `[refund] transfer reversal INCOMPLETE order=${orderId} payment=${paymentRecord.transaction_id} ` +
+            `unrecoveredPaise=${outcome.unrecoveredPaise}`
+        )
       }
 
       const existingResponse =

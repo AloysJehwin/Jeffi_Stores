@@ -33,7 +33,7 @@ export const DAILY_PAYOUT_SURCHARGE_PCT = parseFloat(process.env.DAILY_PAYOUT_SU
  * Compute the effective commission rate for a transfer: base, plus the daily-payout surcharge
  * when the tenant is on the faster cadence.
  */
-function commissionPct(dailyPayout?: boolean): number {
+export function commissionPct(dailyPayout?: boolean): number {
   return PLATFORM_COMMISSION_PCT + (dailyPayout ? DAILY_PAYOUT_SURCHARGE_PCT : 0)
 }
 
@@ -424,15 +424,17 @@ export async function transferToLinkedAccount(opts: {
 /**
  * Reverse a transfer (for refunds). Moves money back from linked account to platform.
  */
-export async function reverseTransfer(transferId: string, amountPaise?: number): Promise<void> {
+export async function reverseTransfer(transferId: string, amountPaise?: number): Promise<{ id?: string } | void> {
   const rz = getRazorpayInstance()
-  await (rz.transfers as any).reverse(transferId, { amount: amountPaise })
+  return (rz.transfers as any).reverse(transferId, { amount: amountPaise })
 }
 
 export interface RouteTransfer {
   id: string
   amount: number
   amountReversed: number
+  status?: string
+  notes?: Record<string, any>
 }
 
 /**
@@ -461,6 +463,8 @@ export async function fetchTransfersForPayment(
         id: String(t.id),
         amount: Number(t.amount) || 0,
         amountReversed: Number(t.amount_reversed) || 0,
+        status: t.status ? String(t.status) : undefined,
+        notes: t.notes && typeof t.notes === 'object' ? t.notes : undefined,
       }))
     return { ok: true, transfers }
   } catch (e: any) {
@@ -468,398 +472,35 @@ export async function fetchTransfersForPayment(
   }
 }
 
-export interface ReversalOutcome {
-  /** Paise actually reversed across every transfer on the payment. */
-  reversedPaise: number
-  /** Paise that should have been reversed but could not be. */
-  unrecoveredPaise: number
-  perTransfer: { transferId: string; amountPaise: number; error?: string }[]
-  /** Set when the transfer LOOKUP failed — distinct from a reversal that was attempted and failed. */
-  lookupError?: string
-}
-
-/**
- * Reverse a payment's Route transfers for a refund of `refundPaise`.
- *
- * Shared by every refund path (direct refund, return, variant-change diff) so the clawback rules
- * live in one place:
- *   - the transfer carried only the tenant's NET share, never the buyer gross, so each reversal is
- *     capped at that transfer's own `amount - amount_reversed`; over-reversing is rejected by
- *     Razorpay and silently leaks funds
- *   - spreads across multiple transfers when a payment has more than one
- *   - own-account tenants were never transferred (the platform never held the money) — nothing to
- *     reverse, so the caller skips entirely
- *
- * Never throws: a refund to the buyer must not be blocked by a failed clawback. The shortfall is
- * returned as `unrecoveredPaise` for the caller to record as tenant debt and retry.
- */
-export async function reverseTransfersForRefund(paymentId: string, refundPaise: number): Promise<ReversalOutcome> {
-  const out: ReversalOutcome = { reversedPaise: 0, unrecoveredPaise: 0, perTransfer: [] }
-  if (!(refundPaise > 0)) return out
-
-  const lookup = await fetchTransfersForPayment(paymentId)
-  if (!lookup.ok) {
-    // Unknown whether a transfer exists — assume the full amount is unrecovered so the retry
-    // job revisits it, rather than writing off money on a transient API blip.
-    out.unrecoveredPaise = refundPaise
-    out.lookupError = lookup.error
-    return out
-  }
-
-  let remaining = refundPaise
-  for (const transfer of lookup.transfers) {
-    if (remaining <= 0) break
-    const reversible = Math.max(0, transfer.amount - transfer.amountReversed)
-    const amountPaise = Math.min(reversible, remaining)
-    if (amountPaise <= 0) continue
-    try {
-      await reverseTransfer(transfer.id, amountPaise)
-      out.reversedPaise += amountPaise
-      out.perTransfer.push({ transferId: transfer.id, amountPaise })
-    } catch (e: any) {
-      // Razorpay hard-fails when the linked account has no floating balance.
-      const error = e?.message || 'reverse failed'
-      out.unrecoveredPaise += amountPaise
-      out.perTransfer.push({ transferId: transfer.id, amountPaise, error })
-    }
-    remaining -= amountPaise
-  }
-  return out
-}
-
-/**
- * Look up the Route transfer id created for a captured payment, so a refund can reverse it.
- * The transfer id is not persisted on the tenant `payments` row, so it is fetched from Razorpay
- * on the platform account (Route transfers always originate there). Returns null on any failure —
- * a missing transfer must never block the buyer refund.
- */
-export async function fetchTransferIdForPayment(paymentId: string): Promise<string | null> {
-  const res = await fetchTransfersForPayment(paymentId)
-  return res.ok ? (res.transfers[0]?.id ?? null) : null
-}
-
-/**
- * Record a COD order settlement in the control-plane ledger.
- *
- * COD cash is collected by Delhivery and remitted to the PLATFORM's account
- * out-of-band (not via a Razorpay payment_id), so it cannot use Route transfers.
- * Instead we record a ledger entry: the tenant is owed (gross − commission − actual
- * Delhivery charge), settled in the next payout cycle.
- *
- * Uses the ACTUAL reconciled Delhivery charge (delhivery_billed_amount) when available,
- * falling back to the estimate — this fixes the "AWB estimate vs actual pickup charge"
- * mismatch flagged in the plan.
- */
-export async function recordCodSettlement(opts: {
-  tenantId: string
-  tenantSlug: string
-  orderRef: string
-  grossAmountInr: number
-  actualDelhiveryChargeInr: number
-  dailyPayout?: boolean
-  /** True when the wallet already debited this AWB — do not deduct shipping a second time. */
-  walletBilled?: boolean
-}): Promise<void> {
-  const { controlPlanePool } = await import('@/lib/tenant-registry')
-  const pool = controlPlanePool()
-
-  const grossPaise = Math.round(opts.grossAmountInr * 100)
-  const rate = commissionPct(opts.dailyPayout)
-  const commissionPaise = Math.round(grossPaise * rate)
-  // Shipping is charged ONCE, from the wallet (debitWalletForAwb, at the real invoiced amount).
-  // Deducting it here as well billed every COD order twice for the same AWB. own_delhivery tenants
-  // are billed directly by Delhivery and never hit the wallet, so they keep the deduction.
-  const delhiveryPaise = opts.walletBilled ? 0 : Math.round(opts.actualDelhiveryChargeInr * 100)
-  const tenantSharePaise = Math.max(0, grossPaise - commissionPaise - delhiveryPaise)
-
-  // tenant_transactions row (COD, no gateway txn id)
-  await pool
-    .query(
-      `INSERT INTO tenant_transactions
-       (tenant_id, order_ref, gross_amount, tenant_share, platform_commission, gateway_fee, gateway, is_cod, status, occurred_at)
-     VALUES ($1,$2,$3,$4,$5,0,'cod_remittance',true,'settled',now())
-     ON CONFLICT DO NOTHING`,
-      [opts.tenantId, opts.orderRef, opts.grossAmountInr, tenantSharePaise / 100, commissionPaise / 100]
-    )
-    .catch(() => {})
-
-  // settlement_ledger entries: +cod_remittance (platform received), then the deductions.
-  // The delhivery row is omitted when the wallet already carried the charge, so the ledger
-  // never shows a deduction the tenant did not actually take here.
-  await pool
-    .query(
-      `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
-     VALUES
-       ($1, 'cod_remittance', $2, $3, now()),
-       ($1, 'commission', $4, $5, now())`,
-      [
-        opts.tenantId,
-        opts.grossAmountInr,
-        `COD collected — order ${opts.orderRef}`,
-        -(commissionPaise / 100),
-        `Platform commission (${(rate * 100).toFixed(1)}%) — order ${opts.orderRef}`,
-      ]
-    )
-    .catch(() => {})
-
-  if (delhiveryPaise > 0) {
-    await pool
-      .query(
-        `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
-       VALUES ($1, 'delhivery_correction', $2, $3, now())`,
-        [opts.tenantId, -(delhiveryPaise / 100), `Delhivery charge (actual) — order ${opts.orderRef}`]
-      )
-      .catch(() => {})
-  }
-}
-
-/**
- * Record a refund against the tenant's settlement ledger, including any share the platform could
- * not claw back.
- *
- * Before this, a refund left no trace in the control plane at all: `settlement_ledger` declared a
- * `refund` entry_type that nothing wrote, and `tenant_transactions.status` never moved off
- * 'captured'. The billing view therefore overstated tenant earnings by every refund ever issued.
- *
- * `unrecoveredInr` is the part of the tenant's share that the reversal could not recover (usually
- * an empty linked-account balance). It is recorded as tenant debt so it can be retried and, failing
- * that, recovered from later settlements — the buyer's refund is never made to wait on it.
- */
-export async function recordRefundSettlement(opts: {
-  tenantId: string
-  orderRef: string
-  refundedInr: number
-  reversedInr: number
-  unrecoveredInr: number
-  note?: string
-}): Promise<void> {
-  if (!opts.tenantId) return
-  const { controlPlanePool } = await import('@/lib/tenant-registry')
-  const pool = controlPlanePool()
-
-  const suffix = opts.note ? ` — ${opts.note}` : ''
-  await pool
-    .query(
-      `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, txn_id, note, occurred_at)
-     SELECT $1, 'refund', $2, t.id, $3, now()
-       FROM (SELECT id FROM tenant_transactions WHERE tenant_id = $1 AND order_ref = $4) t
-     UNION ALL
-     SELECT $1, 'refund', $2, NULL, $3, now()
-      WHERE NOT EXISTS (SELECT 1 FROM tenant_transactions WHERE tenant_id = $1 AND order_ref = $4)`,
-      [opts.tenantId, -Math.abs(opts.reversedInr), `Refund reversed — order ${opts.orderRef}${suffix}`, opts.orderRef]
-    )
-    .catch(() => {})
-
-  if (opts.unrecoveredInr > 0) {
-    await pool
-      .query(
-        `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, note, occurred_at)
-       VALUES ($1, 'refund', $2, $3, now())`,
-        [
-          opts.tenantId,
-          -Math.abs(opts.unrecoveredInr),
-          `Refund NOT reversed (owed by tenant) — order ${opts.orderRef}${suffix}`,
-        ]
-      )
-      .catch(() => {})
-  }
-
-  await pool
-    .query(`UPDATE tenant_transactions SET status = 'refunded' WHERE tenant_id = $1 AND order_ref = $2`, [
-      opts.tenantId,
-      opts.orderRef,
-    ])
-    .catch(() => {})
-}
-
-/**
- * Record a captured online payment in the control-plane `tenant_transactions`, DECOUPLED from
- * the Route transfer. The central-admin billing view reads this table; before this, the only
- * writer welded the row to a successful Route transfer and bailed whenever the tenant had no
- * approved linked account (or no request context, as on the webhook) — so real sales never
- * showed up.
- *
- * Always records the gross. When a Route transfer fired, `split` carries the real
- * tenant_share / commission / gateway_fee; otherwise the seller nominally keeps the gross
- * (commission/fee 0) until Route onboarding reconciles. Idempotent on the
- * (tenant_id, order_ref) unique key so verify + webhook can both fire for one order and write
- * exactly one row. Non-fatal — a bookkeeping failure must not break payment handling.
- */
-export async function recordTenantTransaction(opts: {
-  tenantId: string
-  orderRef: string
-  grossAmountInr: number
-  isCod?: boolean
-  gatewayTxnId?: string | null
-  split?: { tenantShareInr: number; platformCommissionInr: number; gatewayFeeInr: number }
-}): Promise<void> {
-  if (!opts.tenantId || !opts.orderRef) return
-  const { controlPlanePool } = await import('@/lib/tenant-registry')
-  const tenantShare = opts.split ? opts.split.tenantShareInr : opts.grossAmountInr
-  const commission = opts.split ? opts.split.platformCommissionInr : 0
-  const gatewayFee = opts.split ? opts.split.gatewayFeeInr : 0
-  await controlPlanePool()
-    .query(
-      `INSERT INTO tenant_transactions
-       (tenant_id, order_ref, gross_amount, tenant_share, platform_commission, gateway_fee, gateway, is_cod, gateway_txn_id, status, occurred_at)
-     VALUES ($1,$2,$3,$4,$5,$6,'razorpay_route',$7,$8,'captured',now())
-     ON CONFLICT (tenant_id, order_ref) DO NOTHING`,
-      [
-        opts.tenantId,
-        opts.orderRef,
-        opts.grossAmountInr,
-        tenantShare,
-        commission,
-        gatewayFee,
-        !!opts.isCod,
-        opts.gatewayTxnId ?? null,
-      ]
-    )
-    .catch(() => {})
-
-  // Self-heal the transfer.processed race: the webhook may have fired (and matched 0 rows)
-  // before this INSERT committed. If the transfer is already processed at Razorpay, settle now.
-  // Order of the two events no longer matters. Best-effort; never blocks payment handling.
-  if (opts.split && opts.gatewayTxnId && opts.gatewayTxnId.startsWith('trf_')) {
-    settleTenantTransaction({ tenantId: opts.tenantId, orderRef: opts.orderRef, transferId: opts.gatewayTxnId }).catch(
-      () => {}
-    )
-  }
-}
-
-/** Live status of a Route transfer, or null on any failure. */
-export async function fetchTransferStatus(transferId: string): Promise<{ status: string; onHold: boolean } | null> {
+/** Full Route transfer entity, or null on any failure. */
+export async function fetchTransfer(transferId: string): Promise<any | null> {
   try {
     const rz = getRazorpayInstance()
-    const t = await (rz.transfers as any).fetch(transferId)
-    return { status: String(t?.status ?? ''), onHold: t?.on_hold === true }
+    return await (rz.transfers as any).fetch(transferId)
   } catch {
     return null
   }
 }
 
 /**
- * Idempotently move a prepaid tenant_transactions row captured -> settled AND write its
- * settlement_ledger entries (tenant_share credit, commission debit, gateway_fee debit). Called by
- * the transfer.processed webhook, by recordTenantTransaction's post-insert self-check, and by the
- * reconcile job. Idempotent: the status guard makes the flip a no-op once settled, and the ledger
- * insert is guarded so entries are written exactly once per (tenant, order_ref).
- *
- * `verifyLive`: when true (reconcile path) the transfer's live status is confirmed `processed`
- * before settling; the webhook/self-check paths already know it processed and pass false.
+ * Transfers paid out to a linked account by one settlement. The settlement.processed payload
+ * carries only the setl_ id; Razorpay links transfers to it via recipient_settlement_id.
+ * Returns null when the lookup fails so callers can retry rather than conclude "none".
  */
-export async function settleTenantTransaction(opts: {
-  tenantId: string
-  orderRef?: string
-  transferId?: string
-  verifyLive?: boolean
-}): Promise<'settled' | 'noop'> {
-  if (!opts.tenantId || (!opts.orderRef && !opts.transferId)) return 'noop'
-  const { controlPlanePool } = await import('@/lib/tenant-registry')
-  const pool = controlPlanePool()
-
-  const where = opts.orderRef
-    ? { clause: 'order_ref = $2', val: opts.orderRef }
-    : { clause: 'gateway_txn_id = $2', val: opts.transferId! }
-  const row = await pool
-    .query(
-      `SELECT id, order_ref, gateway_txn_id, tenant_share, platform_commission, gateway_fee, is_cod, status
-       FROM tenant_transactions WHERE tenant_id = $1 AND ${where.clause} LIMIT 1`,
-      [opts.tenantId, where.val]
-    )
-    .then(r => r.rows[0])
-    .catch(() => null)
-  if (!row || row.status !== 'captured' || row.is_cod) return 'noop'
-
-  if (opts.verifyLive && row.gateway_txn_id?.startsWith('trf_')) {
-    const live = await fetchTransferStatus(row.gateway_txn_id)
-    if (!live || live.status !== 'processed' || live.onHold) return 'noop'
+export async function fetchTransfersForSettlement(settlementId: string): Promise<any[] | null> {
+  try {
+    const rz = getRazorpayInstance()
+    const out: any[] = []
+    for (let skip = 0; skip < 5000; skip += 100) {
+      const page = await (rz.transfers as any).all({ recipient_settlement_id: settlementId, count: 100, skip })
+      const items = Array.isArray(page?.items) ? page.items : []
+      out.push(...items)
+      if (items.length < 100) break
+    }
+    return out
+  } catch {
+    return null
   }
-
-  const flipped = await pool
-    .query(
-      `UPDATE tenant_transactions SET status = 'settled'
-      WHERE id = $1 AND status = 'captured' RETURNING id`,
-      [row.id]
-    )
-    .then(r => r.rowCount ?? 0)
-    .catch(() => 0)
-  if (!flipped) return 'noop'
-
-  // Prepaid settlement ledger — mirror the COD shape, guarded so it writes once per order.
-  const tenantShare = Number(row.tenant_share) || 0
-  const commission = Number(row.platform_commission) || 0
-  const gatewayFee = Number(row.gateway_fee) || 0
-  await pool
-    .query(
-      `INSERT INTO settlement_ledger (tenant_id, entry_type, amount, txn_id, note, occurred_at)
-     SELECT * FROM (VALUES
-        ($1::uuid, 'order_capture', $2::numeric, $5::uuid, $6::text, now()),
-        ($1::uuid, 'commission',    $3::numeric, $5::uuid, $7::text, now()),
-        ($1::uuid, 'gateway_fee',   $4::numeric, $5::uuid, $8::text, now())
-     ) v(tenant_id, entry_type, amount, txn_id, note, occurred_at)
-     WHERE NOT EXISTS (
-       SELECT 1 FROM settlement_ledger
-        WHERE tenant_id = $1 AND txn_id = $5 AND entry_type = 'order_capture')`,
-      [
-        opts.tenantId,
-        tenantShare,
-        -Math.abs(commission),
-        -Math.abs(gatewayFee),
-        row.id,
-        `Order settled (tenant share) — order ${row.order_ref}`,
-        `Platform commission — order ${row.order_ref}`,
-        `Gateway fee — order ${row.order_ref}`,
-      ]
-    )
-    .catch(() => {})
-
-  return 'settled'
-}
-
-/**
- * Reconcile captured prepaid rows whose Route transfer has already processed at Razorpay but whose
- * status never advanced (the transfer.processed race). Reads live transfer status and settles each
- * via settleTenantTransaction(verifyLive). Optionally scoped to one tenant. Returns how many settled.
- */
-export async function reconcileCapturedTransactions(opts?: {
-  tenantId?: string
-  olderThanMinutes?: number
-  limit?: number
-}): Promise<{ scanned: number; settled: number }> {
-  const { controlPlanePool } = await import('@/lib/tenant-registry')
-  const pool = controlPlanePool()
-  const age = opts?.olderThanMinutes ?? 2
-  const limit = opts?.limit ?? 200
-  const args: any[] = [age, limit]
-  let scope = ''
-  if (opts?.tenantId) {
-    args.push(opts.tenantId)
-    scope = `AND tenant_id = $${args.length}`
-  }
-  const rows = await pool
-    .query(
-      `SELECT tenant_id, gateway_txn_id FROM tenant_transactions
-      WHERE status = 'captured' AND is_cod = false
-        AND gateway_txn_id LIKE 'trf_%'
-        AND occurred_at < now() - ($1 || ' minutes')::interval
-        ${scope}
-      ORDER BY occurred_at ASC LIMIT $2`,
-      args
-    )
-    .then(r => r.rows)
-    .catch(() => [])
-
-  let settled = 0
-  for (const r of rows) {
-    const res = await settleTenantTransaction({
-      tenantId: r.tenant_id,
-      transferId: r.gateway_txn_id,
-      verifyLive: true,
-    }).catch(() => 'noop' as const)
-    if (res === 'settled') settled++
-  }
-  return { scanned: rows.length, settled }
 }
 
 /**

@@ -24,7 +24,7 @@ import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { getRazorpayInstanceFor } from '@/lib/payments/razorpay'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { settleVariantChangePayment } from '@/lib/orders/variant-change'
-import { transferToLinkedAccount, recordTenantTransaction } from '@/lib/payments/razorpay-route'
+import { recordCapturedPayment } from '@/lib/payments/route-settlement'
 import { controlPlanePool } from '@/lib/tenant-registry'
 
 const VerifySchema = z.object({
@@ -131,38 +131,18 @@ async function fireRouteTransfer(opts: {
   const tenant = await resolveRequestTenant()
   if (!tenant?.tenantId) return // platform's own store — no tenant billing
 
-  // Fetch linked account id from control plane
+  // Which keys actually signed (creds.isOwn) and the own_razorpay flag can drift; recordCapturedPayment
+  // resolves the linked account and payout mode itself, so here we only need to decide own vs platform.
   const pool = controlPlanePool()
-  // Razorpay cannot suspend or delete a linked account through its API, so a deprovisioned
-  // tenant's account outlives the tenant. Gating on status is what actually makes it inert:
-  // never move money into an account whose store is suspended or terminated.
-  // A returning owner's linked account survives only on the owner-scoped tenant_bank_accounts
-  // row (tenant_bank_accounts cascades off owners, not tenants), so a re-provisioned tenant can
-  // be 'active' with a NULL razorpay_linked_account_id while the acc_xxx lives there. Billing
-  // already resolves it via this same COALESCE; the transfer path must too, or the split silently
-  // no-ops and the seller keeps the gross.
   const row = await pool
-    .query(
-      `SELECT COALESCE(
-              (SELECT b.linked_account_id FROM tenant_bank_accounts b
-                 JOIN owner_tenants ot ON ot.owner_id = b.owner_id
-                WHERE ot.tenant_id = t.id AND b.linked_account_id IS NOT NULL
-                ORDER BY b.created_at DESC LIMIT 1),
-              t.razorpay_linked_account_id
-            ) AS razorpay_linked_account_id,
-            t.daily_payout, t.own_razorpay
-       FROM tenants t WHERE t.id=$1 AND t.status='active'`,
-      [tenant.tenantId]
-    )
+    .query(`SELECT own_razorpay FROM tenants WHERE id=$1 AND status='active'`, [tenant.tenantId])
     .catch(() => null)
-  const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
-  const dailyPayout = row?.rows[0]?.daily_payout === true
   const ownRazorpayFlag = row?.rows[0]?.own_razorpay === true
 
-  // The own_razorpay column (skip-split) and which keys actually signed (creds.isOwn) are stored
-  // separately and can drift. Reconcile to the account that really holds the money: if the column
-  // says own-account but platform keys collected, the platform must still transfer or the tenant is
-  // never paid; if the column says platform but tenant keys collected, a transfer would be rejected.
+  // The own_razorpay column (skip-split) and which keys actually signed can drift. Reconcile to
+  // the account that really holds the money: column says own but platform keys collected -> the
+  // platform must still transfer or the tenant is never paid; column says platform but tenant keys
+  // collected -> a transfer would be rejected.
   const { isOwn } = await resolveRazorpayCreds(tenant.tenantId).catch(() => ({ isOwn: ownRazorpayFlag }))
   const ownRazorpay = ownRazorpayFlag && isOwn
   if (ownRazorpayFlag !== isOwn) {
@@ -174,58 +154,20 @@ async function fireRouteTransfer(opts: {
     })
   }
 
-  // A tenant on its own Razorpay account collects buyer payments directly — the platform never
-  // touches the money, so there is nothing to split. Record the sale for billing visibility, but
-  // skip the Route transfer entirely.
-  if (ownRazorpay) {
-    await recordTenantTransaction({
-      tenantId: tenant.tenantId,
-      orderRef: opts.orderRef,
-      grossAmountInr: opts.totalAmountInr,
-      isCod: opts.isCod,
-      gatewayTxnId: opts.paymentId,
-    })
-    return
-  }
-
-  // Record the sale for central-admin billing regardless of Route onboarding. When a linked
-  // account exists we fire the transfer and record the real split; otherwise the seller keeps
-  // the gross until Route reconciles.
-  if (!linkedAccountId) {
-    await recordTenantTransaction({
-      tenantId: tenant.tenantId,
-      orderRef: opts.orderRef,
-      grossAmountInr: opts.totalAmountInr,
-      isCod: opts.isCod,
-      gatewayTxnId: opts.paymentId,
-    })
-    return
-  }
-
-  const grossPaise = Math.round(opts.totalAmountInr * 100)
-  const result = await transferToLinkedAccount({
-    paymentId: opts.paymentId,
-    grossAmountPaise: grossPaise,
-    linkedAccountId,
-    isCod: opts.isCod,
-    orderId: opts.orderId,
-    tenantSlug: tenant.slug ?? '',
-    dailyPayout,
-    // Shipping is NOT withheld from the transfer — it is charged once from the prepaid wallet
-    // at the real invoiced amount once the AWB is billed.
-  })
-
-  await recordTenantTransaction({
+  // One entry point for both modes: own-account tenants record the sale with no split (the
+  // platform never held the money); platform-account tenants record the capture and, when a
+  // linked account exists, fire the Route transfer and the real split. Shipping is NOT withheld
+  // here — it is charged once from the prepaid wallet at the real invoiced amount once the AWB is
+  // billed. The transfer is resolved and recorded inside recordCapturedPayment.
+  await recordCapturedPayment({
     tenantId: tenant.tenantId,
+    tenantSlug: tenant.slug ?? '',
     orderRef: opts.orderRef,
-    grossAmountInr: opts.totalAmountInr,
+    orderId: opts.orderId,
+    paymentId: opts.paymentId,
+    grossInr: opts.totalAmountInr,
+    collectedOn: ownRazorpay ? 'own' : 'platform',
     isCod: opts.isCod,
-    gatewayTxnId: result.transferId || opts.paymentId,
-    split: {
-      tenantShareInr: result.amount / 100,
-      platformCommissionInr: result.platformCommissionPaise / 100,
-      gatewayFeeInr: (result.gatewayFeePaise + result.transferFeePaise) / 100,
-    },
   })
 }
 

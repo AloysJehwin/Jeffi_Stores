@@ -20,7 +20,7 @@ import { settleVariantChangePayment } from '@/lib/orders/variant-change'
 import { logActivity } from '@/lib/shared/activity'
 import { recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
 import { getCurrentTenant } from '@/lib/tenancy/tenant-context'
-import { transferToLinkedAccount, recordTenantTransaction, recordRefundSettlement } from '@/lib/payments/razorpay-route'
+import { recordCapturedPayment, applyRouteRefund, applyTransferState, applySettlementProcessed } from '@/lib/payments/route-settlement'
 import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { resolveSubscriptionTenant, runInTenant, type WebhookTenant } from '@/lib/payments/webhook-tenant'
@@ -91,10 +91,13 @@ export async function POST(request: NextRequest) {
       await handlePaymentLinkExpired(event.payload.payment_link.entity)
     } else if (eventType === 'qr_code.credited') {
       await handleQrCodeCredited(event.payload.qr_code.entity)
-    } else if (eventType === 'transfer.processed') {
+    } else if (eventType === 'transfer.processed' || eventType === 'transfer.failed') {
       await handleTransferProcessed(event.payload.transfer.entity)
     } else if (eventType === 'transfer.reversed') {
       await handleTransferReversed(event.payload.transfer.entity)
+    } else if (eventType === 'settlement.processed') {
+      // Account-level settlement cleared: advance every Route transfer it paid out to 'settled'.
+      await applySettlementProcessed(event.payload.settlement.entity).catch(() => {})
     } else if (eventType === 'refund.created' || eventType === 'refund.processed') {
       await handleRefund(event.payload.refund.entity)
     } else if (SUBSCRIPTION_EVENTS.has(eventType)) {
@@ -185,29 +188,16 @@ async function fireRouteTransfer(opts: {
   const resolved = await resolveWebhookTenantId(opts.payment, opts.orderRef)
   if (!resolved) return // platform's own store — no tenant billing
 
+  // recordCapturedPayment resolves the linked account (incl. the owner-bank fallback) and payout
+  // mode itself; here we only decide own vs platform. Reconcile the own_razorpay column against the
+  // keys that actually signed (see verify route): on drift fall to the money-safe branch so a tenant
+  // is never left unpaid nor a bad transfer fired.
   const pool = controlPlanePool()
-  // Same owner-bank fallback as the verify path: a re-provisioned tenant's acc_xxx lives on the
-  // owner-scoped tenant_bank_accounts row, not the tenant row. Resolve it the way billing does.
   const row = await pool
-    .query(
-      `SELECT COALESCE(
-              (SELECT b.linked_account_id FROM tenant_bank_accounts b
-                 JOIN owner_tenants ot ON ot.owner_id = b.owner_id
-                WHERE ot.tenant_id = t.id AND b.linked_account_id IS NOT NULL
-                ORDER BY b.created_at DESC LIMIT 1),
-              t.razorpay_linked_account_id
-            ) AS razorpay_linked_account_id,
-            t.daily_payout, t.own_razorpay
-       FROM tenants t WHERE t.id=$1 AND t.status='active'`,
-      [resolved.tenantId]
-    )
+    .query(`SELECT own_razorpay FROM tenants WHERE id=$1 AND status='active'`, [resolved.tenantId])
     .catch(() => null)
-  const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
-  const dailyPayout = row?.rows[0]?.daily_payout === true
   const ownRazorpayFlag = row?.rows[0]?.own_razorpay === true
 
-  // Reconcile the own_razorpay column against the keys that actually signed (see verify route):
-  // fall to the money-safe branch on drift so a tenant is never left unpaid nor a bad transfer fired.
   const { isOwn } = await resolveRazorpayCreds(resolved.tenantId).catch(() => ({ isOwn: ownRazorpayFlag }))
   const ownRazorpay = ownRazorpayFlag && isOwn
   if (ownRazorpayFlag !== isOwn) {
@@ -219,47 +209,14 @@ async function fireRouteTransfer(opts: {
     })
   }
 
-  if (ownRazorpay) {
-    await recordTenantTransaction({
-      tenantId: resolved.tenantId,
-      orderRef: opts.orderRef,
-      grossAmountInr: opts.totalAmountInr,
-      gatewayTxnId: opts.paymentId,
-    })
-    return
-  }
-
-  if (!linkedAccountId) {
-    await recordTenantTransaction({
-      tenantId: resolved.tenantId,
-      orderRef: opts.orderRef,
-      grossAmountInr: opts.totalAmountInr,
-      gatewayTxnId: opts.paymentId,
-    })
-    return
-  }
-
-  const result = await transferToLinkedAccount({
-    paymentId: opts.paymentId,
-    grossAmountPaise: Math.round(opts.totalAmountInr * 100),
-    // Shipping is NOT withheld from the transfer — it is charged once from the prepaid wallet
-    // at the real invoiced amount once the AWB is billed.
-    linkedAccountId,
-    orderId: opts.orderId,
-    tenantSlug: resolved.slug,
-    dailyPayout,
-  })
-
-  await recordTenantTransaction({
+  await recordCapturedPayment({
     tenantId: resolved.tenantId,
+    tenantSlug: resolved.slug,
     orderRef: opts.orderRef,
-    grossAmountInr: opts.totalAmountInr,
-    gatewayTxnId: result.transferId || opts.paymentId,
-    split: {
-      tenantShareInr: result.amount / 100,
-      platformCommissionInr: result.platformCommissionPaise / 100,
-      gatewayFeeInr: (result.gatewayFeePaise + result.transferFeePaise) / 100,
-    },
+    orderId: opts.orderId,
+    paymentId: opts.paymentId,
+    grossInr: opts.totalAmountInr,
+    collectedOn: ownRazorpay ? 'own' : 'platform',
   })
 }
 
@@ -550,40 +507,20 @@ async function handlePaymentLinkExpired(paymentLink: any) {
   )
 }
 
-// A Route transfer to a linked account has cleared its on_hold window and processed, so the split
-// tenant_transactions row (whose gateway_txn_id is the trf_... id) advances captured -> settled.
-// Own-account/gross-only rows never route through the platform, so they get no transfer.processed
-// event here; their money settles on the tenant's own Razorpay account. Non-fatal bookkeeping.
+// A Route transfer to a linked account changed state. applyTransferState advances the row from the
+// transfer entity itself (captured -> split on processed, -> settled once a recipient settlement
+// covers it, -> failed on transfer.failed), resolving the tenant and writing the capture/settlement
+// ledger. Own-account/gross-only and COD rows are ignored inside it. Non-fatal bookkeeping.
 async function handleTransferProcessed(transfer: any) {
-  const transferId = (transfer?.id ?? '').toString().trim()
-  if (!transferId || transfer?.status !== 'processed' || transfer?.on_hold === true) return
-  // Resolve the tenant for this transfer, then settle idempotently (flips status AND writes the
-  // prepaid settlement ledger). If the tenant_transactions row hasn't been inserted yet (the race),
-  // recordTenantTransaction's own post-insert self-check settles it once it lands.
-  const owner = await controlPlanePool()
-    .query(`SELECT tenant_id FROM tenant_transactions WHERE gateway_txn_id = $1 LIMIT 1`, [transferId])
-    .then(r => r.rows[0])
-    .catch(() => null)
-  if (!owner) return
-  const { settleTenantTransaction } = await import('@/lib/payments/razorpay-route')
-  await settleTenantTransaction({ tenantId: owner.tenant_id, transferId }).catch(() => {})
+  await applyTransferState(transfer).catch(() => {})
 }
 
 /**
- * A transfer was reversed — by our own refund paths, or from the Razorpay dashboard.
- * Marks the tenant transaction refunded so the billing view stops counting the reversed
- * share as tenant earnings. Idempotent: the WHERE clause no-ops once already refunded.
+ * A transfer was reversed — by our own refund paths, or from the Razorpay dashboard. applyTransferState
+ * records the reversed amount; the refunded status is set by the refund handler. Idempotent.
  */
 async function handleTransferReversed(transfer: any) {
-  const transferId = (transfer?.id ?? '').toString().trim()
-  if (!transferId) return
-  await controlPlanePool()
-    .query(
-      `UPDATE tenant_transactions SET status = 'refunded'
-     WHERE gateway_txn_id = $1 AND status <> 'refunded'`,
-      [transferId]
-    )
-    .catch(() => {})
+  await applyTransferState(transfer).catch(() => {})
 }
 
 /**
@@ -655,15 +592,15 @@ async function handleRefund(refund: any) {
   })
   if (!order?.order_number || !tenant?.tenantId) return
 
-  // Out-of-band refund: nothing reversed the tenant's share, so the whole amount is owed.
-  const refundedInr = (Number(refund?.amount) || 0) / 100
-  await recordRefundSettlement({
+  // Account for the refund idempotently (keyed on the refund id). An app-initiated refund already
+  // called this, so it no-ops; a dashboard refund that bypassed the app is recorded here, reversing
+  // the tenant's share proportionally and recording any shortfall as debt for retry-reversals.
+  await applyRouteRefund({
     tenantId: tenant.tenantId,
+    paymentId,
+    refundId: (refund?.id ?? '').toString(),
+    refundPaise: Number(refund?.amount) || 0,
     orderRef: order.order_number,
-    refundedInr,
-    reversedInr: 0,
-    unrecoveredInr: refundedInr,
-    note: 'refunded outside the app (dashboard)',
   }).catch(() => {})
 }
 
