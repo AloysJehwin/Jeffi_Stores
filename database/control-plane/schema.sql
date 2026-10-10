@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_transactions (
     is_cod              boolean NOT NULL DEFAULT false,
     gateway             character varying(32) NOT NULL DEFAULT 'razorpay_route',
     gateway_txn_id      character varying(128),
-    status              character varying(24) NOT NULL DEFAULT 'captured', -- captured|split|settled|refunded|failed
+    status              character varying(24) NOT NULL DEFAULT 'captured', -- captured|split|settled|partially_refunded|refunded|failed
     occurred_at         timestamp with time zone NOT NULL DEFAULT now(),
     created_at          timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -179,6 +179,31 @@ ALTER TABLE ONLY public.settlement_ledger ADD CONSTRAINT settlement_ledger_tenan
 
 CREATE INDEX IF NOT EXISTS idx_tenant_transactions_tenant ON public.tenant_transactions USING btree (tenant_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_settlement_ledger_tenant ON public.settlement_ledger USING btree (tenant_id, occurred_at DESC);
+
+-- Route lifecycle: captured -> split (transferred, on hold) -> settled (linked account paid out),
+-- or partially_refunded / refunded / failed. gateway = razorpay_route | razorpay_own | cod_remittance.
+-- refund_ids makes each Razorpay refund count exactly once across app path + webhook redeliveries.
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS payment_id              character varying(128);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS transfer_id             character varying(128);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS recipient_settlement_id character varying(64);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS refunded_amount         numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS reversed_amount         numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS refund_ids              text[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS failure_reason          character varying(255);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS transferred_at          timestamp with time zone;
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS settled_at              timestamp with time zone;
+-- Idempotency key per money movement (cap:<pay>, trf:<trf>, refund id, reversal id, cod:<order>).
+ALTER TABLE public.settlement_ledger   ADD COLUMN IF NOT EXISTS external_ref            character varying(128);
+
+-- One row per payment: verify + webhook + reconcile racing can never record (or transfer) twice.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tenant_transactions_tenant_payment
+    ON public.tenant_transactions USING btree (tenant_id, payment_id) WHERE payment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tenant_transactions_payment ON public.tenant_transactions USING btree (payment_id) WHERE payment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tenant_transactions_transfer ON public.tenant_transactions USING btree (transfer_id) WHERE transfer_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tenant_transactions_open
+    ON public.tenant_transactions USING btree (occurred_at) WHERE status IN ('captured', 'split');
+CREATE UNIQUE INDEX IF NOT EXISTS uq_settlement_ledger_external_ref
+    ON public.settlement_ledger USING btree (tenant_id, entry_type, external_ref) WHERE external_ref IS NOT NULL;
 
 --
 -- tenant_wallets: per-tenant prepaid balance the platform debits for the real Delhivery
