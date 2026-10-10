@@ -110,6 +110,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       platformAdminOnly: true,
     },
     { href: '/admin/audit', label: 'Audit Log', scope: 'audit:read', group: 'Settings' },
+    { href: '/admin/cron', label: 'Scheduled Jobs', scope: 'audit:read', group: 'Settings' },
     { href: '/admin/service-accounts', label: 'Service Accounts', scope: 'service_accounts:read', group: 'Settings' },
     { href: '/admin/team', label: 'Team Members', scope: 'settings:read', group: 'Settings', ownerOnly: true },
     { href: '/admin/settings/homepage', label: 'Homepage', scope: 'settings:write', group: 'Settings' },

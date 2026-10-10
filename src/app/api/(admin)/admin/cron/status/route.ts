@@ -19,6 +19,23 @@ export async function GET(request: NextRequest) {
     const settings: Record<string, string> = {}
     for (const row of result.rows) settings[row.key] = row.value
 
+    // When a tenant is in context, mark which jobs its PLAN runs (tenantScope ∈ plan scopes).
+    // Platform-only jobs (tenantScope === null) are platform infra → not a tenant's job.
+    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+    const tenantId = await resolveTenantId().catch(() => null)
+    let planScopes: Set<string> | null = null
+    if (tenantId) {
+      const { getTenantPlan } = await import('@/lib/auth/plan-gate')
+      planScopes = await getTenantPlan(tenantId)
+        .then(p => p.scopes)
+        .catch(() => null)
+    }
+    const inPlanFor = (tenantScope: string | null): boolean => {
+      if (!tenantId) return true // platform admin sees everything
+      if (tenantScope === null) return false // platform-only job, not a tenant's
+      return planScopes ? planScopes.has(tenantScope) : false
+    }
+
     const JOBS = CRON_JOBS.map(j => ({
       id: j.id,
       name: j.name,
@@ -26,6 +43,7 @@ export async function GET(request: NextRequest) {
       intervalMs: j.intervalMs,
       intervalLabel: j.intervalLabel,
       tenantScope: j.tenantScope,
+      inPlan: inPlanFor(j.tenantScope),
     }))
 
     const jobs = JOBS.map(job => {
