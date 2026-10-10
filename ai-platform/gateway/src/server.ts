@@ -2,13 +2,13 @@ import { createServer } from 'node:http'
 import IORedis from 'ioredis'
 import pg from 'pg'
 import { CONFIG, modelForHint } from './config'
-import { ollamaChat, ollamaReachable, ollamaEmbed } from './providers/ollama'
+import { ollamaChat, ollamaEmbed, ollamaPool } from './providers/ollama'
 import { runVision } from './providers/paddleocr'
-import { runJob, startWorker, queueHealth, type JobData } from './queue'
+import { runJob, startWorker, queueHealth, pendingWaiters, type JobData } from './queue'
 import { policyFor } from './cache/policy'
 import { cacheKey, kvGet, kvSet } from './cache/kv'
 import { semanticKey, semanticGet, semanticSet } from './cache/semantic'
-import type { AiChatRequest, AiChatResponse, EmbedRequest, EmbedResponse, VisionRequest } from '../../sdk/types'
+import type { AiChatRequest, AiChatResponse, EmbedRequest, EmbedResponse, VisionRequest, VisionResponse } from '../../sdk/types'
 
 const redis = new IORedis(CONFIG.redisUrl, { maxRetriesPerRequest: 3 })
 const pgPool = CONFIG.pgUrl ? new pg.Pool({ connectionString: CONFIG.pgUrl, max: 3 }) : null
@@ -16,10 +16,7 @@ const pgPool = CONFIG.pgUrl ? new pg.Pool({ connectionString: CONFIG.pgUrl, max:
 // ── Model work (runs inside the queue worker) ────────────────────────────────
 async function processJob(data: JobData): Promise<unknown> {
   if (data.kind === 'chat') {
-    const req = data.payload as AiChatRequest
-    const reachable = await ollamaReachable()
-    if (!reachable) throw new Error('Ollama is not reachable')
-    return ollamaChat(req)
+    return ollamaChat(data.payload as AiChatRequest)
   }
   if (data.kind === 'embed') {
     const { input, model } = data.payload as EmbedRequest
@@ -34,6 +31,24 @@ async function processJob(data: JobData): Promise<unknown> {
 }
 
 startWorker(processJob)
+ollamaPool.start()
+
+class HttpError extends Error {
+  constructor(readonly status: number, message: string) { super(message) }
+}
+
+// Fail fast (503) when the last probe found no Ollama, instead of queueing work that will only
+// exhaust its retries; the app falls back to direct Ollama on 5xx.
+function assertOllamaUp(): void {
+  if (ollamaPool.knownDown()) throw new HttpError(503, ollamaPool.status().reason || 'Ollama is not reachable')
+}
+
+/** Truthful dependency check (cached ~probe interval). */
+async function readiness(): Promise<{ ok: boolean; reason?: string; queue: boolean; ollama: Awaited<ReturnType<typeof ollamaPool.health>> }> {
+  const [queue, ollama] = await Promise.all([queueHealth(), ollamaPool.health()])
+  const reasons = [!queue && 'redis queue unreachable', !ollama.ok && (ollama.reason || 'Ollama unreachable')].filter(Boolean)
+  return { ok: reasons.length === 0, reason: reasons.join('; ') || undefined, queue, ollama }
+}
 
 // ── Chat with the two-tier cache in front of the durable queue ───────────────
 async function handleChat(req: AiChatRequest): Promise<AiChatResponse> {
@@ -51,6 +66,7 @@ async function handleChat(req: AiChatRequest): Promise<AiChatResponse> {
     if (hit) return { content: hit, provider: 'ollama', model, latencyMs: Date.now() - start, fallbackUsed: false, cache: 'semantic' }
   }
 
+  assertOllamaUp()
   const r = await runJob<{ content: string; toolCalls?: AiChatResponse['toolCalls']; model: string }>({ kind: 'chat', payload: req })
 
   // Only cache plain text answers (never tool calls).
@@ -80,26 +96,37 @@ function json(res: import('node:http').ServerResponse, status: number, body: unk
 
 const server = createServer(async (req, res) => {
   try {
-    if (req.method === 'GET' && req.url === '/healthz') {
-      const ok = await queueHealth()
-      return json(res, ok ? 200 : 503, { ok, queue: ok })
+    const url = new URL(req.url || '/', 'http://gateway')
+    const path = url.pathname
+    if (req.method === 'GET' && (path === '/readyz' || (path === '/healthz' && url.searchParams.has('deep')))) {
+      const r = await readiness()
+      return json(res, r.ok ? 200 : 503, r)
     }
-    if (req.method === 'POST' && req.url === '/v1/chat') {
+    // Liveness: the process answers. Dependency state is reported, never fails the probe.
+    if (req.method === 'GET' && path === '/healthz') {
+      const o = ollamaPool.status()
+      return json(res, 200, { ok: true, ollama: { ok: o.ok, active: o.active, checkedAt: o.checkedAt }, waiters: pendingWaiters() })
+    }
+    if (req.method === 'POST' && path === '/v1/chat') {
       return json(res, 200, await handleChat(await readBody(req)))
     }
-    if (req.method === 'POST' && req.url === '/v1/embed') {
-      return json(res, 200, await runJob<EmbedResponse>({ kind: 'embed', payload: await readBody(req) }))
+    if (req.method === 'POST' && path === '/v1/embed') {
+      const body = await readBody(req)
+      assertOllamaUp()
+      return json(res, 200, await runJob<EmbedResponse>({ kind: 'embed', payload: body }))
     }
-    if (req.method === 'POST' && req.url === '/v1/vision') {
-      return json(res, 200, await runJob({ kind: 'vision', payload: await readBody(req) }))
+    if (req.method === 'POST' && path === '/v1/vision') {
+      const r = await runJob<VisionResponse>({ kind: 'vision', payload: await readBody(req) })
+      return json(res, !r.ok && ollamaPool.knownDown() ? 503 : 200, r)
     }
     json(res, 404, { error: 'not found' })
   } catch (err) {
-    json(res, 500, { error: err instanceof Error ? err.message : 'internal error' })
+    const status = err instanceof HttpError ? err.status : 500
+    json(res, status, { error: err instanceof Error ? err.message : 'internal error' })
   }
 })
 
 server.listen(CONFIG.port, () => {
   // eslint-disable-next-line no-console
-  console.log(`[ai-gateway] listening on :${CONFIG.port} -> ollama ${CONFIG.ollamaBaseUrl}`)
+  console.log(`[ai-gateway] listening on :${CONFIG.port} -> ollama [${CONFIG.ollamaBaseUrls.join(', ')}]`)
 })

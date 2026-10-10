@@ -20,6 +20,11 @@ spec:
           envFrom:
             - configMapRef: { name: ai-gateway-config }
             - secretRef: { name: ai-gateway-secret }
+          # Both probes are process-level on purpose. Redis and Ollama are shared by every replica,
+          # so gating readiness on them only ever flips ALL replicas off together: the LB then
+          # refuses even KV-cache hits and the durable queue. Instead the gateway answers 503 with a
+          # reason when Ollama is down (the app then goes direct to Ollama), and /readyz is the
+          # truthful dependency check watched by the app's ai_health cron.
           readinessProbe:
             httpGet: { path: /healthz, port: 8080 }
             initialDelaySeconds: 5

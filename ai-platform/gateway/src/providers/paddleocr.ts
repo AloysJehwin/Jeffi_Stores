@@ -1,5 +1,7 @@
 import { CONFIG, VISION_MODEL } from '../config'
 import type { VisionResponse } from '../../../sdk/types'
+import { ollamaPool } from './ollama'
+import { isNetworkError } from './ollama-pool'
 
 // Vision primitive: PaddleOCR first (fast, deterministic), Ollama vision model as
 // fallback. The domain-specific orchestration (PDF rasterization, quotation-extraction
@@ -30,11 +32,12 @@ async function paddle(base64: string): Promise<VisionResponse | null> {
   }
 }
 
-async function ollamaVision(base64Images: string[], prompt: string, model: string): Promise<VisionResponse> {
+// Network errors are rethrown so the pool fails over to the next Ollama URL.
+async function ollamaVisionAt(base: string, base64Images: string[], prompt: string, model: string): Promise<VisionResponse> {
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), VISION_TIMEOUT_MS)
   try {
-    const res = await fetch(`${CONFIG.ollamaBaseUrl}/api/chat`, {
+    const res = await fetch(`${base}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -57,6 +60,7 @@ async function ollamaVision(base64Images: string[], prompt: string, model: strin
     const text = (data?.message?.content || '').trim()
     return { ok: !!text, text, model }
   } catch (e: any) {
+    if (isNetworkError(e)) throw e
     return {
       ok: false, text: '', model,
       error: e?.name === 'AbortError' ? `Vision request timed out after ${VISION_TIMEOUT_MS / 1000}s` : `Cannot reach vision model: ${String(e?.message || e)}`,
@@ -74,5 +78,14 @@ export async function runVision(images: string[], prompt: string, model?: string
     const p = await paddle(images[0])
     if (p) return p
   }
-  return ollamaVision(images, prompt, model || VISION_MODEL)
+  const m = model || VISION_MODEL
+  try {
+    return await ollamaPool.withOllama(base => ollamaVisionAt(base, images, prompt, m))
+  } catch (e: any) {
+    return {
+      ok: false, text: '', model: m,
+      error: `Cannot reach vision model: ${String(e?.message || e)}`,
+      hint: 'Check the gateway->Ollama connection (GET /readyz).',
+    }
+  }
 }

@@ -180,6 +180,17 @@ export const CRON_JOBS: readonly CronJob[] = [
     lockTtlMs: 5 * MIN - 30 * SEC,
     tenantScope: 'dashboard:read',
   },
+  {
+    id: 'ai_health',
+    name: 'AI platform health',
+    path: '/api/internal/ai/health',
+    method: 'GET',
+    intervalMs: 5 * MIN,
+    intervalLabel: 'every 5 min',
+    startDelayMs: 135 * SEC,
+    lockTtlMs: 5 * MIN - 30 * SEC,
+    tenantScope: null,
+  },
 ]
 
 export const CRON_JOB_IDS: readonly string[] = CRON_JOBS.map(j => j.id)

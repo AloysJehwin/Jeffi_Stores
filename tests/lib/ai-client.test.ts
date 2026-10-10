@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 const mockFetch = vi.fn()
 global.fetch = mockFetch
@@ -8,7 +8,7 @@ vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
   resolveTenantId: vi.fn(async () => null),
 }))
 
-import { aiChat, aiEmbed, aiVision, AiClientError, getAiProvider } from '@/lib/shared/ai-client'
+import { aiChat, aiEmbed, aiVision, AiClientError, getAiProvider, __resetAiClientState } from '@/lib/shared/ai-client'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 
 const GATEWAY_REPLY = {
@@ -30,6 +30,7 @@ function sentBody(callIndex = 0) {
 
 beforeEach(() => {
   mockFetch.mockReset()
+  __resetAiClientState()
   vi.mocked(resolveTenantId).mockResolvedValue(null)
 })
 
@@ -179,5 +180,116 @@ describe('aiVision (gateway client)', () => {
     mockFetch.mockRejectedValueOnce(new Error('ECONNRESET'))
     const result = await aiVision(['x'], 'extract')
     expect(result).toMatchObject({ ok: false, error: 'ECONNRESET' })
+  })
+})
+
+describe('direct Ollama fallback (OLLAMA_BASE_URL set)', () => {
+  const OLLAMA = 'http://ollama.test:11434'
+  type Handler = (url: string, init?: any) => any
+  let gateway: Handler
+  let ollama: Handler
+  let errSpy: ReturnType<typeof vi.spyOn>
+
+  const status = (code: number, body = '') => ({ ok: code < 400, status: code, text: async () => body, json: async () => ({}) })
+  const calls = (needle: string) => mockFetch.mock.calls.filter(([u]) => String(u).includes(needle))
+
+  beforeEach(() => {
+    vi.stubEnv('OLLAMA_BASE_URL', OLLAMA)
+    vi.stubEnv('OLLAMA_FAST_MODEL', 'fast-model')
+    vi.stubEnv('OLLAMA_SQL_MODEL', 'sql-model')
+    errSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    gateway = () => okJson(GATEWAY_REPLY)
+    ollama = () => okJson({ message: { content: '<think>x</think>direct answer' } })
+    mockFetch.mockImplementation(async (url: string, init?: any) => {
+      if (String(url).startsWith(OLLAMA)) return ollama(url, init)
+      if (String(url).endsWith('/healthz')) return okJson({ ok: true })
+      return gateway(url, init)
+    })
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    errSpy.mockRestore()
+  })
+
+  it('uses the gateway when it answers', async () => {
+    expect(await aiChat({ messages: [{ role: 'user', content: 'hi' }] })).toEqual(GATEWAY_REPLY)
+    expect(calls(OLLAMA)).toHaveLength(0)
+  })
+
+  it('falls back on a gateway 5xx with the same shape and fallbackUsed', async () => {
+    gateway = () => status(500, '{"error":"Ollama is not reachable"}')
+    const r = await aiChat({ messages: [{ role: 'user', content: 'hi' }], modelHint: 'sql' })
+    expect(r).toMatchObject({ content: 'direct answer', provider: 'ollama', model: 'sql-model', fallbackUsed: true, cache: null })
+    expect(typeof r.latencyMs).toBe('number')
+    const [url, init] = calls(OLLAMA)[0]
+    expect(url).toBe(`${OLLAMA}/api/chat`)
+    expect(JSON.parse(init.body)).toMatchObject({ model: 'sql-model', stream: false, think: false })
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('falling back to direct Ollama'))
+  })
+
+  it('falls back on a network error and passes tools/jsonMode through', async () => {
+    gateway = () => { throw new TypeError('fetch failed') }
+    ollama = () => okJson({ message: { content: '', tool_calls: [{ function: { name: 'search', arguments: '{"q":"x"}' } }] } })
+    const tools = [{ type: 'function' as const, function: { name: 'search', description: 'd', parameters: {} } }]
+    const r = await aiChat({ messages: [{ role: 'user', content: 'hi' }], tools, jsonMode: true, modelHint: 'fast' })
+    expect(r.toolCalls).toEqual([{ name: 'search', arguments: { q: 'x' } }])
+    expect(r.fallbackUsed).toBe(true)
+    expect(JSON.parse(calls(OLLAMA)[0][1].body)).toMatchObject({ tools, format: 'json', model: 'fast-model' })
+  })
+
+  it('goes direct without waiting once the gateway health check fails', async () => {
+    mockFetch.mockImplementation(async (url: string, init?: any) => {
+      if (String(url).startsWith(OLLAMA)) return ollama(url, init)
+      throw new TypeError('fetch failed')
+    })
+    const r = await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+    expect(r.fallbackUsed).toBe(true)
+    expect(calls('/v1/chat')).toHaveLength(0)
+    await aiChat({ messages: [{ role: 'user', content: 'again' }] })
+    expect(calls('/healthz')).toHaveLength(1)
+  })
+
+  it('does NOT fall back on a 4xx', async () => {
+    gateway = () => status(400, 'bad request')
+    const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
+    expect(err).toBeInstanceOf(AiClientError)
+    expect(err.message).toBe('AI gateway HTTP 400: bad request')
+    expect(calls(OLLAMA)).toHaveLength(0)
+  })
+
+  it('throws AiClientError when both the gateway and direct Ollama fail', async () => {
+    gateway = () => status(503)
+    ollama = () => { throw new TypeError('fetch failed') }
+    const err = await aiChat({ messages: [{ role: 'user', content: 'hi' }] }).catch(e => e)
+    expect(err).toBeInstanceOf(AiClientError)
+    expect(err.message).toMatch(/AI gateway failed .*direct Ollama fallback failed/)
+  })
+
+  it('falls back for embeddings', async () => {
+    gateway = () => status(502)
+    ollama = () => okJson({ embedding: [0.5, 0.6] })
+    expect(await aiEmbed(['a', 'b'])).toEqual([[0.5, 0.6], [0.5, 0.6]])
+    expect(JSON.parse(calls(OLLAMA)[0][1].body)).toEqual({ model: 'nomic-embed-text', prompt: 'a' })
+  })
+
+  it('does not fall back for embeddings on a 4xx', async () => {
+    gateway = () => status(422)
+    await expect(aiEmbed('a')).rejects.toThrow('AI gateway embed HTTP 422')
+    expect(calls(OLLAMA)).toHaveLength(0)
+  })
+
+  it('falls back for vision and marks fallbackUsed', async () => {
+    gateway = () => status(503)
+    ollama = () => okJson({ message: { content: 'invoice text' } })
+    vi.stubEnv('OLLAMA_VISION_MODEL', 'vision-model')
+    expect(await aiVision(['aGk='], 'read')).toEqual({ ok: true, text: 'invoice text', model: 'vision-model', fallbackUsed: true })
+    expect(JSON.parse(calls(OLLAMA)[0][1].body).messages[0].images).toEqual(['aGk='])
+  })
+
+  it('reports a vision 4xx without falling back', async () => {
+    gateway = () => status(413)
+    const r = await aiVision(['x'], 'read')
+    expect(r).toMatchObject({ ok: false, error: 'AI gateway vision HTTP 413' })
+    expect(calls(OLLAMA)).toHaveLength(0)
   })
 })
