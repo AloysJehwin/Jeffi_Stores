@@ -435,7 +435,7 @@ describe('reverseTransfer', () => {
 // ── recordCodSettlement — control-plane ledger ──────────────────────────────
 describe('recordCodSettlement', () => {
   it('writes a tenant_transactions row and the settlement_ledger entries', async () => {
-    const { recordCodSettlement } = await import('@/lib/payments/razorpay-route')
+    const { recordCodSettlement } = await import('@/lib/payments/route-settlement')
     await recordCodSettlement({
       tenantId: 't-1',
       tenantSlug: 'acme',
@@ -443,8 +443,8 @@ describe('recordCodSettlement', () => {
       grossAmountInr: 1000,
       actualDelhiveryChargeInr: 50,
     })
-    // txn + base ledger + the delhivery row (no wallet debit on this order)
-    expect(pool.query).toHaveBeenCalledTimes(3)
+    // txn INSERT + one batched settlement_ledger INSERT (base + commission + delhivery rows)
+    expect(pool.query).toHaveBeenCalledTimes(2)
     const [txnSql, txnParams] = pool.query.mock.calls[0]
     expect(txnSql).toMatch(/INSERT INTO tenant_transactions/)
     // gross 1000 → commission 5% = 50 → tenant share = 1000 - 50 - 50 = 900
@@ -456,7 +456,7 @@ describe('recordCodSettlement', () => {
   // Regression: the wallet already debited the real courier cost for this AWB, so deducting it
   // here as well billed the tenant twice for the same shipment.
   it('does NOT deduct shipping again when the wallet already billed it', async () => {
-    const { recordCodSettlement } = await import('@/lib/payments/razorpay-route')
+    const { recordCodSettlement } = await import('@/lib/payments/route-settlement')
     await recordCodSettlement({
       tenantId: 't-1',
       tenantSlug: 'acme',
@@ -474,7 +474,7 @@ describe('recordCodSettlement', () => {
 
   it('swallows a DB error (best-effort ledger, never throws)', async () => {
     pool.query.mockRejectedValue(new Error('db down'))
-    const { recordCodSettlement } = await import('@/lib/payments/razorpay-route')
+    const { recordCodSettlement } = await import('@/lib/payments/route-settlement')
     await expect(
       recordCodSettlement({
         tenantId: 't-1',
