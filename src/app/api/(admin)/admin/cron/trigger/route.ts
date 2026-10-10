@@ -7,7 +7,6 @@ import { getTenantPlan } from '@/lib/auth/plan-gate'
 
 export const dynamic = 'force-dynamic'
 
-const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
 const SELF_BASE = process.env.CRON_SELF_BASE || `http://127.0.0.1:${process.env.PORT || '3000'}`
 
 // Manually run ONE cron job for the CURRENT store (the tenant whose admin panel this is, or the
@@ -30,9 +29,12 @@ export async function POST(request: NextRequest) {
     const cronSecret = process.env.CRON_SECRET
     if (!cronSecret) return NextResponse.json({ error: 'Cron not configured' }, { status: 503 })
 
-    // Resolve the current store. A tenant triggers only its OWN store; the flagship uses the root host.
+    // Resolve the current store (for the plan gate). The self-calls below forward the INCOMING
+    // request's own Host — the host the admin is actually on (e.g. admin-testco.localhost in dev,
+    // admin-testco.jeffistores.in in prod) — so the job + record resolve to the exact same store in
+    // any environment. Rebuilding the host from ROOT_DOMAIN broke this locally (*.localhost ≠ *.{root}).
     const tenant = await resolveTenant().catch(() => null)
-    const host = tenant?.slug ? `${tenant.slug}.${ROOT_DOMAIN}` : ROOT_DOMAIN
+    const host = request.headers.get('host') || ''
 
     // Platform-only jobs (tenantScope === null) are infra — a tenant may not run them.
     if (job.tenantScope === null && tenant) {
