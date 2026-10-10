@@ -8,7 +8,7 @@ import { fetchDelhiveryInvoiceCharges } from '@/lib/shipping/delhivery'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
-import { settleDelhiveryCostToWallet, correctWalletDebitForAwb } from '@/lib/payments/wallet'
+import { tenantShipsOnPlatform } from '@/lib/payments/wallet'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +39,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'orders:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  // A tenant must not price its own wallet charges: platform-account shipments are settled from
+  // Delhivery's invoice (sync) or corrected by the platform (admin/ecom). Own-account and flagship
+  // shipments are billed by Delhivery directly, so this route only records the figures for them.
+  const tenantId = await resolveTenantId()
+  const onPlatform = await tenantShipsOnPlatform(tenantId)
+  if (onPlatform !== false) {
+    return NextResponse.json(
+      {
+        error:
+          onPlatform === null
+            ? 'Could not read the store delivery account. Try again shortly.'
+            : 'This store ships on the platform Delhivery account: charges are settled from Delhivery\'s invoice and corrected by the platform. Contact support to dispute a charge.',
+      },
+      { status: onPlatform === null ? 503 : 409 }
+    )
   }
 
   const { id } = await params
@@ -93,41 +110,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const total = chargedAmount ?? charges!.total
 
-  // Debit the tenant's prepaid wallet by the real Delhivery cost first (own_delhivery tenants are
-  // exempt inside both wallet helpers, which then succeed with no ledger movement). Only stamp
-  // billed_at when the charge is durably settled, so a transient failure leaves it NULL and the next
-  // sync retries instead of silently losing the charge.
-  //
-  // First settlement (no delhivery_billed_at) goes through settleDelhiveryCostToWallet, whose
-  // one-shot (tenant_id, awb) index keeps re-runs idempotent. A correction (the charge was already
-  // billed once, so the operator is re-pricing post-pickup) goes through correctWalletDebitForAwb,
-  // which posts a net adjustment refunding the initial debit and re-debiting the actual amount — the
-  // one-shot debit would otherwise no-op and the wallet would never reflect the new price.
-  const tenantId = await resolveTenantId()
   const isCorrection = order.delhivery_billed_at != null
-  const walletNote = proofNote
-    ? `Delhivery charge ${isCorrection ? 'correction' : ''} — AWB ${order.awb_number} — ${proofNote}`
-    : undefined
-  let settled = true
-  if (tenantId && order.awb_number && total > 0) {
-    if (isCorrection) {
-      const res = await correctWalletDebitForAwb({
-        tenantId,
-        awb: order.awb_number,
-        orderRef: order.order_number,
-        newAmountInr: total,
-        note: walletNote,
-      }).catch(() => ({ ok: false as const, error: 'wallet correction failed' }))
-      settled = res.ok
-    } else {
-      settled = await settleDelhiveryCostToWallet({
-        tenantId,
-        awb: order.awb_number,
-        orderRef: order.order_number,
-        amountInr: total,
-      }).catch(() => false)
-    }
-  }
+  const settled = true
 
   await query(
     `UPDATE orders SET

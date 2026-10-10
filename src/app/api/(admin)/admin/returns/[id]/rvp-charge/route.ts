@@ -3,16 +3,14 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
-import { correctWalletDebitForAwb } from '@/lib/payments/wallet'
+import { tenantShipsOnPlatform } from '@/lib/payments/wallet'
 import { logActivity } from '@/lib/shared/activity'
 
 export const dynamic = 'force-dynamic'
 
-// The store admin enters/updates the calculated delivery charge for a reverse pickup (RVP). Reverse
-// legs have no customer-quoted shipping, so the amount is admin-entered here, then debited from the
-// tenant wallet keyed to the RVP AWB. Uses correctWalletDebitForAwb so a re-save nets the AWB to the
-// new amount (not a second debit). Platform-Delhivery tenants only; own_delhivery is exempt inside
-// the helper. Refunded if the RVP AWB is later cancelled.
+// The store admin records the delivery charge of a reverse pickup (RVP) for its own books. It never
+// moves the wallet: a platform-account RVP is charged an estimate at AWB creation and netted to
+// Delhivery's bill by the platform (a tenant must not price its own wallet charges).
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -50,18 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     await query(`UPDATE return_requests SET rvp_delivery_charge = $1, updated_at = NOW() WHERE id = $2`, [charge, id])
 
-    const tenantId = (await resolveTenantId().catch(() => null)) ?? undefined
-    let walletResult: { ok: boolean; error?: string; outcome?: string } = { ok: true }
-    if (tenantId && charge > 0) {
-      const res = await correctWalletDebitForAwb({
-        tenantId,
-        awb: rr.rvp_awb_number,
-        orderRef: rr.order_number,
-        newAmountInr: charge,
-        note: `RVP delivery charge — AWB ${rr.rvp_awb_number}`,
-      }).catch(() => ({ ok: false as const, error: 'wallet charge failed' }))
-      walletResult = res.ok ? { ok: true, outcome: (res as any).outcome } : { ok: false, error: (res as any).error }
-    }
+    const onPlatform = await tenantShipsOnPlatform((await resolveTenantId().catch(() => null)) ?? undefined)
 
     if (rr.user_id) {
       logActivity({
@@ -78,8 +65,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({
       success: true,
       charge,
-      walletCharged: walletResult.ok,
-      walletWarning: walletResult.ok ? undefined : walletResult.error || 'Charge could not be applied to the wallet.',
+      walletCharged: false,
+      walletWarning: onPlatform
+        ? 'The wallet already holds an estimate for this return pickup; the platform settles it to Delhivery\'s bill.'
+        : undefined,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })

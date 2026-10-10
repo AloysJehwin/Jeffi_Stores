@@ -64,7 +64,7 @@ export async function POST(
     const walletNote = `Delhivery charge ${isCorrection ? 'correction' : 'set'} — AWB ${order.awb_number} — ${proofNote}`
 
     let settled = true
-    if (chargedAmount > 0) {
+    if (chargedAmount > 0 || isCorrection) {
       if (isCorrection) {
         const res = await correctWalletDebitForAwb({
           tenantId,

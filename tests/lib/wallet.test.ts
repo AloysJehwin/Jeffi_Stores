@@ -17,9 +17,10 @@ describe('rechargeWallet — top-up idempotency', () => {
   it('credits once and returns the new balance', async () => {
     client.query
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // ensure wallet
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // lockWallet: ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '0', min_balance: '0' }] }) // lockWallet: SELECT FOR UPDATE
       .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // ledger insert (won)
-      .mockResolvedValueOnce({ rows: [{ balance: '500.00' }] }) // balance update
+      .mockResolvedValueOnce({ rows: [{ balance: '500.00' }] }) // moveBalance
       .mockResolvedValueOnce({ rows: [] }) // COMMIT
     const res = await rechargeWallet({ tenantId: 't1', amountInr: 500, externalRef: 'pay_1' })
     expect(res).toEqual({ ok: true, balance: 500 })
@@ -28,9 +29,9 @@ describe('rechargeWallet — top-up idempotency', () => {
   it('does NOT move the balance when the reference was already credited', async () => {
     client.query
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // ensure wallet
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // lockWallet: ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '500', min_balance: '0' }] }) // lockWallet: SELECT FOR UPDATE
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // ledger insert -> CONFLICT
-      .mockResolvedValueOnce({ rows: [{ balance: '500.00' }] }) // read current balance
       .mockResolvedValueOnce({ rows: [] }) // COMMIT
     const res = await rechargeWallet({ tenantId: 't1', amountInr: 500, externalRef: 'pay_1' })
     expect(res).toEqual({ ok: true, balance: 500, alreadyCredited: true })
@@ -48,13 +49,17 @@ describe('rechargeWallet — top-up idempotency', () => {
 })
 
 describe('correctWalletDebitForAwb — post-pickup reprice', () => {
-  function seedNet(netInr: number) {
+  // Sequence: BEGIN, lockWallet ensure+SELECT, awbNet SELECT, adjustment insert, moveBalance, COMMIT.
+  // awbNet reads SUM(amount) AS net and COUNT(*) AS n — n>0 means the AWB already has a debit row,
+  // so the correction posts an 'adjustment' delta rather than a first 'debit'.
+  function seedNet(netInr: number, n = 1) {
     client.query
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // ensure wallet
-      .mockResolvedValueOnce({ rows: [{ net: String(netInr) }] }) // current net for AWB
+      .mockResolvedValueOnce({ rows: [] }) // lockWallet: ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '1000', min_balance: '0' }] }) // lockWallet: SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [{ net: String(netInr), n }] }) // awbNet
       .mockResolvedValueOnce({ rows: [] }) // adjustment insert
-      .mockResolvedValueOnce({ rows: [] }) // balance update
+      .mockResolvedValueOnce({ rows: [{ balance: '1000' }] }) // moveBalance
       .mockResolvedValueOnce({ rows: [] }) // COMMIT
   }
 
@@ -84,8 +89,9 @@ describe('correctWalletDebitForAwb — post-pickup reprice', () => {
     pool.query.mockResolvedValueOnce({ rows: [{ own_delhivery: false }] })
     client.query
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // ensure wallet
-      .mockResolvedValueOnce({ rows: [{ net: '-100' }] }) // already at target
+      .mockResolvedValueOnce({ rows: [] }) // lockWallet: ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '1000', min_balance: '0' }] }) // lockWallet: SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [{ net: '-100', n: 1 }] }) // awbNet: already at target
       .mockResolvedValueOnce({ rows: [] }) // COMMIT
     const res = await correctWalletDebitForAwb({
       tenantId: 't1',

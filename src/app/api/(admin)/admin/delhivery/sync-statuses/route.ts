@@ -9,7 +9,7 @@ import { fetchDelhiveryInvoiceCharges, chargeableGrams } from '@/lib/shipping/de
 import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
-import { settleDelhiveryCostToWallet } from '@/lib/payments/wallet'
+import { settleDelhiveryCostToWallet, isFlagshipTenant } from '@/lib/payments/wallet'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 import { applyCourierEdd, extractCourierEdd } from '@/lib/shipping/courier-edd'
 
@@ -94,7 +94,10 @@ export async function POST(request: NextRequest) {
      FROM orders o
      LEFT JOIN users u ON u.id = o.user_id
      WHERE o.awb_number IS NOT NULL
-       AND o.status IN ('processing', 'confirmed', 'pending', 'shipped', 'out_for_delivery')
+       AND (o.status IN ('processing', 'confirmed', 'pending', 'shipped', 'out_for_delivery')
+            -- delivered but not yet billed: retry the invoice settlement
+            OR (o.status = 'delivered' AND o.delhivery_billed_at IS NULL
+                AND o.delivered_at > NOW() - INTERVAL '30 days'))
      ORDER BY o.updated_at DESC`,
     []
   )
@@ -110,6 +113,58 @@ export async function POST(request: NextRequest) {
   const DELHIVERY_TOKEN = await resolveDelhiveryToken(tenantId ?? undefined)
   if (!DELHIVERY_TOKEN) {
     return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
+  }
+
+
+  // Bill one AWB on the real (volumetric-aware) weight. 'skipped' when no trustworthy weight or no
+  // invoice yet; 'unsettled' when the wallet write failed (billed_at stays NULL → retried).
+  async function billShipment(
+    order: (typeof orders)[number],
+    awb: string,
+    settledStatus: 'Delivered' | 'RTO'
+  ): Promise<'settled' | 'unsettled' | 'skipped'> {
+    const grams = chargeableGrams(order.delhivery_charged_weight_kg, order.delhivery_quoted_weight_kg, false)
+    if (grams === 0) {
+      console.warn('[delhivery] billing skipped — no trustworthy weight', {
+        awb,
+        orderId: order.id,
+        orderNumber: order.order_number,
+      })
+      return 'skipped'
+    }
+    const invoiceCharges = await fetchDelhiveryInvoiceCharges({
+      awb,
+      settledStatus,
+      chargedWeightG: grams,
+      originPin,
+      destPin: (order as any).dest_pin ?? '',
+      paymentType: order.payment_mode === 'cod' ? 'COD' : 'Pre-paid',
+      tenantId: tenantId ?? undefined,
+    }).catch(() => null)
+    if (!invoiceCharges) return 'skipped'
+    const settled =
+      tenantId && invoiceCharges.total > 0
+        ? await settleDelhiveryCostToWallet({
+            tenantId,
+            awb,
+            orderRef: order.order_number,
+            amountInr: invoiceCharges.total,
+            note: `Delhivery ${settledStatus === 'RTO' ? 'RTO' : 'delivery'} invoice — AWB ${awb}`,
+          }).catch(() => false)
+        : true
+    await query(
+      `UPDATE orders SET
+        delhivery_billed_amount = $2,
+        delhivery_freight_charge = $3,
+        delhivery_cod_charge = $4,
+        delhivery_oda_charge = $5,
+        delhivery_billed_at = CASE WHEN $6 THEN NOW() ELSE delhivery_billed_at END,
+        delhivery_extra_charge = ROUND(($2 - shipping_amount)::numeric, 2),
+        updated_at = NOW()
+       WHERE id = $1`,
+      [order.id, invoiceCharges.total, invoiceCharges.freight, invoiceCharges.codCharge, invoiceCharges.oda, settled]
+    ).catch(() => {})
+    return settled ? 'settled' : 'unsettled'
   }
 
   const BATCH_SIZE = 25
@@ -197,6 +252,25 @@ export async function POST(request: NextRequest) {
           ).catch(() => {})
         }
 
+        // Settle Delhivery's invoiced charge on a billed terminal state (delivered, or RTO back at
+        // origin), once. Runs before the status write so an RTO whose charge can't be settled yet
+        // keeps its AWB (status unchanged) and is retried next sync instead of going unbilled.
+        const billStatus = statusType === 'DL' ? 'Delivered' : statusType === 'RTO-DL' ? 'RTO' : null
+        if (billStatus && !order.delhivery_billed_at) {
+          const billed = await billShipment(order, awb, billStatus)
+          const rtoAgeDays = statusDateTime ? (Date.now() - new Date(statusDateTime).getTime()) / 86_400_000 : 0
+          if (
+            billStatus === 'RTO' &&
+            billed !== 'settled' &&
+            !isFlagshipTenant(tenantId) &&
+            syncRule?.onlyIfCurrent?.includes(order.status) &&
+            !(rtoAgeDays > 7)
+          ) {
+            console.warn('[delhivery] RTO charge not settled yet — deferring RTO-DL', { awb, orderId: order.id })
+            continue
+          }
+        }
+
         if (!syncRule) continue
         if (syncRule.onlyIfCurrent && !syncRule.onlyIfCurrent.includes(order.status)) continue
 
@@ -229,64 +303,6 @@ export async function POST(request: NextRequest) {
             `UPDATE orders SET payment_status = 'cod_collected', updated_at = NOW() WHERE id = $1 AND payment_status = 'cod_pending'`,
             [order.id]
           ).catch(() => {})
-        }
-
-        // Pull actual Delhivery invoice charges on delivery — only once (idempotent guard).
-        if (syncRule.orderStatus === 'delivered' && !order.delhivery_billed_at) {
-          // Bill on the real (volumetric-aware) weight only. When no trustworthy weight exists,
-          // grams is 0 (no silent 500 g floor) — skip billing so the wallet is not under-charged;
-          // billed_at stays NULL and the next sync retries once a weight is present.
-          const grams = chargeableGrams(order.delhivery_charged_weight_kg, order.delhivery_quoted_weight_kg, false)
-          if (grams === 0) {
-            console.warn('[delhivery] billing skipped — no trustworthy weight', {
-              awb,
-              orderId: order.id,
-              orderNumber: order.order_number,
-            })
-          } else {
-            const invoiceCharges = await fetchDelhiveryInvoiceCharges({
-              awb,
-              settledStatus: 'Delivered',
-              chargedWeightG: grams,
-              originPin,
-              destPin: (order as any).dest_pin ?? '',
-              paymentType: order.payment_mode === 'cod' ? 'COD' : 'Pre-paid',
-              tenantId: tenantId ?? undefined,
-            }).catch(() => null)
-            if (invoiceCharges) {
-              // Gate billed_at on a durable wallet debit: settle first, stamp billed_at only when the
-              // charge is on the books (or no wallet applies). A transient failure leaves billed_at NULL
-              // so the next sync retries rather than losing the charge.
-              const settled =
-                tenantId && invoiceCharges.total > 0
-                  ? await settleDelhiveryCostToWallet({
-                      tenantId,
-                      awb,
-                      orderRef: order.order_number,
-                      amountInr: invoiceCharges.total,
-                    }).catch(() => false)
-                  : true
-              await query(
-                `UPDATE orders SET
-                  delhivery_billed_amount = $2,
-                  delhivery_freight_charge = $3,
-                  delhivery_cod_charge = $4,
-                  delhivery_oda_charge = $5,
-                  delhivery_billed_at = CASE WHEN $6 THEN NOW() ELSE delhivery_billed_at END,
-                  delhivery_extra_charge = ROUND(($2 - shipping_amount)::numeric, 2),
-                  updated_at = NOW()
-                 WHERE id = $1`,
-                [
-                  order.id,
-                  invoiceCharges.total,
-                  invoiceCharges.freight,
-                  invoiceCharges.codCharge,
-                  invoiceCharges.oda,
-                  settled,
-                ]
-              ).catch(() => {})
-            }
-          }
         }
 
         if (order.customer_email && order.customer_name) {

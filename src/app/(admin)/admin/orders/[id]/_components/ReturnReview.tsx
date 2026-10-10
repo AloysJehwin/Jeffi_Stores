@@ -90,7 +90,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to save charge')
-      setRvpChargeMsg(data.walletWarning ? `Saved. ${data.walletWarning}` : 'Charge saved and applied to the wallet.')
+      setRvpChargeMsg(data.walletWarning ? `Saved. ${data.walletWarning}` : 'Charge saved.')
       router.refresh()
     } catch (e: any) {
       setRvpChargeMsg(e.message)
