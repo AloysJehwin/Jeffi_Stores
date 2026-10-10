@@ -31,3 +31,57 @@ export async function getRazorpayInstanceFor(tenantId?: string): Promise<{ insta
 export async function isRazorpayEnabled(): Promise<boolean> {
   return (await getFeatureFlags()).razorpayEnabled
 }
+
+/**
+ * Cancel the open payment artifacts tied to an order/invoice — the Razorpay payment link and QR
+ * code — when the invoice is cancelled, so a buyer can no longer pay a voided invoice. Best-effort
+ * and never throws: a cancel must not be blocked by a Razorpay hiccup, and an already
+ * cancelled/paid/expired artifact is treated as success. Returns what it acted on for the audit log.
+ * Uses the tenant's own keys when they collect on their own account.
+ */
+export async function cancelInvoicePaymentArtifacts(opts: {
+  tenantId?: string | null
+  paymentLinkId?: string | null
+  paymentLinkStatus?: string | null
+  qrId?: string | null
+}): Promise<{ paymentLink: 'cancelled' | 'skipped' | 'error' | 'none'; qr: 'closed' | 'skipped' | 'error' | 'none' }> {
+  const out = { paymentLink: 'none' as const, qr: 'none' as const } as {
+    paymentLink: 'cancelled' | 'skipped' | 'error' | 'none'
+    qr: 'closed' | 'skipped' | 'error' | 'none'
+  }
+  let instance: Razorpay
+  try {
+    ;({ instance } = await getRazorpayInstanceFor(opts.tenantId ?? undefined))
+  } catch {
+    // No keys configured — nothing to cancel at the gateway.
+    return out
+  }
+
+  if (opts.paymentLinkId) {
+    // Only an open link can be cancelled; paid/cancelled/expired already can't collect.
+    if (opts.paymentLinkStatus && ['paid', 'cancelled', 'expired'].includes(opts.paymentLinkStatus)) {
+      out.paymentLink = 'skipped'
+    } else {
+      try {
+        await (instance.paymentLink as any).cancel(opts.paymentLinkId)
+        out.paymentLink = 'cancelled'
+      } catch (e: any) {
+        // Razorpay rejects cancelling a non-cancellable link — benign for our purpose.
+        out.paymentLink = /cannot be cancelled|already/i.test(e?.error?.description || e?.message || '') ? 'skipped' : 'error'
+        if (out.paymentLink === 'error') console.error('[razorpay] payment link cancel failed', opts.paymentLinkId, e?.message)
+      }
+    }
+  }
+
+  if (opts.qrId) {
+    try {
+      await (instance.qrCode as any).close(opts.qrId)
+      out.qr = 'closed'
+    } catch (e: any) {
+      out.qr = /already closed|closed/i.test(e?.error?.description || e?.message || '') ? 'skipped' : 'error'
+      if (out.qr === 'error') console.error('[razorpay] qr close failed', opts.qrId, e?.message)
+    }
+  }
+
+  return out
+}
