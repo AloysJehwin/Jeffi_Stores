@@ -2,23 +2,37 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { CRON_JOBS, isCronJobId } from '@/lib/shared/cron-jobs'
-import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { resolveTenant, runWithTenantContext, type TenantContext } from '@/lib/tenancy/tenant-context'
 import { getTenantPlan } from '@/lib/auth/plan-gate'
+import { recordCronRun } from '@/lib/shared/cron-record'
 
 export const dynamic = 'force-dynamic'
 
-const SELF_BASE = process.env.CRON_SELF_BASE || `http://127.0.0.1:${process.env.PORT || '3000'}`
+// Resolve a job's route module from its registry path. Groups are literals so the bundler can trace
+// the dynamic imports; only the in-group tail is interpolated.
+//   /api/cron/<x>        -> (internal)/cron/<x>/route
+//   /api/internal/<rest> -> (internal)/internal/<rest>/route
+//   /api/admin/<rest>    -> (admin)/admin/<rest>/route
+async function importJobRoute(path: string): Promise<Record<string, any> | null> {
+  const cron = path.match(/^\/api\/cron\/(.+)$/)
+  if (cron) return import(`@/app/api/(internal)/cron/${cron[1]}/route`)
+  const internal = path.match(/^\/api\/internal\/(.+)$/)
+  if (internal) return import(`@/app/api/(internal)/internal/${internal[1]}/route`)
+  const admin = path.match(/^\/api\/admin\/(.+)$/)
+  if (admin) return import(`@/app/api/(admin)/admin/${admin[1]}/route`)
+  return null
+}
 
-// Manually run ONE cron job for the CURRENT store (the tenant whose admin panel this is, or the
-// flagship). Mirrors deploy/k8s-cron.mjs for a single target: call the job route with this store's
-// Host + the cron bearer so it hits the right DB, then record the run into that store's site_settings
-// so the Cron Jobs tab shows it. Does NOT fan out across the fleet — a tenant admin only runs its own.
+// Manually run ONE cron job for the CURRENT store, IN-PROCESS under that store's tenant context.
+// Why in-process: an HTTP self-call to 127.0.0.1 can't carry tenant identity — Node fetch ignores a
+// Host override and middleware re-derives x-tenant-slug from the connection host, so the call always
+// resolves to the flagship. db.ts resolves the tenant ALS-first (getCurrentTenant), so wrapping the
+// job handler + the run-record in runWithTenantContext makes every query hit the right store's DB,
+// in dev and prod alike. Does NOT fan out across the fleet — a tenant admin only runs its own store.
 export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    // audit:read is what every plan grants (and what the Cron Jobs tab is gated on); a manual run of
-    // the store's own job is a read-level operation, not a platform-config change.
     if (!hasScope(admin.role, admin.scopes, 'audit:read'))
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
@@ -29,12 +43,8 @@ export async function POST(request: NextRequest) {
     const cronSecret = process.env.CRON_SECRET
     if (!cronSecret) return NextResponse.json({ error: 'Cron not configured' }, { status: 503 })
 
-    // Resolve the current store (for the plan gate). The self-calls below forward the INCOMING
-    // request's own Host — the host the admin is actually on (e.g. admin-testco.localhost in dev,
-    // admin-testco.jeffistores.in in prod) — so the job + record resolve to the exact same store in
-    // any environment. Rebuilding the host from ROOT_DOMAIN broke this locally (*.localhost ≠ *.{root}).
+    // Current store: a tenant triggers only its OWN store; the flagship runs with no tenant context.
     const tenant = await resolveTenant().catch(() => null)
-    const host = request.headers.get('host') || ''
 
     // Platform-only jobs (tenantScope === null) are infra — a tenant may not run them.
     if (job.tenantScope === null && tenant) {
@@ -48,33 +58,36 @@ export async function POST(request: NextRequest) {
       if (!inPlan) return NextResponse.json({ error: 'Not included in your plan' }, { status: 403 })
     }
 
-    const headers = { Host: host, Authorization: `Bearer ${cronSecret}` }
-    let ok = false
-    let errorMsg: string | undefined
-    let detail: unknown
-    try {
-      const res = await fetch(`${SELF_BASE}${job.path}`, {
-        method: job.method,
-        headers,
-        signal: AbortSignal.timeout(290_000),
-      })
-      ok = res.ok
-      if (!ok) errorMsg = `HTTP ${res.status}`
-      detail = await res.json().catch(() => undefined)
-    } catch (e: any) {
-      ok = false
-      errorMsg = e?.message || 'fetch failed'
+    // Synthetic request carrying the cron bearer so the handler's verifyCronRequest passes
+    // (cron-auth checks the bearer only — no Host). Internal URL; the handler reads nothing else.
+    const jobReq = new NextRequest(`http://127.0.0.1${job.path}`, {
+      method: job.method,
+      headers: { Authorization: `Bearer ${cronSecret}` },
+    })
+
+    const run = async (): Promise<{ ok: boolean; errorMsg?: string; detail?: unknown }> => {
+      let ok = false
+      let errorMsg: string | undefined
+      let detail: unknown
+      try {
+        const mod = await importJobRoute(job.path)
+        const handler = mod?.[job.method]
+        if (typeof handler !== 'function') throw new Error(`No ${job.method} handler for ${job.path}`)
+        const res: Response = await handler(jobReq)
+        ok = res.ok
+        if (!ok) errorMsg = `HTTP ${res.status}`
+        detail = await res.json().catch(() => undefined)
+      } catch (e: any) {
+        ok = false
+        errorMsg = e?.message || 'job failed'
+      }
+      // Record into THIS store's site_settings (same ALS context → same DB) so the tab reflects it.
+      await recordCronRun(jobId, ok, errorMsg, detail).catch(() => {})
+      return { ok, errorMsg, detail }
     }
 
-    // Record the run into THIS store's site_settings (same Host → same DB) so the tab reflects it.
-    await fetch(`${SELF_BASE}/api/internal/cron-record`, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId, ok, errorMsg, detail }),
-      signal: AbortSignal.timeout(15_000),
-    }).catch(() => {})
-
-    return NextResponse.json({ ok, error: ok ? undefined : errorMsg })
+    const result = tenant ? await runWithTenantContext(tenant as TenantContext, run) : await run()
+    return NextResponse.json({ ok: result.ok, error: result.ok ? undefined : result.errorMsg })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
