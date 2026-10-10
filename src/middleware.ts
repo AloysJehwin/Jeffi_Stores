@@ -564,12 +564,6 @@ async function handle(request: NextRequest) {
   }
 
   if (isAdminApiPath) {
-    // Machine-to-machine endpoints authenticated by Bearer token — skip cookie check.
-    const bearerOnlyPaths = ['/api/admin/replication/log']
-    if (bearerOnlyPaths.some(p => pathname.startsWith(p)) && request.method === 'POST') {
-      return addSecurityHeaders(passThrough())
-    }
-
     // OAuth callbacks return cross-site from Google; the SameSite=Strict admin cookie is not sent.
     // These authenticate via the HMAC-signed `state` in the route handler, not the session cookie.
     const oauthCallbackPaths = ['/api/admin/data-source/google/callback']

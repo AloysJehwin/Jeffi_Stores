@@ -554,13 +554,6 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     group: 'Settings',
   },
   {
-    key: 'replication:read',
-    label: 'Replication (Read)',
-    description: 'View nightly RDS→Razer ML-replica replication history',
-    routes: ['/admin/replication'],
-    group: 'Settings',
-  },
-  {
     key: 'service_accounts:read',
     label: 'Service Accounts (Read)',
     description: 'View M2M service accounts and their status',
@@ -712,7 +705,6 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/catalog-enrichment')) return 'catalog_enrichment:read'
   if (pathname.startsWith('/api/admin/audit')) return 'audit:read'
   if (pathname.startsWith('/api/admin/cron')) return 'audit:read'
-  if (pathname.startsWith('/api/admin/replication')) return 'replication:read'
   if (pathname.startsWith('/api/admin/service-accounts')) return 'service_accounts:read'
   if (pathname.startsWith('/api/admin/ecom/customers')) return 'ecom_customers:read'
   if (pathname.startsWith('/api/admin/ecom/instances')) return 'ecom_instances:read'

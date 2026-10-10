@@ -200,10 +200,6 @@ describe('getScopeForPath', () => {
     expect(getScopeForPath('/api/admin/catalog-enrichment/run')).toBe('catalog_enrichment:read')
   })
 
-  it('maps /api/admin/replication/... to replication', () => {
-    expect(getScopeForPath('/api/admin/replication/status')).toBe('replication:read')
-  })
-
   it('maps /api/admin/business/customers/... to business_customers', () => {
     expect(getScopeForPath('/api/admin/business/customers/list')).toBe('business_customers:read')
   })

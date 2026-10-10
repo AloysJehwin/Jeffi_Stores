@@ -1360,20 +1360,6 @@ CREATE INDEX idx_quotations_status ON public.quotations USING btree (status);
 
 
 
---
--- Name: idx_replication_runs_recorded_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_replication_runs_recorded_at ON public.replication_runs USING btree (recorded_at DESC);
-
-
-
---
--- Name: idx_replication_runs_status; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_replication_runs_status ON public.replication_runs USING btree (status);
-
 
 
 --

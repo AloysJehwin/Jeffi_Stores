@@ -253,9 +253,9 @@ openssl pkcs12 -in ${created.name}.p12 \\
   -nocerts -out key.pem -nodes
 
 curl --cert cert.pem --key key.pem \\
-  -X POST https://admin.jeffistores.in/api/admin/replication/log \\
+  -X POST https://admin.jeffistores.in/api/admin/<endpoint> \\
   -H 'Content-Type: application/json' \\
-  -d '{"run_id":"test","status":"ok"}'`}</pre>
+  -d '{}'`}</pre>
                 <button
                   type="button"
                   onClick={() => router.push(ap('/admin/service-accounts'))}
@@ -314,7 +314,7 @@ curl --cert cert.pem --key key.pem \\
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="razer-replication"
+              placeholder="razer-sync"
               pattern="[a-z0-9\-_]+"
               minLength={2}
               maxLength={80}
