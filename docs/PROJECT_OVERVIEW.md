@@ -118,6 +118,8 @@ Authentication (`auth.ts`, `jwt.ts`, `otp.ts`, `scopes.ts`), DB (`db.ts`, `queri
 
 ## Deployment
 
+> Planned split into surface and shared services: [`MICROSERVICES_PLAN.md`](MICROSERVICES_PLAN.md).
+
 Production runs on a single EC2 `t4g.micro` (ARM64) running Docker Compose with three services: `app` (two replicas of the Next standalone image from GHCR), `nginx` (TLS + reverse proxy), and `redis`. The image is pulled from `ghcr.io/aloysjehwin/jeffi_stores:latest`.
 
 `deploy/setup.sh` bootstraps a fresh EC2 instance — installs Docker + Docker Compose plugin + Certbot, clones the repo to `/opt/jeffi-stores`, obtains a Let's Encrypt cert for `jeffistores.in`, generates a starter `.env.production` (you must edit it with real secrets before continuing), expects mTLS certs in `/opt/jeffi-stores/certs/`, builds + starts containers, and applies pending migrations.
