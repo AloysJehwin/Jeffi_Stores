@@ -41,6 +41,7 @@ import {
   MessageSquare,
   MessageCircle,
   ArrowDownLeft,
+  Lock,
 } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
@@ -116,6 +117,8 @@ interface CronJob {
   path: string
   intervalMs: number
   intervalLabel: string
+  tenantScope: string | null
+  inPlan: boolean
   enabled: boolean
   lastRun: string | null
   lastStatus: string | null
@@ -1403,7 +1406,9 @@ export default function AdminAuditClient() {
                 return (
                   <div
                     key={job.id}
-                    className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden"
+                    className={`bg-surface-elevated border border-border-default rounded-lg overflow-hidden ${
+                      job.inPlan ? '' : 'opacity-55'
+                    }`}
                   >
                     <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
                       <div className="flex-1 min-w-0">
@@ -1412,28 +1417,34 @@ export default function AdminAuditClient() {
                           <span className="text-[10px] font-mono text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">
                             {job.intervalLabel}
                           </span>
-                          {job.lastStatus === 'ok' && (
+                          {!job.inPlan && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">
+                              <Lock className="w-3 h-3" /> not in your plan
+                            </span>
+                          )}
+                          {job.inPlan && job.lastStatus === 'ok' && (
                             <span className="flex items-center gap-0.5 text-[10px] text-green-700 dark:text-green-400">
                               <CheckCircle2 className="w-3 h-3" /> last run ok
                             </span>
                           )}
-                          {job.lastStatus === 'error' && (
+                          {job.inPlan && job.lastStatus === 'error' && (
                             <span className="flex items-center gap-0.5 text-[10px] text-red-600 dark:text-red-400">
                               <XCircle className="w-3 h-3" /> last run failed
                             </span>
                           )}
                         </div>
                         <p className="text-[11px] text-foreground-muted mt-0.5 font-mono">{job.path}</p>
-                        {job.lastRun && (
+                        {job.inPlan && job.lastRun && (
                           <p className="text-[11px] text-foreground-muted mt-0.5">
                             Last run: {new Date(job.lastRun).toLocaleString('en-IN')}
                             {job.lastError ? ` — ${job.lastError}` : ''}
                           </p>
                         )}
-                        {!job.lastRun && (
+                        {job.inPlan && !job.lastRun && (
                           <p className="text-[11px] text-foreground-muted mt-0.5 italic">No runs recorded yet</p>
                         )}
                       </div>
+                      {job.inPlan && (
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
@@ -1470,8 +1481,9 @@ export default function AdminAuditClient() {
                           {cronTogglingId === job.id ? '...' : job.enabled ? 'Enabled' : 'Disabled'}
                         </button>
                       </div>
+                      )}
                     </div>
-                    {isExpanded && job.log.length > 0 && (
+                    {job.inPlan && isExpanded && job.log.length > 0 && (
                       <div className="border-t border-border-default divide-y divide-border-default max-h-96 overflow-y-auto">
                         {job.log.map((entry, i) => (
                           <div
