@@ -3205,8 +3205,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/whatsapp-dispatch.ts": {
-    "mtime": 1791713957.0866883,
-    "ast_hash": "5302917fbbd684e0f29b86c5aa6b207b",
+    "mtime": 1791716463.105954,
+    "ast_hash": "6d8896150f06b2347d8358c063cc4085",
     "semantic_hash": ""
   },
   "src/lib/campaigns/whatsapp-kinds.ts": {
@@ -3355,8 +3355,8 @@
     "semantic_hash": ""
   },
   "tests/lib/whatsapp-dispatch.test.ts": {
-    "mtime": 1791396378.1901486,
-    "ast_hash": "bf500aed2fb8ebdbac76a08020b0d443",
+    "mtime": 1791716706.2111933,
+    "ast_hash": "134273c5d79b0e38488a1f8fc64451dd",
     "semantic_hash": ""
   },
   "docs/PLAN_FEATURE_MATRIX.md": {
@@ -6440,8 +6440,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/CampaignDetailClient.tsx": {
-    "mtime": 1791714415.639896,
-    "ast_hash": "e70aec540b5799d78bf49e904815e987",
+    "mtime": 1791716831.0520847,
+    "ast_hash": "e1b733d6b863e34061aaccebb610804c",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/loading.tsx": {
@@ -14410,8 +14410,8 @@
     "semantic_hash": ""
   },
   "src/components/admin/campaigns/WhatsAppTemplateEditor.tsx": {
-    "mtime": 1791715765.435186,
-    "ast_hash": "ed1360f9b17667008340b94b6e6fe1a6",
+    "mtime": 1791716785.728558,
+    "ast_hash": "6081d74a497215f5569c7887d227b6ed",
     "semantic_hash": ""
   },
   "src/lib/templates/whatsapp-registry.ts": {

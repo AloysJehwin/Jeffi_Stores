@@ -13,6 +13,7 @@ vi.mock('@/lib/shared/whatsapp', () => ({
   sendBackInStockWhatsApp: vi.fn(),
   sendPromoOfferWhatsApp: vi.fn(),
   sendFeedbackRequestWhatsApp: vi.fn(),
+  sendCampaignTemplateWhatsApp: vi.fn().mockResolvedValue(true),
 }))
 vi.mock('@/lib/shared/sms', () => ({ sendCampaignSMS: vi.fn().mockResolvedValue(true) }))
 
@@ -26,6 +27,7 @@ import {
   sendBackInStockWhatsApp,
   sendPromoOfferWhatsApp,
   sendFeedbackRequestWhatsApp,
+  sendCampaignTemplateWhatsApp,
 } from '@/lib/shared/whatsapp'
 import { sendCampaignSMS } from '@/lib/shared/sms'
 
@@ -302,5 +304,32 @@ describe('var cleanup', () => {
     await sendCampaignWhatsApp('replenishment', 'user-1', { items: 'Earthing Rod ' })
     expect(mockAbandonedCart).toHaveBeenCalledWith(expect.objectContaining({ items: 'Earthing Rod' }))
     expect(mockSendSMS).toHaveBeenCalledWith(expect.objectContaining({ body: 'Running low on Earthing Rod? Reorder in a tap.' }))
+  })
+})
+
+describe('admin-chosen approved template — variable resolution', () => {
+  it('resolves {firstName}/{productImageUrl} in slots + header before sending (not raw tokens)', async () => {
+    mockCanSend.mockResolvedValue({ ok: true } as any)
+    mockAlreadySent.mockResolvedValue(false)
+    mockRecordSent.mockResolvedValue('sent-1')
+    const mockTemplate = vi.mocked(sendCampaignTemplateWhatsApp)
+    mockTemplate.mockResolvedValue(true)
+    // 1st queryOne = user phone; 2nd = campaign row with an admin-chosen template + token slots.
+    mockQueryOne
+      .mockResolvedValueOnce({ phone: '+919876543210' } as any)
+      .mockResolvedValueOnce({
+        sms_template: null,
+        wa_template_sid: 'back_in_stock',
+        wa_variables: { '1': '{product}' },
+        wa_header_image_url: '{imageUrl}',
+      } as any)
+
+    await sendCampaignWhatsApp('restock', 'user-1', { product: 'Widget', imageUrl: 'https://cdn/x.jpg' } as any)
+
+    expect(mockTemplate).toHaveBeenCalledOnce()
+    const arg = mockTemplate.mock.calls[0][0]
+    expect(arg.variables['1']).toBe('Widget') // {product} resolved, not literal
+    expect(arg.headerImageUrl).toBe('https://cdn/x.jpg') // {imageUrl} resolved
+    expect(arg.sidEnvVar).toBe('TWILIO_WA_BACK_IN_STOCK_SID')
   })
 })
