@@ -1005,8 +1005,8 @@
     "semantic_hash": ""
   },
   "database/marketing.sql": {
-    "mtime": 1791395264.0670433,
-    "ast_hash": "d0cf7c558d2a8e175e68d15c2e3731be",
+    "mtime": 1791710240.417655,
+    "ast_hash": "3c97f32247b583532611d74ea5ac435c",
     "semantic_hash": ""
   },
   "database/orders.sql": {
@@ -11860,8 +11860,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/automation-emails.ts": {
-    "mtime": 1791397275.9936612,
-    "ast_hash": "f01892037a4d97b4cde3aa7b023cb386",
+    "mtime": 1791710364.1486769,
+    "ast_hash": "8054db0866b52f98e1c58c067a10c727",
     "semantic_hash": ""
   },
   "src/lib/shared/aws-signing.ts": {
@@ -11970,8 +11970,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/email-campaigns.ts": {
-    "mtime": 1791395316.872453,
-    "ast_hash": "7edcf17ca07e8bebd62fb67878aed5f9",
+    "mtime": 1791710383.287404,
+    "ast_hash": "06b1ad208255cacc3f51907403c50b54",
     "semantic_hash": ""
   },
   "src/lib/shared/format.ts": {
@@ -12015,13 +12015,13 @@
     "semantic_hash": ""
   },
   "src/lib/shared/mail-template.ts": {
-    "mtime": 1790931254.0043743,
-    "ast_hash": "eb1e85148ebb309801f546377e73e910",
+    "mtime": 1791710078.8578424,
+    "ast_hash": "1087960bfb0cca59a13049648d192108",
     "semantic_hash": ""
   },
   "src/lib/shared/marketing.ts": {
-    "mtime": 1791397275.9944894,
-    "ast_hash": "19ec7e7b497f27914416f90457a01892",
+    "mtime": 1791710312.520167,
+    "ast_hash": "71b02287c55506014430b56137f03761",
     "semantic_hash": ""
   },
   "src/lib/shared/message-log.ts": {
@@ -14392,6 +14392,16 @@
   "src/app/(admin)/admin/campaigns/scenarios/_components/ScenariosMobileList.tsx": {
     "mtime": 1791705836.3193316,
     "ast_hash": "2d8af2e6e0ccb4fe6ed316eb7214e311",
+    "semantic_hash": ""
+  },
+  "src/lib/templates/blocks.ts": {
+    "mtime": 1791710440.3077142,
+    "ast_hash": "a2224e21dd65eba975f45d32e927c094",
+    "semantic_hash": ""
+  },
+  "src/lib/templates/email-layouts.ts": {
+    "mtime": 1791710219.351983,
+    "ast_hash": "bc8a8b9377c8186806d53fe8e8701d91",
     "semantic_hash": ""
   }
 }

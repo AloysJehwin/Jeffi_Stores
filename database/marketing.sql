@@ -33,7 +33,14 @@ CREATE TABLE public.campaigns (
     scenario_kind character varying(64),
     parameters jsonb DEFAULT '{}'::jsonb NOT NULL,
     coupon_id uuid,
-    draft_fields jsonb
+    draft_fields jsonb,
+    template_layout character varying(32) DEFAULT 'classic' NOT NULL,
+    template_mode character varying(16) DEFAULT 'richtext' NOT NULL,
+    blocks jsonb,
+    sms_template text,
+    wa_template_sid character varying(64),
+    wa_variables jsonb,
+    wa_header_image_url text
 );
 
 

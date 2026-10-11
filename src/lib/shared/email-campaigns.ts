@@ -3,7 +3,7 @@ import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
 import { createTemplateVariableResolver, renderTemplate } from '@/lib/templates/variables'
 import { platformBrandName } from '@/lib/catalog/brand'
-import { mailShell } from '@/lib/shared/mail-template'
+import { getEmailLayout } from '@/lib/templates/email-layouts'
 
 const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
@@ -19,11 +19,10 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
 
 type TemplateData = Record<string, string>
 
-function baseLayout(title: string, body: string, baseUrl: string = BASE_URL) {
-  return mailShell({
-    brand: '{store_name}',
-    documentTitle: title,
-    content: body,
+function baseLayout(title: string, body: string, baseUrl: string = BASE_URL, layoutKey?: string | null) {
+  return getEmailLayout(layoutKey).render({
+    title,
+    bodyHtml: body,
     footerLines: [
       `&copy; ${new Date().getFullYear()} {store_name} &bull; <a href="${baseUrl}" style="color:#666;">{store_web}</a>`,
     ],

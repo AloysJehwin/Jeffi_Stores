@@ -27,6 +27,29 @@ export const MAIL_BASE_CSS = `
   .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px; }
 `
 
+export interface MailTheme {
+  /** Accent/brand colour for the store name + default buttons/code box. Defaults to the classic blue. */
+  accent?: string
+  /** Page background behind the container. */
+  pageBg?: string
+  /** Container background. */
+  containerBg?: string
+  /** When set, the header shows this logo image instead of the text brand. */
+  logoUrl?: string
+  /** 'card' (default rounded container) or 'full' (edge-to-edge, used by bold/hero layouts). */
+  frame?: 'card' | 'full'
+  /** Header alignment. */
+  headerAlign?: 'center' | 'left'
+}
+
+const DEFAULT_THEME: Required<Pick<MailTheme, 'accent' | 'pageBg' | 'containerBg' | 'frame' | 'headerAlign'>> = {
+  accent: '#2563eb',
+  pageBg: '#ffffff',
+  containerBg: '#f9f9f9',
+  frame: 'card',
+  headerAlign: 'center',
+}
+
 export interface MailShellOptions {
   brand: string
   kicker?: string
@@ -36,6 +59,8 @@ export interface MailShellOptions {
   extraCss?: string
   preheader?: string
   documentTitle?: string
+  /** Optional visual theme. Omitted → the classic blue card look (unchanged for existing callers). */
+  theme?: MailTheme
 }
 
 export function escapeHtml(value: unknown): string {
@@ -49,10 +74,25 @@ export function escapeHtml(value: unknown): string {
 
 export function mailShell(o: MailShellOptions): string {
   const brand = escapeHtml(o.brand)
+  const t = { ...DEFAULT_THEME, ...(o.theme ?? {}) }
+  const logoUrl = o.theme?.logoUrl
   const footer = [
     `<p><strong>${brand}</strong></p>`,
     ...(o.footerLines ?? []).filter(Boolean).map(l => `<p>${l}</p>`),
   ].join('\n              ')
+  // Theme overrides applied as scoped inline-ish CSS after the base sheet so existing classes win by
+  // default but the accent/background follow the selected layout.
+  const themeCss = `
+    body { background:${t.pageBg}; }
+    .container { background-color:${t.containerBg}; ${t.frame === 'full' ? 'border-radius:0;border:none;padding:0;' : ''} }
+    .header { text-align:${t.headerAlign}; }
+    .brand { color:${t.accent}; }
+    .code-box, .button { background-color:${t.accent}; }
+    .info { border-left-color:${t.accent}; }
+  `
+  const brandHeader = logoUrl
+    ? `<img src="${escapeHtml(logoUrl)}" alt="${brand}" style="max-height:48px;max-width:200px;display:inline-block;" />`
+    : `<div class="brand" style="font-size:28px;font-weight:bold;color:${t.accent};letter-spacing:0.5px;">${brand}</div>`
   return `<!DOCTYPE html>
 <html>
   <head>
@@ -61,13 +101,13 @@ export function mailShell(o: MailShellOptions): string {
     <meta name="color-scheme" content="light">
     <meta name="supported-color-schemes" content="light">
     ${o.documentTitle ? `<title>${escapeHtml(o.documentTitle)}</title>` : ''}
-    <style>${MAIL_BASE_CSS}${o.extraCss ?? ''}</style>
+    <style>${MAIL_BASE_CSS}${themeCss}${o.extraCss ?? ''}</style>
   </head>
   <body>
     ${o.preheader ? `<span style="display:none;font-size:1px;color:#f9f9f9;max-height:0;overflow:hidden;mso-hide:all;">${escapeHtml(o.preheader)}</span>` : ''}
     <div class="container">
       <div class="header">
-        <div class="brand" style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
+        ${brandHeader}
         ${o.kicker ? `<p class="kicker" style="color:#666;">${escapeHtml(o.kicker)}</p>` : ''}
       </div>
       ${o.title ? `<h2>${escapeHtml(o.title)}</h2>` : ''}
