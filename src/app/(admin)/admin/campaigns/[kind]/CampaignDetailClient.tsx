@@ -11,8 +11,13 @@ import { CampaignDetailSkeleton } from '@/components/admin/campaigns/CampaignSke
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
+import EmailBlockBuilder from '@/components/admin/email-composer/EmailBlockBuilder'
+import { EMAIL_LAYOUT_OPTIONS } from '@/lib/templates/email-layouts'
+import type { EmailBlock } from '@/lib/templates/blocks'
+import { renderBlocks } from '@/lib/templates/blocks'
 import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
+import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { MessageCircle, ChevronDown } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
@@ -231,6 +236,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     scenario_kind: string | null
     subject_template: string
     body_template: string
+    template_layout: string
+    template_mode: 'richtext' | 'blocks'
+    blocks: EmailBlock[]
+    sms_template: string
     parameters: Record<string, number | boolean | string>
   } | null>(null)
 
@@ -259,6 +268,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           scenario_kind: src.scenario_kind || null,
           subject_template: src.subject_template ?? data.campaign.subject_template,
           body_template: src.body_template ?? data.campaign.body_template,
+          template_layout: src.template_layout ?? data.campaign.template_layout ?? 'classic',
+          template_mode: (src.template_mode ?? data.campaign.template_mode ?? 'richtext') as 'richtext' | 'blocks',
+          blocks: (src.blocks ?? data.campaign.blocks ?? []) as EmailBlock[],
+          sms_template: src.sms_template ?? data.campaign.sms_template ?? '',
           parameters: (src.parameters || {}) as Record<string, number | boolean | string>,
         })
       }
@@ -515,7 +528,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       }
     : SAMPLE_VARS
   const previewSubject = renderTemplate(form.subject_template, previewVars)
-  const previewBody = renderTemplate(form.body_template, previewVars)
+  const previewBodySource =
+    form.template_mode === 'blocks' && form.blocks?.length ? renderBlocks(form.blocks) : form.body_template
+  const previewBody = renderTemplate(previewBodySource, previewVars)
 
   const SINGLE_PRODUCT_KINDS = new Set(['restock', 'price_drop'])
   const MULTI_PRODUCT_KINDS = new Set([
@@ -603,35 +618,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               <h2 className="text-xl font-bold text-foreground">{campaign.name}</h2>
               {campaign.description && <p className="text-sm text-foreground-secondary mt-1">{campaign.description}</p>}
             </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.enabled}
-                onChange={e => setForm({ ...form, enabled: e.target.checked })}
-                className="w-4 h-4"
-              />
-              <span className="text-sm font-medium text-foreground">{form.enabled ? 'Active' : 'Paused'}</span>
-            </label>
+            <Toggle
+              checked={form.enabled}
+              onChange={v => setForm({ ...form, enabled: v })}
+              label={form.enabled ? 'Active' : 'Paused'}
+            />
           </div>
-
-          {campaignSupportsWhatsApp(kind) &&
-            (() => {
-              const waOn = !!form.parameters?.whatsappEnabled
-              return (
-                <div className="mt-3 flex">
-                  <span
-                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full ${
-                      waOn
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                        : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'
-                    }`}
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    WhatsApp: {waOn ? 'On' : 'Off'}
-                  </span>
-                </div>
-              )
-            })()}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
             <div>
@@ -705,15 +697,62 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
           <div className="mt-4">
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              Email template
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {EMAIL_LAYOUT_OPTIONS.map(l => (
+                <button
+                  key={l.key}
+                  type="button"
+                  onClick={() => setForm(f => (f ? { ...f, template_layout: l.key } : f))}
+                  className={`text-left rounded-lg border p-2.5 transition-colors ${
+                    form.template_layout === l.key
+                      ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
+                      : 'border-border-default hover:border-border-secondary bg-surface'
+                  }`}
+                >
+                  <span className="block text-sm font-semibold text-foreground">{l.label}</span>
+                  <span className="block text-[10px] text-foreground-muted mt-0.5 leading-snug">{l.description}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide">
               Email body
             </label>
-            <EmailComposer
-              value={form.body_template}
-              onChange={v => setForm(f => (f ? { ...f, body_template: v } : f))}
-              extraVariables={CAMPAIGN_VARIABLES}
-              ctaHref="{ctaUrl}"
-              minHeight={260}
-            />
+            <div className="inline-flex items-center gap-1 bg-surface-secondary rounded-lg p-0.5">
+              {(['richtext', 'blocks'] as const).map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setForm(f => (f ? { ...f, template_mode: m } : f))}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                    form.template_mode === m ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'
+                  }`}
+                >
+                  {m === 'richtext' ? 'Rich text' : 'Block builder'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-2">
+            {form.template_mode === 'blocks' ? (
+              <EmailBlockBuilder
+                blocks={form.blocks}
+                onChange={b => setForm(f => (f ? { ...f, blocks: b } : f))}
+              />
+            ) : (
+              <EmailComposer
+                value={form.body_template}
+                onChange={v => setForm(f => (f ? { ...f, body_template: v } : f))}
+                extraVariables={CAMPAIGN_VARIABLES}
+                ctaHref="{ctaUrl}"
+                minHeight={260}
+              />
+            )}
             <p className="text-[10px] text-foreground-muted mt-1">
               Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code>{' '}
               <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code>{' '}
@@ -880,19 +919,16 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                         )}
                       </label>
                       {def.type === 'boolean' ? (
-                        <AdminSelect
-                          value={isOverridden ? String(overrideVal) : ''}
+                        <Toggle
+                          checked={isOverridden ? overrideVal === true : defaultVal === true}
                           onChange={v => {
                             const next = { ...form.parameters }
-                            if (v === '') delete next[key]
-                            else next[key] = v === 'true'
+                            // Toggling always sets an explicit override; matching the default again
+                            // simply stores that same value (no hidden "default" state to confuse).
+                            next[key] = v
                             setForm({ ...form, parameters: next })
                           }}
-                          options={[
-                            { value: '', label: `Default (${String(defaultVal)})` },
-                            { value: 'true', label: 'true' },
-                            { value: 'false', label: 'false' },
-                          ]}
+                          label={(isOverridden ? overrideVal === true : defaultVal === true) ? 'On' : 'Off'}
                         />
                       ) : def.type === 'duration' ? (
                         <DurationField

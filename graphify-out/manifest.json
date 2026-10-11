@@ -6440,8 +6440,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/CampaignDetailClient.tsx": {
-    "mtime": 1791399412.4197006,
-    "ast_hash": "a9ac341e062be8819e619c00c6dff044",
+    "mtime": 1791711074.413511,
+    "ast_hash": "b72aec8f93255339d96bebe35a2b3cbe",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/loading.tsx": {
@@ -8925,8 +8925,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/campaigns/[kind]/publish/route.ts": {
-    "mtime": 1790931249.901373,
-    "ast_hash": "8ddea365d368f411130de6b4d311e3e8",
+    "mtime": 1791710741.2867422,
+    "ast_hash": "5e03913c38e5fb83489e33afffd26790",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/campaigns/[kind]/route.ts": {
@@ -14402,6 +14402,11 @@
   "src/lib/templates/email-layouts.ts": {
     "mtime": 1791710219.351983,
     "ast_hash": "bc8a8b9377c8186806d53fe8e8701d91",
+    "semantic_hash": ""
+  },
+  "src/components/admin/email-composer/EmailBlockBuilder.tsx": {
+    "mtime": 1791711018.042769,
+    "ast_hash": "a3e2dbd643a5224df9ba3fdc238c5b25",
     "semantic_hash": ""
   }
 }
