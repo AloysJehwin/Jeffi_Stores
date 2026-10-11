@@ -1,6 +1,6 @@
 import { query, queryOne } from '@/lib/shared/db'
 import { currentBrandName } from '@/lib/catalog/brand'
-import { FREQUENCY_CAP_HOURS } from '@/lib/campaigns/duration'
+import { FREQUENCY_CAP_HOURS, cooldownMinutes, hours } from '@/lib/campaigns/duration'
 
 export type CampaignKind =
   | 'abandoned_cart'
@@ -100,9 +100,20 @@ export async function canSendMarketing(
   if (!campaign) return { ok: false, reason: 'campaign_not_found' }
   if (!campaign.enabled) return { ok: false, reason: 'campaign_disabled' }
 
+  // Per-campaign anti-spam window: the campaign's own send cooldown is authoritative when configured
+  // (so a deliberately short cooldown isn't force-held). Fall back to the global FREQUENCY_CAP_HOURS
+  // floor only when the campaign sets no cooldown — the backstop against an unconfigured over-send.
+  const params = (campaign as unknown as { parameters?: Record<string, unknown> }).parameters
+  const hasCooldown =
+    !!params &&
+    (params.sendCooldown !== undefined && params.sendCooldown !== null
+      ? true
+      : typeof params.sendCooldownDays === 'number' && params.sendCooldownDays > 0)
+  const windowMinutes = hasCooldown ? cooldownMinutes(params as Record<string, unknown>) : hours(FREQUENCY_CAP_HOURS)
+
   const recent = await queryOne<{ cnt: string }>(
     `SELECT COUNT(*)::text AS cnt FROM email_campaigns_sent
-     WHERE user_id = $1 AND campaign_kind = $2 AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'`,
+     WHERE user_id = $1 AND campaign_kind = $2 AND sent_at > NOW() - (${Number(windowMinutes)}::text || ' minutes')::interval`,
     [userId, campaignKind]
   )
   if (recent && parseInt(recent.cnt, 10) >= 1) {
