@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyOTP, deleteOTP } from '@/lib/auth/otp'
+import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/auth/otp'
 import { resolveAdminByEmail } from '@/lib/auth/admin-identity'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { issueStaffToken, setStaffCookie } from '@/lib/auth/staff-session'
@@ -17,6 +17,8 @@ export async function POST(request: NextRequest) {
     const result = await verifyOTP(key, code.trim())
     if (!result.valid) return NextResponse.json({ error: result.message || 'Invalid or expired code' }, { status: 401 })
     await deleteOTP(key)
+    // Verified login clears the resend cooldown so login→logout→login never inherits the backoff.
+    await resetSendOtpCounter(key).catch(() => {})
 
     const admin = await resolveAdminByEmail(email)
     if (!admin) return NextResponse.json({ error: 'No admin account found for this email.' }, { status: 404 })

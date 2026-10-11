@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyOTP, deleteOTP } from '@/lib/auth/otp'
+import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/auth/otp'
 import { issuePortalToken, setPortalCookie } from '@/lib/auth/portal-session'
 
 export const dynamic = 'force-dynamic'
@@ -16,6 +16,8 @@ export async function POST(request: NextRequest) {
     const result = await verifyOTP(key, code.trim())
     if (!result.valid) return NextResponse.json({ error: result.message || 'Invalid or expired code' }, { status: 401 })
     await deleteOTP(key)
+    // Verified login clears the resend cooldown so login→logout→login never inherits the backoff.
+    await resetSendOtpCounter(key).catch(() => {})
     const token = await issuePortalToken(email, null)
     return setPortalCookie(NextResponse.json({ email: email.toLowerCase() }), token)
   } catch {

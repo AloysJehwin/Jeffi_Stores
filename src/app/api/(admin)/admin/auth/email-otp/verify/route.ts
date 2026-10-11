@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyOTP, deleteOTP } from '@/lib/auth/otp'
+import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/auth/otp'
 import { issueMfaTicket } from '@/lib/auth/mfa'
 import { resolveAdminByEmail, enforceCertGate } from '@/lib/auth/admin-identity'
 import { logActivity } from '@/lib/shared/activity'
@@ -41,6 +41,9 @@ export async function POST(request: NextRequest) {
 
     // Consume the OTP (anti-replay).
     if (!devBypass) await deleteOTP(email)
+    // Verified login clears the resend cooldown so a fresh login (e.g. login→logout→login) never
+    // inherits the previous backoff. Only a *verified* OTP resets it, so abuse protection is intact.
+    await resetSendOtpCounter(email).catch(() => {})
 
     const purpose = admin.mfa_enabled ? 'verify' : 'enroll'
     const ticket = await issueMfaTicket({
