@@ -2,6 +2,7 @@ import twilio from 'twilio'
 import { logMessage } from '@/lib/shared/message-log'
 import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 // WhatsApp notifications via Twilio (Meta BSP).
 // Business-initiated WhatsApp messages must use approved Content Templates
@@ -13,14 +14,25 @@ import { orderUrlByNumber } from '@/lib/shared/customer-links'
 //
 // Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN in env.
 // Set TWILIO_WHATSAPP_FROM to override the sender (defaults to +18722179910).
-// Set WHATSAPP_DISABLED=true to suppress all sends.
+// WhatsApp can be turned off two ways: the Site Controls "WhatsApp" toggle (per-tenant,
+// feature_whatsapp_enabled) or the env WHATSAPP_DISABLED kill-switch. The env value is the DEFAULT
+// the Site Controls flag falls back to, so checking the flag honors both.
 
 const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
 const API_KEY_SID = process.env.TWILIO_API_KEY_SID
 const API_KEY_SECRET = process.env.TWILIO_API_KEY_SECRET
 const WA_FROM = process.env.TWILIO_WHATSAPP_FROM || '+18722179910'
-const DISABLED = process.env.WHATSAPP_DISABLED === 'true'
+
+// Is WhatsApp enabled for the current tenant? Honors the Site Controls toggle
+// (feature_whatsapp_enabled), which defaults to `WHATSAPP_DISABLED !== 'true'`.
+async function whatsappChannelEnabled(): Promise<boolean> {
+  try {
+    return (await getFeatureFlags()).whatsappEnabled
+  } catch {
+    return process.env.WHATSAPP_DISABLED !== 'true'
+  }
+}
 
 const TEMPLATES = {
   otp: process.env.TWILIO_WA_OTP_SID || 'HX8efbe15a7d9c7cf152fd65874e6ac240',
@@ -83,7 +95,7 @@ async function sendTemplate(
 ): Promise<boolean> {
   const normalized = normalizePhone(to)
   if (!normalized) return false
-  if (DISABLED) return false
+  if (!(await whatsappChannelEnabled())) return false
   if (!contentSid) return false // template not configured yet → let caller fall back (SMS)
   const client = getClient()
   if (!client) return false
@@ -183,9 +195,7 @@ export async function sendOrderShippedWhatsApp(params: {
   const courier = params.courier || 'courier'
   // No AWB yet: the order's own page, where tracking appears once it has one.
   const tracking =
-    params.trackingId ||
-    (await orderUrlByNumber(params.orderNumber)) ||
-    `${await storeBaseUrlAsync()}/account/orders`
+    params.trackingId || (await orderUrlByNumber(params.orderNumber)) || `${await storeBaseUrlAsync()}/account/orders`
   const { name: STORE } = await storeSignature()
   return sendTemplate(
     params.phone,
@@ -466,7 +476,7 @@ export async function sendFreeTextWhatsApp(params: {
 }): Promise<boolean> {
   const normalized = normalizePhone(params.phone)
   if (!normalized) return false
-  if (DISABLED) return false
+  if (!(await whatsappChannelEnabled())) return false
   const client = getClient()
   if (!client) return false
   const waFrom = `whatsapp:${WA_FROM}`

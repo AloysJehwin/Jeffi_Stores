@@ -2,19 +2,32 @@ import twilio from 'twilio'
 import { logMessage } from '@/lib/shared/message-log'
 import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
+import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
 // Twilio SMS client — initialized lazily so missing creds don't crash the app.
 // Set TWILIO_ACCOUNT_SID + TWILIO_FROM_NUMBER, plus EITHER:
 //   - TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET (preferred — revocable API key), OR
 //   - TWILIO_AUTH_TOKEN (account auth token).
-// Set SMS_DISABLED=true to suppress all sends (useful in dev/test).
+// SMS can be turned off two ways: the Site Controls "SMS" toggle (per-tenant,
+// feature_sms_enabled) or the env SMS_DISABLED kill-switch. The env value is the DEFAULT the
+// Site Controls flag falls back to, so checking the flag honors both.
 
 const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
 const API_KEY_SID = process.env.TWILIO_API_KEY_SID
 const API_KEY_SECRET = process.env.TWILIO_API_KEY_SECRET
 const FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || '+18722179910'
-const DISABLED = process.env.SMS_DISABLED === 'true'
+
+// Is SMS enabled for the current tenant? Honors the Site Controls toggle (feature_sms_enabled),
+// which itself defaults to `SMS_DISABLED !== 'true'`. getFeatureFlags never throws, but the catch
+// keeps this self-contained so a resolver hiccup can't harden into a silent outage.
+async function smsChannelEnabled(): Promise<boolean> {
+  try {
+    return (await getFeatureFlags()).smsEnabled
+  } catch {
+    return process.env.SMS_DISABLED !== 'true'
+  }
+}
 
 function getClient() {
   if (!ACCOUNT_SID) return null
@@ -41,7 +54,7 @@ function normalizePhone(phone: string | null | undefined): string | null {
 async function sendSMS(to: string | null | undefined, body: string, kind: string): Promise<boolean> {
   const normalized = normalizePhone(to)
   if (!normalized) return false
-  if (DISABLED) return false
+  if (!(await smsChannelEnabled())) return false
   const client = getClient()
   if (!client) return false
   try {
@@ -64,7 +77,7 @@ export async function sendCampaignSMS(params: {
   userId?: string | null
 }): Promise<boolean> {
   const normalized = normalizePhone(params.phone)
-  if (!normalized || DISABLED) return false
+  if (!normalized || !(await smsChannelEnabled())) return false
   const client = getClient()
   if (!client) return false
   try {
