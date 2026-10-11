@@ -3205,8 +3205,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/whatsapp-dispatch.ts": {
-    "mtime": 1791711370.0131276,
-    "ast_hash": "9cf263d911de5eb1371db43b437d0ddf",
+    "mtime": 1791712346.0087948,
+    "ast_hash": "180af453ce2657ff18ff70f3cbff57c8",
     "semantic_hash": ""
   },
   "src/lib/campaigns/whatsapp-kinds.ts": {
@@ -6440,8 +6440,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/CampaignDetailClient.tsx": {
-    "mtime": 1791711653.9080334,
-    "ast_hash": "cdbe95d5d1c6e2b5d9a56e5b08af3127",
+    "mtime": 1791712213.4272482,
+    "ast_hash": "b51a0babc0091cabfaf9f77abff40ea9",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/loading.tsx": {
@@ -12105,8 +12105,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/whatsapp.ts": {
-    "mtime": 1791366929.4976308,
-    "ast_hash": "6668b7f06894ec52cd4ed0a5428c3e4b",
+    "mtime": 1791712318.360903,
+    "ast_hash": "d98827066a8369164555b3c9f12271fb",
     "semantic_hash": ""
   },
   "src/lib/shipping/delhivery.ts": {
@@ -14407,6 +14407,21 @@
   "src/components/admin/email-composer/EmailBlockBuilder.tsx": {
     "mtime": 1791711686.8890884,
     "ast_hash": "a0c3aa38a50b233dd5606707a5e3253e",
+    "semantic_hash": ""
+  },
+  "src/components/admin/campaigns/WhatsAppTemplateEditor.tsx": {
+    "mtime": 1791712132.6670043,
+    "ast_hash": "0545cba32df415adef2af8ca5151f2f0",
+    "semantic_hash": ""
+  },
+  "src/lib/templates/whatsapp-registry.ts": {
+    "mtime": 1791712105.925867,
+    "ast_hash": "752104538c3b43dcd4721762652cdcc6",
+    "semantic_hash": ""
+  },
+  "docs/WHATSAPP_TEMPLATES.md": {
+    "mtime": 1791712446.416249,
+    "ast_hash": "0cca534c33f63cb053abad0c7045a3a2",
     "semantic_hash": ""
   }
 }
