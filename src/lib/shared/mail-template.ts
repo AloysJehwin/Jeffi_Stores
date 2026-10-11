@@ -2,14 +2,19 @@
 // content, bordered footer carrying the brand. Mail-specific classes go in extraCss.
 
 export const MAIL_BASE_CSS = `
-  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+  body { font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; -webkit-font-smoothing: antialiased; }
   .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
   .header { text-align: center; margin-bottom: 30px; }
   .brand { font-size: 28px; font-weight: bold; color: #2563eb; letter-spacing: 0.5px; }
   .kicker { color: #666; margin: 6px 0 0 0; }
-  h2 { color: #333; margin-top: 0; }
-  h3 { color: #333; }
-  .card { background-color: white; padding: 20px; border-radius: 8px; margin: 20px 0; }
+  h2 { color: #1f2937; margin-top: 0; font-size: 22px; line-height: 1.3; }
+  h3 { color: #1f2937; font-size: 17px; }
+  p { margin: 0 0 14px; }
+  a { color: #2563eb; }
+  .eyebrow { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #6b7280; margin: 0 0 8px; }
+  .lead { font-size: 16px; color: #374151; margin: 0 0 16px; }
+  .divider { border: none; border-top: 1px solid #e5e7eb; margin: 24px 0; }
+  .card { background-color: #ffffff; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #eee; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
   .info { background-color: #f0f9ff; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0; border-radius: 4px; }
   .warning { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px; }
   .success { background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; border-radius: 4px; }
@@ -17,7 +22,7 @@ export const MAIL_BASE_CSS = `
   .info-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
   .info-label { font-weight: bold; color: #555; }
   .code-box { background-color: #2563eb; color: white; font-size: 32px; font-weight: bold; text-align: center; padding: 20px; border-radius: 8px; letter-spacing: 8px; margin: 24px 0; }
-  .button { display: inline-block; background-color: #2563eb; color: white !important; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; }
+  .button { display: inline-block; background-color: #2563eb; color: white !important; padding: 13px 32px; text-decoration: none; border-radius: 6px; font-weight: bold; }
   .cta { text-align: center; margin: 30px 0; }
   .muted { color: #666; font-size: 13px; }
   .mono { font-family: 'SFMono-Regular', Consolas, Menlo, monospace; }
@@ -25,6 +30,13 @@ export const MAIL_BASE_CSS = `
   table.rows th, table.rows td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
   table.rows th { color: #555; font-weight: bold; }
   .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px; }
+  .footer p { margin: 2px 0; }
+  @media only screen and (max-width: 480px) {
+    body { padding: 10px; }
+    .container { padding: 20px; }
+    h2 { font-size: 20px; }
+    .button { display: block; text-align: center; }
+  }
 `
 
 export interface MailTheme {

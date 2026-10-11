@@ -50,7 +50,7 @@ export default function WhatsAppTemplateEditor({ kind, value, onChange }: Props)
             onChange={key => {
               const def = getWhatsAppTemplate(key)
               // Reset variables/image to fit the newly chosen template.
-              onChange({ key: key || null, variables: {}, headerImageUrl: def?.hasImageHeader ? value.headerImageUrl : '' })
+              onChange({ key: key || null, variables: {}, headerImageUrl: def?.imageSlot != null ? value.headerImageUrl : '' })
             }}
             options={[
               { value: '', label: 'Select a WhatsApp template…' },
@@ -65,7 +65,7 @@ export default function WhatsAppTemplateEditor({ kind, value, onChange }: Props)
 
         {selected && (
           <>
-            {selected.hasImageHeader && (
+            {selected.imageSlot != null && (
               <div>
                 <label className="block text-[11px] font-medium text-foreground-muted mb-1">Header image URL</label>
                 <input
@@ -101,7 +101,7 @@ export default function WhatsAppTemplateEditor({ kind, value, onChange }: Props)
         <div className="rounded-lg p-3 bg-[#e5ddd5] dark:bg-zinc-800 min-h-[120px]">
           {selected ? (
             <div className="max-w-[85%] rounded-lg rounded-tl-none bg-white dark:bg-zinc-700 shadow-sm overflow-hidden">
-              {selected.hasImageHeader && value.headerImageUrl && (
+              {selected.imageSlot != null && value.headerImageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={value.headerImageUrl} alt="" className="w-full max-h-40 object-cover" />
               )}

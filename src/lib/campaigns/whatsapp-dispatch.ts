@@ -141,6 +141,7 @@ export async function sendCampaignWhatsApp(
           sidEnvVar: def.sidEnv,
           variables: (campaignRow?.wa_variables as Record<string, string>) || {},
           headerImageUrl: campaignRow?.wa_header_image_url || null,
+          imageSlot: def.imageSlot ?? null,
           kind,
           entity: { entityType: 'campaign', entityId: kind },
         })
