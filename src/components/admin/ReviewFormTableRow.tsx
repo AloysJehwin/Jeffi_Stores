@@ -3,10 +3,12 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Star, MessageSquare, FileText } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
-import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
+import RowActions from '@/components/admin/RowActions'
+import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
 
 interface FormRow {
@@ -49,7 +51,18 @@ export default function ReviewFormTableRow({
   formsBase: string
 }) {
   const [open, setOpen] = useState(false)
+  const router = useRouter()
+  const { showToast } = useToast()
   const formUrl = `${formsBase}/${f.slug}`
+
+  async function deleteForm() {
+    const res = await fetch(`/api/admin/review-forms/${f.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      showToast((await res.json().catch(() => ({})))?.error || 'Failed to delete form', 'error')
+      return
+    }
+    router.refresh()
+  }
 
   return (
     <>
@@ -193,15 +206,31 @@ export default function ReviewFormTableRow({
           </span>
         </td>
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center gap-3">
-            <Link
-              href={ap(`/admin/review-forms/${f.id}/edit?back=${encodeURIComponent(backUrl)}`)}
-              className="text-accent-500 hover:underline text-sm"
-            >
-              Edit
-            </Link>
-            <DeleteReviewFormButton id={f.id} title={f.title} />
-          </div>
+          <RowActions
+            size="sm"
+            actions={[
+              {
+                key: 'edit',
+                kind: 'edit',
+                label: 'Edit Form',
+                href: ap(`/admin/review-forms/${f.id}/edit?back=${encodeURIComponent(backUrl)}`),
+                scope: 'review_forms:write',
+              },
+              {
+                key: 'delete',
+                kind: 'delete',
+                label: 'Delete Review Form',
+                scope: 'review_forms:write',
+                onSelect: deleteForm,
+                confirm: {
+                  title: 'Delete Review Form',
+                  message: `Delete review form "${f.title}"? This action cannot be undone.`,
+                  confirmLabel: 'Delete',
+                  variant: 'danger',
+                },
+              },
+            ]}
+          />
         </td>
       </tr>
     </>

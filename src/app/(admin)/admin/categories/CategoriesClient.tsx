@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import DraftEditButton from '@/components/admin/DraftEditButton'
+import RowActions from '@/components/admin/RowActions'
 import {
   DndContext,
   DragOverlay,
@@ -17,7 +18,6 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import DeleteCategoryButton from '@/components/admin/DeleteCategoryButton'
 import CategoriesMobileList from './_components/CategoriesMobileList'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import HoverCard from '@/components/ui/HoverCard'
@@ -367,6 +367,20 @@ function SortableRow({
     id: category.id,
   })
 
+  const router = useRouter()
+  const { showToast } = useToast()
+
+  async function deleteCategory() {
+    const res = await fetch(`/api/categories/${category.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      showToast((await res.json().catch(() => ({})))?.error || 'Failed to delete category. Please try again.', 'error')
+      return
+    }
+    showToast(`"${category.name}" deleted successfully.`, 'success')
+    onDeleted?.()
+    router.refresh()
+  }
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -573,7 +587,25 @@ function SortableRow({
             className="text-accent-500 hover:text-accent-600 mr-4 text-sm"
           />
         </RequireWrite>
-        <DeleteCategoryButton categoryId={category.id} categoryName={category.name} onDeleted={onDeleted} />
+        <RowActions
+          className="inline-flex"
+          size="sm"
+          actions={[
+            {
+              key: 'delete',
+              kind: 'delete',
+              label: 'Delete Category',
+              scope: 'categories:write',
+              onSelect: deleteCategory,
+              confirm: {
+                title: 'Delete Category',
+                message: `Delete "${category.name}"? This action cannot be undone.`,
+                confirmLabel: 'Delete',
+                variant: 'danger',
+              },
+            },
+          ]}
+        />
       </td>
     </tr>
   )

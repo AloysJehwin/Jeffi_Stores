@@ -15,6 +15,7 @@ import {
   CampaignStatsGrid,
 } from './_components/campaign-presentation'
 import CampaignsMobileList from './_components/CampaignsMobileList'
+import RowActions from '@/components/admin/RowActions'
 
 export default function CampaignsListClient() {
   const { showToast } = useToast()
@@ -342,31 +343,35 @@ export default function CampaignsListClient() {
                       : 'never'}
                   </p>
                 </div>
-                <div className="flex items-stretch gap-2 sm:shrink-0">
-                  <RequireWrite scope="campaigns:write">
-                    <button
-                      type="button"
-                      onClick={() => toggle(c)}
-                      disabled={busy === c.kind}
-                      className={`flex-1 sm:flex-none sm:w-24 inline-flex items-center justify-center h-control-sm px-3 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${c.enabled ? 'bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200' : 'bg-green-500 hover:bg-green-600 text-white'}`}
-                    >
-                      {c.enabled ? 'Pause' : 'Activate'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => runNow(c)}
-                      disabled={busy === c.kind || !c.enabled}
-                      className="flex-1 sm:flex-none sm:w-24 inline-flex items-center justify-center h-control-sm px-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      Run now
-                    </button>
-                  </RequireWrite>
-                  <Link
-                    href={ap(`/admin/campaigns/${c.kind}/edit`)}
-                    className="flex-1 sm:flex-none sm:w-24 inline-flex items-center justify-center h-control-sm px-3 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-semibold transition-all"
-                  >
-                    Edit
-                  </Link>
+                <div className="flex items-center sm:shrink-0">
+                  <RowActions
+                    size="md"
+                    actions={[
+                      {
+                        key: 'toggle',
+                        kind: 'toggle',
+                        label: c.enabled ? 'Pause' : 'Activate',
+                        variant: c.enabled ? 'default' : 'accent',
+                        onSelect: () => toggle(c),
+                        busy: busy === c.kind,
+                        scope: 'campaigns:write',
+                      },
+                      {
+                        key: 'run',
+                        kind: 'run',
+                        label: 'Run now',
+                        onSelect: () => runNow(c),
+                        disabled: busy === c.kind || !c.enabled,
+                        scope: 'campaigns:write',
+                      },
+                      {
+                        key: 'edit',
+                        kind: 'edit',
+                        label: 'Edit campaign',
+                        href: ap(`/admin/campaigns/${c.kind}/edit`),
+                      },
+                    ]}
+                  />
                 </div>
               </div>
 

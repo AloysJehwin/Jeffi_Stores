@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import HoverCard from '@/components/ui/HoverCard'
-import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
+import RowActions from '@/components/admin/RowActions'
+import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
@@ -27,6 +28,17 @@ export default function BrandTableRow({ brand, backUrl = '/admin/brands' }: { br
   const [isActive, setIsActive] = useState(brand.is_active)
   const [toggling, setToggling] = useState(false)
   const router = useRouter()
+  const { showToast } = useToast()
+
+  async function deleteBrand() {
+    const res = await fetch(`/api/brands/${brand.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      showToast((await res.json().catch(() => ({})))?.error || 'Failed to delete brand', 'error')
+      return
+    }
+    showToast(`"${brand.name}" deleted successfully.`, 'success')
+    router.refresh()
+  }
 
   async function toggleStatus(e: React.MouseEvent) {
     e.stopPropagation()
@@ -255,15 +267,31 @@ export default function BrandTableRow({ brand, backUrl = '/admin/brands' }: { br
           </RequireWrite>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
-          <RequireWrite scope="brands:write">
-            <Link
-              href={ap(`/admin/brands/${brand.id}/edit?back=${encodeURIComponent(backUrl)}`)}
-              className="text-accent-500 hover:text-accent-600 mr-4"
-            >
-              Edit
-            </Link>
-          </RequireWrite>
-          <DeleteBrandButton brandId={brand.id} brandName={brand.name} />
+          <RowActions
+            size="sm"
+            actions={[
+              {
+                key: 'edit',
+                kind: 'edit',
+                label: 'Edit Brand',
+                href: ap(`/admin/brands/${brand.id}/edit?back=${encodeURIComponent(backUrl)}`),
+                scope: 'brands:write',
+              },
+              {
+                key: 'delete',
+                kind: 'delete',
+                label: 'Delete Brand',
+                scope: 'brands:write',
+                onSelect: deleteBrand,
+                confirm: {
+                  title: 'Delete Brand',
+                  message: `Delete "${brand.name}"? This action cannot be undone.`,
+                  confirmLabel: 'Delete',
+                  variant: 'danger',
+                },
+              },
+            ]}
+          />
         </td>
       </tr>
     </>
