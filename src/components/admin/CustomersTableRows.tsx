@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import Tooltip from '@/components/ui/Tooltip'
 import HoverCard from '@/components/ui/HoverCard'
+import RowActions from '@/components/admin/RowActions'
 import { ap } from '@/lib/shared/admin-path'
 
 function CustomerDetailModal({ customer, onClose, backUrl }: { customer: any; onClose: () => void; backUrl: string }) {
@@ -350,22 +351,17 @@ export default function CustomersTableRows({
             </div>
           </td>
           <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-end gap-1">
-              <Link
-                href={ap(`/admin/customers/${customer.id}/view?back=${encodeURIComponent(backUrl)}`)}
-                title="View Customer"
-                className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-              </Link>
-            </div>
+            <RowActions
+              size="sm"
+              actions={[
+                {
+                  key: 'view',
+                  kind: 'view',
+                  label: 'View Customer',
+                  href: ap(`/admin/customers/${customer.id}/view?back=${encodeURIComponent(backUrl)}`),
+                },
+              ]}
+            />
           </td>
         </tr>
       ))}

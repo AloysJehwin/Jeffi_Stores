@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { AlertTriangle, Check } from 'lucide-react'
+import { AlertTriangle, Check, X } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { useToast } from '@/contexts/ToastContext'
-import { useConfirm } from '@/contexts/ConfirmContext'
+import RowActions from '@/components/admin/RowActions'
+import IconButton from '@/components/ui/IconButton'
 import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, {
   newLineItem,
@@ -97,7 +98,6 @@ export const SOURCE_COLORS: Record<string, string> = {
 
 export default function InvoicesClient({ canWrite = false }: { canWrite?: boolean }) {
   const { showToast } = useToast()
-  const confirm = useConfirm()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [view, setViewState] = useState<View>(() => {
@@ -627,14 +627,6 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   }
 
   async function cancelInvoice(inv: Invoice) {
-    const ok = await confirm({
-      title: 'Cancel Invoice',
-      message: `Cancel invoice ${inv.invoice_number}? This action cannot be undone.`,
-      confirmLabel: 'Cancel Invoice',
-      cancelLabel: 'Keep',
-      variant: 'danger',
-    })
-    if (!ok) return
     setCancellingId(inv.id)
     try {
       const res = await fetch(`/api/admin/orders/${inv.id}/cancel`, { method: 'POST', credentials: 'include' })
@@ -2275,141 +2267,75 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                           )}
                         </td>
                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-1">
-                            {inv.source === 'cash_sale' ? (
-                              <>
-                                <a
-                                  href={`/api/admin/cash-sale/${inv.id}/receipt`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="Download Receipt PDF"
-                                  className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                    />
-                                  </svg>
-                                </a>
-                                <a
-                                  href={ap(`/admin/cash-sale/${inv.id}/view`)}
-                                  title="View Sale"
-                                  className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                                    />
-                                  </svg>
-                                </a>
-                              </>
-                            ) : (
-                              <>
-                                <a
-                                  href={`/api/orders/${inv.id}/invoice`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  title="Download Invoice PDF"
-                                  className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                    />
-                                  </svg>
-                                </a>
-                                <a
-                                  href={ap(`/admin/invoices/${inv.id}/view`)}
-                                  title="View Invoice"
-                                  className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                                    />
-                                  </svg>
-                                </a>
-                                {inv.customer_email && (
-                                  <button
-                                    onClick={() => sendInvoiceEmail(inv)}
-                                    disabled={sendingEmailId === inv.id}
-                                    title={`Send email to ${inv.customer_email}`}
-                                    className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-blue-500 transition-colors disabled:opacity-40"
-                                  >
-                                    {sendingEmailId === inv.id ? (
-                                      <svg
-                                        className="w-4 h-4 animate-spin"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        viewBox="0 0 24 24"
-                                      >
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                                        />
-                                      </svg>
-                                    ) : (
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          strokeWidth={2}
-                                          d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                                        />
-                                      </svg>
-                                    )}
-                                  </button>
-                                )}
-                                {inv.source === 'offline' && inv.status !== 'cancelled' && canWrite && (
-                                  <button
-                                    onClick={() => openEdit(inv)}
-                                    title="Edit Invoice"
-                                    className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                      />
-                                    </svg>
-                                  </button>
-                                )}
-                                {inv.source === 'offline' && inv.status !== 'cancelled' && canWrite && (
-                                  <button
-                                    onClick={() => cancelInvoice(inv)}
-                                    disabled={cancellingId === inv.id}
-                                    title="Cancel Invoice"
-                                    className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-red-500 transition-colors disabled:opacity-50"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M6 18L18 6M6 6l12 12"
-                                      />
-                                    </svg>
-                                  </button>
-                                )}
-                              </>
-                            )}
-                          </div>
+                          <RowActions
+                            size="sm"
+                            actions={
+                              inv.source === 'cash_sale'
+                                ? [
+                                    {
+                                      key: 'download-receipt',
+                                      kind: 'download',
+                                      label: 'Download Receipt PDF',
+                                      href: `/api/admin/cash-sale/${inv.id}/receipt`,
+                                      target: '_blank',
+                                    },
+                                    {
+                                      key: 'view-sale',
+                                      kind: 'open',
+                                      label: 'View Sale',
+                                      href: ap(`/admin/cash-sale/${inv.id}/view`),
+                                    },
+                                  ]
+                                : [
+                                    {
+                                      key: 'download-invoice',
+                                      kind: 'download',
+                                      label: 'Download Invoice PDF',
+                                      href: `/api/orders/${inv.id}/invoice`,
+                                      target: '_blank',
+                                    },
+                                    {
+                                      key: 'view-invoice',
+                                      kind: 'open',
+                                      label: 'View Invoice',
+                                      href: ap(`/admin/invoices/${inv.id}/view`),
+                                    },
+                                    {
+                                      key: 'send-email',
+                                      kind: 'email',
+                                      label: `Send email to ${inv.customer_email}`,
+                                      hidden: !inv.customer_email,
+                                      busy: sendingEmailId === inv.id,
+                                      onSelect: () => sendInvoiceEmail(inv),
+                                    },
+                                    {
+                                      key: 'edit',
+                                      kind: 'edit',
+                                      label: 'Edit Invoice',
+                                      scope: 'invoices:write',
+                                      hidden: inv.source !== 'offline' || inv.status === 'cancelled',
+                                      onSelect: () => openEdit(inv),
+                                    },
+                                    {
+                                      key: 'cancel',
+                                      label: 'Cancel Invoice',
+                                      icon: X,
+                                      variant: 'danger',
+                                      scope: 'invoices:write',
+                                      hidden: inv.source !== 'offline' || inv.status === 'cancelled',
+                                      busy: cancellingId === inv.id,
+                                      onSelect: () => cancelInvoice(inv),
+                                      confirm: {
+                                        title: 'Cancel Invoice',
+                                        message: `Cancel invoice ${inv.invoice_number}? This action cannot be undone.`,
+                                        confirmLabel: 'Cancel Invoice',
+                                        cancelLabel: 'Keep',
+                                        variant: 'danger',
+                                      },
+                                    },
+                                  ]
+                            }
+                          />
                         </td>
                       </tr>
                     ))}
@@ -2484,14 +2410,7 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
               })}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors flex-shrink-0"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <IconButton icon={X} label="Close" onClick={onClose} className="flex-shrink-0" />
         </div>
 
         <div className="p-5 space-y-5">
