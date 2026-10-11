@@ -1,5 +1,5 @@
 import type { ParamDef } from './types'
-import { days, hours } from './duration'
+import { days, minutes } from './duration'
 
 // The per-user cooldown is stored as canonical MINUTES under `sendCooldown`. The legacy integer key
 // `sendCooldownDays` (days) is still read by cooldownMinutes() for campaigns saved before the migration,
@@ -12,7 +12,7 @@ export const UNIVERSAL_DEFAULTS: Record<string, number | boolean | string> = {
 export const UNIVERSAL_SCHEMA: Record<string, ParamDef> = {
   sendCooldown: {
     type: 'duration',
-    min: hours(1),
+    min: minutes(1),
     max: days(30),
     recommendedUnit: 'days',
     label: 'Per-user cooldown',

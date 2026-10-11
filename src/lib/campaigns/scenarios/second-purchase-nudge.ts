@@ -1,7 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -28,7 +28,7 @@ export const secondPurchaseNudge: ScenarioModule<Params, Row> = {
   paramSchema: {
     sinceFirstOrder: {
       type: 'duration',
-      min: days(1),
+      min: minutes(1),
       max: days(180),
       recommendedUnit: 'days',
       label: 'Time since first order',
@@ -189,7 +189,11 @@ export const secondPurchaseNudge: ScenarioModule<Params, Row> = {
       sendCampaignWhatsApp(
         campaign.kind,
         row.user_id,
-        { headline: 'Come back for more', code: couponCode || '', discount: discountPercent ? String(discountPercent) : '' },
+        {
+          headline: 'Come back for more',
+          code: couponCode || '',
+          discount: discountPercent ? String(discountPercent) : '',
+        },
         cooldownDays(params)
       ).catch(() => {})
     }

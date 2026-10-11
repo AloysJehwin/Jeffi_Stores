@@ -1,7 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -43,7 +43,7 @@ export const subscriptionRenewal: ScenarioModule<Params, Row> = {
     },
     sendCooldown: {
       type: 'duration',
-      min: days(1),
+      min: minutes(1),
       max: days(90),
       recommendedUnit: 'days',
       label: 'Per-user cooldown',
@@ -195,7 +195,9 @@ export const subscriptionRenewal: ScenarioModule<Params, Row> = {
     })
 
     if (params.whatsappEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: row.product_name }, cooldownDays(params)).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: row.product_name }, cooldownDays(params)).catch(
+        () => {}
+      )
     }
     return emailResult
   },

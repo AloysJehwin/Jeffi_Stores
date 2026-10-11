@@ -8,7 +8,7 @@
 
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, sendCampaignEmail } from '@/lib/shared/automation-emails'
-import { days, hours, readDurationParam } from '../duration'
+import { days, minutes, hours, readDurationParam } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -34,7 +34,7 @@ export const templateScenario: ScenarioModule<Params, Row> = {
   paramSchema: {
     lookback: {
       type: 'duration',
-      min: hours(1),
+      min: minutes(1),
       max: days(90),
       recommendedUnit: 'days',
       label: 'Lookback window',

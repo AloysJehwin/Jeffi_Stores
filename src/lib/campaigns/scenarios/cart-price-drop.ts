@@ -1,12 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
-import {
-  fetchUserContext,
-  resolveCoupon,
-  sendCampaignEmail,
-  renderItemRows,
-} from '@/lib/shared/automation-emails'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, hours, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, hours, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
 // A product sitting in the cart is now cheaper than when the customer added it. cart_items.price_at_addition
@@ -41,7 +36,7 @@ export const cartPriceDrop: ScenarioModule<Params, Row> = {
   paramSchema: {
     lookback: {
       type: 'duration',
-      min: hours(1),
+      min: minutes(1),
       max: days(90),
       recommendedUnit: 'days',
       label: 'Lookback window',
@@ -49,7 +44,7 @@ export const cartPriceDrop: ScenarioModule<Params, Row> = {
     },
     sendCooldown: {
       type: 'duration',
-      min: hours(1),
+      min: minutes(1),
       max: days(30),
       recommendedUnit: 'days',
       label: 'Per-user cooldown',

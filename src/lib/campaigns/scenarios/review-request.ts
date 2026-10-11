@@ -5,7 +5,7 @@ import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/li
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
 import { apiBaseUrl } from '@/lib/shared/customer-links'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, readDurationParam } from '../duration'
+import { days, minutes, readDurationParam } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -33,7 +33,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
   paramSchema: {
     lookbackDays: {
       type: 'duration',
-      min: days(1),
+      min: minutes(1),
       max: days(90),
       recommendedUnit: 'days',
       label: 'Lookback',
@@ -121,14 +121,19 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 
-    const { subject, html, ampHtml } = renderCampaignEmail('review_request', {
-      firstName: user.first_name || 'there',
-      orderNumber: row.order_number,
-      itemsJson: JSON.stringify(itemsWithLinks),
-      couponCode: couponCode ?? '',
-      discountPercent: discountPercent ? String(discountPercent) : '',
-      apiBaseUrl: storeBase,
-    }, undefined, user.baseUrl)
+    const { subject, html, ampHtml } = renderCampaignEmail(
+      'review_request',
+      {
+        firstName: user.first_name || 'there',
+        orderNumber: row.order_number,
+        itemsJson: JSON.stringify(itemsWithLinks),
+        couponCode: couponCode ?? '',
+        discountPercent: discountPercent ? String(discountPercent) : '',
+        apiBaseUrl: storeBase,
+      },
+      undefined,
+      user.baseUrl
+    )
 
     const emailResult = await sendCampaignEmailRendered({
       campaign,

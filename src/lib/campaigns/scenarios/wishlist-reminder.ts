@@ -1,14 +1,9 @@
 import { queryMany } from '@/lib/shared/db'
-import {
-  fetchUserContext,
-  resolveCoupon,
-  sendCampaignEmail,
-  renderItemRows,
-} from '@/lib/shared/automation-emails'
+import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
 import { SAVED_ITEMS_SQL } from './_wishlist-base'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -27,7 +22,7 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
   name: 'Wishlist Reminder',
   description: 'Customer has an untouched, in-stock saved item they never ordered',
   trigger:
-    'Fires when a product has sat on the wishlist or in the cart\'s Saved for later, untouched, for at least the idle window, is still in stock, and was never ordered by the user. Sends at most once per cooldown window per user. Skipped for guests, inactive accounts, and marketing opt-outs.',
+    "Fires when a product has sat on the wishlist or in the cart's Saved for later, untouched, for at least the idle window, is still in stock, and was never ordered by the user. Sends at most once per cooldown window per user. Skipped for guests, inactive accounts, and marketing opt-outs.",
   defaultParams: {
     idleFor: days(14),
     maxItemsPerEmail: 4,
@@ -37,7 +32,7 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
   paramSchema: {
     idleFor: {
       type: 'duration',
-      min: days(1),
+      min: minutes(1),
       max: days(180),
       recommendedUnit: 'days',
       label: 'Idle window',
