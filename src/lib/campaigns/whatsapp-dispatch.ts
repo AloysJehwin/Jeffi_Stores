@@ -96,9 +96,15 @@ export async function sendCampaignWhatsApp(
     const user = await queryOne<{ phone: string | null }>(`SELECT phone FROM users WHERE id = $1`, [userId])
     if (!user?.phone) return { ok: false, reason: 'no_phone' }
 
-    // Admin-authored SMS override for this campaign (replaces the built-in per-kind line when set).
-    const campaignRow = await queryOne<{ sms_template: string | null }>(
-      `SELECT sms_template FROM campaigns WHERE kind = $1`,
+    // Admin-authored overrides for this campaign: a custom SMS line, and/or an explicitly chosen
+    // approved WhatsApp template (registry key) with filled variable slots + optional header image.
+    const campaignRow = await queryOne<{
+      sms_template: string | null
+      wa_template_sid: string | null
+      wa_variables: Record<string, string> | null
+      wa_header_image_url: string | null
+    }>(
+      `SELECT sms_template, wa_template_sid, wa_variables, wa_header_image_url FROM campaigns WHERE kind = $1`,
       [kind]
     ).catch(() => null)
 
@@ -120,7 +126,30 @@ export async function sendCampaignWhatsApp(
     const clean = Object.fromEntries(
       Object.entries(vars).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])
     ) as CampaignWaVars
-    const ok = await dispatch(kind, user.phone, clean, { entityType: 'campaign', entityId: kind })
+
+    // Admin-chosen approved template takes precedence over the built-in per-kind dispatch. The
+    // registry maps the chosen key → the env Content SID; variable slots were filled by the admin.
+    let ok: boolean
+    const waKey = campaignRow?.wa_template_sid
+    if (waKey) {
+      const { getWhatsAppTemplate } = await import('@/lib/templates/whatsapp-registry')
+      const def = getWhatsAppTemplate(waKey)
+      if (def) {
+        const { sendCampaignTemplateWhatsApp } = await import('@/lib/shared/whatsapp')
+        ok = await sendCampaignTemplateWhatsApp({
+          phone: user.phone,
+          sidEnvVar: def.sidEnv,
+          variables: (campaignRow?.wa_variables as Record<string, string>) || {},
+          headerImageUrl: campaignRow?.wa_header_image_url || null,
+          kind,
+          entity: { entityType: 'campaign', entityId: kind },
+        })
+      } else {
+        ok = await dispatch(kind, user.phone, clean, { entityType: 'campaign', entityId: kind })
+      }
+    } else {
+      ok = await dispatch(kind, user.phone, clean, { entityType: 'campaign', entityId: kind })
+    }
 
     // Mobile = both channels: fire a plain-text SMS alongside WhatsApp so a customer reached on
     // mobile gets it even if WhatsApp isn't delivered. Shares the one dedup above (no extra gate),

@@ -123,6 +123,24 @@ async function sendTemplate(
   }
 }
 
+// Campaign-chosen approved template: resolve a registry key → env Content SID and send with the admin's
+// filled variable slots (+ an optional media/header image passed as the "image" content variable, which
+// media-header templates reference). Returns false (caller falls back to SMS) if the SID isn't configured.
+export async function sendCampaignTemplateWhatsApp(params: {
+  phone?: string | null
+  sidEnvVar: string
+  variables: Record<string, string>
+  headerImageUrl?: string | null
+  kind: string
+  entity?: { entityType?: string; entityId?: string }
+}): Promise<boolean> {
+  const contentSid = process.env[params.sidEnvVar] || ''
+  if (!contentSid) return false
+  const vars: Record<string, string> = { ...params.variables }
+  if (params.headerImageUrl) vars.image = params.headerImageUrl
+  return sendTemplate(params.phone, contentSid, vars, params.kind, `WhatsApp: ${params.kind}`, params.entity)
+}
+
 export async function sendOTPWhatsApp(params: { phone?: string | null; otp: string }): Promise<boolean> {
   const { name: STORE } = await storeSignature()
   return sendTemplate(

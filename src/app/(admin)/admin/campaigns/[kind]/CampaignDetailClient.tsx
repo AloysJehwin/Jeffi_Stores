@@ -22,6 +22,7 @@ import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { MessageCircle, ChevronDown } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
+import WhatsAppTemplateEditor from '@/components/admin/campaigns/WhatsAppTemplateEditor'
 import DurationField from '@/components/admin/campaigns/DurationField'
 import type { DurationUnit } from '@/lib/campaigns/duration'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
@@ -242,6 +243,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     template_mode: 'richtext' | 'blocks'
     blocks: EmailBlock[]
     sms_template: string
+    wa_template_sid: string | null
+    wa_variables: Record<string, string>
+    wa_header_image_url: string
     parameters: Record<string, number | boolean | string>
   } | null>(null)
 
@@ -274,6 +278,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           template_mode: (src.template_mode ?? data.campaign.template_mode ?? 'richtext') as 'richtext' | 'blocks',
           blocks: (src.blocks ?? data.campaign.blocks ?? []) as EmailBlock[],
           sms_template: src.sms_template ?? data.campaign.sms_template ?? '',
+          wa_template_sid: src.wa_template_sid ?? data.campaign.wa_template_sid ?? null,
+          wa_variables: (src.wa_variables ?? data.campaign.wa_variables ?? {}) as Record<string, string>,
+          wa_header_image_url: src.wa_header_image_url ?? data.campaign.wa_header_image_url ?? '',
           parameters: (src.parameters || {}) as Record<string, number | boolean | string>,
         })
       }
@@ -806,6 +813,29 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                 {form.sms_template.length === 0 ? 0 : Math.ceil(form.sms_template.length / 160)} segment
                 {Math.ceil((form.sms_template.length || 0) / 160) === 1 ? '' : 's'} · plain text only, no images.
               </p>
+            </div>
+          )}
+
+          {campaignSupportsWhatsApp(kind) && !!form.parameters?.whatsappEnabled && (
+            <div className="mt-4">
+              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-2">
+                WhatsApp message
+              </label>
+              <WhatsAppTemplateEditor
+                kind={kind}
+                value={{
+                  key: form.wa_template_sid,
+                  variables: form.wa_variables,
+                  headerImageUrl: form.wa_header_image_url,
+                }}
+                onChange={v =>
+                  setForm(f =>
+                    f
+                      ? { ...f, wa_template_sid: v.key, wa_variables: v.variables, wa_header_image_url: v.headerImageUrl }
+                      : f
+                  )
+                }
+              />
             </div>
           )}
 
