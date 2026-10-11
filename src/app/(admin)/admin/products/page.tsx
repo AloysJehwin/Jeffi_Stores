@@ -259,7 +259,7 @@ async function ProductsStats() {
                     name={d.name}
                     subtitle={`${d.sku} — new product, not yet published`}
                     updatedAt={d.created_at}
-                    editHref={ap(`/admin/products/edit/${d.id}`, host)}
+                    editHref={ap(`/admin/products/${d.id}/edit`, host)}
                     publishPath={`/api/admin/products/${d.id}/publish`}
                     publishConfirm={`Publish "${d.name}" to the live product list?`}
                     discardPath={`/api/admin/products/${d.id}/draft`}
@@ -285,7 +285,7 @@ async function ProductsStats() {
                     name={d.name}
                     subtitle={d.sku}
                     updatedAt={d.updated_at}
-                    editHref={ap(`/admin/products/edit/${d.product_id}`, host)}
+                    editHref={ap(`/admin/products/${d.product_id}/edit`, host)}
                     publishPath={`/api/admin/products/${d.product_id}/publish`}
                     discardPath={`/api/admin/products/${d.product_id}/draft`}
                     entityLabel="product"

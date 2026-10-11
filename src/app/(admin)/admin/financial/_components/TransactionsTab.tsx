@@ -195,7 +195,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                             )
                           ) : r.supplier_id ? (
                             <Link
-                              href={ap(`/admin/suppliers/${r.supplier_id}`)}
+                              href={ap(`/admin/suppliers/${r.supplier_id}/view`)}
                               className="hover:text-accent-500 hover:underline"
                             >
                               {r.party}
@@ -304,7 +304,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                           )
                         ) : r.supplier_id ? (
                           <Link
-                            href={ap(`/admin/suppliers/${r.supplier_id}`)}
+                            href={ap(`/admin/suppliers/${r.supplier_id}/view`)}
                             className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
                           >
                             {r.party}

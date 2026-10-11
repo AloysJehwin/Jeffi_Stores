@@ -384,7 +384,7 @@ export default function AnalyticsDashboardClient({
                 key: p.id,
                 primary: `${i + 1}. ${p.name}`,
                 value: `${p.qty} sold, ${rs(p.revenue)}`,
-                href: ap(`/admin/products/edit/${p.id}`, host),
+                href: ap(`/admin/products/${p.id}/edit`, host),
               }))}
             />
           </SectionCard>

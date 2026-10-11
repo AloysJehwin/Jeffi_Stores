@@ -522,7 +522,7 @@ export default function ProductsTableClient({
                       )
                     : canWrite && (
                         <Link
-                          href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(backUrl)}`)}
+                          href={ap(`/admin/products/${product.id}/edit?back=${encodeURIComponent(backUrl)}`)}
                           title="Edit Product"
                           className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                         >

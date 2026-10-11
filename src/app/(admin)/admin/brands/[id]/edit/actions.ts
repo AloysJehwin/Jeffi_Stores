@@ -76,8 +76,8 @@ export async function updateBrand(brandId: string, formData: FormData) {
     if (hasDraft || intent === 'draft') {
       if (intent === 'discard') {
         await query(`DELETE FROM brand_drafts WHERE brand_id = $1`, [brandId])
-        revalidatePath(`/admin/brands/edit/${brandId}`)
-        redirect(ap(`/admin/brands/edit/${brandId}`, host))
+        revalidatePath(`/admin/brands/${brandId}/edit`)
+        redirect(ap(`/admin/brands/${brandId}/edit`, host))
       }
 
       await query(
@@ -120,7 +120,7 @@ export async function updateBrand(brandId: string, formData: FormData) {
       }
 
       // Save as Draft always returns to the list.
-      revalidatePath(`/admin/brands/edit/${brandId}`)
+      revalidatePath(`/admin/brands/${brandId}/edit`)
       revalidatePath('/admin/brands')
       const back = formData.get('_back') as string | null
       redirect(ap(back && back.startsWith('/admin/brands') ? back : '/admin/brands', host))
@@ -134,8 +134,8 @@ export async function updateBrand(brandId: string, formData: FormData) {
        ON CONFLICT (brand_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
       [brandId, JSON.stringify(draftFields)]
     )
-    revalidatePath(`/admin/brands/edit/${brandId}`)
-    redirect(ap(`/admin/brands/edit/${brandId}`, host))
+    revalidatePath(`/admin/brands/${brandId}/edit`)
+    redirect(ap(`/admin/brands/${brandId}/edit`, host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     throw new Error('Failed to update brand')

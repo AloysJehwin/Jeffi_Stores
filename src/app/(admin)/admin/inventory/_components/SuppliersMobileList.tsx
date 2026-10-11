@@ -45,7 +45,7 @@ export default function SuppliersMobileList({ suppliers, canWrite, onToggleActiv
         key: 'view',
         label: 'View supplier',
         icon: <Eye className="w-4 h-4" />,
-        onSelect: () => router.push(ap(`/admin/suppliers/${supplier.id}`)),
+        onSelect: () => router.push(ap(`/admin/suppliers/${supplier.id}/view`)),
       },
     ]
     if (canWrite) {

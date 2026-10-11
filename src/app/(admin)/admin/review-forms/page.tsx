@@ -127,7 +127,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
               name={d.title}
               subtitle="New form — not yet published"
               updatedAt={d.created_at}
-              editHref={ap(`/admin/review-forms/edit/${d.id}`, host)}
+              editHref={ap(`/admin/review-forms/${d.id}/edit`, host)}
               publishPath={`/api/admin/review-forms/${d.id}`}
               publishMethod="PATCH"
               publishBody={{ is_draft: false, is_active: true }}
@@ -143,7 +143,7 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
               entityId={d.form_id}
               name={d.name}
               updatedAt={d.updated_at}
-              editHref={ap(`/admin/review-forms/edit/${d.form_id}`, host)}
+              editHref={ap(`/admin/review-forms/${d.form_id}/edit`, host)}
               publishPath={`/api/admin/review-forms/${d.form_id}/publish`}
               discardPath={`/api/admin/review-forms/${d.form_id}/draft`}
               entityLabel="review form"

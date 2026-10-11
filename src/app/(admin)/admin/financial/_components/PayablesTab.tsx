@@ -311,7 +311,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                             <td className="px-4 py-3">
                               {r.supplier_id ? (
                                 <Link
-                                  href={ap(`/admin/suppliers/${r.supplier_id}`)}
+                                  href={ap(`/admin/suppliers/${r.supplier_id}/view`)}
                                   className="font-medium text-foreground hover:text-accent-500 hover:underline"
                                 >
                                   {r.supplier_name}
@@ -385,7 +385,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                           <div>
                             {r.supplier_id ? (
                               <Link
-                                href={ap(`/admin/suppliers/${r.supplier_id}`)}
+                                href={ap(`/admin/suppliers/${r.supplier_id}/view`)}
                                 className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
                               >
                                 {r.supplier_name}

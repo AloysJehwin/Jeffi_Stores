@@ -131,7 +131,7 @@ async function BrandsStats() {
                   name={d.name}
                   subtitle="New brand — not yet published"
                   updatedAt={d.created_at}
-                  editHref={ap(`/admin/brands/edit/${d.id}`, host)}
+                  editHref={ap(`/admin/brands/${d.id}/edit`, host)}
                   publishPath={`/api/admin/brands/${d.id}`}
                   publishMethod="PATCH"
                   publishBody={{ is_draft: false, is_active: true }}
@@ -147,7 +147,7 @@ async function BrandsStats() {
                   entityId={d.brand_id}
                   name={d.name}
                   updatedAt={d.updated_at}
-                  editHref={ap(`/admin/brands/edit/${d.brand_id}`, host)}
+                  editHref={ap(`/admin/brands/${d.brand_id}/edit`, host)}
                   publishPath={`/api/admin/brands/${d.brand_id}/publish`}
                   discardPath={`/api/admin/brands/${d.brand_id}/draft`}
                   entityLabel="brand"

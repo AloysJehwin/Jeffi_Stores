@@ -257,7 +257,7 @@ export default function BrandTableRow({ brand, backUrl = '/admin/brands' }: { br
         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
           <RequireWrite scope="brands:write">
             <Link
-              href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(backUrl)}`)}
+              href={ap(`/admin/brands/${brand.id}/edit?back=${encodeURIComponent(backUrl)}`)}
               className="text-accent-500 hover:text-accent-600 mr-4"
             >
               Edit

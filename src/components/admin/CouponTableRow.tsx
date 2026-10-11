@@ -224,7 +224,7 @@ export default function CouponTableRow({
           <div className="flex items-center gap-3">
             {canWrite && (
               <Link
-                href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(backUrl)}`)}
+                href={ap(`/admin/coupons/${c.id}/edit?back=${encodeURIComponent(backUrl)}`)}
                 className="text-accent-500 hover:underline text-sm"
               >
                 Edit

@@ -47,8 +47,8 @@ export async function updateCoupon(id: string, formData: FormData) {
   try {
     if (intent === 'discard') {
       await query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
-      revalidatePath(`/admin/coupons/edit/${id}`)
-      redirect(ap(`/admin/coupons/edit/${id}`, host))
+      revalidatePath(`/admin/coupons/${id}/edit`)
+      redirect(ap(`/admin/coupons/${id}/edit`, host))
     }
 
     // Save to draft
@@ -85,7 +85,7 @@ export async function updateCoupon(id: string, formData: FormData) {
       redirect(ap('/admin/coupons', host))
     }
 
-    revalidatePath(`/admin/coupons/edit/${id}`)
+    revalidatePath(`/admin/coupons/${id}/edit`)
     redirect(ap(destination, host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT') || err?.type === 'NEXT_REDIRECT') throw err

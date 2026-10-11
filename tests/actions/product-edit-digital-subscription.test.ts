@@ -25,7 +25,7 @@ vi.mock('@/lib/shared/db', () => ({
 }))
 
 import { query, queryOne } from '@/lib/shared/db'
-import { updateProduct } from '@/app/(admin)/admin/products/edit/[id]/actions'
+import { updateProduct } from '@/app/(admin)/admin/products/[id]/edit/actions'
 
 const PID = '11111111-1111-4111-8111-111111111111'
 

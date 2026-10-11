@@ -95,8 +95,8 @@ export async function updateCategory(categoryId: string, formData: FormData) {
   if (hasDraft || intent === 'draft') {
     if (intent === 'discard') {
       await query(`DELETE FROM category_drafts WHERE category_id = $1`, [categoryId])
-      revalidatePath(`/admin/categories/edit/${categoryId}`)
-      redirect(ap(`/admin/categories/edit/${categoryId}`, host))
+      revalidatePath(`/admin/categories/${categoryId}/edit`)
+      redirect(ap(`/admin/categories/${categoryId}/edit`, host))
     }
 
     // Save to draft
@@ -110,12 +110,12 @@ export async function updateCategory(categoryId: string, formData: FormData) {
     if (intent === 'publish') {
       await publishCategoryDraft(categoryId)
       revalidatePath('/admin/categories')
-      revalidatePath(`/admin/categories/edit/${categoryId}`)
+      revalidatePath(`/admin/categories/${categoryId}/edit`)
       redirect(ap(`/admin/categories`, host))
     }
 
     // Save as Draft always returns to the list.
-    revalidatePath(`/admin/categories/edit/${categoryId}`)
+    revalidatePath(`/admin/categories/${categoryId}/edit`)
     revalidatePath('/admin/categories')
     const back = formData.get('_back') as string | null
     redirect(ap(back && back.startsWith('/admin/categories') ? back : '/admin/categories', host))
@@ -130,6 +130,6 @@ export async function updateCategory(categoryId: string, formData: FormData) {
      ON CONFLICT (category_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
     [categoryId, JSON.stringify(draftFields)]
   )
-  revalidatePath(`/admin/categories/edit/${categoryId}`)
-  redirect(ap(`/admin/categories/edit/${categoryId}`, host))
+  revalidatePath(`/admin/categories/${categoryId}/edit`)
+  redirect(ap(`/admin/categories/${categoryId}/edit`, host))
 }

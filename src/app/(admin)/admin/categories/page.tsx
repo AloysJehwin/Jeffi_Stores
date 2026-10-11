@@ -103,7 +103,7 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
                     name={d.name}
                     subtitle="New category — not yet published"
                     updatedAt={d.created_at}
-                    editHref={ap(`/admin/categories/edit/${d.id}`, host)}
+                    editHref={ap(`/admin/categories/${d.id}/edit`, host)}
                     publishPath={`/api/admin/categories/${d.id}`}
                     publishMethod="PATCH"
                     publishBody={{ is_draft: false, is_active: true }}
@@ -126,7 +126,7 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
                     entityId={d.category_id}
                     name={d.name}
                     updatedAt={d.updated_at}
-                    editHref={ap(`/admin/categories/edit/${d.category_id}`, host)}
+                    editHref={ap(`/admin/categories/${d.category_id}/edit`, host)}
                     publishPath={`/api/admin/categories/${d.category_id}/publish`}
                     discardPath={`/api/admin/categories/${d.category_id}/draft`}
                     entityLabel="category"

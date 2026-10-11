@@ -360,7 +360,7 @@ function SuppliersTab() {
                   {sortedSuppliers.map(s => (
                     <tr key={s.id} className="hover:bg-surface-secondary/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">
-                        <Link href={ap(`/admin/suppliers/${s.id}`)} className="hover:text-accent-500 hover:underline">
+                        <Link href={ap(`/admin/suppliers/${s.id}/view`)} className="hover:text-accent-500 hover:underline">
                           {s.name}
                         </Link>
                       </td>
@@ -1741,7 +1741,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     </td>
                     <td className="px-4 py-3 font-medium text-foreground">
                       <Link
-                        href={ap(`/admin/suppliers/${po.supplier_id}`)}
+                        href={ap(`/admin/suppliers/${po.supplier_id}/view`)}
                         className="hover:text-accent-500 hover:underline"
                       >
                         {po.supplier_name}

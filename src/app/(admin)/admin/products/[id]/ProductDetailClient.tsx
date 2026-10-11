@@ -419,7 +419,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                   <div className="bg-surface rounded-lg border border-border-default p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <Link
-                        href={`/admin/suppliers/${data.primarySupplier.id}`}
+                        href={`/admin/suppliers/${data.primarySupplier.id}/view`}
                         className="text-sm font-semibold text-accent-600 hover:underline"
                       >
                         {data.primarySupplier.name}
@@ -506,7 +506,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                                       >
                                         <td className="py-1.5 pr-3">
                                           <Link
-                                            href={`/admin/suppliers/${row.supplier_id}`}
+                                            href={`/admin/suppliers/${row.supplier_id}/view`}
                                             className="text-accent-600 hover:underline"
                                           >
                                             {row.supplier_name}
