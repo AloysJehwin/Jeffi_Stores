@@ -96,6 +96,12 @@ export async function sendCampaignWhatsApp(
     const user = await queryOne<{ phone: string | null }>(`SELECT phone FROM users WHERE id = $1`, [userId])
     if (!user?.phone) return { ok: false, reason: 'no_phone' }
 
+    // Admin-authored SMS override for this campaign (replaces the built-in per-kind line when set).
+    const campaignRow = await queryOne<{ sms_template: string | null }>(
+      `SELECT sms_template FROM campaigns WHERE kind = $1`,
+      [kind]
+    ).catch(() => null)
+
     // Respect marketing opt-out (same gate as email campaigns).
     const gate = await canSendMarketing(userId, kind as CampaignKind)
     if (!gate.ok) return { ok: false, reason: gate.reason || 'opted_out' }
@@ -119,7 +125,9 @@ export async function sendCampaignWhatsApp(
     // Mobile = both channels: fire a plain-text SMS alongside WhatsApp so a customer reached on
     // mobile gets it even if WhatsApp isn't delivered. Shares the one dedup above (no extra gate),
     // best-effort. (#campaign SMS+WhatsApp together)
-    const smsBody = campaignSmsBody(kind, clean)
+    const smsBody = campaignRow?.sms_template?.trim()
+      ? renderSmsTemplate(campaignRow.sms_template, clean)
+      : campaignSmsBody(kind, clean)
     if (smsBody) {
       const { sendCampaignSMS } = await import('@/lib/shared/sms')
       sendCampaignSMS({ phone: user.phone, body: smsBody, kind, userId }).catch(() => {})
@@ -134,6 +142,18 @@ export async function sendCampaignWhatsApp(
 // Scenarios pass the bare percent ("10"), which read as "for 10." in the SMS.
 function smsDiscount(discount: string): string {
   return /^\d+(\.\d+)?$/.test(discount.trim()) ? `${discount.trim()}% off` : discount
+}
+
+// Render an admin-authored SMS template: {token} / {{token}} filled from the campaign vars, unknown
+// tokens dropped. Plain text only (SMS has no markup). Collapses whitespace from removed tokens.
+function renderSmsTemplate(template: string, vars: CampaignWaVars): string {
+  return template
+    .replace(/\{\{?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}?\}/g, (_m, key: string) => {
+      const v = (vars as Record<string, unknown>)[key]
+      return v == null ? '' : String(v)
+    })
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
 }
 
 // A short SMS line per campaign kind, built from the same vars as the WhatsApp template. Returns ''
