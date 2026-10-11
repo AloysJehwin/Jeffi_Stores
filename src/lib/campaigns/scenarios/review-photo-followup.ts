@@ -7,7 +7,7 @@ import {
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, minutes, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -170,7 +170,7 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
     })
 
     if (params.whatsappEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }, cooldownDays(params)).catch(
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }, cooldownMinutes(params)).catch(
         () => {}
       )
     }

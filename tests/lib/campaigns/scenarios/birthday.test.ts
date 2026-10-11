@@ -24,7 +24,15 @@ const mockFetchUser = fetchUserContext as ReturnType<typeof vi.fn>
 const mockSendEmail = sendCampaignEmail as ReturnType<typeof vi.fn>
 const mockSendWa = sendCampaignWhatsApp as ReturnType<typeof vi.fn>
 
-const campaign = { kind: 'birthday', enabled: true, name: 'Birthday', coupon_id: null, discount_percent: 0, delay_hours: 0, parameters: {} } as any
+const campaign = {
+  kind: 'birthday',
+  enabled: true,
+  name: 'Birthday',
+  coupon_id: null,
+  discount_percent: 0,
+  delay_hours: 0,
+  parameters: {},
+} as any
 const defaultParams = birthday.defaultParams
 
 describe('birthday scenario', () => {
@@ -82,7 +90,7 @@ describe('birthday scenario', () => {
       expect(mockSendWa).toHaveBeenCalledOnce()
       const [kind, , , cooldown] = mockSendWa.mock.calls[0]
       expect(kind).toBe('birthday')
-      expect(cooldown).toBe(1)
+      expect(cooldown).toBe(days(1))
     })
   })
 })

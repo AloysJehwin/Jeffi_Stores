@@ -245,12 +245,12 @@ describe('sendCampaignWhatsApp missing vars', () => {
       )
     })
 
-    it('defaults to a 1-day window when no cooldown is passed (never unbounded)', async () => {
+    it('defaults to a 1-day window (in minutes) when no cooldown is passed (never unbounded)', async () => {
       allowAndSend()
       await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt' })
-      // alreadySentForReference called with a positive window, not undefined/0.
+      // alreadySentForReference called with a positive MINUTES window, not undefined/0.
       const call = mockAlreadySent.mock.calls.at(-1)!
-      expect(call[3]).toBe(1)
+      expect(call[3]).toBe(1440) // days(1) in minutes
     })
   })
 
@@ -268,7 +268,15 @@ describe('sendCampaignWhatsApp missing vars', () => {
 // Every kind advertised as WhatsApp-capable must actually dispatch (loyalty_points_reminder used to
 // fall through to `default` and always fail).
 describe('every supported kind dispatches', () => {
-  const VARS = { items: 'Bolt', product: 'Bolt', headline: 'Hi', code: 'C1', discount: '5', orderNumber: 'O1', url: 'https://x' }
+  const VARS = {
+    items: 'Bolt',
+    product: 'Bolt',
+    headline: 'Hi',
+    code: 'C1',
+    discount: '5',
+    orderNumber: 'O1',
+    url: 'https://x',
+  }
   for (const kind of CAMPAIGN_WA_KINDS) {
     it(`${kind} sends`, async () => {
       allowAndSend()
@@ -282,7 +290,10 @@ describe('every supported kind dispatches', () => {
     allowAndSend()
     await sendCampaignWhatsApp('loyalty_points_reminder', 'user-1', { headline: 'You have 500 points', code: '' })
     expect(mockPromoOffer).toHaveBeenCalledWith(
-      expect.objectContaining({ headline: 'You have 500 points', entity: { entityType: 'campaign', entityId: 'loyalty_points_reminder' } })
+      expect.objectContaining({
+        headline: 'You have 500 points',
+        entity: { entityType: 'campaign', entityId: 'loyalty_points_reminder' },
+      })
     )
   })
 })
@@ -291,7 +302,9 @@ describe('campaign SMS copy', () => {
   it('formats a bare percent discount as "N% off"', async () => {
     allowAndSend()
     await sendCampaignWhatsApp('winback_90', 'user-1', { headline: 'We miss you!', code: 'BACK-1', discount: '10' })
-    expect(mockSendSMS).toHaveBeenCalledWith(expect.objectContaining({ body: 'We miss you! — use code BACK-1 for 10% off.' }))
+    expect(mockSendSMS).toHaveBeenCalledWith(
+      expect.objectContaining({ body: 'We miss you! — use code BACK-1 for 10% off.' })
+    )
   })
 
   it('keeps a discount that is already worded', async () => {
@@ -306,7 +319,9 @@ describe('var cleanup', () => {
     allowAndSend()
     await sendCampaignWhatsApp('replenishment', 'user-1', { items: 'Earthing Rod ' })
     expect(mockAbandonedCart).toHaveBeenCalledWith(expect.objectContaining({ items: 'Earthing Rod' }))
-    expect(mockSendSMS).toHaveBeenCalledWith(expect.objectContaining({ body: 'Running low on Earthing Rod? Reorder in a tap.' }))
+    expect(mockSendSMS).toHaveBeenCalledWith(
+      expect.objectContaining({ body: 'Running low on Earthing Rod? Reorder in a tap.' })
+    )
   })
 })
 
@@ -318,14 +333,12 @@ describe('admin-chosen approved template — variable resolution', () => {
     const mockTemplate = vi.mocked(sendCampaignTemplateWhatsApp)
     mockTemplate.mockResolvedValue(true)
     // 1st queryOne = user phone; 2nd = campaign row with an admin-chosen template + token slots.
-    mockQueryOne
-      .mockResolvedValueOnce({ phone: '+919876543210' } as any)
-      .mockResolvedValueOnce({
-        sms_template: null,
-        wa_template_sid: 'back_in_stock',
-        wa_variables: { '1': '{product}' },
-        wa_header_image_url: '{imageUrl}',
-      } as any)
+    mockQueryOne.mockResolvedValueOnce({ phone: '+919876543210' } as any).mockResolvedValueOnce({
+      sms_template: null,
+      wa_template_sid: 'back_in_stock',
+      wa_variables: { '1': '{product}' },
+      wa_header_image_url: '{imageUrl}',
+    } as any)
 
     await sendCampaignWhatsApp('restock', 'user-1', { product: 'Widget', imageUrl: 'https://cdn/x.jpg' } as any)
 
@@ -344,14 +357,12 @@ describe('admin-chosen template — CTA link is click-tracked', () => {
     mockRecordSent.mockResolvedValue('wa-sent-9')
     const mockTemplate = vi.mocked(sendCampaignTemplateWhatsApp)
     mockTemplate.mockResolvedValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ phone: '+919876543210' } as any)
-      .mockResolvedValueOnce({
-        sms_template: null,
-        wa_template_sid: 'back_in_stock', // urlSlot = 3
-        wa_variables: { '1': '{product}', '3': '{productUrl}' },
-        wa_header_image_url: null,
-      } as any)
+    mockQueryOne.mockResolvedValueOnce({ phone: '+919876543210' } as any).mockResolvedValueOnce({
+      sms_template: null,
+      wa_template_sid: 'back_in_stock', // urlSlot = 3
+      wa_variables: { '1': '{product}', '3': '{productUrl}' },
+      wa_header_image_url: null,
+    } as any)
 
     await sendCampaignWhatsApp('restock', 'u1', { product: 'Widget', productUrl: 'https://shop/p/widget' } as any)
 
@@ -368,14 +379,12 @@ describe('admin-chosen template — CTA link is click-tracked', () => {
     mockAlreadySent.mockResolvedValue(false)
     mockRecordSent.mockResolvedValue('wa-sent-10')
     vi.mocked(sendCampaignTemplateWhatsApp).mockResolvedValue(true)
-    mockQueryOne
-      .mockResolvedValueOnce({ phone: '+919876543210' } as any)
-      .mockResolvedValueOnce({
-        sms_template: null,
-        wa_template_sid: 'back_in_stock',
-        wa_variables: { '1': 'Widget', '3': 'see store' },
-        wa_header_image_url: null,
-      } as any)
+    mockQueryOne.mockResolvedValueOnce({ phone: '+919876543210' } as any).mockResolvedValueOnce({
+      sms_template: null,
+      wa_template_sid: 'back_in_stock',
+      wa_variables: { '1': 'Widget', '3': 'see store' },
+      wa_header_image_url: null,
+    } as any)
     await sendCampaignWhatsApp('restock', 'u1', {} as any)
     const arg = vi.mocked(sendCampaignTemplateWhatsApp).mock.calls[0][0]
     expect(arg.variables['3']).toBe('see store')

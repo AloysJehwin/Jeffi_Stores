@@ -8,13 +8,8 @@ import {
   renderHeroProduct,
 } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { cooldownDays } from '../duration'
-import {
-  NOT_RECENTLY_EMAILED_SQL,
-  SAVED_ITEMS_SQL,
-  settleWishlistEvent,
-  syncWishlistSnapshots,
-} from './_wishlist-base'
+import { cooldownMinutes } from '../duration'
+import { NOT_RECENTLY_EMAILED_SQL, SAVED_ITEMS_SQL, settleWishlistEvent, syncWishlistSnapshots } from './_wishlist-base'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -147,7 +142,7 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
     await settleWishlistEvent(emailResult, row.user_id, row.product_id)
 
     if (params.whatsappEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }, cooldownDays(params)).catch(
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }, cooldownMinutes(params)).catch(
         () => {}
       )
     }

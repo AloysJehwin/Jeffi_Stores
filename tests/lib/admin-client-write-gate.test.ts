@@ -39,6 +39,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'src/components/admin/CreateAdminForm.tsx',
   'src/components/admin/AdminUserActions.tsx',
   'src/components/admin/ServiceAccountRevokeButton.tsx',
+  // Owner-only revoke rendered only for owners by service-accounts/page.tsx (replaced the button above).
+  'src/components/admin/ServiceAccountRowActions.tsx',
   'src/app/(admin)/admin/service-accounts/add/page.tsx',
   // Read-only view; its only POST is an export/filter, not a scoped write.
   'src/app/(admin)/admin/audit/AdminAuditClient.tsx',
@@ -51,6 +53,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'src/app/(admin)/admin/products/_components/ProductsMobileList.tsx',
   'src/app/(admin)/admin/invoices/InvoicesClient.tsx',
   'src/app/(admin)/admin/quotations/QuotationsClient.tsx',
+  // Gated by a server-derived `canWrite` prop that wraps the RowActions ({canWrite && <RowActions/>}).
+  'src/components/admin/CouponTableRow.tsx',
   // Gated on a server-derived canWrite prop (hasScope(role, scopes, 'service_accounts:write')
   // in the page), passed in and used to gate every action — same pattern as the siblings above.
   'src/app/(admin)/admin/service-accounts/_components/ServiceAccountsMobileList.tsx',
@@ -87,7 +91,12 @@ function ungatedMutatingComponents(): string[] {
     .filter(f => !ALLOWED_WITHOUT_CLIENT_GATE.has(f))
     .filter(f => {
       const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
-      return !/useCanWrite\(|RequireWrite\b|useCanUseAi\(|RequireAi\b|useHasScope\(['"][^'"]+:write['"]\)/.test(src)
+      // A gate is: the client scope hooks/components, OR a RowActions action carrying a
+      // `scope: '<area>:write'` descriptor (RowActions hides scoped actions via useCanWrite).
+      return !(
+        /useCanWrite\(|RequireWrite\b|useCanUseAi\(|RequireAi\b|useHasScope\(['"][^'"]+:write['"]\)/.test(src) ||
+        /scope: *['"][^'"]+:write['"]/.test(src)
+      )
     })
     .sort()
 }

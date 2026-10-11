@@ -1,7 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, minutes, hours, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, hours, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
 // A product sitting in the cart is now cheaper than when the customer added it. cart_items.price_at_addition
@@ -229,7 +229,7 @@ export const cartPriceDrop: ScenarioModule<Params, Row> = {
     })
 
     if (params.whatsappEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, cooldownDays(params)).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

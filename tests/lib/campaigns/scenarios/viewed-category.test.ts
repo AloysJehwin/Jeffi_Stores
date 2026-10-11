@@ -85,9 +85,11 @@ describe('viewedCategory scenario', () => {
     beforeEach(() => {
       mockFetchUser.mockResolvedValue({ first_name: 'Sam', baseUrl: 'https://shop.test', unsubscribe_token: 't' })
       // 1st call: category lookup, 2nd call: products in category
-      mockQueryMany.mockResolvedValueOnce([{ name: 'Shoes', slug: 'shoes' }]).mockResolvedValueOnce([
-        { product_id: 'p1', product_slug: 'runner', name: 'Runner', price: 100, image_url: 'img.jpg' },
-      ])
+      mockQueryMany
+        .mockResolvedValueOnce([{ name: 'Shoes', slug: 'shoes' }])
+        .mockResolvedValueOnce([
+          { product_id: 'p1', product_slug: 'runner', name: 'Runner', price: 100, image_url: 'img.jpg' },
+        ])
     })
 
     it('sends an email featuring the category', async () => {
@@ -110,11 +112,11 @@ describe('viewedCategory scenario', () => {
         { campaign, params: { ...defaultParams, whatsappEnabled: true } }
       )
       expect(mockSendWa).toHaveBeenCalledOnce()
-      const [kind, userId, vars, cooldownDays] = mockSendWa.mock.calls[0]
+      const [kind, userId, vars, cooldownMin] = mockSendWa.mock.calls[0]
       expect(kind).toBe('viewed_category')
       expect(userId).toBe('u1')
       expect(vars.items).toBe('Shoes')
-      expect(cooldownDays).toBe(7)
+      expect(cooldownMin).toBe(10080) // 7 days in minutes
     })
 
     it('returns no_items when the category has no products', async () => {

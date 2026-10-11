@@ -3,7 +3,7 @@ import { fetchUserContext, sendCampaignEmail } from '@/lib/shared/automation-ema
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { getOrCreateReferralCode } from '@/lib/referrals/codes'
 import { getReferralSettings, isReferralLive } from '@/lib/referrals/settings'
-import { days, minutes, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -174,7 +174,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
         campaign.kind,
         row.user_id,
         { headline: `Refer a friend and earn ${rewardPoints} points: ${shareUrl}`, code: '', discount: '' },
-        cooldownDays(params)
+        cooldownMinutes(params)
       ).catch(() => {})
     }
     return emailResult

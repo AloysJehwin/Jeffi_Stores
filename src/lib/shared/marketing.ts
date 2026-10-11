@@ -116,17 +116,18 @@ export async function alreadySentForReference(
   campaignKind: CampaignKind,
   userId: string,
   referenceId: string | null,
-  // Cooldown window (days) for a NON-null reference: the same reference re-qualifies after this many
-  // days, so a recurring campaign (e.g. abandoned_cart sendCooldownDays:1) resends on the next cycle
-  // instead of being blocked forever. Omit/undefined keeps the legacy "ever sent → blocked" behavior
-  // for one-shot references. A null reference always uses the global FREQUENCY_CAP_HOURS. (#campaign)
-  cooldownDays?: number | null
+  // Cooldown window (MINUTES) for a NON-null reference: the same reference re-qualifies after this many
+  // minutes, so a recurring campaign resends on the next cycle instead of being blocked forever — and a
+  // sub-day cooldown (e.g. a 1-minute test cooldown) is honored exactly, matching the eligibility preview.
+  // Omit/undefined keeps the legacy "ever sent → blocked" behavior for one-shot references. A null
+  // reference always uses the global FREQUENCY_CAP_HOURS. (#campaign)
+  cooldownMinutes?: number | null
 ): Promise<boolean> {
   const timeFilter =
     referenceId === null
       ? `AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'`
-      : typeof cooldownDays === 'number' && cooldownDays > 0
-        ? `AND sent_at > NOW() - (${Number(cooldownDays)}::text || ' days')::interval`
+      : typeof cooldownMinutes === 'number' && cooldownMinutes > 0
+        ? `AND sent_at > NOW() - (${Number(cooldownMinutes)}::text || ' minutes')::interval`
         : ''
   const row = await queryOne<{ id: string }>(
     `SELECT id FROM email_campaigns_sent
