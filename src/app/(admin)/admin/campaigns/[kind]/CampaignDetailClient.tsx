@@ -764,6 +764,27 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             </p>
           </div>
 
+          {campaignSupportsWhatsApp(kind) && (
+            <div className="mt-4">
+              <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                SMS message
+              </label>
+              <textarea
+                value={form.sms_template}
+                onChange={e => setForm(f => (f ? { ...f, sms_template: e.target.value } : f))}
+                rows={3}
+                maxLength={480}
+                placeholder="Short text sent alongside WhatsApp when a phone is on file. Leave blank to use the built-in line. Variables like {firstName} and {couponCode} are filled per recipient."
+                className="field-normal w-full border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+              />
+              <p className="text-[10px] text-foreground-muted mt-1">
+                {form.sms_template.length} chars ·{' '}
+                {form.sms_template.length === 0 ? 0 : Math.ceil(form.sms_template.length / 160)} segment
+                {Math.ceil((form.sms_template.length || 0) / 160) === 1 ? '' : 's'} · plain text only, no images.
+              </p>
+            </div>
+          )}
+
           {hasDraft && (
             <RequireWrite scope="campaigns:write">
               <div className="mt-4 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
