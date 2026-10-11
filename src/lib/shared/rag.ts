@@ -1,5 +1,6 @@
 import { Pool } from 'pg'
 import { createPgPool, rdsSslOption, rdsIamPassword } from '@/lib/shared/pg-pool'
+import { getClient as getTenantClient, queryMany as tenantQueryMany } from '@/lib/shared/db'
 
 export interface RagResult {
   source_table: string
@@ -168,8 +169,8 @@ export async function runWithHnswTuning(sql: string, params: unknown[]) {
 // enrichment approve path), so product search must read there. SET LOCAL only holds inside a
 // transaction, so wrap the tuning + SELECT in one. The flagship reads its own DB and is unaffected.
 async function tenantHnswQuery<T extends Record<string, any> = any>(sql: string, params: unknown[]): Promise<T[]> {
-  const { getClient } = await import('@/lib/shared/db')
-  const client = await getClient()
+  const client = await getTenantClient()
+  if (!client) return []
   try {
     await client.query('BEGIN')
     await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH}`)
@@ -180,7 +181,7 @@ async function tenantHnswQuery<T extends Record<string, any> = any>(sql: string,
     await client.query('ROLLBACK').catch(() => {})
     throw e
   } finally {
-    client.release()
+    client?.release?.()
   }
 }
 
@@ -270,7 +271,7 @@ async function keywordProductIds(query: string, limit: number): Promise<string[]
   // Full-text keyword match over the CURRENT TENANT's own `products` (via the tenant pool), so literal
   // terms surface alongside the vector hits. Tenant-safe: `products.search_vector` is read from the
   // tenant's own DB, same place findSimilarProductIds reads embeddings.
-  const { queryMany } = await import('@/lib/shared/db')
+  const queryMany = tenantQueryMany
   // Salient tokens: drop stopwords / connectors, keep words >= 3 chars.
   const STOP = new Set([
     'for',
