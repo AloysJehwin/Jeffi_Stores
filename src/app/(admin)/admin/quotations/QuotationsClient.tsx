@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Check, ExternalLink } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
-import { useConfirm } from '@/contexts/ConfirmContext'
+import RowActions from '@/components/admin/RowActions'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
@@ -96,7 +96,6 @@ function todayISO() {
 
 export default function QuotationsClient({ canWrite = false }: { canWrite?: boolean }) {
   const { showToast } = useToast()
-  const confirm = useConfirm()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [view, setViewState] = useState<View>(() => {
@@ -740,13 +739,6 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
   }
 
   async function deleteQuote(id: string) {
-    const confirmed = await confirm({
-      title: 'Delete Quotation',
-      message: 'Delete this draft quotation? This cannot be undone.',
-      confirmLabel: 'Delete',
-      variant: 'danger',
-    })
-    if (!confirmed) return
     try {
       const res = await fetch(`/api/admin/quotations/${id}`, { method: 'DELETE' })
       if (!res.ok) {
@@ -1105,91 +1097,39 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          {q.status === 'draft' && !q.from_rfq && canWrite && (
-                            <button
-                              onClick={() => openEdit(q.id)}
-                              title="Edit"
-                              className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                />
-                              </svg>
-                            </button>
-                          )}
-                          <a
-                            href={ap(`/admin/quotations/${q.id}/view`)}
-                            title="View Detail"
-                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
-                          <a
-                            href={`/api/admin/quotations/${q.id}/pdf`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Download PDF"
-                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
-                          >
-                            <svg
-                              className="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                              />
-                            </svg>
-                          </a>
-                          {q.status === 'final' && q.consignee_email && (
-                            <button
-                              onClick={() => sendQuoteEmail(q.id)}
-                              disabled={sendingEmailId === q.id}
-                              title={`Send email to ${q.consignee_email}`}
-                              className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-blue-500 transition-colors disabled:opacity-50"
-                            >
-                              {sendingEmailId === q.id ? (
-                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                  <circle
-                                    className="opacity-25"
-                                    cx="12"
-                                    cy="12"
-                                    r="10"
-                                    stroke="currentColor"
-                                    strokeWidth={4}
-                                  />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                </svg>
-                              ) : (
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                                  />
-                                </svg>
-                              )}
-                            </button>
-                          )}
+                          <RowActions
+                            size="sm"
+                            actions={[
+                              {
+                                key: 'edit',
+                                kind: 'edit',
+                                label: 'Edit',
+                                hidden: q.status !== 'draft' || q.from_rfq || !canWrite,
+                                onSelect: () => openEdit(q.id),
+                              },
+                              {
+                                key: 'view',
+                                kind: 'open',
+                                label: 'View Detail',
+                                href: ap(`/admin/quotations/${q.id}/view`),
+                              },
+                              {
+                                key: 'download',
+                                kind: 'download',
+                                label: 'Download PDF',
+                                href: `/api/admin/quotations/${q.id}/pdf`,
+                                target: '_blank',
+                              },
+                              {
+                                key: 'email',
+                                kind: 'email',
+                                label: `Send email to ${q.consignee_email}`,
+                                hidden: q.status !== 'final' || !q.consignee_email,
+                                busy: sendingEmailId === q.id,
+                                onSelect: () => sendQuoteEmail(q.id),
+                              },
+                            ]}
+                          />
                           {q.status === 'final' && !q.converted_order_id && canWrite && (
                             <button
                               onClick={() => startConvert(q)}
@@ -1207,27 +1147,24 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                               Invoiced ↗
                             </a>
                           )}
-                          {q.status === 'draft' && canWrite && (
-                            <button
-                              onClick={() => deleteQuote(q.id)}
-                              title="Delete"
-                              className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-red-500 transition-colors"
-                            >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                              </svg>
-                            </button>
-                          )}
+                          <RowActions
+                            size="sm"
+                            actions={[
+                              {
+                                key: 'delete',
+                                kind: 'delete',
+                                label: 'Delete',
+                                hidden: q.status !== 'draft' || !canWrite,
+                                onSelect: () => deleteQuote(q.id),
+                                confirm: {
+                                  title: 'Delete Quotation',
+                                  message: 'Delete this draft quotation? This cannot be undone.',
+                                  confirmLabel: 'Delete',
+                                  variant: 'danger',
+                                },
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>

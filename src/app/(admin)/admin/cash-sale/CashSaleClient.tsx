@@ -14,6 +14,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import LineItemsSection, { newLineItem, fetchSeedLineItem, type LineItem } from '@/components/admin/LineItemsSection'
 import HoverCard from '@/components/ui/HoverCard'
+import RowActions from '@/components/admin/RowActions'
 import { ap } from '@/lib/shared/admin-path'
 import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
 import SerialEntryModal, {
@@ -1079,55 +1080,35 @@ export default function CashSaleClient() {
                         )}
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <a
-                            href={`/api/admin/cash-sale/${sale.id}/receipt`}
-                            target="_blank"
-                            rel="noreferrer"
-                            title="Download Receipt PDF"
-                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                              />
-                            </svg>
-                          </a>
-                          <a
-                            href={ap(`/admin/cash-sale/${sale.id}/view`)}
-                            title="View Detail"
-                            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                              />
-                            </svg>
-                          </a>
-                          {sale.status !== 'cancelled' && canWrite && (
-                            <button
-                              onClick={() => cancelSale(sale.id)}
-                              disabled={cancellingId === sale.id}
-                              title="Cancel Sale"
-                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-50"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M6 18L18 6M6 6l12 12"
-                                />
-                              </svg>
-                            </button>
-                          )}
-                        </div>
+                        <RowActions
+                          size="sm"
+                          actions={[
+                            {
+                              key: 'receipt',
+                              kind: 'download',
+                              label: 'Download Receipt PDF',
+                              href: `/api/admin/cash-sale/${sale.id}/receipt`,
+                              target: '_blank',
+                            },
+                            {
+                              key: 'view',
+                              kind: 'view',
+                              label: 'View Detail',
+                              href: ap(`/admin/cash-sale/${sale.id}/view`),
+                            },
+                            {
+                              key: 'cancel',
+                              kind: 'revoke',
+                              label: 'Cancel Sale',
+                              variant: 'danger',
+                              danger: false,
+                              hidden: sale.status === 'cancelled' || !canWrite,
+                              busy: cancellingId === sale.id,
+                              disabled: cancellingId === sale.id,
+                              onSelect: () => cancelSale(sale.id),
+                            },
+                          ]}
+                        />
                       </td>
                     </tr>
                   ))}

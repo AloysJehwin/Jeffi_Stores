@@ -7,6 +7,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminImage from '@/components/admin/AdminImage'
+import RowActions from '@/components/admin/RowActions'
 
 interface OfferListRow {
   id: string
@@ -19,7 +20,7 @@ interface OfferListRow {
 }
 
 export default function OffersListClient({ canWrite: canWriteProp }: { canWrite: boolean }) {
-  const { showToast, showConfirm } = useToast()
+  const { showToast } = useToast()
   const router = useRouter()
   const hasWriteScope = useCanWrite('coupons:write')
   const canWrite = canWriteProp && hasWriteScope
@@ -64,21 +65,12 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
     }
   }
 
-  function deleteOffer(id: string) {
-    showConfirm({
-      title: 'Delete offer?',
-      message: 'This will permanently remove the offer collection. Products are not deleted.',
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
-      type: 'danger',
-      onConfirm: async () => {
-        const res = await fetch(`/api/admin/product-offers/${id}`, { method: 'DELETE', credentials: 'include' })
-        if (res.ok) {
-          setOffers(prev => prev.filter(o => o.id !== id))
-          showToast('Offer deleted', 'success')
-        } else showToast('Failed to delete', 'error')
-      },
-    })
+  async function deleteOffer(id: string) {
+    const res = await fetch(`/api/admin/product-offers/${id}`, { method: 'DELETE', credentials: 'include' })
+    if (res.ok) {
+      setOffers(prev => prev.filter(o => o.id !== id))
+      showToast('Offer deleted', 'success')
+    } else showToast('Failed to delete', 'error')
   }
 
   return (
@@ -136,16 +128,25 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
                 title={offer.is_active ? 'Active' : 'Paused'}
               />
               {canWrite && (
-                <button
-                  type="button"
-                  onClick={() => deleteOffer(offer.id)}
-                  title="Delete offer"
-                  className="p-1.5 rounded-lg text-foreground-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0"
-                >
-                  <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.8}>
-                    <path d="M6 6l8 8M14 6l-8 8" strokeLinecap="round" />
-                  </svg>
-                </button>
+                <RowActions
+                  size="md"
+                  className="shrink-0"
+                  actions={[
+                    {
+                      key: 'delete',
+                      kind: 'delete',
+                      label: 'Delete offer',
+                      onSelect: () => deleteOffer(offer.id),
+                      confirm: {
+                        title: 'Delete offer?',
+                        message: 'This will permanently remove the offer collection. Products are not deleted.',
+                        confirmLabel: 'Delete',
+                        cancelLabel: 'Cancel',
+                        variant: 'danger',
+                      },
+                    },
+                  ]}
+                />
               )}
             </div>
           ))}

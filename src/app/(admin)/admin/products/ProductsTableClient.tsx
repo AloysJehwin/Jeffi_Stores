@@ -3,18 +3,17 @@
 import { useState } from 'react'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Star } from 'lucide-react'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { ap } from '@/lib/shared/admin-path'
 import FeaturedToggleButton from './_components/FeaturedToggleButton'
 import ProductImage from './_components/ProductImage'
-import DownloadAdButton from './_components/DownloadAdButton'
 import ProductDetailModal from './_components/ProductDetailModal'
 import ProductLabelModal from './_components/ProductLabelModal'
 import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import HoverCard from '@/components/ui/HoverCard'
 import CopySku from '@/components/ui/CopySku'
+import RowActions from '@/components/admin/RowActions'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface Props {
@@ -34,7 +33,6 @@ export default function ProductsTableClient({
 }: Props) {
   const canLabels = useHasScope('labels:read')
   const confirm = useConfirm()
-  const router = useRouter()
   const [selected, setSelected] = useState<any>(null)
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({})
@@ -61,13 +59,7 @@ export default function ProductsTableClient({
     }
   }
 
-  async function handleDelete(productId: string, productName: string) {
-    const ok = await confirm({
-      message: `Permanently delete "${productName}"? This cannot be undone.`,
-      variant: 'danger',
-      confirmLabel: 'Delete',
-    })
-    if (!ok) return
+  async function handleDelete(productId: string) {
     setDeletingId(productId)
     try {
       const res = await fetch(`/api/admin/products/${productId}`, { method: 'DELETE' })
@@ -477,109 +469,65 @@ export default function ProductsTableClient({
                 </div>
               </td>
               <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-end gap-1 flex-nowrap whitespace-nowrap">
-                  <Link
-                    href={ap(`/admin/products/${product.id}`)}
-                    title="View Details"
-                    className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                      />
-                    </svg>
-                  </Link>
-                  {product.is_active
-                    ? canWrite && (
-                        <button
-                          onClick={() =>
-                            setDraftProduct({
-                              id: product.id,
-                              name: String(product.name || ''),
-                              sku: product.sku ? String(product.sku) : null,
-                              backUrl,
-                            })
-                          }
-                          title="Edit Product"
-                          className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </button>
-                      )
-                    : canWrite && (
-                        <Link
-                          href={ap(`/admin/products/${product.id}/edit?back=${encodeURIComponent(backUrl)}`)}
-                          title="Edit Product"
-                          className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                        >
-                          <svg
-                            className="w-4 h-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </Link>
-                      )}
-                  {canLabels && (
-                    <button
-                      onClick={() =>
-                        setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants })
-                      }
-                      title="Print Label"
-                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                        />
-                      </svg>
-                    </button>
-                  )}
-                  <DownloadAdButton productId={product.id} productName={product.name} productSlug={product.slug} />
-                  {isSuperAdmin && canWrite && (
-                    <button
-                      onClick={() => handleDelete(product.id, product.name)}
-                      disabled={deletingId === product.id}
-                      title="Delete Product"
-                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-muted hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-40"
-                    >
-                      {deletingId === product.id ? (
-                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
-                      ) : (
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                          />
-                        </svg>
-                      )}
-                    </button>
-                  )}
-                </div>
+                <RowActions
+                  size="sm"
+                  actions={[
+                    {
+                      key: 'view',
+                      kind: 'open',
+                      label: 'View Details',
+                      href: ap(`/admin/products/${product.id}`),
+                    },
+                    {
+                      key: 'edit-active',
+                      kind: 'edit',
+                      label: 'Edit Product',
+                      hidden: !canWrite || !product.is_active,
+                      onSelect: () =>
+                        setDraftProduct({
+                          id: product.id,
+                          name: String(product.name || ''),
+                          sku: product.sku ? String(product.sku) : null,
+                          backUrl,
+                        }),
+                    },
+                    {
+                      key: 'edit-inactive',
+                      kind: 'edit',
+                      label: 'Edit Product',
+                      hidden: !canWrite || product.is_active,
+                      href: ap(`/admin/products/${product.id}/edit?back=${encodeURIComponent(backUrl)}`),
+                    },
+                    {
+                      key: 'print-label',
+                      kind: 'print',
+                      label: 'Print Label',
+                      hidden: !canLabels,
+                      onSelect: () =>
+                        setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants }),
+                    },
+                    {
+                      key: 'download-ad',
+                      kind: 'download',
+                      label: 'Download Ad Image',
+                      href: `/api/admin/products/${product.id}/ad-image`,
+                      download: true,
+                    },
+                    {
+                      key: 'delete',
+                      kind: 'delete',
+                      label: 'Delete Product',
+                      hidden: !isSuperAdmin || !canWrite,
+                      busy: deletingId === product.id,
+                      onSelect: () => handleDelete(product.id),
+                      confirm: {
+                        message: `Permanently delete "${product.name}"? This cannot be undone.`,
+                        confirmLabel: 'Delete',
+                        variant: 'danger',
+                      },
+                    },
+                  ]}
+                />
               </td>
             </tr>
           ))
