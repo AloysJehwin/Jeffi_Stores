@@ -43,7 +43,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     autoCancelMaxMinutes: {
       type: 'duration',
       recommendedUnit: 'minutes',
-      min: minutes(5),
+      min: minutes(1),
       max: minutes(120),
       label: 'Auto-cancel detection window',
       description:
@@ -154,13 +154,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
       WHERE u.is_active = FALSE OR u.marketing_opt_out = TRUE OR ecs.sent_at IS NOT NULL
       LIMIT 200
     `,
-      [
-        campaign.kind,
-        campaign.delay_hours,
-        String(minAfterCancel),
-        String(cooldownMin),
-        String(autoCancelMax),
-      ]
+      [campaign.kind, campaign.delay_hours, String(minAfterCancel), String(cooldownMin), String(autoCancelMax)]
     )
     return rows.map(r => ({
       user_id: r.user_id,

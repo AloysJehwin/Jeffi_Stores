@@ -1,7 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, sendCampaignEmail } from '@/lib/shared/automation-emails'
 import { generateBirthdayToken } from '@/lib/auth/jwt'
-import { days, readDurationParam, cooldownMinutes } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
@@ -33,7 +33,7 @@ export const birthdayCollect: ScenarioModule<Params, Row> = {
   paramSchema: {
     askAgainAfter: {
       type: 'duration',
-      min: days(30),
+      min: minutes(1),
       max: days(730),
       recommendedUnit: 'days',
       label: 'Ask again after',

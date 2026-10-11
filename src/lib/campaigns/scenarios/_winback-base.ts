@@ -1,7 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, readDurationParam, cooldownMinutes } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule, ParamSchema } from '../types'
 
 export interface WinbackParams extends Record<string, unknown> {
@@ -20,7 +20,7 @@ interface Row {
 const winbackSchema: ParamSchema<WinbackParams> = {
   minDaysSinceOrder: {
     type: 'duration',
-    min: days(1),
+    min: minutes(1),
     max: days(730),
     recommendedUnit: 'days',
     label: 'Min since last order',
@@ -28,7 +28,7 @@ const winbackSchema: ParamSchema<WinbackParams> = {
   },
   maxDaysSinceOrder: {
     type: 'duration',
-    min: days(1),
+    min: minutes(1),
     max: days(730),
     recommendedUnit: 'days',
     label: 'Max since last order',

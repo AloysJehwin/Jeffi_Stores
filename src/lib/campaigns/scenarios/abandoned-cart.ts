@@ -1,7 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, hours, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, hours, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -35,7 +35,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
   paramSchema: {
     lookbackDays: {
       type: 'duration',
-      min: days(1),
+      min: minutes(1),
       max: days(90),
       recommendedUnit: 'days',
       label: 'Lookback',
@@ -57,7 +57,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     },
     secondEmailDelayHours: {
       type: 'duration',
-      min: hours(24),
+      min: minutes(1),
       max: hours(168),
       recommendedUnit: 'hours',
       label: 'Second email delay',

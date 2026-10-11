@@ -3,7 +3,7 @@ import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { tierName } from '@/lib/loyalty/tiers'
-import { days, readDurationParam, cooldownDays } from '../duration'
+import { days, minutes, readDurationParam, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -32,7 +32,7 @@ export const loyaltyTierUpgrade: ScenarioModule<Params, Row> = {
   paramSchema: {
     recentWindow: {
       type: 'duration',
-      min: days(1),
+      min: minutes(1),
       max: days(60),
       recommendedUnit: 'days',
       label: 'Recent upgrade window',
@@ -157,7 +157,11 @@ export const loyaltyTierUpgrade: ScenarioModule<Params, Row> = {
       sendCampaignWhatsApp(
         campaign.kind,
         row.user_id,
-        { headline: `You reached ${tier}!`, code: couponCode || '', discount: discountPercent ? String(discountPercent) : '' },
+        {
+          headline: `You reached ${tier}!`,
+          code: couponCode || '',
+          discount: discountPercent ? String(discountPercent) : '',
+        },
         cooldownDays(params)
       ).catch(() => {})
     }

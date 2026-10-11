@@ -4,7 +4,7 @@ import { generateReviewToken } from '@/lib/auth/jwt'
 import { apiBaseUrl } from '@/lib/shared/customer-links'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, readDurationParam } from '../duration'
+import { days, minutes, readDurationParam } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -33,7 +33,7 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
   paramSchema: {
     lookbackDays: {
       type: 'duration',
-      min: days(1),
+      min: minutes(1),
       max: days(90),
       recommendedUnit: 'days',
       label: 'Lookback',

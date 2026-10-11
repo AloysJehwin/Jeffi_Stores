@@ -199,44 +199,41 @@ describe('runScenarioForAllCampaigns', () => {
   })
 })
 
-describe('legacy duration params', () => {
-  it('reads a bare legacy count below the field minimum in the key unit', async () => {
+describe('duration params are honored verbatim (no inflation)', () => {
+  it('passes saved minute-values through unchanged, even below the field minimum', async () => {
     const { resolveScenarioParams } = await import('@/lib/campaigns/runner')
     const { abandonedCart } = await import('@/lib/campaigns/scenarios/abandoned-cart')
     const { postPurchase } = await import('@/lib/campaigns/scenarios/post-purchase')
+    // A 1-minute cooldown/lookback/delay must survive exactly — the old normalizer inflated these.
     const cart = resolveScenarioParams(abandonedCart as any, {
-      lookbackDays: 30,
-      secondEmailDelayHours: 1440,
-      sendCooldown: 1440,
+      lookbackDays: 1,
+      secondEmailDelayHours: 1,
+      sendCooldown: 1,
     }) as any
-    expect(cart.lookbackDays).toBe(30 * 1440)
-    expect(cart.secondEmailDelayHours).toBe(1440)
-    expect(cart.sendCooldown).toBe(1440)
-    expect((resolveScenarioParams(postPurchase as any, { lookbackDays: 5 }) as any).lookbackDays).toBe(5 * 1440)
+    expect(cart.lookbackDays).toBe(1)
+    expect(cart.secondEmailDelayHours).toBe(1)
+    expect(cart.sendCooldown).toBe(1)
+    // A larger value is likewise untouched.
+    expect((resolveScenarioParams(postPurchase as any, { lookbackDays: 30 }) as any).lookbackDays).toBe(30)
   })
 
-  it('leaves canonical minutes and keys without a minimum alone', async () => {
-    const { normalizeDurationParams } = await import('@/lib/campaigns/runner')
-    const schema = {
-      lookback: { type: 'duration', min: 60, recommendedUnit: 'days', label: 'x' },
-      free: { type: 'duration', recommendedUnit: 'days', label: 'x' },
-      count: { type: 'integer', min: 5, label: 'x' },
-    } as any
-    expect(normalizeDurationParams({ lookback: 2880, free: 3, count: 1 }, schema)).toEqual({
-      lookback: 2880,
-      free: 3,
-      count: 1,
-    })
-    expect(normalizeDurationParams({ lookback: 7 }, schema)).toEqual({ lookback: 7 * 1440 })
+  it('still applies scenario defaults when an override key is absent', async () => {
+    const { resolveScenarioParams } = await import('@/lib/campaigns/runner')
+    const { abandonedCart } = await import('@/lib/campaigns/scenarios/abandoned-cart')
+    const { days } = await import('@/lib/campaigns/duration')
+    const resolved = resolveScenarioParams(abandonedCart as any, { sendCooldown: 1 }) as any
+    // lookbackDays wasn't overridden → keeps the scenario default (days(30)).
+    expect(resolved.lookbackDays).toBe(days(30))
+    expect(resolved.sendCooldown).toBe(1)
   })
 
-  it('runScenario hands the scenario normalized params', async () => {
+  it('runScenario hands the scenario its params verbatim', async () => {
     mockGetCampaign.mockResolvedValue(makeCampaign({ parameters: { lookbackDays: 30 } }))
     const scenario = makeScenario({
       defaultParams: { lookbackDays: 43200 },
-      paramSchema: { lookbackDays: { type: 'duration', min: 1440, recommendedUnit: 'days', label: 'x' } },
+      paramSchema: { lookbackDays: { type: 'duration', min: 1, recommendedUnit: 'days', label: 'x' } },
     })
     await runScenario(scenario, 'abandoned_checkout')
-    expect(scenario.findEligible.mock.calls[0][0].params.lookbackDays).toBe(43200)
+    expect(scenario.findEligible.mock.calls[0][0].params.lookbackDays).toBe(30)
   })
 })

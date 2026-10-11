@@ -3,7 +3,7 @@ import { fetchUserContext, sendCampaignEmail } from '@/lib/shared/automation-ema
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { getOrCreateReferralCode } from '@/lib/referrals/codes'
 import { getReferralSettings, isReferralLive } from '@/lib/referrals/settings'
-import { days, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -30,7 +30,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
   paramSchema: {
     sinceDelivered: {
       type: 'duration',
-      min: days(1),
+      min: minutes(1),
       max: days(60),
       recommendedUnit: 'days',
       label: 'Wait after delivery',
