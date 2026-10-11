@@ -22,7 +22,7 @@ import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { MessageCircle, ChevronDown } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
-import WhatsAppTemplateEditor from '@/components/admin/campaigns/WhatsAppTemplateEditor'
+import WhatsAppTemplateEditor, { WhatsAppPreview } from '@/components/admin/campaigns/WhatsAppTemplateEditor'
 import DurationField from '@/components/admin/campaigns/DurationField'
 import type { DurationUnit } from '@/lib/campaigns/duration'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
@@ -917,6 +917,22 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               sandbox=""
             />
           </div>
+
+          {campaignSupportsWhatsApp(kind) && !!form.parameters?.whatsappEnabled && form.wa_template_sid && (
+            <div className="mt-5">
+              <p className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-2">
+                WhatsApp preview
+              </p>
+              <WhatsAppPreview
+                value={{
+                  key: form.wa_template_sid,
+                  variables: form.wa_variables,
+                  headerImageUrl: form.wa_header_image_url,
+                }}
+                vars={previewVars}
+              />
+            </div>
+          )}
         </div>
       </div>
 

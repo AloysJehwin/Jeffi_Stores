@@ -136,11 +136,20 @@ export async function sendCampaignWhatsApp(
       const def = getWhatsAppTemplate(waKey)
       if (def) {
         const { sendCampaignTemplateWhatsApp } = await import('@/lib/shared/whatsapp')
+        // Resolve the admin's slot values + header image through the send vars, so {firstName} →
+        // the recipient's name and {productImageUrl} → the subject product's image (same pipeline as
+        // SMS/email). Raw values were being sent literally. (#campaign templates)
+        const rawVars = (campaignRow?.wa_variables as Record<string, string>) || {}
+        const resolvedVars: Record<string, string> = {}
+        for (const [k, v] of Object.entries(rawVars)) resolvedVars[k] = renderSmsTemplate(String(v ?? ''), clean)
+        const resolvedImage = campaignRow?.wa_header_image_url
+          ? renderSmsTemplate(campaignRow.wa_header_image_url, clean)
+          : null
         ok = await sendCampaignTemplateWhatsApp({
           phone: user.phone,
           sidEnvVar: def.sidEnv,
-          variables: (campaignRow?.wa_variables as Record<string, string>) || {},
-          headerImageUrl: campaignRow?.wa_header_image_url || null,
+          variables: resolvedVars,
+          headerImageUrl: resolvedImage,
           imageSlot: def.imageSlot ?? null,
           kind,
           entity: { entityType: 'campaign', entityId: kind },
