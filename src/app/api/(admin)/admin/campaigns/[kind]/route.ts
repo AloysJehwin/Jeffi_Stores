@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
   const campaign = await queryOne(`SELECT * FROM campaigns WHERE kind = $1`, [kind])
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
 
-  const [recentSends, countRow, whatsappLogs] = await Promise.all([
+  const [recentSends, countRow, whatsappLogs, statsRow] = await Promise.all([
     queryMany(
       `
       SELECT
@@ -50,10 +50,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
     `,
       [kind]
     ),
+    // Same aggregate stats the list endpoint computes, so the view page's performance grid matches.
+    queryOne(
+      `
+      SELECT
+        COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = $1), 0) AS total_sent,
+        COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = $1 AND ecs.opened_at IS NOT NULL), 0) AS total_opened,
+        COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = $1 AND ecs.clicked_at IS NOT NULL), 0) AS total_clicked,
+        COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = $1 AND ecs.converted_at IS NOT NULL), 0) AS total_converted,
+        COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = $1 AND ecs.unsubscribed_at IS NOT NULL), 0) AS total_unsubscribed,
+        COALESCE((SELECT SUM(o.total_amount) FROM email_campaigns_sent ecs JOIN orders o ON o.id = ecs.conversion_order_id WHERE ecs.campaign_kind = $1), 0) AS revenue_attributed
+    `,
+      [kind]
+    ),
   ])
 
   return NextResponse.json({
-    campaign,
+    campaign: { ...campaign, ...(statsRow || {}) },
     recentSends,
     whatsappLogs,
     total: parseInt(countRow?.total || '0', 10),

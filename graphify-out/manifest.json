@@ -670,8 +670,8 @@
     "semantic_hash": ""
   },
   "src/middleware.ts": {
-    "mtime": 1791650409.1441014,
-    "ast_hash": "f85548d8f14a8ac8707e6d910447269f",
+    "mtime": 1791738978.6163926,
+    "ast_hash": "e49d71a4957cca24e114065f9cf56739",
     "semantic_hash": ""
   },
   "src/types/google.d.ts": {
@@ -6435,13 +6435,13 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/CampaignsListClient.tsx": {
-    "mtime": 1791724981.7224386,
-    "ast_hash": "327ece31f0e5a31244d18d9b065c02d7",
+    "mtime": 1791738993.6435854,
+    "ast_hash": "e7de693f74b225d1ba5add290a06c91f",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/CampaignDetailClient.tsx": {
-    "mtime": 1791724014.6630023,
-    "ast_hash": "4af4b8694fca39d382c78c6e7c34d53c",
+    "mtime": 1791738686.7292001,
+    "ast_hash": "2e801a65c18cad7011f7ccc9cce482b7",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/loading.tsx": {
@@ -6450,8 +6450,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/page.tsx": {
-    "mtime": 1791724969.625567,
-    "ast_hash": "03c166a1f6c74dc147a3caffcb8d2bdb",
+    "mtime": 1791738920.7648652,
+    "ast_hash": "c3434a2d1fc7d19059152ce2b66b6d47",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/loading.tsx": {
@@ -8930,8 +8930,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/campaigns/[kind]/route.ts": {
-    "mtime": 1790931249.907421,
-    "ast_hash": "4f6fa6d7c06bc4da2e3200090c8dbbb1",
+    "mtime": 1791738853.9265459,
+    "ast_hash": "36db745bb65fa37483aef975457dc695",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/campaigns/[kind]/run/route.ts": {
@@ -14425,13 +14425,23 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/view/CampaignViewClient.tsx": {
-    "mtime": 1791725104.414264,
-    "ast_hash": "954361f2c340605bfe15bd94caa3b777",
+    "mtime": 1791738968.148452,
+    "ast_hash": "74f1812c3ab23e4b273805ca4c6e4c8a",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/view/page.tsx": {
     "mtime": 1791724947.199332,
     "ast_hash": "b1693d472f4561066f8a1cc1f7a73d3c",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/campaigns/[kind]/_components/CampaignOpsPanels.tsx": {
+    "mtime": 1791738777.2733908,
+    "ast_hash": "0f7be30e402d254196986ab79bd8daf0",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/campaigns/[kind]/edit/page.tsx": {
+    "mtime": 1791738722.550823,
+    "ast_hash": "152b8aca67102ae0d512e33ef146ee74",
     "semantic_hash": ""
   }
 }

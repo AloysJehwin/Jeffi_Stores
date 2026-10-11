@@ -77,13 +77,17 @@ function isMobileUA(ua: string | null): boolean {
 }
 
 function isAdminWritePath(pathname: string): boolean {
-  return /\/admin\/(products|categories|brands|coupons|review-forms|suppliers|inventory\/po|mailer|campaigns|service-accounts|team)\/(add|new|edit(\/|$))/i.test(
+  return /\/admin\/(products|categories|brands|coupons|review-forms|suppliers|inventory\/po|mailer|campaigns|service-accounts|team)\/(?:(?:add|new)(?:\/|$)|(?:[^/]+\/)?edit(?:\/|$))/i.test(
     pathname
   )
 }
 
-// Strip /add, /new, or /edit/[...] suffix to derive the parent list URL.
+// Derive the parent URL to bounce a mobile user to from a write page.
+// id-first edit (`/<area>/<id>/edit`) → the record's read-only `/view` (mobile-safe);
+// add / new / verb-first `edit/<id>` → the list.
 function adminWritePathParent(pathname: string): string {
+  const idFirst = pathname.replace(/\/([^/]+)\/edit$/i, '/$1/view')
+  if (idFirst !== pathname) return idFirst
   return pathname.replace(/\/(add|new|edit(\/[^?]*)?)$/i, '')
 }
 
