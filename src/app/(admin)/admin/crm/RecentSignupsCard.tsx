@@ -24,7 +24,7 @@ function timeAgo(iso: string) {
 function SignupRow({ s }: { s: SignupEntry }) {
   return (
     <Link
-      href={ap(`/admin/customers/${s.id}`)}
+      href={ap(`/admin/customers/${s.id}/view`)}
       className="flex items-center justify-between gap-3 py-2 hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors"
     >
       <div className="min-w-0 flex-1">

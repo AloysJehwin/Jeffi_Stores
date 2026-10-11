@@ -180,14 +180,14 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                               <span>{r.party}</span>
                             ) : r.user_id ? (
                               <Link
-                                href={ap(`/admin/customers/${r.user_id}`)}
+                                href={ap(`/admin/customers/${r.user_id}/view`)}
                                 className="hover:text-accent-500 hover:underline"
                               >
                                 {r.party}
                               </Link>
                             ) : (
                               <Link
-                                href={ap(`/admin/orders/${r.id}`)}
+                                href={ap(`/admin/orders/${r.id}/view`)}
                                 className="hover:text-accent-500 hover:underline"
                               >
                                 {r.party}
@@ -202,7 +202,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                             </Link>
                           ) : (
                             <Link
-                              href={ap(`/admin/financial/payables/${r.expense_id}`)}
+                              href={ap(`/admin/financial/payables/${r.expense_id}/view`)}
                               className="hover:text-accent-500 hover:underline"
                             >
                               {r.party}
@@ -222,14 +222,14 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                               </a>
                             ) : r.invoice_number ? (
                               <Link
-                                href={ap(`/admin/invoices/${r.id}`)}
+                                href={ap(`/admin/invoices/${r.id}/view`)}
                                 className="hover:text-accent-500 hover:underline font-mono"
                               >
                                 {r.txn_ref}
                               </Link>
                             ) : (
                               <Link
-                                href={ap(`/admin/orders/${r.id}`)}
+                                href={ap(`/admin/orders/${r.id}/view`)}
                                 className="hover:text-accent-500 hover:underline font-mono"
                               >
                                 {r.txn_ref}
@@ -237,7 +237,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                             )
                           ) : (
                             <Link
-                              href={ap(`/admin/financial/payables/${r.expense_id}`)}
+                              href={ap(`/admin/financial/payables/${r.expense_id}/view`)}
                               className="hover:text-accent-500 hover:underline font-mono"
                             >
                               {r.txn_ref}
@@ -289,14 +289,14 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                             <span className="font-medium text-foreground text-sm">{r.party}</span>
                           ) : r.user_id ? (
                             <Link
-                              href={ap(`/admin/customers/${r.user_id}`)}
+                              href={ap(`/admin/customers/${r.user_id}/view`)}
                               className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
                             >
                               {r.party}
                             </Link>
                           ) : (
                             <Link
-                              href={ap(`/admin/orders/${r.id}`)}
+                              href={ap(`/admin/orders/${r.id}/view`)}
                               className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
                             >
                               {r.party}
@@ -311,7 +311,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                           </Link>
                         ) : (
                           <Link
-                            href={ap(`/admin/financial/payables/${r.expense_id}`)}
+                            href={ap(`/admin/financial/payables/${r.expense_id}/view`)}
                             className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
                           >
                             {r.party}
@@ -330,14 +330,14 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                               </a>
                             ) : r.invoice_number ? (
                               <Link
-                                href={ap(`/admin/invoices/${r.id}`)}
+                                href={ap(`/admin/invoices/${r.id}/view`)}
                                 className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block"
                               >
                                 {r.txn_ref}
                               </Link>
                             ) : (
                               <Link
-                                href={ap(`/admin/orders/${r.id}`)}
+                                href={ap(`/admin/orders/${r.id}/view`)}
                                 className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block"
                               >
                                 {r.txn_ref}
@@ -345,7 +345,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                             )
                           ) : (
                             <Link
-                              href={ap(`/admin/financial/payables/${r.expense_id}`)}
+                              href={ap(`/admin/financial/payables/${r.expense_id}/view`)}
                               className="text-xs text-foreground-secondary font-mono mt-0.5 hover:text-accent-500 hover:underline block"
                             >
                               {r.txn_ref}

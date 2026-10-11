@@ -31,7 +31,7 @@ function CustomerDetailModal({ customer, onClose, backUrl }: { customer: any; on
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link
-              href={ap(`/admin/customers/${customer.id}?back=${encodeURIComponent(backUrl)}`)}
+              href={ap(`/admin/customers/${customer.id}/view?back=${encodeURIComponent(backUrl)}`)}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
             >
               Full Profile
@@ -163,7 +163,7 @@ export default function CustomersTableRows({
             <HoverCard
               trigger={
                 <Link
-                  href={ap(`/admin/customers/${customer.id}?back=${encodeURIComponent(backUrl)}`)}
+                  href={ap(`/admin/customers/${customer.id}/view?back=${encodeURIComponent(backUrl)}`)}
                   className="text-sm font-medium text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2 whitespace-nowrap"
                 >
                   {[customer.first_name, customer.last_name].filter(Boolean).join(' ') || '—'}
@@ -352,7 +352,7 @@ export default function CustomersTableRows({
           <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-end gap-1">
               <Link
-                href={ap(`/admin/customers/${customer.id}?back=${encodeURIComponent(backUrl)}`)}
+                href={ap(`/admin/customers/${customer.id}/view?back=${encodeURIComponent(backUrl)}`)}
                 title="View Customer"
                 className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
               >

@@ -122,7 +122,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link
-              href={ap(`/admin/orders/${order.id}`)}
+              href={ap(`/admin/orders/${order.id}/view`)}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
             >
               Full Details
@@ -173,7 +173,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               )}
               {o.users?.id && (
                 <Link
-                  href={ap(`/admin/customers/${o.users.id}`)}
+                  href={ap(`/admin/customers/${o.users.id}/view`)}
                   className="text-xs text-accent-500 hover:underline mt-1 inline-block"
                 >
                   View customer →

@@ -127,7 +127,7 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-default bg-surface-secondary">
         <div className="flex items-center gap-3">
           <Link
-            href={ap(`/admin/orders/${row.order_id}`)}
+            href={ap(`/admin/orders/${row.order_id}/view`)}
             className="text-sm font-semibold text-accent-500 hover:text-accent-600 underline"
           >
             #{row.order_number}
@@ -183,7 +183,7 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
             <div>
               <p className="text-foreground-secondary text-xs mb-0.5">Replacement order</p>
               <Link
-                href={ap(`/admin/orders/${row.replacement_order_id}`)}
+                href={ap(`/admin/orders/${row.replacement_order_id}/view`)}
                 className="text-sm font-medium text-accent-500 hover:text-accent-600 underline"
               >
                 #{row.replacement_order_number}
@@ -268,7 +268,7 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
             </svg>
             <span className="text-green-800 dark:text-green-300">
               Replacement order{' '}
-              <Link href={ap(`/admin/orders/${row.replacement_order_id}`)} className="underline font-medium">
+              <Link href={ap(`/admin/orders/${row.replacement_order_id}/view`)} className="underline font-medium">
                 #{row.replacement_order_number}
               </Link>{' '}
               created and confirmed.

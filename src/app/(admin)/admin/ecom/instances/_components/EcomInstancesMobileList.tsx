@@ -38,7 +38,7 @@ export default function EcomInstancesMobileList({ tenants }: { tenants: Instance
   }
 
   const actions = (t: InstanceTenant): MobileAction[] => [
-    { key: 'detail', label: 'View instance detail', onSelect: () => router.push(`/admin/ecom/instances/${t.id}`) },
+    { key: 'detail', label: 'View instance detail', onSelect: () => router.push(`/admin/ecom/instances/${t.id}/view`) },
   ]
 
   return (

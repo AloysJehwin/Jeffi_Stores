@@ -45,13 +45,7 @@ function formatDate(c: Campaign): string {
   return new Date(c.created_at).toLocaleDateString('en-IN')
 }
 
-export default function MailerMobileList({
-  campaigns,
-  templateLabels,
-  statusStyles,
-  currentListUrl,
-  host,
-}: Props) {
+export default function MailerMobileList({ campaigns, templateLabels, statusStyles, currentListUrl, host }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
   const canWrite = useCanWrite('campaigns:write')
@@ -60,7 +54,7 @@ export default function MailerMobileList({
   const [actionsOpen, setActionsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const viewUrl = (c: Campaign) => ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)
+  const viewUrl = (c: Campaign) => ap(`/admin/mailer/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)
 
   async function dispatch(c: Campaign) {
     if (busy) return

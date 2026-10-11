@@ -174,7 +174,7 @@ export function TenantTabNav({
           return (
             <Link
               key={key}
-              href={`/admin/ecom/customers/${tenantId}?tab=${key}`}
+              href={`/admin/ecom/customers/${tenantId}/view?tab=${key}`}
               className={`px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
                 on
                   ? 'border-accent-500 text-foreground'

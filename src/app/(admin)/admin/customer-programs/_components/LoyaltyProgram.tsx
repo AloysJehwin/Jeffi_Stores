@@ -115,7 +115,10 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
               defaultValue={tier}
               sm
               className="w-36"
-              options={[{ value: '', label: 'All tiers' }, ...TIER_KEYS.map(key => ({ value: key, label: TIER_NAMES[key] }))]}
+              options={[
+                { value: '', label: 'All tiers' },
+                ...TIER_KEYS.map(key => ({ value: key, label: TIER_NAMES[key] })),
+              ]}
             />
             <button type="submit" className={filterButtonClass}>
               Filter
@@ -144,7 +147,7 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
                   <tr key={member.userId} className="border-t border-border-default">
                     <td className="px-4 py-3">
                       <Link
-                        href={ap(`/admin/customers/${member.userId}`, host)}
+                        href={ap(`/admin/customers/${member.userId}/view`, host)}
                         className="font-medium text-foreground hover:text-accent-600"
                       >
                         {member.name}

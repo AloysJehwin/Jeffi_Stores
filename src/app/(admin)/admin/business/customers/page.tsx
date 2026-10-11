@@ -162,7 +162,7 @@ async function BusinessCustomersListContent({
             industry: c.industry,
             approval_status: c.approval_status,
             created_at: c.created_at,
-            href: ap(`/admin/business/customers/${c.user_id}`, host),
+            href: ap(`/admin/business/customers/${c.user_id}/view`, host),
           }))}
         />
       </div>
@@ -193,7 +193,7 @@ async function BusinessCustomersListContent({
                 <tr key={c.user_id} className="hover:bg-surface-secondary transition-colors">
                   <td className="px-4 py-3 font-medium">
                     <Link
-                      href={ap(`/admin/business/customers/${c.user_id}`, host)}
+                      href={ap(`/admin/business/customers/${c.user_id}/view`, host)}
                       className="text-foreground hover:text-accent-500 transition-colors"
                     >
                       {c.company_name}
@@ -223,7 +223,7 @@ async function BusinessCustomersListContent({
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link
-                      href={ap(`/admin/business/customers/${c.user_id}`, host)}
+                      href={ap(`/admin/business/customers/${c.user_id}/view`, host)}
                       className="text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline"
                     >
                       View →

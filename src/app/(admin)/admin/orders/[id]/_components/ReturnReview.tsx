@@ -365,7 +365,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
         <div>
           <p className="text-sm text-foreground-secondary mb-1">Replacement order</p>
           <Link
-            href={ap(`/admin/orders/${returnRequest.replacement_order_id}`)}
+            href={ap(`/admin/orders/${returnRequest.replacement_order_id}/view`)}
             className="text-sm font-medium text-accent-500 hover:text-accent-600 underline"
           >
             #{replacementOrderNumber}

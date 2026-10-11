@@ -149,7 +149,7 @@ export default async function ReferralProgram({ host, query }: { host: string; q
                     {[row.referrer, row.friend].map((person, i) => (
                       <td key={i} className="px-4 py-3">
                         <Link
-                          href={ap(`/admin/customers/${person.id}`, host)}
+                          href={ap(`/admin/customers/${person.id}/view`, host)}
                           className="font-medium text-foreground hover:text-accent-600"
                         >
                           {person.name}
@@ -158,7 +158,9 @@ export default async function ReferralProgram({ host, query }: { host: string; q
                       </td>
                     ))}
                     <td className="px-4 py-3">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS[row.status].className}`}>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS[row.status].className}`}
+                      >
                         {STATUS[row.status].label}
                       </span>
                       {row.rejectReason && (
@@ -170,7 +172,9 @@ export default async function ReferralProgram({ host, query }: { host: string; q
                     <td className="px-4 py-3 text-right font-medium text-foreground">
                       {row.points != null ? number(row.points) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(row.signedUpAt)}</td>
+                    <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">
+                      {formatDate(row.signedUpAt)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

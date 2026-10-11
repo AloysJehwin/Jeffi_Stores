@@ -61,7 +61,7 @@ export default function CustomersMobileList({ customers, backUrl, pagination }: 
         key: 'view',
         label: 'View customer profile',
         icon: <Eye className="w-4 h-4" />,
-        onSelect: () => router.push(ap(`/admin/customers/${customer.id}?back=${encodeURIComponent(backUrl)}`)),
+        onSelect: () => router.push(ap(`/admin/customers/${customer.id}/view?back=${encodeURIComponent(backUrl)}`)),
       },
     ]
   }
@@ -83,10 +83,7 @@ export default function CustomersMobileList({ customers, backUrl, pagination }: 
                 onTap={() => setSelected(customer)}
                 className="relative pl-5 overflow-hidden"
               >
-                <span
-                  className={`absolute left-0 top-0 bottom-0 w-1 ${healthBarColor(score)}`}
-                  aria-hidden="true"
-                />
+                <span className={`absolute left-0 top-0 bottom-0 w-1 ${healthBarColor(score)}`} aria-hidden="true" />
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="text-sm font-semibold text-foreground truncate">{fullName(customer)}</span>
                   <div className="flex items-center gap-1.5 shrink-0">

@@ -360,7 +360,10 @@ function SuppliersTab() {
                   {sortedSuppliers.map(s => (
                     <tr key={s.id} className="hover:bg-surface-secondary/50 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">
-                        <Link href={ap(`/admin/suppliers/${s.id}/view`)} className="hover:text-accent-500 hover:underline">
+                        <Link
+                          href={ap(`/admin/suppliers/${s.id}/view`)}
+                          className="hover:text-accent-500 hover:underline"
+                        >
                           {s.name}
                         </Link>
                       </td>
@@ -2858,14 +2861,14 @@ function StockTab() {
                       const refLink =
                         group.refType === 'order' && group.linkId ? (
                           <Link
-                            href={ap(`/admin/invoices/${group.linkId}`)}
+                            href={ap(`/admin/invoices/${group.linkId}/view`)}
                             className="font-mono text-accent-500 hover:underline underline-offset-2"
                           >
                             {group.refLabel || (group.linkId || group.refId).slice(0, 8) + '…'}
                           </Link>
                         ) : group.refType === 'cash_sale' && group.linkId ? (
                           <Link
-                            href={ap(`/admin/cash-sale/${group.linkId}`)}
+                            href={ap(`/admin/cash-sale/${group.linkId}/view`)}
                             className="font-mono text-accent-500 hover:underline underline-offset-2"
                           >
                             {group.refLabel || (group.linkId || group.refId).slice(0, 8) + '…'}

@@ -1,31 +1,10 @@
-import { cookies } from 'next/headers'
-import { redirect } from 'next/navigation'
-import { verifyToken } from '@/lib/auth/jwt'
-import { hasScope } from '@/lib/auth/scopes'
+import { permanentRedirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import CashSaleDetailClient from './CashSaleDetailClient'
-import { adminCookieName } from '@/lib/auth/admin-cookie'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CashSaleDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const host = await getHost()
-  const cookieStore = await cookies()
-  const token = cookieStore.get(await adminCookieName())
-  if (!token) redirect(ap('/admin/login', host))
-
-  let session: any = null
-  try {
-    session = await verifyToken(token.value)
-  } catch {
-    redirect(ap('/admin/login', host))
-  }
-
-  if (!hasScope(session?.role || '', session?.scopes || [], 'invoices:read')) {
-    redirect(ap('/admin/dashboard', host))
-  }
-
-  return <CashSaleDetailClient id={id} />
+  permanentRedirect(ap(`/admin/cash-sale/${id}/view`, await getHost()))
 }

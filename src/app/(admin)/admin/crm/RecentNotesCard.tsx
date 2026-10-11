@@ -28,7 +28,7 @@ function NoteRow({ n }: { n: NoteEntry }) {
       <p className="text-sm text-foreground whitespace-pre-wrap break-words line-clamp-3">{n.body}</p>
       <p className="text-[10px] text-foreground-muted mt-1">
         <Link
-          href={ap(`/admin/customers/${n.userId}`)}
+          href={ap(`/admin/customers/${n.userId}/view`)}
           className="text-accent-600 dark:text-accent-400 hover:underline"
         >
           {n.customerName}

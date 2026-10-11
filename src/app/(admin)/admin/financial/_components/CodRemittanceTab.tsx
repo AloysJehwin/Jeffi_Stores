@@ -210,7 +210,7 @@ export function CodRemittanceTab() {
                         </td>
                         <td className="px-4 py-2.5">
                           <Link
-                            href={`/admin/orders/${o.id}`}
+                            href={`/admin/orders/${o.id}/view`}
                             className="text-secondary-500 hover:underline font-mono text-xs font-medium"
                           >
                             #{o.order_number}
@@ -281,7 +281,7 @@ export function CodRemittanceTab() {
                   <tr key={o.id} className="hover:bg-surface-secondary/40 transition-colors">
                     <td className="px-4 py-2.5">
                       <Link
-                        href={`/admin/orders/${o.id}`}
+                        href={`/admin/orders/${o.id}/view`}
                         className="text-secondary-500 hover:underline font-mono text-xs font-medium"
                       >
                         #{o.order_number}

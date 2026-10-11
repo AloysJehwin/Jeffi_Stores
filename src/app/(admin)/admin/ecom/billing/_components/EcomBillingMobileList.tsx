@@ -42,7 +42,7 @@ export default function EcomBillingMobileList({ tenants }: { tenants: BillingTen
     t.monthly_price_inr ? '₹' + Number(t.monthly_price_inr).toLocaleString('en-IN') : '—'
 
   const actions = (t: BillingTenant): MobileAction[] => [
-    { key: 'view', label: 'View ledger', onSelect: () => router.push(`/admin/ecom/billing/${t.id}`) },
+    { key: 'view', label: 'View ledger', onSelect: () => router.push(`/admin/ecom/billing/${t.id}/view`) },
   ]
 
   return (

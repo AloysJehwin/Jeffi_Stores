@@ -325,7 +325,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                             </td>
                             <td className="px-4 py-3 text-foreground-secondary">
                               <Link
-                                href={ap(`/admin/financial/payables/${r.id}`)}
+                                href={ap(`/admin/financial/payables/${r.id}/view`)}
                                 className="font-mono hover:text-accent-500 hover:underline"
                               >
                                 {r.expense_number}
@@ -410,7 +410,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                         </div>
                         <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
                           <Link
-                            href={ap(`/admin/financial/payables/${r.id}`)}
+                            href={ap(`/admin/financial/payables/${r.id}/view`)}
                             className="font-mono hover:text-accent-500 hover:underline"
                           >
                             {r.expense_number}

@@ -495,7 +495,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
       } else {
         setShowConvertModal(false)
         showToast(`Invoice ${data.invoiceNumber} created`, 'success')
-        if (data.orderId) window.location.href = ap(`/admin/invoices/${data.orderId}`)
+        if (data.orderId) window.location.href = ap(`/admin/invoices/${data.orderId}/view`)
       }
     } catch {
       showToast('Failed to convert quotation', 'error')
@@ -1047,7 +1047,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                         <HoverCard
                           trigger={
                             <a
-                              href={ap(`/admin/quotations/${q.id}`)}
+                              href={ap(`/admin/quotations/${q.id}/view`)}
                               className="text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
                             >
                               {q.quote_number}
@@ -1127,7 +1127,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                             </button>
                           )}
                           <a
-                            href={ap(`/admin/quotations/${q.id}`)}
+                            href={ap(`/admin/quotations/${q.id}/view`)}
                             title="View Detail"
                             className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                           >
@@ -1201,7 +1201,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                           )}
                           {q.status === 'final' && q.converted_order_id && (
                             <a
-                              href={ap(`/admin/invoices/${q.converted_order_id}`)}
+                              href={ap(`/admin/invoices/${q.converted_order_id}/view`)}
                               className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors"
                             >
                               Invoiced ↗
@@ -1370,7 +1370,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                     </button>
                     {convertResultOrderId && (
                       <a
-                        href={ap(`/admin/invoices/${convertResultOrderId}`)}
+                        href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
                         className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors"
                       >
                         View Draft Invoice →
@@ -1851,7 +1851,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                     </button>
                     {convertResultOrderId && (
                       <a
-                        href={ap(`/admin/invoices/${convertResultOrderId}`)}
+                        href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
                         className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors"
                       >
                         View Invoice →
@@ -1946,7 +1946,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
           )}
           {convertedOrderId && (
             <a
-              href={ap(`/admin/invoices/${convertedOrderId}`)}
+              href={ap(`/admin/invoices/${convertedOrderId}/view`)}
               className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-400 dark:border-green-600 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors whitespace-nowrap"
             >
               View Invoice →
@@ -2330,7 +2330,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                   </button>
                   {convertResultOrderId && (
                     <a
-                      href={ap(`/admin/invoices/${convertResultOrderId}`)}
+                      href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
                       className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors"
                     >
                       View Draft Invoice →
@@ -2800,7 +2800,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                   </button>
                   {convertResultOrderId && (
                     <a
-                      href={ap(`/admin/invoices/${convertResultOrderId}`)}
+                      href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
                       className="px-4 py-2 text-sm rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white font-semibold transition-colors"
                     >
                       View Invoice →
@@ -2829,7 +2829,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
           <div className="min-w-0 pr-4">
             <h2 className="text-lg font-bold text-foreground leading-tight font-mono">
               <a
-                href={ap(`/admin/quotations/${q.id}`)}
+                href={ap(`/admin/quotations/${q.id}/view`)}
                 className="hover:text-accent-500 hover:underline transition-colors"
               >
                 {q.quote_number}
@@ -2913,7 +2913,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
             <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
               <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Converted to Invoice</span>
               <a
-                href={ap(`/admin/invoices/${q.converted_order_id}`)}
+                href={ap(`/admin/invoices/${q.converted_order_id}/view`)}
                 className="text-xs font-semibold text-blue-700 dark:text-blue-300 hover:underline"
               >
                 View Invoice →
@@ -2939,7 +2939,7 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
               Download PDF
             </a>
             <a
-              href={ap(`/admin/quotations/${q.id}`)}
+              href={ap(`/admin/quotations/${q.id}/view`)}
               className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 text-white transition-colors"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

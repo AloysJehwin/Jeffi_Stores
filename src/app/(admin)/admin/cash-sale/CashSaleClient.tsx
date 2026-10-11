@@ -1005,7 +1005,7 @@ export default function CashSaleClient() {
                           trigger={
                             sale.invoice_number ? (
                               <a
-                                href={ap(`/admin/cash-sale/${sale.id}`)}
+                                href={ap(`/admin/cash-sale/${sale.id}/view`)}
                                 className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
                               >
                                 {sale.invoice_number}
@@ -1097,7 +1097,7 @@ export default function CashSaleClient() {
                             </svg>
                           </a>
                           <a
-                            href={ap(`/admin/cash-sale/${sale.id}`)}
+                            href={ap(`/admin/cash-sale/${sale.id}/view`)}
                             title="View Detail"
                             className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                           >
@@ -1362,7 +1362,7 @@ function SaleDetailModal({
               Receipt PDF
             </a>
             <a
-              href={ap(`/admin/orders/${sale.id}`)}
+              href={ap(`/admin/orders/${sale.id}/view`)}
               className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

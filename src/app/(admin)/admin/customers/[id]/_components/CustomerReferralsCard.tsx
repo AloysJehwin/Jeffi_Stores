@@ -22,7 +22,9 @@ export default async function CustomerReferralsCard({
   host: string
 }) {
   const [code, referredBy, friends, total] = await Promise.all([
-    queryOne<{ referral_code: string }>(`SELECT referral_code FROM referrals WHERE referrer_user_id = $1`, [customerId]),
+    queryOne<{ referral_code: string }>(`SELECT referral_code FROM referrals WHERE referrer_user_id = $1`, [
+      customerId,
+    ]),
     queryOne<{ id: string; name: string; status: string }>(
       `SELECT r.id::text AS id, COALESCE(NULLIF(TRIM(CONCAT(r.first_name, ' ', r.last_name)), ''), r.email) AS name, s.status
        FROM referral_signups s JOIN users r ON r.id = s.referrer_user_id
@@ -38,7 +40,9 @@ export default async function CustomerReferralsCard({
        LIMIT 5`,
       [customerId]
     ),
-    queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM referral_signups WHERE referrer_user_id = $1`, [customerId]),
+    queryOne<{ n: number }>(`SELECT COUNT(*)::int AS n FROM referral_signups WHERE referrer_user_id = $1`, [
+      customerId,
+    ]),
   ]).catch(() => [null, null, [], null] as const)
 
   const count = total?.n ?? 0
@@ -55,7 +59,10 @@ export default async function CustomerReferralsCard({
       {referredBy && (
         <p className="text-sm text-foreground-secondary">
           Referred by{' '}
-          <Link href={ap(`/admin/customers/${referredBy.id}`, host)} className="font-medium text-foreground hover:text-accent-600">
+          <Link
+            href={ap(`/admin/customers/${referredBy.id}/view`, host)}
+            className="font-medium text-foreground hover:text-accent-600"
+          >
             {referredBy.name}
           </Link>{' '}
           ({STATUS_LABEL[referredBy.status] ?? referredBy.status})
@@ -63,11 +70,16 @@ export default async function CustomerReferralsCard({
       )}
       {count > 0 && (
         <div>
-          <p className="text-sm text-foreground-secondary">Referred {count.toLocaleString('en-IN')} {count === 1 ? 'friend' : 'friends'}</p>
+          <p className="text-sm text-foreground-secondary">
+            Referred {count.toLocaleString('en-IN')} {count === 1 ? 'friend' : 'friends'}
+          </p>
           <ul className="mt-2 divide-y divide-border-default">
             {friends.map(friend => (
               <li key={friend.id} className="flex items-center justify-between gap-3 py-2 text-sm">
-                <Link href={ap(`/admin/customers/${friend.id}`, host)} className="truncate text-foreground hover:text-accent-600">
+                <Link
+                  href={ap(`/admin/customers/${friend.id}/view`, host)}
+                  className="truncate text-foreground hover:text-accent-600"
+                >
                   {friend.name}
                 </Link>
                 <span className="shrink-0 text-xs text-foreground-muted">

@@ -50,7 +50,7 @@ export default function SupportRequestsAlert() {
         {sessions.map(s => (
           <a
             key={s.id}
-            href={ap(`/admin/customers/${s.user_id}?chat=true`)}
+            href={ap(`/admin/customers/${s.user_id}/view?chat=true`)}
             className="flex items-center justify-between p-3 rounded-lg border border-border-default hover:border-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors group"
           >
             <div className="flex items-center gap-3 min-w-0">

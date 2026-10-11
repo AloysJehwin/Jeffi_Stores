@@ -53,7 +53,7 @@ export default function CommerceTab({
         title="Money"
         action={
           <Link
-            href={`/admin/ecom/billing/${t.id}`}
+            href={`/admin/ecom/billing/${t.id}/view`}
             className="text-sm text-accent-600 dark:text-accent-400 hover:underline"
           >
             Full billing →
@@ -186,7 +186,7 @@ export default function CommerceTab({
             <p className="text-xs text-foreground-muted mt-3">
               Showing 15 of {txns.length}.{' '}
               <Link
-                href={`/admin/ecom/billing/${t.id}`}
+                href={`/admin/ecom/billing/${t.id}/view`}
                 className="text-accent-600 dark:text-accent-400 hover:underline"
               >
                 See all →

@@ -108,7 +108,10 @@ async function SubscriptionsListContent({ sp }: { sp: SP }) {
               {items.map(s => (
                 <tr key={s.id} className="hover:bg-surface-secondary/50">
                   <td className="px-4 py-3">
-                    <Link href={ap(`/admin/subscriptions/${s.id}`, host)} className="font-medium text-accent-600 hover:underline">
+                    <Link
+                      href={ap(`/admin/subscriptions/${s.id}/view`, host)}
+                      className="font-medium text-accent-600 hover:underline"
+                    >
                       {s.customerName}
                     </Link>
                     {s.customerEmail && <p className="text-xs text-foreground-muted">{s.customerEmail}</p>}
@@ -130,7 +133,9 @@ async function SubscriptionsListContent({ sp }: { sp: SP }) {
                     {s.status === 'active' && !s.cancelAtCycleEnd ? fmtDate(s.currentEnd) : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SUBSCRIPTION_STATUS_BADGE[s.status] ?? ''}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${SUBSCRIPTION_STATUS_BADGE[s.status] ?? ''}`}
+                    >
                       {s.statusLabel}
                     </span>
                     {s.cancelAtCycleEnd && s.status === 'active' && (
@@ -152,10 +157,12 @@ async function SubscriptionsListContent({ sp }: { sp: SP }) {
 
         <div className="md:hidden divide-y divide-border-default">
           {items.map(s => (
-            <Link key={s.id} href={ap(`/admin/subscriptions/${s.id}`, host)} className="block p-4">
+            <Link key={s.id} href={ap(`/admin/subscriptions/${s.id}/view`, host)} className="block p-4">
               <div className="flex justify-between gap-2">
                 <p className="font-medium">{s.customerName}</p>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SUBSCRIPTION_STATUS_BADGE[s.status] ?? ''}`}>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${SUBSCRIPTION_STATUS_BADGE[s.status] ?? ''}`}
+                >
                   {s.statusLabel}
                 </span>
               </div>
@@ -166,7 +173,9 @@ async function SubscriptionsListContent({ sp }: { sp: SP }) {
               </p>
             </Link>
           ))}
-          {items.length === 0 && <p className="p-4 text-center text-foreground-muted text-sm">No subscriptions found</p>}
+          {items.length === 0 && (
+            <p className="p-4 text-center text-foreground-muted text-sm">No subscriptions found</p>
+          )}
         </div>
       </div>
 

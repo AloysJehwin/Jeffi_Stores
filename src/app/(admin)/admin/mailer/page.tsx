@@ -202,7 +202,7 @@ async function MailerListContent({
             <tr key={c.id} className="hover:bg-surface-secondary/50 transition-colors">
               <td className="px-4 py-3">
                 <Link
-                  href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                  href={ap(`/admin/mailer/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)}
                   className="font-medium text-foreground hover:text-accent-500 transition-colors"
                 >
                   {c.title}
@@ -212,9 +212,7 @@ async function MailerListContent({
               <td className="px-4 py-3 text-foreground-secondary">
                 {TEMPLATE_LABELS[c.template_key] || c.template_key}
               </td>
-              <td className="px-4 py-3 capitalize text-foreground-secondary">
-                {c.audience_type.replace('_', ' ')}
-              </td>
+              <td className="px-4 py-3 capitalize text-foreground-secondary">{c.audience_type.replace('_', ' ')}</td>
               <td className="px-4 py-3 text-foreground-secondary">{c.recipient_count ?? '—'}</td>
               <td className="px-4 py-3">
                 <span
@@ -240,7 +238,7 @@ async function MailerListContent({
                     <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />
                   )}
                   <Link
-                    href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
+                    href={ap(`/admin/mailer/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)}
                     className="text-accent-500 hover:underline text-sm"
                   >
                     View

@@ -50,7 +50,7 @@ export default function HealthFactorsCard({
             {gains.map(g => (
               <Link
                 key={g.id}
-                href={ap(`/admin/customers/${g.id}`)}
+                href={ap(`/admin/customers/${g.id}/view`)}
                 className="flex items-center gap-3 py-2 group hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors"
               >
                 <span className="text-xs font-medium text-foreground flex-1 truncate group-hover:text-accent-600 transition-colors">

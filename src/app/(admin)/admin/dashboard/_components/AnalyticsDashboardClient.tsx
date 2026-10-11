@@ -403,7 +403,7 @@ export default function AnalyticsDashboardClient({
                     {statusLabel(o.status)}
                   </span>
                 ),
-                href: ap(`/admin/orders/${o.id}`, host),
+                href: ap(`/admin/orders/${o.id}/view`, host),
               }))}
             />
           </SectionCard>

@@ -153,7 +153,7 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
 
   function refLink(e: ActivityEvent) {
     if (e.reference_type === 'orders' && e.reference_id) {
-      return ap(`/admin/orders/${e.reference_id}`)
+      return ap(`/admin/orders/${e.reference_id}/view`)
     }
     return null
   }

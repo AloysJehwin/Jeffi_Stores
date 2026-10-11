@@ -325,7 +325,7 @@ function renderBlock(
           {b.customers.map(c => (
             <Link
               key={c.id}
-              href={ap(`/admin/customers/${c.id}`)}
+              href={ap(`/admin/customers/${c.id}/view`)}
               className="flex items-center gap-2 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
             >
               <User className="w-4 h-4 text-foreground-muted shrink-0" />
@@ -358,7 +358,7 @@ function renderBlock(
           {b.orders.map(o => (
             <Link
               key={o.id}
-              href={ap(`/admin/orders/${o.id}`)}
+              href={ap(`/admin/orders/${o.id}/view`)}
               className="flex items-center gap-2 p-2 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
             >
               <ShoppingBag className="w-4 h-4 text-foreground-muted shrink-0" />

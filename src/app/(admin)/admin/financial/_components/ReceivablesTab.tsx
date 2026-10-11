@@ -162,14 +162,14 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                         <td className="px-4 py-3">
                           {r.user_id ? (
                             <Link
-                              href={ap(`/admin/customers/${r.user_id}`)}
+                              href={ap(`/admin/customers/${r.user_id}/view`)}
                               className="font-medium text-foreground hover:text-accent-500 hover:underline"
                             >
                               {r.customer_name}
                             </Link>
                           ) : (
                             <Link
-                              href={ap(`/admin/orders/${r.order_id}`)}
+                              href={ap(`/admin/orders/${r.order_id}/view`)}
                               className="font-medium text-foreground hover:text-accent-500 hover:underline"
                             >
                               {r.customer_name}
@@ -182,14 +182,14 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                         <td className="px-4 py-3 text-foreground-secondary">
                           {r.invoice_number ? (
                             <Link
-                              href={ap(`/admin/invoices/${r.order_id}`)}
+                              href={ap(`/admin/invoices/${r.order_id}/view`)}
                               className="hover:text-accent-500 hover:underline font-mono"
                             >
                               {r.invoice_number || r.order_number}
                             </Link>
                           ) : (
                             <Link
-                              href={ap(`/admin/orders/${r.order_id}`)}
+                              href={ap(`/admin/orders/${r.order_id}/view`)}
                               className="hover:text-accent-500 hover:underline font-mono"
                             >
                               {r.order_number}
@@ -240,14 +240,14 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                       <div>
                         {r.user_id ? (
                           <Link
-                            href={ap(`/admin/customers/${r.user_id}`)}
+                            href={ap(`/admin/customers/${r.user_id}/view`)}
                             className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
                           >
                             {r.customer_name}
                           </Link>
                         ) : (
                           <Link
-                            href={ap(`/admin/orders/${r.order_id}`)}
+                            href={ap(`/admin/orders/${r.order_id}/view`)}
                             className="font-medium text-foreground text-sm hover:text-accent-500 hover:underline"
                           >
                             {r.customer_name}
@@ -265,14 +265,14 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                       <div className="flex items-center gap-1.5">
                         {r.invoice_number ? (
                           <Link
-                            href={ap(`/admin/invoices/${r.order_id}`)}
+                            href={ap(`/admin/invoices/${r.order_id}/view`)}
                             className="font-mono hover:text-accent-500 hover:underline"
                           >
                             {r.invoice_number || r.order_number}
                           </Link>
                         ) : (
                           <Link
-                            href={ap(`/admin/orders/${r.order_id}`)}
+                            href={ap(`/admin/orders/${r.order_id}/view`)}
                             className="font-mono hover:text-accent-500 hover:underline"
                           >
                             {r.order_number}

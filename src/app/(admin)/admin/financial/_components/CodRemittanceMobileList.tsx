@@ -56,7 +56,7 @@ export default function CodRemittanceMobileList({
         key: 'order',
         label: 'View order',
         onSelect: () => {
-          window.location.href = ap(`/admin/orders/${order.id}`)
+          window.location.href = ap(`/admin/orders/${order.id}/view`)
         },
       },
     ]
@@ -108,7 +108,9 @@ export default function CodRemittanceMobileList({
               </div>
               <div className="text-sm text-foreground-secondary truncate">{order.customer_name}</div>
               {order.payment_status && (
-                <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(order.payment_status)}`}>
+                <span
+                  className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(order.payment_status)}`}
+                >
                   {statusLabel(order.payment_status)}
                 </span>
               )}
@@ -158,7 +160,9 @@ export default function CodRemittanceMobileList({
             </div>
             <div className="flex justify-between">
               <span className="text-foreground-secondary">Remitted</span>
-              <span className="text-foreground">{active.cod_remitted_at ? formatDate(active.cod_remitted_at) : '-'}</span>
+              <span className="text-foreground">
+                {active.cod_remitted_at ? formatDate(active.cod_remitted_at) : '-'}
+              </span>
             </div>
           </div>
         )}
