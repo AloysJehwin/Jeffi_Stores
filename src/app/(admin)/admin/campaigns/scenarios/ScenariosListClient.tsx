@@ -154,7 +154,7 @@ export default function ScenariosListClient() {
         <div className="space-y-3 pt-2">
           {scenarios.map(s => (
             <div key={s.kind} className="bg-surface-elevated rounded-xl border border-border-default p-5">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="font-semibold text-foreground text-lg">{s.name}</h3>
@@ -187,7 +187,7 @@ export default function ScenariosListClient() {
                   </div>
                   <p className="text-xs text-foreground-secondary mt-1">{s.description}</p>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap sm:shrink-0">
                   {s.type === 'custom' && (
                     <RequireWrite scope="campaigns:write">
                       <button

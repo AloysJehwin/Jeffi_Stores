@@ -341,7 +341,7 @@ export default function CampaignsListClient() {
       ) : (
         filtered.map(c => (
           <div key={c.kind} className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Link
@@ -377,13 +377,13 @@ export default function CampaignsListClient() {
                     : 'never'}
                 </p>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-stretch gap-2 sm:shrink-0">
                 <RequireWrite scope="campaigns:write">
                   <button
                     type="button"
                     onClick={() => toggle(c)}
                     disabled={busy === c.kind}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${c.enabled ? 'bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                    className={`flex-1 sm:flex-none sm:w-24 inline-flex items-center justify-center h-control-sm px-3 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${c.enabled ? 'bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200' : 'bg-green-500 hover:bg-green-600 text-white'}`}
                   >
                     {c.enabled ? 'Pause' : 'Activate'}
                   </button>
@@ -391,14 +391,14 @@ export default function CampaignsListClient() {
                     type="button"
                     onClick={() => runNow(c)}
                     disabled={busy === c.kind || !c.enabled}
-                    className="px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
+                    className="flex-1 sm:flex-none sm:w-24 inline-flex items-center justify-center h-control-sm px-3 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50"
                   >
                     Run now
                   </button>
                 </RequireWrite>
                 <Link
                   href={ap(`/admin/campaigns/${c.kind}`)}
-                  className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-semibold transition-all"
+                  className="flex-1 sm:flex-none sm:w-24 inline-flex items-center justify-center h-control-sm px-3 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-semibold transition-all"
                 >
                   View / Edit
                 </Link>
