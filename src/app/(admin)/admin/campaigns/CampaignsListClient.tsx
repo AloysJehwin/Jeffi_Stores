@@ -150,7 +150,7 @@ export default function CampaignsListClient() {
 
       {/* Search + Filters */}
       <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none"
             fill="none"
@@ -180,21 +180,23 @@ export default function CampaignsListClient() {
           )}
         </div>
 
-        {/* Status filter */}
-        <div className="flex items-center gap-1 bg-surface-elevated border border-border-default rounded-lg p-1 shrink-0">
-          {(['all', 'active', 'paused'] as const).map(s => (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors ${statusFilter === s ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
+        {/* Filter groups — side-by-side on their own row; each sized to content */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Status filter */}
+          <div className="flex items-center gap-1 bg-surface-elevated border border-border-default rounded-lg p-1 w-fit">
+            {(['all', 'active', 'paused'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors ${statusFilter === s ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
 
-        {/* Channel filter */}
-        <div className="flex items-center gap-1 bg-surface-elevated border border-border-default rounded-lg p-1 shrink-0">
+          {/* Channel filter */}
+          <div className="flex items-center gap-1 bg-surface-elevated border border-border-default rounded-lg p-1 w-fit">
           <button
             onClick={() => setChannelFilter('all')}
             className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${channelFilter === 'all' ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
@@ -203,24 +205,29 @@ export default function CampaignsListClient() {
           </button>
           <button
             onClick={() => setChannelFilter('email')}
+            aria-label="Email campaigns"
+            title="Email"
             className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold transition-colors ${channelFilter === 'email' ? 'bg-blue-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
           >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="4" width="20" height="16" rx="2" />
               <path d="m2 7 10 7 10-7" />
             </svg>
-            Email
+            <span className="hidden sm:inline">Email</span>
           </button>
           <button
             onClick={() => setChannelFilter('whatsapp')}
+            aria-label="WhatsApp campaigns"
+            title="WhatsApp"
             className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold transition-colors ${channelFilter === 'whatsapp' ? 'bg-green-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
           >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
               <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.975-1.407A9.953 9.953 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a7.946 7.946 0 01-4.073-1.117l-.292-.173-3.012.852.838-3.028-.19-.31A7.944 7.944 0 014 12c0-4.418 3.582-8 8-8s8 3.582 8 8-3.582 8-8 8z" />
             </svg>
-            WhatsApp
+            <span className="hidden sm:inline">WhatsApp</span>
           </button>
+          </div>
         </div>
       </div>
 

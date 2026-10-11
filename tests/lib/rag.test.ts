@@ -23,7 +23,20 @@ vi.mock('@/lib/shared/ai-client', () => ({ aiEmbed: vi.fn() }))
 
 // Tenant resolver drives RAG isolation (#489): default null = platform/off-tenant.
 const { mockResolveTenantId } = vi.hoisted(() => ({ mockResolveTenantId: vi.fn().mockResolvedValue(null) }))
-vi.mock('@/lib/tenancy/tenant-context', () => ({ resolveTenantId: mockResolveTenantId }))
+vi.mock('@/lib/tenancy/tenant-context', () => ({
+  resolveTenantId: mockResolveTenantId,
+  getCurrentTenant: vi.fn(() => null),
+}))
+
+// findSimilarProductIds now reads the CURRENT TENANT's own embeddings via db.ts (getClient for the
+// HNSW-tuned vector query, queryMany for the keyword fallback) — NOT the shared replica pool.
+const { mockDbClientQuery, mockDbGetClient, mockQueryMany } = vi.hoisted(() => {
+  const mockDbClientQuery = vi.fn().mockResolvedValue({ rows: [] })
+  const mockDbGetClient = vi.fn().mockResolvedValue({ query: mockDbClientQuery, release: vi.fn() })
+  const mockQueryMany = vi.fn().mockResolvedValue([])
+  return { mockDbClientQuery, mockDbGetClient, mockQueryMany }
+})
+vi.mock('@/lib/shared/db', () => ({ getClient: mockDbGetClient, queryMany: mockQueryMany }))
 
 // ── Import after mocks ────────────────────────────────────────────────────────
 
@@ -164,17 +177,18 @@ describe('findSimilarProductIds', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAiEmbed.mockResolvedValue([MOCK_VEC])
+    mockQueryMany.mockResolvedValue([]) // keyword fallback: no extra hits
+    mockDbGetClient.mockResolvedValue({ query: mockDbClientQuery, release: vi.fn() })
   })
 
   it('returns empty array when no results', async () => {
-    mockClientQuery.mockImplementation(async () => ({ rows: [] }))
+    mockDbClientQuery.mockImplementation(async () => ({ rows: [] }))
     const results = await findSimilarProductIds('test')
     expect(results).toEqual([])
   })
 
   it('returns product matches sorted by similarity descending', async () => {
-    mockClientQuery.mockImplementation(async (sql: string) => {
-      if (sql.startsWith('SET LOCAL')) return { rows: [] }
+    mockDbClientQuery.mockImplementation(async (sql: string) => {
       if (sql.includes("source_table = 'products'"))
         return {
           rows: [
@@ -194,8 +208,7 @@ describe('findSimilarProductIds', () => {
   })
 
   it('includes variant matches', async () => {
-    mockClientQuery.mockImplementation(async (sql: string) => {
-      if (sql.startsWith('SET LOCAL')) return { rows: [] }
+    mockDbClientQuery.mockImplementation(async (sql: string) => {
       if (sql.includes("source_table = 'product_variants'")) return { rows: [{ source_id: 'var-1', similarity: 0.8 }] }
       return { rows: [] }
     })
@@ -207,8 +220,7 @@ describe('findSimilarProductIds', () => {
   })
 
   it('parses string similarity values in both product and variant rows', async () => {
-    mockClientQuery.mockImplementation(async (sql: string) => {
-      if (sql.startsWith('SET LOCAL')) return { rows: [] }
+    mockDbClientQuery.mockImplementation(async (sql: string) => {
       if (sql.includes("source_table = 'products'")) return { rows: [{ source_id: 'p1', similarity: '0.88' }] }
       if (sql.includes("source_table = 'product_variants'"))
         return { rows: [{ source_id: 'var-1', similarity: '0.77' }] }
@@ -222,8 +234,7 @@ describe('findSimilarProductIds', () => {
   })
 
   it('deduplicates products by productId (second occurrence skipped)', async () => {
-    mockClientQuery.mockImplementation(async (sql: string) => {
-      if (sql.startsWith('SET LOCAL')) return { rows: [] }
+    mockDbClientQuery.mockImplementation(async (sql: string) => {
       if (sql.includes("source_table = 'products'"))
         return {
           rows: [
@@ -240,8 +251,7 @@ describe('findSimilarProductIds', () => {
   })
 
   it('stops when limit is reached', async () => {
-    mockClientQuery.mockImplementation(async (sql: string) => {
-      if (sql.startsWith('SET LOCAL')) return { rows: [] }
+    mockDbClientQuery.mockImplementation(async (sql: string) => {
       if (sql.includes("source_table = 'products'"))
         return {
           rows: [
@@ -257,8 +267,7 @@ describe('findSimilarProductIds', () => {
   })
 
   it('sorts mixed products and variants by similarity descending', async () => {
-    mockClientQuery.mockImplementation(async (sql: string) => {
-      if (sql.startsWith('SET LOCAL')) return { rows: [] }
+    mockDbClientQuery.mockImplementation(async (sql: string) => {
       if (sql.includes("source_table = 'products'")) return { rows: [{ source_id: 'p1', similarity: 0.7 }] }
       if (sql.includes("source_table = 'product_variants'")) return { rows: [{ source_id: 'var-1', similarity: 0.9 }] }
       return { rows: [] }
@@ -309,13 +318,21 @@ describe('tenant isolation (#489)', () => {
     expect(params).toContain('t-123')
   })
 
-  it('findSimilarProductIds scopes the product + variant queries to the tenant', async () => {
+  it('findSimilarProductIds reads the tenant pool (db.ts), never the shared replica', async () => {
     mockResolveTenantId.mockResolvedValue('t-123')
-    await findSimilarProductIds('bolt')
-    const tenantScoped = mockClientQuery.mock.calls.filter(
-      c => /tenant_id IS NOT DISTINCT FROM/.test(c[0]) && (c[1] as unknown[]).includes('t-123')
-    )
-    expect(tenantScoped.length).toBeGreaterThanOrEqual(2) // products + product_variants
+    mockQueryMany.mockResolvedValue([])
+    mockDbClientQuery.mockImplementation(async (sql: string) => {
+      if (sql.includes("source_table = 'products'")) return { rows: [{ source_id: 'p1', similarity: 0.9 }] }
+      return { rows: [] }
+    })
+    const results = await findSimilarProductIds('bolt')
+    // Served from the tenant pool (getClient), with no tenant_id filter in the SQL (the pool IS the
+    // isolation), and the replica pool is never touched for product search.
+    expect(mockDbGetClient).toHaveBeenCalled()
+    expect(results.some(r => r.productId === 'p1')).toBe(true)
+    const vectorSql = mockDbClientQuery.mock.calls.map(c => c[0] as string).join('\n')
+    expect(vectorSql).not.toMatch(/tenant_id IS NOT DISTINCT FROM/)
+    expect(mockPoolConnect).not.toHaveBeenCalled()
   })
 
   it('queryManyReplica refuses on a tenant (returns [] without touching the pool)', async () => {
