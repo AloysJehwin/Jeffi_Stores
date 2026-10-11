@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import EmailBlockBuilder from '@/components/admin/email-composer/EmailBlockBuilder'
-import { EMAIL_LAYOUT_OPTIONS } from '@/lib/templates/email-layouts'
+import { EMAIL_LAYOUT_OPTIONS, layoutStarterBody } from '@/lib/templates/email-layouts'
 import type { EmailBlock } from '@/lib/templates/blocks'
 import { renderBlocks } from '@/lib/templates/blocks'
 import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
@@ -699,23 +699,29 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
               Email template
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {EMAIL_LAYOUT_OPTIONS.map(l => (
-                <button
-                  key={l.key}
-                  type="button"
-                  onClick={() => setForm(f => (f ? { ...f, template_layout: l.key } : f))}
-                  className={`text-left rounded-lg border p-2.5 transition-colors ${
-                    form.template_layout === l.key
-                      ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                      : 'border-border-default hover:border-border-secondary bg-surface'
-                  }`}
-                >
-                  <span className="block text-sm font-semibold text-foreground">{l.label}</span>
-                  <span className="block text-[10px] text-foreground-muted mt-0.5 leading-snug">{l.description}</span>
-                </button>
-              ))}
-            </div>
+            <AdminSelect
+              value={form.template_layout}
+              onChange={key => {
+                setForm(f => {
+                  if (!f) return f
+                  const opt = EMAIL_LAYOUT_OPTIONS.find(o => o.key === key)
+                  const starter = opt?.starterBody ?? ''
+                  // Custom (or no starter): just switch the theme, keep the body.
+                  if (key === 'custom' || !starter) return { ...f, template_layout: key }
+                  // A preset with starter content: offer to load it, but don't clobber real edits
+                  // without asking (confirm only when the body already has non-trivial content).
+                  const current = (f.body_template || '').trim()
+                  const loadStarter = !current || window.confirm('Replace the current email body with this template’s starter content?')
+                  return loadStarter
+                    ? { ...f, template_layout: key, template_mode: 'richtext', body_template: starter }
+                    : { ...f, template_layout: key }
+                })
+              }}
+              options={EMAIL_LAYOUT_OPTIONS.map(l => ({ value: l.key, label: l.label }))}
+            />
+            <p className="text-[10px] text-foreground-muted mt-1">
+              {EMAIL_LAYOUT_OPTIONS.find(l => l.key === form.template_layout)?.description}
+            </p>
           </div>
 
           <div className="mt-4 flex items-center justify-between gap-3">
@@ -742,12 +748,19 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             {form.template_mode === 'blocks' ? (
               <EmailBlockBuilder
                 blocks={form.blocks}
-                onChange={b => setForm(f => (f ? { ...f, blocks: b } : f))}
+                onChange={b =>
+                  setForm(f => (f ? { ...f, blocks: b, template_layout: f.template_layout === 'custom' ? 'custom' : f.template_layout } : f))
+                }
               />
             ) : (
               <EmailComposer
                 value={form.body_template}
-                onChange={v => setForm(f => (f ? { ...f, body_template: v } : f))}
+                onChange={v =>
+                  // Editing a preset's body makes it a Custom template (so edits aren't mislabeled).
+                  setForm(f =>
+                    f ? { ...f, body_template: v, template_layout: v !== layoutStarterBody(f.template_layout) && f.template_layout !== 'custom' ? 'custom' : f.template_layout } : f
+                  )
+                }
                 extraVariables={CAMPAIGN_VARIABLES}
                 ctaHref="{ctaUrl}"
                 minHeight={260}

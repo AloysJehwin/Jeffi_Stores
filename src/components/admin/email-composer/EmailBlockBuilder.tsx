@@ -13,6 +13,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } 
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical, Trash2, Plus, Image as ImageIcon, Type, Heading, MousePointerClick, Minus, Space, Package, LayoutGrid } from 'lucide-react'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
+import AdminSelect from '@/components/admin/AdminSelect'
 import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
 import type { EmailBlock } from '@/lib/templates/blocks'
 
@@ -89,14 +90,16 @@ function BlockRow({
             onChange={e => onPatch({ ...block, text: e.target.value })}
             placeholder="Heading text ({variables} allowed)"
           />
-          <select
-            className="field-normal border border-border-secondary bg-surface text-foreground text-sm"
-            value={block.align ?? 'left'}
-            onChange={e => onPatch({ ...block, align: e.target.value as 'left' | 'center' })}
-          >
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-          </select>
+          <div className="w-32 shrink-0">
+            <AdminSelect
+              value={block.align ?? 'left'}
+              onChange={v => onPatch({ ...block, align: v as 'left' | 'center' })}
+              options={[
+                { value: 'left', label: 'Left' },
+                { value: 'center', label: 'Center' },
+              ]}
+            />
+          </div>
         </div>
       )}
 
@@ -155,15 +158,17 @@ function BlockRow({
       )}
 
       {block.type === 'spacer' && (
-        <select
-          className="field-normal border border-border-secondary bg-surface text-foreground text-sm"
-          value={block.size ?? 'md'}
-          onChange={e => onPatch({ ...block, size: e.target.value as 'sm' | 'md' | 'lg' })}
-        >
-          <option value="sm">Small</option>
-          <option value="md">Medium</option>
-          <option value="lg">Large</option>
-        </select>
+        <div className="w-32">
+          <AdminSelect
+            value={block.size ?? 'md'}
+            onChange={v => onPatch({ ...block, size: v as 'sm' | 'md' | 'lg' })}
+            options={[
+              { value: 'sm', label: 'Small' },
+              { value: 'md', label: 'Medium' },
+              { value: 'lg', label: 'Large' },
+            ]}
+          />
+        </div>
       )}
 
       {block.type === 'divider' && <p className="text-xs text-foreground-muted">A horizontal rule.</p>}
