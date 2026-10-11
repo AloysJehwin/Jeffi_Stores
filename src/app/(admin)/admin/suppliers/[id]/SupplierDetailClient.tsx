@@ -38,7 +38,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
     setTabState(next)
     const params = new URLSearchParams(searchParams.toString())
     params.set('tab', next)
-    router.replace(ap(`/admin/suppliers/${id}?${params.toString()}`), { scroll: false })
+    router.replace(ap(`/admin/suppliers/${id}/view?${params.toString()}`), { scroll: false })
   }
 
   useEffect(() => {

@@ -47,7 +47,7 @@ export default function DraftConfirmModal({
         // 409 = draft already exists — reload this same edit page to show the draft form
         if (res.status === 409) {
           router.push(
-            `${apPrefix}/admin/${entity}/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
+            `${apPrefix}/admin/${entity}/${productId}/edit${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
           )
           return
         }
@@ -56,7 +56,7 @@ export default function DraftConfirmModal({
       }
       // Draft created — reload the same edit page (original record id); it will detect the draft
       router.push(
-        `${apPrefix}/admin/${entity}/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
+        `${apPrefix}/admin/${entity}/${productId}/edit${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
       )
     } catch {
       setError('Something went wrong. Please try again.')
@@ -149,7 +149,7 @@ export default function DraftConfirmModal({
                 existingDraftId
                   ? () =>
                       router.push(
-                        `${apPrefix}/admin/${entity}/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
+                        `${apPrefix}/admin/${entity}/${productId}/edit${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`
                       )
                   : createDraft
               }

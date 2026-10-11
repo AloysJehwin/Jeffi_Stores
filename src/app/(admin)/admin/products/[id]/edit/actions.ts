@@ -426,8 +426,8 @@ export async function updateProduct(productId: string, formData: FormData): Prom
   const stayDest = () => {
     const popupVariantId = formData.get('popup_variant_id') as string | null
     return popupVariantId
-      ? `/admin/products/edit/${productId}?popup=${encodeURIComponent(popupVariantId)}`
-      : `/admin/products/edit/${productId}`
+      ? `/admin/products/${productId}/edit?popup=${encodeURIComponent(popupVariantId)}`
+      : `/admin/products/${productId}/edit`
   }
   const finish = (dest: string): ProductActionResult => {
     const url = ap(dest, host)
@@ -612,7 +612,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         [productId, JSON.stringify(draftFields), draftVariants ? JSON.stringify(draftVariants) : null]
       )
       await applyDraftSubVariantPrices(productId, subVariantPrices)
-      revalidatePath(`/admin/products/edit/${productId}`)
+      revalidatePath(`/admin/products/${productId}/edit`)
 
       // Publish: draft fields just saved — call publishProductDraft directly (no HTTP roundtrip)
       if (isPublish) {
@@ -1272,7 +1272,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     await triggerEnrichment(productId).catch(e => console.error('[product-edit] enrichment failed for', productId, e))
 
     revalidatePath('/admin/products')
-    revalidatePath(`/admin/products/edit/${productId}`)
+    revalidatePath(`/admin/products/${productId}/edit`)
     return finish(intent === 'draft-stay' ? stayDest() : listDest)
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err

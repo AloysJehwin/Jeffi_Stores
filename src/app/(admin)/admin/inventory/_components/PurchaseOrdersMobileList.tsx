@@ -63,7 +63,7 @@ export default function PurchaseOrdersMobileList({
       {
         key: 'supplier',
         label: 'View supplier',
-        onSelect: () => router.push(ap(`/admin/suppliers/${po.supplier_id}`)),
+        onSelect: () => router.push(ap(`/admin/suppliers/${po.supplier_id}/view`)),
       },
     ]
     if (canWrite) {

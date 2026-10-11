@@ -225,7 +225,7 @@ async function CouponsStats() {
                     name={d.code}
                     subtitle="New coupon — not yet published"
                     updatedAt={d.created_at}
-                    editHref={ap(`/admin/coupons/edit/${d.id}`, host)}
+                    editHref={ap(`/admin/coupons/${d.id}/edit`, host)}
                     publishPath={`/api/admin/coupons/${d.id}`}
                     publishMethod="PATCH"
                     publishBody={{ is_draft: false, is_active: true }}
@@ -251,7 +251,7 @@ async function CouponsStats() {
                     name={d.code}
                     subtitle={null}
                     updatedAt={d.updated_at}
-                    editHref={ap(`/admin/coupons/edit/${d.coupon_id}`, host)}
+                    editHref={ap(`/admin/coupons/${d.coupon_id}/edit`, host)}
                     publishPath={`/api/admin/coupons/${d.coupon_id}/publish`}
                     discardPath={`/api/admin/coupons/${d.coupon_id}/draft`}
                     entityLabel="coupon"

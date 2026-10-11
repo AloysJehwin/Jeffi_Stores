@@ -108,7 +108,7 @@ export default function ReviewFormTableRow({
                 </div>
                 <div className="flex gap-3 pt-1 border-t border-border-default">
                   <Link
-                    href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(backUrl)}`)}
+                    href={ap(`/admin/review-forms/${f.id}/edit?back=${encodeURIComponent(backUrl)}`)}
                     className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
                     onClick={() => setOpen(false)}
                   >
@@ -195,7 +195,7 @@ export default function ReviewFormTableRow({
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3">
             <Link
-              href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(backUrl)}`)}
+              href={ap(`/admin/review-forms/${f.id}/edit?back=${encodeURIComponent(backUrl)}`)}
               className="text-accent-500 hover:underline text-sm"
             >
               Edit

@@ -99,7 +99,7 @@ export default function ProductInsights({ data, host }: { data: DashboardAnalyti
             {topViewed.map(p => (
               <Link
                 key={p.id}
-                href={ap(`/admin/products/edit/${p.id}`, host)}
+                href={ap(`/admin/products/${p.id}/edit`, host)}
                 className="flex items-center gap-3 py-2 group hover:bg-surface-secondary rounded-md px-1 -mx-1 transition-colors"
               >
                 <div className="flex-1 min-w-0">
