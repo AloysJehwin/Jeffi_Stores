@@ -35,6 +35,13 @@ export async function POST(req: NextRequest, { params }: Params) {
        subject_template = COALESCE($7, subject_template),
        body_template = COALESCE($8, body_template),
        parameters = COALESCE($9::jsonb, parameters),
+       template_layout = COALESCE($10, template_layout),
+       template_mode = COALESCE($11, template_mode),
+       blocks = COALESCE($12::jsonb, blocks),
+       sms_template = COALESCE($13, sms_template),
+       wa_template_sid = COALESCE($14, wa_template_sid),
+       wa_variables = COALESCE($15::jsonb, wa_variables),
+       wa_header_image_url = COALESCE($16, wa_header_image_url),
        draft_fields = NULL,
        updated_at = NOW()
      WHERE kind = $1`,
@@ -48,6 +55,13 @@ export async function POST(req: NextRequest, { params }: Params) {
       d.subject_template || null,
       d.body_template || null,
       d.parameters ? JSON.stringify(d.parameters) : null,
+      d.template_layout || null,
+      d.template_mode || null,
+      d.blocks != null ? JSON.stringify(d.blocks) : null,
+      d.sms_template != null ? d.sms_template : null,
+      d.wa_template_sid || null,
+      d.wa_variables != null ? JSON.stringify(d.wa_variables) : null,
+      d.wa_header_image_url != null ? d.wa_header_image_url : null,
     ]
   )
   return NextResponse.json({ success: true })
