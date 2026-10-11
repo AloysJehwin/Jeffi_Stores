@@ -79,9 +79,7 @@ export default async function BirthdayProgram({ host }: { host: string }) {
         </div>
 
         <div className="bg-surface-elevated rounded-lg border border-border-default p-4 min-w-0">
-          <h3 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
-            Coming up
-          </h3>
+          <h3 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Coming up</h3>
           {stats.upcoming.length === 0 ? (
             <p className="text-sm text-foreground-muted">No birthdays in the next 30 days.</p>
           ) : (
@@ -89,7 +87,7 @@ export default async function BirthdayProgram({ host }: { host: string }) {
               {stats.upcoming.map(person => (
                 <li key={person.userId} className="flex items-center justify-between gap-3 py-2">
                   <Link
-                    href={ap(`/admin/customers/${person.userId}`, host)}
+                    href={ap(`/admin/customers/${person.userId}/view`, host)}
                     className="min-w-0 truncate text-sm font-medium text-foreground hover:text-accent-600"
                   >
                     {person.name}

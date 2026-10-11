@@ -55,7 +55,7 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
         body: JSON.stringify({ title: 'New offer' }),
       })
       const d = await res.json().catch(() => ({}))
-      if (res.ok && d.offer?.id) router.push(ap(`/admin/offers/${d.offer.id}`))
+      if (res.ok && d.offer?.id) router.push(ap(`/admin/offers/${d.offer.id}/view`))
       else showToast(d.error || 'Failed to add offer', 'error')
     } catch {
       showToast('Failed to add offer', 'error')
@@ -104,7 +104,10 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
               key={offer.id}
               className="flex items-center gap-3 rounded-xl border border-border-default bg-surface-elevated px-3 py-2.5"
             >
-              <Link href={ap(`/admin/offers/${offer.id}`)} className="flex items-center gap-3 flex-1 min-w-0 group">
+              <Link
+                href={ap(`/admin/offers/${offer.id}/view`)}
+                className="flex items-center gap-3 flex-1 min-w-0 group"
+              >
                 <div className="w-14 h-9 rounded-lg bg-surface-secondary border border-border-default overflow-hidden shrink-0">
                   {offer.image_url ? (
                     <AdminImage

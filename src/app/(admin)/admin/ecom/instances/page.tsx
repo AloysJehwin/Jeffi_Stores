@@ -58,7 +58,7 @@ export default async function EcomInstancesPage({ searchParams }: { searchParams
             {tenants.map(t => (
               <tr key={t.id} className="hover:bg-surface-secondary">
                 <td className="px-4 py-3 font-medium text-foreground">
-                  <Link href={`/admin/ecom/instances/${t.id}`} className="hover:text-accent-600">
+                  <Link href={`/admin/ecom/instances/${t.id}/view`} className="hover:text-accent-600">
                     {t.display_name}
                   </Link>
                 </td>
@@ -70,7 +70,7 @@ export default async function EcomInstancesPage({ searchParams }: { searchParams
                 <td className="px-4 py-3 text-foreground-secondary">{t.region || '—'}</td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href={`/admin/ecom/instances/${t.id}`}
+                    href={`/admin/ecom/instances/${t.id}/view`}
                     className="text-accent-600 dark:text-accent-400 hover:underline"
                   >
                     Detail →

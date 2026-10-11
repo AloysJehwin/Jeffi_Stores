@@ -643,7 +643,7 @@ export default function AdminTasksClient() {
 
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
                               <Link
-                                href={ap(`/admin/customers/${t.user_id}`)}
+                                href={ap(`/admin/customers/${t.user_id}/view`)}
                                 className="text-[11px] text-accent-500 hover:text-accent-600 font-medium"
                               >
                                 {customerName(t)}

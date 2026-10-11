@@ -61,7 +61,7 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
         {tenants.map(t => (
           <Link
             key={t.id}
-            href={`/admin/ecom/store-status/${t.id}`}
+            href={`/admin/ecom/store-status/${t.id}/view`}
             className="rounded-xl border border-border-default p-4 bg-surface-elevated hover:border-accent-400 transition-colors"
           >
             <div className="flex items-center justify-between">

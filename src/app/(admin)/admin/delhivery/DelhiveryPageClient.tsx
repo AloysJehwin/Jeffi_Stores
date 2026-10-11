@@ -743,7 +743,7 @@ export default function DelhiveryPageClient({
                       </td>
                       <td className="px-4 py-3">
                         <Link
-                          href={ap(`/admin/orders/${order.id}`)}
+                          href={ap(`/admin/orders/${order.id}/view`)}
                           className="font-mono text-accent-500 hover:underline"
                         >
                           #{order.order_number || order.id.slice(0, 8)}

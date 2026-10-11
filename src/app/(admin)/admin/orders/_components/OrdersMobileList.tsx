@@ -83,7 +83,7 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
         key: 'view',
         label: 'View full order',
         icon: <Eye className="w-4 h-4" />,
-        onSelect: () => router.push(ap(`/admin/orders/${order.id}?back=${encodeURIComponent(backUrl)}`)),
+        onSelect: () => router.push(ap(`/admin/orders/${order.id}/view?back=${encodeURIComponent(backUrl)}`)),
       },
     ]
     if (canPackingSlips && order.status !== 'granted') {

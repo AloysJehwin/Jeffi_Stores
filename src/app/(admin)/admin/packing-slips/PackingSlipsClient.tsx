@@ -410,7 +410,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                       </td>
                       <td className="px-4 py-3 font-mono">
                         <a
-                          href={ap(`/admin/orders/${order.id}`)}
+                          href={ap(`/admin/orders/${order.id}/view`)}
                           className="text-foreground font-medium hover:text-accent-500 hover:underline transition-colors"
                         >
                           #{order.order_number}

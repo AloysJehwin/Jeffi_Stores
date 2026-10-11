@@ -293,7 +293,7 @@ async function BusinessRFQsListContent({ resolvedSearchParams, host }: { resolve
             first_name: rfq.first_name,
             last_name: rfq.last_name,
             email: rfq.email,
-            href: ap(`/admin/business/rfqs/${rfq.id}`, host),
+            href: ap(`/admin/business/rfqs/${rfq.id}/view`, host),
           }))}
         />
       </div>
@@ -324,7 +324,7 @@ async function BusinessRFQsListContent({ resolvedSearchParams, host }: { resolve
                 <tr key={rfq.id} className="hover:bg-surface-secondary transition-colors">
                   <td className="px-4 py-3 font-mono text-xs font-semibold">
                     <Link
-                      href={ap(`/admin/business/rfqs/${rfq.id}`, host)}
+                      href={ap(`/admin/business/rfqs/${rfq.id}/view`, host)}
                       className="text-foreground hover:text-accent-500 hover:underline transition-colors"
                     >
                       {rfq.rfq_number}
@@ -354,7 +354,7 @@ async function BusinessRFQsListContent({ resolvedSearchParams, host }: { resolve
                   </td>
                   <td className="px-4 py-3 text-right">
                     <Link
-                      href={ap(`/admin/business/rfqs/${rfq.id}`, host)}
+                      href={ap(`/admin/business/rfqs/${rfq.id}/view`, host)}
                       className="text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline"
                     >
                       View →

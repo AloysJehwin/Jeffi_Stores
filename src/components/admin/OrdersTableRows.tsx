@@ -86,7 +86,7 @@ function CustomerPopover({ order }: { order: any }) {
         {order.users?.id && (
           <div className="pt-1 border-t border-border-default">
             <Link
-              href={ap(`/admin/customers/${order.users.id}`)}
+              href={ap(`/admin/customers/${order.users.id}/view`)}
               className="text-xs text-accent-500 hover:text-accent-600 font-medium"
             >
               View customer profile →
@@ -121,7 +121,7 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
             <HoverCard
               trigger={
                 <a
-                  href={ap(`/admin/orders/${order.id}?back=${encodeURIComponent(backUrl)}`)}
+                  href={ap(`/admin/orders/${order.id}/view?back=${encodeURIComponent(backUrl)}`)}
                   className="font-mono font-semibold text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
                   onClick={e => e.stopPropagation()}
                 >
@@ -316,7 +316,7 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
                 </a>
               )}
               <Link
-                href={ap(`/admin/orders/${order.id}?back=${encodeURIComponent(backUrl)}`)}
+                href={ap(`/admin/orders/${order.id}/view?back=${encodeURIComponent(backUrl)}`)}
                 title="View Details"
                 className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
               >

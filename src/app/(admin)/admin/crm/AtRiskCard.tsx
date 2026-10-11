@@ -23,7 +23,7 @@ function fmtDate(iso: string) {
 function Row({ c, large }: { c: AtRiskEntry; large?: boolean }) {
   return (
     <Link
-      href={ap(`/admin/customers/${c.id}`)}
+      href={ap(`/admin/customers/${c.id}/view`)}
       className={`flex items-center justify-between gap-3 ${large ? 'py-2.5' : 'py-2'} hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors`}
     >
       <div className="min-w-0 flex-1">

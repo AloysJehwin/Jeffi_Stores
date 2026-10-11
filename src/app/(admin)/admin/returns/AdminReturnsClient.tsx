@@ -115,7 +115,7 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-default bg-surface-secondary">
         <div className="flex items-center gap-3">
           <Link
-            href={ap(`/admin/orders/${row.order_id}`)}
+            href={ap(`/admin/orders/${row.order_id}/view`)}
             className="text-sm font-semibold text-accent-500 hover:text-accent-600 underline"
           >
             #{row.order_number}

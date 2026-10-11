@@ -19,7 +19,7 @@ interface DropEntry {
 function Row({ c, large }: { c: DropEntry; large?: boolean }) {
   return (
     <Link
-      href={ap(`/admin/customers/${c.id}`)}
+      href={ap(`/admin/customers/${c.id}/view`)}
       className={`flex items-center justify-between text-sm ${large ? 'py-2.5' : 'py-1'} hover:bg-surface-secondary/50 px-2 -mx-2 rounded transition-colors`}
     >
       <div className="min-w-0 flex-1">

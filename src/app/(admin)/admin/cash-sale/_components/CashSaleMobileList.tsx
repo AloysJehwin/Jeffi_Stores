@@ -57,7 +57,7 @@ export default function CashSaleMobileList({ sales, canWrite, cancellingId, paym
         key: 'detail',
         label: 'View detail',
         onSelect: () => {
-          window.location.href = ap(`/admin/cash-sale/${sale.id}`)
+          window.location.href = ap(`/admin/cash-sale/${sale.id}/view`)
         },
       },
     ]

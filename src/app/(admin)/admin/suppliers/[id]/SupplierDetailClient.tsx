@@ -396,7 +396,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                         <td className="px-4 py-3">
                           {canFinancial ? (
                             <Link
-                              href={ap(`/admin/financial/payables/${e.id}`)}
+                              href={ap(`/admin/financial/payables/${e.id}/view`)}
                               className="font-mono font-medium text-accent-500 hover:underline"
                             >
                               {e.expense_number}

@@ -131,7 +131,7 @@ export default function ProductStockMovements({ productId }: { productId: string
                       <td className="px-4 py-2 whitespace-nowrap">
                         {tx.reference_type === 'order' && tx.reference_id ? (
                           <Link
-                            href={ap(`/admin/orders/${tx.reference_id}`)}
+                            href={ap(`/admin/orders/${tx.reference_id}/view`)}
                             className="text-accent-500 hover:text-accent-600 hover:underline underline-offset-2 font-medium"
                           >
                             {tx.reference_label || 'Order'}

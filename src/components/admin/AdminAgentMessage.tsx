@@ -6,8 +6,8 @@ import { ap } from '@/lib/shared/admin-path'
 
 const ENTITY_ROUTES: Record<string, (id: string) => string> = {
   product: id => `/admin/products/${id}`,
-  order: id => `/admin/orders/${id}`,
-  customer: id => `/admin/customers/${id}`,
+  order: id => `/admin/orders/${id}/view`,
+  customer: id => `/admin/customers/${id}/view`,
   campaign: kind => `/admin/campaigns/${kind}`,
 }
 

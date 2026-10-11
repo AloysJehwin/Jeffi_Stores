@@ -1,8 +1,10 @@
-import PayableDetailClient from './PayableDetailClient'
+import { permanentRedirect } from 'next/navigation'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
 
 export const dynamic = 'force-dynamic'
 
-export default async function PayableDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  return <PayableDetailClient id={id} />
+  permanentRedirect(ap(`/admin/financial/payables/${id}/view`, await getHost()))
 }

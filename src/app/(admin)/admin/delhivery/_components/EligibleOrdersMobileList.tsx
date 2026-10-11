@@ -48,7 +48,7 @@ export default function EligibleOrdersMobileList({ orders, selected, onToggle }:
         key: 'order',
         label: 'View order',
         onSelect: () => {
-          window.location.href = ap(`/admin/orders/${order.id}`)
+          window.location.href = ap(`/admin/orders/${order.id}/view`)
         },
       },
       {

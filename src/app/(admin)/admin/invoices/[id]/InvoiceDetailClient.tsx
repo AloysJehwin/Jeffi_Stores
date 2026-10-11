@@ -165,7 +165,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         setAmendError(json.error || 'Failed to create amendment draft')
         return
       }
-      router.push(ap(`/admin/invoices/${json.draftId}`))
+      router.push(ap(`/admin/invoices/${json.draftId}/view`))
     } catch {
       setAmendError('Failed to create amendment draft')
     } finally {
@@ -354,15 +354,20 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
               {qrLoading ? 'Generating…' : 'QR'}
             </button>
           )}
-          {o.invoice_number && o.status !== 'draft' && o.source !== 'online' && !isVoided && amendDraft === null && canWrite && (
-            <button
-              onClick={createAmendmentDraft}
-              disabled={amending}
-              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
-            >
-              {amending ? 'Creating…' : 'Amend Invoice'}
-            </button>
-          )}
+          {o.invoice_number &&
+            o.status !== 'draft' &&
+            o.source !== 'online' &&
+            !isVoided &&
+            amendDraft === null &&
+            canWrite && (
+              <button
+                onClick={createAmendmentDraft}
+                disabled={amending}
+                className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
+              >
+                {amending ? 'Creating…' : 'Amend Invoice'}
+              </button>
+            )}
           <a
             href={`/api/orders/${o.id}/invoice`}
             target="_blank"
@@ -380,7 +385,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             Download PDF
           </a>
           <Link
-            href={ap(`/admin/orders/${o.id}`)}
+            href={ap(`/admin/orders/${o.id}/view`)}
             className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
           >
             View Order
@@ -403,7 +408,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 text-sm text-blue-800 dark:text-blue-300">
           <span>An amendment draft is pending for this invoice.</span>
           <a
-            href={ap(`/admin/invoices/${amendDraft.id}`)}
+            href={ap(`/admin/invoices/${amendDraft.id}/view`)}
             className="shrink-0 font-semibold underline underline-offset-2 hover:text-blue-900 dark:hover:text-blue-100 transition-colors"
           >
             View draft ({amendDraft.order_number})

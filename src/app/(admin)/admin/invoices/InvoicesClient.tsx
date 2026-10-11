@@ -1880,7 +1880,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                         >
                           <td className="px-4 py-3 font-mono text-xs font-medium">
                             <a
-                              href={ap(`/admin/orders/${draft.id}`)}
+                              href={ap(`/admin/orders/${draft.id}/view`)}
                               className="text-foreground hover:text-accent-500 hover:underline transition-colors"
                             >
                               {draft.order_number}
@@ -1931,7 +1931,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                               )}
                               {draft.source !== 'offline' && (
                                 <a
-                                  href={ap(`/admin/invoices/${draft.id}`)}
+                                  href={ap(`/admin/invoices/${draft.id}/view`)}
                                   className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
                                 >
                                   View
@@ -1940,7 +1940,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                               {draft.order_number?.startsWith('AMD-') ? (
                                 <>
                                   <a
-                                    href={ap(`/admin/invoices/${draft.id}`)}
+                                    href={ap(`/admin/invoices/${draft.id}/view`)}
                                     className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
                                   >
                                     View
@@ -1978,7 +1978,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 flex-wrap">
                           <a
-                            href={ap(`/admin/orders/${draft.id}`)}
+                            href={ap(`/admin/orders/${draft.id}/view`)}
                             className="font-mono text-xs font-medium text-foreground hover:text-accent-500 hover:underline transition-colors"
                           >
                             {draft.order_number}
@@ -2029,7 +2029,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                         )}
                         {(draft.source !== 'offline' || draft.order_number?.startsWith('AMD-')) && (
                           <a
-                            href={ap(`/admin/invoices/${draft.id}`)}
+                            href={ap(`/admin/invoices/${draft.id}/view`)}
                             className="text-xs text-foreground-secondary hover:text-foreground font-medium"
                           >
                             View
@@ -2156,8 +2156,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                               <a
                                 href={ap(
                                   inv.source === 'cash_sale'
-                                    ? `/admin/cash-sale/${inv.id}`
-                                    : `/admin/invoices/${inv.id}`
+                                    ? `/admin/cash-sale/${inv.id}/view`
+                                    : `/admin/invoices/${inv.id}/view`
                                 )}
                                 className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
                               >
@@ -2295,7 +2295,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                                   </svg>
                                 </a>
                                 <a
-                                  href={ap(`/admin/cash-sale/${inv.id}`)}
+                                  href={ap(`/admin/cash-sale/${inv.id}/view`)}
                                   title="View Sale"
                                   className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                                 >
@@ -2328,7 +2328,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                                   </svg>
                                 </a>
                                 <a
-                                  href={ap(`/admin/invoices/${inv.id}`)}
+                                  href={ap(`/admin/invoices/${inv.id}/view`)}
                                   title="View Invoice"
                                   className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                                 >

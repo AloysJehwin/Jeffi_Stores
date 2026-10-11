@@ -48,7 +48,11 @@ export default function EcomCustomersMobileList({ tenants }: { tenants: Customer
   const purgeable = (t: CustomerTenant) => t.status === 'terminated' || t.status === 'deprovisioned'
 
   const actions = (t: CustomerTenant): MobileAction[] => [
-    { key: 'view', label: 'View store', onSelect: () => router.push(`/admin/ecom/customers/${t.id}?tab=overview`) },
+    {
+      key: 'view',
+      label: 'View store',
+      onSelect: () => router.push(`/admin/ecom/customers/${t.id}/view?tab=overview`),
+    },
   ]
 
   return (

@@ -222,7 +222,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
           </a>
           {q.converted_order_id && (
             <a
-              href={ap(`/admin/invoices/${q.converted_order_id}`)}
+              href={ap(`/admin/invoices/${q.converted_order_id}/view`)}
               className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
             >
               View Invoice →
@@ -264,7 +264,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
               <div className="flex justify-between gap-4">
                 <span className="text-foreground-secondary">Converted</span>
                 <a
-                  href={ap(`/admin/invoices/${q.converted_order_id}`)}
+                  href={ap(`/admin/invoices/${q.converted_order_id}/view`)}
                   className="text-green-600 dark:text-green-400 text-xs font-medium hover:underline"
                 >
                   View Invoice ↗

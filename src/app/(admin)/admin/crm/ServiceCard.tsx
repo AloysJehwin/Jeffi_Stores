@@ -66,7 +66,7 @@ export default function ServiceCard({ service, lowReviews }: { service: Service;
             {lowReviews.map(lr => (
               <Link
                 key={lr.id}
-                href={ap(lr.userId ? `/admin/customers/${lr.userId}` : '/admin/reviews?filter=all')}
+                href={ap(lr.userId ? `/admin/customers/${lr.userId}/view` : '/admin/reviews?filter=all')}
                 className="flex items-center gap-3 py-2 group hover:bg-surface-secondary/50 -mx-2 px-2 rounded-lg transition-colors"
               >
                 <div className="min-w-0 flex-1">

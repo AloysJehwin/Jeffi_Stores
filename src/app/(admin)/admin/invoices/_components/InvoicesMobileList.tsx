@@ -51,7 +51,7 @@ export default function InvoicesMobileList({
   const [actionsOpen, setActionsOpen] = useState(false)
 
   function viewHref(inv: Invoice) {
-    return ap(inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}` : `/admin/invoices/${inv.id}`)
+    return ap(inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}/view` : `/admin/invoices/${inv.id}/view`)
   }
 
   function pdfHref(inv: Invoice) {
@@ -109,14 +109,18 @@ export default function InvoicesMobileList({
                   <div className="text-xs text-foreground-muted mt-0.5 font-mono truncate">{inv.order_number}</div>
                 )}
               </div>
-              <span className="font-semibold text-foreground text-sm shrink-0">₹{fmt(parseFloat(inv.total_amount))}</span>
+              <span className="font-semibold text-foreground text-sm shrink-0">
+                ₹{fmt(parseFloat(inv.total_amount))}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2 mt-2">
               <span className="text-sm text-foreground font-medium truncate">{inv.customer_name}</span>
               <span className="text-xs text-foreground-muted shrink-0">{fmtDate(inv.invoice_date)}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[inv.payment_status] || ''}`}>
+              <span
+                className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[inv.payment_status] || ''}`}
+              >
                 {inv.payment_status}
               </span>
               <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
@@ -172,7 +176,9 @@ export default function InvoicesMobileList({
               >
                 {selected.payment_status}
               </span>
-              <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${SOURCE_COLORS[selected.source] || ''}`}>
+              <span
+                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${SOURCE_COLORS[selected.source] || ''}`}
+              >
                 {sourceLabel(selected.source)}
               </span>
               {selected.status === 'cancelled' && (
@@ -185,7 +191,9 @@ export default function InvoicesMobileList({
               <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Total</p>
               <p className="text-xl font-bold text-primary-500">₹{fmt(parseFloat(selected.total_amount))}</p>
               {parseFloat(selected.taxable_amount) > 0 && (
-                <p className="text-xs text-foreground-muted mt-0.5">Taxable ₹{fmt(parseFloat(selected.taxable_amount))}</p>
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  Taxable ₹{fmt(parseFloat(selected.taxable_amount))}
+                </p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border-default pt-4">

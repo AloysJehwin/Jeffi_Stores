@@ -432,14 +432,14 @@ export default function RFQDetailClient({ id }: { id: string }) {
             {rfq.status === 'converted' && rfq.converted_quotation_id && (
               <div className="flex flex-col gap-2 items-end">
                 <Link
-                  href={ap(`/admin/quotations/${rfq.converted_quotation_id}`)}
+                  href={ap(`/admin/quotations/${rfq.converted_quotation_id}/view`)}
                   className="px-5 py-2 border-2 border-accent-500 text-accent-400 text-sm font-semibold rounded-lg hover:bg-accent-900/20 transition-colors"
                 >
                   View Quotation {rfq.quote_number ? `(${rfq.quote_number})` : ''} →
                 </Link>
                 {rfq.order_id && (
                   <Link
-                    href={ap(`/admin/invoices/${rfq.order_id}`)}
+                    href={ap(`/admin/invoices/${rfq.order_id}/view`)}
                     className="px-5 h-control border-2 border-green-500 text-green-400 text-sm font-semibold rounded-lg hover:bg-green-900/20 transition-colors flex items-center gap-2"
                   >
                     View Invoice {rfq.invoice_number ? `(${rfq.invoice_number})` : ''} →
@@ -957,7 +957,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
             </dl>
             <div className="mt-4 pt-4 border-t border-border-default">
               <Link
-                href={ap(`/admin/business/customers/${rfq.user_id}`)}
+                href={ap(`/admin/business/customers/${rfq.user_id}/view`)}
                 className="text-xs text-accent-500 hover:text-accent-600 font-medium"
               >
                 View customer profile →
@@ -989,7 +989,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
               <div>
                 <p className="text-sm text-green-700 dark:text-green-400 font-medium mb-1">Converted to quotation</p>
                 <Link
-                  href={ap(`/admin/quotations/${rfq.converted_quotation_id}`)}
+                  href={ap(`/admin/quotations/${rfq.converted_quotation_id}/view`)}
                   className="text-sm font-semibold text-accent-600 dark:text-accent-400 hover:underline"
                 >
                   Open Quotation {rfq.quote_number ? `(${rfq.quote_number})` : ''} →
@@ -1031,7 +1031,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                     </p>
                   )}
                   <Link
-                    href={ap(`/admin/invoices/${rfq.order_id}`)}
+                    href={ap(`/admin/invoices/${rfq.order_id}/view`)}
                     className="text-sm font-semibold text-accent-600 dark:text-accent-400 hover:underline"
                   >
                     Open Invoice {rfq.invoice_number ? `(${rfq.invoice_number})` : ''} →

@@ -57,7 +57,7 @@ export default function QuotationsMobileList({
         key: 'view',
         label: 'View detail',
         icon: <ExternalLink className="w-4 h-4" />,
-        onSelect: () => window.open(ap(`/admin/quotations/${q.id}`), '_self'),
+        onSelect: () => window.open(ap(`/admin/quotations/${q.id}/view`), '_self'),
       },
       {
         key: 'pdf',
@@ -88,7 +88,7 @@ export default function QuotationsMobileList({
         key: 'invoiced',
         label: 'View invoice',
         icon: <ExternalLink className="w-4 h-4" />,
-        onSelect: () => window.open(ap(`/admin/invoices/${q.converted_order_id}`), '_self'),
+        onSelect: () => window.open(ap(`/admin/invoices/${q.converted_order_id}/view`), '_self'),
       })
     }
     if (q.status === 'draft' && canWrite) {
@@ -148,7 +148,9 @@ export default function QuotationsMobileList({
         {selected && (
           <div className="p-5 space-y-4">
             <div className="flex flex-wrap gap-2">
-              <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${STATUS_COLORS[selected.status] || ''}`}>
+              <span
+                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${STATUS_COLORS[selected.status] || ''}`}
+              >
                 {statusLabel(selected.status)}
               </span>
               {selected.converted_order_id && (

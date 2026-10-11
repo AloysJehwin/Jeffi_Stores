@@ -34,7 +34,7 @@ function ScoreBadge({ score }: { score: number }) {
 function Row({ c, large }: { c: ChurnRisk; large?: boolean }) {
   return (
     <Link
-      href={ap(`/admin/customers/${c.id}`)}
+      href={ap(`/admin/customers/${c.id}/view`)}
       className={`flex items-center justify-between ${large ? 'text-sm py-2.5' : 'text-sm py-1'} hover:bg-surface-secondary/50 px-2 -mx-2 rounded transition-colors`}
     >
       <div className="min-w-0 flex-1">
