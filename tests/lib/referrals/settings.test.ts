@@ -1,7 +1,11 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 vi.mock('@/lib/shared/db', () => ({ query: vi.fn(), queryMany: vi.fn(), queryOne: vi.fn() }))
-vi.mock('@/lib/loyalty/settings', () => ({ getLoyaltySettings: vi.fn() }))
+vi.mock('@/lib/loyalty/settings', () => ({
+  getLoyaltySettings: vi.fn(),
+  // Referral `enabled` now also requires the plan to sell customer programs. Default allowed in tests.
+  customerProgramsAllowed: vi.fn().mockResolvedValue(true),
+}))
 
 import {
   getReferralSettings,
@@ -11,14 +15,18 @@ import {
   ReferralSettingsInputSchema,
 } from '@/lib/referrals/settings'
 import { query, queryMany } from '@/lib/shared/db'
-import { getLoyaltySettings } from '@/lib/loyalty/settings'
+import { getLoyaltySettings, customerProgramsAllowed } from '@/lib/loyalty/settings'
 
 const mockQuery = query as ReturnType<typeof vi.fn>
 const mockQueryMany = queryMany as ReturnType<typeof vi.fn>
 const mockLoyalty = getLoyaltySettings as ReturnType<typeof vi.fn>
+const mockProgramsAllowed = customerProgramsAllowed as ReturnType<typeof vi.fn>
 
 describe('referral settings', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockProgramsAllowed.mockResolvedValue(true)
+  })
 
   it('defaults to off, 100 points, 10 a year, 90 days', async () => {
     mockQueryMany.mockResolvedValue([])
@@ -51,6 +59,12 @@ describe('referral settings', () => {
   it('rejects out-of-range input', () => {
     expect(ReferralSettingsInputSchema.safeParse({ enabled: true, rewardPoints: 0, yearlyCap: 10, qualifyDays: 90 }).success).toBe(false)
     expect(ReferralSettingsInputSchema.safeParse({ enabled: true, rewardPoints: 100, yearlyCap: 10, qualifyDays: 400 }).success).toBe(false)
+  })
+
+  it('forces enabled off when the plan does not include customer programs', async () => {
+    mockQueryMany.mockResolvedValue([{ key: 'referral_enabled', value: 'true' }])
+    mockProgramsAllowed.mockResolvedValue(false)
+    expect((await getReferralSettings()).enabled).toBe(false)
   })
 
   it('is live only while both referrals and loyalty are on', async () => {

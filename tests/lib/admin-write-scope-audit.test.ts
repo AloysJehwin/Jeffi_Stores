@@ -70,6 +70,10 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'auth/google',
   // Mints a token whose scopes are filtered to a subset of the caller's own — cannot escalate.
   'token/generate',
+  // Cron Jobs self-service (Audit > Cron Jobs tab): a store toggling its OWN scheduled job on/off,
+  // gated on audit:read — the read-tier sibling of cron/trigger (which is CRON_SECRET-exempt above).
+  // It writes only this store's own cron_enabled_* flag; no cross-tenant or privileged effect.
+  'cron/config',
 ])
 
 function mutatingRoutesWithoutWriteScope(): string[] {
