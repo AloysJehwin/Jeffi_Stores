@@ -345,15 +345,15 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({
-            parameters: form.parameters,
-            scenario_kind: form.scenario_kind,
-          }),
+          // Send the WHOLE form: the draft PATCH replaces draft_fields wholesale, so a params-only
+          // body would wipe the subject/body/layout/blocks/sms/whatsapp the user is editing.
+          body: JSON.stringify(form),
         })
         if (res.ok) {
           setAutoSaveStatus('saved')
           setParamsBaseline(currentParams)
           setScenarioBaseline(currentScenario)
+          setHasDraft(true)
           setTimeout(() => setAutoSaveStatus('idle'), 1500)
         } else {
           const data = await res.json().catch(() => ({}))
