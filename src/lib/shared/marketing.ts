@@ -41,6 +41,18 @@ export interface Campaign {
   subject_template: string
   body_template: string
   last_run_at: string | null
+  /** Email layout preset key (email-layouts.ts). Defaults to 'classic'. */
+  template_layout?: string | null
+  /** 'richtext' (body_template) or 'blocks' (blocks JSON). Defaults to 'richtext'. */
+  template_mode?: string | null
+  /** Block-builder document when template_mode === 'blocks'. */
+  blocks?: unknown
+  /** Plain-text SMS body with variable tokens. */
+  sms_template?: string | null
+  /** WhatsApp approved Content template SID + filled variables + optional header image. */
+  wa_template_sid?: string | null
+  wa_variables?: Record<string, string> | null
+  wa_header_image_url?: string | null
 }
 
 function resolveAppUrl(): string {

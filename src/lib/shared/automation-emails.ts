@@ -113,7 +113,15 @@ export async function sendCampaignEmail(params: {
 
   const registered = await recipientVars(user)
   const subject = renderCampaignTemplate(campaign.subject_template, vars, registered, false)
-  const renderedBody = renderCampaignTemplate(campaign.body_template, vars, registered, true)
+  // Body source by template_mode: 'blocks' renders the block document, else the rich-text body_template.
+  // Both still carry variable tokens that renderCampaignTemplate/renderVars fill below.
+  let bodySource = campaign.body_template
+  if (campaign.template_mode === 'blocks' && campaign.blocks != null) {
+    const { renderBlocks } = await import('@/lib/templates/blocks')
+    const rendered = renderBlocks(campaign.blocks)
+    if (rendered) bodySource = rendered
+  }
+  const renderedBody = renderCampaignTemplate(bodySource, vars, registered, true)
   const { campaignMailFromAsync } = await import('@/lib/catalog/brand')
   const [fromAddr, apiBase] = await Promise.all([campaignMailFromAsync(), apiBaseUrl()])
   const storeName = registered.store_name
@@ -121,7 +129,7 @@ export async function sendCampaignEmail(params: {
   // customer, whose page base can end in /business (no API lives there).
   const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind, apiBase)
   const tracked = wrapWithTracking(renderedBody, sentId, unsubscribeUrl, apiBase, storeName)
-  const html = renderVars(baseLayout(subject, tracked, user.baseUrl), registered, { escape: true })
+  const html = renderVars(baseLayout(subject, tracked, user.baseUrl, campaign.template_layout), registered, { escape: true })
 
   try {
     await sendAuditedMail({
