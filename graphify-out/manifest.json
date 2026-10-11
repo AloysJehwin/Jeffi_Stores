@@ -6435,13 +6435,13 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/CampaignsListClient.tsx": {
-    "mtime": 1791706582.769913,
-    "ast_hash": "14e11911395d4f12b76e419c2ea57760",
+    "mtime": 1791724981.7224386,
+    "ast_hash": "327ece31f0e5a31244d18d9b065c02d7",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/CampaignDetailClient.tsx": {
-    "mtime": 1791716831.0520847,
-    "ast_hash": "e1b733d6b863e34061aaccebb610804c",
+    "mtime": 1791724014.6630023,
+    "ast_hash": "4af4b8694fca39d382c78c6e7c34d53c",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/loading.tsx": {
@@ -6450,8 +6450,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/page.tsx": {
-    "mtime": 1791313811.3150284,
-    "ast_hash": "8c385c27693072ce4eeb028f3529a911",
+    "mtime": 1791724969.625567,
+    "ast_hash": "03c166a1f6c74dc147a3caffcb8d2bdb",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/loading.tsx": {
@@ -11860,8 +11860,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/automation-emails.ts": {
-    "mtime": 1791710364.1486769,
-    "ast_hash": "8054db0866b52f98e1c58c067a10c727",
+    "mtime": 1791724319.9671483,
+    "ast_hash": "3fcdb514f59f8c4fe003c499963b511b",
     "semantic_hash": ""
   },
   "src/lib/shared/aws-signing.ts": {
@@ -14380,8 +14380,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/_components/CampaignsMobileList.tsx": {
-    "mtime": 1791705583.6314266,
-    "ast_hash": "15aecf8aa1a962c1357f07c7f0af80c9",
+    "mtime": 1791725028.3818333,
+    "ast_hash": "effbd469a96d52af57eed1bc6421549b",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/_components/campaign-presentation.tsx": {
@@ -14422,6 +14422,16 @@
   "docs/WHATSAPP_TEMPLATES.md": {
     "mtime": 1791714609.9072905,
     "ast_hash": "6b9f81bbc28ede5c6b28081212bf6f49",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/campaigns/[kind]/view/CampaignViewClient.tsx": {
+    "mtime": 1791725104.414264,
+    "ast_hash": "954361f2c340605bfe15bd94caa3b777",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/campaigns/[kind]/view/page.tsx": {
+    "mtime": 1791724947.199332,
+    "ast_hash": "b1693d472f4561066f8a1cc1f7a73d3c",
     "semantic_hash": ""
   }
 }

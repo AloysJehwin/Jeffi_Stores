@@ -307,7 +307,7 @@ export default function CampaignsListClient() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Link
-                    href={ap(`/admin/campaigns/${c.kind}`)}
+                    href={ap(`/admin/campaigns/${c.kind}/view`)}
                     className="font-semibold text-foreground hover:text-accent-500 transition-colors"
                   >
                     {c.name}
