@@ -6435,8 +6435,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/CampaignsListClient.tsx": {
-    "mtime": 1791399412.4170578,
-    "ast_hash": "9f45969cc021e535e9b81d7c9d7e5647",
+    "mtime": 1791694746.31102,
+    "ast_hash": "91ae58abca4cdc6b0125ed210348ba4d",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/[kind]/CampaignDetailClient.tsx": {
@@ -6480,8 +6480,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/scenarios/ScenariosListClient.tsx": {
-    "mtime": 1791399412.4225838,
-    "ast_hash": "812b1e12bbb26c90b35ca6712b40e79d",
+    "mtime": 1791694656.2996635,
+    "ast_hash": "20c3251282a3aaa5d9ea7311d100161e",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/campaigns/scenarios/[kind]/ScenarioDetailClient.tsx": {
