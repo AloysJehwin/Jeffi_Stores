@@ -18,6 +18,11 @@ export interface WhatsAppTemplateDef {
    *  URL (Twilio fills the template's media component from contentVariables[imageSlot]). Absent = no
    *  media header. The real index is defined when the template is built in Twilio — see the doc. */
   imageSlot?: number
+  /** The {{n}} slot that carries a clickable store/CTA link; the admin's URL is sent click-tracked. */
+  urlSlot?: number
+  /** True once the approved Twilio template is confirmed to actually have a media header (so the image
+   *  delivers). false/absent → the image shows in our preview but may not attach until verified. */
+  mediaVerified?: boolean
   /** Approved copy with {{1}} placeholders, for the chat-bubble preview only. */
   bodyPreview: string
 }
@@ -29,7 +34,9 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDef[] = [
     sidEnv: 'TWILIO_WA_ABANDONED_CART_SID',
     kinds: ['abandoned_cart', 'abandoned_checkout', 'high_value_cart', 'cart_price_drop'],
     slots: [{ index: 1, label: 'Items / summary' }],
-    bodyPreview: 'You left {{1}} in your cart. Complete your order before it sells out!',
+    urlSlot: 2,
+    imageSlot: 3,
+    bodyPreview: 'You left {{1}} in your cart. Complete your order: {{2}}',
   },
   {
     key: 'promo_offer',
@@ -40,7 +47,9 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDef[] = [
       { index: 1, label: 'Offer / discount' },
       { index: 2, label: 'Code or link' },
     ],
+    urlSlot: 2,
     imageSlot: 3,
+    mediaVerified: true,
     bodyPreview: 'Special offer just for you: {{1}}. Use {{2}} to redeem.',
   },
   {
@@ -50,7 +59,9 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDef[] = [
     kinds: ['restock', 'back_in_stock_wishlist', 'price_drop', 'wishlist_reminder', 'viewed_product'],
     slots: [{ index: 1, label: 'Product name' }],
     imageSlot: 2,
-    bodyPreview: '{{1}} is back in stock! Grab it before it runs out again.',
+    urlSlot: 3,
+    mediaVerified: true,
+    bodyPreview: '{{1}} is back in stock! Grab it: {{3}}',
   },
   {
     key: 'new_arrivals',
@@ -59,7 +70,9 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDef[] = [
     kinds: ['viewed_category', 'replenishment'],
     slots: [{ index: 1, label: 'Items / highlights' }],
     imageSlot: 2,
-    bodyPreview: 'Just in: {{1}}. Be the first to shop the new drop.',
+    urlSlot: 3,
+    mediaVerified: true,
+    bodyPreview: 'Just in: {{1}}. Shop the new drop: {{3}}',
   },
   {
     key: 'reorder_reminder',
@@ -67,7 +80,9 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDef[] = [
     sidEnv: 'TWILIO_WA_REORDER_REMINDER_SID',
     kinds: ['replenishment', 'subscription_renewal', 'post_purchase'],
     slots: [{ index: 1, label: 'Product name' }],
-    bodyPreview: 'Running low on {{1}}? Reorder in a tap.',
+    urlSlot: 2,
+    imageSlot: 3,
+    bodyPreview: 'Running low on {{1}}? Reorder in a tap: {{2}}',
   },
   {
     key: 'festive_greeting',
@@ -76,17 +91,18 @@ export const WHATSAPP_TEMPLATES: WhatsAppTemplateDef[] = [
     kinds: ['birthday', 'signup_anniversary'],
     slots: [{ index: 1, label: 'Greeting / name' }],
     imageSlot: 2,
-    bodyPreview: 'Happy {{1}}! Celebrate with a little something from us.',
+    urlSlot: 3,
+    mediaVerified: true,
+    bodyPreview: 'Happy {{1}}! Celebrate with a little something: {{3}}',
   },
   {
     key: 'feedback_request',
     label: 'Feedback request',
     sidEnv: 'TWILIO_WA_FEEDBACK_REQUEST_SID',
     kinds: ['review_request', 'review_reminder', 'review_photo_followup', 'post_purchase'],
-    slots: [
-      { index: 1, label: 'Order number' },
-      { index: 2, label: 'Review link' },
-    ],
+    slots: [{ index: 1, label: 'Order number' }],
+    urlSlot: 2,
+    imageSlot: 3,
     bodyPreview: 'How was order {{1}}? Share a quick review: {{2}}',
   },
 ]
