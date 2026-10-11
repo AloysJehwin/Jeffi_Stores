@@ -4,7 +4,7 @@ import { ADMIN_SCOPES, hasScope } from '@/lib/auth/scopes'
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import Link from 'next/link'
-import ServiceAccountRevokeButton from '@/components/admin/ServiceAccountRevokeButton'
+import ServiceAccountRowActions from '@/components/admin/ServiceAccountRowActions'
 import ServiceAccountsMobileList from './_components/ServiceAccountsMobileList'
 
 async function getServiceAccounts() {
@@ -262,7 +262,11 @@ export default async function ServiceAccountsPage() {
                         </td>
                         {canWrite && (
                           <td className="px-4 py-3 text-right">
-                            {!sa.is_revoked && <ServiceAccountRevokeButton id={sa.id} name={sa.name} />}
+                            {!sa.is_revoked && (
+                              <div className="flex justify-end">
+                                <ServiceAccountRowActions id={sa.id} name={sa.name} />
+                              </div>
+                            )}
                           </td>
                         )}
                       </tr>

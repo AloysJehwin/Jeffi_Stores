@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import HoverCard from '@/components/ui/HoverCard'
-import DeleteCouponButton from '@/components/admin/DeleteCouponButton'
+import RowActions from '@/components/admin/RowActions'
+import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
 
 interface CouponRow {
@@ -35,6 +36,16 @@ export default function CouponTableRow({
   const isExpired = c.valid_until && new Date(c.valid_until) < new Date()
   const [open, setOpen] = useState(false)
   const router = useRouter()
+  const { showToast } = useToast()
+
+  async function deleteCoupon() {
+    const res = await fetch(`/api/admin/coupons/${c.id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      showToast((await res.json().catch(() => ({})))?.error || 'Failed to delete coupon', 'error')
+      return
+    }
+    router.refresh()
+  }
 
   return (
     <>
@@ -221,17 +232,31 @@ export default function CouponTableRow({
           </span>
         </td>
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center gap-3">
-            {canWrite && (
-              <Link
-                href={ap(`/admin/coupons/${c.id}/edit?back=${encodeURIComponent(backUrl)}`)}
-                className="text-accent-500 hover:underline text-sm"
-              >
-                Edit
-              </Link>
-            )}
-            {canWrite && <DeleteCouponButton id={c.id} code={c.code} />}
-          </div>
+          {canWrite && (
+            <RowActions
+              size="sm"
+              actions={[
+                {
+                  key: 'edit',
+                  kind: 'edit',
+                  label: 'Edit Coupon',
+                  href: ap(`/admin/coupons/${c.id}/edit?back=${encodeURIComponent(backUrl)}`),
+                },
+                {
+                  key: 'delete',
+                  kind: 'delete',
+                  label: 'Delete Coupon',
+                  onSelect: deleteCoupon,
+                  confirm: {
+                    title: 'Delete Coupon',
+                    message: `Delete coupon "${c.code}"? This action cannot be undone.`,
+                    confirmLabel: 'Delete',
+                    variant: 'danger',
+                  },
+                },
+              ]}
+            />
+          )}
         </td>
       </tr>
     </>

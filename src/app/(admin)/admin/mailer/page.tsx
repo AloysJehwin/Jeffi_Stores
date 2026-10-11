@@ -2,8 +2,8 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { queryMany, queryCount } from '@/lib/shared/db'
 import Pagination from '@/components/admin/Pagination'
-import DeleteCampaignButton from '@/components/admin/DeleteCampaignButton'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
+import MailerRowActions from '@/components/admin/MailerRowActions'
 import AdminFilters from '@/components/admin/AdminFilters'
 import ResponsiveList from '@/components/admin/ResponsiveList'
 import { ap } from '@/lib/shared/admin-path'
@@ -237,13 +237,12 @@ async function MailerListContent({
                   {(c.status === 'draft' || c.status === 'scheduled') && (
                     <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />
                   )}
-                  <Link
-                    href={ap(`/admin/mailer/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)}
-                    className="text-accent-500 hover:underline text-sm"
-                  >
-                    View
-                  </Link>
-                  {c.status !== 'sending' && <DeleteCampaignButton id={c.id} title={c.title} />}
+                  <MailerRowActions
+                    id={c.id}
+                    title={c.title}
+                    viewHref={ap(`/admin/mailer/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)}
+                    canDelete={c.status !== 'sending'}
+                  />
                 </div>
               </td>
             </tr>
