@@ -18,6 +18,7 @@ import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import ResponsiveList from '@/components/admin/ResponsiveList'
+import RowActions from '@/components/admin/RowActions'
 import SuppliersMobileList from './_components/SuppliersMobileList'
 import PurchaseOrdersMobileList from './_components/PurchaseOrdersMobileList'
 import InventoryOverviewTab from './_components/InventoryOverviewTab'
@@ -386,21 +387,26 @@ function SuppliersTab() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <div className="hidden md:flex items-center justify-end gap-3">
-                          <RequireWrite scope="inventory">
-                            <Link
-                              href={ap(`/admin/suppliers/${s.id}/edit`)}
-                              className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium"
-                            >
-                              Edit
-                            </Link>
-                            <button
-                              className="text-xs text-foreground-secondary hover:text-foreground hover:underline"
-                              onClick={() => toggleActive(s)}
-                            >
-                              {s.is_active ? 'Deactivate' : 'Activate'}
-                            </button>
-                          </RequireWrite>
+                        <div className="hidden md:block">
+                          <RowActions
+                            size="sm"
+                            actions={[
+                              {
+                                key: 'edit',
+                                kind: 'edit',
+                                label: 'Edit supplier',
+                                href: ap(`/admin/suppliers/${s.id}/edit`),
+                                scope: 'inventory',
+                              },
+                              {
+                                key: 'toggle',
+                                kind: 'toggle',
+                                label: s.is_active ? 'Deactivate supplier' : 'Activate supplier',
+                                onSelect: () => toggleActive(s),
+                                scope: 'inventory',
+                              },
+                            ]}
+                          />
                         </div>
                       </td>
                     </tr>
