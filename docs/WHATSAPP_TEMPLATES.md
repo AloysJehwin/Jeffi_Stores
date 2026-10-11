@@ -24,7 +24,12 @@ header image — see the **WhatsApp message** panel in Marketing → Campaigns w
    `.env.local` locally; the deploy secret in prod).
 4. Add an entry to `WHATSAPP_TEMPLATES` in `src/lib/templates/whatsapp-registry.ts`: a `key`, `label`,
    `sidEnv` (the new var), the campaign `kinds` it suits, its `slots` (matching the `{{n}}` order),
-   `hasImageHeader`, and a `bodyPreview` mirroring the approved copy.
+   and a `bodyPreview` mirroring the approved copy. **If the template has an image/media header**, set
+   `imageSlot` to the `{{n}}` index that the template's media component uses for its URL — the admin's
+   header-image URL is sent into `contentVariables[imageSlot]` at dispatch (Twilio fills the media
+   component from that variable). Omit `imageSlot` for text-only templates. The real index comes from the
+   template's definition in the Twilio Content Builder; a wrong/omitted index simply means the image is
+   not attached (the text still sends), never a broken send.
 5. It appears automatically in the campaign WhatsApp picker for the listed kinds — no other code change.
 
 ## Constraints

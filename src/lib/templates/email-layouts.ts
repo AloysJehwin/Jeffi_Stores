@@ -36,7 +36,7 @@ const DEFAULT_FOOTER = [
 // Brand token the shell renders in the header. Left as a variable so each store's name fills at send.
 const BRAND = '{store_name}'
 
-function layout(theme: MailTheme) {
+function layout(theme: MailTheme, extraCss?: string) {
   return (ctx: EmailLayoutContext): string =>
     mailShell({
       brand: BRAND,
@@ -45,7 +45,32 @@ function layout(theme: MailTheme) {
       content: ctx.bodyHtml,
       footerLines: ctx.footerLines ?? DEFAULT_FOOTER,
       theme: { ...theme, logoUrl: ctx.logoUrl ?? theme.logoUrl },
+      extraCss,
     })
+}
+
+// Per-layout character — small CSS layered on MAIL_BASE_CSS + the theme accent. Keeps the shared class
+// vocabulary (.card/.button/.cta/.info/table.rows) so starter content and the block renderer look
+// finished, while each template reads distinctly.
+const LAYOUT_CSS = {
+  classic: `.container{box-shadow:0 1px 3px rgba(0,0,0,0.06);} h2{font-size:22px;}`,
+  bold: `.header{background:#111827;margin:-30px -30px 24px;padding:28px 30px;border-radius:10px 10px 0 0;}
+    .brand{color:#fff !important;} .kicker{color:#9ca3af !important;}
+    h2{font-size:28px;font-weight:800;letter-spacing:-0.3px;}
+    .button{border-radius:4px;padding:14px 32px;}`,
+  minimal: `.container{box-shadow:none;} h2,h3{font-weight:600;letter-spacing:-0.2px;}
+    .card{border:1px solid #ececec;box-shadow:none;}
+    .button{background:transparent !important;color:#111 !important;border:1px solid #111;padding:11px 26px;}`,
+  promo: `.header{background:linear-gradient(135deg,#e07b3f,#f0a868);margin:-30px -30px 22px;padding:26px 30px;border-radius:10px 10px 0 0;}
+    .brand{color:#fff !important;} .kicker{color:#fff5ec !important;}
+    .promo-chip{display:inline-block;background:#fff;color:#e07b3f;font-weight:800;padding:6px 14px;border-radius:999px;font-size:14px;}
+    .button{box-shadow:0 2px 8px rgba(224,123,63,0.35);}`,
+  festive: `.container{border-top:5px solid #b91c1c;}
+    .header:after{content:"✦ ✦ ✦";display:block;color:#b91c1c;letter-spacing:8px;font-size:12px;margin-top:8px;}
+    h2{font-family:Georgia,'Times New Roman',serif;}`,
+  fresh: `.card{background:#f0fdf4;border:1px solid #bbf7d0;}
+    .button{border-radius:999px;} h2{color:#065f46;}`,
+  custom: ``,
 }
 
 // Starter bodies: tasteful defaults so picking a template fills the editor with real content the admin
@@ -86,7 +111,7 @@ export const EMAIL_LAYOUTS: EmailLayout[] = [
     description: 'The familiar clean card — blue accent, centered brand. Safe for any message.',
     supportsBlocks: true,
     starterBody: S.classic,
-    render: layout({ accent: '#2563eb', containerBg: '#f9f9f9', frame: 'card', headerAlign: 'center' }),
+    render: layout({ accent: '#2563eb', containerBg: '#f9f9f9', frame: 'card', headerAlign: 'center' }, LAYOUT_CSS.classic),
   },
   {
     key: 'bold',
@@ -94,7 +119,7 @@ export const EMAIL_LAYOUTS: EmailLayout[] = [
     description: 'High-contrast, left-aligned header on white — strong for launches and announcements.',
     supportsBlocks: true,
     starterBody: S.bold,
-    render: layout({ accent: '#111827', containerBg: '#ffffff', frame: 'card', headerAlign: 'left' }),
+    render: layout({ accent: '#111827', containerBg: '#ffffff', frame: 'card', headerAlign: 'left' }, LAYOUT_CSS.bold),
   },
   {
     key: 'minimal',
@@ -102,7 +127,7 @@ export const EMAIL_LAYOUTS: EmailLayout[] = [
     description: 'Edge-to-edge, no card chrome — understated, letter-like.',
     supportsBlocks: true,
     starterBody: S.minimal,
-    render: layout({ accent: '#374151', pageBg: '#ffffff', containerBg: '#ffffff', frame: 'full', headerAlign: 'left' }),
+    render: layout({ accent: '#374151', pageBg: '#ffffff', containerBg: '#ffffff', frame: 'full', headerAlign: 'left' }, LAYOUT_CSS.minimal),
   },
   {
     key: 'promo',
@@ -110,7 +135,7 @@ export const EMAIL_LAYOUTS: EmailLayout[] = [
     description: 'Warm orange accent on a soft background — built for discounts and offers.',
     supportsBlocks: true,
     starterBody: S.promo,
-    render: layout({ accent: '#e07b3f', pageBg: '#fff7ed', containerBg: '#ffffff', frame: 'card', headerAlign: 'center' }),
+    render: layout({ accent: '#e07b3f', pageBg: '#fff7ed', containerBg: '#ffffff', frame: 'card', headerAlign: 'center' }, LAYOUT_CSS.promo),
   },
   {
     key: 'festive',
@@ -118,7 +143,7 @@ export const EMAIL_LAYOUTS: EmailLayout[] = [
     description: 'Deep red accent on a cream background — seasonal and celebratory.',
     supportsBlocks: true,
     starterBody: S.festive,
-    render: layout({ accent: '#b91c1c', pageBg: '#fff8f0', containerBg: '#fffdf7', frame: 'card', headerAlign: 'center' }),
+    render: layout({ accent: '#b91c1c', pageBg: '#fff8f0', containerBg: '#fffdf7', frame: 'card', headerAlign: 'center' }, LAYOUT_CSS.festive),
   },
   {
     key: 'fresh',
@@ -126,7 +151,7 @@ export const EMAIL_LAYOUTS: EmailLayout[] = [
     description: 'Green accent on a light-mint background — upbeat, good for restock/back-in-stock.',
     supportsBlocks: true,
     starterBody: S.fresh,
-    render: layout({ accent: '#059669', pageBg: '#f0fdf4', containerBg: '#ffffff', frame: 'card', headerAlign: 'center' }),
+    render: layout({ accent: '#059669', pageBg: '#f0fdf4', containerBg: '#ffffff', frame: 'card', headerAlign: 'center' }, LAYOUT_CSS.fresh),
   },
   {
     key: 'custom',
@@ -149,6 +174,13 @@ export function getEmailLayout(key: string | null | undefined): EmailLayout {
 
 export function isEmailLayoutKey(key: unknown): key is string {
   return typeof key === 'string' && BY_KEY.has(key)
+}
+
+/** Client-safe full-document render for the admin PREVIEW pane: wraps already-variable-filled body HTML
+ *  in the selected layout's themed shell so e.g. Fresh and Promo look visibly different. The returned
+ *  HTML is a complete email document; render it in an <iframe srcDoc> so its <style> doesn't leak. */
+export function renderLayoutPreview(key: string | null | undefined, bodyHtml: string, logoUrl?: string): string {
+  return getEmailLayout(key).render({ title: '', bodyHtml, logoUrl, footerLines: DEFAULT_FOOTER })
 }
 
 /** Client-safe metadata for the layout picker (no render fns). */

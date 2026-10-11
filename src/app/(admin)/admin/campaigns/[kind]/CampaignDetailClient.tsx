@@ -13,7 +13,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import EmailBlockBuilder from '@/components/admin/email-composer/EmailBlockBuilder'
-import { EMAIL_LAYOUT_OPTIONS, layoutStarterBody } from '@/lib/templates/email-layouts'
+import { EMAIL_LAYOUT_OPTIONS, layoutStarterBody, renderLayoutPreview } from '@/lib/templates/email-layouts'
 import type { EmailBlock } from '@/lib/templates/blocks'
 import { renderBlocks } from '@/lib/templates/blocks'
 import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
@@ -540,6 +540,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const previewBodySource =
     form.template_mode === 'blocks' && form.blocks?.length ? renderBlocks(form.blocks) : form.body_template
   const previewBody = renderTemplate(previewBodySource, previewVars)
+  // Full themed document for the preview iframe, so the selected layout (Fresh vs Promo…) renders
+  // with its own shell + CSS. renderLayoutPreview also fills {store_name}/{store_web} via previewVars.
+  const previewDoc = renderTemplate(renderLayoutPreview(form.template_layout, previewBody), previewVars)
 
   const SINGLE_PRODUCT_KINDS = new Set(['restock', 'price_drop'])
   const MULTI_PRODUCT_KINDS = new Set([
@@ -906,7 +909,13 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               <span className="text-foreground-muted">Subject:</span>{' '}
               <span className="font-semibold text-foreground">{previewSubject}</span>
             </div>
-            <div className="p-4 bg-white text-zinc-900" dangerouslySetInnerHTML={{ __html: previewBody }} />
+            <iframe
+              title="Email preview"
+              srcDoc={previewDoc}
+              className="w-full rounded-b-lg border-0 bg-white"
+              style={{ height: 520 }}
+              sandbox=""
+            />
           </div>
         </div>
       </div>

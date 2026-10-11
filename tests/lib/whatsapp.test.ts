@@ -209,3 +209,47 @@ describe('guards', () => {
     expect(await wa.sendFreeTextWhatsApp({ phone: '9876543210', body: 'x' })).toBe(false)
   })
 })
+
+describe('sendCampaignTemplateWhatsApp — header image goes to the declared numbered slot', () => {
+  it('puts the header image URL at contentVariables[imageSlot], not an "image" key', async () => {
+    const wa = await loadWa({ TWILIO_WA_PROMO_OFFER_SID: 'HXpromo' })
+    const ok = await wa.sendCampaignTemplateWhatsApp({
+      phone: '9876543210',
+      sidEnvVar: 'TWILIO_WA_PROMO_OFFER_SID',
+      variables: { '1': '20% off', '2': 'SAVE20' },
+      headerImageUrl: 'https://cdn.example/banner.jpg',
+      imageSlot: 3,
+      kind: 'winback_90',
+    })
+    expect(ok).toBe(true)
+    const vars = JSON.parse(messagesCreate.mock.calls[0][0].contentVariables)
+    expect(vars['3']).toBe('https://cdn.example/banner.jpg')
+    expect(vars.image).toBeUndefined()
+    expect(vars['1']).toBe('20% off')
+  })
+
+  it('sends text-only (no image var) when imageSlot is absent', async () => {
+    const wa = await loadWa({ TWILIO_WA_REORDER_REMINDER_SID: 'HXreorder' })
+    await wa.sendCampaignTemplateWhatsApp({
+      phone: '9876543210',
+      sidEnvVar: 'TWILIO_WA_REORDER_REMINDER_SID',
+      variables: { '1': 'Coffee beans' },
+      headerImageUrl: 'https://cdn.example/x.jpg', // provided but no slot → must be ignored
+      imageSlot: null,
+      kind: 'replenishment',
+    })
+    const vars = JSON.parse(messagesCreate.mock.calls[0][0].contentVariables)
+    expect(vars).toEqual({ '1': 'Coffee beans' })
+  })
+
+  it('returns false when the template SID is not configured (caller falls back to SMS)', async () => {
+    const wa = await loadWa({ TWILIO_WA_PROMO_OFFER_SID: undefined })
+    const ok = await wa.sendCampaignTemplateWhatsApp({
+      phone: '9876543210',
+      sidEnvVar: 'TWILIO_WA_PROMO_OFFER_SID',
+      variables: { '1': 'x' },
+      kind: 'winback_90',
+    })
+    expect(ok).toBe(false)
+  })
+})
