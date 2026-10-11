@@ -591,13 +591,22 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
     store: web ? { web } : undefined,
   })
   const subject = `[TEST] ${renderCampaignTemplate(campaign.subject_template, sampleVars, registered, false)}`
-  const body = renderCampaignTemplate(campaign.body_template, sampleVars, registered, true)
+  // Match the real send: block-builder mode renders the blocks, else the rich-text body; wrap in the
+  // campaign's chosen layout (not always Classic). Keeps the test true to what recipients get.
+  let bodySource = campaign.body_template
+  if ((campaign as any).template_mode === 'blocks' && (campaign as any).blocks != null) {
+    const { renderBlocks } = await import('@/lib/templates/blocks')
+    const rendered = renderBlocks((campaign as any).blocks)
+    if (rendered) bodySource = rendered
+  }
+  const body = renderCampaignTemplate(bodySource, sampleVars, registered, true)
   const html = renderVars(
     baseLayout(
       subject,
       body +
         `<p style="margin-top:24px;color:#999;font-size:12px;">— This is a test send. Tracking pixel and unsubscribe footer omitted.</p>`,
-      baseUrl
+      baseUrl,
+      (campaign as any).template_layout
     ),
     registered,
     { escape: true }
