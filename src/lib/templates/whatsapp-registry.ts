@@ -97,10 +97,23 @@ export function getWhatsAppTemplate(key: string | null | undefined): WhatsAppTem
   return (key && BY_KEY.get(key)) || null
 }
 
-/** Templates offered for a given campaign kind. */
+/** Templates whose `kinds` list this campaign kind — i.e. recommended/best-fit for it. */
 export function whatsAppTemplatesForKind(kind: string): WhatsAppTemplateDef[] {
   return WHATSAPP_TEMPLATES.filter(t => t.kinds.includes(kind))
 }
+
+/** Every approved template — a campaign may pick any, not only the kind-matched one. */
+export function allWhatsAppTemplates(): WhatsAppTemplateDef[] {
+  return WHATSAPP_TEMPLATES
+}
+
+/** Whether a template is the recommended fit for a campaign kind (for a "· recommended" hint). */
+export function isRecommendedForKind(def: WhatsAppTemplateDef, kind: string): boolean {
+  return def.kinds.includes(kind)
+}
+
+/** WhatsApp media-header images render best at ~1.91:1 landscape (same as link-preview images). */
+export const WHATSAPP_IMAGE_RATIO = '1.91 / 1'
 
 /** Fill {{1}}/{{2}} placeholders in the preview copy from a {"1": "...", "2": "..."} map. */
 export function renderWhatsAppPreview(def: WhatsAppTemplateDef, vars: Record<string, string>): string {

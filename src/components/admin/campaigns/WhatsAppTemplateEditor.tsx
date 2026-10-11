@@ -1,11 +1,14 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import {
-  whatsAppTemplatesForKind,
+  allWhatsAppTemplates,
+  isRecommendedForKind,
   getWhatsAppTemplate,
   renderWhatsAppPreview,
+  WHATSAPP_IMAGE_RATIO,
 } from '@/lib/templates/whatsapp-registry'
 
 export interface WhatsAppTemplateValue {
@@ -26,13 +29,32 @@ const inputCls =
   'w-full field-normal border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500'
 
 export default function WhatsAppTemplateEditor({ kind, value, onChange }: Props) {
-  const templates = whatsAppTemplatesForKind(kind)
+  const templates = allWhatsAppTemplates()
   const selected = getWhatsAppTemplate(value.key)
+  const [imgRatioWarning, setImgRatioWarning] = useState<string | null>(null)
+
+  // Verify the supplied image is ~1.91:1 so the preview matches what WhatsApp actually renders to the
+  // recipient. Warn (don't block) if it's off — the admin can crop and re-upload.
+  useEffect(() => {
+    setImgRatioWarning(null)
+    const url = value.headerImageUrl?.trim()
+    if (!url || selected?.imageSlot == null) return
+    const img = new Image()
+    img.onload = () => {
+      const r = img.naturalWidth / img.naturalHeight
+      if (Math.abs(r - 1.91) > 0.25) {
+        setImgRatioWarning(
+          `This image is ${img.naturalWidth}×${img.naturalHeight} (${r.toFixed(2)}:1). WhatsApp shows header images at ~1.91:1 — it will be cropped. Use a 1.91:1 image so recipients see exactly this preview.`
+        )
+      }
+    }
+    img.src = url
+  }, [value.headerImageUrl, selected?.imageSlot])
 
   if (templates.length === 0) {
     return (
       <p className="text-xs text-foreground-muted">
-        No approved WhatsApp templates are available for this campaign type yet.
+        No approved WhatsApp templates are available yet.
       </p>
     )
   }
@@ -41,7 +63,7 @@ export default function WhatsAppTemplateEditor({ kind, value, onChange }: Props)
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* Editor */}
+      {/* Editor (left) */}
       <div className="space-y-3">
         <div>
           <label className="block text-[11px] font-medium text-foreground-muted mb-1">Template</label>
@@ -54,12 +76,15 @@ export default function WhatsAppTemplateEditor({ kind, value, onChange }: Props)
             }}
             options={[
               { value: '', label: 'Select a WhatsApp template…' },
-              ...templates.map(t => ({ value: t.key, label: t.label })),
+              ...templates.map(t => ({
+                value: t.key,
+                label: isRecommendedForKind(t, kind) ? `${t.label} · recommended` : t.label,
+              })),
             ]}
           />
           <p className="text-[10px] text-foreground-muted mt-1">
-            WhatsApp templates are pre-approved by Meta. Pick one and fill its fields; apply for more in
-            Twilio to grow this list.
+            Any approved WhatsApp template can be used; the one marked “recommended” best fits this
+            campaign. Templates are pre-approved by Meta — apply for more in Twilio to grow this list.
           </p>
         </div>
 
@@ -67,13 +92,23 @@ export default function WhatsAppTemplateEditor({ kind, value, onChange }: Props)
           <>
             {selected.imageSlot != null && (
               <div>
-                <label className="block text-[11px] font-medium text-foreground-muted mb-1">Header image URL</label>
+                <label className="block text-[11px] font-medium text-foreground-muted mb-1">
+                  Header image URL <span className="text-foreground-muted/60">(1.91:1 landscape)</span>
+                </label>
                 <input
                   className={inputCls}
                   value={value.headerImageUrl}
                   onChange={e => onChange({ ...value, headerImageUrl: e.target.value })}
                   placeholder="https://…/image.jpg"
                 />
+                {imgRatioWarning ? (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">{imgRatioWarning}</p>
+                ) : (
+                  <p className="text-[10px] text-foreground-muted mt-1">
+                    Use a 1.91:1 (landscape) image, e.g. 1200×628 — the preview shows exactly what the
+                    recipient receives.
+                  </p>
+                )}
               </div>
             )}
             {selected.slots.map(slot => (
@@ -95,15 +130,24 @@ export default function WhatsAppTemplateEditor({ kind, value, onChange }: Props)
         )}
       </div>
 
-      {/* Chat-bubble preview */}
+      {/* Chat-bubble preview (right) */}
       <div>
         <p className="text-[11px] font-medium text-foreground-muted mb-1">Preview</p>
-        <div className="rounded-lg p-3 bg-[#e5ddd5] dark:bg-zinc-800 min-h-[120px]">
+        <div className="rounded-lg p-3 bg-[#e5ddd5] dark:bg-zinc-800 min-h-[160px]">
           {selected ? (
-            <div className="max-w-[85%] rounded-lg rounded-tl-none bg-white dark:bg-zinc-700 shadow-sm overflow-hidden">
-              {selected.imageSlot != null && value.headerImageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={value.headerImageUrl} alt="" className="w-full max-h-40 object-cover" />
+            <div className="max-w-[88%] rounded-lg rounded-tl-none bg-white dark:bg-zinc-700 shadow-sm overflow-hidden">
+              {selected.imageSlot != null && (
+                <div
+                  className="w-full bg-zinc-100 dark:bg-zinc-600 flex items-center justify-center overflow-hidden"
+                  style={{ aspectRatio: WHATSAPP_IMAGE_RATIO }}
+                >
+                  {value.headerImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={value.headerImageUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] text-zinc-400">Header image (1.91:1)</span>
+                  )}
+                </div>
               )}
               <div className="px-3 py-2">
                 <p className="text-[13px] text-zinc-900 dark:text-zinc-100 whitespace-pre-line leading-snug">
