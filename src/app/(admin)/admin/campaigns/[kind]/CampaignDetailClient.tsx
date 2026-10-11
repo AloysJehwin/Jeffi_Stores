@@ -9,6 +9,8 @@ import {
 import { useEffect, useState } from 'react'
 import { CampaignDetailSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
@@ -683,59 +685,6 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               />
             </div>
           )}
-
-          {hasDraft && (
-            <RequireWrite scope="campaigns:write">
-              <div className="mt-4 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
-                <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">
-                  Draft pending — changes not live yet.
-                </p>
-                <button
-                  type="button"
-                  onClick={discardDraft}
-                  className="text-xs text-amber-600 dark:text-amber-400 hover:underline"
-                >
-                  Discard
-                </button>
-                <button
-                  type="button"
-                  onClick={publish}
-                  disabled={publishing}
-                  className="px-3 h-control-sm bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors disabled:opacity-50"
-                >
-                  {publishing ? 'Publishing…' : 'Publish'}
-                </button>
-              </div>
-            </RequireWrite>
-          )}
-
-          <RequireWrite scope="campaigns:write">
-            <div className="flex items-center gap-2 mt-5 flex-wrap">
-              <input
-                type="email"
-                value={testEmail}
-                onChange={e => setTestEmail(e.target.value)}
-                placeholder="your@email.com for test send"
-                className="h-10 flex-1 min-w-[200px] max-w-xs px-3 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
-              />
-              <button
-                type="button"
-                onClick={sendTest}
-                disabled={testBusy || !testEmail.trim()}
-                className="h-10 inline-flex items-center justify-center px-4 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-              >
-                {testBusy ? 'Sending…' : 'Send test'}
-              </button>
-              <button
-                type="button"
-                onClick={save}
-                disabled={saving}
-                className="h-10 ml-auto inline-flex items-center justify-center px-4 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-              >
-                {saving ? 'Saving…' : 'Save Draft'}
-              </button>
-            </div>
-          </RequireWrite>
         </div>
 
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
@@ -924,6 +873,64 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           )
         })()}
       </div>
+
+      {/* Sticky action bar — Cancel / test send / Save Draft / Publish, pinned to the bottom like
+          the other edit pages (the logs/preview live on the read-only view page now). */}
+      <RequireWrite scope="campaigns:write">
+        <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 mt-2 border-t border-border-default bg-surface-elevated/95 backdrop-blur px-4 sm:px-6 py-3">
+          {hasDraft && (
+            <div className="mb-2 flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
+              <p className="text-xs text-amber-800 dark:text-amber-300 flex-1">Draft pending — changes not live yet.</p>
+              <button
+                type="button"
+                onClick={discardDraft}
+                className="text-xs text-amber-600 dark:text-amber-400 hover:underline"
+              >
+                Discard
+              </button>
+            </div>
+          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              type="email"
+              value={testEmail}
+              onChange={e => setTestEmail(e.target.value)}
+              placeholder="your@email.com for test send"
+              className="h-control flex-1 min-w-[180px] max-w-xs px-3 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+            />
+            <button
+              type="button"
+              onClick={sendTest}
+              disabled={testBusy || !testEmail.trim()}
+              className="h-control inline-flex items-center justify-center px-4 bg-surface-secondary hover:bg-border-default text-foreground rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+            >
+              {testBusy ? 'Sending…' : 'Send test'}
+            </button>
+            <Link
+              href={ap('/admin/campaigns')}
+              className="h-control ml-auto inline-flex items-center justify-center px-4 rounded-lg text-sm font-semibold border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+            >
+              Cancel
+            </Link>
+            <button
+              type="button"
+              onClick={save}
+              disabled={saving}
+              className="h-control inline-flex items-center justify-center px-4 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save Draft'}
+            </button>
+            <button
+              type="button"
+              onClick={publish}
+              disabled={publishing}
+              className="h-control inline-flex items-center justify-center px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+            >
+              {publishing ? 'Publishing…' : 'Publish'}
+            </button>
+          </div>
+        </div>
+      </RequireWrite>
     </div>
   )
 }
