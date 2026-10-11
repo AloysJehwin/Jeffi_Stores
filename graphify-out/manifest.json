@@ -7030,8 +7030,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/inventory/InventoryClient.tsx": {
-    "mtime": 1791740649.4388227,
-    "ast_hash": "7b585b64e35f0d3080771b103955fa15",
+    "mtime": 1791742329.599873,
+    "ast_hash": "56f095e29597c0d63b0fcae9cc893b0a",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/inventory/loading.tsx": {
