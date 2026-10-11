@@ -7,6 +7,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import ScenariosMobileList from './_components/ScenariosMobileList'
 
 interface ScenarioCampaign {
   scenario_kind: string
@@ -18,7 +19,7 @@ interface ScenarioCampaign {
   last_run_at: string | null
 }
 
-interface Scenario {
+export interface Scenario {
   kind: string
   name: string
   description: string
@@ -152,8 +153,14 @@ export default function ScenariosListClient() {
         </div>
       ) : (
         <div className="space-y-3 pt-2">
+          {/* Mobile: compact rows → detail + action sheets */}
+          <div className="md:hidden">
+            <ScenariosMobileList scenarios={scenarios} busy={busy} onToggle={toggle} onRemove={remove} />
+          </div>
+
+          {/* Desktop: full card */}
           {scenarios.map(s => (
-            <div key={s.kind} className="bg-surface-elevated rounded-xl border border-border-default p-5">
+            <div key={s.kind} className="hidden md:block bg-surface-elevated rounded-xl border border-border-default p-5">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
