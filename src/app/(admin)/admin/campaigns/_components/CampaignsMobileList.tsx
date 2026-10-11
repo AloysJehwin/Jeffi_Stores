@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Power, Play, Pencil } from 'lucide-react'
+import { Power, Play, Eye } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
@@ -127,10 +127,10 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
             )}
             {selected && (
               <Link
-                href={ap(`/admin/campaigns/${selected.kind}`)}
+                href={ap(`/admin/campaigns/${selected.kind}/view`)}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
               >
-                <Pencil className="w-4 h-4" /> View / Edit
+                <Eye className="w-4 h-4" /> View
               </Link>
             )}
           </div>
