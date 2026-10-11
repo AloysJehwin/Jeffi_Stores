@@ -1,7 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, minutes, hours, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, hours, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -302,7 +302,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       const names = items.map(i => i.name)
       const summary = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
       // Pass the cooldown so WhatsApp dedups per user within the window (stops the resend storm).
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, cooldownDays(params)).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

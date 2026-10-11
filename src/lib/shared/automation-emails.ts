@@ -19,7 +19,7 @@ import {
   resolveTemplateVariables,
   stripDoubleBraceTokens,
 } from '@/lib/templates/variables'
-import { cooldownDays } from '@/lib/campaigns/duration'
+import { cooldownMinutes } from '@/lib/campaigns/duration'
 import { DEFAULT_COUPON_DISCOUNT } from '@/lib/campaigns/default-templates'
 import { queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
@@ -34,10 +34,11 @@ interface UserContext {
   baseUrl: string
 }
 
-// The campaign's send cooldown in days, read from its JSONB parameters (not on the Campaign type).
-// Used to window the per-reference "already sent" check so recurring campaigns resend each cycle.
-// Reads the canonical `sendCooldown` (minutes) or the legacy `sendCooldownDays` integer.
-function campaignCooldownDays(campaign: Campaign): number | null {
+// The campaign's send cooldown in MINUTES, read from its JSONB parameters (not on the Campaign type).
+// Used to window the per-reference "already sent" check so recurring campaigns resend each cycle — at
+// minute granularity, matching the eligibility preview. Reads the canonical `sendCooldown` (minutes) or
+// the legacy `sendCooldownDays` integer. Returns null when the campaign has no cooldown (one-shot block).
+function campaignCooldownMinutes(campaign: Campaign): number | null {
   const params = (campaign as unknown as { parameters?: Record<string, unknown> }).parameters
   if (!params) return null
   const hasCooldown =
@@ -45,7 +46,7 @@ function campaignCooldownDays(campaign: Campaign): number | null {
       ? true
       : typeof params.sendCooldownDays === 'number' && params.sendCooldownDays > 0
   if (!hasCooldown) return null
-  return cooldownDays(params)
+  return cooldownMinutes(params)
 }
 
 // Registered variables ({store_name}, {customer_first_name}, custom ones…) for this recipient. The
@@ -98,8 +99,8 @@ export async function sendCampaignEmail(params: {
 
   // Honor the campaign's cooldown for keyed references so a recurring campaign resends after the
   // window instead of being blocked forever (abandoned_cart day-2 was never sending). (#campaign)
-  const cooldownDays = campaignCooldownDays(campaign)
-  if (await alreadySentForReference(campaign.kind as CampaignKind, user.id, referenceId, cooldownDays)) {
+  const cooldownMin = campaignCooldownMinutes(campaign)
+  if (await alreadySentForReference(campaign.kind as CampaignKind, user.id, referenceId, cooldownMin)) {
     return { ok: false, reason: 'already_sent' }
   }
 
@@ -129,7 +130,9 @@ export async function sendCampaignEmail(params: {
   // customer, whose page base can end in /business (no API lives there).
   const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind, apiBase)
   const tracked = wrapWithTracking(renderedBody, sentId, unsubscribeUrl, apiBase, storeName)
-  const html = renderVars(baseLayout(subject, tracked, user.baseUrl, campaign.template_layout), registered, { escape: true })
+  const html = renderVars(baseLayout(subject, tracked, user.baseUrl, campaign.template_layout), registered, {
+    escape: true,
+  })
 
   try {
     await sendAuditedMail({
@@ -167,8 +170,8 @@ export async function sendCampaignEmailRendered(params: {
   const eligibility = await canSendMarketing(user.id, campaign.kind as CampaignKind)
   if (!eligibility.ok) return { ok: false, reason: eligibility.reason }
 
-  const cooldownDays = campaignCooldownDays(campaign)
-  if (await alreadySentForReference(campaign.kind as CampaignKind, user.id, referenceId, cooldownDays)) {
+  const cooldownMin = campaignCooldownMinutes(campaign)
+  if (await alreadySentForReference(campaign.kind as CampaignKind, user.id, referenceId, cooldownMin)) {
     return { ok: false, reason: 'already_sent' }
   }
 

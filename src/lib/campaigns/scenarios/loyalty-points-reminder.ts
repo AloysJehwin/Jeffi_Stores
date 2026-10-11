@@ -3,7 +3,7 @@ import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { tierName } from '@/lib/loyalty/tiers'
-import { cooldownMinutes, cooldownDays } from '../duration'
+import { cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -150,8 +150,12 @@ export const loyaltyPointsReminder: ScenarioModule<Params, Row> = {
       sendCampaignWhatsApp(
         campaign.kind,
         row.user_id,
-        { headline: `You have ${row.points} points to spend`, code: couponCode || '', discount: discountPercent ? String(discountPercent) : '' },
-        cooldownDays(params)
+        {
+          headline: `You have ${row.points} points to spend`,
+          code: couponCode || '',
+          discount: discountPercent ? String(discountPercent) : '',
+        },
+        cooldownMinutes(params)
       ).catch(() => {})
     }
     return emailResult

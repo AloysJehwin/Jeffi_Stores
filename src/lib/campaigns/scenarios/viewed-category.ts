@@ -1,7 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, minutes, hours, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, hours, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -262,7 +262,7 @@ export const viewedCategory: ScenarioModule<Params, Row> = {
     })
 
     if (params.whatsappEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: categoryName }, cooldownDays(params)).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: categoryName }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

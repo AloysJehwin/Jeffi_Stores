@@ -1,7 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, fromMinutes, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, fromMinutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 
@@ -160,8 +160,12 @@ export const birthday: ScenarioModule<Params, Row> = {
       sendCampaignWhatsApp(
         campaign.kind,
         row.user_id,
-        { headline: 'Happy birthday from all of us', code: couponCode || '', discount: discountPercent ? String(discountPercent) : '' },
-        cooldownDays(params)
+        {
+          headline: 'Happy birthday from all of us',
+          code: couponCode || '',
+          discount: discountPercent ? String(discountPercent) : '',
+        },
+        cooldownMinutes(params)
       ).catch(() => {})
     }
     return emailResult

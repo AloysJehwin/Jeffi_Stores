@@ -267,13 +267,14 @@ describe('alreadySentForReference', () => {
     expect(sql).not.toContain('sent_at > NOW()')
   })
 
-  // #campaign: a recurring campaign passes its cooldown so the SAME reference re-qualifies after the
-  // window — fixing abandoned_cart day-2 never sending.
-  it('windows a non-null reference by cooldownDays when provided (recurring resend)', async () => {
+  // #campaign: a recurring campaign passes its cooldown (MINUTES) so the SAME reference re-qualifies
+  // after the window — fixing abandoned_cart never resending, and honoring sub-day cooldowns exactly.
+  it('windows a non-null reference by cooldown MINUTES when provided (recurring resend)', async () => {
     mockQueryOne.mockResolvedValue(null)
-    await alreadySentForReference('abandoned_cart', 'user-2', 'seq1', 1)
+    await alreadySentForReference('abandoned_cart', 'user-2', 'seq1', 90)
     const [sql] = mockQueryOne.mock.calls[0]
-    expect(sql).toContain('days')
+    expect(sql).toContain('minutes')
+    expect(sql).not.toContain(' days')
     expect(sql).toContain('sent_at > NOW()')
   })
 })

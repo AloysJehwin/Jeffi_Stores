@@ -3,7 +3,7 @@ import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } fr
 import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
 import { SAVED_ITEMS_SQL } from './_wishlist-base'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, minutes, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -210,7 +210,7 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
     })
 
     if (params.whatsappEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, cooldownDays(params)).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

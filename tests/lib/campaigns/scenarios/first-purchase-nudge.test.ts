@@ -94,12 +94,15 @@ describe('firstPurchaseNudge scenario', () => {
     })
 
     it('sends WhatsApp with a day cooldown when enabled', async () => {
-      await firstPurchaseNudge.send({ user_id: 'u1' }, { campaign, params: { ...defaultParams, whatsappEnabled: true } })
+      await firstPurchaseNudge.send(
+        { user_id: 'u1' },
+        { campaign, params: { ...defaultParams, whatsappEnabled: true } }
+      )
       expect(mockSendWa).toHaveBeenCalledOnce()
       const [kind, userId, , cd] = mockSendWa.mock.calls[0]
       expect(kind).toBe('first_purchase_nudge')
       expect(userId).toBe('u1')
-      expect(cd).toBe(1) // universal default cooldown = 1 day
+      expect(cd).toBe(days(1)) // universal default cooldown = 1 day
     })
 
     it('returns no_user when the user is gone', async () => {

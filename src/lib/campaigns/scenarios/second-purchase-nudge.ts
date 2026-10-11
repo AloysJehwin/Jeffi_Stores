@@ -1,7 +1,7 @@
 import { queryMany } from '@/lib/shared/db'
 import { fetchUserContext, resolveCoupon, sendCampaignEmail, renderItemRows } from '@/lib/shared/automation-emails'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, minutes, readDurationParam, cooldownMinutes, cooldownDays } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -194,7 +194,7 @@ export const secondPurchaseNudge: ScenarioModule<Params, Row> = {
           code: couponCode || '',
           discount: discountPercent ? String(discountPercent) : '',
         },
-        cooldownDays(params)
+        cooldownMinutes(params)
       ).catch(() => {})
     }
     return emailResult

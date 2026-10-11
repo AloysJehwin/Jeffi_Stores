@@ -1,6 +1,7 @@
 import { queryOne } from '@/lib/shared/db'
 import { canSendMarketing, alreadySentForReference, recordSent } from '@/lib/shared/marketing'
 import type { CampaignKind } from '@/lib/shared/marketing'
+import { days } from '@/lib/campaigns/duration'
 import { CAMPAIGN_WA_KINDS, campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import {
   sendAbandonedCartWhatsApp,
@@ -85,10 +86,10 @@ export async function sendCampaignWhatsApp(
   kind: string,
   userId: string,
   vars: CampaignWaVars,
-  // Per-user cooldown (days). Without this, the campaign re-sent WhatsApp every cron run to every
+  // Per-user cooldown (MINUTES). Without this, the campaign re-sent WhatsApp every cron run to every
   // still-eligible user — 55k messages / 192-per-number-per-day for ~155 carts. The WhatsApp send
   // now records its own dedup marker and refuses to resend within the window. (#campaign over-send)
-  cooldownDays?: number | null
+  cooldownMin?: number | null
 ): Promise<CampaignWaResult> {
   try {
     if (!campaignSupportsWhatsApp(kind)) return { ok: false, reason: 'unsupported_kind' }
@@ -103,24 +104,25 @@ export async function sendCampaignWhatsApp(
       wa_template_sid: string | null
       wa_variables: Record<string, string> | null
       wa_header_image_url: string | null
-    }>(
-      `SELECT sms_template, wa_template_sid, wa_variables, wa_header_image_url FROM campaigns WHERE kind = $1`,
-      [kind]
-    ).catch(() => null)
+    }>(`SELECT sms_template, wa_template_sid, wa_variables, wa_header_image_url FROM campaigns WHERE kind = $1`, [
+      kind,
+    ]).catch(() => null)
 
     // Respect marketing opt-out (same gate as email campaigns).
     const gate = await canSendMarketing(userId, kind as CampaignKind)
     if (!gate.ok) return { ok: false, reason: gate.reason || 'opted_out' }
 
     // Dedup the WhatsApp send independently of email: a 'wa:<kind>' reference in email_campaigns_sent,
-    // windowed by the campaign cooldown. Default to 1 day when unknown so a bug can never fan out
-    // unbounded again. Record BEFORE sending so a crash mid-send can't cause a resend storm.
+    // windowed by the campaign cooldown (MINUTES). Default to 1 day when unknown so a bug can never fan
+    // out unbounded again. Record BEFORE sending so a crash mid-send can't cause a resend storm.
     const waRef = `wa:${kind}`
-    const window = typeof cooldownDays === 'number' && cooldownDays > 0 ? cooldownDays : 1
+    const window = typeof cooldownMin === 'number' && cooldownMin > 0 ? cooldownMin : days(1)
     if (await alreadySentForReference(kind as CampaignKind, userId, waRef, window)) {
       return { ok: false, reason: 'cooldown' }
     }
-    const waSentId = await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: waRef }).catch(() => null)
+    const waSentId = await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: waRef }).catch(
+      () => null
+    )
 
     // Product names can carry stray whitespace ("Earthing Rod ?" in the SMS).
     const clean = Object.fromEntries(
