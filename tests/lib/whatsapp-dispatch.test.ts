@@ -7,7 +7,10 @@ vi.mock('@/lib/shared/marketing', () => ({
   canSendMarketing: vi.fn(),
   alreadySentForReference: vi.fn().mockResolvedValue(false),
   recordSent: vi.fn().mockResolvedValue('sent-1'),
+  buildClickTrackingUrl: (sentId: string, url: string, base: string) =>
+    `${base}/api/email-events/click?id=${sentId}&url=${encodeURIComponent(url)}`,
 }))
+vi.mock('@/lib/shared/customer-links', () => ({ apiBaseUrl: vi.fn().mockResolvedValue('https://api.test') }))
 vi.mock('@/lib/shared/whatsapp', () => ({
   sendAbandonedCartWhatsApp: vi.fn(),
   sendBackInStockWhatsApp: vi.fn(),
@@ -331,5 +334,50 @@ describe('admin-chosen approved template — variable resolution', () => {
     expect(arg.variables['1']).toBe('Widget') // {product} resolved, not literal
     expect(arg.headerImageUrl).toBe('https://cdn/x.jpg') // {imageUrl} resolved
     expect(arg.sidEnvVar).toBe('TWILIO_WA_BACK_IN_STOCK_SID')
+  })
+})
+
+describe('admin-chosen template — CTA link is click-tracked', () => {
+  it('wraps the urlSlot http(s) value in the click-tracking redirect keyed to the WhatsApp sentId', async () => {
+    mockCanSend.mockResolvedValue({ ok: true } as any)
+    mockAlreadySent.mockResolvedValue(false)
+    mockRecordSent.mockResolvedValue('wa-sent-9')
+    const mockTemplate = vi.mocked(sendCampaignTemplateWhatsApp)
+    mockTemplate.mockResolvedValue(true)
+    mockQueryOne
+      .mockResolvedValueOnce({ phone: '+919876543210' } as any)
+      .mockResolvedValueOnce({
+        sms_template: null,
+        wa_template_sid: 'back_in_stock', // urlSlot = 3
+        wa_variables: { '1': '{product}', '3': '{productUrl}' },
+        wa_header_image_url: null,
+      } as any)
+
+    await sendCampaignWhatsApp('restock', 'u1', { product: 'Widget', productUrl: 'https://shop/p/widget' } as any)
+
+    const arg = vi.mocked(sendCampaignTemplateWhatsApp).mock.calls[0][0]
+    // slot 3 resolved {productUrl} then got wrapped in the tracking redirect (keyed to the sentId).
+    expect(arg.variables['3']).toContain('/api/email-events/click?id=wa-sent-9')
+    expect(arg.variables['3']).toContain(encodeURIComponent('https://shop/p/widget'))
+    // a non-URL text slot is left as the resolved value.
+    expect(arg.variables['1']).toBe('Widget')
+  })
+
+  it('leaves the urlSlot untouched when its value is not an http(s) URL', async () => {
+    mockCanSend.mockResolvedValue({ ok: true } as any)
+    mockAlreadySent.mockResolvedValue(false)
+    mockRecordSent.mockResolvedValue('wa-sent-10')
+    vi.mocked(sendCampaignTemplateWhatsApp).mockResolvedValue(true)
+    mockQueryOne
+      .mockResolvedValueOnce({ phone: '+919876543210' } as any)
+      .mockResolvedValueOnce({
+        sms_template: null,
+        wa_template_sid: 'back_in_stock',
+        wa_variables: { '1': 'Widget', '3': 'see store' },
+        wa_header_image_url: null,
+      } as any)
+    await sendCampaignWhatsApp('restock', 'u1', {} as any)
+    const arg = vi.mocked(sendCampaignTemplateWhatsApp).mock.calls[0][0]
+    expect(arg.variables['3']).toBe('see store')
   })
 })

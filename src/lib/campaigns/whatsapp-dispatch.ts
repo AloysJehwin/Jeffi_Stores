@@ -120,7 +120,7 @@ export async function sendCampaignWhatsApp(
     if (await alreadySentForReference(kind as CampaignKind, userId, waRef, window)) {
       return { ok: false, reason: 'cooldown' }
     }
-    await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: waRef }).catch(() => null)
+    const waSentId = await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: waRef }).catch(() => null)
 
     // Product names can carry stray whitespace ("Earthing Rod ?" in the SMS).
     const clean = Object.fromEntries(
@@ -142,6 +142,16 @@ export async function sendCampaignWhatsApp(
         const rawVars = (campaignRow?.wa_variables as Record<string, string>) || {}
         const resolvedVars: Record<string, string> = {}
         for (const [k, v] of Object.entries(rawVars)) resolvedVars[k] = renderSmsTemplate(String(v ?? ''), clean)
+        // Click-track the CTA link slot: wrap the resolved http(s) URL in the shared click redirect so
+        // the delivered link records a click (keyed to this WhatsApp send) then forwards to the store.
+        if (def.urlSlot != null && waSentId) {
+          const raw = resolvedVars[String(def.urlSlot)]
+          if (raw && /^https?:\/\//i.test(raw)) {
+            const { buildClickTrackingUrl } = await import('@/lib/shared/marketing')
+            const { apiBaseUrl } = await import('@/lib/shared/customer-links')
+            resolvedVars[String(def.urlSlot)] = buildClickTrackingUrl(waSentId, raw, await apiBaseUrl())
+          }
+        }
         const resolvedImage = campaignRow?.wa_header_image_url
           ? renderSmsTemplate(campaignRow.wa_header_image_url, clean)
           : null

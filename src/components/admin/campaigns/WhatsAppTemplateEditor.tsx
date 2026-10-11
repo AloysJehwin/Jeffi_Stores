@@ -179,6 +179,12 @@ export default function WhatsAppTemplateEditor({
                   campaign’s subject product. The preview shows exactly what the recipient receives.
                 </p>
               )}
+              {selected.mediaVerified === false || selected.mediaVerified === undefined ? (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+                  Note: confirm this approved template actually has a media header in Twilio — until then
+                  the image shows here in preview but may not attach to the delivered message.
+                </p>
+              ) : null}
             </div>
           )}
           {selected.slots.map(slot => (
@@ -196,6 +202,31 @@ export default function WhatsAppTemplateEditor({
               />
             </div>
           ))}
+          {selected.urlSlot != null && (
+            <div>
+              <label className="block text-[11px] font-medium text-foreground-muted mb-1">
+                Store / CTA link <span className="text-foreground-muted/60">({`{{${selected.urlSlot}}}`})</span>
+              </label>
+              <input
+                className={inputCls}
+                value={value.variables[String(selected.urlSlot)] ?? ''}
+                onChange={e =>
+                  onChange({
+                    ...value,
+                    variables: { ...value.variables, [String(selected.urlSlot!)]: e.target.value },
+                  })
+                }
+                placeholder="https://…  or  {ctaUrl} / {productUrl}"
+              />
+              <p className="text-[10px] text-foreground-muted mt-1">
+                Where the recipient lands when they tap through. The link is click-tracked automatically —
+                taps are counted and the customer is redirected to the store. Use{' '}
+                <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code> /{' '}
+                <code className="px-1 bg-surface-secondary rounded">{'{productUrl}'}</code> for the
+                campaign’s page, or paste a full URL.
+              </p>
+            </div>
+          )}
           {selected.slots.length > 0 && (
             <p className="text-[10px] text-foreground-muted">
               Variables resolve per recipient at send: {COMMON_TOKENS.map(t => (
