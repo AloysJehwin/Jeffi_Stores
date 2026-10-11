@@ -217,6 +217,30 @@ describe('canSendMarketing', () => {
     expect(r.reason).toBe('frequency_cap')
   })
 
+  it('windows the frequency cap by the campaign cooldown when one is set (minute-exact)', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ email: 'u@e.com', is_active: true, marketing_opt_out: false })
+      .mockResolvedValueOnce({ kind: 'winback_90', enabled: true, parameters: { sendCooldown: 1 } })
+      .mockResolvedValueOnce({ cnt: '0' })
+    const r = await canSendMarketing('user-1', 'winback_90')
+    expect(r.ok).toBe(true)
+    // The recent-send query (3rd queryOne call) uses the campaign's 1-minute window, not 72h.
+    const recentSql = String(mockQueryOne.mock.calls[2][0])
+    expect(recentSql).toContain('minutes')
+    expect(recentSql).toContain('1::text')
+  })
+
+  it('falls back to the 72h floor when the campaign sets no cooldown', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ email: 'u@e.com', is_active: true, marketing_opt_out: false })
+      .mockResolvedValueOnce({ kind: 'winback_90', enabled: true }) // no parameters
+      .mockResolvedValueOnce({ cnt: '0' })
+    await canSendMarketing('user-1', 'winback_90')
+    const recentSql = String(mockQueryOne.mock.calls[2][0])
+    expect(recentSql).toContain('4320::text') // hours(72) in minutes
+    expect(recentSql).toContain('minutes')
+  })
+
   it('returns ok:true when all checks pass', async () => {
     mockQueryOne
       .mockResolvedValueOnce({ email: 'u@e.com', is_active: true, marketing_opt_out: false })
