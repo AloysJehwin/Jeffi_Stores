@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { CampaignDetailSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import EmailBlockBuilder from '@/components/admin/email-composer/EmailBlockBuilder'
 import { EMAIL_LAYOUT_OPTIONS, layoutStarterBody } from '@/lib/templates/email-layouts'
@@ -199,6 +200,7 @@ function renderTemplate(template: string, vars: Record<string, string | number>)
 export default function CampaignDetailClient({ kind }: { kind: string }) {
   const router = useRouter()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [recentSends, setRecentSends] = useState<RecentSend[]>([])
   const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([])
@@ -701,21 +703,30 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             </label>
             <AdminSelect
               value={form.template_layout}
-              onChange={key => {
-                setForm(f => {
-                  if (!f) return f
-                  const opt = EMAIL_LAYOUT_OPTIONS.find(o => o.key === key)
-                  const starter = opt?.starterBody ?? ''
-                  // Custom (or no starter): just switch the theme, keep the body.
-                  if (key === 'custom' || !starter) return { ...f, template_layout: key }
-                  // A preset with starter content: offer to load it, but don't clobber real edits
-                  // without asking (confirm only when the body already has non-trivial content).
-                  const current = (f.body_template || '').trim()
-                  const loadStarter = !current || window.confirm('Replace the current email body with this template’s starter content?')
-                  return loadStarter
-                    ? { ...f, template_layout: key, template_mode: 'richtext', body_template: starter }
-                    : { ...f, template_layout: key }
-                })
+              onChange={async key => {
+                const opt = EMAIL_LAYOUT_OPTIONS.find(o => o.key === key)
+                const starter = opt?.starterBody ?? ''
+                // Custom (or no starter): just switch the theme, keep the body.
+                if (key === 'custom' || !starter) {
+                  setForm(f => (f ? { ...f, template_layout: key } : f))
+                  return
+                }
+                // A preset with starter content: confirm before clobbering a non-empty body.
+                const current = (form.body_template || '').trim()
+                const loadStarter =
+                  !current ||
+                  (await confirm({
+                    title: 'Load template content?',
+                    message: "Replace the current email body with this template's starter content? Your current body will be lost.",
+                    confirmLabel: 'Load template',
+                  }))
+                setForm(f =>
+                  f
+                    ? loadStarter
+                      ? { ...f, template_layout: key, template_mode: 'richtext', body_template: starter }
+                      : { ...f, template_layout: key }
+                    : f
+                )
               }}
               options={EMAIL_LAYOUT_OPTIONS.map(l => ({ value: l.key, label: l.label }))}
             />
