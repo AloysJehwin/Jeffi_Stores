@@ -26,21 +26,21 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
     <>
       {/* Interval toggle */}
       <div className="flex justify-center mb-10">
-        <div className="inline-flex items-center rounded-xl border border-border-default bg-surface-secondary p-1 gap-1">
+        <div className="inline-flex items-center rounded-full org-sand p-1 gap-1">
           <button
             type="button"
             onClick={() => setInterval('monthly')}
-            className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${interval === 'monthly' ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-muted hover:text-foreground'}`}
+            className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors ${interval === 'monthly' ? 'ecom-accent-bg text-white' : 'text-foreground-secondary hover:text-foreground'}`}
           >
             Monthly
           </button>
           <button
             type="button"
             onClick={() => setInterval('yearly')}
-            className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${interval === 'yearly' ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-muted hover:text-foreground'}`}
+            className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors flex items-center gap-2 ${interval === 'yearly' ? 'ecom-accent-bg text-white' : 'text-foreground-secondary hover:text-foreground'}`}
           >
             Yearly
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold org-sage org-sage-text">
               2 months free
             </span>
           </button>
@@ -48,7 +48,7 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
       </div>
 
       {/* Plan cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
         {ordered.map(p => {
           const featured = p.slug === 'growth'
           const monthly = Number(p.monthly_price_inr)
@@ -58,25 +58,25 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
           return (
             <div
               key={p.slug}
-              className={`relative rounded-2xl border p-6 flex flex-col ${featured ? 'border-accent-500 bg-surface-elevated shadow-xl lg:scale-[1.03]' : 'border-border-default bg-surface-elevated'}`}
+              className={`relative rounded-[2rem] p-7 flex flex-col ${featured ? 'org-peach' : 'org-sand'}`}
             >
               {featured && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-accent-600 text-white text-xs font-semibold">
+                <span className="ecom-accent-bg absolute -top-3 left-7 px-3 py-1 rounded-full text-white text-xs font-bold">
                   Most popular
                 </span>
               )}
-              <div className="text-xl font-bold">{p.name}</div>
+              <div className="font-display font-black text-2xl">{p.name}</div>
 
               {/* Price display */}
               <div className="mt-2">
                 <div className="flex items-end gap-1">
-                  <span className="text-3xl font-extrabold">₹{price.toLocaleString('en-IN')}</span>
+                  <span className="font-display font-black text-4xl">₹{price.toLocaleString('en-IN')}</span>
                   <span className="text-sm text-foreground-muted font-normal mb-1">
                     /{interval === 'yearly' ? 'yr' : 'mo'}
                   </span>
                 </div>
                 {interval === 'yearly' && (
-                  <div className="text-xs text-green-600 dark:text-green-400 font-medium mt-0.5">
+                  <div className="text-xs org-sage-text font-semibold mt-0.5">
                     2 months free
                   </div>
                 )}
@@ -86,7 +86,7 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
 
               <Link
                 href={`/signup?plan=${p.slug}&interval=${interval}`}
-                className={`mt-6 text-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors ${featured ? 'bg-accent-600 hover:bg-accent-700 text-white' : 'border border-border-default hover:bg-surface-secondary'}`}
+                className={`mt-6 text-center px-4 py-2.5 rounded-full text-sm font-display font-bold transition-colors ${featured ? 'ecom-accent-bg text-white' : 'bg-surface-elevated text-foreground hover:bg-surface'}`}
               >
                 Choose {p.name}
               </Link>
