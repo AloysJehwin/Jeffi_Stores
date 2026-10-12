@@ -14,7 +14,7 @@ export function BrowserFrame({
   children?: ReactNode
 }) {
   return (
-    <figure className={`rounded-[2rem] overflow-hidden org-chrome shadow-2xl shadow-black/10 ${className}`}>
+    <figure className={`rounded-[2rem] overflow-hidden org-chrome border border-border-secondary shadow-xl shadow-black/[0.08] ${className}`}>
       <div className="flex items-center gap-2 px-5 h-14">
         <span className="w-3.5 h-3.5 rounded-full" style={{ background: 'var(--org-terracotta)' }} />
         <span className="w-3.5 h-3.5 rounded-full" style={{ background: 'var(--org-apricot)' }} />

@@ -98,5 +98,5 @@
 .ecom-scope .to-primary-600 { --tw-gradient-to: var(--org-brown) var(--tw-gradient-to-position) !important; }
 
 /* Shape language: pill buttons, rounded inputs */
-.ecom-scope button:not(.org-square) { border-radius: 9999px; }
+.ecom-scope button:not(.org-square):not([class*='rounded']) { border-radius: 9999px; }
 .ecom-scope input:not([type='checkbox']):not([type='radio']), .ecom-scope select, .ecom-scope textarea { border-radius: 0.75rem; }

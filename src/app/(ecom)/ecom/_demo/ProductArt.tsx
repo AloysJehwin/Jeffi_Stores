@@ -12,15 +12,15 @@ export function categoryTint(category: string): string {
     case 'Electronics':
       return ACCENT
     case 'Fashion':
-      return '#6366f1'
+      return '#6b7f55'
     case 'Kitchen':
-      return '#4f46e5'
+      return '#a9552f'
     case 'Sports':
-      return '#4338ca'
+      return '#8a4a1f'
     case 'Home':
-      return '#7c3aed'
+      return '#c46a46'
     case 'Beauty':
-      return '#818cf8'
+      return '#d9a98e'
     default:
       return ACCENT
   }
@@ -37,9 +37,9 @@ function normalizeCategory(category: string): string {
   return 'Other'
 }
 
-const INK = '#334155'
-const MUTE = '#e2e8f0'
-const PAPER = '#f8fafc'
+const INK = '#3d3a35'
+const MUTE = '#e3dacb'
+const PAPER = '#fffdf7'
 
 export default function ProductArt({ category, className }: ProductArtProps) {
   const tint = categoryTint(category)
