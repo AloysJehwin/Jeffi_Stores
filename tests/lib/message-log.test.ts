@@ -59,6 +59,9 @@ describe('logMessage', () => {
       null, // userId default
       null, // entityType default
       null, // entityId default
+      null, // provider default
+      null, // price default
+      null, // deliveryStatus default
     ])
   })
 

@@ -34,6 +34,7 @@ export const twilioSmsProvider: SmsProvider = {
   get configured() {
     return getClient() !== null
   },
+  name: 'twilio',
   from: SMS_FROM,
   async sendText(toE164, body) {
     const client = getClient()
@@ -53,6 +54,7 @@ export const twilioWhatsAppProvider: WhatsAppProvider = {
   get configured() {
     return getClient() !== null
   },
+  name: 'twilio',
   from: WA_FROM,
   async sendTemplate(toE164, templateRef, vars) {
     const client = getClient()

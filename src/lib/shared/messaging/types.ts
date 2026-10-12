@@ -7,6 +7,8 @@
 export interface SmsProvider {
   /** True when the provider has usable credentials; a false means "treat as not sent" without throwing. */
   readonly configured: boolean
+  /** Which provider this is (for the audit log / spend attribution). */
+  readonly name: ProviderName
   /** The sender number used (for the audit log). */
   readonly from: string
   /** Send a plain SMS to an E.164 number. Returns the provider message id. Throws on failure. */
@@ -15,6 +17,8 @@ export interface SmsProvider {
 
 export interface WhatsAppProvider {
   readonly configured: boolean
+  /** Which provider this is (for the audit log / spend attribution). */
+  readonly name: ProviderName
   /** The WhatsApp sender number (bare E.164, without the `whatsapp:` prefix) for the audit log. */
   readonly from: string
   /** Send an approved template. `templateRef` is the provider's template identifier (Twilio contentSid).

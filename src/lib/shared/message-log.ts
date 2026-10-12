@@ -35,13 +35,16 @@ export function logMessage(params: {
   userId?: string | null
   entityType?: string | null
   entityId?: string | null
+  provider?: string | null
+  price?: number | null
+  deliveryStatus?: string | null
 }): void {
   // OTP messages are logged for the audit trail, but with the code redacted so
   // the secret never lands in the DB.
   const body = params.kind === 'otp' ? redactOtpBody(params.body) : params.body
   query(
-    `INSERT INTO message_logs (channel, direction, to_number, from_number, body, kind, status, error, provider_sid, user_id, entity_type, entity_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+    `INSERT INTO message_logs (channel, direction, to_number, from_number, body, kind, status, error, provider_sid, user_id, entity_type, entity_id, provider, price, delivery_status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
     [
       params.channel,
       params.direction ?? 'outbound',
@@ -55,6 +58,9 @@ export function logMessage(params: {
       params.userId ?? null,
       params.entityType ?? null,
       params.entityId ?? null,
+      params.provider ?? null,
+      params.price ?? null,
+      params.deliveryStatus ?? null,
     ]
   ).catch(() => {})
 }

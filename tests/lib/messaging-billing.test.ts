@@ -1,9 +1,11 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 const debitWallet = vi.hoisted(() => vi.fn())
+const debitMessaging = vi.hoisted(() => vi.fn())
 const getWalletBalance = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/payments/wallet', () => ({
   debitWallet,
+  debitMessaging,
   getWalletBalance,
   isFlagshipTenant: (id: string | null | undefined) => !id || id === '00000000-0000-0000-0000-000000000000',
 }))
@@ -44,16 +46,16 @@ describe('checkMessagingBalance', () => {
 })
 
 describe('debitMessageCost', () => {
-  it('debits the exact price with a sid-keyed external ref and ₹0 floor', async () => {
-    debitWallet.mockResolvedValue({ ok: true, charged: true, balance: 93 })
+  it('trues up to the exact price on a sid-keyed external ref', async () => {
+    debitMessaging.mockResolvedValue(undefined)
     await debitMessageCost({ tenantId: 't1', channel: 'sms', providerSid: 'SM1', priceInr: 7 })
-    expect(debitWallet).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId: 't1', amountInr: 7, category: 'sms', externalRef: 'msg:SM1', floorInr: 0 })
+    expect(debitMessaging).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: 't1', amountInr: 7, category: 'sms', externalRef: 'msg:SM1', trueUp: true })
     )
   })
 
   it('is a no-op for a non-positive price', async () => {
     await debitMessageCost({ tenantId: 't1', channel: 'sms', providerSid: 'SM1', priceInr: 0 })
-    expect(debitWallet).not.toHaveBeenCalled()
+    expect(debitMessaging).not.toHaveBeenCalled()
   })
 })

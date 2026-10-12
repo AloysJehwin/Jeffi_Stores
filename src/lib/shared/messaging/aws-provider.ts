@@ -11,6 +11,7 @@ const NOT_READY = 'AWS messaging provider is not configured yet (migration pendi
 
 export const awsSmsProvider: SmsProvider = {
   configured: false,
+  name: 'aws',
   from: process.env.AWS_SMS_FROM || '',
   async sendText() {
     throw new Error(NOT_READY)
@@ -19,6 +20,7 @@ export const awsSmsProvider: SmsProvider = {
 
 export const awsWhatsAppProvider: WhatsAppProvider = {
   configured: false,
+  name: 'aws',
   from: process.env.AWS_WHATSAPP_FROM || '',
   async sendTemplate() {
     throw new Error(NOT_READY)
