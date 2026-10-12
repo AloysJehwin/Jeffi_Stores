@@ -14,6 +14,7 @@ export type ResourceType =
   | 'site_controls'
   | 'po_new'
   | 'po_receive'
+  | 'homepage'
 
 export const RESOURCE_TYPES: ResourceType[] = [
   'mailer',
@@ -28,6 +29,7 @@ export const RESOURCE_TYPES: ResourceType[] = [
   'site_controls',
   'po_new',
   'po_receive',
+  'homepage',
 ]
 
 /**
@@ -136,6 +138,17 @@ export async function snapshotResource(
       if (!row) return { snapshot: { kind: 'none' }, updatedAt: null }
       return {
         snapshot: { kind: 'edit', line_items: row.line_items, serials: row.serials },
+        updatedAt: row.updated_at,
+      }
+    }
+    case 'homepage': {
+      // Singleton draft (homepage_drafts.id = true). resourceId is the admin's own uuid.
+      const row = await queryOne<{ sections: unknown; hero_slides: unknown; updated_at: string }>(
+        `SELECT sections, hero_slides, updated_at FROM homepage_drafts WHERE id = true`
+      )
+      if (!row) return { snapshot: { kind: 'none' }, updatedAt: null }
+      return {
+        snapshot: { kind: 'edit', sections: row.sections, hero_slides: row.hero_slides },
         updatedAt: row.updated_at,
       }
     }
@@ -337,6 +350,27 @@ export async function restoreSnapshot(
         )
       } else {
         await client.query(`DELETE FROM po_receive_drafts WHERE po_id = $1`, [resourceId])
+      }
+      return
+    }
+    case 'homepage': {
+      // Singleton: upsert the draft row back to the snapshot shape, or delete it if there was none.
+      const kind = (snapshot as { kind?: string }).kind
+      if (kind === 'edit') {
+        const sections = (snapshot as { sections: unknown }).sections
+        const heroSlides = (snapshot as { hero_slides: unknown }).hero_slides
+        await client.query(
+          `INSERT INTO homepage_drafts (id, sections, hero_slides, updated_by, updated_at)
+             VALUES (true, $1::jsonb, $2::jsonb, $3::uuid, now())
+           ON CONFLICT (id) DO UPDATE
+             SET sections = EXCLUDED.sections,
+                 hero_slides = EXCLUDED.hero_slides,
+                 updated_by = EXCLUDED.updated_by,
+                 updated_at = now()`,
+          [JSON.stringify(sections ?? []), JSON.stringify(heroSlides ?? []), resourceId]
+        )
+      } else {
+        await client.query(`DELETE FROM homepage_drafts WHERE id = true`)
       }
       return
     }
