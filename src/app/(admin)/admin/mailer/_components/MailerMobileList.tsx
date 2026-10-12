@@ -54,7 +54,13 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
   const [actionsOpen, setActionsOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const viewUrl = (c: Campaign) => ap(`/admin/mailer/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)
+  const viewUrl = (c: Campaign) =>
+    ap(
+      c.status === 'draft'
+        ? `/admin/mailer/new?draftId=${c.id}`
+        : `/admin/mailer/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`,
+      host
+    )
 
   async function dispatch(c: Campaign) {
     if (busy) return
@@ -95,7 +101,7 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
     const actions: MobileAction[] = [
       {
         key: 'view',
-        label: 'View campaign',
+        label: c.status === 'draft' ? 'Resume draft' : 'View campaign',
         icon: <Eye className="w-4 h-4" />,
         onSelect: () => router.push(viewUrl(c)),
       },

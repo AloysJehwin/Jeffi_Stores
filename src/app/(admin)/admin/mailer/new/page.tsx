@@ -92,9 +92,17 @@ export default function NewCampaignPage() {
       .then(data => setReviewForms(data.forms || []))
       .catch(() => {})
 
-    // Check for existing draft in localStorage
+    // ?draftId=<id> from the list overrides localStorage; otherwise prompt restore if we have one locally.
+    const params = new URLSearchParams(window.location.search)
+    const fromUrl = params.get('draftId')
+    if (fromUrl) {
+      localStorage.setItem(DRAFT_STORAGE_KEY, fromUrl)
+      void restoreDraftFromId(fromUrl)
+      return
+    }
     const saved = localStorage.getItem(DRAFT_STORAGE_KEY)
     if (saved) setShowRestoreBanner(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Keep ref in sync
@@ -102,9 +110,9 @@ export default function NewCampaignPage() {
     draftIdRef.current = draftId
   }, [draftId])
 
-  // Auto-save on step 2 changes (debounced 1.5s)
+  // Autosave every step (debounced 1.5s) — step cursor + content + audience/schedule all persisted
+  // so the admin can close any time and resume at exactly the stage they left.
   const triggerAutoSave = useCallback(() => {
-    if (step !== 2) return
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
     setSaveState('saving')
     autoSaveRef.current = setTimeout(async () => {
@@ -119,6 +127,10 @@ export default function NewCampaignPage() {
             title: title || subject || 'Draft',
             subject,
             template_data: templateData,
+            audience_type: audienceType,
+            audience_filter: audienceType === 'order_history' ? { daysSinceOrder } : {},
+            scheduled_at: scheduledAt || null,
+            wizard_step: step,
           }),
         })
         if (!res.ok) throw new Error()
@@ -133,15 +145,25 @@ export default function NewCampaignPage() {
         setSaveState('error')
       }
     }, 1500)
-  }, [step, templateKey, title, subject, templateData])
+  }, [step, templateKey, title, subject, templateData, audienceType, daysSinceOrder, scheduledAt])
 
   useEffect(() => {
-    if (step === 2) triggerAutoSave()
-  }, [templateKey, templateData, subject, title, step, triggerAutoSave])
+    triggerAutoSave()
+  }, [templateKey, templateData, subject, title, audienceType, daysSinceOrder, scheduledAt, step, triggerAutoSave])
 
-  async function restoreDraft() {
-    const id = localStorage.getItem(DRAFT_STORAGE_KEY)
-    if (!id) return
+  // Exit guard — warn if an autosave is still in flight (we'd lose the latest edits).
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (saveState === 'saving' || saveState === 'error') {
+        e.preventDefault()
+        e.returnValue = ''
+      }
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [saveState])
+
+  async function restoreDraftFromId(id: string) {
     try {
       const res = await fetch(`/api/admin/mailer/${id}`, { credentials: 'include' })
       if (!res.ok) {
@@ -160,11 +182,29 @@ export default function NewCampaignPage() {
       setTitle(campaign.title || '')
       setSubject(campaign.subject || '')
       setTemplateData(campaign.template_data || {})
-      setStep(2)
+      setAudienceType(campaign.audience_type || 'all')
+      const dso = campaign.audience_filter?.daysSinceOrder
+      if (dso != null) setDaysSinceOrder(String(dso))
+      if (campaign.scheduled_at) {
+        // DateTimePicker expects `YYYY-MM-DDTHH:mm` local; the API returns ISO.
+        const d = new Date(campaign.scheduled_at)
+        const pad = (n: number) => String(n).padStart(2, '0')
+        setScheduledAt(
+          `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+        )
+      }
+      const savedStep = Number(campaign.wizard_step)
+      setStep(Number.isFinite(savedStep) ? Math.min(3, Math.max(1, savedStep)) : 2)
     } catch {
       /* ignore */
     }
     setShowRestoreBanner(false)
+  }
+
+  async function restoreDraft() {
+    const id = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!id) return
+    await restoreDraftFromId(id)
   }
 
   function discardDraft() {

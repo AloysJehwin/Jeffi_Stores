@@ -202,7 +202,12 @@ async function MailerListContent({
             <tr key={c.id} className="hover:bg-surface-secondary/50 transition-colors">
               <td className="px-4 py-3">
                 <Link
-                  href={ap(`/admin/mailer/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)}
+                  href={ap(
+                    c.status === 'draft'
+                      ? `/admin/mailer/new?draftId=${c.id}`
+                      : `/admin/mailer/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`,
+                    host
+                  )}
                   className="font-medium text-foreground hover:text-accent-500 transition-colors"
                 >
                   {c.title}

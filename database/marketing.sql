@@ -139,7 +139,9 @@ CREATE TABLE public.email_campaigns (
     scheduled_at timestamp with time zone,
     sent_at timestamp with time zone,
     created_by uuid,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    wizard_step smallint DEFAULT 1 NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
