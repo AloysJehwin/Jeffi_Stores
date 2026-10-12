@@ -3288,3 +3288,47 @@ ALTER TABLE ONLY public.upload_sessions
     ADD CONSTRAINT upload_sessions_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
 ALTER TABLE public.upload_sessions
     ADD CONSTRAINT upload_sessions_status_check CHECK (status IN ('open','completed','aborted'));
+
+--
+-- Name: editor_sessions editor_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+ALTER TABLE ONLY public.editor_sessions
+    ADD CONSTRAINT editor_sessions_pkey PRIMARY KEY (id);
+
+ALTER TABLE public.editor_sessions
+    ADD CONSTRAINT editor_sessions_closed_reason_check
+    CHECK (closed_reason IN ('save','cancel','expired') OR closed_reason IS NULL);
+
+--
+-- campaign_drafts
+--
+ALTER TABLE ONLY public.campaign_drafts
+    ADD CONSTRAINT campaign_drafts_pkey PRIMARY KEY (campaign_id);
+ALTER TABLE ONLY public.campaign_drafts
+    ADD CONSTRAINT campaign_drafts_kind_fkey FOREIGN KEY (kind) REFERENCES public.campaigns(kind) ON DELETE CASCADE;
+
+--
+-- offer_drafts
+--
+ALTER TABLE ONLY public.offer_drafts
+    ADD CONSTRAINT offer_drafts_pkey PRIMARY KEY (offer_id);
+ALTER TABLE ONLY public.offer_drafts
+    ADD CONSTRAINT offer_drafts_offer_id_fkey FOREIGN KEY (offer_id) REFERENCES public.product_offers(id) ON DELETE CASCADE;
+
+--
+-- site_control_drafts
+--
+ALTER TABLE ONLY public.site_control_drafts
+    ADD CONSTRAINT site_control_drafts_pkey PRIMARY KEY (admin_id, scope);
+
+--
+-- po_drafts
+--
+ALTER TABLE ONLY public.po_drafts
+    ADD CONSTRAINT po_drafts_pkey PRIMARY KEY (id);
+
+--
+-- po_receive_drafts
+--
+ALTER TABLE ONLY public.po_receive_drafts
+    ADD CONSTRAINT po_receive_drafts_pkey PRIMARY KEY (po_id);

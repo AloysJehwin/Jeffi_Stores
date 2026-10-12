@@ -2053,3 +2053,25 @@ CREATE INDEX idx_vault_tickets_expires ON public.vault_tickets USING btree (expi
 
 CREATE INDEX idx_vault_access_log_user ON public.vault_access_log USING btree (user_id, created_at);
 CREATE INDEX idx_upload_sessions_product ON public.upload_sessions USING btree (product_id, status);
+
+-- One live session per admin + resource. closed_at IS NULL rows cover the "open" state;
+-- closed sessions are historical and can repeat without conflict.
+CREATE UNIQUE INDEX idx_editor_sessions_open
+  ON public.editor_sessions (admin_id, resource_type, resource_id)
+  WHERE closed_at IS NULL;
+
+CREATE INDEX idx_editor_sessions_resource
+  ON public.editor_sessions (resource_type, resource_id, started_at DESC);
+
+-- One open po_drafts row per admin — once promoted_po_id is set, the draft is
+-- "spent" and a new draft can be opened.
+CREATE UNIQUE INDEX idx_po_drafts_open
+  ON public.po_drafts (admin_id)
+  WHERE promoted_po_id IS NULL;
+
+CREATE INDEX idx_po_drafts_admin ON public.po_drafts (admin_id, updated_at DESC);
+CREATE INDEX idx_po_receive_drafts_admin ON public.po_receive_drafts (admin_id, updated_at DESC);
+CREATE INDEX idx_offer_drafts_updated ON public.offer_drafts (updated_at DESC);
+
+CREATE UNIQUE INDEX idx_campaign_drafts_kind ON public.campaign_drafts (kind);
+CREATE INDEX idx_campaign_drafts_updated ON public.campaign_drafts (updated_at DESC);

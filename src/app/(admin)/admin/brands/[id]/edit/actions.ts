@@ -69,7 +69,8 @@ export async function updateBrand(brandId: string, formData: FormData) {
       ]
     )
     revalidatePath('/admin/brands')
-    redirect(ap('/admin/brands', host))
+    // Publish → /view (new standardized destination); save-as-draft stays on list.
+    redirect(ap(publish ? `/admin/brands/${brandId}/view` : '/admin/brands', host))
   }
 
   try {

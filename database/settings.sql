@@ -34,6 +34,19 @@ CREATE TABLE public.site_settings (
 
 
 --
+-- Name: site_control_drafts; Type: TABLE; Schema: public; Owner: -
+-- Per-admin draft for site-controls editor. One row per (admin, scope).
+-- Publish writes to site_settings; Cancel discards.
+
+CREATE TABLE public.site_control_drafts (
+    admin_id uuid NOT NULL,
+    scope character varying(32) NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: suppliers; Type: TABLE; Schema: public; Owner: -
 --
 

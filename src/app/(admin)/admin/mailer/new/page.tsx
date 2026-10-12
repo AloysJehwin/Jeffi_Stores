@@ -11,6 +11,9 @@ import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
+import EditorToolbar from '@/components/admin/EditorToolbar'
+import { useEditSession } from '@/hooks/useEditSession'
+import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
 const TEMPLATES = [
   {
@@ -81,6 +84,7 @@ export default function NewCampaignPage() {
   // Draft state
   const [draftId, setDraftId] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>('idle')
+  const edit = useEditSession({ resourceType: 'mailer', resourceId: draftId })
   const [showRestoreBanner, setShowRestoreBanner] = useState(false)
   const draftIdRef = useRef<string | null>(null)
 
@@ -471,60 +475,19 @@ export default function NewCampaignPage() {
           <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">New Campaign</h1>
           <p className="text-sm text-foreground-secondary mt-0.5">Step {step} of 3</p>
         </div>
-        {/* Auto-save indicator — always visible on step 2 */}
-        {step === 2 && (
-          <div
-            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
-              saveState === 'saving'
-                ? 'text-foreground-muted bg-surface-secondary border-border-default'
-                : saveState === 'saved'
-                  ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-                  : saveState === 'error'
-                    ? 'text-red-500 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-                    : draftId
-                      ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700'
-                      : 'text-foreground-muted bg-surface-secondary border-border-default'
-            }`}
-          >
-            {saveState === 'saving' && (
-              <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-            )}
-            {saveState === 'saved' && (
-              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-            )}
-            {saveState === 'error' && (
-              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-                />
-              </svg>
-            )}
-            {saveState === 'idle' && draftId && (
-              <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                />
-              </svg>
-            )}
-            {saveState === 'saving'
-              ? 'Saving draft…'
-              : saveState === 'saved'
-                ? 'Draft saved'
-                : saveState === 'error'
-                  ? 'Save failed — retry?'
-                  : draftId
-                    ? 'Draft'
-                    : 'Auto-save enabled'}
-          </div>
+        {/* Session-undo toolbar — Cancel rolls back the draft to its pre-session snapshot. */}
+        {draftId && edit.sessionId && (
+          <EditorToolbar
+            autosaveStatus={saveState as AutosaveStatus}
+            sessionStatus={edit.status}
+            onSave={async () => {
+              const ok = await edit.save()
+              if (ok) router.push(ap('/admin/mailer'))
+            }}
+            onCancel={edit.cancel}
+            cancelHref={ap('/admin/mailer')}
+            saveLabel="Save draft"
+          />
         )}
       </div>
 

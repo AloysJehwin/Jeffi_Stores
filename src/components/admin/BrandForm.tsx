@@ -6,6 +6,9 @@ import { ap } from '@/lib/shared/admin-path'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
 import AIFillForm from './AIFillForm'
+import EditorToolbar from '@/components/admin/EditorToolbar'
+import { useEditSession } from '@/hooks/useEditSession'
+import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
 interface BrandFormProps {
   action: (formData: FormData) => Promise<void>
@@ -34,6 +37,7 @@ export default function BrandForm({
   const [replacementAllowed, setReplacementAllowed] = useState<boolean>(brand?.replacement_allowed ?? true)
   const [replacementDays, setReplacementDays] = useState<number>(brand?.replacement_window_days ?? 7)
   const formRef = useRef<HTMLFormElement>(null)
+  const edit = useEditSession({ resourceType: 'brand', resourceId: brand?.id ?? null })
 
   function setInput(name: string, value: string) {
     const el = formRef.current?.elements.namedItem(name) as HTMLInputElement | null
@@ -88,6 +92,18 @@ export default function BrandForm({
     >
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
+        {edit.sessionId && (
+          <div className="mb-4 flex justify-end">
+            <EditorToolbar
+              autosaveStatus={'idle' as AutosaveStatus}
+              sessionStatus={edit.status}
+              onSave={async () => { await edit.save() }}
+              onCancel={edit.cancel}
+              cancelHref={ap('/admin/brands')}
+              hideSave
+            />
+          </div>
+        )}
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300">
             {error}

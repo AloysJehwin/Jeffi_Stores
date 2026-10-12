@@ -18,8 +18,34 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
   const limit = 20
   const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10))
 
-  const campaign = await queryOne(`SELECT * FROM campaigns WHERE kind = $1`, [kind])
+  const campaign = await queryOne<Record<string, any>>(
+    `SELECT c.*, cd.campaign_id AS draft_campaign_id, cd.fields AS draft_fields_new
+     FROM campaigns c
+     LEFT JOIN campaign_drafts cd ON cd.kind = c.kind
+     WHERE c.kind = $1`,
+    [kind]
+  )
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+
+  // Ensure a draft row exists so the session has a stable uuid to key on.
+  if (!campaign.draft_campaign_id) {
+    const row = await queryOne<{ campaign_id: string }>(
+      `INSERT INTO campaign_drafts (kind, fields) VALUES ($1, '{}'::jsonb)
+       ON CONFLICT (kind) DO UPDATE SET updated_at = campaign_drafts.updated_at
+       RETURNING campaign_id`,
+      [kind]
+    )
+    campaign.draft_campaign_id = row?.campaign_id ?? null
+    campaign.draft_fields_new = {}
+  }
+  // Draft now lives in campaign_drafts.fields — expose non-empty one as draft_fields;
+  // null means "no pending draft" to the client (empty jsonb row still counts as no draft).
+  const draftFromTable =
+    campaign.draft_fields_new && Object.keys(campaign.draft_fields_new).length > 0
+      ? campaign.draft_fields_new
+      : null
+  campaign.draft_fields = draftFromTable
+  delete campaign.draft_fields_new
 
   const [recentSends, countRow, whatsappLogs, statsRow] = await Promise.all([
     queryMany(

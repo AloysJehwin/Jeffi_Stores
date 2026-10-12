@@ -39,6 +39,9 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useToast } from '@/contexts/ToastContext'
 import { gstError, paiseString, priceErrors, publishShippingError } from '@/lib/catalog/product-validation'
+import EditorToolbar from '@/components/admin/EditorToolbar'
+import { useEditSession } from '@/hooks/useEditSession'
+import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
 interface Category {
   id: string
@@ -712,6 +715,7 @@ export default function ProductForm({
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialSnapshotRef = useRef<string | null>(null)
   const [serverSaveStatus, setServerSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const edit = useEditSession({ resourceType: 'product', resourceId: productId ?? null })
 
   const [variants, setVariants] = useState<VariantRow[]>(() => {
     if (product?.product_variants && product.product_variants.length > 0) {
@@ -2534,6 +2538,18 @@ export default function ProductForm({
       >
         {backUrl && <input type="hidden" name="_back" value={backUrl} />}
         <div className="p-4 sm:p-6">
+          {edit.sessionId && (
+            <div className="mb-4 flex justify-end">
+              <EditorToolbar
+                autosaveStatus={serverSaveStatus as AutosaveStatus}
+                sessionStatus={edit.status}
+                onSave={async () => { await edit.save() }}
+                onCancel={edit.cancel}
+                cancelHref={ap('/admin/products')}
+                hideSave
+              />
+            </div>
+          )}
           {hasDraft && (
             <div className="mb-4 px-4 py-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
               <span className="text-yellow-800 dark:text-yellow-200">
