@@ -68,6 +68,22 @@ describe('site-controls per-platform on-device flags', () => {
     expect(flags.ondeviceSummaryDesktopEnabled).toBe(false)
   })
 
+  it('messaging provider defaults to twilio on empty DB', async () => {
+    mockQueryMany.mockResolvedValueOnce([] as any)
+    const flags = await getFeatureFlags()
+    expect(flags.smsProvider).toBe('twilio')
+    expect(flags.whatsappProvider).toBe('twilio')
+  })
+
+  it('reads aws provider from the DB and clamps unknown values to twilio', async () => {
+    mockQueryMany.mockResolvedValueOnce(
+      rows({ feature_sms_provider: 'aws', feature_whatsapp_provider: 'nonsense' }) as any
+    )
+    const flags = await getFeatureFlags()
+    expect(flags.smsProvider).toBe('aws')
+    expect(flags.whatsappProvider).toBe('twilio')
+  })
+
   it('falls back to DEFAULTS when the DB query throws', async () => {
     mockQueryMany.mockRejectedValueOnce(new Error('db down'))
     const c = await getSiteControls()

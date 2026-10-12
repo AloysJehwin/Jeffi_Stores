@@ -319,6 +319,53 @@ export function ToggleControl({
   )
 }
 
+// A single-select site-control (string/enum value), saved on change. Mirrors ToggleControl but for an
+// enum setting (e.g. the messaging provider twilio|aws).
+export function SelectControl({
+  settingKey,
+  label,
+  hint,
+  initial,
+  options,
+}: {
+  settingKey: string
+  label: string
+  hint?: string
+  initial: string
+  options: { value: string; label: string }[]
+}) {
+  const { showToast } = useToast()
+  const canWrite = useCanWrite('settings:write')
+  const [value, setValue] = useState(initial)
+  const [saving, setSaving] = useState(false)
+
+  async function onChange(next: string) {
+    const prev = value
+    setValue(next)
+    setSaving(true)
+    const ok = await patchSetting(settingKey, next)
+    setSaving(false)
+    if (!ok) {
+      setValue(prev)
+      showToast('Failed to save', 'error')
+    } else {
+      showToast('Saved', 'success')
+    }
+  }
+
+  return (
+    <div
+      className={`flex items-center justify-between gap-3 p-4 bg-surface-secondary rounded-lg border border-border-default ${!canWrite ? 'opacity-60' : ''}`}
+    >
+      <div>
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        {hint && <p className="text-xs text-foreground-muted mt-0.5">{hint}</p>}
+      </div>
+      <AdminSelect value={value} options={options} onChange={onChange} disabled={saving || !canWrite} sm />
+    </div>
+  )
+}
+
 // Keys Chrome/browsers reserve with a plain Ctrl/⌘ modifier — these keep their
 // default browser behavior and cannot be used for our shortcuts. Add Shift to the
 // combo (⌘/Ctrl + Shift + key) to use any of these instead.

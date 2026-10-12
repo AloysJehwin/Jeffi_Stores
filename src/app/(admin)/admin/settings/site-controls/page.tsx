@@ -13,6 +13,7 @@ import {
   TextAreaControl,
   NumberControl,
   ToggleControl,
+  SelectControl,
   FullSpan,
   KeyboardShortcutControl,
 } from '@/components/admin/site-controls/controls'
@@ -283,6 +284,30 @@ export default async function SiteControlsPage() {
                   label="WhatsApp notifications"
                   hint="When off, WhatsApp channel is hidden from signin/signup and no WhatsApp messages are sent."
                   initial={c.flags.whatsappEnabled}
+                />
+              </FullSpan>
+              <FullSpan>
+                <SelectControl
+                  settingKey="feature_sms_provider"
+                  label="SMS provider"
+                  hint="Which gateway sends SMS for this store. AWS is unavailable until onboarding completes."
+                  initial={c.flags.smsProvider}
+                  options={[
+                    { value: 'twilio', label: 'Twilio' },
+                    { value: 'aws', label: 'AWS' },
+                  ]}
+                />
+              </FullSpan>
+              <FullSpan>
+                <SelectControl
+                  settingKey="feature_whatsapp_provider"
+                  label="WhatsApp provider"
+                  hint="Which gateway sends WhatsApp for this store. AWS is unavailable until onboarding completes."
+                  initial={c.flags.whatsappProvider}
+                  options={[
+                    { value: 'twilio', label: 'Twilio' },
+                    { value: 'aws', label: 'AWS' },
+                  ]}
                 />
               </FullSpan>
             </SectionCard>

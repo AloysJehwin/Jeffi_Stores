@@ -31,6 +31,10 @@ export interface FeatureFlags {
   // When off, these channels are hidden from the storefront signin/signup page.
   smsEnabled: boolean
   whatsappEnabled: boolean
+  // Which messaging provider sends each channel (per-tenant), for the gradual Twilio→AWS migration.
+  // 'twilio' (default) or 'aws' (stub until onboarded). Independent per channel.
+  smsProvider: 'twilio' | 'aws'
+  whatsappProvider: 'twilio' | 'aws'
   // Master on/off for each on-device AI feature.
   ondeviceSummaryEnabled: boolean
   ondeviceFinetuneEnabled: boolean
@@ -140,6 +144,8 @@ const DEFAULTS: SiteControls = {
     inventoryValidationEnabled: true,
     smsEnabled: process.env.SMS_DISABLED !== 'true',
     whatsappEnabled: process.env.WHATSAPP_DISABLED !== 'true',
+    smsProvider: 'twilio',
+    whatsappProvider: 'twilio',
     birthdayEnabled: true,
     digitalProductsEnabled: true,
     vaultDownloadsEnabled: false,
@@ -234,6 +240,8 @@ const KEYS = [
   'feature_inventory_validation_enabled',
   'feature_sms_enabled',
   'feature_whatsapp_enabled',
+  'feature_sms_provider',
+  'feature_whatsapp_provider',
   'feature_birthday_enabled',
   'feature_digital_products_enabled',
   'feature_vault_downloads_enabled',
@@ -413,6 +421,8 @@ export async function getSiteControls(): Promise<SiteControls> {
         inventoryValidationEnabled: bool('feature_inventory_validation_enabled', d.flags.inventoryValidationEnabled),
         smsEnabled: bool('feature_sms_enabled', d.flags.smsEnabled),
         whatsappEnabled: bool('feature_whatsapp_enabled', d.flags.whatsappEnabled),
+        smsProvider: str('feature_sms_provider', d.flags.smsProvider) === 'aws' ? 'aws' : 'twilio',
+        whatsappProvider: str('feature_whatsapp_provider', d.flags.whatsappProvider) === 'aws' ? 'aws' : 'twilio',
         birthdayEnabled: bool('feature_birthday_enabled', d.flags.birthdayEnabled),
         digitalProductsEnabled: bool('feature_digital_products_enabled', d.flags.digitalProductsEnabled),
         vaultDownloadsEnabled: bool('feature_vault_downloads_enabled', d.flags.vaultDownloadsEnabled),

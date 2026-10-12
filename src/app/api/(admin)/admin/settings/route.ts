@@ -41,6 +41,8 @@ const EDITABLE_KEYS = [
   'feature_inventory_validation_enabled',
   'feature_sms_enabled',
   'feature_whatsapp_enabled',
+  'feature_sms_provider',
+  'feature_whatsapp_provider',
   'feature_birthday_enabled',
   // Shared with Marketing > Referrals so the two switches can never disagree.
   'referral_enabled',
@@ -161,7 +163,8 @@ export async function PATCH(request: NextRequest) {
       if (bad) return NextResponse.json({ error: `Setting not editable: ${bad.key}` }, { status: 400 })
       if (enablesLockedProgram(updates, hasCampaigns))
         return NextResponse.json({ error: CUSTOMER_PROGRAM_DENIED }, { status: 403 })
-      if (await referralNeedsLoyalty(updates)) return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
+      if (await referralNeedsLoyalty(updates))
+        return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
       for (const u of updates) await upsert(u.key, String(u.value))
       invalidateFor(updates.map(u => u.key))
       const firstPass = await loyaltyFirstPass(updates)
