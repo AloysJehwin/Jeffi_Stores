@@ -3,6 +3,7 @@ export interface AppItem {
   name: string
   blurb: string
   icon: string
+  benefits?: string[]
 }
 
 export interface AppGroup {
