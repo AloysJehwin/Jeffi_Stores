@@ -16,17 +16,17 @@ export interface BankState {
 const STATE: Record<string, { label: string; tone: string; blurb: string }> = {
   verified: {
     label: 'Verified',
-    tone: 'bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/30',
+    tone: 'ecom-accent-bg/10 org-sage-text border-border-default',
     blurb: 'Your payouts settle to this account.',
   },
   unverified: {
     label: 'Awaiting verification',
-    tone: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30',
+    tone: 'org-sand org-brown border-border-default',
     blurb: 'Saved, but not yet confirmed by the payment provider. Payouts start once it is.',
   },
   failed: {
     label: 'Rejected',
-    tone: 'bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/30',
+    tone: 'org-sand text-[#8a2e1f] border-border-default',
     blurb: 'The payment provider would not accept this account. Payouts are on hold until it is corrected.',
   },
 }
@@ -83,7 +83,7 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
     setBusy(false)
   }
 
-  const inp = 'w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground'
+  const inp = 'w-full rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground'
   const lbl = 'block text-xs font-medium text-foreground-muted mb-1'
 
   return (
@@ -105,7 +105,7 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
           <p className="text-xs text-foreground-muted mt-3">{meta.blurb}</p>
           <button
             onClick={() => setEditing(true)}
-            className="mt-4 rounded-lg border border-border-default px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface"
+            className="mt-4 rounded-xl border border-border-default px-3 py-1.5 text-sm font-medium text-foreground hover:bg-surface"
           >
             {status === 'failed' ? 'Correct these details' : 'Change account'}
           </button>
@@ -136,7 +136,7 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
               autoComplete="off"
               onChange={e => setConfirmNumber(e.target.value.replace(/\D/g, '').slice(0, 18))}
             />
-            {mismatch && <p className="text-xs text-red-600 dark:text-red-400 mt-1">The two numbers do not match.</p>}
+            {mismatch && <p className="text-xs text-[#8a2e1f] mt-1">The two numbers do not match.</p>}
           </div>
           <div>
             <label className={lbl}>IFSC</label>
@@ -155,14 +155,14 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
             <button
               disabled={!canSubmit || busy}
               onClick={submit}
-              className="rounded-lg bg-secondary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-xl bg-secondary-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
             >
               {busy ? 'Checking…' : 'Save and verify'}
             </button>
             {bank && (
               <button
                 onClick={() => setEditing(false)}
-                className="rounded-lg border border-border-default px-4 py-2 text-sm font-medium text-foreground"
+                className="rounded-xl border border-border-default px-4 py-2 text-sm font-medium text-foreground"
               >
                 Cancel
               </button>

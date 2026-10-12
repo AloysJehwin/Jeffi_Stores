@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react'
 
 type Probe = { ok: boolean; status: number; latencyMs: number }
 
-const GREEN = 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-const RED = 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+const GREEN = 'org-sage org-sage-text'
+const RED = 'bg-[#f2d4cd] text-[#8a2e1f]'
 const NEUTRAL = 'bg-surface-secondary text-foreground-muted'
 
 export default function SiteReachabilityBadge({ url }: { url?: string }) {

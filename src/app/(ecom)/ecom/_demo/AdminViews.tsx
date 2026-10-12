@@ -28,30 +28,30 @@ import {
 
 const PANEL = 'bg-surface-elevated rounded-xl border border-border-default'
 const BTN =
-  'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white ecom-accent-bg disabled:opacity-40 disabled:cursor-not-allowed'
+  'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white ecom-accent-bg disabled:opacity-40 disabled:cursor-not-allowed'
 export const rupees = (n: number) => 'Rs. ' + Math.round(n).toLocaleString('en-IN')
 
 const STOCK_TONE: Record<string, string> = {
-  'In Stock': 'bg-green-100 text-green-800',
-  'Low Stock': 'bg-yellow-100 text-yellow-800',
-  'Out of Stock': 'bg-red-100 text-red-800',
+  'In Stock': 'org-sage org-sage-text',
+  'Low Stock': 'org-peach org-brown',
+  'Out of Stock': 'bg-[#f2d4cd] text-[#8a2e1f]',
 }
 const AGE_TONE: Record<string, string> = {
-  paid: 'bg-green-100 text-green-800',
-  partial: 'bg-yellow-100 text-yellow-800',
-  overdue: 'bg-red-100 text-red-800',
+  paid: 'org-sage org-sage-text',
+  partial: 'org-peach org-brown',
+  overdue: 'bg-[#f2d4cd] text-[#8a2e1f]',
 }
 const STAGE_TONE: Record<string, string> = {
-  pending_approval: 'bg-yellow-100 text-yellow-800',
-  approved: 'bg-blue-100 text-blue-800',
-  received: 'bg-blue-100 text-blue-800',
-  completed: 'bg-green-100 text-green-800',
-  negotiating: 'bg-yellow-100 text-yellow-800',
-  offer_accepted: 'bg-blue-100 text-blue-800',
-  converted: 'bg-green-100 text-green-800',
-  draft: 'bg-yellow-100 text-yellow-800',
-  final: 'bg-green-100 text-green-800',
-  sent: 'bg-blue-100 text-blue-800',
+  pending_approval: 'org-peach org-brown',
+  approved: 'org-sand org-brown',
+  received: 'org-sand org-brown',
+  completed: 'org-sage org-sage-text',
+  negotiating: 'org-peach org-brown',
+  offer_accepted: 'org-sand org-brown',
+  converted: 'org-sage org-sage-text',
+  draft: 'org-peach org-brown',
+  final: 'org-sage org-sage-text',
+  sent: 'org-sand org-brown',
 }
 
 function Chip({ label, tone }: { label: string; tone: string }) {
@@ -70,7 +70,7 @@ function Head({ icon, title, right }: { icon: ReactNode; title: string; right?: 
 }
 export function Kv({ label, value, strong }: { label: string; value: ReactNode; strong?: boolean }) {
   return (
-    <div className="bg-surface-secondary rounded-lg border border-border-default p-3">
+    <div className="bg-surface-secondary rounded-xl border border-border-default p-3">
       <p className="text-xs text-foreground-muted">{label}</p>
       <p className={clsx('text-sm text-foreground mt-0.5', strong ? 'font-bold tracking-wide' : 'font-medium')}>
         {value}
@@ -152,7 +152,7 @@ export function InventoryView() {
       <Head
         icon={<Boxes className="w-4 h-4" />}
         title="Inventory"
-        right={<Chip label={`${low} need attention`} tone="bg-yellow-100 text-yellow-800" />}
+        right={<Chip label={`${low} need attention`} tone="org-peach org-brown" />}
       />
       <div className="mt-3 flex-1 min-h-0 overflow-hidden flex flex-col">
         <DataTable
@@ -286,7 +286,7 @@ export function GrnView() {
         />
       </div>
       {received ? (
-        <p className="text-sm text-green-700 font-medium mt-2 shrink-0">Stock restored and back on shelf.</p>
+        <p className="text-sm org-sage-text font-medium mt-2 shrink-0">Stock restored and back on shelf.</p>
       ) : (
         <button className={clsx(BTN, 'self-start mt-3 shrink-0')} onClick={actions.receiveGoods}>
           <PackageCheck className="w-4 h-4" /> Receive goods
@@ -335,7 +335,7 @@ export function SettlementView() {
           <Wallet className="w-4 h-4" /> Settle
         </button>
       ) : (
-        <p className="text-sm text-green-700 font-medium mt-3 shrink-0">Settled to your bank account.</p>
+        <p className="text-sm org-sage-text font-medium mt-3 shrink-0">Settled to your bank account.</p>
       )}
     </div>
   )
@@ -466,7 +466,7 @@ export function ReturnView() {
           <RotateCcw className="w-4 h-4" /> Advance return
         </button>
       ) : (
-        <p className="text-sm text-green-700 font-medium mt-3 shrink-0">Return completed and refunded.</p>
+        <p className="text-sm org-sage-text font-medium mt-3 shrink-0">Return completed and refunded.</p>
       )}
     </div>
   )
@@ -592,7 +592,7 @@ export function RfqView() {
           <Handshake className="w-4 h-4" /> Advance deal
         </button>
       ) : (
-        <p className="text-sm text-green-700 font-medium mt-3 shrink-0">RFQ converted to a B2B order.</p>
+        <p className="text-sm org-sage-text font-medium mt-3 shrink-0">RFQ converted to a B2B order.</p>
       )}
     </div>
   )

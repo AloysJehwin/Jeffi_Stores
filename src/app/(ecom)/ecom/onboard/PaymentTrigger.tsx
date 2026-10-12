@@ -63,7 +63,7 @@ export default function PaymentTrigger({
         email: ownerEmail,
         name: ownerName ?? ownerEmail,
       },
-      theme: { color: '#16a34a' },
+      theme: { color: '#c46a46' },
       callback_url: `${window.location.origin}/onboard/success?tenant=${slug}`,
       modal: {
         ondismiss: () => {
@@ -82,10 +82,10 @@ export default function PaymentTrigger({
 
   return (
     <div className="w-full max-w-lg text-center">
-      <div className="rounded-2xl border border-accent-200 dark:border-accent-800 bg-surface-elevated p-10 shadow-lg">
-        <div className="w-14 h-14 rounded-full bg-accent-100 dark:bg-accent-900/40 flex items-center justify-center mx-auto mb-5">
+      <div className="rounded-2xl border border-accent-200 bg-surface-elevated p-10 shadow-lg">
+        <div className="w-14 h-14 rounded-full bg-accent-100 flex items-center justify-center mx-auto mb-5">
           <svg
-            className="w-7 h-7 text-accent-600 dark:text-accent-400"
+            className="w-7 h-7 text-accent-600"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"

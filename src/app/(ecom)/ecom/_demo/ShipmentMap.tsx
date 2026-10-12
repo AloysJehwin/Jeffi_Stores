@@ -73,17 +73,17 @@ export default function ShipmentMap({ stage, timeline, awb, reduced }: ShipmentM
           <span className="ecom-accent-bg inline-flex h-7 items-center rounded-md px-2 text-xs font-semibold text-white">
             Delhivery
           </span>
-          <span className="text-xs font-medium text-slate-500">Surface Express</span>
+          <span className="text-xs font-medium text-foreground-muted">Surface Express</span>
         </div>
         {awb ? (
-          <span className="rounded-md border border-slate-200 bg-white px-2 py-1 font-mono text-[11px] font-semibold text-slate-700">
+          <span className="rounded-md border border-border-default bg-white px-2 py-1 font-mono text-[11px] font-semibold text-foreground-secondary">
             AWB {awb}
           </span>
         ) : null}
       </div>
 
       <div className="mt-3 grid min-h-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-[1.4fr_1fr]">
-        <div className="relative min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white">
+        <div className="relative min-h-0 overflow-hidden rounded-xl border border-border-default bg-gradient-to-br from-slate-50 to-white">
           <svg
             viewBox="0 0 400 200"
             preserveAspectRatio="xMidYMid meet"
@@ -137,7 +137,7 @@ export default function ShipmentMap({ stage, timeline, awb, reduced }: ShipmentM
             )}
           </svg>
 
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-foreground-muted">
             <span>Warehouse</span>
             <span>{STAGE_LABELS[STAGES[currentIdx]]}</span>
             <span>Destination</span>
@@ -177,7 +177,7 @@ export default function ShipmentMap({ stage, timeline, awb, reduced }: ShipmentM
                   <p className="text-sm font-semibold leading-tight" style={{ color: done ? '#0f172a' : IDLE }}>
                     {step.label}
                   </p>
-                  <p className="text-[11px] leading-tight text-slate-400">
+                  <p className="text-[11px] leading-tight text-foreground-muted">
                     {done ? at || 'Completed' : isCurrent ? 'In progress' : 'Pending'}
                   </p>
                 </div>

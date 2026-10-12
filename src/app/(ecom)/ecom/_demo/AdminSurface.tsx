@@ -48,15 +48,15 @@ import {
 
 const PANEL = 'bg-surface-elevated rounded-xl border border-border-default'
 const BTN =
-  'inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white ecom-accent-bg disabled:opacity-40 disabled:cursor-not-allowed'
-const statusPill = (s: string) => STATUS_CLASSES[s] ?? 'bg-yellow-100 text-yellow-800'
+  'inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-white ecom-accent-bg disabled:opacity-40 disabled:cursor-not-allowed'
+const statusPill = (s: string) => STATUS_CLASSES[s] ?? 'org-peach org-brown'
 const resolveOrder = (world: World): Order | null => world.order ?? world.orders[0] ?? null
 
 const HEALTH: Record<string, { tier: string; tone: string }> = {
-  VIP: { tier: 'healthy', tone: 'bg-green-100 text-green-800' },
-  Loyal: { tier: 'healthy', tone: 'bg-green-100 text-green-800' },
-  Repeat: { tier: 'at_risk', tone: 'bg-yellow-100 text-yellow-800' },
-  New: { tier: 'at_risk', tone: 'bg-yellow-100 text-yellow-800' },
+  VIP: { tier: 'healthy', tone: 'org-sage org-sage-text' },
+  Loyal: { tier: 'healthy', tone: 'org-sage org-sage-text' },
+  Repeat: { tier: 'at_risk', tone: 'org-peach org-brown' },
+  New: { tier: 'at_risk', tone: 'org-peach org-brown' },
 }
 const SHIP_STAGE: Record<string, string> = {
   pending: 'created',
@@ -139,9 +139,9 @@ function DashboardView({ reducedMotion }: { reducedMotion: boolean }) {
     { label: 'Gross margin', node: '38%' },
   ]
   const attention = [
-    { label: '1 order pending > 24h', tone: 'bg-yellow-100 text-yellow-800' },
-    { label: `${lowStock} low / out of stock`, tone: 'bg-red-100 text-red-800' },
-    { label: '1 open return', tone: 'bg-blue-100 text-blue-800' },
+    { label: '1 order pending > 24h', tone: 'org-peach org-brown' },
+    { label: `${lowStock} low / out of stock`, tone: 'bg-[#f2d4cd] text-[#8a2e1f]' },
+    { label: '1 open return', tone: 'org-sand org-brown' },
   ]
   return (
     <div className="h-full min-h-0 flex flex-col gap-3">
@@ -343,7 +343,7 @@ function CampaignView() {
           <Kv label="Status" value={sent ? 'Active' : 'Paused'} />
         </div>
         {sent ? (
-          <div className="rounded-lg border border-border-default p-3">
+          <div className="rounded-xl border border-border-default p-3">
             <p className="text-sm font-semibold text-foreground">Campaign sent</p>
             <div className="grid grid-cols-3 gap-3 mt-2 text-center">
               <Stat value={CAMPAIGN.reach.toLocaleString('en-IN')} label="Reach" />
@@ -380,7 +380,7 @@ function CouponView() {
         </div>
         <Kv label="Minimum cart" value={rupees(COUPON.minCart)} />
         {created ? (
-          <div className="rounded-lg border border-border-default p-3">
+          <div className="rounded-xl border border-border-default p-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-foreground">Live · {COUPON.code}</p>
               <p className="text-xs text-foreground-muted tabular-nums">
@@ -443,7 +443,7 @@ function CrmView() {
               head: 'Segment',
               align: 'right',
               cell: c => (
-                <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                <span className="px-2 py-0.5 text-xs font-semibold rounded-full org-sand org-brown">
                   {(c.tag as string).toLowerCase()}
                 </span>
               ),
@@ -498,7 +498,7 @@ export default function AdminSurface() {
                 key={t.focus}
                 title={t.label}
                 className={clsx(
-                  'inline-flex items-center justify-center w-7 h-7 rounded-lg',
+                  'inline-flex items-center justify-center w-7 h-7 rounded-xl',
                   on ? 'ecom-accent-bg text-white' : 'text-foreground-muted bg-surface-secondary'
                 )}
               >

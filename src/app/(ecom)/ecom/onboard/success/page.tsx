@@ -54,12 +54,12 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
 
   return (
     <div className="min-h-[calc(100vh-56px)] flex items-center justify-center bg-surface-secondary px-4">
-      <div className="max-w-md w-full rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-10 text-center">
-        <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-green-600 text-white mx-auto mb-5">
+      <div className="max-w-md w-full rounded-[2rem] org-sage p-10 text-center">
+        <span className="inline-flex items-center justify-center w-14 h-14 rounded-full ecom-accent-bg text-white mx-auto mb-5">
           <CheckMark className="w-7 h-7" />
         </span>
-        <h1 className="text-2xl font-bold text-green-800 dark:text-green-200">Payment confirmed!</h1>
-        <p className="text-sm text-green-700 dark:text-green-400 mt-3">
+        <h1 className="text-2xl font-bold font-display font-black org-sage-text">Payment confirmed!</h1>
+        <p className="text-sm text-foreground-secondary mt-3">
           {tenantSlug ? (
             <>
               Your store <span className="font-semibold">{tenantSlug}.jeffistores.in</span> is being set up.
