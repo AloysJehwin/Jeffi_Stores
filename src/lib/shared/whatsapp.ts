@@ -1,28 +1,21 @@
-import twilio from 'twilio'
 import { logMessage } from '@/lib/shared/message-log'
 import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { getWhatsAppProvider } from '@/lib/shared/messaging'
 
-// WhatsApp notifications via Twilio (Meta BSP).
-// Business-initiated WhatsApp messages must use approved Content Templates
-// (contentSid + contentVariables), NOT free-form text — WhatsApp only allows
-// free text within a 24h customer-service window.
+// WhatsApp notifications. The provider (Twilio today, AWS later) is chosen per-tenant by the Site
+// Controls selector in src/lib/shared/messaging; this file owns the shared concerns: the channel
+// gate, phone normalization, audit logging, and the approved-template registry.
 //
-// Content template SIDs are created in Twilio and approved by Meta.
-// Override any SID via env (e.g. TWILIO_WA_OTP_SID) to swap templates without a deploy.
+// Business-initiated WhatsApp messages must use approved Content Templates (templateRef + numbered
+// variables), NOT free-form text — WhatsApp only allows free text within a 24h customer-service
+// window. Template SIDs are created in Twilio/approved by Meta; override via env (e.g.
+// TWILIO_WA_OTP_SID) to swap templates without a deploy.
 //
-// Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN in env.
-// Set TWILIO_WHATSAPP_FROM to override the sender (defaults to +18722179910).
 // WhatsApp can be turned off two ways: the Site Controls "WhatsApp" toggle (per-tenant,
 // feature_whatsapp_enabled) or the env WHATSAPP_DISABLED kill-switch. The env value is the DEFAULT
 // the Site Controls flag falls back to, so checking the flag honors both.
-
-const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
-const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
-const API_KEY_SID = process.env.TWILIO_API_KEY_SID
-const API_KEY_SECRET = process.env.TWILIO_API_KEY_SECRET
-const WA_FROM = process.env.TWILIO_WHATSAPP_FROM || '+18722179910'
 
 // Is WhatsApp enabled for the current tenant? Honors the Site Controls toggle
 // (feature_whatsapp_enabled), which defaults to `WHATSAPP_DISABLED !== 'true'`.
@@ -66,15 +59,6 @@ const TEMPLATES = {
   accessGranted: process.env.TWILIO_WA_ACCESS_GRANTED_SID || '',
 }
 
-function getClient() {
-  if (!ACCOUNT_SID) return null
-  if (API_KEY_SID && API_KEY_SECRET) {
-    return twilio(API_KEY_SID, API_KEY_SECRET, { accountSid: ACCOUNT_SID })
-  }
-  if (AUTH_TOKEN) return twilio(ACCOUNT_SID, AUTH_TOKEN)
-  return null
-}
-
 function normalizePhone(phone: string | null | undefined): string | null {
   if (!phone) return null
   const digits = phone.replace(/\D/g, '')
@@ -96,25 +80,19 @@ async function sendTemplate(
   const normalized = normalizePhone(to)
   if (!normalized) return false
   if (!(await whatsappChannelEnabled())) return false
-  if (!contentSid) return false // template not configured yet → let caller fall back (SMS)
-  const client = getClient()
-  if (!client) return false
-  const waFrom = `whatsapp:${WA_FROM}`
+  if (!contentSid) return false // not configured → caller falls back to SMS
+  const provider = await getWhatsAppProvider()
+  if (!provider.configured) return false
   try {
-    const msg = await client.messages.create({
-      from: waFrom,
-      to: `whatsapp:${normalized}`,
-      contentSid,
-      contentVariables: JSON.stringify(variables),
-    })
+    const sid = await provider.sendTemplate(normalized, contentSid, variables)
     logMessage({
       channel: 'whatsapp',
       to: normalized,
-      from: WA_FROM,
+      from: provider.from,
       body: summary,
       kind,
       status: 'sent',
-      providerSid: msg.sid,
+      providerSid: sid,
       entityType: entity?.entityType,
       entityId: entity?.entityId,
     })
@@ -123,7 +101,7 @@ async function sendTemplate(
     logMessage({
       channel: 'whatsapp',
       to: normalized,
-      from: WA_FROM,
+      from: provider.from,
       body: summary,
       kind,
       status: 'failed',
@@ -477,27 +455,26 @@ export async function sendFreeTextWhatsApp(params: {
   const normalized = normalizePhone(params.phone)
   if (!normalized) return false
   if (!(await whatsappChannelEnabled())) return false
-  const client = getClient()
-  if (!client) return false
-  const waFrom = `whatsapp:${WA_FROM}`
+  const provider = await getWhatsAppProvider()
+  if (!provider.configured) return false
   const kind = params.kind || 'support_reply'
   try {
-    const msg = await client.messages.create({ from: waFrom, to: `whatsapp:${normalized}`, body: params.body })
+    const sid = await provider.sendText(normalized, params.body)
     logMessage({
       channel: 'whatsapp',
       to: normalized,
-      from: WA_FROM,
+      from: provider.from,
       body: params.body,
       kind,
       status: 'sent',
-      providerSid: msg.sid,
+      providerSid: sid,
     })
     return true
   } catch (err: any) {
     logMessage({
       channel: 'whatsapp',
       to: normalized,
-      from: WA_FROM,
+      from: provider.from,
       body: params.body,
       kind,
       status: 'failed',

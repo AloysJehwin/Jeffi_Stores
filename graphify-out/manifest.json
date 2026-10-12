@@ -550,8 +550,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/runner.ts": {
-    "mtime": 1791395544.8540623,
-    "ast_hash": "0fc08e0e77b273756dcd0c256a63494a",
+    "mtime": 1791746160.752897,
+    "ast_hash": "66ac9139ef55a37eca17811f2cdacb09",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/_registry.ts": {
@@ -560,38 +560,38 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/_winback-base.ts": {
-    "mtime": 1791047197.846219,
-    "ast_hash": "57445cc9a4b92c7856f82f05885242f7",
+    "mtime": 1791746290.7555137,
+    "ast_hash": "7238fa4507ec9f51c359525aeaa07f74",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/abandoned-cart.ts": {
-    "mtime": 1791050550.8132687,
-    "ast_hash": "67f75d98628f3179482a047f3dd2b827",
+    "mtime": 1791747293.8488288,
+    "ast_hash": "ba4bf31adaf198d4c0473028757a2188",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/abandoned-checkout.ts": {
-    "mtime": 1791316438.119761,
-    "ast_hash": "a651627fe24b5eefbc19198113f5d8c6",
+    "mtime": 1791746419.7819655,
+    "ast_hash": "c8db479ea8350580e2a2515faa8916d8",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/post-purchase.ts": {
-    "mtime": 1791366784.755095,
-    "ast_hash": "8e994d847b3d367166e132c924241699",
+    "mtime": 1791746290.7602851,
+    "ast_hash": "fb756bab790df7a8a1878812a2295da2",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/price-drop.ts": {
-    "mtime": 1791395479.3101692,
+    "mtime": 1791746623.0173383,
     "ast_hash": "1533c7875a4cd648b5975ee53a3cc809",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/restock.ts": {
-    "mtime": 1791311199.8145895,
+    "mtime": 1791746623.020963,
     "ast_hash": "5b8e0e2dc04b63291b8757b790383ee7",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/review-reminder.ts": {
-    "mtime": 1791396334.0968273,
-    "ast_hash": "50aa446c611e7107f113eac72d7ffc2b",
+    "mtime": 1791746290.7629156,
+    "ast_hash": "dfb669b47379c4d77abdbac24b3647aa",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/winback-180.ts": {
@@ -1115,8 +1115,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/review-request.ts": {
-    "mtime": 1791396334.0987585,
-    "ast_hash": "91580fd87e3bd61aa4bbe370f5f049c4",
+    "mtime": 1791746419.8964787,
+    "ast_hash": "8ad7215fcd9731c565ae83b438b1ed97",
     "semantic_hash": ""
   },
   "tests/api/admin/access-request/route.test.ts": {
@@ -1940,8 +1940,8 @@
     "semantic_hash": ""
   },
   "tests/lib/campaigns/runner.test.ts": {
-    "mtime": 1791395956.2352731,
-    "ast_hash": "e6591e9316de8b33c782419c795504f5",
+    "mtime": 1791746338.5048563,
+    "ast_hash": "eb2d6913edc1c6f6e132157bbf1edc44",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios.test.ts": {
@@ -2135,8 +2135,8 @@
     "semantic_hash": ""
   },
   "tests/lib/marketing.test.ts": {
-    "mtime": 1791397341.8642187,
-    "ast_hash": "fdc15b17c92057f70931a63c9c48eb0b",
+    "mtime": 1791748431.4868512,
+    "ast_hash": "681efdc4b6fd9cac4542e43371e24cd4",
     "semantic_hash": ""
   },
   "tests/lib/merchant/client.test.ts": {
@@ -3150,8 +3150,8 @@
     "semantic_hash": ""
   },
   "src/components/admin/site-controls/controls.tsx": {
-    "mtime": 1791399412.9468253,
-    "ast_hash": "b6b4541d9cf6235f7afb52c3e112b834",
+    "mtime": 1791781763.9701746,
+    "ast_hash": "bfe53ce93aa5aa736b3cb755d61809a1",
     "semantic_hash": ""
   },
   "src/components/visitor/FilterSidebar.tsx": {
@@ -3170,8 +3170,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/whatsapp-dispatch.ts": {
-    "mtime": 1791722841.2028165,
-    "ast_hash": "9948b0f8ba00d172461e92cb18443646",
+    "mtime": 1791747903.1610796,
+    "ast_hash": "642f42ede258f8ee2321f3e6a5627528",
     "semantic_hash": ""
   },
   "src/lib/campaigns/whatsapp-kinds.ts": {
@@ -3305,8 +3305,8 @@
     "semantic_hash": ""
   },
   "tests/lib/site-controls.test.ts": {
-    "mtime": 1791310415.2068188,
-    "ast_hash": "eb14aa7c2f3b7bba07dc0cfdce742dbe",
+    "mtime": 1791782050.2764332,
+    "ast_hash": "4cbc4276d9a51aa2a11111f9d0a5ff8a",
     "semantic_hash": ""
   },
   "tests/lib/tenant-registry.test.ts": {
@@ -3320,8 +3320,8 @@
     "semantic_hash": ""
   },
   "tests/lib/whatsapp-dispatch.test.ts": {
-    "mtime": 1791723014.9640055,
-    "ast_hash": "26cb466ee00480a761ad1f2b9e0c84b6",
+    "mtime": 1791747903.4214506,
+    "ast_hash": "20201b8b4f8c027cc34298900951ee99",
     "semantic_hash": ""
   },
   "docs/PLAN_FEATURE_MATRIX.md": {
@@ -3605,8 +3605,8 @@
     "semantic_hash": ""
   },
   "tests/lib/admin-client-write-gate.test.ts": {
-    "mtime": 1791645282.0082524,
-    "ast_hash": "48da2aa5a8f821b3f134568b19b57465",
+    "mtime": 1791747781.6561768,
+    "ast_hash": "7eef1bd326b75a4429864efc7b92e500",
     "semantic_hash": ""
   },
   "tests/lib/admin-cookie.test.ts": {
@@ -7560,8 +7560,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/settings/site-controls/page.tsx": {
-    "mtime": 1791657989.0631015,
-    "ast_hash": "f6fc70b59fb99bfb112b772606132f9d",
+    "mtime": 1791781812.2363467,
+    "ast_hash": "7d7b1e03b9458fa0cb05460c2a5de41f",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/shelving/ShelvingClient.tsx": {
@@ -10180,8 +10180,8 @@
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/settings/route.ts": {
-    "mtime": 1791657313.8057833,
-    "ast_hash": "707b6b6f5b14cd8b88abcc12b99b2bed",
+    "mtime": 1791782115.2734454,
+    "ast_hash": "c0f3d0f3c4c45c1e00e88d6253d083b0",
     "semantic_hash": ""
   },
   "src/app/api/(admin)/admin/shelving/labels/route.ts": {
@@ -11530,8 +11530,8 @@
     "semantic_hash": ""
   },
   "src/lib/catalog/site-controls.ts": {
-    "mtime": 1791657343.0924606,
-    "ast_hash": "8967c3523b66f13aaae567dce4da3014",
+    "mtime": 1791781724.3493948,
+    "ast_hash": "77c5bdbeaa55358691ee4e005edfdfe5",
     "semantic_hash": ""
   },
   "src/lib/catalog/sku.ts": {
@@ -11755,8 +11755,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/automation-emails.ts": {
-    "mtime": 1791724319.9671483,
-    "ast_hash": "3fcdb514f59f8c4fe003c499963b511b",
+    "mtime": 1791747903.191494,
+    "ast_hash": "be81866725b5522e2c37a5c7eb11db20",
     "semantic_hash": ""
   },
   "src/lib/shared/aws-signing.ts": {
@@ -11915,8 +11915,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/marketing.ts": {
-    "mtime": 1791710312.520167,
-    "ast_hash": "71b02287c55506014430b56137f03761",
+    "mtime": 1791748339.365201,
+    "ast_hash": "48d13529eaa48491ac774cd7e228be24",
     "semantic_hash": ""
   },
   "src/lib/shared/message-log.ts": {
@@ -11970,8 +11970,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/sms.ts": {
-    "mtime": 1791744174.227602,
-    "ast_hash": "135f0fb7003bdfd9a7904d8136dc8ea2",
+    "mtime": 1791782115.347913,
+    "ast_hash": "a16f7c70004e1286a4eaae413e386917",
     "semantic_hash": ""
   },
   "src/lib/shared/ssm-client.ts": {
@@ -12000,8 +12000,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/whatsapp.ts": {
-    "mtime": 1791744394.8003395,
-    "ast_hash": "ce552130bd5745af5e1ded388243af9d",
+    "mtime": 1791781896.9229448,
+    "ast_hash": "030d6987589f371c1e8da5d398054dfc",
     "semantic_hash": ""
   },
   "src/lib/shipping/delhivery.ts": {
@@ -12930,8 +12930,8 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/_TEMPLATE.ts": {
-    "mtime": 1791040367.5261972,
-    "ast_hash": "b7e7521889230bfa3eb284518efa918c",
+    "mtime": 1791746290.7549257,
+    "ast_hash": "b07152112c1eb0c2b509d4e0f40086e8",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/_wishlist-base.ts": {
@@ -12940,93 +12940,93 @@
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/back-in-stock-wishlist.ts": {
-    "mtime": 1791311199.8151836,
-    "ast_hash": "b30fa429468bfee254fdacd49a6beb73",
+    "mtime": 1791747903.0296743,
+    "ast_hash": "a079d0ff45bb74ba751e33c69b1f89c7",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/birthday-collect.ts": {
-    "mtime": 1791310190.146904,
-    "ast_hash": "b7c7e9e660a4988004210ba17b8c5bbc",
+    "mtime": 1791746290.7571464,
+    "ast_hash": "19cffadcb5d0fd78baee9818477db1e2",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/birthday.ts": {
-    "mtime": 1791310190.146273,
-    "ast_hash": "42ce8bce38930bd489068bc604d0cd1b",
+    "mtime": 1791747903.039241,
+    "ast_hash": "f24244ba5ffbd00ad0efc5562148da51",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/cart-price-drop.ts": {
-    "mtime": 1791050162.6366842,
-    "ast_hash": "74b964e630d7fceaa0692c9f466190a4",
+    "mtime": 1791747293.8497105,
+    "ast_hash": "972e1933eff5226ec781971939fcbf98",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/first-purchase-nudge.ts": {
-    "mtime": 1791050080.6520548,
-    "ast_hash": "2ca91b5acb4b22c18c31b459d6262803",
+    "mtime": 1791747293.8501525,
+    "ast_hash": "65258788f9ba69c3e3466ac191f5dd83",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/high-value-cart.ts": {
-    "mtime": 1791050125.6150637,
-    "ast_hash": "ce9e41025671cd216e25bb7bfb915aa5",
+    "mtime": 1791747293.8492684,
+    "ast_hash": "a0a26fd3792874df6c7349fd034a3b0d",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/loyalty-points-reminder.ts": {
-    "mtime": 1791228525.345069,
-    "ast_hash": "b112c2d3d3ffcd42f601e2234611818b",
+    "mtime": 1791747903.0683086,
+    "ast_hash": "72d507357d76063b945a8f27eded4a58",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/loyalty-tier-upgrade.ts": {
-    "mtime": 1791171251.9824414,
-    "ast_hash": "448582abd61bc73bcb42f22afa6ccd90",
+    "mtime": 1791747293.851137,
+    "ast_hash": "3646ecd1d01823a4bb0da0f324d846c7",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/referral-invite.ts": {
-    "mtime": 1791366784.7574317,
-    "ast_hash": "484404a2548bce201864dc8e27b77362",
+    "mtime": 1791747293.8536031,
+    "ast_hash": "d0108457c9c0fd3514010412d6b23c9d",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/replenishment.ts": {
-    "mtime": 1791313771.7361393,
-    "ast_hash": "2fcf8db951a5a0c98f5a4beb37d720d6",
+    "mtime": 1791747293.8527565,
+    "ast_hash": "55f05d89129f7321efb191730ca4bbc8",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/review-photo-followup.ts": {
-    "mtime": 1791313378.0044904,
-    "ast_hash": "578a056095d08df0dcdb2b6f4b7a8c92",
+    "mtime": 1791747293.8522365,
+    "ast_hash": "4310d5343a6babc0874cd3d129376fed",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/second-purchase-nudge.ts": {
-    "mtime": 1791050111.4143188,
-    "ast_hash": "fd60ff4f526dd682f77a9943580237bb",
+    "mtime": 1791747293.8548963,
+    "ast_hash": "8ea1e8c60244413b29cc883328d608e5",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/signup-anniversary.ts": {
-    "mtime": 1791050142.5129788,
-    "ast_hash": "ee507c60edd322ae2f7ab42c818fc2ae",
+    "mtime": 1791747903.1074805,
+    "ast_hash": "a5fdfbe3d61852e02d6cbec885a54808",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/subscription-renewal.ts": {
-    "mtime": 1791368687.679142,
-    "ast_hash": "2367a04f645f1455c97847ebc2567e10",
+    "mtime": 1791747293.8568165,
+    "ast_hash": "b6cf431a6da6b3e20c69971be516d4e0",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/viewed-category.ts": {
-    "mtime": 1791050088.6407764,
-    "ast_hash": "d3dc0c9a79891163ea711b9c715e67e0",
+    "mtime": 1791747293.8561711,
+    "ast_hash": "55ef778b2b1295f0b2e076c8f01f0947",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/viewed-product.ts": {
-    "mtime": 1791046985.911701,
-    "ast_hash": "3d4e735c7f768ea8959a6d21e58be225",
+    "mtime": 1791747293.8555033,
+    "ast_hash": "5b828bc24d70fff8b5dc8ed5deb21160",
     "semantic_hash": ""
   },
   "src/lib/campaigns/scenarios/wishlist-reminder.ts": {
-    "mtime": 1791311199.819365,
-    "ast_hash": "de9b8a3f3ab1b23a211bae3eb1a7d8ee",
+    "mtime": 1791747293.857344,
+    "ast_hash": "d3f7385488ff0c559b3b679a939f24ed",
     "semantic_hash": ""
   },
   "src/lib/campaigns/universal-params.ts": {
-    "mtime": 1791046941.4461942,
-    "ast_hash": "b0fa089053c1f11eaf71f4581599151b",
+    "mtime": 1791746186.2099345,
+    "ast_hash": "5630c8e7745d536a09ade9379d427ced",
     "semantic_hash": ""
   },
   "src/lib/catalog/cart-unit-cap.ts": {
@@ -13460,13 +13460,13 @@
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/abandoned-cart.test.ts": {
-    "mtime": 1791047334.9006743,
-    "ast_hash": "50b4d11eca603f90e6c9c376a24ced48",
+    "mtime": 1791747903.243943,
+    "ast_hash": "0bc4abb4b539b964568f2e3813c5a786",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/back-in-stock-wishlist.test.ts": {
-    "mtime": 1791136156.814745,
-    "ast_hash": "010e3f85d710aa349545c25fd7b43323",
+    "mtime": 1791747538.8174987,
+    "ast_hash": "54c22623231bc9a704aa1082fb4f667e",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/birthday-collect.test.ts": {
@@ -13475,48 +13475,48 @@
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/birthday.test.ts": {
-    "mtime": 1791310360.207861,
-    "ast_hash": "cddf7ecc8c92e93fcd7647464470d91a",
+    "mtime": 1791747903.2668345,
+    "ast_hash": "15d867f90c8764bbb9a8cecf936ed5f0",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/cart-price-drop.test.ts": {
-    "mtime": 1791050237.6303895,
-    "ast_hash": "c169f8d9973567381a954df56525758f",
+    "mtime": 1791747338.1128728,
+    "ast_hash": "7ff6e15ebd74a2110fcacb8301544833",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/first-purchase-nudge.test.ts": {
-    "mtime": 1791050167.0677729,
-    "ast_hash": "e2eed5919668ab695630c6d40937156f",
+    "mtime": 1791747903.3004224,
+    "ast_hash": "1a3880f9a156053cc91c2b7688f603d1",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/high-value-cart.test.ts": {
-    "mtime": 1791050213.399185,
-    "ast_hash": "d439bd58640a545e0591796aeccb37ef",
+    "mtime": 1791747338.144016,
+    "ast_hash": "a9b67fdf83ebd74736bf0536ca225cdb",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/loyalty-points-reminder.test.ts": {
-    "mtime": 1791228634.6756537,
-    "ast_hash": "9c4a0f6c6a43f33b7581e08a191edd97",
+    "mtime": 1791747903.3224893,
+    "ast_hash": "fa64d11d0fcc466dc70e877886769bb3",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/loyalty-tier-upgrade.test.ts": {
-    "mtime": 1791171729.5216277,
-    "ast_hash": "acf2e0a2d9cbb9bd189409882b3f84a3",
+    "mtime": 1791747510.8445642,
+    "ast_hash": "d837b2bf0b165f084d5318a73af68118",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/referral-invite.test.ts": {
-    "mtime": 1791308154.1501262,
-    "ast_hash": "62eedc7429adfea421562327ce49672a",
+    "mtime": 1791747903.3455918,
+    "ast_hash": "0962b7f3540548ca406b6424379d0893",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/replenishment.test.ts": {
-    "mtime": 1791313864.8057427,
-    "ast_hash": "d60f62cb1cf1529a56fcb7aa72db454c",
+    "mtime": 1791747510.8659914,
+    "ast_hash": "13b6e006f6809edbd1cb6ecccbf1fb74",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/review-photo-followup.test.ts": {
-    "mtime": 1791313554.2170446,
-    "ast_hash": "51a664f12a0b607cbe6b8e729090c1a2",
+    "mtime": 1791747510.855499,
+    "ast_hash": "bfc9e373a25513e48e2ced956c6c2664",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/second-purchase-nudge.test.ts": {
@@ -13530,18 +13530,18 @@
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/subscription-renewal.test.ts": {
-    "mtime": 1791368687.704972,
-    "ast_hash": "6f620f54a6553821ca16b2ca8dd2771f",
+    "mtime": 1791747510.8707159,
+    "ast_hash": "87082a374fa7cb653ecbd372d4e280b6",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/viewed-category.test.ts": {
-    "mtime": 1791050288.8070738,
-    "ast_hash": "a88b19c96d937136ceb3dbc8d0893b5b",
+    "mtime": 1791747903.3773928,
+    "ast_hash": "c360cf61b7576170db2873d6252e21bf",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/viewed-product.test.ts": {
-    "mtime": 1791040167.4561107,
-    "ast_hash": "516f9b80db148a8d557a7274196b17a4",
+    "mtime": 1791747338.0757787,
+    "ast_hash": "093d45a60f06a0e5c5fa6336e8c51c71",
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/wishlist-base.test.ts": {
@@ -13550,8 +13550,8 @@
     "semantic_hash": ""
   },
   "tests/lib/campaigns/scenarios/wishlist-reminder.test.ts": {
-    "mtime": 1791311377.5755713,
-    "ast_hash": "645ea3e2c3208ec4e920481647b9f627",
+    "mtime": 1791747903.3932028,
+    "ast_hash": "2d96ba228c1599ae5ba630bb825d7e08",
     "semantic_hash": ""
   },
   "tests/lib/cart-unit-cap.test.ts": {
@@ -14557,6 +14557,31 @@
   "tests/lib/channel-gating.test.ts": {
     "mtime": 1791744351.3783128,
     "ast_hash": "58340322341dbf25deb32fa132d734d4",
+    "semantic_hash": ""
+  },
+  "src/lib/shared/messaging/aws-provider.ts": {
+    "mtime": 1791780388.8988955,
+    "ast_hash": "e2f9ea4537789e9b7b008ca9caa9573d",
+    "semantic_hash": ""
+  },
+  "src/lib/shared/messaging/index.ts": {
+    "mtime": 1791780402.7155378,
+    "ast_hash": "bca3b4d68d46b3110e85123aa12495c1",
+    "semantic_hash": ""
+  },
+  "src/lib/shared/messaging/twilio-provider.ts": {
+    "mtime": 1791780376.6797528,
+    "ast_hash": "366c7e8b12078badde15d410ade75472",
+    "semantic_hash": ""
+  },
+  "src/lib/shared/messaging/types.ts": {
+    "mtime": 1791782115.339317,
+    "ast_hash": "e1efaf5f78edaf375b698225dea339a2",
+    "semantic_hash": ""
+  },
+  "tests/lib/messaging-provider.test.ts": {
+    "mtime": 1791782066.6624372,
+    "ast_hash": "44783706e9459f5ca24182f40abb55ba",
     "semantic_hash": ""
   }
 }

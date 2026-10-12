@@ -1,22 +1,16 @@
-import twilio from 'twilio'
 import { logMessage } from '@/lib/shared/message-log'
 import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
+import { getSmsProvider } from '@/lib/shared/messaging'
 
-// Twilio SMS client — initialized lazily so missing creds don't crash the app.
-// Set TWILIO_ACCOUNT_SID + TWILIO_FROM_NUMBER, plus EITHER:
-//   - TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET (preferred — revocable API key), OR
-//   - TWILIO_AUTH_TOKEN (account auth token).
-// SMS can be turned off two ways: the Site Controls "SMS" toggle (per-tenant,
-// feature_sms_enabled) or the env SMS_DISABLED kill-switch. The env value is the DEFAULT the
-// Site Controls flag falls back to, so checking the flag honors both.
-
-const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
-const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
-const API_KEY_SID = process.env.TWILIO_API_KEY_SID
-const API_KEY_SECRET = process.env.TWILIO_API_KEY_SECRET
-const FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || '+18722179910'
+// SMS send path. The provider (Twilio today, AWS later) is chosen per-tenant by the Site Controls
+// selector in src/lib/shared/messaging; this file owns the shared concerns: phone normalization,
+// the channel-enabled gate, and audit logging.
+//
+// SMS can be turned off two ways: the Site Controls "SMS" toggle (per-tenant, feature_sms_enabled)
+// or the env SMS_DISABLED kill-switch. The env value is the DEFAULT the Site Controls flag falls
+// back to, so checking the flag honors both.
 
 // Is SMS enabled for the current tenant? Honors the Site Controls toggle (feature_sms_enabled),
 // which itself defaults to `SMS_DISABLED !== 'true'`. getFeatureFlags never throws, but the catch
@@ -27,16 +21,6 @@ async function smsChannelEnabled(): Promise<boolean> {
   } catch {
     return process.env.SMS_DISABLED !== 'true'
   }
-}
-
-function getClient() {
-  if (!ACCOUNT_SID) return null
-  // Prefer API key auth (revocable) when available; fall back to account auth token.
-  if (API_KEY_SID && API_KEY_SECRET) {
-    return twilio(API_KEY_SID, API_KEY_SECRET, { accountSid: ACCOUNT_SID })
-  }
-  if (AUTH_TOKEN) return twilio(ACCOUNT_SID, AUTH_TOKEN)
-  return null
 }
 
 // Normalize Indian mobile numbers to E.164 format (+91XXXXXXXXXX).
@@ -55,14 +39,22 @@ async function sendSMS(to: string | null | undefined, body: string, kind: string
   const normalized = normalizePhone(to)
   if (!normalized) return false
   if (!(await smsChannelEnabled())) return false
-  const client = getClient()
-  if (!client) return false
+  const provider = await getSmsProvider()
+  if (!provider.configured) return false
   try {
-    const msg = await client.messages.create({ from: FROM_NUMBER, to: normalized, body })
-    logMessage({ channel: 'sms', to: normalized, from: FROM_NUMBER, body, kind, status: 'sent', providerSid: msg.sid })
+    const sid = await provider.sendText(normalized, body)
+    logMessage({ channel: 'sms', to: normalized, from: provider.from, body, kind, status: 'sent', providerSid: sid })
     return true
   } catch (err: any) {
-    logMessage({ channel: 'sms', to: normalized, from: FROM_NUMBER, body, kind, status: 'failed', error: err?.message })
+    logMessage({
+      channel: 'sms',
+      to: normalized,
+      from: provider.from,
+      body,
+      kind,
+      status: 'failed',
+      error: err?.message,
+    })
     return false
   }
 }
@@ -78,18 +70,18 @@ export async function sendCampaignSMS(params: {
 }): Promise<boolean> {
   const normalized = normalizePhone(params.phone)
   if (!normalized || !(await smsChannelEnabled())) return false
-  const client = getClient()
-  if (!client) return false
+  const provider = await getSmsProvider()
+  if (!provider.configured) return false
   try {
-    const msg = await client.messages.create({ from: FROM_NUMBER, to: normalized, body: params.body })
+    const sid = await provider.sendText(normalized, params.body)
     logMessage({
       channel: 'sms',
       to: normalized,
-      from: FROM_NUMBER,
+      from: provider.from,
       body: params.body,
       kind: params.kind,
       status: 'sent',
-      providerSid: msg.sid,
+      providerSid: sid,
       userId: params.userId ?? null,
       entityType: 'campaign',
       entityId: params.kind,
@@ -99,7 +91,7 @@ export async function sendCampaignSMS(params: {
     logMessage({
       channel: 'sms',
       to: normalized,
-      from: FROM_NUMBER,
+      from: provider.from,
       body: params.body,
       kind: params.kind,
       status: 'failed',
