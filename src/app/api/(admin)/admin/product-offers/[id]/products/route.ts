@@ -4,11 +4,19 @@ import { hasScope } from '@/lib/auth/scopes'
 import { query, queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/shared/validate'
+import { findOpenSession } from '@/lib/admin/editor-sessions'
+import { ensureOfferDraft } from '@/lib/admin/offer-drafts'
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/admin/product-offers/[id]/products — assigned products, or (with ?q=) candidate
-// products to assign. Both return plain product rows so ids are real product uuids the PUT accepts.
+async function draftProductIds(offerId: string): Promise<string[] | null> {
+  const row = await queryOne<{ products: string[] | null }>(
+    `SELECT products FROM offer_drafts WHERE offer_id = $1`,
+    [offerId]
+  )
+  return (row?.products ?? null) as string[] | null
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
@@ -31,6 +39,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ items: rows.map(r => ({ id: r.id, label: r.name, sublabel: r.sku })) })
   }
 
+  const session = await findOpenSession(admin.id, 'offer', id)
+  if (session) {
+    await ensureOfferDraft(id)
+    const ids = (await draftProductIds(id)) ?? []
+    if (ids.length === 0) return NextResponse.json({ products: [] })
+    const products = await queryMany(
+      `SELECT p.id, p.name, p.sku, p.image_url
+         FROM products p WHERE p.id = ANY($1::uuid[])
+         ORDER BY p.name ASC`,
+      [ids]
+    )
+    return NextResponse.json({ products })
+  }
+
   const products = await queryMany(
     `SELECT p.id, p.name, p.sku, p.image_url
        FROM product_offer_items i
@@ -44,7 +66,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 const putSchema = z.object({ productIds: z.array(zUuid) })
 
-// PUT /api/admin/product-offers/[id]/products — replace the full membership.
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
@@ -60,6 +81,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!parsed.ok) return parsed.response
   const productIds = Array.from(new Set(parsed.data.productIds))
 
+  const session = await findOpenSession(admin.id, 'offer', id)
+  if (session) {
+    await ensureOfferDraft(id)
+    await query(
+      `UPDATE offer_drafts SET products = $1::jsonb, updated_at = now() WHERE offer_id = $2`,
+      [JSON.stringify(productIds), id]
+    )
+    return NextResponse.json({ success: true, count: productIds.length, draft: true })
+  }
+
   await withTransaction(async client => {
     await client.query(`DELETE FROM product_offer_items WHERE offer_id = $1`, [id])
     if (productIds.length > 0) {
@@ -71,11 +102,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       )
     }
   })
-
   return NextResponse.json({ success: true, count: productIds.length })
 }
 
-// Brand ids include seeded non-RFC uuids, so these accept any Postgres uuid shape.
 const bulkSchema = z
   .object({
     action: z.enum(['add', 'remove']),
@@ -87,13 +116,11 @@ const bulkSchema = z
   })
 
 const CATEGORY_TREE = `WITH RECURSIVE tree AS (
-    SELECT id FROM categories WHERE id = $2
+    SELECT id FROM categories WHERE id = $1
     UNION
     SELECT c.id FROM categories c JOIN tree t ON c.parent_category_id = t.id WHERE c.is_active = true
   )`
 
-// POST /api/admin/product-offers/[id]/products — add or remove every product in a category
-// (subcategories included) or a brand. Adding skips inactive products and existing members.
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
@@ -109,20 +136,48 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!parsed.ok) return parsed.response
   const { action, categoryId, brandId } = parsed.data
 
-  const tree = categoryId ? CATEGORY_TREE : ''
-  const match = categoryId ? 'p.category_id IN (SELECT id FROM tree)' : 'p.brand_id = $2'
-  const sql =
-    action === 'add'
-      ? `${tree} INSERT INTO product_offer_items (offer_id, product_id)
-         SELECT $1, p.id FROM products p WHERE p.is_active = true AND ${match}
-       ON CONFLICT DO NOTHING`
-      : `${tree} DELETE FROM product_offer_items i USING products p
-        WHERE i.offer_id = $1 AND i.product_id = p.id AND ${match}`
+  // Resolve the match set to product ids first — one SQL path, reused for both draft & live.
+  const matchIdsSql = categoryId
+    ? `${CATEGORY_TREE} SELECT p.id FROM products p WHERE p.is_active = true AND p.category_id IN (SELECT id FROM tree)`
+    : `SELECT p.id FROM products p WHERE p.is_active = true AND p.brand_id = $1`
+  const matched = await queryMany<{ id: string }>(matchIdsSql, [categoryId ?? brandId])
+  const matchedIds = matched.map(m => m.id)
 
-  const result = await query(sql, [id, categoryId ?? brandId])
+  const session = await findOpenSession(admin.id, 'offer', id)
+  if (session) {
+    await ensureOfferDraft(id)
+    const current = (await draftProductIds(id)) ?? []
+    const next =
+      action === 'add'
+        ? Array.from(new Set([...current, ...matchedIds]))
+        : current.filter(pid => !matchedIds.includes(pid))
+    const changed = Math.abs(next.length - current.length)
+    await query(
+      `UPDATE offer_drafts SET products = $1::jsonb, updated_at = now() WHERE offer_id = $2`,
+      [JSON.stringify(next), id]
+    )
+    return NextResponse.json({ changed, total: next.length, draft: true })
+  }
+
+  await withTransaction(async client => {
+    if (action === 'add') {
+      await client.query(
+        `INSERT INTO product_offer_items (offer_id, product_id)
+           SELECT $1, pid FROM unnest($2::uuid[]) AS pid
+         ON CONFLICT DO NOTHING`,
+        [id, matchedIds]
+      )
+    } else {
+      await client.query(
+        `DELETE FROM product_offer_items WHERE offer_id = $1 AND product_id = ANY($2::uuid[])`,
+        [id, matchedIds]
+      )
+    }
+  })
   const total = await queryOne<{ n: number }>(
     `SELECT count(*)::int AS n FROM product_offer_items WHERE offer_id = $1`,
     [id]
   )
-  return NextResponse.json({ changed: result.rowCount ?? 0, total: total?.n ?? 0 })
+  return NextResponse.json({ changed: matchedIds.length, total: total?.n ?? 0 })
 }
+
