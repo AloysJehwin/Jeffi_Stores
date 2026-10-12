@@ -107,7 +107,7 @@ export async function snapshotResource(
           updatedAt: draft.updated_at,
         }
       }
-      // No draft yet: Cancel restores to the "no draft" state — DELETE on close.
+      // No draft yet — Cancel means "DELETE the draft row we created during this session".
       return { snapshot: { kind: 'none' }, updatedAt: null }
     }
     case 'site_controls': {
@@ -445,5 +445,22 @@ export async function bumpChangeCount(sessionId: string, adminId: string): Promi
     `UPDATE editor_sessions SET change_count = change_count + 1
      WHERE id = $1 AND admin_id = $2 AND closed_at IS NULL`,
     [sessionId, adminId]
+  )
+}
+
+/**
+ * Look up the open edit session for a given admin + resource, if any.
+ * Write endpoints use this to decide: write to draft (session open) vs live (no session).
+ */
+export async function findOpenSession(
+  adminId: string,
+  resourceType: ResourceType,
+  resourceId: string
+): Promise<{ id: string } | null> {
+  return queryOne<{ id: string }>(
+    `SELECT id FROM editor_sessions
+     WHERE admin_id = $1 AND resource_type = $2 AND resource_id = $3 AND closed_at IS NULL
+     LIMIT 1`,
+    [adminId, resourceType, resourceId]
   )
 }

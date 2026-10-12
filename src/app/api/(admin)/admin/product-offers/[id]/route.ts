@@ -4,6 +4,8 @@ import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import { z } from 'zod'
 import { parseBody } from '@/lib/shared/validate'
+import { findOpenSession } from '@/lib/admin/editor-sessions'
+import { ensureOfferDraft } from '@/lib/admin/offer-drafts'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +22,6 @@ const patchSchema = z.object({
   displayOrder: z.coerce.number().int().min(0).optional(),
 })
 
-// Map camelCase request keys to snake_case DB columns.
 const COLUMN_MAP: Record<string, string> = {
   title: 'title',
   slug: 'slug',
@@ -34,7 +35,6 @@ const COLUMN_MAP: Record<string, string> = {
   displayOrder: 'display_order',
 }
 
-// PATCH /api/admin/product-offers/[id] — update one offer (partial).
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)
@@ -46,26 +46,40 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const parsed = parseBody(patchSchema, await request.json())
   if (!parsed.ok) return parsed.response
   const d = parsed.data as Record<string, unknown>
+  const touched = Object.entries(COLUMN_MAP).filter(([key]) => key in d)
+  if (touched.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
+  const session = await findOpenSession(admin.id, 'offer', id)
+
+  if (session) {
+    // Draft path — merge the patch into offer_drafts.fields.
+    await ensureOfferDraft(id)
+    const patchJson: Record<string, unknown> = {}
+    for (const [key, col] of touched) patchJson[col] = d[key] ?? null
+    await query(
+      `UPDATE offer_drafts SET fields = fields || $1::jsonb, updated_at = now()
+       WHERE offer_id = $2`,
+      [JSON.stringify(patchJson), id]
+    )
+    const row = await queryOne(`SELECT * FROM offer_drafts WHERE offer_id = $1`, [id])
+    return NextResponse.json({ draft: row })
+  }
+
+  // Legacy path — commit directly to live row (non-editor callers like homepage picker).
   const sets: string[] = []
   const vals: unknown[] = []
   let i = 1
-  for (const [key, col] of Object.entries(COLUMN_MAP)) {
-    if (key in d) {
-      sets.push(`${col} = $${i++}`)
-      vals.push(d[key] ?? null)
-    }
+  for (const [key, col] of touched) {
+    sets.push(`${col} = $${i++}`)
+    vals.push(d[key] ?? null)
   }
-  if (sets.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
   vals.push(id)
-
   await query(`UPDATE product_offers SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${i}`, vals)
   const offer = await queryOne(`SELECT * FROM product_offers WHERE id = $1`, [id])
   if (!offer) return NextResponse.json({ error: 'Offer not found' }, { status: 404 })
   return NextResponse.json({ offer })
 }
 
-// DELETE /api/admin/product-offers/[id] — remove the offer and its memberships.
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const admin = await authenticateAdmin(request)

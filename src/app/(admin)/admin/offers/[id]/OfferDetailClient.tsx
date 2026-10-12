@@ -2,11 +2,14 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import Toggle from '@/components/ui/Toggle'
 import OfferProductPicker, { type AssignOption } from '@/components/admin/OffersProductPicker'
+import EditorToolbar from '@/components/admin/EditorToolbar'
+import { useEditSession } from '@/hooks/useEditSession'
 import type { ProductOffer } from '@/lib/catalog/product-offers-shared'
 
 function toDateInput(iso: string | null): string {
@@ -17,7 +20,6 @@ function toDateInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-// Dates are the admin's local calendar days; an end date keeps the offer live through that whole day.
 function fromDateInput(value: string, endOfDay: boolean): string | null {
   if (!value) return null
   const [y, m, d] = value.split('-').map(Number)
@@ -39,6 +41,7 @@ export default function OfferDetailClient({
   categoryOptions: AssignOption[]
   brandOptions: AssignOption[]
 }) {
+  const router = useRouter()
   const { showToast } = useToast()
   const canWrite = useCanWrite('coupons:write')
   const [title, setTitle] = useState(offer.title)
@@ -47,6 +50,23 @@ export default function OfferDetailClient({
   const [endsAt, setEndsAt] = useState<string | null>(offer.ends_at)
   const [isActive, setIsActive] = useState(offer.is_active)
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [pickerKey, setPickerKey] = useState(0)
+
+  const edit = useEditSession({
+    resourceType: 'offer',
+    resourceId: offer.id,
+    onCancelled: () => {
+      // Reset local state + remount picker so it re-fetches the restored live rows.
+      setTitle(offer.title)
+      setSavedTitle(offer.title)
+      setStartsAt(offer.starts_at)
+      setEndsAt(offer.ends_at)
+      setIsActive(offer.is_active)
+      setPickerKey(k => k + 1)
+      router.push(backHref)
+    },
+  })
 
   const save = useCallback(
     async (patch: Record<string, unknown>): Promise<boolean> => {
@@ -80,21 +100,55 @@ export default function OfferDetailClient({
     if (await save({ title: next })) setSavedTitle(next)
   }
 
+  async function publish() {
+    setPublishing(true)
+    try {
+      const res = await fetch(`/api/admin/product-offers/${offer.id}/publish`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        showToast(body.error || 'Failed to publish', 'error')
+        return
+      }
+      showToast('Offer published', 'success')
+      router.push(ap(`/admin/offers/${offer.id}/view`))
+    } catch {
+      showToast('Failed to publish', 'error')
+    } finally {
+      setPublishing(false)
+    }
+  }
+
+  const autosaveStatus = saving ? 'saving' : 'saved'
+
   return (
     <div className="p-4 sm:p-6 w-full max-w-full min-w-0">
-      <div className="flex items-center gap-2 mb-6 text-sm">
-        <Link
-          href={backHref}
-          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
-        >
-          <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Offers
-        </Link>
-        <span className="text-border-default">/</span>
-        <span className="text-foreground font-medium truncate">{title || 'Untitled offer'}</span>
-        {saving && <span className="ml-2 text-[11px] text-foreground-muted">Saving…</span>}
+      <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2 text-sm min-w-0">
+          <Link
+            href={backHref}
+            className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
+          >
+            <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Offers
+          </Link>
+          <span className="text-border-default">/</span>
+          <span className="text-foreground font-medium truncate">{title || 'Untitled offer'}</span>
+        </div>
+        {canWrite && (
+          <EditorToolbar
+            autosaveStatus={autosaveStatus}
+            sessionStatus={edit.status}
+            onSave={publish}
+            onCancel={edit.cancel}
+            saveLabel={publishing ? 'Publishing…' : 'Publish'}
+            disabled={publishing}
+          />
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)] items-start">
@@ -180,6 +234,7 @@ export default function OfferDetailClient({
 
         <div className="min-w-0 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
           <OfferProductPicker
+            key={pickerKey}
             offerId={offer.id}
             canWrite={canWrite}
             categoryOptions={categoryOptions}
