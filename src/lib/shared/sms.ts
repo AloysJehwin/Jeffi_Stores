@@ -1,4 +1,5 @@
 import { logMessage } from '@/lib/shared/message-log'
+import { messagingInline, remoteSend } from '@/lib/shared/messaging/remote'
 import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
@@ -41,6 +42,11 @@ async function sendSMS(to: string | null | undefined, body: string, kind: string
   if (!normalized) return false
   if (!(await smsChannelEnabled())) return false
   if (!(await messagingGateAllows('sms', false))) return false
+  if (!messagingInline()) {
+    const r = await remoteSend({ channel: 'sms', to: normalized, body, metadata: { kind } })
+    logMessage({ channel: 'sms', to: normalized, from: 'messaging-service', body, kind, status: r.ok ? 'sent' : 'failed', providerSid: r.providerRef, provider: 'messaging-service', error: r.error, deliveryStatus: r.ok ? 'estimated' : undefined })
+    return r.ok
+  }
   const provider = await getSmsProvider()
   if (!provider.configured) return false
   try {

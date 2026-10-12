@@ -23,6 +23,7 @@ export const SendMessageRequest = z
     subject: z.string().max(200).optional(),
     body: z.string().max(20000).optional(),
     from: z.string().optional(),
+    provider_ref: z.string().max(80).optional(), // WhatsApp: a Twilio content SID when not using a stored template
     reference: z.string().max(120).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
   })

@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { messagingInline, remoteSend } from '@/lib/shared/messaging/remote'
 import { queryOne } from '@/lib/shared/db'
 import { findTokenKeys } from '@/lib/templates/variables-shared'
 import { messagingGateAllows, debitEmailCost } from '@/lib/shared/messaging/billing'
@@ -184,6 +185,12 @@ export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ 
         messageId: null,
       })
       return {}
+    }
+    if (!messagingInline() && !o.cc && !o.bcc && !o.amp && !o.attachments?.length && typeof o.to === 'string') {
+      const r = await remoteSend({ channel: 'email', to: o.to, from, subject: o.subject, body: o.html ?? o.text ?? '', metadata: { kind: o.kind } })
+      await logMail({ to, from, cc, bcc, subject: o.subject, html: o.redactBody ? null : (o.html ?? null), text: o.redactBody ? null : (o.text ?? null), kind: o.kind, entityType: o.entityType ?? null, entityId: o.entityId ?? null, userId: o.userId ?? null, templateName: o.templateName ?? null, metadata: { ...(o.metadata ?? {}), via: 'messaging-service' }, status: r.ok ? 'sent' : 'failed', error: r.error ?? null, messageId: r.providerRef ?? null })
+      if (!r.ok) throw new Error(r.error ?? 'messaging-service send failed')
+      return { messageId: r.providerRef }
     }
     const info = await getTransporter().sendMail({
       from,

@@ -59,6 +59,7 @@ interface Ctx {
   tenantSlug?: string
   apiKeyId?: string
   batchId?: string
+  internal?: boolean
 }
 
 /** Resolve template + variables into the final subject/body. */
@@ -66,7 +67,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   const vars: Vars = (req.variables ?? {}) as Vars
   let subject = req.subject ?? null
   let body = req.body ?? ''
-  let providerRef: string | undefined
+  let providerRef: string | undefined = req.provider_ref
   if (req.template) {
     const t = await findTemplate(ctx.tenantId, req.channel, req.template)
     if (!t) throw new SendError(404, 'template_not_found', `No ${req.channel} template '${req.template}'`)
@@ -74,7 +75,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     if (missing.length) throw new SendError(422, 'missing_variables', `Template needs: ${missing.join(', ')}`, { missing })
     subject = subject ?? t.subject
     body = t.body
-    providerRef = t.provider_ref ?? undefined
+    providerRef = providerRef ?? t.provider_ref ?? undefined
   }
   const html = req.channel === 'email'
   return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars }
@@ -85,14 +86,14 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
 
   const id = randomUUID()
-  const priceInr = messagePriceInr(req.channel)
+  const priceInr = messagePriceInr(req.channel, ctx.internal)
   const from =
     req.from ?? (req.channel === 'email' ? `${ctx.tenantSlug ?? 'noreply'}@${PLATFORM_DOMAIN}` : null)
 
   await db.query(
     `INSERT INTO messages (id, tenant_id, api_key_id, batch_id, channel, to_address, from_address, template_slug, subject, body, price_inr, reference, metadata)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-    [id, ctx.tenantId, ctx.apiKeyId ?? null, ctx.batchId ?? null, req.channel, req.to, from, req.template ?? null, subject, body, priceInr, req.reference ?? null, req.metadata ?? null]
+    [id, ctx.tenantId, ctx.apiKeyId ?? null, ctx.batchId ?? null, req.channel, req.to, from, req.template ?? null, subject, body, priceInr, req.reference ?? null, { ...(req.metadata ?? {}), internal: !!ctx.internal }]
   )
 
   // Wallet gate — debit before the provider call; idempotent on the message id.

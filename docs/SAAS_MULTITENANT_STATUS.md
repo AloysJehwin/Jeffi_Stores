@@ -236,3 +236,11 @@ These are nice-to-have improvements beyond what was built:
 ## Architecture in One Paragraph
 
 Each signed-up tenant gets a dedicated `db.t4g.micro` RDS Postgres instance + an S3 bucket, provisioned by a 15-step state machine (`steps.ts`) driven by an in-app recurring worker (45s tick) running in-VPC. DNS (`{slug}.jeffistores.in` etc.) points at the shared prod EC2 via Route53 A-records. The app's middleware resolves the request `Host` header to a `TenantContext` and forwards `x-tenant-slug` to the route handler; `db.ts` uses that to route queries to the tenant's own RDS instead of the platform DB. Deprovision backs up the DB to S3, deletes RDS + bucket, and clears DNS — a returning owner can restore from the backup on re-onboard.
+
+## Service types & public API (added 2026-10-13)
+
+- `tenants.service_types text[]` — `store`, `messaging`, `documents` (default `{store}`). Onboarding now starts with a service picker (`onboard/OnboardEntry.tsx`): store → the existing 8-step wizard (extra services carried on submit); services-only → `ServicesOnboard.tsx` → `POST /api/ecom/onboard/services`, which creates an **active** tenant on the `services` plan (tier 0, product `services`) with the welcome wallet credit, auto-approved KYC, no subscription and **no provisioning**.
+- Dashboard gate (`lib/ecom/owner-context.ts`): only store-only tenants are held in `/onboard` while `pending_approval`/`awaiting_payment`.
+- Console nav is filtered by service type (`dashboard/nav.ts` `navFor`). New pages: Wallet (Razorpay top-up via `/api/ecom/wallet/topup/*`), API keys, Messaging (templates + log), Documents, Add a store (`upgradeTenantToStore` — same tenant id and wallet).
+- Public API: `public.jeffistores.in` → `public-api-service/`; keys in control-plane `api_keys` / `api_key_usage_daily`. See `docs/MICROSERVICES_PLAN.md` addendum.
+- Hosts: `public.` is served by the gateway, not the Next app (add the Traefik rule when deploying).
