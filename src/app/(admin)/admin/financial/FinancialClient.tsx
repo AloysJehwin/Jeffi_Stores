@@ -11,6 +11,7 @@ import { TransactionsTab } from './_components/TransactionsTab'
 import { PLTab } from './_components/PLTab'
 import { CashflowTab } from './_components/CashflowTab'
 import { CodRemittanceTab } from './_components/CodRemittanceTab'
+import { MessagingTab } from './_components/MessagingTab'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -20,13 +21,23 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'pl', label: 'P&L' },
   { key: 'cashflow', label: 'Cashflow' },
   { key: 'cod_remittance', label: 'COD Remittance' },
+  { key: 'messaging', label: 'Messaging' },
 ]
 
 export default function FinancialClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const tabParam = searchParams.get('tab') as Tab | null
-  const validTabs: Tab[] = ['overview', 'receivables', 'payables', 'transactions', 'pl', 'cashflow', 'cod_remittance']
+  const validTabs: Tab[] = [
+    'overview',
+    'receivables',
+    'payables',
+    'transactions',
+    'pl',
+    'cashflow',
+    'cod_remittance',
+    'messaging',
+  ]
   const [tab, setTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'overview')
 
   const now = new Date()
@@ -91,6 +102,7 @@ export default function FinancialClient() {
         {tab === 'pl' && <PLTab initialData={allData.pl ?? null} />}
         {tab === 'cashflow' && <CashflowTab initialData={allData.cashflow ?? null} />}
         {tab === 'cod_remittance' && <CodRemittanceTab />}
+        {tab === 'messaging' && <MessagingTab />}
       </div>
     </div>
   )

@@ -6925,8 +6925,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/FinancialClient.tsx": {
-    "mtime": 1790931248.3282306,
-    "ast_hash": "64d4a94989307abd0ddd4137a78c6576",
+    "mtime": 1791783674.410196,
+    "ast_hash": "1c8dff8ca8d37f319b97b6574c49b35a",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/_components/CashflowTab.tsx": {
@@ -6975,8 +6975,8 @@
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/_components/shared.tsx": {
-    "mtime": 1790931248.374898,
-    "ast_hash": "ca95537ed3992a5719e0fbf2bb6781ae",
+    "mtime": 1791783674.4246275,
+    "ast_hash": "b1082331fed1923d1542968008bf2174",
     "semantic_hash": ""
   },
   "src/app/(admin)/admin/financial/loading.tsx": {
@@ -11695,8 +11695,8 @@
     "semantic_hash": ""
   },
   "src/lib/payments/wallet.ts": {
-    "mtime": 1791782685.3233433,
-    "ast_hash": "6c2dcdcebd2a6bf808959accabc7c90c",
+    "mtime": 1791783500.4933364,
+    "ast_hash": "ba483dc3943edbf57ed5dbcb4ec6fd9c",
     "semantic_hash": ""
   },
   "src/lib/shared/activity-shared.ts": {
@@ -14607,6 +14607,21 @@
   "tests/api/webhooks/twilio-status.test.ts": {
     "mtime": 1791783253.2520573,
     "ast_hash": "c14183bf59a2b7f1885a81f350b9d2c2",
+    "semantic_hash": ""
+  },
+  "src/app/(admin)/admin/financial/_components/MessagingTab.tsx": {
+    "mtime": 1791783579.9540823,
+    "ast_hash": "17b0b7c85a641ecc75fc6de16ecb37f4",
+    "semantic_hash": ""
+  },
+  "src/app/api/(admin)/admin/financial/messaging-spend/route.ts": {
+    "mtime": 1791783512.3287208,
+    "ast_hash": "921ea77c369b4888ef892eacb6e56123",
+    "semantic_hash": ""
+  },
+  "tests/lib/messaging-spend.test.ts": {
+    "mtime": 1791783636.4772236,
+    "ast_hash": "09321bcdc668e18bb1bff54dae76858c",
     "semantic_hash": ""
   }
 }
