@@ -14,7 +14,7 @@ export default function SiteReachabilityBadge({ url }: { url?: string }) {
   useEffect(() => {
     let active = true
     const qs = url ? `?url=${encodeURIComponent(url)}` : ''
-    fetch(`/api/admin/site-reachability${qs}`, { credentials: 'include' })
+    fetch(`/api/ecom/site-reachability${qs}`, { credentials: 'include' })
       .then(r => r.json())
       .then(d => {
         if (!active) return

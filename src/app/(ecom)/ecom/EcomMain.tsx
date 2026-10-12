@@ -9,6 +9,6 @@ const NO_NAV = ['/signin', '/signup', '/ecom/signin', '/ecom/signup']
 
 export default function EcomMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const hideNav = NO_NAV.includes(pathname)
+  const hideNav = NO_NAV.includes(pathname) || pathname.startsWith('/dashboard')
   return <main className={`flex-1 ${hideNav ? '' : 'pt-14'}`}>{children}</main>
 }
