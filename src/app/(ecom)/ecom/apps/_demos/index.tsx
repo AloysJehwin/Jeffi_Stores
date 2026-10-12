@@ -25,6 +25,18 @@ const DEMOS: Record<string, ComponentType> = {
   payments: lazy(() => import('./PaymentsDemo')),
   financial: lazy(() => import('./FinancialDemo')),
   payouts: lazy(() => import('./PayoutsDemo')),
+  campaigns: lazy(() => import('./CampaignsDemo')),
+  mailer: lazy(() => import('./MailerDemo')),
+  social: lazy(() => import('./SocialDemo')),
+  offers: lazy(() => import('./OffersDemo')),
+  business: lazy(() => import('./BusinessDemo')),
+  rfqs: lazy(() => import('./RfqsDemo')),
+  'b2b-pricing': lazy(() => import('./B2bPricingDemo')),
+  crm: lazy(() => import('./CrmDemo')),
+  dashboard: lazy(() => import('./DashboardDemo')),
+  agent: lazy(() => import('./AgentDemo')),
+  team: lazy(() => import('./TeamDemo')),
+  traffic: lazy(() => import('./TrafficDemo')),
 }
 
 export function hasDemo(slug: string) {
