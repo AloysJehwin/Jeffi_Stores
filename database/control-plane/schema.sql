@@ -99,7 +99,7 @@ ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_subscription_statu
     CHECK (subscription_status IN ('created','authenticated','active','halted','cancelled','completed','expired'));
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_billing_interval_check
     CHECK (billing_interval IN ('monthly','yearly'));
-ALTER TABLE ONLY public.plans          ADD CONSTRAINT plans_tier_check CHECK (tier BETWEEN 1 AND 4);
+ALTER TABLE ONLY public.plans          ADD CONSTRAINT plans_tier_check CHECK (tier BETWEEN 0 AND 4); -- 0 = services-only plan
 
 -- FKs are safe here: all four tables live in the SAME control-plane DB.
 ALTER TABLE ONLY public.plan_features  ADD CONSTRAINT plan_features_plan_id_fkey
@@ -784,3 +784,45 @@ CREATE TABLE IF NOT EXISTS public.razorpay_subscription_index (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rzp_sub_index_tenant ON public.razorpay_subscription_index USING btree (tenant_id);
+
+--
+-- Service types + public API keys (public.jeffistores.in). A tenant may subscribe to any mix of
+-- store | messaging | documents. Services-only tenants are never provisioned (no RDS/S3/compute)
+-- and are created 'active' straight from onboarding; they keep the same tenants.id (and so the
+-- same tenant_wallets row) if they later add a store.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS service_types text[] NOT NULL DEFAULT '{store}';
+ALTER TABLE public.plans   ADD COLUMN IF NOT EXISTS product character varying(16) NOT NULL DEFAULT 'store'; -- store|services
+
+CREATE TABLE IF NOT EXISTS public.api_keys (
+    id                 uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    owner_id           uuid NOT NULL,
+    tenant_id          uuid NOT NULL,
+    name               character varying(80) NOT NULL,
+    key_prefix         character varying(16) NOT NULL,  -- 'jk_live_' + 8 chars, shown in UI
+    key_hash           character(64) NOT NULL,          -- sha256 hex of the full key; plaintext never stored
+    scopes             text[] NOT NULL DEFAULT '{}',    -- messages:send | templates:read | templates:write | documents:render | documents:read | wallet:read
+    rate_limit_per_min integer NOT NULL DEFAULT 120,
+    status             character varying(16) NOT NULL DEFAULT 'active', -- active|revoked
+    last_used_at       timestamp with time zone,
+    revoked_at         timestamp with time zone,
+    created_at         timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.api_key_usage_daily (
+    api_key_id   uuid NOT NULL,
+    day          date NOT NULL,
+    requests     integer NOT NULL DEFAULT 0,
+    messages     integer NOT NULL DEFAULT 0,
+    documents    integer NOT NULL DEFAULT 0,
+    spend_paise  bigint  NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ONLY public.api_keys ADD CONSTRAINT api_keys_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.api_keys ADD CONSTRAINT api_keys_key_hash_key UNIQUE (key_hash);
+ALTER TABLE ONLY public.api_keys ADD CONSTRAINT api_keys_status_check CHECK (status IN ('active','revoked'));
+ALTER TABLE ONLY public.api_keys ADD CONSTRAINT api_keys_owner_id_fkey  FOREIGN KEY (owner_id)  REFERENCES public.owners(id)  ON DELETE CASCADE;
+ALTER TABLE ONLY public.api_keys ADD CONSTRAINT api_keys_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.api_key_usage_daily ADD CONSTRAINT api_key_usage_daily_pkey PRIMARY KEY (api_key_id, day);
+ALTER TABLE ONLY public.api_key_usage_daily ADD CONSTRAINT api_key_usage_daily_api_key_id_fkey FOREIGN KEY (api_key_id) REFERENCES public.api_keys(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON public.api_keys USING btree (tenant_id, status);

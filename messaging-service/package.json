@@ -1,0 +1,9 @@
+{
+  "name": "messaging-service", "version": "0.1.0", "private": true, "type": "module",
+  "scripts": { "dev": "tsx watch src/server.ts", "start": "tsx src/server.ts", "typecheck": "tsc -p tsconfig.json", "test": "vitest run" },
+  "dependencies": {
+    "@jeffi/api-contracts": "*", "@jeffi/pricing": "*", "@jeffi/service-auth": "*", "@jeffi/wallet": "*",
+    "fastify": "^5.2.1", "@fastify/formbody": "^8.0.2", "pg": "^8.13.0", "nodemailer": "^6.9.16", "twilio": "^5.4.0", "zod": "^4.4.3"
+  },
+  "devDependencies": { "@types/node": "^22.10.0", "@types/nodemailer": "^6.4.17", "@types/pg": "^8.11.10", "tsx": "^4.19.2", "typescript": "^5.7.2", "vitest": "^3.0.0" }
+}

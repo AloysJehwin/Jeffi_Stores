@@ -107,3 +107,5 @@ public/models/onboarding/ort/*.mjs
 .idea/
 .vault-store/
 .env.local.overrides
+
+**/node_modules/
