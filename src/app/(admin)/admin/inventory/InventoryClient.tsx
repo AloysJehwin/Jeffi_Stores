@@ -501,6 +501,9 @@ function POTab({ initialPO }: { initialPO?: string }) {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [viewPO, setViewPO] = useState<{ po: any; items: POItem[]; grns: any[] } | null>(null)
   const [receiveMode, setReceiveMode] = useState<{ po: any } | null>(null)
+  // Receive edit-session id — opened on modal open, closed on submit (save) or
+  // cancel (rollback). Kept in a ref because closers run outside the setter.
+  const receiveSessionIdRef = React.useRef<string | null>(null)
   const [poCategories, setPoCategories] = useState<{ id: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
   const [receiveItems, setReceiveItems] = useState<any[]>([])
@@ -591,27 +594,39 @@ function POTab({ initialPO }: { initialPO?: string }) {
 
   // Autosave the in-progress receive form to localStorage (keyed by PO id) so a
   // long receive isn't lost on navigate-away/refresh. Restored in openReceive.
+  // Also mirrors to po_receive_drafts on the server so Cancel rolls back cleanly.
   useEffect(() => {
     if (!receiveMode?.po?.id || receiveItems.length === 0) return
-    const key = `po_receive_draft:${receiveMode.po.id}`
+    const poId = receiveMode.po.id
+    const key = `po_receive_draft:${poId}`
     const t = setTimeout(() => {
+      // Only persist the fields the user edits (not the whole product record).
+      const slim = receiveItems.map(it => ({
+        id: it.id,
+        receive_qty: it.receive_qty,
+        receive_cost: it.receive_cost,
+        lot_number: it.lot_number,
+        expiry_date: it.expiry_date,
+        manufacture_date: it.manufacture_date,
+        location_id: it.location_id,
+        serial_numbers: it.serial_numbers,
+      }))
       try {
-        // Only persist the fields the user edits (not the whole product record).
-        const slim = receiveItems.map(it => ({
-          id: it.id,
-          receive_qty: it.receive_qty,
-          receive_cost: it.receive_cost,
-          lot_number: it.lot_number,
-          expiry_date: it.expiry_date,
-          manufacture_date: it.manufacture_date,
-          location_id: it.location_id,
-          serial_numbers: it.serial_numbers,
-        }))
         localStorage.setItem(
           key,
           JSON.stringify({ items: slim, notes: receiveNotes, warehouse_id: receiveWarehouseId, savedAt: Date.now() })
         )
       } catch {}
+      // Mirror to server draft (fire-and-forget — localStorage still works offline).
+      void fetch(`/api/admin/inventory/po/${poId}/receive/draft`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          line_items: slim,
+          serials: slim.flatMap(r => (Array.isArray(r.serial_numbers) ? r.serial_numbers : [])),
+        }),
+      }).catch(() => {})
     }, 600)
     return () => clearTimeout(t)
   }, [receiveMode, receiveItems, receiveNotes, receiveWarehouseId])
@@ -749,7 +764,38 @@ function POTab({ initialPO }: { initialPO?: string }) {
       }
     })
     setReceiveMode({ po: json.purchase_order })
-    // Restore an autosaved draft for this PO (survives navigate-away / refresh).
+
+    // Open an editor-session so Cancel can roll back the draft on the server.
+    try {
+      const sr = await fetch('/api/admin/editor-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ resource_type: 'po_receive', resource_id: id }),
+      })
+      if (sr.ok) {
+        const sj = await sr.json()
+        receiveSessionIdRef.current = sj.session_id || null
+      }
+    } catch {}
+
+    // Prefer the server-side receive draft (survives machine switches); fall back to localStorage.
+    try {
+      const dr = await fetch(`/api/admin/inventory/po/${id}/receive/draft`, { credentials: 'include' })
+      if (dr.ok) {
+        const dj = await dr.json()
+        if (dj?.draft?.line_items && Array.isArray(dj.draft.line_items)) {
+          const byId: Record<string, any> = {}
+          for (const d of dj.draft.line_items as any[]) byId[d.id] = d
+          const merged = items.map((it: any) => (byId[it.id] ? { ...it, ...byId[it.id] } : it))
+          setReceiveItems(merged)
+          setReceiveNotes('')
+          setReceiveWarehouseId('')
+          setDraftRestored(true)
+          return
+        }
+      }
+    } catch {}
     try {
       const raw = localStorage.getItem(`po_receive_draft:${id}`)
       if (raw) {
@@ -788,6 +834,26 @@ function POTab({ initialPO }: { initialPO?: string }) {
     }
   }
 
+  // Cancel the receive: close the session (rolls back draft on the server) and
+  // discard the client state. localStorage mirror is cleared too.
+  async function cancelReceive() {
+    const poId = receiveMode?.po?.id
+    const sid = receiveSessionIdRef.current
+    if (sid) {
+      await fetch(`/api/admin/editor-sessions/${sid}/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'cancel' }),
+      }).catch(() => {})
+      receiveSessionIdRef.current = null
+    }
+    if (poId) {
+      try { localStorage.removeItem(`po_receive_draft:${poId}`) } catch {}
+    }
+    setReceiveMode(null)
+  }
+
   // Explicitly save the in-progress receive as a draft and exit. The form already
   // autosaves as you type; this writes immediately (bypassing the debounce) so the
   // user can confidently leave and resume later from the PO list.
@@ -816,6 +882,17 @@ function POTab({ initialPO }: { initialPO?: string }) {
       showToast('Draft saved — resume this receipt anytime from the PO list.', 'success')
     } catch {
       showToast('Could not save draft', 'error')
+    }
+    // Close the session as 'save' — server does NOT roll back the draft on save.
+    const sid = receiveSessionIdRef.current
+    if (sid) {
+      void fetch(`/api/admin/editor-sessions/${sid}/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'save' }),
+      }).catch(() => {})
+      receiveSessionIdRef.current = null
     }
     setReceiveMode(null)
   }
@@ -882,6 +959,21 @@ function POTab({ initialPO }: { initialPO?: string }) {
       try {
         localStorage.removeItem(`po_receive_draft:${receiveMode.po.id}`)
       } catch {}
+      // Delete the server-side draft + close the session as 'save' (no rollback).
+      void fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive/draft`, {
+        method: 'DELETE',
+        credentials: 'include',
+      }).catch(() => {})
+      const sid = receiveSessionIdRef.current
+      if (sid) {
+        void fetch(`/api/admin/editor-sessions/${sid}/close`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ action: 'save' }),
+        }).catch(() => {})
+        receiveSessionIdRef.current = null
+      }
       setDraftRestored(false)
       // Stash received serials so labels can be printed from the PO list, then close.
       const receivedSerials = items.flatMap((it: any) => (Array.isArray(it.serial_numbers) ? it.serial_numbers : []))
@@ -937,7 +1029,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
         <div className="flex items-center gap-3">
           <button
             className="inline-flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground transition-colors"
-            onClick={() => setReceiveMode(null)}
+            onClick={cancelReceive}
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -1337,7 +1429,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
           >
             Save Draft
           </button>
-          <button className={btnSecondary} onClick={() => setReceiveMode(null)}>
+          <button className={btnSecondary} onClick={cancelReceive}>
             Cancel
           </button>
         </div>
