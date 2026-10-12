@@ -1,11 +1,11 @@
-export const ACCENT = '#2563eb'
+export const ACCENT = '#c46a46'
 
 export const STATUS_CLASSES: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  processing: 'bg-blue-100 text-blue-800',
-  shipped: 'bg-blue-100 text-blue-800',
-  delivered: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
-  paid: 'bg-green-100 text-green-800',
-  refunded: 'bg-red-100 text-red-800',
+  pending: 'org-peach org-brown',
+  processing: 'org-sand text-foreground',
+  shipped: 'org-sand text-foreground',
+  delivered: 'org-sage org-sage-text',
+  cancelled: 'bg-[#f2d4cd] text-[#8a2e1f]',
+  paid: 'org-sage org-sage-text',
+  refunded: 'bg-[#f2d4cd] text-[#8a2e1f]',
 }

@@ -1,129 +1,13 @@
-/* Ecom marketing demo: white/near-black scope with a single indigo accent.
-   Redefines the same tokens .light-scope does; touches nothing outside .ecom-clean. */
-.ecom-clean {
-  --color-surface: #ffffff;
-  --color-surface-elevated: #ffffff;
-  --color-surface-secondary: #f5f6f8;
-  --color-foreground: #0b0d12;
-  --color-foreground-secondary: #3a3f4b;
-  --color-foreground-muted: #6b7280;
-  --color-border: #e5e7eb;
-  --color-border-secondary: #d1d5db;
-  --primary-500: #f59e0b;
-  --primary-600: #d97706;
-  --accent-500: #7cb900;
-  --accent-600: #5a8a00;
-}
-
-/* Ecom demo: one restrained blue accent for primary buttons + active states */
-.ecom-accent-bg {
-  background-color: #2563eb !important;
-}
-.ecom-accent-bg:hover {
-  background-color: #1d4ed8 !important;
-}
-.ecom-accent-text {
-  color: #2563eb;
-}
-.ecom-accent-border {
-  border-color: #2563eb;
-}
-
-/* Ecom pages: recolor the brand accent (green) to a professional blue, scoped to .ecom-scope
-   on the ecom layout so the rest of the app keeps its green. */
-.ecom-scope .bg-accent-600 {
-  background-color: #1d4ed8 !important;
-}
-.ecom-scope .text-accent-600 {
-  color: #1d4ed8 !important;
-}
-.ecom-scope .bg-accent-500 {
-  background-color: #2563eb !important;
-}
-.ecom-scope .text-accent-400 {
-  color: #60a5fa !important;
-}
-.ecom-scope .bg-accent-700 {
-  background-color: #1e40af !important;
-}
-.ecom-scope .to-accent-500 {
-  --tw-gradient-to: #2563eb var(--tw-gradient-to-position) !important;
-}
-.ecom-scope .border-accent-500 {
-  border-color: #2563eb !important;
-}
-.ecom-scope .bg-accent-900 {
-  background-color: #172554 !important;
-}
-.ecom-scope .bg-accent-50 {
-  background-color: #eff6ff !important;
-}
-.ecom-scope .text-accent-700 {
-  color: #1e40af !important;
-}
-.ecom-scope .text-accent-300 {
-  color: #93c5fd !important;
-}
-.ecom-scope .ring-accent-500 {
-  --tw-ring-color: #2563eb !important;
-}
-.ecom-scope .border-accent-400 {
-  border-color: #60a5fa !important;
-}
-.ecom-scope .border-accent-300 {
-  border-color: #93c5fd !important;
-}
-.ecom-scope .shadow-accent-600 {
-  --tw-shadow-color: #1d4ed8 !important;
-}
-.ecom-scope .from-accent-600 {
-  --tw-gradient-from: #1d4ed8 var(--tw-gradient-from-position) !important;
-  --tw-gradient-to: rgb(37 99 235 / 0) var(--tw-gradient-to-position) !important;
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
-}
-.ecom-scope .border-accent-600 {
-  border-color: #1d4ed8 !important;
-}
-.ecom-scope .text-accent-500 {
-  color: #2563eb !important;
-}
-.ecom-scope .from-accent-500 {
-  --tw-gradient-from: #2563eb var(--tw-gradient-from-position) !important;
-  --tw-gradient-to: rgb(37 99 235 / 0) var(--tw-gradient-to-position) !important;
-  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
-}
-.ecom-scope .border-accent-800 {
-  border-color: #1e3a8a !important;
-}
-.ecom-scope .border-accent-700 {
-  border-color: #1e40af !important;
-}
-.ecom-scope .border-accent-200 {
-  border-color: #bfdbfe !important;
-}
-.ecom-scope .bg-accent-100 {
-  background-color: #dbeafe !important;
-}
-.ecom-scope .hover\:bg-accent-500:hover {
-  background-color: #2563eb !important;
-}
-.ecom-scope .hover\:bg-accent-600:hover {
-  background-color: #1d4ed8 !important;
-}
-.ecom-scope .hover\:bg-accent-700:hover {
-  background-color: #1e40af !important;
-}
-.ecom-scope .group:hover .group-hover\:text-accent-600 {
-  color: #1d4ed8 !important;
-}
-
-/* ── Owner console (/dashboard/*): "Organic" theme — cream, ink, terracotta. Light only. ── */
-.ecom-console {
+/* ── ecom.jeffistores.in: "Organic" theme — cream, ink, terracotta. Light only. ──
+   .ecom-scope is the root of the ecom layout, so every page on the host inherits these tokens.
+   The accent-* remaps below turn the app's green accent utilities into terracotta without touching
+   component code; raw palette classes (blue-*, green-*) are replaced file-by-file instead. */
+.ecom-scope {
   --color-surface: #f5f0e6;
   --color-surface-elevated: #fffdf7;
-  --color-surface-secondary: #ebe4d6;
+  --color-surface-secondary: #ecdfc8;
   --color-foreground: #1b1714;
-  --color-foreground-secondary: #4a433b;
+  --color-foreground-secondary: #5f574d;
   --color-foreground-muted: #7a7064;
   --color-border: #e3dacb;
   --color-border-secondary: #cfc4b1;
@@ -131,54 +15,88 @@
   --primary-600: #a9552f;
   --accent-500: #c46a46;
   --accent-600: #a9552f;
-  --console-terracotta: #c46a46;
-  --console-terracotta-deep: #a9552f;
-  --console-terracotta-soft: #f7e9e0;
-  --console-sage: #e2ebd6;
-  --console-sage-deep: #6b7f55;
+
+  --org-sand: #ecdfc8;
+  --org-sand-deep: #e2d3b8;
+  --org-peach: #fbe3d4;
+  --org-apricot: #f9c6a3;
+  --org-sage: #dfe9cf;
+  --org-sage-deep: #6b7f55;
+  --org-terracotta: #c46a46;
+  --org-terracotta-deep: #a9552f;
+  --org-brown: #8a4a1f;
+  --org-band: #2a2822;
+  --org-band-text: #f3ead9;
+  --org-frame: #f8f3ea;
+  --org-chrome: #f3ead9;
+
+  /* legacy aliases used by the dashboard console */
+  --console-terracotta: var(--org-terracotta);
+  --console-terracotta-deep: var(--org-terracotta-deep);
+  --console-terracotta-soft: var(--org-peach);
+  --console-sage: var(--org-sage);
+  --console-sage-deep: var(--org-sage-deep);
+
   background-color: var(--color-surface);
   color: var(--color-foreground);
 }
-.ecom-console .font-display {
+
+.ecom-scope .font-display {
   font-family: var(--font-display), Georgia, serif;
   font-variation-settings: 'SOFT' 100, 'WONK' 0;
 }
-.ecom-console .ecom-accent-bg { background-color: var(--console-terracotta) !important; }
-.ecom-console .ecom-accent-bg:hover { background-color: var(--console-terracotta-deep) !important; }
-.ecom-console .ecom-accent-text { color: var(--console-terracotta); }
-.ecom-console .ecom-accent-border { border-color: var(--console-terracotta); }
 
-/* Terracotta overrides the .ecom-scope blue remaps for anything mounted inside the console. */
-.ecom-scope .ecom-console .bg-accent-50 { background-color: var(--console-terracotta-soft) !important; }
-.ecom-scope .ecom-console .bg-accent-100 { background-color: #f0d9cb !important; }
-.ecom-scope .ecom-console .bg-accent-500,
-.ecom-scope .ecom-console .hover\:bg-accent-500:hover { background-color: var(--console-terracotta) !important; }
-.ecom-scope .ecom-console .bg-accent-600,
-.ecom-scope .ecom-console .hover\:bg-accent-600:hover,
-.ecom-scope .ecom-console .bg-accent-700,
-.ecom-scope .ecom-console .hover\:bg-accent-700:hover { background-color: var(--console-terracotta-deep) !important; }
-.ecom-scope .ecom-console .text-accent-400,
-.ecom-scope .ecom-console .text-accent-500,
-.ecom-scope .ecom-console .text-accent-600,
-.ecom-scope .ecom-console .text-accent-700,
-.ecom-scope .ecom-console .group:hover .group-hover\:text-accent-600 { color: var(--console-terracotta-deep) !important; }
-.ecom-scope .ecom-console .text-accent-300 { color: var(--console-terracotta) !important; }
-.ecom-scope .ecom-console .border-accent-200,
-.ecom-scope .ecom-console .border-accent-300,
-.ecom-scope .ecom-console .border-accent-400,
-.ecom-scope .ecom-console .border-accent-500,
-.ecom-scope .ecom-console .border-accent-600,
-.ecom-scope .ecom-console .border-accent-700,
-.ecom-scope .ecom-console .border-accent-800 { border-color: var(--console-terracotta) !important; }
-.ecom-scope .ecom-console .ring-accent-500 { --tw-ring-color: var(--console-terracotta) !important; }
-.ecom-scope .ecom-console .from-accent-500,
-.ecom-scope .ecom-console .from-accent-600 {
-  --tw-gradient-from: var(--console-terracotta) var(--tw-gradient-from-position) !important;
+/* Organic utilities */
+.org-sand { background-color: var(--org-sand); }
+.org-sand-hover:hover { background-color: var(--org-sand-deep); }
+.org-peach { background-color: var(--org-peach); }
+.org-sage { background-color: var(--org-sage); }
+.org-sage-text { color: var(--org-sage-deep); }
+.org-brown { color: var(--org-brown); }
+.org-band { background-color: var(--org-band); color: var(--org-band-text); }
+.org-frame { background-color: var(--org-frame); }
+.org-chrome { background-color: var(--org-chrome); }
+
+.ecom-accent-bg { background-color: var(--org-terracotta) !important; color: #fff; }
+.ecom-accent-bg:hover { background-color: var(--org-terracotta-deep) !important; }
+.ecom-accent-text { color: var(--org-terracotta); }
+.ecom-accent-border { border-color: var(--org-terracotta); }
+
+/* accent-* utility remaps (green → terracotta/brown) */
+.ecom-scope .bg-accent-50 { background-color: var(--org-peach) !important; }
+.ecom-scope .bg-accent-100 { background-color: #f0d9cb !important; }
+.ecom-scope .bg-accent-500,
+.ecom-scope .hover\:bg-accent-500:hover { background-color: var(--org-terracotta) !important; }
+.ecom-scope .bg-accent-600,
+.ecom-scope .hover\:bg-accent-600:hover,
+.ecom-scope .bg-accent-700,
+.ecom-scope .hover\:bg-accent-700:hover { background-color: var(--org-terracotta-deep) !important; }
+.ecom-scope .bg-accent-900 { background-color: var(--org-band) !important; }
+.ecom-scope .text-accent-300 { color: var(--org-apricot) !important; }
+.ecom-scope .text-accent-400,
+.ecom-scope .text-accent-500 { color: var(--org-terracotta) !important; }
+.ecom-scope .text-accent-600,
+.ecom-scope .text-accent-700,
+.ecom-scope .group:hover .group-hover\:text-accent-600 { color: var(--org-brown) !important; }
+.ecom-scope .border-accent-200,
+.ecom-scope .border-accent-300 { border-color: var(--org-apricot) !important; }
+.ecom-scope .border-accent-400,
+.ecom-scope .border-accent-500,
+.ecom-scope .border-accent-600,
+.ecom-scope .border-accent-700,
+.ecom-scope .border-accent-800 { border-color: var(--org-terracotta) !important; }
+.ecom-scope .ring-accent-500 { --tw-ring-color: var(--org-terracotta) !important; }
+.ecom-scope .shadow-accent-600 { --tw-shadow-color: var(--org-terracotta-deep) !important; }
+.ecom-scope .from-accent-500,
+.ecom-scope .from-accent-600,
+.ecom-scope .from-primary-500 {
+  --tw-gradient-from: var(--org-terracotta) var(--tw-gradient-from-position) !important;
   --tw-gradient-to: rgb(196 106 70 / 0) var(--tw-gradient-to-position) !important;
   --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
 }
-.ecom-scope .ecom-console .to-accent-500 { --tw-gradient-to: var(--console-terracotta-deep) var(--tw-gradient-to-position) !important; }
+.ecom-scope .to-accent-500 { --tw-gradient-to: var(--org-terracotta-deep) var(--tw-gradient-to-position) !important; }
+.ecom-scope .to-primary-600 { --tw-gradient-to: var(--org-brown) var(--tw-gradient-to-position) !important; }
 
-/* Pill buttons + softer cards are the console's default shape language. */
-.ecom-console button, .ecom-console a[class*="rounded-lg"] { border-radius: 9999px; }
-.ecom-console input, .ecom-console select, .ecom-console textarea { border-radius: 0.75rem; }
+/* Shape language: pill buttons, rounded inputs */
+.ecom-scope button:not(.org-square) { border-radius: 9999px; }
+.ecom-scope input:not([type='checkbox']):not([type='radio']), .ecom-scope select, .ecom-scope textarea { border-radius: 0.75rem; }

@@ -481,15 +481,15 @@ export default function AdminSurface() {
   const active = TABS.find(t => t.focus === focus) ?? TABS[0]
   return (
     <div
-      className="ecom-clean bg-surface text-foreground h-full w-full flex flex-col overflow-hidden rounded-xl p-4"
+      className=" bg-surface text-foreground h-full w-full flex flex-col overflow-hidden rounded-xl p-4"
       style={{ ['--accent' as string]: ACCENT }}
     >
-      <div className="flex items-center justify-between gap-3 shrink-0">
+      <div className="flex items-center justify-between gap-3 shrink-0 h-12">
         <div className="min-w-0">
           <p className="text-xs text-foreground-muted uppercase tracking-widest">Store admin</p>
           <h3 className="text-base font-bold text-foreground mt-0.5 truncate">{active.label}</h3>
         </div>
-        <nav className="flex items-center gap-1 flex-wrap justify-end max-w-[70%]">
+        <nav className="flex items-center gap-1 flex-nowrap overflow-x-auto max-w-[70%] shrink-0">
           {TABS.map(t => {
             const Icon = t.icon
             const on = t.focus === focus

@@ -36,7 +36,7 @@ export default function LandingFeatures() {
             key={f.title}
             type="button"
             onClick={() => scrub(f.chapter)}
-            className="ecom-clean group text-left rounded-2xl border border-border-default bg-surface-elevated p-5 hover:border-[color:var(--ecom-accent,#4f46e5)] hover:shadow-md transition"
+            className=" group text-left rounded-2xl border border-border-default bg-surface-elevated p-5 hover:border-[color:var(--ecom-accent,#4f46e5)] hover:shadow-md transition"
           >
             <span className="ecom-accent-bg inline-flex w-9 h-9 items-center justify-center rounded-lg text-white">
               <Icon className="w-4.5 h-4.5" />

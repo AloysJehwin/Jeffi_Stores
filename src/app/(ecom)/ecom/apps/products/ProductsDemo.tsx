@@ -62,7 +62,7 @@ export default function ProductsDemo() {
   }
 
   return (
-    <div className="ecom-clean w-full">
+    <div className=" w-full">
       {/* stepper */}
       <div className="flex items-center overflow-x-auto pb-4">
         {STEPS.map((s, i) => {

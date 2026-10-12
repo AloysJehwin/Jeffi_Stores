@@ -168,7 +168,7 @@ export default function BillingClient({
             >
               {iv}
               {iv === 'yearly' && (
-                <span className="ml-1.5 text-xs text-green-600 dark:text-green-400 font-semibold">20% off</span>
+                <span className="ml-1.5 text-xs text-green-600 dark:text-green-400 font-semibold">2 months free</span>
               )}
             </button>
           ))}
@@ -178,7 +178,7 @@ export default function BillingClient({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           {plans.map(p => {
             const monthly = Number(p.monthly_price_inr)
-            const price = interval === 'yearly' ? monthly * 12 : monthly
+            const price = interval === 'yearly' ? monthly * 10 : monthly
             const isCurrent = p.slug === tenant.plan && interval === (tenant.billing_interval ?? 'monthly')
             return (
               <button
@@ -200,7 +200,7 @@ export default function BillingClient({
                   </span>
                 </div>
                 {interval === 'yearly' && (
-                  <div className="text-xs text-green-600 dark:text-green-400">20% off at checkout</div>
+                  <div className="text-xs text-green-600 dark:text-green-400">2 months free</div>
                 )}
               </button>
             )

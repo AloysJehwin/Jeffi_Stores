@@ -16,10 +16,10 @@
 BEGIN;
 
 INSERT INTO public.plans (slug, name, tier, monthly_price_inr, max_custom_domains, is_active, storage_quota_bytes, max_file_bytes) VALUES
-  ('basic', 'Basic', 1, 4999.00, 0, true, 10737418240, 5368709120),
-  ('growth', 'Growth', 2, 9999.00, 0, true, 53687091200, 5368709120),
-  ('pro', 'Pro', 3, 19999.00, 1, true, 214748364800, 5368709120),
-  ('enterprise', 'Enterprise', 4, 49999.00, 3, true, 1099511627776, 5368709120)
+  ('basic', 'Basic', 1, 2999.00, 0, true, 10737418240, 5368709120),
+  ('growth', 'Grow', 2, 4999.00, 0, true, 53687091200, 5368709120),
+  ('pro', 'Pro', 3, 7999.00, 1, true, 214748364800, 5368709120),
+  ('enterprise', 'Enterprise', 4, 9999.00, 3, true, 1099511627776, 5368709120)
 ON CONFLICT (slug) DO UPDATE SET
   name = EXCLUDED.name, tier = EXCLUDED.tier,
   monthly_price_inr = EXCLUDED.monthly_price_inr,

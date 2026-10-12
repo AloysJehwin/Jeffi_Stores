@@ -2,7 +2,7 @@
 
 import { motion } from 'motion/react'
 
-const ACCENT = '#2563eb'
+import { ACCENT } from './theme'
 const TRACK = '#cbd5e1'
 const IDLE = '#94a3b8'
 

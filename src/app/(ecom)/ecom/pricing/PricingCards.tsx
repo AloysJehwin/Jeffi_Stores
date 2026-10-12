@@ -41,7 +41,7 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
           >
             Yearly
             <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">
-              20% off
+              2 months free
             </span>
           </button>
         </div>
@@ -52,7 +52,7 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
         {ordered.map(p => {
           const featured = p.slug === 'growth'
           const monthly = Number(p.monthly_price_inr)
-          const price = interval === 'yearly' ? monthly * 12 : monthly
+          const price = interval === 'yearly' ? monthly * 10 : monthly
           const perMonth = interval === 'yearly' ? monthly : monthly
 
           return (
@@ -77,7 +77,7 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
                 </div>
                 {interval === 'yearly' && (
                   <div className="text-xs text-green-600 dark:text-green-400 font-medium mt-0.5">
-                    20% off applied at checkout
+                    2 months free
                   </div>
                 )}
               </div>

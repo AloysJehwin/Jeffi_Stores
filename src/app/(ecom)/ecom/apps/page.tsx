@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 export default function AppsIndexPage() {
   return (
-    <div className="ecom-clean bg-[#eef1f5] text-foreground">
+    <div className="bg-surface text-foreground">
       <section className="border-b border-border-default">
         <div className="w-full px-6 lg:px-12 pt-14 pb-10 sm:pt-20 text-center">
           <p className="ecom-accent-text font-semibold text-sm uppercase tracking-widest">One platform</p>
