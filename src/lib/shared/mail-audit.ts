@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import { queryOne } from '@/lib/shared/db'
 import { findTokenKeys } from '@/lib/templates/variables-shared'
+import { messagingGateAllows, debitEmailCost } from '@/lib/shared/messaging/billing'
 
 // Single chokepoint for outbound mail. Wraps transporter.sendMail and writes
 // a row to email_logs (status, body, kind, entity link) so admins can see
@@ -163,6 +164,27 @@ export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ 
   }
 
   try {
+    if (!(await messagingGateAllows('email', false))) {
+      await logMail({
+        to,
+        from,
+        cc,
+        bcc,
+        subject: o.subject,
+        html: o.redactBody ? null : (o.html ?? null),
+        text: o.redactBody ? null : (o.text ?? null),
+        kind: o.kind,
+        entityType: o.entityType ?? null,
+        entityId: o.entityId ?? null,
+        userId: o.userId ?? null,
+        templateName: o.templateName ?? null,
+        metadata: { ...(o.metadata ?? {}), walletBlocked: true },
+        status: 'skipped',
+        error: 'wallet balance too low',
+        messageId: null,
+      })
+      return {}
+    }
     const info = await getTransporter().sendMail({
       from,
       to: o.to,
@@ -194,6 +216,7 @@ export async function sendAuditedMail(input: SendAuditedMailOptions): Promise<{ 
       error: null,
       messageId: info.messageId ?? null,
     })
+    await debitEmailCost(info.messageId)
     return { messageId: info.messageId }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

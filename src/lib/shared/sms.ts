@@ -3,6 +3,7 @@ import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { getSmsProvider } from '@/lib/shared/messaging'
+import { messagingGateAllows } from '@/lib/shared/messaging/billing'
 
 // SMS send path. The provider (Twilio today, AWS later) is chosen per-tenant by the Site Controls
 // selector in src/lib/shared/messaging; this file owns the shared concerns: phone normalization,
@@ -39,6 +40,7 @@ async function sendSMS(to: string | null | undefined, body: string, kind: string
   const normalized = normalizePhone(to)
   if (!normalized) return false
   if (!(await smsChannelEnabled())) return false
+  if (!(await messagingGateAllows('sms', false))) return false
   const provider = await getSmsProvider()
   if (!provider.configured) return false
   try {
@@ -70,6 +72,7 @@ export async function sendCampaignSMS(params: {
 }): Promise<boolean> {
   const normalized = normalizePhone(params.phone)
   if (!normalized || !(await smsChannelEnabled())) return false
+  if (!(await messagingGateAllows('sms', true))) return false
   const provider = await getSmsProvider()
   if (!provider.configured) return false
   try {
