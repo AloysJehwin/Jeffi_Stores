@@ -166,10 +166,20 @@ export async function recordSent(params: {
   channel?: 'email' | 'whatsapp' | 'sms'
 }): Promise<string | null> {
   try {
+    // The dedup unique index (campaign_kind,user_id,coalesce(reference_id,'')) is permanent, so a
+    // recurring reference (e.g. seq1) can only be inserted once. The time-window gate
+    // (alreadySentForReference) already decides WHETHER to resend; on a resend we refresh the existing
+    // row's sent_at rather than letting the INSERT fail (which used to abort the send → "Sent 0").
     const result = await query<{ id: string }>(
       `INSERT INTO email_campaigns_sent
          (campaign_kind, user_id, reference_id, message_id, metadata, channel)
        VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (campaign_kind, user_id, COALESCE(reference_id, ''::character varying))
+         WHERE unsubscribed_at IS NULL AND bounced_at IS NULL AND complained_at IS NULL
+         DO UPDATE SET sent_at = now(),
+                       message_id = EXCLUDED.message_id,
+                       metadata = EXCLUDED.metadata,
+                       channel = EXCLUDED.channel
        RETURNING id`,
       [
         params.campaignKind,

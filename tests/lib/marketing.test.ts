@@ -320,6 +320,11 @@ describe('recordSent', () => {
     mockQuery.mockResolvedValue({ rows: [{ id: 'sent-abc' }], rowCount: 1 } as any)
     const id = await recordSent({ campaignKind: 'winback_90', userId: 'user-1' })
     expect(id).toBe('sent-abc')
+    // Upserts (refresh sent_at) instead of failing on the permanent dedup index — a recurring
+    // reference must re-record after its cooldown, else the send is blocked forever ("Sent 0").
+    const sql = String(mockQuery.mock.calls[0][0])
+    expect(sql).toContain('ON CONFLICT')
+    expect(sql).toContain('DO UPDATE SET sent_at = now()')
   })
 
   it('calls send_count upsert when sentId is non-null', async () => {
