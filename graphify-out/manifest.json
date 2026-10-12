@@ -6000,8 +6000,8 @@
     "semantic_hash": ""
   },
   "tests/lib/tenant-registry.lookup-and-kyc-branches.test.ts": {
-    "mtime": 1790931257.6817732,
-    "ast_hash": "3a8ea7de4a8864d8dc58dcf15ac449ab",
+    "mtime": 1791783818.850499,
+    "ast_hash": "65041d1edbf169f426edb55d39c6236f",
     "semantic_hash": ""
   },
   "tests/middleware/admin-canonical-url.test.ts": {
@@ -6250,8 +6250,8 @@
     "semantic_hash": ""
   },
   "src/lib/tenant-registry/tenants.ts": {
-    "mtime": 1790931254.1685512,
-    "ast_hash": "57ad13522281ebaa24b105ddb9f40b6c",
+    "mtime": 1791783850.791877,
+    "ast_hash": "41ee0c5f9f6bd7ac6a2831fa1dc9a551",
     "semantic_hash": ""
   },
   "tests/lib/cron-auth.test.ts": {
