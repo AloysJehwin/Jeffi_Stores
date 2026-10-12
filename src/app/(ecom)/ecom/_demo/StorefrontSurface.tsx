@@ -96,8 +96,8 @@ function CatalogueView({ products, onOpen }: { products: Product[]; onOpen: (id:
               onClick={() => onOpen(p.id)}
               className="group text-left org-sand rounded-2xl overflow-hidden flex flex-col hover:-translate-y-0.5 transition"
             >
-              <div className="relative aspect-[4/3] bg-surface-secondary overflow-hidden">
-                <ProductArt category={p.category} className="w-full h-full" />
+              <div className="relative aspect-[4/3] org-sand overflow-hidden grid place-items-center p-5">
+                <ProductArt category={p.category} className="h-full w-auto max-w-full rounded-2xl" />
                 {off !== null && (
                   <span className="ecom-accent-bg absolute top-2.5 left-2.5 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
                     {off}% off
