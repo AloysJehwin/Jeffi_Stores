@@ -284,7 +284,7 @@ export default function StorefrontSurface() {
   const checkoutTotal = world.order ? world.order.total : cartTotal
 
   return (
-    <div className="ecom-clean h-full w-full flex flex-col overflow-hidden bg-surface text-foreground p-4 sm:p-5">
+    <div className=" h-full w-full flex flex-col overflow-hidden bg-surface text-foreground p-4 sm:p-5">
       <StoreHeader cartCount={world.cart.length} />
       <div className="flex-1 min-h-0 mt-4 relative">
         <AnimatePresence mode="wait" initial={false}>

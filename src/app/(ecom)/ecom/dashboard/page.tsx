@@ -26,7 +26,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const isLive = tenant.status === 'active'
   const storeUrl = `https://${tenant.slug}.jeffistores.in`
   const monthly = Number(tenant.monthly_price_inr ?? 0)
-  const price = tenant.billing_interval === 'yearly' ? monthly * 12 : monthly
+  const price = tenant.billing_interval === 'yearly' ? monthly * 10 : monthly
   const priceLabel = price > 0 ? `₹${price.toLocaleString('en-IN')}/${tenant.billing_interval === 'yearly' ? 'yr' : 'mo'}` : '—'
   const ownRazorpay = tenant.own_razorpay === true
 

@@ -94,7 +94,7 @@ export default function AppsGrid() {
                   <Link
                     key={app.slug}
                     href={`/apps/${app.slug}`}
-                    className="ecom-clean group flex items-start gap-4 rounded-2xl border border-border-default bg-surface p-5 shadow-sm shadow-black/[0.03] transition hover:-translate-y-0.5 hover:border-[color:var(--ecom-accent,#2563eb)] hover:shadow-md"
+                    className=" group flex items-start gap-4 rounded-2xl border border-border-default bg-surface p-5 shadow-sm shadow-black/[0.03] transition hover:-translate-y-0.5 hover:border-[color:var(--ecom-accent,#2563eb)] hover:shadow-md"
                   >
                     <span className="ecom-accent-bg inline-flex w-11 h-11 shrink-0 items-center justify-center rounded-xl text-white">
                       <Icon className="w-5 h-5" />

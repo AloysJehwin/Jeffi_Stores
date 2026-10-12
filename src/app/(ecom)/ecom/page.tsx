@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
 
 export default function EcomLandingPage() {
   return (
-    <div className="ecom-clean bg-[#eef1f5] text-foreground relative isolate">
+    <div className="bg-surface text-foreground relative isolate">
       {/* ── Hero ── */}
       <section className="relative overflow-hidden border-b border-border-default">
         <div className="w-full px-6 lg:px-12 pt-12 pb-10 sm:pt-24 text-center">

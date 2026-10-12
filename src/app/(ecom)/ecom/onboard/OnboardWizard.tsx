@@ -246,7 +246,7 @@ export default function OnboardWizard({
   const effectiveSlug = slugEdited ? slug : slugify(displayName)
   const selectedPlan = plans.find(p => p.slug === planSlug)
   const monthly = Number(selectedPlan?.monthly_price_inr ?? 0)
-  const price = interval === 'yearly' ? monthly * 12 : monthly
+  const price = interval === 'yearly' ? monthly * 10 : monthly
 
   // ── Auto-save draft ──────────────────────────────────────────────────────────
   const autosave = useCallback(
@@ -638,7 +638,7 @@ export default function OnboardWizard({
                   >
                     {iv}{' '}
                     {iv === 'yearly' && (
-                      <span className="ml-1 text-[10px] text-green-600 dark:text-green-400 font-bold">20% off</span>
+                      <span className="ml-1 text-[10px] text-green-600 dark:text-green-400 font-bold">2 months free</span>
                     )}
                   </button>
                 ))}
@@ -646,7 +646,7 @@ export default function OnboardWizard({
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                 {plans.map(p => {
                   const m = Number(p.monthly_price_inr)
-                  const pr = interval === 'yearly' ? m * 12 : m
+                  const pr = interval === 'yearly' ? m * 10 : m
                   return (
                     <button
                       key={p.slug}
@@ -658,7 +658,7 @@ export default function OnboardWizard({
                       <div className="text-2xl font-extrabold text-foreground mt-2">₹{pr.toLocaleString('en-IN')}</div>
                       <div className="text-xs text-foreground-muted">/{interval === 'yearly' ? 'yr' : 'mo'}</div>
                       {interval === 'yearly' && (
-                        <div className="text-xs text-green-600 dark:text-green-400 mt-1">20% off at checkout</div>
+                        <div className="text-xs text-green-600 dark:text-green-400 mt-1">2 months free</div>
                       )}
                       {planSlug === p.slug && (
                         <div className="mt-3 flex items-center gap-1 text-xs text-accent-600 dark:text-accent-400 font-semibold">

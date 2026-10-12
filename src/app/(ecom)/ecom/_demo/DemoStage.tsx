@@ -3,7 +3,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import clsx from 'clsx'
-import { Play, Pause, Check } from 'lucide-react'
+import { Play, Pause } from 'lucide-react'
 import { BrowserFrame } from '@/app/(ecom)/ecom/BrowserFrame'
 import { DemoProvider, useDemo } from './store'
 import StorefrontSurface from './StorefrontSurface'
@@ -34,10 +34,10 @@ function SurfaceFade({ surfaceKey, reduced, children }: { surfaceKey: string; re
 }
 
 function FlowTabs() {
-  const { flow, flows, actions } = useDemo()
+  const { flow, flows, isPlaying, actions } = useDemo()
   return (
-    <div className="border-b border-border-default overflow-x-auto">
-      <div className="flex gap-6 min-w-max">
+    <div className="flex items-center gap-3 h-14">
+      <div className="flex gap-2 overflow-x-auto min-w-0 flex-1 pb-1">
         {flows.map(f => {
           const active = f.id === flow
           return (
@@ -47,75 +47,55 @@ function FlowTabs() {
               onClick={() => actions.setFlow(f.id)}
               aria-current={active ? 'true' : undefined}
               className={clsx(
-                'relative whitespace-nowrap pb-3 pt-1 text-sm font-semibold transition-colors',
-                active ? 'text-foreground' : 'text-foreground-muted hover:text-foreground-secondary'
+                'shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-colors',
+                active ? 'ecom-accent-bg text-white' : 'org-sand org-sand-hover text-foreground'
               )}
             >
               {f.title}
-              {active && (
-                <motion.span
-                  layoutId="ecom-flow-underline"
-                  className="ecom-accent-bg absolute left-0 right-0 -bottom-px h-0.5 rounded-full"
-                />
-              )}
             </button>
           )
         })}
       </div>
+      <button
+        type="button"
+        onClick={isPlaying ? actions.pause : actions.play}
+        aria-label={isPlaying ? 'Pause demo' : 'Play demo'}
+        className="shrink-0 flex items-center justify-center w-10 h-10 rounded-full org-sand org-sand-hover ecom-accent-text"
+      >
+        {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+      </button>
     </div>
   )
 }
 
+// Dots on a hairline; always 4 slots so 3-chapter flows don't change the row width or height.
 function Stepper() {
-  const { chapter, chapters, flow, actions, reducedMotion } = useDemo()
+  const { chapter, chapters, flow, actions } = useDemo()
   const steps = chapters.filter(c => c.flow === flow)
   const activePos = steps.findIndex(c => c.id === chapter.id)
+  const slots = Array.from({ length: 4 }, (_, i) => steps[i] ?? null)
   return (
-    <div className="flex items-center overflow-x-auto py-1">
-      {steps.map((c, i) => {
+    <div className="grid grid-cols-4 h-16 items-start">
+      {slots.map((c, i) => {
+        if (!c) return <div key={`empty-${i}`} />
         const globalIndex = chapters.findIndex(x => x.id === c.id)
-        const done = i < activePos
         const active = i === activePos
+        const done = i < activePos
         return (
-          <div key={c.id} className="flex items-center shrink-0">
-            <button
-              type="button"
-              onClick={() => actions.goToChapter(globalIndex)}
-              aria-current={active ? 'step' : undefined}
-              className="group flex items-center gap-2"
-            >
+          <button key={c.id} type="button" onClick={() => actions.goToChapter(globalIndex)} className="group text-left min-w-0">
+            <div className="relative h-4 flex items-center">
+              <span className="absolute inset-x-0 h-px bg-border-secondary" />
               <span
                 className={clsx(
-                  'flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold border transition',
-                  active && 'ecom-accent-bg ecom-accent-border text-white',
-                  done && 'ecom-accent-bg ecom-accent-border text-white',
-                  !active &&
-                    !done &&
-                    'border-border-default bg-surface-elevated text-foreground-muted group-hover:border-border-secondary'
+                  'relative w-4 h-4 rounded-full border-2 transition-colors',
+                  active || done ? 'ecom-accent-bg ecom-accent-border' : 'bg-surface border-border-secondary group-hover:border-foreground-muted'
                 )}
-              >
-                {done ? <Check className="w-3.5 h-3.5" /> : i + 1}
-              </span>
-              <span
-                className={clsx(
-                  'whitespace-nowrap text-xs font-medium transition-colors',
-                  active ? 'text-foreground' : 'text-foreground-muted group-hover:text-foreground-secondary'
-                )}
-              >
-                {c.title}
-              </span>
-            </button>
-            {i < steps.length - 1 && (
-              <span className="mx-2 h-px w-8 bg-border-default relative overflow-hidden">
-                <motion.span
-                  className="ecom-accent-bg absolute inset-y-0 left-0"
-                  initial={false}
-                  animate={{ width: done ? '100%' : '0%' }}
-                  transition={reducedMotion ? { duration: 0 } : { duration: 0.4 }}
-                />
-              </span>
-            )}
-          </div>
+              />
+            </div>
+            <div className={clsx('mt-2 text-sm truncate pr-3', active ? 'font-bold text-foreground' : 'text-foreground-muted')}>
+              {c.title}
+            </div>
+          </button>
         )
       })}
     </div>
@@ -123,7 +103,7 @@ function Stepper() {
 }
 
 function StageInner() {
-  const { chapter, flow, flows, isPlaying, reducedMotion, actions } = useDemo()
+  const { chapter, reducedMotion, actions } = useDemo()
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -137,31 +117,25 @@ function StageInner() {
 
   const isStorefront = chapter.surface === 'storefront'
   const caption = isStorefront ? 'novastore.jeffistores.in' : `admin - ${chapter.title}`
-  const activeFlow = flows.find(f => f.id === flow)
 
   return (
-    <div className="ecom-clean w-full flex flex-col">
+    <div className="w-full flex flex-col">
       <FlowTabs />
-      {activeFlow && <p className="text-sm text-foreground-secondary mt-3">{activeFlow.blurb}</p>}
-      <div className="mt-3 mb-4">
-        <Stepper />
-      </div>
 
-      <BrowserFrame alt={chapter.title} caption={caption} className="w-full relative">
-        <button
-          type="button"
-          onClick={isPlaying ? actions.pause : actions.play}
-          aria-label={isPlaying ? 'Pause demo' : 'Play demo'}
-          className="ecom-accent-bg absolute top-2 right-3 z-10 flex items-center justify-center w-8 h-8 rounded-full text-white shadow-md hover:opacity-90 transition"
-        >
-          {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-        </button>
-        <div className="bg-surface h-[68svh] min-h-[420px] sm:h-[calc(82svh-2.25rem)] sm:min-h-[484px] max-h-[864px] overflow-hidden">
+      <BrowserFrame alt={chapter.title} caption={caption} className="w-full relative mt-2">
+        <div className="h-[520px] sm:h-[560px] lg:h-[620px] overflow-hidden">
           <SurfaceFade surfaceKey={chapter.surface} reduced={reducedMotion}>
             {isStorefront ? <StorefrontSurface /> : <AdminSurface />}
           </SurfaceFade>
         </div>
       </BrowserFrame>
+
+      <div className="mt-6">
+        <Stepper />
+      </div>
+      <p className="h-6 text-base text-foreground-secondary truncate">
+        <span className="font-semibold text-foreground">{chapter.title}</span> — {chapter.blurb}
+      </p>
     </div>
   )
 }

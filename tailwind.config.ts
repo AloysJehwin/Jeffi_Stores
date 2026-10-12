@@ -63,6 +63,7 @@ const config: Config = {
       fontFamily: {
         bebas: ['"Bebas Neue"', 'cursive'],
         inter: ['"Inter"', 'sans-serif'],
+        display: ['var(--font-display)', 'Georgia', 'serif'],
       },
       fontSize: {
         xs: ['clamp(0.8rem, 0.79rem + 0.05vw, 0.83rem)', { lineHeight: '1rem' }],

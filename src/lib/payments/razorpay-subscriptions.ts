@@ -4,15 +4,15 @@ export type BillingInterval = 'monthly' | 'yearly'
 
 // Monthly prices in paise (INR × 100) — must match plans.monthly_price_inr in the DB.
 const MONTHLY_PAISE: Record<string, number> = {
-  basic: 499900, // ₹4999
-  growth: 999900, // ₹9999
-  pro: 1999900, // ₹19999
-  enterprise: 4999900, // ₹49999
+  basic: 299900, // ₹2999
+  growth: 499900, // ₹4999
+  pro: 799900, // ₹7999
+  enterprise: 999900, // ₹9999
 }
 
-// Yearly = monthly × 12 (full price — 20% discount applied via Razorpay offer at checkout).
+// Yearly = monthly × 10 (two months free).
 function yearlyPaise(slug: string): number {
-  return (MONTHLY_PAISE[slug] ?? 0) * 12
+  return (MONTHLY_PAISE[slug] ?? 0) * 10
 }
 
 function planPaise(slug: string, interval: BillingInterval): number {

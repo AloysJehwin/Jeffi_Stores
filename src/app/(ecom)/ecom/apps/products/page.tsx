@@ -13,7 +13,7 @@ const BENEFITS = [
 
 export default function ProductsAppPage() {
   return (
-    <div className="ecom-clean bg-[#eef1f5] text-foreground">
+    <div className="bg-surface text-foreground">
       <section className="w-full px-6 lg:px-12 pt-10 pb-16 sm:pt-14 max-w-6xl mx-auto">
         <nav className="text-sm text-foreground-muted mb-8">
           <Link href="/apps" className="hover:text-foreground">

@@ -3,7 +3,10 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
 import EcomNav from './EcomNav'
 import EcomMain from './EcomMain'
+import { Fraunces } from 'next/font/google'
 import './ecom.css'
+
+const display = Fraunces({ subsets: ['latin'], weight: 'variable', axes: ['SOFT', 'opsz'], variable: '--font-display', display: 'swap' })
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +25,7 @@ export default async function EcomLayout({ children }: { children: React.ReactNo
   const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
 
   return (
-    <div className="ecom-scope min-h-screen bg-surface flex flex-col">
+    <div className={`ecom-scope ${display.variable} min-h-screen bg-surface flex flex-col`}>
       <EcomNav owner={owner ? { email: owner.email, name: owner.name } : null} />
       <EcomMain>{children}</EcomMain>
     </div>
