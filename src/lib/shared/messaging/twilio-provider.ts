@@ -1,10 +1,9 @@
 import twilio from 'twilio'
+import { getCurrentTenantId } from '@/lib/tenancy/tenant-context'
 import type { SmsProvider, WhatsAppProvider } from './types'
 
 // All Twilio specifics live here: client construction (API key preferred, auth-token fallback),
 // the sender numbers, the `whatsapp:` channel prefix, and the two `messages.create` payload shapes.
-// Set TWILIO_ACCOUNT_SID + a from number, plus EITHER TWILIO_API_KEY_SID+TWILIO_API_KEY_SECRET
-// (preferred, revocable) OR TWILIO_AUTH_TOKEN.
 
 const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
@@ -22,6 +21,15 @@ function getClient() {
   return null
 }
 
+// Delivery/price callback URL carrying the current tenant id (the webhook has no Host). Null when the
+// base URL or tenant is unknown, so no callback is requested (send still proceeds; just no true-up).
+function statusCallback(): string | undefined {
+  const base = process.env.PUBLIC_WEBHOOK_BASE_URL || process.env.APP_URL
+  const tenantId = getCurrentTenantId()
+  if (!base || !tenantId) return undefined
+  return `${base.replace(/\/$/, '')}/api/webhooks/twilio/status?t=${encodeURIComponent(tenantId)}`
+}
+
 export const twilioSmsProvider: SmsProvider = {
   get configured() {
     return getClient() !== null
@@ -30,7 +38,13 @@ export const twilioSmsProvider: SmsProvider = {
   async sendText(toE164, body) {
     const client = getClient()
     if (!client) throw new Error('Twilio SMS not configured')
-    const msg = await client.messages.create({ from: SMS_FROM, to: toE164, body })
+    const cb = statusCallback()
+    const msg = await client.messages.create({
+      from: SMS_FROM,
+      to: toE164,
+      body,
+      ...(cb ? { statusCallback: cb } : {}),
+    })
     return msg.sid
   },
 }
@@ -43,18 +57,26 @@ export const twilioWhatsAppProvider: WhatsAppProvider = {
   async sendTemplate(toE164, templateRef, vars) {
     const client = getClient()
     if (!client) throw new Error('Twilio WhatsApp not configured')
+    const cb = statusCallback()
     const msg = await client.messages.create({
       from: `whatsapp:${WA_FROM}`,
       to: `whatsapp:${toE164}`,
       contentSid: templateRef,
       contentVariables: JSON.stringify(vars),
+      ...(cb ? { statusCallback: cb } : {}),
     })
     return msg.sid
   },
   async sendText(toE164, body) {
     const client = getClient()
     if (!client) throw new Error('Twilio WhatsApp not configured')
-    const msg = await client.messages.create({ from: `whatsapp:${WA_FROM}`, to: `whatsapp:${toE164}`, body })
+    const cb = statusCallback()
+    const msg = await client.messages.create({
+      from: `whatsapp:${WA_FROM}`,
+      to: `whatsapp:${toE164}`,
+      body,
+      ...(cb ? { statusCallback: cb } : {}),
+    })
     return msg.sid
   },
 }

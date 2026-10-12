@@ -14570,8 +14570,8 @@
     "semantic_hash": ""
   },
   "src/lib/shared/messaging/twilio-provider.ts": {
-    "mtime": 1791780376.6797528,
-    "ast_hash": "366c7e8b12078badde15d410ade75472",
+    "mtime": 1791783390.3485663,
+    "ast_hash": "ddd866cd977737d511738958c886a0a6",
     "semantic_hash": ""
   },
   "src/lib/shared/messaging/types.ts": {
@@ -14597,6 +14597,16 @@
   "tests/lib/messaging-billing.test.ts": {
     "mtime": 1791782685.3310962,
     "ast_hash": "ddfa8b68cbafa96005629abb5e1fd6c9",
+    "semantic_hash": ""
+  },
+  "src/app/api/(public)/webhooks/twilio/status/route.ts": {
+    "mtime": 1791783303.673098,
+    "ast_hash": "aaa0171115e5d01804ab4a4b0c0faf12",
+    "semantic_hash": ""
+  },
+  "tests/api/webhooks/twilio-status.test.ts": {
+    "mtime": 1791783253.2520573,
+    "ast_hash": "c14183bf59a2b7f1885a81f350b9d2c2",
     "semantic_hash": ""
   }
 }
