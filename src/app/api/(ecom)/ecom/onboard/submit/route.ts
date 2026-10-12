@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
     ownRazorpay: d.ownRazorpay,
     warehouse: d.warehouse,
     status: 'pending_approval',
+    serviceTypes: ['store', ...d.extraServices],
   })
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
 

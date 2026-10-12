@@ -148,8 +148,11 @@ export default function OnboardWizard({
   initialDraft,
   reusingPreviousDetails,
   ownerName,
+  extraServices = [],
 }: {
   plans: Plan[]
+  /** Messaging / documents picked alongside the store on the service picker. */
+  extraServices?: ('messaging' | 'documents')[]
   /** Name on the owner's sign-in account, used only to prefill the editable name field. */
   ownerName?: string | null
   initialDraft?: { current_step: number; data: Record<string, any> } | null
@@ -419,6 +422,7 @@ export default function OnboardWizard({
         body: JSON.stringify({
           planSlug,
           billingInterval: interval,
+          extraServices,
           displayName,
           slug: effectiveSlug,
           productCategories: productCats.join(', '),

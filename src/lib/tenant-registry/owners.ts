@@ -42,7 +42,7 @@ export async function getOwnerById(id: string): Promise<Owner | null> {
 export async function getOwnerTenants(ownerId: string): Promise<TenantRow[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.created_at,
+    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.created_at,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id, t.noreply_email, t.campaign_email,
             p.slug AS plan, p.monthly_price_inr, COALESCE(p.max_custom_domains, 0) AS max_custom_domains,

@@ -24,7 +24,10 @@ export async function loadOwnerContext(opts: { tenantSlug?: string } = {}): Prom
 
   const tenants = await getOwnerTenants(owner.id)
   if (tenants.length === 0) redirect('/onboard')
-  if (tenants.some(t => t.status === 'pending_approval' || t.status === 'awaiting_payment')) redirect('/onboard')
+  // A store-only tenant sits in /onboard until paid. Anything with messaging/documents enabled
+  // already has a usable dashboard (its store upgrade, if any, is tracked on /dashboard/add-store).
+  const storeOnly = (t: TenantRow) => (t.service_types ?? ['store']).every(s => s === 'store')
+  if (tenants.every(t => storeOnly(t) && (t.status === 'pending_approval' || t.status === 'awaiting_payment'))) redirect('/onboard')
 
   const wanted = opts.tenantSlug ?? jar.get(TENANT_COOKIE)?.value
   const tenant =

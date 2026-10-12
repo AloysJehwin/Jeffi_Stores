@@ -20,7 +20,7 @@ export async function reconcileOrphanedTenants(): Promise<string[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
     `UPDATE tenants t SET status='suspended', updated_at=now()
-     WHERE t.status='active'
+     WHERE t.status='active' AND 'store' = ANY(t.service_types)
        AND NOT EXISTS (
          SELECT 1 FROM tenant_infra i WHERE i.tenant_id = t.id AND i.rds_endpoint IS NOT NULL
        )

@@ -4,12 +4,13 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { Menu, X, LogOut, ExternalLink, ChevronDown } from 'lucide-react'
-import { NAV_GROUPS } from './nav'
+import { navFor } from './nav'
 
 interface TenantLite {
   slug: string
   display_name: string
   status: string
+  service_types: string[]
 }
 
 interface Props {
@@ -25,6 +26,8 @@ export default function ConsoleShell({ owner, tenants, current, children }: Prop
   const [open, setOpen] = useState(false)
   const [switching, setSwitching] = useState(false)
   const storeUrl = `https://${current.slug}.jeffistores.in`
+  const groups = navFor(current.service_types)
+  const hasStore = current.service_types.includes('store')
 
   async function signOut() {
     await fetch('/api/ecom/auth/signout', { method: 'POST' }).catch(() => {})
@@ -74,7 +77,7 @@ export default function ConsoleShell({ owner, tenants, current, children }: Prop
       </div>
 
       <nav className="flex-1 space-y-5 overflow-y-auto">
-        {NAV_GROUPS.map((g, gi) => (
+        {groups.map((g, gi) => (
           <div key={gi}>
             {g.title && (
               <div className="px-3 mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-foreground-muted">
@@ -108,7 +111,7 @@ export default function ConsoleShell({ owner, tenants, current, children }: Prop
       </nav>
 
       <div className="mt-6 pt-4 border-t border-border-default space-y-2">
-        {current.status === 'active' && (
+        {hasStore && current.status === 'active' && (
           <a
             href={storeUrl}
             target="_blank"

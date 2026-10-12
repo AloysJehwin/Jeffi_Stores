@@ -24,6 +24,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const renewalDate = rzpSub?.current_end ? fmtDay(new Date(rzpSub.current_end * 1000)) : null
 
   const isLive = tenant.status === 'active'
+  const isStore = (tenant.service_types ?? ['store']).includes('store')
   const storeUrl = `https://${tenant.slug}.jeffistores.in`
   const monthly = Number(tenant.monthly_price_inr ?? 0)
   const price = tenant.billing_interval === 'yearly' ? monthly * 10 : monthly
@@ -38,7 +39,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
         actions={
           <>
             <StatusPill status={tenant.status} />
-            {isLive && <SiteReachabilityBadge url={storeUrl} />}
+            {isStore && isLive && <SiteReachabilityBadge url={storeUrl} />}
           </>
         }
       />
@@ -62,7 +63,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
               <Row label="Created" value={fmtDay(new Date(tenant.created_at))} />
               {tenant.region && <Row label="Region" value={tenant.region} />}
             </div>
-            {!isLive && (
+            {isStore && !isLive && (
               <div className="mt-4 flex items-center gap-2 text-sm text-foreground-secondary">
                 <span className="w-4 h-4 border-2 border-[var(--console-terracotta)] border-t-transparent rounded-full animate-spin" />
                 Provisioning in progress…
@@ -85,12 +86,20 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
           <Card title="Quick links">
             <ul className="space-y-2 text-sm">
-              {[
-                ['/dashboard/domains', 'Domains & subdomains'],
-                ['/dashboard/delivery', 'Delivery account'],
-                ['/dashboard/payouts', 'Payout bank account'],
-                ['/dashboard/business', 'Business details'],
-              ].map(([href, label]) => (
+              {(isStore
+                ? [
+                    ['/dashboard/domains', 'Domains & subdomains'],
+                    ['/dashboard/delivery', 'Delivery account'],
+                    ['/dashboard/payouts', 'Payout bank account'],
+                    ['/dashboard/api-keys', 'API keys'],
+                  ]
+                : [
+                    ['/dashboard/api-keys', 'API keys'],
+                    ['/dashboard/wallet', 'Wallet & top-up'],
+                    ['/dashboard/add-store', 'Add an online store'],
+                    ['/dashboard/business', 'Business details'],
+                  ]
+              ).map(([href, label]) => (
                 <li key={href}>
                   <Link href={href} className="text-foreground hover:ecom-accent-text hover:underline">
                     {label} →

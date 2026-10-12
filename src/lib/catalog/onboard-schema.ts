@@ -11,6 +11,7 @@ export const OnboardSchema = z
     // Step 0 — Plan
     planSlug: z.enum(['basic', 'growth', 'pro', 'enterprise']),
     billingInterval: z.enum(['monthly', 'yearly']).default('monthly'),
+    extraServices: z.array(z.enum(['messaging', 'documents'])).default([]),
     // Step 1 — Store
     displayName: z.string().min(1).max(200),
     slug: z.string().min(3).max(63),

@@ -13,6 +13,7 @@ export interface TenantRow {
   daily_payout: boolean
   own_delhivery: boolean
   own_razorpay: boolean
+  service_types: string[] // store | messaging | documents
   billing_interval: string
   razorpay_subscription_id: string | null
   razorpay_checkout_url: string | null
@@ -45,7 +46,7 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
     where.push(`(lower(t.display_name) LIKE $${args.length} OR lower(t.slug) LIKE $${args.length})`)
   }
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.created_at,
+    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.created_at,
             p.slug AS plan, p.monthly_price_inr,
             i.rds_endpoint, i.s3_bucket, i.ec2_target, i.region
      FROM tenants t
@@ -89,6 +90,7 @@ export interface CreateTenantInput {
   ownDelhivery?: boolean
   ownRazorpay?: boolean
   status?: string
+  serviceTypes?: string[]
   warehouse?: {
     originPincode?: string
     pickupLocation?: string
@@ -130,8 +132,8 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
   try {
     await client.query('BEGIN')
     const t = await client.query(
-      `INSERT INTO tenants (slug, display_name, plan_id, status, billing_interval, daily_payout, own_delhivery, own_razorpay)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      `INSERT INTO tenants (slug, display_name, plan_id, status, billing_interval, daily_payout, own_delhivery, own_razorpay, service_types)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
       [
         slug,
         input.displayName.trim(),
@@ -141,6 +143,7 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
         !!input.dailyPayout,
         !!input.ownDelhivery,
         !!input.ownRazorpay,
+        input.serviceTypes?.length ? input.serviceTypes : ['store'],
       ]
     )
     const tenantId = t.rows[0].id
@@ -208,7 +211,7 @@ export interface TenantDetail extends TenantRow {
 export async function getTenant(id: string): Promise<TenantDetail | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.created_at, t.instance_state,
+    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.service_types, t.created_at, t.instance_state,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,
@@ -293,3 +296,29 @@ export async function billingSummary(): Promise<{
 }
 
 // ── Provisioning data-layer (control-plane) ──────────────────────────────────
+
+export type ServiceType = 'store' | 'messaging' | 'documents'
+export const SERVICE_TYPES: ServiceType[] = ['store', 'messaging', 'documents']
+export const hasService = (t: { service_types?: string[] | null }, s: ServiceType) => (t.service_types ?? ['store']).includes(s)
+
+/** Add service types to an existing tenant (idempotent). */
+export async function addTenantServices(tenantId: string, types: ServiceType[]): Promise<void> {
+  await controlPlanePool().query(
+    `UPDATE tenants SET service_types = (SELECT array_agg(DISTINCT x) FROM unnest(service_types || $2::text[]) x), updated_at = now() WHERE id = $1`,
+    [tenantId, types]
+  )
+}
+
+/** Services-only tenant → store: pick a store plan, add 'store', and enter the KYC approval flow. */
+export async function upgradeTenantToStore(tenantId: string, planSlug: string, billingInterval: 'monthly' | 'yearly'): Promise<{ ok: true } | { ok: false; error: string }> {
+  const pool = controlPlanePool()
+  const plan = await pool.query(`SELECT id FROM plans WHERE slug = $1 AND is_active = true AND product = 'store'`, [planSlug])
+  if (!plan.rows[0]) return { ok: false, error: `Unknown store plan "${planSlug}".` }
+  await pool.query(
+    `UPDATE tenants SET plan_id = $2, billing_interval = $3, status = 'pending_approval',
+            service_types = (SELECT array_agg(DISTINCT x) FROM unnest(service_types || '{store}'::text[]) x), updated_at = now()
+     WHERE id = $1 AND NOT ('store' = ANY(service_types))`,
+    [tenantId, plan.rows[0].id, billingInterval]
+  )
+  return { ok: true }
+}
