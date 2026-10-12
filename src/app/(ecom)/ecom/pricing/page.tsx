@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 function Check() {
   return (
     <svg
-      className="w-5 h-5 mx-auto text-accent-600 dark:text-accent-400"
+      className="w-5 h-5 mx-auto org-sage-text"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
@@ -39,11 +39,11 @@ export default async function PricingPage() {
       <section className="relative overflow-hidden">
         <div
           aria-hidden
-          className="absolute inset-0 -z-10 bg-[radial-gradient(50%_40%_at_50%_-10%,rgba(16,185,129,0.15),transparent)]"
+          className="org-sage absolute -top-40 -right-24 -z-10 w-[520px] h-[520px] rounded-full opacity-70"
         />
-        <div className="w-full px-6 lg:px-12 pt-20 pb-10 text-center">
-          <h1 className="text-4xl lg:text-6xl font-extrabold tracking-tight">Pricing</h1>
-          <p className="mt-4 text-lg text-foreground-secondary max-w-2xl mx-auto">
+        <div className="w-full px-6 lg:px-12 pt-20 pb-10">
+          <h1 className="font-display font-black text-5xl lg:text-7xl tracking-tight">Pricing</h1>
+          <p className="mt-5 text-lg text-foreground-secondary max-w-2xl">
             Every plan includes the complete storefront. As you grow, unlock more of the admin platform. Monthly or
             yearly — cancel anytime.
           </p>
@@ -57,8 +57,8 @@ export default async function PricingPage() {
 
       {/* Detailed comparison table */}
       <section className="w-full px-6 lg:px-12 pb-24">
-        <h2 className="text-3xl lg:text-4xl font-extrabold text-center mb-10">Compare every feature</h2>
-        <div className="w-full overflow-x-auto rounded-2xl border border-border-default bg-surface-elevated">
+        <h2 className="font-display font-black text-3xl lg:text-4xl mb-10">Compare every feature</h2>
+        <div className="w-full overflow-x-auto rounded-[2rem] bg-surface-elevated">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="sticky top-0">
               <tr className="bg-surface-secondary">
@@ -66,7 +66,7 @@ export default async function PricingPage() {
                 {ordered.map(p => (
                   <th
                     key={p.slug}
-                    className={`px-4 py-4 text-center font-semibold ${p.slug === 'growth' ? 'text-accent-600 dark:text-accent-400' : 'text-foreground'}`}
+                    className={`px-4 py-4 text-center font-semibold ${p.slug === 'growth' ? 'ecom-accent-text' : 'text-foreground'}`}
                   >
                     {p.name}
                     <div className="text-xs font-normal text-foreground-muted">
@@ -137,7 +137,7 @@ export default async function PricingPage() {
         <div className="text-center mt-10">
           <Link
             href="/signup"
-            className="inline-block px-8 py-4 rounded-lg bg-accent-600 hover:bg-accent-700 text-white font-semibold text-lg transition-colors shadow-lg shadow-accent-600/20"
+            className="ecom-accent-bg inline-block px-8 py-4 rounded-full text-white font-display font-bold text-lg transition-colors"
           >
             Start your store
           </Link>
@@ -145,8 +145,8 @@ export default async function PricingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="w-full px-6 lg:px-12 pb-24 bg-surface-elevated border-t border-border-default pt-16">
-        <h2 className="text-3xl font-extrabold text-center mb-10">Frequently asked</h2>
+      <section className="w-full px-6 lg:px-12 pb-24 pt-8">
+        <h2 className="font-display font-black text-3xl lg:text-4xl mb-10">Frequently asked</h2>
         <div className="max-w-3xl mx-auto space-y-4">
           {[
             [
@@ -174,8 +174,8 @@ export default async function PricingPage() {
               'Compliant GST invoices are generated automatically on every order, quotation and cash sale.',
             ],
           ].map(([q, a]) => (
-            <details key={q} className="group rounded-xl border border-border-default bg-surface p-5">
-              <summary className="flex items-center justify-between cursor-pointer font-medium text-foreground list-none">
+            <details key={q} className="group rounded-[2rem] org-sand px-8 py-5">
+              <summary className="flex items-center justify-between cursor-pointer font-display font-black text-lg text-foreground list-none">
                 {q}
                 <span className="text-foreground-muted group-open:rotate-45 transition-transform text-xl leading-none">
                   +

@@ -28,19 +28,17 @@ export default async function AuthSplit({ mode }: { mode: 'signup' | 'signin' })
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       {/* Brand / value panel */}
-      <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-accent-600 to-primary-600 text-white p-12">
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] bg-[size:40px_40px]"
-        />
-        <Link href="/" className="relative flex items-center gap-2 font-bold text-lg">
-          <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/20 backdrop-blur text-white">
+      <div className="ecom-accent-bg relative hidden lg:flex flex-col justify-between overflow-hidden text-white p-12">
+        <div aria-hidden className="org-sage absolute -bottom-32 -right-32 w-[420px] h-[420px] rounded-full opacity-60" />
+        <div aria-hidden className="org-peach absolute top-24 -left-16 w-40 h-40 rounded-full opacity-50" />
+        <Link href="/" className="relative flex items-center gap-2 font-display font-black text-xl">
+          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/20 text-white">
             J
           </span>
           Jeffi Commerce
         </Link>
         <div className="relative">
-          <h2 className="text-4xl font-extrabold leading-tight">Everything you need to sell online — in one place.</h2>
+          <h2 className="font-display font-black text-4xl xl:text-5xl leading-[1.05]">Everything you need to sell online — in one place.</h2>
           <ul className="mt-8 space-y-3">
             {points.map(p => (
               <li key={p} className="flex items-center gap-3 text-white/90">
@@ -60,8 +58,8 @@ export default async function AuthSplit({ mode }: { mode: 'signup' | 'signin' })
       {/* Form panel */}
       <div className="flex flex-col justify-center px-6 py-12 sm:px-12 bg-surface">
         {/* mobile brand */}
-        <Link href="/" className="lg:hidden flex items-center gap-2 font-bold text-foreground mb-8 self-center">
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 text-white text-sm">
+        <Link href="/" className="lg:hidden flex items-center gap-2 font-display font-black text-xl text-foreground mb-8 self-center">
+          <span className="ecom-accent-bg inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-display font-black">
             J
           </span>
           Jeffi Commerce

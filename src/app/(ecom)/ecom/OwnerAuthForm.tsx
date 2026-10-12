@@ -16,7 +16,7 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
   const [busy, setBusy] = useState(false)
 
   const input =
-    'w-full rounded-lg border border-border-default bg-surface-elevated px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
+    'w-full rounded-xl bg-surface-elevated px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
 
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault()
@@ -64,7 +64,7 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
   return (
     <div className="w-full max-w-sm mx-auto">
       <div>
-        <h1 className="text-3xl font-extrabold text-foreground">
+        <h1 className="font-display font-black text-4xl text-foreground">
           {mode === 'signup' ? 'Create your store account' : 'Welcome back'}
         </h1>
         <p className="text-sm text-foreground-muted mt-2">
@@ -92,7 +92,7 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
             />
             <button
               disabled={busy}
-              className="w-full rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white font-medium py-2.5 transition-colors"
+              className="ecom-accent-bg w-full rounded-full disabled:opacity-50 text-white font-display font-bold py-3 transition-colors"
             >
               {busy ? 'Sending…' : 'Continue with email'}
             </button>
@@ -113,7 +113,7 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
             />
             <button
               disabled={busy}
-              className="w-full rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white font-medium py-2.5 transition-colors"
+              className="ecom-accent-bg w-full rounded-full disabled:opacity-50 text-white font-display font-bold py-3 transition-colors"
             >
               {busy ? 'Verifying…' : mode === 'signup' ? 'Create account' : 'Sign in'}
             </button>
@@ -137,14 +137,14 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
           {mode === 'signup' ? (
             <>
               Already have an account?{' '}
-              <a href="/signin" className="text-accent-600 dark:text-accent-400 hover:underline">
+              <a href="/signin" className="org-brown font-semibold hover:underline">
                 Sign in
               </a>
             </>
           ) : (
             <>
               New to Jeffi Commerce?{' '}
-              <a href="/signup" className="text-accent-600 dark:text-accent-400 hover:underline">
+              <a href="/signup" className="org-brown font-semibold hover:underline">
                 Get started
               </a>
             </>
@@ -199,7 +199,7 @@ function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (
     <button
       onClick={start}
       disabled={busy}
-      className="w-full inline-flex items-center justify-center gap-2 rounded-lg border border-border-default bg-surface-elevated hover:bg-surface-secondary py-2.5 text-sm font-medium text-foreground transition-colors disabled:opacity-50"
+      className="org-sand org-sand-hover w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-foreground transition-colors disabled:opacity-50"
     >
       <svg className="w-4 h-4" viewBox="0 0 24 24">
         <path
