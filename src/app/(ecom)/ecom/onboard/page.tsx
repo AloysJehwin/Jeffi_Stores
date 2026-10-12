@@ -2,7 +2,7 @@ import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { listPlans, getOwnerTenants, getDraft } from '@/lib/tenant-registry'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
-import OnboardWizard from './OnboardWizard'
+import OnboardEntry from './OnboardEntry'
 import PaymentTrigger from './PaymentTrigger'
 
 export const dynamic = 'force-dynamic'
@@ -226,7 +226,7 @@ export default async function OnboardPage() {
     : (draft?.data ?? {})
 
   return (
-    <OnboardWizard
+    <OnboardEntry
       plans={plans}
       initialDraft={draft ? { current_step: submitted ? 0 : draft.current_step, data: carried } : null}
       reusingPreviousDetails={submitted}

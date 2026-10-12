@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { owner, tenants, tenant } = await loadOwnerContext()
-  const lite = (t: typeof tenant) => ({ slug: t.slug, display_name: t.display_name, status: t.status })
+  const lite = (t: typeof tenant) => ({ slug: t.slug, display_name: t.display_name, status: t.status, service_types: t.service_types ?? ['store'] })
   return (
     <div>
       <ConsoleShell owner={{ email: owner.email, name: owner.name }} tenants={tenants.map(lite)} current={lite(tenant)}>
