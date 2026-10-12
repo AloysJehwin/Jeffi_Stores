@@ -545,15 +545,15 @@ export default function OnboardWizard({
                 type="button"
                 onClick={() => (s.id < step ? goTo(s.id as StepIdx) : undefined)}
                 disabled={s.id > step}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-colors ${active ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300' : done ? 'text-foreground-secondary hover:bg-surface-secondary cursor-pointer' : 'text-foreground-muted cursor-default'}`}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-colors ${active ? 'bg-accent-50 text-accent-700' : done ? 'text-foreground-secondary hover:bg-surface-secondary cursor-pointer' : 'text-foreground-muted cursor-default'}`}
               >
                 <span
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${active ? 'bg-accent-600 text-white' : done ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400' : 'bg-surface-secondary text-foreground-muted'}`}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? 'bg-accent-600 text-white' : done ? 'org-sage org-sage-text' : 'bg-surface-secondary text-foreground-muted'}`}
                 >
                   {done ? <CheckMark className="w-4 h-4" /> : <StepIcon icon={s.icon} className="w-4 h-4" />}
                 </span>
                 <div>
-                  <div className={`text-sm font-medium ${active ? 'text-accent-700 dark:text-accent-300' : ''}`}>
+                  <div className={`text-sm font-medium ${active ? 'text-accent-700' : ''}`}>
                     {s.label}
                   </div>
                   <div className="text-xs text-foreground-muted">{s.desc}</div>
@@ -582,7 +582,7 @@ export default function OnboardWizard({
             {STEPS.map(s => (
               <div
                 key={s.id}
-                className={`h-1 flex-1 rounded-full transition-colors ${s.id < step ? 'bg-green-500' : s.id === step ? 'bg-accent-600' : 'bg-surface-secondary'}`}
+                className={`h-1 flex-1 rounded-full transition-colors ${s.id < step ? 'ecom-accent-bg' : s.id === step ? 'bg-accent-600' : 'bg-surface-secondary'}`}
               />
             ))}
           </div>
@@ -591,7 +591,7 @@ export default function OnboardWizard({
         <div className="flex-1 flex flex-col items-center px-5 sm:px-8 lg:px-16 py-8 lg:py-10 lg:justify-center">
           {/* ── Restore banner (returning owner with a prior backup) ── */}
           {restoreBackup && step <= 1 && (
-            <div className="w-full max-w-3xl mb-6 rounded-2xl border border-accent-300 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/20 p-5">
+            <div className="w-full max-w-3xl mb-6 rounded-2xl border border-accent-300 bg-accent-50 p-5">
               <div className="flex items-start gap-3">
                 <div className="flex-1">
                   <div className="font-semibold text-foreground">We found a backup of your previous store</div>
@@ -634,11 +634,11 @@ export default function OnboardWizard({
                     key={iv}
                     type="button"
                     onClick={() => setInterval(iv)}
-                    className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors capitalize ${interval === iv ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-muted hover:text-foreground'}`}
+                    className={`px-5 py-2 rounded-xl text-sm font-medium transition-colors capitalize ${interval === iv ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-muted hover:text-foreground'}`}
                   >
                     {iv}{' '}
                     {iv === 'yearly' && (
-                      <span className="ml-1 text-[10px] text-green-600 dark:text-green-400 font-bold">2 months free</span>
+                      <span className="ml-1 text-[10px] org-sage-text font-bold">2 months free</span>
                     )}
                   </button>
                 ))}
@@ -652,16 +652,16 @@ export default function OnboardWizard({
                       key={p.slug}
                       type="button"
                       onClick={() => setPlanSlug(p.slug)}
-                      className={`rounded-2xl border-2 p-5 text-left transition-all ${planSlug === p.slug ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 shadow-md' : 'border-border-default bg-surface-elevated hover:border-accent-300'}`}
+                      className={`rounded-2xl border-2 p-5 text-left transition-all ${planSlug === p.slug ? 'border-accent-500 bg-accent-50 shadow-md' : 'border-border-default bg-surface-elevated hover:border-accent-300'}`}
                     >
                       <div className="font-bold text-foreground text-base">{p.name}</div>
                       <div className="text-2xl font-extrabold text-foreground mt-2">₹{pr.toLocaleString('en-IN')}</div>
                       <div className="text-xs text-foreground-muted">/{interval === 'yearly' ? 'yr' : 'mo'}</div>
                       {interval === 'yearly' && (
-                        <div className="text-xs text-green-600 dark:text-green-400 mt-1">2 months free</div>
+                        <div className="text-xs org-sage-text mt-1">2 months free</div>
                       )}
                       {planSlug === p.slug && (
-                        <div className="mt-3 flex items-center gap-1 text-xs text-accent-600 dark:text-accent-400 font-semibold">
+                        <div className="mt-3 flex items-center gap-1 text-xs text-accent-600 font-semibold">
                           <CheckMark className="w-3.5 h-3.5" />
                           Selected
                         </div>
@@ -725,7 +725,7 @@ export default function OnboardWizard({
                     <p className="text-xs text-foreground-muted mt-2">Select at least one category.</p>
                   )}
                   {(productCats.includes('Food & Groceries') || productCats.includes('Health & Beauty')) && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                    <p className="text-xs org-brown mt-2">
                       Selling food requires a valid FSSAI certificate, and medicine/pharma requires a drug licence —
                       you&apos;ll need to submit these with your documents. See the{' '}
                       <a
@@ -767,7 +767,7 @@ export default function OnboardWizard({
                         key={t.value}
                         type="button"
                         onClick={() => setBizType(t.value)}
-                        className={`px-3 py-2.5 rounded-xl border text-sm text-left transition-colors ${bizType === t.value ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 font-medium' : 'border-border-default text-foreground-secondary hover:border-accent-300'}`}
+                        className={`px-3 py-2.5 rounded-xl border text-sm text-left transition-colors ${bizType === t.value ? 'border-accent-500 bg-accent-50 text-accent-700 font-medium' : 'border-border-default text-foreground-secondary hover:border-accent-300'}`}
                       >
                         {t.label}
                       </button>
@@ -827,11 +827,11 @@ export default function OnboardWizard({
                     <span className="text-foreground-muted font-normal">(optional — PDF, JPG or PNG, max 5 MB)</span>
                   </label>
                   {gstS3Key ? (
-                    <div className="flex items-center gap-3 p-4 rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20">
-                      <CheckMark className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                    <div className="flex items-center gap-3 p-4 rounded-xl border border-[var(--org-sage-deep)]/40 org-sage">
+                      <CheckMark className="w-5 h-5 org-sage-text flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-green-700 dark:text-green-300">Uploaded</div>
-                        <div className="text-xs text-green-600 dark:text-green-500 truncate">{gstFilename}</div>
+                        <div className="text-sm font-medium org-sage-text">Uploaded</div>
+                        <div className="text-xs org-sage-text truncate">{gstFilename}</div>
                       </div>
                       <button
                         type="button"
@@ -862,9 +862,9 @@ export default function OnboardWizard({
                       />
                     </label>
                   )}
-                  {gstErr && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{gstErr}</p>}
+                  {gstErr && <p className="text-xs text-[#8a2e1f] mt-1">{gstErr}</p>}
                 </div>
-                <div className="rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 text-sm text-yellow-800 dark:text-yellow-300">
+                <div className="rounded-xl org-peach border border-[var(--org-apricot)] p-4 text-sm org-brown">
                   Your GST certificate will be reviewed by the Jeffi Commerce team before your store goes live. This
                   usually takes 1–2 business days.
                 </div>
@@ -894,9 +894,9 @@ export default function OnboardWizard({
                       <p
                         className={`text-xs mt-1 ${
                           pinCheck.state === 'ok'
-                            ? 'text-green-700 dark:text-green-400'
+                            ? 'org-sage-text'
                             : pinCheck.state === 'bad'
-                              ? 'text-red-600 dark:text-red-400'
+                              ? 'text-[#8a2e1f]'
                               : 'text-foreground-muted'
                         }`}
                       >
@@ -1054,7 +1054,7 @@ export default function OnboardWizard({
                     {busy ? 'Saving…' : 'Save account'}
                   </button>
                 ) : (
-                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-semibold">
+                  <div className="flex items-center gap-2 org-sage-text text-sm font-semibold">
                     <CheckMark className="w-4 h-4" /> {bankNameConfirmed ? 'Account verified' : 'Account saved'}
                     <button
                       type="button"
@@ -1071,7 +1071,7 @@ export default function OnboardWizard({
                 )}
                 {bankMsg && (
                   <p
-                    className={`text-sm ${bankMsg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                    className={`text-sm ${bankMsg.ok ? 'org-sage-text' : 'text-[#8a2e1f]'}`}
                   >
                     {bankMsg.text}
                   </p>
@@ -1203,11 +1203,11 @@ export default function OnboardWizard({
                         }}
                       />
                     </label>
-                    {key && <p className="text-[10px] text-green-600 dark:text-green-400 mt-1">✓ uploaded</p>}
+                    {key && <p className="text-[10px] org-sage-text mt-1">✓ uploaded</p>}
                   </div>
                 ))}
               </div>
-              {brandErr && <p className="text-sm text-red-600 dark:text-red-400 mb-4">{brandErr}</p>}
+              {brandErr && <p className="text-sm text-[#8a2e1f] mb-4">{brandErr}</p>}
 
               <label className="flex items-start gap-3 rounded-xl border border-border-default bg-surface p-4 cursor-pointer">
                 <input
@@ -1222,7 +1222,7 @@ export default function OnboardWizard({
                     href="/legal/merchant-agreement"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-accent-600 dark:text-accent-400 hover:underline"
+                    className="text-accent-600 hover:underline"
                   >
                     Merchant Agreement
                   </a>
@@ -1231,7 +1231,7 @@ export default function OnboardWizard({
                     href="/legal/terms-and-conditions"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-accent-600 dark:text-accent-400 hover:underline"
+                    className="text-accent-600 hover:underline"
                   >
                     Terms
                   </a>{' '}
@@ -1240,7 +1240,7 @@ export default function OnboardWizard({
                     href="/legal/privacy-policy"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-accent-600 dark:text-accent-400 hover:underline"
+                    className="text-accent-600 hover:underline"
                   >
                     Privacy Policy
                   </a>{' '}
@@ -1332,7 +1332,7 @@ export default function OnboardWizard({
                       className={`flex items-center gap-2 ${s.ok ? 'text-foreground' : 'text-foreground-muted/50 line-through'}`}
                     >
                       <span
-                        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.ok ? 'bg-green-500' : 'bg-foreground-muted/20'}`}
+                        className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.ok ? 'ecom-accent-bg' : 'bg-foreground-muted/20'}`}
                       />
                       <span className="w-20 flex-shrink-0 not-italic text-[10px] text-foreground-muted">{s.label}</span>
                       {s.url}
@@ -1340,7 +1340,7 @@ export default function OnboardWizard({
                   ))}
                 </div>
               </div>
-              <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 p-4 text-sm text-blue-800 dark:text-blue-300 mb-6">
+              <div className="rounded-xl org-sand border border-border-default p-4 text-sm org-brown mb-6">
                 After submitting, our team will review your GST certificate (1–2 business days). You&apos;ll receive an
                 email when approved — then you&apos;ll complete payment and your store goes live.
               </div>

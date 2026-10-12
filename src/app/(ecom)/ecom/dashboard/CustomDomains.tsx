@@ -79,10 +79,10 @@ export default function CustomDomains({
   }
 
   const statusColor: Record<string, string> = {
-    verified: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    verifying: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    failed: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    verified: 'org-sage org-sage-text',
+    verifying: 'org-sand org-brown',
+    pending: 'org-peach org-brown',
+    failed: 'bg-[#f2d4cd] text-[#8a2e1f]',
   }
 
   return (
@@ -106,7 +106,7 @@ export default function CustomDomains({
             <button
               onClick={() => verify(d.id)}
               disabled={busy}
-              className="text-xs px-3 py-1 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
+              className="text-xs px-3 py-1 rounded-xl border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
             >
               Verify
             </button>
@@ -121,12 +121,12 @@ export default function CustomDomains({
               value={newDomain}
               onChange={e => setNewDomain(e.target.value)}
               placeholder="shop.yourbrand.com"
-              className="flex-1 rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="flex-1 rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             <button
               onClick={addDomain}
               disabled={busy || !newDomain}
-              className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-medium"
+              className="px-4 py-2 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-medium"
             >
               Add
             </button>

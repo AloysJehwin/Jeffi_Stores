@@ -1,22 +1,22 @@
 import type { TenantTransaction, LedgerEntry } from '@/lib/tenant-registry'
 
 export const STATUS_PILL: Record<string, string> = {
-  captured: 'bg-green-100 text-green-700',
+  captured: 'org-sage org-sage-text',
   settled: 'bg-[var(--console-sage)] text-[var(--console-sage-deep)]',
-  split: 'bg-yellow-100 text-yellow-700',
-  refunded: 'bg-red-100 text-red-700',
-  failed: 'bg-red-100 text-red-700',
+  split: 'org-peach org-brown',
+  refunded: 'bg-[#f2d4cd] text-[#8a2e1f]',
+  failed: 'bg-[#f2d4cd] text-[#8a2e1f]',
 }
 
 const LEDGER_COLORS: Record<string, string> = {
-  order_capture: 'text-green-600',
-  payout: 'text-red-500',
+  order_capture: 'org-sage-text',
+  payout: 'text-[#8a2e1f]',
   commission: 'text-orange-500',
   gateway_fee: 'text-orange-400',
   subscription_charge: 'text-purple-600',
-  refund: 'text-red-500',
+  refund: 'text-[#8a2e1f]',
   adjustment: 'text-foreground-secondary',
-  cod_remittance: 'text-blue-600',
+  cod_remittance: 'org-brown',
 }
 
 export function fmt(n: number) {
@@ -91,7 +91,7 @@ export function TransactionsTable({
               </td>
               <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{fmtDate(t.occurred_at)}</td>
               <td className="px-4 py-3 font-medium">{fmt(Number(t.gross_amount))}</td>
-              <td className="px-4 py-3 font-semibold text-green-600">{fmt(Number(t.tenant_share))}</td>
+              <td className="px-4 py-3 font-semibold org-sage-text">{fmt(Number(t.tenant_share))}</td>
               <td className="px-4 py-3 text-foreground-secondary">{fmt(Number(t.platform_commission))}</td>
               <td className="px-4 py-3 text-foreground-secondary">{fmt(Number(t.gateway_fee))}</td>
               <td className="px-4 py-3 text-foreground-secondary">{t.is_cod ? 'COD' : t.gateway}</td>
@@ -107,7 +107,7 @@ export function TransactionsTable({
           <tr>
             <td className="px-4 py-3 font-semibold text-foreground-secondary" colSpan={2}>Totals</td>
             <td className="px-4 py-3 font-bold">{fmt(totals.gross)}</td>
-            <td className="px-4 py-3 font-bold text-green-600">{fmt(totals.tenantShare)}</td>
+            <td className="px-4 py-3 font-bold org-sage-text">{fmt(totals.tenantShare)}</td>
             <td className="px-4 py-3 font-bold text-foreground-secondary">{fmt(totals.commission)}</td>
             <td className="px-4 py-3 font-bold text-foreground-secondary">{fmt(totals.fees)}</td>
             <td colSpan={2} />
@@ -143,7 +143,7 @@ export function LedgerTable({ ledger, balance }: { ledger: LedgerEntry[]; balanc
                     {e.entry_type.replace(/_/g, ' ')}
                   </span>
                 </td>
-                <td className={`px-4 py-3 font-semibold ${amt >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                <td className={`px-4 py-3 font-semibold ${amt >= 0 ? 'org-sage-text' : 'text-[#8a2e1f]'}`}>
                   {amt >= 0 ? '+' : '-'}{fmt(amt)}
                 </td>
                 <td className="px-4 py-3 text-foreground-secondary text-xs">{e.note ?? '—'}</td>
@@ -154,7 +154,7 @@ export function LedgerTable({ ledger, balance }: { ledger: LedgerEntry[]; balanc
         <tfoot className="border-t-2 border-border-default bg-surface-secondary">
           <tr>
             <td className="px-4 py-3 font-semibold text-foreground-secondary" colSpan={2}>Balance</td>
-            <td className={`px-4 py-3 font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+            <td className={`px-4 py-3 font-bold ${balance >= 0 ? 'org-sage-text' : 'text-[#8a2e1f]'}`}>
               {balance >= 0 ? '+' : '-'}{fmt(balance)}
             </td>
             <td />

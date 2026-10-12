@@ -40,7 +40,7 @@ function Stars({ rating }: { rating: number }) {
       {[1, 2, 3, 4, 5].map(i => (
         <svg
           key={i}
-          className={`w-3 h-3 ${i <= Math.round(rating) ? 'text-amber-400' : 'text-border-default'}`}
+          className={`w-3 h-3 ${i <= Math.round(rating) ? 'text-foreground-secondary' : 'text-border-default'}`}
           fill="currentColor"
           viewBox="0 0 20 20"
         >
@@ -179,7 +179,7 @@ function CartView({
             key={line.productId}
             className="flex items-center gap-3 bg-surface rounded-xl border border-border-default p-3"
           >
-            <div className="w-12 h-12 flex-shrink-0 rounded-lg bg-surface-secondary overflow-hidden">
+            <div className="w-12 h-12 flex-shrink-0 rounded-xl bg-surface-secondary overflow-hidden">
               <ProductArt category={line.category} className="w-full h-full" />
             </div>
             <div className="min-w-0 flex-1">

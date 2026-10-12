@@ -94,7 +94,7 @@ export default function SubdomainList({
         >
           <div className="flex items-center gap-3 min-w-0">
             <span
-              className={`w-2 h-2 rounded-full flex-shrink-0 ${s.available ? 'bg-green-500' : 'bg-foreground-muted/50'}`}
+              className={`w-2 h-2 rounded-full flex-shrink-0 ${s.available ? 'ecom-accent-bg' : 'bg-foreground-muted/50'}`}
             />
             <span className="text-foreground-secondary w-28 flex-shrink-0 text-xs font-medium">{s.label}</span>
             <span

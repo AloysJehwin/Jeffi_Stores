@@ -14,13 +14,13 @@ interface Plan {
 type Interval = 'monthly' | 'yearly'
 
 const SUB_STATUS_LABEL: Record<string, { label: string; color: string }> = {
-  active: { label: 'Active', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-  created: { label: 'Pending', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
+  active: { label: 'Active', color: 'org-sage org-sage-text' },
+  created: { label: 'Pending', color: 'org-peach org-brown' },
   authenticated: {
     label: 'Pending',
-    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+    color: 'org-peach org-brown',
   },
-  halted: { label: 'Halted', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+  halted: { label: 'Halted', color: 'bg-[#f2d4cd] text-[#8a2e1f]' },
   cancelled: { label: 'Cancelled', color: 'bg-surface-secondary text-foreground-muted' },
   completed: { label: 'Completed', color: 'bg-surface-secondary text-foreground-muted' },
   expired: { label: 'Expired', color: 'bg-surface-secondary text-foreground-muted' },
@@ -158,7 +158,7 @@ export default function BillingClient({
         <h2 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-4">Change plan</h2>
 
         {/* Interval toggle */}
-        <div className="inline-flex items-center rounded-lg border border-border-default bg-surface-secondary p-1 mb-5">
+        <div className="inline-flex items-center rounded-xl border border-border-default bg-surface-secondary p-1 mb-5">
           {(['monthly', 'yearly'] as Interval[]).map(iv => (
             <button
               key={iv}
@@ -168,7 +168,7 @@ export default function BillingClient({
             >
               {iv}
               {iv === 'yearly' && (
-                <span className="ml-1.5 text-xs text-green-600 dark:text-green-400 font-semibold">2 months free</span>
+                <span className="ml-1.5 text-xs org-sage-text font-semibold">2 months free</span>
               )}
             </button>
           ))}
@@ -185,7 +185,7 @@ export default function BillingClient({
                 key={p.slug}
                 type="button"
                 onClick={() => setSelectedPlan(p.slug)}
-                className={`rounded-xl border p-3 text-left transition-colors relative ${selectedPlan === p.slug ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20' : 'border-border-default'}`}
+                className={`rounded-xl border p-3 text-left transition-colors relative ${selectedPlan === p.slug ? 'border-accent-500 bg-accent-50' : 'border-border-default'}`}
               >
                 {isCurrent && (
                   <span className="absolute -top-2 left-3 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-600 text-white">
@@ -200,7 +200,7 @@ export default function BillingClient({
                   </span>
                 </div>
                 {interval === 'yearly' && (
-                  <div className="text-xs text-green-600 dark:text-green-400">2 months free</div>
+                  <div className="text-xs org-sage-text">2 months free</div>
                 )}
               </button>
             )
@@ -238,7 +238,7 @@ export default function BillingClient({
         <button
           onClick={changePlan}
           disabled={busy || unchanged}
-          className="px-5 py-2.5 rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+          className="px-5 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
         >
           {busy ? 'Updating…' : isUpgrade ? 'Upgrade now' : 'Schedule change'}
         </button>
@@ -246,8 +246,8 @@ export default function BillingClient({
 
       {/* Cancel subscription */}
       {canCancel && (
-        <div className="rounded-2xl border border-red-200 dark:border-red-900/40 bg-surface-elevated p-6">
-          <h2 className="text-sm font-semibold text-red-700 dark:text-red-400 uppercase tracking-widest mb-2">
+        <div className="rounded-2xl border border-[#e0a89c] bg-surface-elevated p-6">
+          <h2 className="text-sm font-semibold text-[#8a2e1f] uppercase tracking-widest mb-2">
             Cancel subscription
           </h2>
           <p className="text-sm text-foreground-muted mb-4">
@@ -257,7 +257,7 @@ export default function BillingClient({
           {!confirmCancel ? (
             <button
               onClick={() => setConfirmCancel(true)}
-              className="px-5 py-2.5 rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-semibold transition-colors"
+              className="px-5 py-2.5 rounded-xl border border-[#e0a89c] text-[#8a2e1f] hover:bg-[#f2d4cd] text-sm font-semibold transition-colors"
             >
               Cancel subscription
             </button>
@@ -267,14 +267,14 @@ export default function BillingClient({
               <button
                 onClick={cancelSubscription}
                 disabled={cancelBusy}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+                className="px-4 py-2 rounded-xl org-sand hover:org-sand disabled:opacity-40 text-white text-sm font-semibold transition-colors"
               >
                 {cancelBusy ? 'Cancelling…' : 'Yes, cancel'}
               </button>
               <button
                 onClick={() => setConfirmCancel(false)}
                 disabled={cancelBusy}
-                className="px-4 py-2 rounded-lg border border-border-default text-foreground-muted hover:bg-surface-secondary text-sm font-medium transition-colors"
+                className="px-4 py-2 rounded-xl border border-border-default text-foreground-muted hover:bg-surface-secondary text-sm font-medium transition-colors"
               >
                 Keep subscription
               </button>
