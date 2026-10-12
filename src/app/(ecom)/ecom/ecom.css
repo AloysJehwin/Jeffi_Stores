@@ -100,3 +100,9 @@
 /* Shape language: pill buttons, rounded inputs */
 .ecom-scope button:not(.org-square):not([class*='rounded']) { border-radius: 9999px; }
 .ecom-scope input:not([type='checkbox']):not([type='radio']), .ecom-scope select, .ecom-scope textarea { border-radius: 0.75rem; }
+
+/* No rubber-band / pull-to-refresh bounce at the top and bottom of ecom pages. */
+html:has(.ecom-scope),
+html:has(.ecom-scope) body {
+  overscroll-behavior-y: none;
+}
