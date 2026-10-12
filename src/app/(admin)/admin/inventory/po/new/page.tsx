@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
@@ -15,6 +15,9 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { useToast } from '@/contexts/ToastContext'
 import { round3 } from '@/lib/shared/number-display'
+import { useEditSession } from '@/hooks/useEditSession'
+import { useAutosaveDraft, type AutosaveStatus } from '@/hooks/useAutosaveDraft'
+import EditorToolbar from '@/components/admin/EditorToolbar'
 
 const PURCHASE_UNITS = [
   { value: '', label: '— same as sell unit —' },
@@ -208,6 +211,108 @@ export default function NewPOPage() {
   const [scanInputs, setScanInputs] = useState<Record<string, string>>({})
   const lineItemsRef = useRef(lineItems)
   lineItemsRef.current = lineItems
+
+  // --- Draft wiring ---
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [draftLoaded, setDraftLoaded] = useState(false)
+  const draftIdRef = useRef<string | null>(null)
+  draftIdRef.current = draftId
+  const hydratedRef = useRef(false)
+
+  // Resume via ?draftId=<id> or open-or-create one on mount.
+  useEffect(() => {
+    let cancelled = false
+    const resumeId = searchParams.get('draftId')
+    async function hydrate(id: string) {
+      try {
+        const res = await fetch(`/api/admin/inventory/po/draft/${id}`, { credentials: 'include' })
+        if (!res.ok) return
+        const { draft } = await res.json()
+        if (cancelled || !draft) return
+        hydratedRef.current = true
+        setForm({
+          supplier_id: draft.supplier_id || '',
+          order_date: draft.order_date ? String(draft.order_date).slice(0, 10) : '',
+          expected_date: draft.expected_date ? String(draft.expected_date).slice(0, 10) : '',
+          notes: draft.notes || '',
+          status: draft.status || 'draft',
+        })
+        if (Array.isArray(draft.line_items) && draft.line_items.length > 0) {
+          setLineItems(draft.line_items as POLineItem[])
+        }
+      } catch {
+        /* best-effort hydrate */
+      }
+    }
+    ;(async () => {
+      if (resumeId) {
+        setDraftId(resumeId)
+        await hydrate(resumeId)
+      } else {
+        try {
+          const res = await fetch('/api/admin/inventory/po/draft', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({}),
+          })
+          const j = await res.json()
+          if (cancelled) return
+          if (j?.id) {
+            setDraftId(j.id)
+            if (j.resumed) await hydrate(j.id)
+          }
+        } catch {
+          /* non-fatal — editor still works without a draft */
+        }
+      }
+      if (!cancelled) setDraftLoaded(true)
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const edit = useEditSession({
+    resourceType: 'po_new',
+    resourceId: draftId,
+    onCancelled: () => {
+      // Draft was rolled back by server (deleted on cancel). Go back to the list.
+      router.push(ap('/admin/inventory?tab=po'))
+    },
+  })
+
+  const autosave = useAutosaveDraft<{ form: typeof form; lineItems: POLineItem[] }>({
+    save: async (value, signal) => {
+      const id = draftIdRef.current
+      if (!id) return
+      const res = await fetch(`/api/admin/inventory/po/draft/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        signal,
+        body: JSON.stringify({
+          supplier_id: value.form.supplier_id || null,
+          order_date: value.form.order_date || null,
+          expected_date: value.form.expected_date || null,
+          status: value.form.status || null,
+          notes: value.form.notes || null,
+          line_items: value.lineItems,
+        }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    },
+    enabled: () => !!draftIdRef.current && draftLoaded,
+  })
+
+  // Trigger autosave whenever form or lineItems change (after the initial hydrate).
+  const triggerRef = useRef(autosave.trigger)
+  triggerRef.current = autosave.trigger
+  useEffect(() => {
+    if (!draftLoaded || !draftId) return
+    triggerRef.current({ form, lineItems })
+  }, [form, lineItems, draftLoaded, draftId])
 
   useEffect(() => {
     fetch('/api/admin/inventory/suppliers?limit=1000')
@@ -531,6 +636,14 @@ export default function NewPOPage() {
         gst_inclusive: it.gst_inclusive,
       }))
     try {
+      // Flush any pending autosave so the draft is current (not strictly needed
+      // because we promote from local state, but keeps the draft row consistent
+      // if the live POST fails and the user retries).
+      try {
+        await autosave.flush({ form, lineItems })
+      } catch {
+        /* ignore autosave flush errors — the live POST is the source of truth here */
+      }
       const res = await fetch('/api/admin/inventory/po', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -542,6 +655,14 @@ export default function NewPOPage() {
         setSaving(false)
         return
       }
+      // Clean up the draft + close the session as 'save' (no cancel-rollback).
+      if (draftIdRef.current) {
+        await fetch(`/api/admin/inventory/po/draft/${draftIdRef.current}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        }).catch(() => {})
+      }
+      await edit.save().catch(() => false)
       router.push(ap('/admin/inventory?tab=po'))
     } catch {
       showToast('Failed to create purchase order', 'error')
@@ -577,10 +698,22 @@ export default function NewPOPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold text-foreground">New Purchase Order</h1>
             <p className="text-foreground-secondary text-sm mt-0.5">Create a new PO for a supplier</p>
           </div>
+          <EditorToolbar
+            autosaveStatus={autosave.status}
+            sessionStatus={edit.status}
+            onSave={() => {
+              // Toolbar Save mirrors the form submit — reuses handleSubmit via a synthetic event.
+              const btn = document.querySelector<HTMLButtonElement>('button[data-po-submit]')
+              btn?.click()
+            }}
+            onCancel={edit.cancel}
+            saveLabel={saving ? 'Creating…' : 'Create PO'}
+            disabled={saving || !form.supplier_id}
+          />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -1118,13 +1251,15 @@ export default function NewPOPage() {
 
           <div className="flex gap-3">
             <RequireWrite scope="inventory">
-              <button type="submit" disabled={saving || !form.supplier_id} className={btnPrimary}>
+              <button
+                type="submit"
+                data-po-submit
+                disabled={saving || !form.supplier_id}
+                className={btnPrimary}
+              >
                 {saving ? 'Creating...' : 'Create PO'}
               </button>
             </RequireWrite>
-            <Link href={ap('/admin/inventory?tab=po')} className={btnSecondary}>
-              Cancel
-            </Link>
           </div>
         </form>
 
