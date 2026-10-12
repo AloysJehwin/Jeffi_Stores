@@ -69,6 +69,13 @@ describe('abandonedCart scenario', () => {
   })
 
   describe('findEligible', () => {
+    it('scopes the email-dedup NOT EXISTS to channel=email (whatsapp/sms markers never block the email)', async () => {
+      mockQueryMany.mockResolvedValue([])
+      await abandonedCart.findEligible({ campaign, params: defaultParams })
+      const seq1Sql = String(mockQueryMany.mock.calls[0][0])
+      expect(seq1Sql).toContain("channel = 'email'")
+    })
+
     it('passes durations to the seq1 query as canonical-minute strings', async () => {
       mockQueryMany.mockResolvedValue([])
       await abandonedCart.findEligible({ campaign, params: defaultParams })

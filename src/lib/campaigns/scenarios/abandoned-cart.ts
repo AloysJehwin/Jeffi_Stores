@@ -11,6 +11,7 @@ interface Params extends Record<string, unknown> {
   secondEmailDelayHours: number
   highValueFloor: number
   whatsappEnabled: boolean
+  smsEnabled: boolean
 }
 
 interface Row {
@@ -31,6 +32,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     secondEmailDelayHours: hours(48),
     highValueFloor: 5000,
     whatsappEnabled: false,
+    smsEnabled: false,
   },
   paramSchema: {
     lookbackDays: {
@@ -76,6 +78,11 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       label: 'Also send via WhatsApp',
       description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
     },
+    smsEnabled: {
+      type: 'boolean',
+      label: 'Also send via SMS',
+      description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+    },
   },
 
   async findEligible({ campaign, params }) {
@@ -101,6 +108,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
+            AND ecs.channel = 'email'
             AND ecs.user_id = ci.user_id
             AND ecs.sent_at > NOW() - ($4::text || ' minutes')::interval
         )
@@ -132,6 +140,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       -- Must have received sequence 1
       JOIN email_campaigns_sent ecs1 ON ecs1.user_id = ci.user_id
         AND ecs1.campaign_kind = $1
+        AND ecs1.channel = 'email'
         AND (ecs1.metadata->>'sequence')::int = 1
         AND ecs1.sent_at < NOW() - ($5::text || ' minutes')::interval
         AND ecs1.sent_at > NOW() - ($3::text || ' minutes')::interval
@@ -145,6 +154,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs2
           WHERE ecs2.campaign_kind = $1
+            AND ecs2.channel = 'email'
             AND ecs2.user_id = ci.user_id
             AND (ecs2.metadata->>'sequence')::int = 2
         )
@@ -221,6 +231,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       LEFT JOIN LATERAL (
         SELECT sent_at FROM email_campaigns_sent
          WHERE campaign_kind = $1
+           AND channel = 'email'
            AND user_id = ec.user_id
            AND sent_at > NOW() - ($4::text || ' minutes')::interval
          ORDER BY sent_at DESC LIMIT 1

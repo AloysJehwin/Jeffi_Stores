@@ -13,6 +13,7 @@ export const NOT_RECENTLY_EMAILED_SQL = `
   NOT EXISTS (
     SELECT 1 FROM email_campaigns_sent ecs
     WHERE ecs.campaign_kind = $1
+      AND ecs.channel = 'email'
       AND ecs.user_id = wi.user_id
       AND ecs.sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'
   )

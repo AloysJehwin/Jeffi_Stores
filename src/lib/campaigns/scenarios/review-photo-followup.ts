@@ -13,6 +13,7 @@ import type { ScenarioModule } from '../types'
 interface Params extends Record<string, unknown> {
   sinceReview: number
   whatsappEnabled: boolean
+  smsEnabled: boolean
 }
 
 interface Row {
@@ -32,6 +33,7 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
   defaultParams: {
     sinceReview: days(3),
     whatsappEnabled: false,
+    smsEnabled: false,
   },
   paramSchema: {
     sinceReview: {
@@ -46,6 +48,11 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via WhatsApp',
       description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
+    smsEnabled: {
+      type: 'boolean',
+      label: 'Also send via SMS',
+      description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
     },
   },
 
@@ -75,6 +82,7 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
+            AND ecs.channel = 'email'
             AND ecs.user_id = r.user_id
             AND ecs.reference_id = r.id::text
             AND ecs.sent_at > NOW() - ($3::text || ' minutes')::interval
@@ -123,6 +131,7 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
       LEFT JOIN LATERAL (
         SELECT sent_at FROM email_campaigns_sent
          WHERE campaign_kind = $1 AND user_id = r.user_id AND reference_id = r.id::text
+           AND channel = 'email'
            AND sent_at > NOW() - ($3::text || ' minutes')::interval
          ORDER BY sent_at DESC LIMIT 1
       ) ecs ON TRUE

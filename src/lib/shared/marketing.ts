@@ -111,9 +111,12 @@ export async function canSendMarketing(
       : typeof params.sendCooldownDays === 'number' && params.sendCooldownDays > 0)
   const windowMinutes = hasCooldown ? cooldownMinutes(params as Record<string, unknown>) : hours(FREQUENCY_CAP_HOURS)
 
+  // Count only real email sends: whatsapp/sms dedup markers live in this same table (channel column)
+  // and must not trip the email frequency cap.
   const recent = await queryOne<{ cnt: string }>(
     `SELECT COUNT(*)::text AS cnt FROM email_campaigns_sent
-     WHERE user_id = $1 AND campaign_kind = $2 AND sent_at > NOW() - (${Number(windowMinutes)}::text || ' minutes')::interval`,
+     WHERE user_id = $1 AND campaign_kind = $2 AND channel = 'email'
+       AND sent_at > NOW() - (${Number(windowMinutes)}::text || ' minutes')::interval`,
     [userId, campaignKind]
   )
   if (recent && parseInt(recent.cnt, 10) >= 1) {
@@ -158,12 +161,15 @@ export async function recordSent(params: {
   referenceId?: string | null
   messageId?: string | null
   metadata?: Record<string, unknown>
+  // Which channel this row records. Email reads filter channel='email' so a whatsapp/sms dedup marker
+  // can never block an email send (or vice-versa). Defaults to 'email'.
+  channel?: 'email' | 'whatsapp' | 'sms'
 }): Promise<string | null> {
   try {
     const result = await query<{ id: string }>(
       `INSERT INTO email_campaigns_sent
-         (campaign_kind, user_id, reference_id, message_id, metadata)
-       VALUES ($1, $2, $3, $4, $5)
+         (campaign_kind, user_id, reference_id, message_id, metadata, channel)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
       [
         params.campaignKind,
@@ -171,6 +177,7 @@ export async function recordSent(params: {
         params.referenceId ?? null,
         params.messageId ?? null,
         JSON.stringify(params.metadata ?? {}),
+        params.channel ?? 'email',
       ]
     )
     const sentId = result.rows[0]?.id ?? null

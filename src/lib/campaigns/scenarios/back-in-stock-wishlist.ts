@@ -15,6 +15,7 @@ import type { ScenarioModule } from '../types'
 interface Params extends Record<string, unknown> {
   maxWatchesPerSweep: number
   whatsappEnabled: boolean
+  smsEnabled: boolean
 }
 
 interface Row {
@@ -34,6 +35,7 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
   defaultParams: {
     maxWatchesPerSweep: 100,
     whatsappEnabled: false,
+    smsEnabled: false,
   },
   paramSchema: {
     maxWatchesPerSweep: {
@@ -47,6 +49,11 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via WhatsApp',
       description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
+    smsEnabled: {
+      type: 'boolean',
+      label: 'Also send via SMS',
+      description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
     },
   },
 

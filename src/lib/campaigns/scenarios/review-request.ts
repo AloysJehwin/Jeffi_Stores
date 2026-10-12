@@ -12,6 +12,7 @@ interface Params extends Record<string, unknown> {
   lookbackDays: number
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
+  smsEnabled: boolean
 }
 
 interface Row {
@@ -29,6 +30,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
     lookbackDays: days(30),
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
+    smsEnabled: false,
   },
   paramSchema: {
     lookbackDays: {
@@ -50,6 +52,11 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via WhatsApp',
       description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
+    smsEnabled: {
+      type: 'boolean',
+      label: 'Also send via SMS',
+      description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
     },
   },
 
@@ -74,12 +81,14 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
+            AND ecs.channel = 'email'
             AND ecs.reference_id = o.id::text
         )
         -- review_request and review_reminder target the same orders; one review email per order.
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = 'review_reminder'
+            AND ecs.channel = 'email'
             AND ecs.reference_id = o.id::text
         )
       LIMIT $4

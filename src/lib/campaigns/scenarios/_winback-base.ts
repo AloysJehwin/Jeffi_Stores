@@ -11,6 +11,7 @@ export interface WinbackParams extends Record<string, unknown> {
   healthScoreMax: number
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
+  smsEnabled: boolean
 }
 
 interface Row {
@@ -60,6 +61,11 @@ const winbackSchema: ParamSchema<WinbackParams> = {
     label: 'Also send via WhatsApp',
     description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
   },
+  smsEnabled: {
+    type: 'boolean',
+    label: 'Also send via SMS',
+    description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
+  },
 }
 
 export function buildWinbackScenario(opts: {
@@ -99,6 +105,7 @@ export function buildWinbackScenario(opts: {
           AND NOT EXISTS (
             SELECT 1 FROM email_campaigns_sent ecs
             WHERE ecs.campaign_kind = $1
+              AND ecs.channel = 'email'
               AND ecs.user_id = u.id
               AND ecs.sent_at > NOW() - ($6 || ' minutes')::interval
           )

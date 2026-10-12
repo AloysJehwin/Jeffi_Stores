@@ -161,7 +161,8 @@ CREATE TABLE public.email_campaigns_sent (
     unsubscribed_at timestamp with time zone,
     bounced_at timestamp with time zone,
     complained_at timestamp with time zone,
-    metadata jsonb DEFAULT '{}'::jsonb
+    metadata jsonb DEFAULT '{}'::jsonb,
+    channel character varying(16) DEFAULT 'email'::character varying NOT NULL
 );
 
 

@@ -104,9 +104,11 @@ export async function sendCampaignWhatsApp(
       wa_template_sid: string | null
       wa_variables: Record<string, string> | null
       wa_header_image_url: string | null
-    }>(`SELECT sms_template, wa_template_sid, wa_variables, wa_header_image_url FROM campaigns WHERE kind = $1`, [
-      kind,
-    ]).catch(() => null)
+      parameters: Record<string, unknown> | null
+    }>(
+      `SELECT sms_template, wa_template_sid, wa_variables, wa_header_image_url, parameters FROM campaigns WHERE kind = $1`,
+      [kind]
+    ).catch(() => null)
 
     // Respect marketing opt-out (same gate as email campaigns).
     const gate = await canSendMarketing(userId, kind as CampaignKind)
@@ -120,7 +122,7 @@ export async function sendCampaignWhatsApp(
     if (await alreadySentForReference(kind as CampaignKind, userId, waRef, window)) {
       return { ok: false, reason: 'cooldown' }
     }
-    const waSentId = await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: waRef }).catch(
+    const waSentId = await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: waRef, channel: 'whatsapp' }).catch(
       () => null
     )
 
@@ -173,15 +175,16 @@ export async function sendCampaignWhatsApp(
       ok = await dispatch(kind, user.phone, clean, { entityType: 'campaign', entityId: kind })
     }
 
-    // Mobile = both channels: fire a plain-text SMS alongside WhatsApp so a customer reached on
-    // mobile gets it even if WhatsApp isn't delivered. Shares the one dedup above (no extra gate),
-    // best-effort. (#campaign SMS+WhatsApp together)
-    const smsBody = campaignRow?.sms_template?.trim()
-      ? renderSmsTemplate(campaignRow.sms_template, clean)
-      : campaignSmsBody(kind, clean)
-    if (smsBody) {
-      const { sendCampaignSMS } = await import('@/lib/shared/sms')
-      sendCampaignSMS({ phone: user.phone, body: smsBody, kind, userId }).catch(() => {})
+    // Campaign SMS alongside WhatsApp — opt-in per campaign via the smsEnabled scenario param
+    // (default off), mirroring whatsappEnabled. Transactional SMS (OTP/order) is unaffected.
+    if (campaignRow?.parameters?.smsEnabled === true) {
+      const smsBody = campaignRow?.sms_template?.trim()
+        ? renderSmsTemplate(campaignRow.sms_template, clean)
+        : campaignSmsBody(kind, clean)
+      if (smsBody) {
+        const { sendCampaignSMS } = await import('@/lib/shared/sms')
+        sendCampaignSMS({ phone: user.phone, body: smsBody, kind, userId }).catch(() => {})
+      }
     }
 
     return { ok, reason: ok ? undefined : 'send_failed' }

@@ -64,6 +64,7 @@ export const birthdayCollect: ScenarioModule<Params, Row> = {
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
+            AND ecs.channel = 'email'
             AND ecs.user_id = u.id
             AND ecs.sent_at > NOW() - ($2::text || ' minutes')::interval
         )
@@ -104,6 +105,7 @@ export const birthdayCollect: ScenarioModule<Params, Row> = {
       LEFT JOIN LATERAL (
         SELECT sent_at FROM email_campaigns_sent
          WHERE campaign_kind = $1 AND user_id = u.id
+           AND channel = 'email'
          ORDER BY sent_at DESC LIMIT 1
       ) ecs ON ecs.sent_at > NOW() - ($2::text || ' minutes')::interval
       WHERE u.date_of_birth IS NULL
