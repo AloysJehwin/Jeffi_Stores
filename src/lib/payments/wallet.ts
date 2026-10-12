@@ -40,6 +40,9 @@ export type WalletCategory =
   | 'goodwill_credit'
   | 'campaign'
   | 'ai'
+  | 'sms'
+  | 'whatsapp'
+  | 'email'
   | 'adjustment'
 
 export interface TenantWallet {
@@ -87,7 +90,11 @@ export async function tenantShipsOnPlatform(tenantId: string | null | undefined)
   return mode === null ? null : mode === 'platform'
 }
 
-async function lockWallet(client: PoolClient, tenantId: string): Promise<{ balance: number; floor: number }> {
+async function lockWallet(
+  client: PoolClient,
+  tenantId: string,
+  floorInr: number = WALLET_PICKUP_MIN_FLOOR_INR
+): Promise<{ balance: number; floor: number }> {
   await client.query(`INSERT INTO tenant_wallets (tenant_id) VALUES ($1) ON CONFLICT (tenant_id) DO NOTHING`, [
     tenantId,
   ])
@@ -95,7 +102,7 @@ async function lockWallet(client: PoolClient, tenantId: string): Promise<{ balan
     tenantId,
   ])
   const balance = Number(r.rows[0]?.balance ?? 0)
-  const floor = Math.max(WALLET_PICKUP_MIN_FLOOR_INR, Number(r.rows[0]?.min_balance ?? 0))
+  const floor = Math.max(floorInr, Number(r.rows[0]?.min_balance ?? 0))
   return { balance, floor }
 }
 
@@ -282,7 +289,14 @@ export async function chargeDeliveryEstimate(opts: {
           `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, order_ref, awb, note)
            VALUES ($1, 'debit', $6, $2, $3, $4, $5)
            ON CONFLICT (tenant_id, awb) WHERE awb IS NOT NULL AND entry_type = 'debit' DO NOTHING`,
-          [opts.tenantId, -Math.abs(i.estimateInr), i.orderRef ?? null, i.awb, `${label} — AWB ${i.awb}`, opts.kind === 'rvp' ? 'shipping_rvp' : 'shipping_forward']
+          [
+            opts.tenantId,
+            -Math.abs(i.estimateInr),
+            i.orderRef ?? null,
+            i.awb,
+            `${label} — AWB ${i.awb}`,
+            opts.kind === 'rvp' ? 'shipping_rvp' : 'shipping_forward',
+          ]
         )
         if (ins.rowCount) charged += Math.abs(i.estimateInr)
       }
@@ -500,17 +514,19 @@ export async function debitWallet(opts: {
   category: WalletCategory
   externalRef: string
   note: string
+  // Minimum balance to leave after the charge. Defaults to the Rs 500 shipping floor; messaging passes 0.
+  floorInr?: number
 }): Promise<{ ok: true; charged: boolean; balance: number } | { ok: false; error: string }> {
   if (isFlagshipTenant(opts.tenantId)) return { ok: true, charged: false, balance: 0 }
   if (!(opts.amountInr > 0)) return { ok: false, error: 'Debit amount must be positive.' }
   try {
     return await withWalletTx(opts.tenantId, async client => {
-      const { balance, floor } = await lockWallet(client, opts.tenantId)
+      const { balance, floor } = await lockWallet(client, opts.tenantId, opts.floorInr)
       const amount = round2(opts.amountInr)
-      const dup = await client.query(
-        `SELECT 1 FROM wallet_ledger WHERE tenant_id = $1 AND external_ref = $2 LIMIT 1`,
-        [opts.tenantId, opts.externalRef]
-      )
+      const dup = await client.query(`SELECT 1 FROM wallet_ledger WHERE tenant_id = $1 AND external_ref = $2 LIMIT 1`, [
+        opts.tenantId,
+        opts.externalRef,
+      ])
       if (dup.rowCount) return { ok: true as const, charged: false, balance }
       if (balance - amount < floor) {
         return { ok: false as const, error: shortfallMessage(opts.note, amount, balance, floor) }

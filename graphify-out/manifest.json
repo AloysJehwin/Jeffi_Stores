@@ -11695,8 +11695,8 @@
     "semantic_hash": ""
   },
   "src/lib/payments/wallet.ts": {
-    "mtime": 1791644844.805782,
-    "ast_hash": "0bcf8a30da9ca53ff96b176e27595fc6",
+    "mtime": 1791782685.3233433,
+    "ast_hash": "6c2dcdcebd2a6bf808959accabc7c90c",
     "semantic_hash": ""
   },
   "src/lib/shared/activity-shared.ts": {
@@ -14582,6 +14582,21 @@
   "tests/lib/messaging-provider.test.ts": {
     "mtime": 1791782066.6624372,
     "ast_hash": "44783706e9459f5ca24182f40abb55ba",
+    "semantic_hash": ""
+  },
+  "src/lib/shared/messaging/billing.ts": {
+    "mtime": 1791782541.2021189,
+    "ast_hash": "dfcfd550a23233851847ac8fff5329da",
+    "semantic_hash": ""
+  },
+  "src/lib/shared/messaging/pricing.ts": {
+    "mtime": 1791782507.4532764,
+    "ast_hash": "92a83abccd6213c2a6d21d6b377d698b",
+    "semantic_hash": ""
+  },
+  "tests/lib/messaging-billing.test.ts": {
+    "mtime": 1791782685.3310962,
+    "ast_hash": "ddfa8b68cbafa96005629abb5e1fd6c9",
     "semantic_hash": ""
   }
 }
