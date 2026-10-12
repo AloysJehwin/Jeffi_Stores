@@ -22,15 +22,13 @@ export default function EcomNav({ owner }: { owner: { email: string; name: strin
   }
 
   return (
-    <header className="fixed top-0 inset-x-0 z-40 border-b border-border-default bg-surface-elevated/80 backdrop-blur">
+    <header className="fixed top-0 inset-x-0 z-40 bg-surface/85 backdrop-blur">
       <div className="w-full px-6 lg:px-10 h-14 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 font-bold text-foreground">
-          <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 text-white text-sm">
+          <span className="ecom-accent-bg inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-sm font-display font-black">
             J
           </span>
-          <span>
-            Jeffi <span className="text-accent-600 dark:text-accent-400">Commerce</span>
-          </span>
+          <span className="font-display font-black text-xl tracking-tight">Jeffi Commerce</span>
         </Link>
 
         <nav className="flex items-center gap-2 sm:gap-4 text-sm">
@@ -45,7 +43,7 @@ export default function EcomNav({ owner }: { owner: { email: string; name: strin
               <span className="hidden sm:inline text-foreground-muted text-xs">{owner.name || owner.email}</span>
               <button
                 onClick={signOut}
-                className="px-3 py-1.5 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
+                className="org-sand org-sand-hover px-4 py-1.5 rounded-full text-foreground transition-colors"
               >
                 Sign out
               </button>
@@ -57,7 +55,7 @@ export default function EcomNav({ owner }: { owner: { email: string; name: strin
               </Link>
               <Link
                 href="/signup"
-                className="px-3.5 py-1.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white font-medium transition-colors"
+                className="ecom-accent-bg px-5 py-2 rounded-full text-white font-display font-bold transition-colors"
               >
                 Get started
               </Link>

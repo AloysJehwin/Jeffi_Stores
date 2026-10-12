@@ -17,7 +17,7 @@ export function PhoneMock({
   return (
     <div className={`relative mx-auto w-[190px] ${className}`}>
       <div
-        className={`rounded-[2rem] border-[6px] border-foreground/80 bg-surface-elevated shadow-2xl overflow-hidden ${src ? 'aspect-[390/844]' : 'aspect-[9/19]'}`}
+        className={`rounded-[2.5rem] border-[5px] border-[#3d3a35] bg-[#f8f3ea] overflow-hidden ${src ? 'aspect-[390/844]' : 'aspect-[9/19]'}`}
       >
         {src ? (
           <img src={src} alt={alt} className="w-full h-full object-cover object-top" />
@@ -25,19 +25,15 @@ export function PhoneMock({
           <>
             {/* notch */}
             <div className="h-6 flex items-center justify-center">
-              <span className="w-16 h-1.5 rounded-full bg-foreground/20" />
+              <span className="w-16 h-2 rounded-full bg-[#d9d2c3]" />
             </div>
             <div className="px-3 pb-3 space-y-2.5">
               {variant === 'store' && (
                 <>
-                  <div className="h-20 rounded-xl bg-gradient-to-br from-accent-500/80 to-primary-500/80" />
+                  <div className="h-4 rounded-full bg-[#e8e1d3]" />
                   <div className="grid grid-cols-2 gap-2">
-                    {[0, 1, 2, 3].map(i => (
-                      <div key={i} className="rounded-lg border border-border-default p-2 space-y-1">
-                        <div className="h-8 rounded bg-surface-secondary" />
-                        <div className="h-1.5 w-3/4 rounded bg-foreground/10" />
-                        <div className="h-1.5 w-1/2 rounded bg-accent-500/40" />
-                      </div>
+                    {['var(--org-peach)', 'var(--org-sage)', 'var(--org-sage)', 'var(--org-apricot)'].map((c, i) => (
+                      <div key={i} className="aspect-square rounded-xl" style={{ background: c }} />
                     ))}
                   </div>
                 </>
@@ -48,7 +44,7 @@ export function PhoneMock({
                     <div className="h-1.5 w-1/3 rounded bg-foreground/10 mb-2" />
                     <div className="h-16 flex items-end gap-1">
                       {[40, 65, 50, 80, 60, 90, 70].map((h, i) => (
-                        <div key={i} className="flex-1 rounded-t bg-accent-500/70" style={{ height: `${h}%` }} />
+                        <div key={i} className="flex-1 rounded-sm" style={{ height: `${h}%`, background: i === 5 ? 'var(--org-terracotta)' : i % 2 ? 'var(--org-apricot)' : 'var(--org-peach)' }} />
                       ))}
                     </div>
                   </div>

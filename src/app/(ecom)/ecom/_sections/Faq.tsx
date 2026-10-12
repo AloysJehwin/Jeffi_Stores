@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Eyebrow, Display } from '../_ui'
 import { ChevronDown } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -42,38 +43,25 @@ const FAQS: QA[] = [
 
 export default function Faq() {
   const [open, setOpen] = useState<number | null>(0)
-
   return (
-    <section className="w-full px-6 lg:px-12 py-16">
-      <div className="text-center mb-10">
-        <p className="ecom-accent-text font-semibold text-sm uppercase tracking-widest">Questions</p>
-        <h2 className="text-4xl lg:text-5xl font-extrabold mt-3 text-foreground">Frequently asked questions</h2>
-      </div>
-
-      <div className="mx-auto max-w-3xl space-y-3">
+    <section className="w-full px-6 lg:px-12 py-20">
+      <Eyebrow>Questions</Eyebrow>
+      <Display className="mt-3 text-4xl lg:text-5xl max-w-xl">Frequently asked questions</Display>
+      <div className="mt-10 max-w-3xl space-y-3">
         {FAQS.map((item, i) => {
           const isOpen = open === i
           return (
-            <div
-              key={item.q}
-              className="rounded-2xl border border-border-default bg-surface-elevated shadow-sm shadow-black/[0.04] overflow-hidden"
-            >
+            <div key={item.q} className="org-sand rounded-[2rem] overflow-hidden">
               <button
                 type="button"
                 aria-expanded={isOpen}
                 onClick={() => setOpen(isOpen ? null : i)}
-                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+                className="org-square flex w-full items-center justify-between gap-4 px-8 py-5 text-left"
               >
-                <span className="text-base font-semibold text-foreground">{item.q}</span>
-                <ChevronDown
-                  aria-hidden
-                  className={clsx(
-                    'ecom-accent-text h-5 w-5 shrink-0 transition-transform duration-200',
-                    isOpen && 'rotate-180'
-                  )}
-                />
+                <span className="font-display font-black text-lg text-foreground">{item.q}</span>
+                <ChevronDown aria-hidden className={clsx('h-5 w-5 shrink-0 text-foreground transition-transform', isOpen && 'rotate-180')} />
               </button>
-              <div className={clsx('px-5 pb-4 text-sm text-foreground-secondary', !isOpen && 'hidden')}>{item.a}</div>
+              <div className={clsx('px-8 pb-6 text-base text-foreground-secondary leading-relaxed max-w-2xl', !isOpen && 'hidden')}>{item.a}</div>
             </div>
           )
         })}
