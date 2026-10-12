@@ -10,6 +10,7 @@ interface Params extends Record<string, unknown> {
   sinceDelivered: number
   maxRecipientsPerSweep: number
   whatsappEnabled: boolean
+  smsEnabled: boolean
 }
 
 interface Row {
@@ -26,6 +27,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
     sinceDelivered: days(3),
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
+    smsEnabled: false,
   },
   paramSchema: {
     sinceDelivered: {
@@ -47,6 +49,11 @@ export const referralInvite: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via WhatsApp',
       description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
+    smsEnabled: {
+      type: 'boolean',
+      label: 'Also send via SMS',
+      description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
     },
   },
 
@@ -74,6 +81,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
+            AND ecs.channel = 'email'
             AND ecs.user_id = u.id
             AND ecs.sent_at > NOW() - ($3::text || ' minutes')::interval
         )
@@ -128,6 +136,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
       LEFT JOIN LATERAL (
         SELECT sent_at FROM email_campaigns_sent
          WHERE campaign_kind = $1 AND user_id = d.user_id
+           AND channel = 'email'
            AND sent_at > NOW() - ($3::text || ' minutes')::interval
          ORDER BY sent_at DESC LIMIT 1
       ) ecs ON TRUE

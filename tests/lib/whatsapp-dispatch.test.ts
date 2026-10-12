@@ -45,8 +45,9 @@ const mockRecordSent = vi.mocked(recordSent)
 const mockSendSMS = vi.mocked(sendCampaignSMS)
 
 // Default happy-path setup: phone on file + marketing allowed + not in cooldown + sender succeeds.
+// Campaign row carries smsEnabled:true so the opt-in SMS leg fires (mirrors whatsappEnabled).
 function allowAndSend() {
-  mockQueryOne.mockResolvedValue({ phone: '+919876543210' } as any)
+  mockQueryOne.mockResolvedValue({ phone: '+919876543210', parameters: { smsEnabled: true } } as any)
   mockCanSend.mockResolvedValue({ ok: true } as any)
   mockAlreadySent.mockResolvedValue(false)
   mockRecordSent.mockResolvedValue('sent-1')
@@ -241,7 +242,12 @@ describe('sendCampaignWhatsApp missing vars', () => {
       allowAndSend()
       await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt' }, 1)
       expect(mockRecordSent).toHaveBeenCalledWith(
-        expect.objectContaining({ campaignKind: 'abandoned_cart', userId: 'user-1', referenceId: 'wa:abandoned_cart' })
+        expect.objectContaining({
+          campaignKind: 'abandoned_cart',
+          userId: 'user-1',
+          referenceId: 'wa:abandoned_cart',
+          channel: 'whatsapp',
+        })
       )
     })
 
@@ -262,6 +268,14 @@ describe('sendCampaignWhatsApp missing vars', () => {
     expect(mockSendSMS).toHaveBeenCalledWith(
       expect.objectContaining({ phone: '+919876543210', kind: 'abandoned_cart', userId: 'user-1' })
     )
+  })
+
+  it('does NOT send SMS when the campaign has smsEnabled off (default)', async () => {
+    allowAndSend()
+    mockQueryOne.mockResolvedValue({ phone: '+919876543210', parameters: {} } as any)
+    await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt, Nut' }, 1)
+    expect(mockAbandonedCart).toHaveBeenCalled()
+    expect(mockSendSMS).not.toHaveBeenCalled()
   })
 })
 

@@ -53,6 +53,7 @@ export const templateScenario: ScenarioModule<Params, Row> = {
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1 AND ecs.user_id = u.id
+            AND ecs.channel = 'email'
             AND ecs.sent_at > NOW() - ($3::text || ' minutes')::interval
         )
       LIMIT $4

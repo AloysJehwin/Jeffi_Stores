@@ -20,6 +20,7 @@ interface Params extends Record<string, unknown> {
   priceDropThresholdPct: number
   maxWatchesPerSweep: number
   whatsappEnabled: boolean
+  smsEnabled: boolean
 }
 
 interface Row {
@@ -37,7 +38,7 @@ export const priceDrop: ScenarioModule<Params, Row> = {
   description: 'Saved product price dropped',
   trigger:
     "Fires when a product on the wishlist or saved for later in the cart has a base_price drops by at least the configured threshold % below the snapshot price. Only for active products that are in stock. The wishlist snapshot is refreshed once the email is sent, so a further drop notifies again.",
-  defaultParams: { priceDropThresholdPct: 5, maxWatchesPerSweep: 100, whatsappEnabled: false },
+  defaultParams: { priceDropThresholdPct: 5, maxWatchesPerSweep: 100, whatsappEnabled: false, smsEnabled: false },
   paramSchema: {
     priceDropThresholdPct: {
       type: 'integer',
@@ -57,6 +58,11 @@ export const priceDrop: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via WhatsApp',
       description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
+    smsEnabled: {
+      type: 'boolean',
+      label: 'Also send via SMS',
+      description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
     },
   },
 

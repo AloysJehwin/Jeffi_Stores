@@ -15,5 +15,6 @@ export const winback180 = buildWinbackScenario({
     healthScoreMax: 100,
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
+    smsEnabled: false,
   },
 })

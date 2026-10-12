@@ -659,6 +659,14 @@ CREATE INDEX idx_email_sent_campaign_user ON public.email_campaigns_sent USING b
 
 
 --
+-- Name: idx_email_sent_channel; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_email_sent_channel ON public.email_campaigns_sent USING btree (campaign_kind, user_id, channel, sent_at DESC);
+
+
+
+--
 -- Name: idx_email_sent_clicked; Type: INDEX; Schema: public; Owner: -
 --
 

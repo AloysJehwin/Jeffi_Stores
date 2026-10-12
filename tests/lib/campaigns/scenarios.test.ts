@@ -456,7 +456,7 @@ describe('priceDrop scenario', () => {
 
   it('findEligible passes computed factor to queryMany', async () => {
     mockQueryMany.mockResolvedValueOnce([])
-    const params = { priceDropThresholdPct: 10, maxWatchesPerSweep: 100, whatsappEnabled: false }
+    const params = { priceDropThresholdPct: 10, maxWatchesPerSweep: 100, whatsappEnabled: false, smsEnabled: false }
 
     await priceDrop.findEligible({
       campaign: makeCampaign({ kind: 'price_drop' }) as any,
@@ -748,7 +748,7 @@ describe('restock scenario', () => {
 
   it('findEligible passes the campaign kind and the row limit', async () => {
     mockQueryMany.mockResolvedValueOnce([])
-    const params = { maxWatchesPerSweep: 200, whatsappEnabled: false }
+    const params = { maxWatchesPerSweep: 200, whatsappEnabled: false, smsEnabled: false }
 
     await restock.findEligible({
       campaign: makeCampaign({ kind: 'restock' }) as any,

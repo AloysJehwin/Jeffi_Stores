@@ -19,6 +19,7 @@ import type { ScenarioModule } from '../types'
 interface Params extends Record<string, unknown> {
   maxWatchesPerSweep: number
   whatsappEnabled: boolean
+  smsEnabled: boolean
 }
 
 interface Row {
@@ -35,7 +36,7 @@ export const restock: ScenarioModule<Params, Row> = {
   description: 'Wishlisted product back in stock',
   trigger:
     "Fires when a product on a customer's wishlist goes from Out of Stock back to in stock (by stock status, not inventory quantity). One send per product per restock event; the wishlist snapshot is refreshed once the email is sent so the next out-to-in transition notifies again.",
-  defaultParams: { maxWatchesPerSweep: 100, whatsappEnabled: false },
+  defaultParams: { maxWatchesPerSweep: 100, whatsappEnabled: false, smsEnabled: false },
   paramSchema: {
     maxWatchesPerSweep: {
       type: 'integer',
@@ -48,6 +49,11 @@ export const restock: ScenarioModule<Params, Row> = {
       type: 'boolean',
       label: 'Also send via WhatsApp',
       description: "Additionally send this campaign to the customer's WhatsApp when a phone number is on file",
+    },
+    smsEnabled: {
+      type: 'boolean',
+      label: 'Also send via SMS',
+      description: "Additionally send this campaign as a text SMS when a phone number is on file (off by default)",
     },
   },
 

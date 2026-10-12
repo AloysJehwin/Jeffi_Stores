@@ -241,6 +241,16 @@ describe('canSendMarketing', () => {
     expect(recentSql).toContain('minutes')
   })
 
+  it('counts only channel=email rows in the frequency cap (ignores whatsapp/sms markers)', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ email: 'u@e.com', is_active: true, marketing_opt_out: false })
+      .mockResolvedValueOnce({ kind: 'winback_90', enabled: true })
+      .mockResolvedValueOnce({ cnt: '0' })
+    await canSendMarketing('user-1', 'winback_90')
+    const recentSql = String(mockQueryOne.mock.calls[2][0])
+    expect(recentSql).toContain("channel = 'email'")
+  })
+
   it('returns ok:true when all checks pass', async () => {
     mockQueryOne
       .mockResolvedValueOnce({ email: 'u@e.com', is_active: true, marketing_opt_out: false })
