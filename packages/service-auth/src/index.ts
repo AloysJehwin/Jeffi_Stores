@@ -7,6 +7,7 @@ export interface ServiceClaims {
   tenantId: string
   apiKeyId?: string
   tenantSlug?: string
+  internal?: boolean // platform-originated send: charged at provider cost, no public margin
   exp: number
 }
 

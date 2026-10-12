@@ -1,4 +1,5 @@
 import { logMessage } from '@/lib/shared/message-log'
+import { messagingInline, remoteSend } from '@/lib/shared/messaging/remote'
 import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
@@ -84,6 +85,11 @@ async function sendTemplate(
   if (!(await whatsappChannelEnabled())) return false
   if (!contentSid) return false // not configured → caller falls back to SMS
   if (!(await messagingGateAllows('whatsapp', isMarketingKind(kind)))) return false
+  if (!messagingInline()) {
+    const r = await remoteSend({ channel: 'whatsapp', to: normalized, body: summary, provider_ref: contentSid, variables, metadata: { kind } })
+    logMessage({ channel: 'whatsapp', to: normalized, from: 'messaging-service', body: summary, kind, status: r.ok ? 'sent' : 'failed', providerSid: r.providerRef, provider: 'messaging-service', error: r.error, entityType: entity?.entityType, entityId: entity?.entityId, deliveryStatus: r.ok ? 'estimated' : undefined })
+    return r.ok
+  }
   const provider = await getWhatsAppProvider()
   if (!provider.configured) return false
   try {

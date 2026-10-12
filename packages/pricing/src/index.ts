@@ -17,8 +17,8 @@ export const usdToInr = (usd: number) => Math.round(Math.abs(usd) * USD_INR_RATE
 export function withMargin(costInr: number): number {
   return round2(costInr * (1 + PUBLIC_MARGIN))
 }
-export function messagePriceInr(channel: MessagingChannel): number {
-  return withMargin(MESSAGING_COST_INR[channel])
+export function messagePriceInr(channel: MessagingChannel, internal = false): number {
+  return internal ? round2(MESSAGING_COST_INR[channel]) : withMargin(MESSAGING_COST_INR[channel])
 }
 export function documentPriceInr(type: DocumentType): number {
   return withMargin(DOCUMENT_COST_INR[type])

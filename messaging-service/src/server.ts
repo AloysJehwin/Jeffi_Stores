@@ -41,8 +41,8 @@ app.get('/healthz', async () => ({ ok: true, service: 'messaging' }))
 // ── messages ──
 app.post('/messages', async req => {
   const body = SendMessageRequest.parse(req.body)
-  const { tenantId, tenantSlug, apiKeyId } = req.claims
-  return msgToApi(await sendMessage({ tenantId, tenantSlug, apiKeyId }, body))
+  const { tenantId, tenantSlug, apiKeyId, internal } = req.claims
+  return msgToApi(await sendMessage({ tenantId, tenantSlug, apiKeyId, internal }, body))
 })
 
 app.post('/messages/batch', async req => {
@@ -120,7 +120,7 @@ app.post<{ Querystring: { m?: string }; Body: Record<string, string> }>('/webhoo
   const usd = priceUsd(req.body?.Price)
   if (usd !== null) {
     const { withMargin } = await import('@jeffi/pricing')
-    const exact = withMargin(usdToInr(usd))
+    const exact = (m.metadata as any)?.internal ? usdToInr(usd) : withMargin(usdToInr(usd))
     await wallet.trueUp({ tenantId: m.tenant_id, amountInr: exact, externalRef: `pub:${id}`, note: `${m.channel} → ${m.to_address} (exact)` })
     await db.query(`UPDATE messages SET charged_inr=$2, updated_at=now() WHERE id=$1`, [id, exact])
   }

@@ -209,3 +209,23 @@ current app, which keeps running until phase 6).
 3. **Monorepo tool:** npm workspaces + Turborepo (recommended) or Nx?
 4. **Start date:** before or after the vCPU quota is approved? Phases 0–2 fit on the current core node; phases
    3–5 need more capacity.
+
+---
+
+## Addendum (2026-10-13): first services shipped — messaging, documents, public API
+
+Status: **built and committed** (see `git log` for `messaging-service`, `document-service`, `public-api-service`).
+Names/locations differ from the proposal above; this addendum is authoritative for them.
+
+| Proposal above | Shipped as | Notes |
+|---|---|---|
+| `services/notifications` (internal) | **`messaging-service/`** (top-level) | SES email, Twilio SMS/WhatsApp. Reachable externally **through the gateway** with an API key, and internally from the monolith with `internal=true` claims (cost price, no margin). |
+| `apps/docs` renderer (`/render`) | **`document-service/`** (top-level) | pdfkit renderer for invoice/quotation/receipt/packing-slip/label/PO, 5 layouts, server-side GST split, per-tenant numbering, S3 + token viewer. |
+| — | **`public-api-service/`** (top-level) | `public.jeffistores.in`. Bearer API keys (sha256 in control-plane `api_keys`), scopes + `tenants.service_types` gating, per-key rate limit, Redis idempotency, HMAC proxy to the two services, OpenAPI at `/docs`. |
+| `packages/clients` etc. | **`packages/{api-contracts,service-auth,pricing,wallet,gst}`** | zod contracts drive validation + OpenAPI; HMAC token has `{service, tenantId, tenantSlug, apiKeyId?, internal?, exp}`. |
+
+- **Billing**: prepaid tenant wallet (`tenant_wallets` / `wallet_ledger`, control plane). Public price = provider cost × 1.4 (`PUBLIC_MARGIN`), SMS/WhatsApp trued-up from the Twilio status callback. Category `document` added.
+- **Service types**: `tenants.service_types text[]` (`store | messaging | documents`). `plans.product = 'services'` (slug `services`, tier 0, ₹0) for API-only workspaces, which are created `active` straight from onboarding with **no provisioning**; `reconcileOrphanedTenants` ignores them. Adding a store later upgrades the **same tenant row** (`upgradeTenantToStore`), so the wallet is shared by construction.
+- **Monolith cut-over**: `MESSAGING_INLINE` (default `true`). Set `false` to route `sendAuditedMail` (no cc/bcc/attachments), `sendSMS`, and WhatsApp `sendTemplate` through messaging-service at cost; `email_logs`/`message_logs` keep being written.
+- **Dev ports**: public-api 3100, messaging 3101, documents 3102. DBs on the local Postgres: `jeffi_messaging`, `jeffi_documents` (`database/messaging/`, `database/documents/`).
+- **Still per the original plan**: queue (BullMQ) for batches, k8s deployments + Traefik host rule for `public.`, moving the Next app into `apps/`, payments/sync-worker services.
