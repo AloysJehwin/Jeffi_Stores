@@ -635,6 +635,14 @@ CREATE INDEX idx_message_logs_kind ON public.message_logs USING btree (kind);
 
 
 --
+-- Name: idx_message_logs_provider_sid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_logs_provider_sid ON public.message_logs USING btree (provider_sid);
+
+
+
+--
 -- Name: idx_email_logs_status_sent_at; Type: INDEX; Schema: public; Owner: -
 --
 
