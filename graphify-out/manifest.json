@@ -955,8 +955,8 @@
     "semantic_hash": ""
   },
   "database/indexes.sql": {
-    "mtime": 1791650467.7841165,
-    "ast_hash": "00e8505fc6288492143e726c4f2d3496",
+    "mtime": 1791782296.8245883,
+    "ast_hash": "3f3aa8982941f2e1796ab378d532a7be",
     "semantic_hash": ""
   },
   "database/inventory.sql": {
@@ -970,8 +970,8 @@
     "semantic_hash": ""
   },
   "database/logs.sql": {
-    "mtime": 1791650452.197495,
-    "ast_hash": "4512ba1dfeec4ac3763143e1d40d27d7",
+    "mtime": 1791782272.0645669,
+    "ast_hash": "b25490b318776c3c74bf6c78e330dd10",
     "semantic_hash": ""
   },
   "database/marketing.sql": {

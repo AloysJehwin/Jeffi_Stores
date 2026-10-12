@@ -93,6 +93,11 @@ CREATE TABLE public.message_logs (
     status character varying(50) DEFAULT 'sent'::character varying,
     error text,
     provider_sid character varying(128),
+    provider character varying(16),
+    price numeric(12,4),
+    currency character(3) DEFAULT 'INR'::bpchar,
+    delivery_status character varying(24),
+    priced_at timestamp with time zone,
     sent_at timestamp with time zone DEFAULT now()
 );
 
