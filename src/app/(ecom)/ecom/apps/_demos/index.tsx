@@ -17,6 +17,14 @@ const DEMOS: Record<string, ComponentType> = {
   quotations: lazy(() => import('./QuotationsDemo')),
   coupons: lazy(() => import('./CouponsDemo')),
   reviews: lazy(() => import('./ReviewsDemo')),
+  delivery: lazy(() => import('./DeliveryDemo')),
+  'packing-slips': lazy(() => import('./PackingSlipsDemo')),
+  labels: lazy(() => import('./LabelsDemo')),
+  returns: lazy(() => import('./ReturnsDemo')),
+  gst: lazy(() => import('./GstDemo')),
+  payments: lazy(() => import('./PaymentsDemo')),
+  financial: lazy(() => import('./FinancialDemo')),
+  payouts: lazy(() => import('./PayoutsDemo')),
 }
 
 export function hasDemo(slug: string) {
