@@ -501,6 +501,44 @@ export async function getWalletBalance(
   }
 }
 
+export interface MessagingSpendRow {
+  channel: string
+  month: string
+  spent: number
+}
+
+// Messaging spend for the Finance → Messaging tab. Reads control-plane wallet_ledger debits (unlike
+// the tenant-DB finance readers). Returns per-channel+month totals plus overall + this-month totals.
+export async function getMessagingSpend(
+  tenantId: string
+): Promise<{ rows: MessagingSpendRow[]; total: number; thisMonth: number; byChannel: Record<string, number> }> {
+  const pool = controlPlanePool()
+  const r = await pool
+    .query(
+      `SELECT category AS channel, to_char(date_trunc('month', occurred_at), 'YYYY-MM') AS month, SUM(-amount) AS spent
+       FROM wallet_ledger
+       WHERE tenant_id = $1 AND entry_type = 'debit' AND category IN ('sms','whatsapp','email')
+       GROUP BY category, 2 ORDER BY 2 DESC, category`,
+      [tenantId]
+    )
+    .catch(() => null)
+  const rows: MessagingSpendRow[] = (r?.rows ?? []).map(x => ({
+    channel: String(x.channel),
+    month: String(x.month),
+    spent: Number(x.spent),
+  }))
+  const nowMonth = new Date().toISOString().slice(0, 7)
+  const byChannel: Record<string, number> = {}
+  let total = 0
+  let thisMonth = 0
+  for (const row of rows) {
+    total += row.spent
+    byChannel[row.channel] = (byChannel[row.channel] ?? 0) + row.spent
+    if (row.month === nowMonth) thisMonth += row.spent
+  }
+  return { rows, total, thisMonth, byChannel }
+}
+
 /**
  * Generic categorised debit for future paid features (campaigns, AI, …). Not wired to any caller
  * yet — the one call those features make. Idempotent on externalRef. Blocks when the balance would
