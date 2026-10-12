@@ -150,6 +150,17 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
       tenantId,
       `jeffi-tenant-${slug}`,
     ])
+    // Welcome wallet credit so a new store can send messages immediately. Idempotent via external_ref.
+    await client.query(
+      `INSERT INTO tenant_wallets (tenant_id, balance) VALUES ($1, 100) ON CONFLICT (tenant_id) DO NOTHING`,
+      [tenantId]
+    )
+    await client.query(
+      `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, external_ref, note)
+       VALUES ($1, 'recharge', 'recharge', 100, $2, 'Welcome wallet credit')
+       ON CONFLICT (tenant_id, external_ref) WHERE external_ref IS NOT NULL DO NOTHING`,
+      [tenantId, `signup_credit:${tenantId}`]
+    )
     await client.query('COMMIT')
     clearTenantCache()
     return { ok: true, tenantId, slug }
