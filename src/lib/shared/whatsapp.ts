@@ -3,6 +3,7 @@ import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { getWhatsAppProvider } from '@/lib/shared/messaging'
+import { messagingGateAllows, isMarketingKind } from '@/lib/shared/messaging/billing'
 
 // WhatsApp notifications. The provider (Twilio today, AWS later) is chosen per-tenant by the Site
 // Controls selector in src/lib/shared/messaging; this file owns the shared concerns: the channel
@@ -81,6 +82,7 @@ async function sendTemplate(
   if (!normalized) return false
   if (!(await whatsappChannelEnabled())) return false
   if (!contentSid) return false // not configured → caller falls back to SMS
+  if (!(await messagingGateAllows('whatsapp', isMarketingKind(kind)))) return false
   const provider = await getWhatsAppProvider()
   if (!provider.configured) return false
   try {
@@ -455,6 +457,7 @@ export async function sendFreeTextWhatsApp(params: {
   const normalized = normalizePhone(params.phone)
   if (!normalized) return false
   if (!(await whatsappChannelEnabled())) return false
+  if (!(await messagingGateAllows('whatsapp', false))) return false
   const provider = await getWhatsAppProvider()
   if (!provider.configured) return false
   const kind = params.kind || 'support_reply'
