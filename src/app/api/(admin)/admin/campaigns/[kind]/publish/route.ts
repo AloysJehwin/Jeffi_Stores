@@ -17,14 +17,17 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const campaign = await queryOne<{ draft_fields: Record<string, unknown> | null }>(
-    `SELECT draft_fields FROM campaigns WHERE kind = $1`,
+  const live = await queryOne<{ kind: string }>(`SELECT kind FROM campaigns WHERE kind = $1`, [kind])
+  if (!live) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+
+  const draft = await queryOne<{ fields: Record<string, unknown> | null }>(
+    `SELECT fields FROM campaign_drafts WHERE kind = $1`,
     [kind]
   )
-  if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
-  if (!campaign.draft_fields) return NextResponse.json({ error: 'No draft to publish' }, { status: 400 })
-
-  const d = campaign.draft_fields as any
+  const d = (draft?.fields || {}) as any
+  if (!draft || Object.keys(d).length === 0) {
+    return NextResponse.json({ error: 'No draft to publish' }, { status: 400 })
+  }
   await query(
     `UPDATE campaigns SET
        enabled = COALESCE($2::boolean, enabled),
@@ -42,7 +45,6 @@ export async function POST(req: NextRequest, { params }: Params) {
        wa_template_sid = COALESCE($14, wa_template_sid),
        wa_variables = COALESCE($15::jsonb, wa_variables),
        wa_header_image_url = COALESCE($16, wa_header_image_url),
-       draft_fields = NULL,
        updated_at = NOW()
      WHERE kind = $1`,
     [
@@ -63,6 +65,11 @@ export async function POST(req: NextRequest, { params }: Params) {
       d.wa_variables != null ? JSON.stringify(d.wa_variables) : null,
       d.wa_header_image_url != null ? d.wa_header_image_url : null,
     ]
+  )
+  // Clear the draft (keep the row so campaign_id stays stable).
+  await query(
+    `UPDATE campaign_drafts SET fields = '{}'::jsonb, updated_at = now() WHERE kind = $1`,
+    [kind]
   )
   return NextResponse.json({ success: true })
 }

@@ -27,6 +27,7 @@ import WhatsAppTemplateEditor, { WhatsAppPreview } from '@/components/admin/camp
 import DurationField from '@/components/admin/campaigns/DurationField'
 import type { DurationUnit } from '@/lib/campaigns/duration'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
+import { useEditSession } from '@/hooks/useEditSession'
 
 interface Campaign {
   kind: string
@@ -41,6 +42,8 @@ interface Campaign {
   body_template: string
   last_run_at: string | null
   parameters: Record<string, number | boolean | string> | null
+  draft_campaign_id?: string | null
+  draft_fields?: Record<string, unknown> | null
 }
 
 interface ParamDef {
@@ -116,6 +119,8 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const [campaign, setCampaign] = useState<Campaign | null>(null)
+  const [draftCampaignId, setDraftCampaignId] = useState<string | null>(null)
+  const edit = useEditSession({ resourceType: 'campaign', resourceId: draftCampaignId })
   const [loading, setLoading] = useState(true)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
@@ -156,6 +161,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       if (campaignRes.ok) {
         const data = await campaignRes.json()
         setCampaign(data.campaign)
+        setDraftCampaignId(data.campaign.draft_campaign_id || null)
         const draft = data.campaign.draft_fields
         setHasDraft(!!draft)
         const src = draft || data.campaign
@@ -251,6 +257,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       })
       if (res.ok) {
         setHasDraft(true)
+        if (edit.sessionId) await edit.save()
         showToast('Draft saved', 'success')
       } else {
         const data = await res.json().catch(() => ({}))
@@ -270,6 +277,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       })
       if (res.ok) {
         setHasDraft(false)
+        if (edit.sessionId) await edit.save()
         await load()
         router.refresh()
         showToast('Campaign published', 'success')
@@ -906,12 +914,24 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             >
               {testBusy ? 'Sending…' : 'Send test'}
             </button>
-            <Link
-              href={ap('/admin/campaigns')}
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Discard changes?',
+                  message:
+                    'Any edits made since you opened this campaign will be rolled back. The live campaign stays as-is.',
+                  confirmLabel: 'Discard',
+                  variant: 'danger',
+                })
+                if (!ok) return
+                if (edit.sessionId) await edit.cancel()
+                router.push(ap('/admin/campaigns'))
+              }}
               className="h-control ml-auto inline-flex items-center justify-center px-4 rounded-lg text-sm font-semibold border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
             >
               Cancel
-            </Link>
+            </button>
             <button
               type="button"
               onClick={save}

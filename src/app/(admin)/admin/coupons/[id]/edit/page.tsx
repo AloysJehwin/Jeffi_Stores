@@ -199,6 +199,7 @@ export default async function EditCouponPage({
 
       <CouponForm
         action={updateCoupon.bind(null, id)}
+        couponId={id}
         submitLabel={isDraft ? undefined : 'Save Changes'}
         isDraft={isDraft}
         backUrl={backUrl}

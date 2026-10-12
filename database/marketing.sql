@@ -109,6 +109,18 @@ CREATE TABLE public.coupon_drafts (
 
 
 --
+-- Name: campaign_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.campaign_drafts (
+    campaign_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    kind character varying(64) NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: email_campaign_logs; Type: TABLE; Schema: public; Owner: -
 --
 

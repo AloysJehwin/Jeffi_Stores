@@ -9,6 +9,9 @@ import DateTimePicker from '@/components/ui/DateTimePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import AIFillForm from '@/components/admin/AIFillForm'
 import CouponUserSelector from '@/components/admin/CouponUserSelector'
+import EditorToolbar from '@/components/admin/EditorToolbar'
+import { useEditSession } from '@/hooks/useEditSession'
+import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
 interface CouponFormProps {
   action: (formData: FormData) => Promise<void>
@@ -16,6 +19,7 @@ interface CouponFormProps {
   isDraft?: boolean
   showUserSelector?: boolean
   backUrl?: string
+  couponId?: string
   defaultValues?: {
     code?: string
     discount_type?: string
@@ -46,6 +50,7 @@ export default function CouponForm({
   isDraft = false,
   showUserSelector = false,
   backUrl,
+  couponId,
   defaultValues: d = {},
 }: CouponFormProps) {
   const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
@@ -54,6 +59,7 @@ export default function CouponForm({
   const [couponDescription, setCouponDescription] = useState(d.description ?? '')
   const [discountType, setDiscountType] = useState(d.discount_type || 'percentage')
   const formRef = useRef<HTMLFormElement>(null)
+  const edit = useEditSession({ resourceType: 'coupon', resourceId: couponId ?? null })
 
   function setInput(name: string, value: string) {
     const el = formRef.current?.elements.namedItem(name) as HTMLInputElement | null
@@ -77,6 +83,18 @@ export default function CouponForm({
   return (
     <form ref={formRef} action={action} className="space-y-5">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
+      {edit.sessionId && (
+        <div className="flex justify-end">
+          <EditorToolbar
+            autosaveStatus={'idle' as AutosaveStatus}
+            sessionStatus={edit.status}
+            onSave={async () => { await edit.save() }}
+            onCancel={edit.cancel}
+            cancelHref={ap('/admin/coupons')}
+            hideSave
+          />
+        </div>
+      )}
       <AIFillForm
         fields={[
           { name: 'code', label: 'Coupon Code', type: 'text' },

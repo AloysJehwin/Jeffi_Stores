@@ -159,3 +159,40 @@ CREATE TABLE public.product_suppliers (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: po_drafts; Type: TABLE; Schema: public; Owner: -
+-- Autosave target for the "new PO" wizard. Create-PO promotes draft → real
+-- purchase_orders + po_line_items rows in one transaction and stamps
+-- promoted_po_id. Partial unique index enforces one open draft per admin.
+
+CREATE TABLE public.po_drafts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    admin_id uuid NOT NULL,
+    supplier_id uuid,
+    order_date date,
+    expected_date date,
+    status character varying(32),
+    notes text,
+    line_items jsonb DEFAULT '[]'::jsonb NOT NULL,
+    promoted_po_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: po_receive_drafts; Type: TABLE; Schema: public; Owner: -
+-- Autosave scans / qty-counts / serials for an open PO-receive flow.
+-- Post-Receipt is the sole action that writes stock_movements / serials.
+-- One open draft per PO.
+
+CREATE TABLE public.po_receive_drafts (
+    po_id uuid NOT NULL,
+    admin_id uuid NOT NULL,
+    line_items jsonb DEFAULT '[]'::jsonb NOT NULL,
+    serials jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);

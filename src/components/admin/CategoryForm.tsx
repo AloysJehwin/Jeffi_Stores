@@ -8,6 +8,9 @@ import * as Icons from 'lucide-react'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
+import EditorToolbar from '@/components/admin/EditorToolbar'
+import { useEditSession } from '@/hooks/useEditSession'
+import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
 const ICON_OPTIONS = [
   'Anchor',
@@ -254,6 +257,7 @@ export default function CategoryForm({
     category?.replacement_window_days ?? parentCat?.replacement_window_days ?? 7
   )
   const nameRef = useRef<HTMLInputElement>(null)
+  const edit = useEditSession({ resourceType: 'category', resourceId: category?.id ?? null })
 
   const mainCategories = categories.filter(c => !c.parent_category_id)
 
@@ -297,6 +301,18 @@ export default function CategoryForm({
     <form onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
+        {edit.sessionId && (
+          <div className="mb-4 flex justify-end">
+            <EditorToolbar
+              autosaveStatus={'idle' as AutosaveStatus}
+              sessionStatus={edit.status}
+              onSave={async () => { await edit.save() }}
+              onCancel={edit.cancel}
+              cancelHref={ap('/admin/categories')}
+              hideSave
+            />
+          </div>
+        )}
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300">
             {error}
