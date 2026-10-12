@@ -7,6 +7,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import HeroSlideManager from '@/components/admin/HeroSlideManager'
 import HomepageSectionManager from '@/components/admin/homepage/HomepageSectionManager'
 import HomepageDraftBar from '@/components/admin/homepage/HomepageDraftBar'
+import HomepageEditorToolbar from '@/components/admin/homepage/HomepageEditorToolbar'
 import { getStorefrontContent, getStoreIdentity } from '@/lib/catalog/site-controls'
 import { defaultAboutCopy, resolveAboutStats } from '@/lib/catalog/homepage-sections'
 import { getEditableHomepage, getHomepageDraftSummary } from '@/lib/catalog/homepage-draft'
@@ -104,13 +105,16 @@ export default async function HomepagePage() {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Homepage</h1>
-        <p className="text-sm text-foreground-muted mt-0.5">
-          Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section to
-          edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section. Changes
-          are saved as a draft and go live only when you publish.
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Homepage</h1>
+          <p className="text-sm text-foreground-muted mt-0.5">
+            Everything on the homepage, in the order it appears. Drag to reorder, toggle to hide, and expand a section
+            to edit it. Hero slides are edited inside the Hero section; offer slides inside the Offer Slider section.
+            Changes are saved as a draft and go live only when you publish.
+          </p>
+        </div>
+        <HomepageEditorToolbar adminId={adminId} cancelHref={ap('/admin/settings', host)} />
       </div>
 
       <HomepageDraftBar initial={draftSummary} />

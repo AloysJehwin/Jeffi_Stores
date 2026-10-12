@@ -9,10 +9,13 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import FormsPreview from './FormsPreview'
 import Toggle from '@/components/ui/Toggle'
 import AIFillForm from '@/components/admin/AIFillForm'
+import EditorToolbar from '@/components/admin/EditorToolbar'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useEditSession } from '@/hooks/useEditSession'
+import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
 interface Coupon {
   id: string
@@ -104,6 +107,7 @@ export default function ReviewFormForm({
   const [customFields, setCustomFields] = useState<CustomField[]>(d.custom_fields || [])
   const [submitting, setSubmitting] = useState(false)
   const { showToast } = useToast()
+  const edit = useEditSession({ resourceType: 'review_form', resourceId: formId ?? null })
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [formsHost, setFormsHost] = useState('forms.jeffistores.in')
   useEffect(() => {
@@ -302,6 +306,18 @@ export default function ReviewFormForm({
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+      {edit.sessionId && (
+        <div className="xl:col-span-2 flex justify-end">
+          <EditorToolbar
+            autosaveStatus={'idle' as AutosaveStatus}
+            sessionStatus={edit.status}
+            onSave={async () => { await edit.save() }}
+            onCancel={edit.cancel}
+            cancelHref={ap('/admin/review-forms')}
+            hideSave={true}
+          />
+        </div>
+      )}
       <div className="xl:col-span-2">
         <AIFillForm
           fields={[

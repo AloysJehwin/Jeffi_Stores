@@ -8,6 +8,9 @@ import { ap } from '@/lib/shared/admin-path'
 import { ADMIN_INPUT_CLASS } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
+import EditorToolbar from '@/components/admin/EditorToolbar'
+import { useEditSession } from '@/hooks/useEditSession'
+import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
 const inputCls = ADMIN_INPUT_CLASS
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -42,6 +45,7 @@ export default function EditSupplierPage() {
   const [hasDraft, setHasDraft] = useState(false)
   const [error, setError] = useState('')
   const [ifscLookup, setIfscLookup] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
+  const edit = useEditSession({ resourceType: 'supplier', resourceId: id ?? null })
 
   useEffect(() => {
     Promise.all([
@@ -204,6 +208,18 @@ export default function EditSupplierPage() {
   return (
     <MobileEditBlock>
     <div className="p-4 sm:p-6">
+      {edit.sessionId && (
+        <div className="mb-4 flex justify-end">
+          <EditorToolbar
+            autosaveStatus={'idle' as AutosaveStatus}
+            sessionStatus={edit.status}
+            onSave={async () => { await edit.save() }}
+            onCancel={edit.cancel}
+            cancelHref={ap('/admin/suppliers')}
+            hideSave
+          />
+        </div>
+      )}
       <div className="flex items-center gap-3 mb-6">
         <Link
           href={ap('/admin/inventory?tab=suppliers')}
