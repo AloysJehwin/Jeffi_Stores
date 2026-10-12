@@ -28,25 +28,20 @@ function scrub(index: number) {
 
 export default function LandingFeatures() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-      {FEATURES.map(f => {
-        const Icon = f.icon
-        return (
-          <button
-            key={f.title}
-            type="button"
-            onClick={() => scrub(f.chapter)}
-            className=" group text-left rounded-2xl border border-border-default bg-surface-elevated p-5 hover:border-[color:var(--ecom-accent,#4f46e5)] hover:shadow-md transition"
-          >
-            <span className="ecom-accent-bg inline-flex w-9 h-9 items-center justify-center rounded-lg text-white">
-              <Icon className="w-4.5 h-4.5" />
-            </span>
-            <h3 className="mt-3 text-base font-bold text-foreground">{f.title}</h3>
-            <p className="mt-1 text-sm text-foreground-secondary">{f.copy}</p>
-            <span className="ecom-accent-text mt-3 inline-block text-xs font-semibold">See it in the demo</span>
-          </button>
-        )
-      })}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
+      {FEATURES.map((f, i) => (
+        <button
+          key={f.title}
+          type="button"
+          onClick={() => scrub(f.chapter)}
+          className={`org-square text-left rounded-[2rem] p-7 transition hover:-translate-y-0.5 ${i === 0 ? 'org-peach' : 'org-sand org-sand-hover'}`}
+        >
+          <span className="font-display font-black text-2xl org-brown">{String(i + 1).padStart(2, '0')}</span>
+          <h3 className="font-display font-black text-2xl text-foreground mt-4">{f.title}</h3>
+          <p className="mt-2 text-base text-foreground-secondary leading-relaxed">{f.copy}</p>
+          <span className="org-brown mt-5 inline-block text-sm font-semibold">See it in the demo →</span>
+        </button>
+      ))}
     </div>
   )
 }

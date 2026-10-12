@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react'
+import { Eyebrow, Display, SandCard, Dot } from '../_ui'
 import {
   ShoppingBag,
   LayoutDashboard,
@@ -31,29 +32,18 @@ const FEATURES: Feature[] = [
 
 export default function FeatureGrid() {
   return (
-    <section className="w-full px-6 lg:px-12 py-16">
-      <div className="text-center mb-10">
-        <p className="ecom-accent-text font-semibold text-sm uppercase tracking-widest">Everything included</p>
-        <h2 className="text-4xl lg:text-5xl font-extrabold mt-3 text-foreground">No add-ons, no surprises</h2>
-        <p className="text-foreground-secondary mt-3 text-lg">Every capability below ships on day one.</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-        {FEATURES.map(f => {
-          const Icon = f.icon
-          return (
-            <div
-              key={f.title}
-              className="rounded-2xl border border-border-default bg-surface-elevated p-5 shadow-sm shadow-black/[0.03]"
-            >
-              <span className="ecom-accent-bg inline-flex w-10 h-10 items-center justify-center rounded-lg text-white">
-                <Icon className="w-5 h-5" />
-              </span>
-              <h3 className="mt-3 text-base font-bold text-foreground">{f.title}</h3>
-              <p className="mt-1 text-sm text-foreground-secondary">{f.copy}</p>
-            </div>
-          )
-        })}
+    <section className="w-full px-6 lg:px-12 py-20">
+      <Eyebrow>Everything included</Eyebrow>
+      <Display className="mt-3 text-4xl lg:text-5xl max-w-xl">No add-ons, no surprises</Display>
+      <p className="text-foreground-secondary mt-4 text-lg">Every capability below ships on day one.</p>
+      <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
+        {FEATURES.map(f => (
+          <SandCard key={f.title}>
+            <Dot tone="terracotta" />
+            <h3 className="font-display font-black text-xl text-foreground mt-5">{f.title}</h3>
+            <p className="mt-2 text-base text-foreground-secondary leading-relaxed">{f.copy}</p>
+          </SandCard>
+        ))}
       </div>
     </section>
   )
