@@ -6,6 +6,7 @@ export interface ServiceClaims {
   service: string
   tenantId: string
   apiKeyId?: string
+  tenantSlug?: string
   exp: number
 }
 
