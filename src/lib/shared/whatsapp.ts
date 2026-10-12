@@ -3,7 +3,8 @@ import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { getWhatsAppProvider } from '@/lib/shared/messaging'
-import { messagingGateAllows, isMarketingKind } from '@/lib/shared/messaging/billing'
+import { messagingGateAllows, isMarketingKind, debitMessageEstimate } from '@/lib/shared/messaging/billing'
+import { estimateFor } from '@/lib/shared/messaging/pricing'
 
 // WhatsApp notifications. The provider (Twilio today, AWS later) is chosen per-tenant by the Site
 // Controls selector in src/lib/shared/messaging; this file owns the shared concerns: the channel
@@ -87,6 +88,7 @@ async function sendTemplate(
   if (!provider.configured) return false
   try {
     const sid = await provider.sendTemplate(normalized, contentSid, variables)
+    debitMessageEstimate({ channel: 'whatsapp', providerSid: sid }).catch(() => {})
     logMessage({
       channel: 'whatsapp',
       to: normalized,
@@ -97,6 +99,9 @@ async function sendTemplate(
       providerSid: sid,
       entityType: entity?.entityType,
       entityId: entity?.entityId,
+      provider: provider.name,
+      price: estimateFor('whatsapp'),
+      deliveryStatus: 'estimated',
     })
     return true
   } catch (err: any) {
@@ -110,6 +115,7 @@ async function sendTemplate(
       error: err?.message,
       entityType: entity?.entityType,
       entityId: entity?.entityId,
+      provider: provider.name,
     })
     return false
   }
@@ -463,6 +469,7 @@ export async function sendFreeTextWhatsApp(params: {
   const kind = params.kind || 'support_reply'
   try {
     const sid = await provider.sendText(normalized, params.body)
+    debitMessageEstimate({ channel: 'whatsapp', providerSid: sid }).catch(() => {})
     logMessage({
       channel: 'whatsapp',
       to: normalized,
@@ -471,6 +478,9 @@ export async function sendFreeTextWhatsApp(params: {
       kind,
       status: 'sent',
       providerSid: sid,
+      provider: provider.name,
+      price: estimateFor('whatsapp'),
+      deliveryStatus: 'estimated',
     })
     return true
   } catch (err: any) {
@@ -482,6 +492,7 @@ export async function sendFreeTextWhatsApp(params: {
       kind,
       status: 'failed',
       error: err?.message,
+      provider: provider.name,
     })
     return false
   }

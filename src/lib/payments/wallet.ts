@@ -580,3 +580,50 @@ export async function debitWallet(opts: {
     return { ok: false, error: e?.message || 'Wallet debit failed.' }
   }
 }
+
+/**
+ * Messaging debit with true-up. SMS/WhatsApp debit an estimate at send (status 'estimated') then the
+ * provider status callback reconciles to the exact price. Keyed by externalRef = `msg:<sid>`:
+ *  - no existing row  → debit `amountInr`
+ *  - existing row + `trueUp` → adjust the wallet by the delta (exact − already-debited) and overwrite
+ *    the row's amount, so the net charge equals the exact price (never double-charges, delta may be ±).
+ *  - existing row, no `trueUp` (duplicate send-time call) → no-op.
+ * Floor 0; a true-up never blocks (the message already went out). Flagship exempt.
+ */
+export async function debitMessaging(opts: {
+  tenantId: string
+  category: WalletCategory
+  amountInr: number
+  externalRef: string
+  note: string
+  trueUp?: boolean
+}): Promise<void> {
+  if (isFlagshipTenant(opts.tenantId)) return
+  if (!(opts.amountInr > 0)) return
+  const amount = round2(opts.amountInr)
+  await withWalletTx(opts.tenantId, async client => {
+    await lockWallet(client, opts.tenantId, 0)
+    const existing = await client.query(
+      `SELECT amount FROM wallet_ledger WHERE tenant_id = $1 AND external_ref = $2 LIMIT 1`,
+      [opts.tenantId, opts.externalRef]
+    )
+    if (!existing.rowCount) {
+      await client.query(
+        `INSERT INTO wallet_ledger (tenant_id, entry_type, category, amount, external_ref, note)
+         VALUES ($1, 'debit', $2, $3, $4, $5)`,
+        [opts.tenantId, opts.category, -amount, opts.externalRef, opts.note]
+      )
+      await moveBalance(client, opts.tenantId, -amount)
+      return
+    }
+    if (!opts.trueUp) return
+    const prev = Math.abs(Number(existing.rows[0].amount)) // estimate already debited (positive)
+    const delta = round2(amount - prev) // + = charge more, − = refund
+    if (delta === 0) return
+    await client.query(
+      `UPDATE wallet_ledger SET amount = $3, note = $4 WHERE tenant_id = $1 AND external_ref = $2`,
+      [opts.tenantId, opts.externalRef, -amount, opts.note]
+    )
+    await moveBalance(client, opts.tenantId, -delta)
+  }).catch(() => {})
+}

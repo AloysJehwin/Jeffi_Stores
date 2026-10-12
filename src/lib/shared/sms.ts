@@ -45,7 +45,21 @@ async function sendSMS(to: string | null | undefined, body: string, kind: string
   if (!provider.configured) return false
   try {
     const sid = await provider.sendText(normalized, body)
-    logMessage({ channel: 'sms', to: normalized, from: provider.from, body, kind, status: 'sent', providerSid: sid })
+    const { debitMessageEstimate } = await import('@/lib/shared/messaging/billing')
+    const { estimateFor } = await import('@/lib/shared/messaging/pricing')
+    debitMessageEstimate({ channel: 'sms', providerSid: sid }).catch(() => {})
+    logMessage({
+      channel: 'sms',
+      to: normalized,
+      from: provider.from,
+      body,
+      kind,
+      status: 'sent',
+      providerSid: sid,
+      provider: provider.name,
+      price: estimateFor('sms'),
+      deliveryStatus: 'estimated',
+    })
     return true
   } catch (err: any) {
     logMessage({
@@ -56,6 +70,7 @@ async function sendSMS(to: string | null | undefined, body: string, kind: string
       kind,
       status: 'failed',
       error: err?.message,
+      provider: provider.name,
     })
     return false
   }
@@ -77,6 +92,9 @@ export async function sendCampaignSMS(params: {
   if (!provider.configured) return false
   try {
     const sid = await provider.sendText(normalized, params.body)
+    const { debitMessageEstimate } = await import('@/lib/shared/messaging/billing')
+    const { estimateFor } = await import('@/lib/shared/messaging/pricing')
+    debitMessageEstimate({ channel: 'sms', providerSid: sid }).catch(() => {})
     logMessage({
       channel: 'sms',
       to: normalized,
@@ -88,6 +106,9 @@ export async function sendCampaignSMS(params: {
       userId: params.userId ?? null,
       entityType: 'campaign',
       entityId: params.kind,
+      provider: provider.name,
+      price: estimateFor('sms'),
+      deliveryStatus: 'estimated',
     })
     return true
   } catch (err: any) {
@@ -102,6 +123,7 @@ export async function sendCampaignSMS(params: {
       userId: params.userId ?? null,
       entityType: 'campaign',
       entityId: params.kind,
+      provider: provider.name,
     })
     return false
   }

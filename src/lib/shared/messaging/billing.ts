@@ -1,4 +1,10 @@
-import { debitWallet, getWalletBalance, isFlagshipTenant, type WalletCategory } from '@/lib/payments/wallet'
+import {
+  debitWallet,
+  debitMessaging,
+  getWalletBalance,
+  isFlagshipTenant,
+  type WalletCategory,
+} from '@/lib/payments/wallet'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { createAdminNotification } from '@/lib/shared/admin-notify'
 import { estimateFor, channelCategory, type MessagingChannel } from './pricing'
@@ -35,8 +41,28 @@ export async function checkMessagingBalance(params: {
   }
 }
 
-// Debit the EXACT provider price (already converted to INR) for a sent message, idempotent on the
-// provider message id. Called from the status-callback webhook. ≤0 price is a no-op.
+// Debit the send-time ESTIMATE for a sent SMS/WhatsApp, idempotent on the provider message id, so
+// spend is visible immediately (local dev has no delivery callback). The status callback later trues
+// this up to the exact price via debitMessageCost. Resolves the current tenant; flagship exempt.
+export async function debitMessageEstimate(params: {
+  channel: MessagingChannel
+  providerSid: string | null | undefined
+}): Promise<void> {
+  if (!gateEnabled() || !params.providerSid) return
+  const tenantId = await resolveTenantId().catch(() => null)
+  if (!tenantId || isFlagshipTenant(tenantId)) return
+  await debitMessaging({
+    tenantId,
+    category: channelCategory(params.channel) as WalletCategory,
+    amountInr: estimateFor(params.channel),
+    externalRef: `msg:${params.providerSid}`,
+    note: `${params.channel} message ${params.providerSid} (estimated)`,
+  }).catch(() => {})
+}
+
+// True-up to the EXACT provider price (already converted to INR) on the status callback, keyed by the
+// provider message id. Adjusts the wallet by the delta vs the send-time estimate (never double-charges).
+// Called from the status-callback webhook. ≤0 price is a no-op.
 export async function debitMessageCost(params: {
   tenantId: string
   channel: MessagingChannel
@@ -44,13 +70,13 @@ export async function debitMessageCost(params: {
   priceInr: number
 }): Promise<void> {
   if (!(params.priceInr > 0)) return
-  await debitWallet({
+  await debitMessaging({
     tenantId: params.tenantId,
-    amountInr: params.priceInr,
     category: channelCategory(params.channel) as WalletCategory,
+    amountInr: params.priceInr,
     externalRef: `msg:${params.providerSid}`,
     note: `${params.channel} message ${params.providerSid}`,
-    floorInr: MESSAGING_FLOOR_INR,
+    trueUp: true,
   })
 }
 
