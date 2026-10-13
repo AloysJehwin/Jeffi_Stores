@@ -296,7 +296,7 @@ interface Recipient {
 export type MessagingChannels = {
   email?: { slug: string; vars?: Record<string, string>; subject?: string }
   sms?: { slug: string; vars?: Record<string, string> }
-  whatsapp?: { slug: string; vars?: Record<string, string> }
+  whatsapp?: { slug: string; vars?: Record<string, string>; media_url?: string; button_url?: string }
 }
 
 async function resolveAudience(audienceType: string, audienceFilter: Record<string, unknown>): Promise<Recipient[]> {
@@ -579,7 +579,7 @@ async function sendLibraryMessaging(
         const variables = Object.fromEntries(
           waSlots.map(n => [n, renderCampaignTemplate(channels.whatsapp!.vars![n], vars, registered, false)])
         )
-        const extra = await fillActionSlots(waT!, { imageUrl: null, linkUrl: null })
+        const extra = await fillActionSlots(waT!, { imageUrl: channels.whatsapp.media_url ?? null, linkUrl: channels.whatsapp.button_url ?? null })
         Object.assign(variables, extra ?? {})
         const res = await sendByTemplate({ channel: 'whatsapp', slug: extra ? waT!.slug : plainSlug(waT!.slug), to: r.phone, variables, reference: `messaging:${campaignId}` })
         const ok = res.status !== 'failed' && res.status !== 'skipped'

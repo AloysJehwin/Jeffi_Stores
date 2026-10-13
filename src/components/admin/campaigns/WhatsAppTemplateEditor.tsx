@@ -87,7 +87,7 @@ export default function WhatsAppTemplateEditor({
 }
 
 // ── Preview (right-hand Preview column): the approved template on a phone, slots filled. ──
-export function WhatsAppPreview({ value, vars }: { value: WhatsAppTemplateValue; vars: Record<string, string | number> }) {
+export function WhatsAppPreview({ value, vars, mediaUrl }: { value: WhatsAppTemplateValue; vars: Record<string, string | number>; mediaUrl?: string | null }) {
   const [tpl, setTpl] = useState<{ body: string; blocks: any } | null>(null)
   useEffect(() => {
     let live = true
@@ -107,9 +107,18 @@ export function WhatsAppPreview({ value, vars }: { value: WhatsAppTemplateValue;
       channel="whatsapp"
       body={tpl.body}
       vars={slotVars}
-      headerMedia={tpl.blocks?.types?.['twilio/media']?.media?.[0] ?? null}
+      headerMedia={headerImage(tpl.blocks, mediaUrl)}
       buttons={tpl.blocks?.buttons ?? []}
       cards={tpl.blocks?.carousel?.cards ?? []}
     />
   )
+}
+
+// An `_action` header is "<prefix>{{n}}": show the chosen image, else the template's sample one.
+function headerImage(blocks: any, chosen?: string | null): string | null {
+  const media: string = blocks?.types?.['twilio/media']?.media?.[0] ?? ''
+  if (!media) return null
+  const slot = media.match(/\{\{\s*(\d+)\s*\}\}/)?.[1]
+  if (!slot) return media
+  return chosen || media.replace(/\{\{\s*\d+\s*\}\}/, blocks?.variables?.[slot] ?? '')
 }

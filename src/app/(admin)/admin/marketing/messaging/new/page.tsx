@@ -11,6 +11,7 @@ import LibraryTemplatePicker from '@/components/admin/messaging-templates/Librar
 import LinkedTemplateEditor from '@/components/admin/messaging-templates/LinkedTemplateEditor'
 import PhonePreview from '@/components/admin/messaging-templates/PhonePreview'
 import { WhatsAppPreview, waSlots } from '@/components/admin/campaigns/WhatsAppTemplateEditor'
+import WaParamsForm, { waParams, VarInput, usageContext } from '@/components/admin/campaigns/WaParamsForm'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
@@ -21,8 +22,8 @@ import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
 type Channel = 'email' | 'sms' | 'whatsapp'
-type Channels = Partial<Record<Channel, { slug: string; vars?: Record<string, string>; subject?: string }>>
-type Loaded = { slug: string; subject: string | null; body: string; approval_status: string | null }
+type Channels = Partial<Record<Channel, { slug: string; vars?: Record<string, string>; subject?: string; media_url?: string; button_url?: string }>>
+type Loaded = { slug: string; subject: string | null; body: string; approval_status: string | null; blocks?: any }
 
 const CHANNELS: Array<{ key: Channel; label: string; icon: typeof Mail; note: string }> = [
   { key: 'email', label: 'Email', icon: Mail, note: 'Sent to every customer in the audience' },
@@ -69,6 +70,9 @@ export default function NewMessagePage() {
   const [channels, setChannels] = useState<Channels>({})
   const [vars, setVars] = useState<Record<string, string>>({})
   const [waVars, setWaVars] = useState<Record<string, string>>({})
+  // _action WhatsApp templates: the header image and the button's destination for this send.
+  const [waMedia, setWaMedia] = useState('')
+  const [waLink, setWaLink] = useState('')
   const [loaded, setLoaded] = useState<Partial<Record<Channel, Loaded>>>({})
   const [editing, setEditing] = useState<Channel | null>(null)
   const [previewTab, setPreviewTab] = useState<Channel>('email')
@@ -111,9 +115,9 @@ export default function NewMessagePage() {
     const out: Channels = {}
     if (channels.email?.slug) out.email = { slug: channels.email.slug, vars, ...(subject ? { subject } : {}) }
     if (channels.sms?.slug) out.sms = { slug: channels.sms.slug, vars }
-    if (channels.whatsapp?.slug) out.whatsapp = { slug: channels.whatsapp.slug, vars: waVars }
+    if (channels.whatsapp?.slug) out.whatsapp = { slug: channels.whatsapp.slug, vars: waVars, ...(waMedia ? { media_url: waMedia } : {}), ...(waLink ? { button_url: waLink } : {}) }
     return out
-  }, [channels, vars, waVars, subject])
+  }, [channels, vars, waVars, waMedia, waLink, subject])
 
   useEffect(() => {
     fetch('/api/admin/review-forms?page=1').then(r => r.json()).then(d => setReviewForms(d.forms || [])).catch(() => {})
@@ -139,7 +143,7 @@ export default function NewMessagePage() {
       fetch(`/api/admin/messaging-templates/${k}/${encodeURIComponent(slug)}`).then(r => (r.ok ? r.json() : null)).then(a => {
         if (!live || !a) return
         const v = a.current_version ?? {}
-        setLoaded(p => ({ ...p, [k]: { slug, subject: v.subject ?? null, body: v.body ?? '', approval_status: a.approval_status ?? null } }))
+        setLoaded(p => ({ ...p, [k]: { slug, subject: v.subject ?? null, body: v.body ?? '', approval_status: a.approval_status ?? null, blocks: v.blocks ?? null } }))
       }).catch(() => {})
     }
     return () => { live = false }
@@ -151,6 +155,7 @@ export default function NewMessagePage() {
     [channels.email, channels.sms, loaded]
   )
   const slots = channels.whatsapp && loaded.whatsapp ? waSlots(loaded.whatsapp.body) : []
+  const waP = useMemo(() => (channels.whatsapp && loaded.whatsapp ? waParams(loaded.whatsapp.body, loaded.whatsapp.blocks) : null), [channels.whatsapp, loaded.whatsapp])
 
   const triggerAutoSave = useCallback(() => {
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
@@ -220,6 +225,8 @@ export default function NewMessagePage() {
         setChannels(ch)
         setVars(ch.email?.vars ?? ch.sms?.vars ?? {})
         setWaVars(ch.whatsapp?.vars ?? {})
+        setWaMedia(ch.whatsapp?.media_url ?? '')
+        setWaLink(ch.whatsapp?.button_url ?? '')
       }
       setAudienceType(campaign.audience_type || 'all')
       const dso = campaign.audience_filter?.daysSinceOrder
@@ -302,7 +309,7 @@ export default function NewMessagePage() {
 
   function pickTemplate(k: Channel, slug: string | null) {
     setChannels(p => ({ ...p, [k]: { slug: slug ?? '' } }))
-    if (k === 'whatsapp') setWaVars({})
+    if (k === 'whatsapp') { setWaVars({}); setWaMedia(''); setWaLink('') }
     if (k === 'email') setSubject('')
     setEditing(null)
   }
@@ -316,7 +323,7 @@ export default function NewMessagePage() {
       const res = await fetch('/api/admin/ai-generate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: scenarioPrompt, subject, variables: fields }),
+        body: JSON.stringify({ scenario: scenarioPrompt, subject, variables: fields, campaign: true }),
       })
       const data = (await res.json()) as { html?: string; error?: string }
       if (!res.ok || !data.html) return setScenarioError(data.error || 'Generation failed')
@@ -500,7 +507,7 @@ export default function NewMessagePage() {
       {step === 2 && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
           <div className="space-y-5">
-            {canUseAi && (
+            {canUseAi && channels.email && (
               <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-violet-500 shrink-0" />
@@ -560,37 +567,28 @@ export default function NewMessagePage() {
               />
             )}
 
-            {fields.filter(f => !(fields.includes('formUrl') && (f === 'formUrl' || f === 'formTitle'))).map(f => (
-              <div key={f}>
-                <label className={labelClass}>{humanize(f)}</label>
-                {/body|details|message/i.test(f) ? (
-                  <textarea value={vars[f] ?? ''} onChange={e => setVars(p => ({ ...p, [f]: e.target.value }))} rows={4} className={`${inputClass} resize-none`} />
-                ) : (
-                  <input value={vars[f] ?? ''} onChange={e => setVars(p => ({ ...p, [f]: e.target.value }))} className={inputClass} />
-                )}
-              </div>
-            ))}
+            {fields.filter(f => !(fields.includes('formUrl') && (f === 'formUrl' || f === 'formTitle'))).map(f => {
+              // Where the variable sits in each chosen message, so the value reads right in context.
+              const where = [
+                channels.email && usageContext(f, loaded.email?.subject, loaded.email?.body) ? { ch: 'Email', ctx: usageContext(f, loaded.email?.subject, loaded.email?.body)! } : null,
+                channels.sms && usageContext(f, loaded.sms?.body) ? { ch: 'SMS', ctx: usageContext(f, loaded.sms?.body)! } : null,
+              ].filter(Boolean) as Array<{ ch: string; ctx: string }>
+              return (
+                <div key={f}>
+                  <label className={labelClass}>{humanize(f)}</label>
+                  {where.map(w => <p key={w.ch} className="-mt-1 mb-1.5 text-[11px] text-foreground-muted">{w.ch}: “{w.ctx}”</p>)}
+                  <VarInput value={vars[f] ?? ''} onChange={v => setVars(p => ({ ...p, [f]: v }))} className={inputClass} rows={/body|details|message/i.test(f) ? 4 : undefined} />
+                </div>
+              )
+            })}
             {fields.length > 0 && (
               <p className="text-[11px] text-foreground-muted">
                 Shared by email and SMS. The customer&apos;s name and your store details fill in automatically.
               </p>
             )}
 
-            {channels.whatsapp && slots.length > 0 && (
-              <div className="space-y-3 rounded-lg border border-border-default p-3">
-                <p className="text-xs font-semibold text-foreground-secondary flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp slots</p>
-                {slots.map(n => (
-                  <div key={n}>
-                    <label className="block text-[11px] font-medium text-foreground-muted mb-1">{`{{${n}}}`}</label>
-                    <input
-                      className={inputClass}
-                      value={waVars[n] ?? ''}
-                      onChange={e => setWaVars(p => ({ ...p, [n]: e.target.value }))}
-                      placeholder="Fixed text, or a variable like {firstName}"
-                    />
-                  </div>
-                ))}
-              </div>
+            {channels.whatsapp && waP && (
+              <WaParamsForm params={waP} vars={waVars} setVars={setWaVars} mediaUrl={waMedia} setMediaUrl={setWaMedia} linkUrl={waLink} setLinkUrl={setWaLink} inputClass={inputClass} />
             )}
             {waProblem && <p className="text-xs text-yellow-700 dark:text-yellow-300">{waProblem}</p>}
 
@@ -656,7 +654,7 @@ export default function NewMessagePage() {
               <PhonePreview channel="sms" body={loaded.sms?.body ?? ''} vars={previewVars} />
             )}
             {(channels[previewTab] ? previewTab : active[0]) === 'whatsapp' && (
-              <WhatsAppPreview value={{ slug: channels.whatsapp?.slug || null, variables: waVars }} vars={previewVars} />
+              <WhatsAppPreview value={{ slug: channels.whatsapp?.slug || null, variables: waVars }} vars={previewVars} mediaUrl={waMedia || null} />
             )}
           </div>
         </div>
