@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       params.push(...sc2.params)
       idx = sc2.nextIdx
 
-      const rk = buildProductSearchRank(q, 'name', 'p.search_vector', idx)
+      const rk = buildProductSearchRank(q, 'name', 'search_vector', idx)
       rank = rk.rank
       params.push(...rk.params)
       idx = rk.nextIdx
@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
       `SELECT * FROM (
          SELECT
            'product:' || p.id AS id,
+           p.search_vector,
            p.id AS product_id,
            NULL::uuid AS variant_id,
            p.name,
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
 
          SELECT
            'variant:' || pv.id AS id,
+           p.search_vector,
            p.id AS product_id,
            pv.id AS variant_id,
            p.name,

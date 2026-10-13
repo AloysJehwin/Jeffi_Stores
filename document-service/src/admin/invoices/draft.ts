@@ -181,11 +181,16 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     if (order.status !== 'draft') return NextResponse.json({ error: 'Only drafts can be deleted' }, { status: 400 })
 
     await withTransaction(async client => {
+      const addr = await client.query(`SELECT shipping_address_id, billing_address_id FROM orders WHERE id = $1`, [id])
       await client.query(`DELETE FROM order_items WHERE order_id = $1`, [id])
-      await client.query(`DELETE FROM addresses WHERE id = (SELECT shipping_address_id FROM orders WHERE id = $1)`, [
-        id,
-      ])
       await client.query(`DELETE FROM orders WHERE id = $1`, [id])
+      const ids = [addr.rows[0]?.shipping_address_id, addr.rows[0]?.billing_address_id].filter(Boolean)
+      if (ids.length)
+        await client.query(
+          `DELETE FROM addresses a WHERE a.id = ANY($1::uuid[]) AND a.user_id IS NULL
+             AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.shipping_address_id = a.id OR o.billing_address_id = a.id)`,
+          [ids]
+        )
     })
 
     return NextResponse.json({ success: true })
