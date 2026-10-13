@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import TemplateEditor, { type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
+import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp']
 const CHANNEL_LABEL: Record<Channel, string> = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' }
@@ -66,7 +66,7 @@ export default function MessagingTemplatesClient() {
     if (selected?.slug === slug && selected.channel === channel) return
     fetch(`${API}/${channel}/${encodeURIComponent(slug)}`)
       .then(r => r.ok ? r.json() : null)
-      .then(t => { if (t) setSelected(t) })
+      .then(t => { if (t) setSelected(toEditorTemplate(t)) })
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, channel])
@@ -95,7 +95,7 @@ export default function MessagingTemplatesClient() {
       const res = await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       if (res.ok) {
         const saved = await res.json()
-        setSelected(saved)
+        setSelected(toEditorTemplate(saved))
         if (saved?.slug) updateUrl({ slug: saved.slug })
         await load()
       } else {
