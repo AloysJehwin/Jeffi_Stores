@@ -1,6 +1,6 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
 import { randomUUID } from 'node:crypto'
-import { currentTenant } from './context.js'
+import { currentTenant } from './context'
 
 const REGION = process.env.AWS_REGION || 'us-east-1'
 const DEFAULT_BUCKET = process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket'
