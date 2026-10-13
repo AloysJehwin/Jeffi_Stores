@@ -138,6 +138,17 @@ export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertI
       [family.id, tenantId, i.channel])).rows[0]
 
     const locale = i.locale ?? 'en'
+    // Media-type immutability: once a variant is approved, Meta locks the header
+    // media type (image|video|document). We allow URL swaps of the same type but
+    // reject a type change outright.
+    const existingVariant = await first<VariantRow>(c,
+      `SELECT * FROM template_variant WHERE template_id=$1 AND locale=$2`, [template.id, locale])
+    if (existingVariant && existingVariant.approval_status === 'approved'
+        && i.media_type && existingVariant.media_type && existingVariant.media_type !== i.media_type) {
+      throw Object.assign(new Error(
+        `media_type is immutable after approval (locked to '${existingVariant.media_type}', got '${i.media_type}')`),
+        { status: 409, code: 'media_type_locked' })
+    }
     const variant = (await c.query<VariantRow>(
       `INSERT INTO template_variant (template_id, tenant_id, locale, provider_ref, meta_category, media_type)
        VALUES ($1,$2,$3,$4,$5,$6)
