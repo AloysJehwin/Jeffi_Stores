@@ -48,7 +48,7 @@ const VARS: Array<{ token: string; label: string; group: string }> = [
   ...BUILTIN_TEMPLATE_VARIABLES.filter(v => v.key !== 'customer_first_name').map(v => ({ token: `{{${v.key}}}`, label: v.label, group: v.group[0].toUpperCase() + v.group.slice(1) })),
 ]
 
-export function InsertVariable({ onInsert }: { onInsert: (token: string) => void }) {
+export function InsertVariable({ onInsert, compact }: { onInsert: (token: string) => void; compact?: boolean }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -59,13 +59,15 @@ export function InsertVariable({ onInsert }: { onInsert: (token: string) => void
   }, [open])
   const groups = [...new Set(VARS.map(v => v.group))]
   return (
-    <div ref={ref} className="relative shrink-0">
-      <button type="button" onClick={() => setOpen(o => !o)}
-        className="inline-flex h-full items-center gap-1 rounded-lg border border-border-default px-2.5 text-xs font-semibold text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-900/30">
-        <Braces className="w-3.5 h-3.5" /> Insert variable
+    <div ref={ref} className={`relative shrink-0 ${open ? 'z-40' : ''}`}>
+      <button type="button" onClick={() => setOpen(o => !o)} title="Insert variable"
+        className={compact
+          ? 'inline-flex h-6 w-6 items-center justify-center rounded text-violet-500 hover:bg-violet-100 dark:text-violet-400 dark:hover:bg-violet-800/40'
+          : 'inline-flex h-full items-center gap-1 rounded-lg border border-border-default px-2.5 text-xs font-semibold text-violet-600 hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-900/30'}>
+        <Braces className="w-3.5 h-3.5" />{!compact && ' Insert variable'}
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-border-default bg-surface-elevated p-1 shadow-lg">
+        <div className="absolute right-0 z-40 mt-1 max-h-72 w-64 overflow-y-auto rounded-lg border border-border-default bg-surface-elevated p-1 shadow-lg">
           {groups.map(g => (
             <div key={g}>
               <p className="px-2 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-foreground-muted">{g}</p>
@@ -95,14 +97,17 @@ export function VarInput({ value, onChange, placeholder, className, rows, ai }: 
     onChange(value.slice(0, at) + t + value.slice(end))
     requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(at + t.length, at + t.length) })
   }
+  // Controls sit inside the field: right edge for inputs, bottom-right for textareas.
   return (
-    <div className={`flex gap-2 ${rows ? 'items-start' : ''}`}>
+    <div className="relative">
       {rows
-        ? <textarea ref={ref} rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={`${className} flex-1 min-w-0 resize-none`} />
-        : <input ref={ref} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={`${className} flex-1 min-w-0`} />}
-      <div className={rows ? 'h-9' : ''}><InsertVariable onInsert={insert} /></div>
-      {ai && <AIEnrichButton placement="inline" fieldLabel={ai.label} value={value} onChange={onChange} scope={ai.scope ?? 'mailer:write'} context={ai.context}
-        format={ai.format ?? 'plain'} variables={ai.variables} endpoint={ai.endpoint} write={ai.write ?? true} maxLength={ai.maxLength} broadcast />}
+        ? <textarea ref={ref} rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={`${className} resize-none pr-16`} />
+        : <input ref={ref} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={`${className} pr-16`} />}
+      <div className={`absolute right-2 flex items-center gap-0.5 ${rows ? 'bottom-2' : 'inset-y-0'}`}>
+        <InsertVariable compact onInsert={insert} />
+        {ai && <AIEnrichButton placement="inline" fieldLabel={ai.label} value={value} onChange={onChange} scope={ai.scope ?? 'mailer:write'} context={ai.context}
+          format={ai.format ?? 'plain'} variables={ai.variables} endpoint={ai.endpoint} write={ai.write ?? true} maxLength={ai.maxLength} broadcast />}
+      </div>
     </div>
   )
 }
