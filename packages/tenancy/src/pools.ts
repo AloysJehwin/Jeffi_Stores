@@ -2,7 +2,7 @@ import pg from 'pg'
 import path from 'node:path'
 import fs from 'node:fs'
 import { Signer } from '@aws-sdk/rds-signer'
-import type { TenantContext, TenantInfra } from './context.js'
+import type { TenantContext, TenantInfra } from './context'
 
 export function createPgPool(config: pg.PoolConfig): pg.Pool {
   const pool = new pg.Pool(config)

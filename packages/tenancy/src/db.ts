@@ -1,6 +1,6 @@
 import type pg from 'pg'
-import { currentAdminId, requireTenant } from './context.js'
-import { tenantPool } from './pools.js'
+import { currentAdminId, requireTenant } from './context'
+import { tenantPool } from './pools'
 
 type Row = pg.QueryResultRow
 

@@ -1,6 +1,6 @@
-import type { TenantContext } from './context.js'
-import { controlPlanePool } from './pools.js'
-import { slugFromHost } from './hosts.js'
+import type { TenantContext } from './context'
+import { controlPlanePool } from './pools'
+import { slugFromHost } from './hosts'
 
 const cache = new Map<string, { ctx: TenantContext | null; expires: number }>()
 const TTL = 60_000
