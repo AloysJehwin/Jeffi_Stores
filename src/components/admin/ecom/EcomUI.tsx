@@ -145,6 +145,7 @@ export const TENANT_TABS = [
   { key: 'shipments', label: 'Shipments' },
   { key: 'access', label: 'Access' },
   { key: 'kyc', label: 'KYC' },
+  { key: 'messaging', label: 'Messaging' },
 ] as const
 
 export type TenantTab = (typeof TENANT_TABS)[number]['key']
@@ -164,15 +165,17 @@ export function TenantTabNav({
   tenantId,
   active,
   badges,
+  hidden = [],
 }: {
   tenantId: string
   active: TenantTab
   badges?: Partial<Record<TenantTab, React.ReactNode>>
+  hidden?: TenantTab[]
 }) {
   return (
     <div className="border-b border-border-default -mx-6 px-6 overflow-x-auto">
       <nav className="flex gap-1 min-w-max">
-        {TENANT_TABS.map(({ key, label }) => {
+        {TENANT_TABS.filter(t => !hidden.includes(t.key)).map(({ key, label }) => {
           const on = key === active
           return (
             <Link

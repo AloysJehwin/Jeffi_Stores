@@ -1,3 +1,4 @@
+import MessagingTab from '@/components/admin/ecom/tabs/MessagingTab'
 import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
@@ -6,6 +7,7 @@ import {
   getTenantBilling,
   getKyc,
   listServiceApprovals,
+  hasService,
   getProvisioningJob,
   getTenantOwners,
   getTenantSocialAccounts,
@@ -78,6 +80,7 @@ export default async function TenantObjectPage({
       <TenantTabNav
         tenantId={t.id}
         active={tab}
+        hidden={hasService(t, 'messaging') ? [] : ['messaging']}
         badges={{
           kyc: kycPending ? (
             <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block align-middle" />
@@ -97,6 +100,7 @@ export default async function TenantObjectPage({
         )}
         {tab === 'access' && <AccessTab tenant={t} {...await accessData(id)} />}
         {tab === 'kyc' && <KycTab tenant={t} kyc={kyc} approvals={approvals} />}
+        {tab === 'messaging' && hasService(t, 'messaging') && <MessagingTab tenantId={t.id} />}
       </div>
     </div>
   )
