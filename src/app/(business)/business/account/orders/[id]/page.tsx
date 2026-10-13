@@ -1,5 +1,6 @@
 'use client'
 
+import { documentUrlForLocation } from '@/lib/tenancy/forms-host'
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useRouter } from 'next/navigation'
@@ -590,7 +591,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                 )}
                 {order.invoiceNumber && !order.originalOrderId && order.viewToken && (
                   <a
-                    href={`/invoice/${order.viewToken}`}
+                    href={documentUrlForLocation('invoice', window.location, order.viewToken)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white shadow-sm transition-colors"
