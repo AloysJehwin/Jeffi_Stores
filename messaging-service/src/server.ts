@@ -15,6 +15,7 @@ import * as twContent from './providers/twilio-content.js'
 import { priceUsd } from './providers/twilio.js'
 import { poolsForTenant } from './pools.js'
 import { render as renderVars, missingKeys } from './render.js'
+import { wrapEmail } from './mail-shell.js'
 import { randomBytes } from 'node:crypto'
 
 export const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' } })
@@ -167,20 +168,32 @@ app.post<{ Params: { id: string }; Body: { versionId: string } }>(
   }
 )
 
+const SAMPLES: Record<string, string> = {
+  customer_name: 'Priya Sharma', customer_first_name: 'Priya', first_name: 'Priya', store_name: 'Your Store',
+  order_number: 'JS-10234', total: '₹2,499', amount: '₹2,499', product_name: 'Classic Cotton Kurta',
+  code: '482913', otp: '482913', ttl_minutes: '10', courier: 'Delhivery', awb: '1234567890123',
+  short_url: 'https://jeffi.st/x1y2z3', order_url: 'https://example.com/account/orders/JS-10234',
+  product_url: 'https://example.com/p/classic-cotton-kurta', vault_url: 'https://example.com/vault/abc',
+  discount: '20%', festival: 'Diwali', ticket: 'T-4521', items: '2 items', reason: '',
+}
+const sampleFor = (key: string) => SAMPLES[key] ?? (/^\d+$/.test(key) ? `Sample ${key}` : `[${key.replace(/_/g, ' ')}]`)
+
 app.post<{ Body: { channel: string; slug: string; locale?: string; versionId?: string; variables?: Record<string, any> } }>(
   '/v2/templates/preview',
   async (req, reply) => {
     const { pools } = await poolFor(req)
     const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, req.body.channel, req.body.slug, req.body.locale ?? 'en')
     if (!t?.version) return reply.code(404).send({ error: 'not_found' })
-    const vars = req.body.variables ?? {}
+    const given = req.body.variables ?? {}
+    // Preview = sample data: anything the caller didn't supply gets a sample value.
+    const missing = [...new Set([...missingKeys(t.version.subject ?? '', given), ...missingKeys(t.version.body, given)])]
+    const vars = { ...Object.fromEntries(missing.map(k => [k, sampleFor(k)])), ...given }
+    const isEmail = t.template.channel === 'email'
     const subject = t.version.subject ? renderVars(t.version.subject, vars) : null
-    const body = renderVars(t.version.body, vars, t.template.channel === 'email')
-    const missing = [...new Set([
-      ...missingKeys(t.version.subject ?? '', vars),
-      ...missingKeys(t.version.body, vars),
-    ])]
-    return { channel: t.template.channel, subject, body, missing }
+    let body = renderVars(t.version.body, vars, isEmail)
+    const b = req.body as any
+    if (isEmail) body = wrapEmail(body, { brand: b.brand ?? req.claims.tenantSlug, kicker: b.kicker, footerContact: b.footer_contact })
+    return { channel: t.template.channel, subject, body, missing, sampled: missing }
   }
 )
 

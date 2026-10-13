@@ -20,7 +20,7 @@ export default function MessagingClient() {
   const [saving, setSaving] = useState(false)
 
   const loadMsgs = () => fetch(`${API}/messages?limit=100`).then(r => r.json()).then(d => setMsgs(d.items ?? []))
-  const loadTpls = useCallback(() => fetch(`${API}/templates?channel=${channel}`).then(r => r.json()).then(d => setItems(d.items ?? [])), [channel])
+  const loadTpls = useCallback(() => fetch(`${API}/v2/templates?channel=${channel}`).then(r => r.json()).then(d => setItems(d.items ?? [])), [channel])
 
   useEffect(() => { loadMsgs() }, [])
   useEffect(() => { if (tab === 'templates') loadTpls() }, [tab, loadTpls])
