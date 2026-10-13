@@ -1,0 +1,61 @@
+// Thin client to messaging-service `POST /messages {template, variables, to, channel}`.
+// Collapses the ~40 `send*Email|SMS|WhatsApp` wrappers that each used to inline their body.
+// Wrappers keep their public shape so callers don't change; they now one-line into here.
+
+import { createHmac } from 'node:crypto'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
+
+const MESSAGING_URL = (process.env.MESSAGING_URL || 'http://localhost:3101').replace(/\/$/, '')
+
+type Channel = 'email' | 'sms' | 'whatsapp'
+
+export interface SendByTemplateInput {
+  channel: Channel
+  slug: string
+  to: string
+  variables?: Record<string, unknown>
+  subject?: string
+  reference?: string
+  locale?: string
+}
+
+export interface SendResult {
+  id?: string
+  status: string
+  error?: string
+}
+
+function token(tenantId: string, tenantSlug: string): string {
+  const secret = process.env.SERVICE_AUTH_SECRET
+  if (!secret) throw new Error('SERVICE_AUTH_SECRET is not set')
+  const payload = JSON.stringify({ service: 'platform', internal: true, tenantId, tenantSlug, exp: Math.floor(Date.now() / 1000) + 60 })
+  const sig = createHmac('sha256', secret).update(payload).digest()
+  return `${Buffer.from(payload).toString('base64url')}.${sig.toString('base64url')}`
+}
+
+export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult> {
+  const tenant = await resolveTenant()
+  if (!tenant) return { status: 'skipped', error: 'no tenant context' }
+  const body = {
+    channel: i.channel,
+    to: i.to,
+    template: i.slug,
+    variables: i.variables ?? {},
+    subject: i.subject,
+    reference: i.reference,
+    locale: i.locale,
+  }
+  try {
+    const res = await fetch(`${MESSAGING_URL}/messages`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token(tenant.tenantId, tenant.slug)}`, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { status: 'failed', error: data?.message || data?.error || `HTTP ${res.status}` }
+    return { id: data.id, status: data.status ?? 'sent' }
+  } catch (e: any) {
+    return { status: 'failed', error: e?.message || 'network error' }
+  }
+}
