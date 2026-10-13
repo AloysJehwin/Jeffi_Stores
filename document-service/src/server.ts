@@ -8,7 +8,7 @@ import { documentPriceInr } from '@jeffi/pricing'
 import { getFinancialYear, generateInvoiceNumber } from '@jeffi/gst'
 import * as wallet from '@jeffi/wallet'
 import { computeTotals } from './totals.js'
-import { renderPdf, LAYOUTS } from './pdf.js'
+import { renderDocument, resolveDesign, DESIGNS } from './designs/index.js'
 import { putPdf, getPdf, pdfUrl } from './storage.js'
 import { appFromHost } from '@jeffi/tenancy'
 import { publicRoutes } from './tenant/public.js'
@@ -104,7 +104,7 @@ async function nextNumber(c: pg.PoolClient, tenantId: string, type: string): Pro
 app.post<{ Params: { type: string } }>('/documents/:type', async (req, reply) => {
   const type = DocumentType.parse(req.params.type)
   const body = RenderDocumentRequest.parse(req.body)
-  if (!LAYOUTS[body.template]) return reply.code(400).send({ error: 'unknown_template', message: `Templates: ${Object.keys(LAYOUTS).join(', ')}` })
+  if (!resolveDesign(body.template)) return reply.code(400).send({ error: 'unknown_template', message: `Designs: ${DESIGNS.map(d => d.key).join(', ')}` })
   const { tenantId, apiKeyId } = req.claims
   const totals = computeTotals(body)
   const id = randomUUID()
@@ -119,7 +119,7 @@ app.post<{ Params: { type: string } }>('/documents/:type', async (req, reply) =>
     await c.query('BEGIN')
     const number = body.number ?? (await nextNumber(c, tenantId, type))
     const key = `${tenantId}/${type}/${id}.pdf`
-    const pdf = await renderPdf(type, body, totals, number, `${PUBLIC_BASE}/d/${token}`)
+    const pdf = await renderDocument(body.template, type, body, totals, number, `${PUBLIC_BASE}/d/${token}`)
     await putPdf(key, pdf)
     await c.query(
       `INSERT INTO documents (id, tenant_id, api_key_id, type, number, template, payload, totals, s3_key, view_token, price_inr, reference)

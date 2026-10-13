@@ -12,34 +12,35 @@
     "build:css": "tailwindcss -c tailwind.config.cjs -i src/tenant/views/tailwind.css -o src/tenant/views/styles.css --minify"
   },
   "dependencies": {
-    "@jeffi/api-contracts": "*",
-    "@jeffi/pricing": "*",
-    "@jeffi/service-auth": "*",
-    "@jeffi/wallet": "*",
-    "@jeffi/gst": "*",
-    "@jeffi/tenancy": "*",
     "@aws-sdk/client-s3": "^3.700.0",
     "@aws-sdk/s3-request-presigner": "^3.700.0",
+    "@jeffi/api-contracts": "*",
+    "@jeffi/gst": "*",
+    "@jeffi/pricing": "*",
+    "@jeffi/service-auth": "*",
+    "@jeffi/tenancy": "*",
+    "@jeffi/wallet": "*",
+    "@react-pdf/renderer": "4.9.0",
     "fastify": "^5.2.1",
-    "pg": "^8.13.0",
     "pdfkit": "^0.18.0",
+    "pg": "^8.13.0",
+    "qrcode": "^1.5.4",
     "razorpay": "^2.9.6",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "sharp": "^0.35.4",
-    "zod": "^4.4.3",
-    "qrcode": "^1.5.4"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/pdfkit": "^0.13.9",
     "@types/pg": "^8.11.10",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^18.2.46",
     "@types/react-dom": "^18.2.18",
+    "tailwindcss": "^3.4.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^3.0.0",
-    "@types/qrcode": "^1.5.5",
-    "tailwindcss": "^3.4.1"
+    "vitest": "^3.0.0"
   }
 }
