@@ -21,6 +21,17 @@ export type EditorTemplate = {
   approval_reason?: string | null
 }
 
+// messaging-service nests the published snapshot under current_version; the editor edits a flat shape.
+export function toEditorTemplate(api: any): EditorTemplate {
+  const v = api?.current_version ?? {}
+  return {
+    id: api.id, slug: api.slug ?? '', channel: api.channel, name: api.name ?? '', category: api.category ?? null,
+    subject: v.subject ?? api.subject ?? '', body: v.body ?? api.body ?? '', blocks: v.blocks ?? api.blocks,
+    blocks_format: v.blocks_format ?? api.blocks_format ?? null, meta_category: api.meta_category ?? null,
+    media_type: api.media_type ?? null, approval_status: api.approval_status ?? null, approval_reason: api.approval_reason ?? null,
+  }
+}
+
 export type WaCarouselCard = {
   title?: string
   body?: string

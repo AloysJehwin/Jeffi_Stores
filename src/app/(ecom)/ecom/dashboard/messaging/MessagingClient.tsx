@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Card } from '../_components/Card'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
-import TemplateEditor, { type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
+import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 
 interface ListItem { id: string; slug: string; channel: Channel; name: string; category?: string | null; approval_status?: string | null }
 interface Msg { id: string; channel: string; to: string; template: string | null; status: string; price_inr: number; charged_inr: number; error: string | null; created_at: string }
@@ -27,7 +27,7 @@ export default function MessagingClient() {
 
   async function open(it: ListItem) {
     const r = await fetch(`${API}/v2/templates/${it.channel}/${encodeURIComponent(it.slug)}`)
-    if (r.ok) setSelected(await r.json())
+    if (r.ok) setSelected(toEditorTemplate(await r.json()))
   }
 
   function createNew() {
@@ -41,7 +41,7 @@ export default function MessagingClient() {
       const url = selected.id ? `${API}/v2/templates/${selected.id}` : `${API}/v2/templates`
       const method = selected.id ? 'PUT' : 'POST'
       const r = await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...selected, publish }) })
-      if (r.ok) { setSelected(await r.json()); await loadTpls() } else alert('Save failed')
+      if (r.ok) { setSelected(toEditorTemplate(await r.json())); await loadTpls() } else alert('Save failed')
     } finally { setSaving(false) }
   }
 
