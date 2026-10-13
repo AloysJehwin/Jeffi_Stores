@@ -70,6 +70,16 @@ export default async function OrderDetailsPage({
   // the mode at capture time — a post-capture toggle is an accepted edge case. Platform's own store
   // (no tenant) falls through to the platform label.
   const tenant = await resolveRequestTenant().catch(() => null)
+  // Refunds owed by changes the customer approved — issued only when an admin clicks.
+  const pendingChangeRefunds = order
+    ? await queryMany<{ id: string; amount: string; legacy: boolean }>(
+        `SELECT id, abs(net_diff) AS amount, false AS legacy FROM order_adjustments WHERE order_id = $1 AND refund_status = 'pending'
+         UNION ALL
+         SELECT id, abs(price_diff), true FROM variant_change_requests
+          WHERE order_id = $1 AND settlement_type = 'refund' AND status = 'applied' AND refund_id IS NULL`,
+        [order.id]
+      ).catch(() => [])
+    : []
   const ownRazorpay = tenant?.tenantId
     ? await controlPlanePool()
         .query(`SELECT own_razorpay FROM tenants WHERE id=$1`, [tenant.tenantId])
@@ -860,6 +870,19 @@ export default async function OrderDetailsPage({
                 isReturn={order.status === 'returned'}
               />
             )}
+
+          {canWrite &&
+            pendingChangeRefunds.map(r => (
+              <InitiateRefundButton
+                key={r.id}
+                orderId={order.id}
+                orderNumber={order.order_number || order.id.slice(0, 8)}
+                amount={Number(r.amount)}
+                endpoint={`/api/admin/orders/${order.id}/adjustments/${r.id}/refund${r.legacy ? '?legacy=1' : ''}`}
+                heading="Refund for approved changes"
+                description="The customer approved the product changes on this order. Refund the difference to their original payment:"
+              />
+            ))}
 
           {order.status !== 'cancelled' && !isReturnStatus && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">

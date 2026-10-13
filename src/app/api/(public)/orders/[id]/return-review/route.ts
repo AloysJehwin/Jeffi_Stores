@@ -10,6 +10,7 @@ import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
 import { logActivity } from '@/lib/shared/activity'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
+import { refundCapacity } from '@/lib/payments/refund'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -254,13 +255,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
               // Cap the spread at what was actually captured, so we never ask Razorpay to refund
               // more than a payment holds.
-              const capturedTotal = refundable.reduce((s: number, p: any) => s + (parseFloat(p.amount) || 0), 0)
+              const capturedTotal = refundable.reduce((s: number, p: any) => s + refundCapacity(p), 0)
               let remaining = Math.min(netRefundAmount, capturedTotal)
               const perPayment: { record: any; refund: any }[] = []
 
               for (const paymentRecord of refundable) {
                 if (remaining <= 0) break
-                const captured = parseFloat(paymentRecord.amount) || 0
+                const captured = refundCapacity(paymentRecord)
                 const thisRefund = Math.min(captured, remaining)
                 if (!(thisRefund > 0)) continue
                 const amountInPaise = Math.round(thisRefund * 100)

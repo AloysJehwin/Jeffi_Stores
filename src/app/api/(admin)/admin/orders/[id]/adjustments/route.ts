@@ -20,7 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   const [adjustments, legacy] = await Promise.all([
     queryMany<any>(
-      `SELECT a.id, a.status, a.settlement_type, a.net_diff, a.new_total, a.settle_payment, a.admin_notes, a.created_at, a.applied_at,
+      `SELECT a.id, a.status, a.settlement_type, a.net_diff, a.new_total, a.settle_payment, a.admin_notes, a.created_at, a.applied_at, a.refund_status,
               COALESCE(json_agg(json_build_object('action', l.action, 'old', l.old_snapshot, 'new', l.new_line) ORDER BY l.created_at)
                 FILTER (WHERE l.id IS NOT NULL), '[]') AS lines
          FROM order_adjustments a LEFT JOIN order_adjustment_lines l ON l.adjustment_id = a.id
@@ -29,6 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     ),
     queryMany<any>(
       `SELECT vcr.id, vcr.status, vcr.settlement_type, vcr.price_diff AS net_diff, vcr.created_at, vcr.applied_at,
+              CASE WHEN vcr.settlement_type = 'refund' AND vcr.status = 'applied' THEN (CASE WHEN vcr.refund_id IS NULL THEN 'pending' ELSE 'refunded' END) END AS refund_status,
               json_build_array(json_build_object('action', 'switch', 'old', json_build_object('name', vcr.old_variant_name),
                 'new', json_build_object('productName', vcr.new_variant_name))) AS lines
          FROM variant_change_requests vcr WHERE vcr.order_id = $1 ORDER BY vcr.created_at DESC`,

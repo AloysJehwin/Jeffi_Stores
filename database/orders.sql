@@ -414,6 +414,7 @@ CREATE TABLE public.order_adjustments (
     razorpay_order_id character varying(255),
     razorpay_payment_id character varying(255),
     refunds jsonb DEFAULT '[]'::jsonb NOT NULL,
+    refund_status character varying(20),
     applied_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()

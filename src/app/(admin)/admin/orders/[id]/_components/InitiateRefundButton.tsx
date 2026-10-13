@@ -10,9 +10,13 @@ interface InitiateRefundButtonProps {
   orderNumber: string
   amount: number
   isReturn?: boolean
+  /** Defaults to the order's full refund; product adjustments pass their own refund route. */
+  endpoint?: string
+  heading?: string
+  description?: string
 }
 
-export default function InitiateRefundButton({ orderId, orderNumber, amount, isReturn }: InitiateRefundButtonProps) {
+export default function InitiateRefundButton({ orderId, orderNumber, amount, isReturn, endpoint, heading, description }: InitiateRefundButtonProps) {
   const [showConfirm, setShowConfirm] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const { showToast } = useToast()
@@ -21,7 +25,7 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
   async function handleRefund() {
     setIsProcessing(true)
     try {
-      const response = await fetch(`/api/orders/${orderId}/refund`, {
+      const response = await fetch(endpoint ?? `/api/orders/${orderId}/refund`, {
         method: 'POST',
       })
       const data = await response.json()
@@ -41,15 +45,19 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
   return (
     <div className="bg-surface-elevated rounded-lg shadow-sm border-2 border-blue-200 dark:border-blue-800">
       <div className="px-6 py-4 border-b border-blue-100 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-        <h2 className="text-lg font-semibold text-blue-900 dark:text-blue-300">Refund Pending</h2>
+        <h2 className="text-lg font-semibold text-blue-900 dark:text-blue-300">{heading ?? 'Refund Pending'}</h2>
       </div>
       <div className="p-4 sm:p-6">
         <p className="text-sm text-foreground-secondary mb-4">
+          {description ? (
+            <>{description} <span className="font-semibold text-foreground">₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>.</>
+          ) : (<>
           This order was {isReturn ? 'returned' : 'cancelled'} but the payment of{' '}
           <span className="font-semibold text-foreground">
             ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>{' '}
           has not yet been refunded. Initiating a refund will trigger it via Razorpay and notify the customer by email.
+          </>)}
         </p>
 
         {showConfirm ? (

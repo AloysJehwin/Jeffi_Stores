@@ -93,52 +93,20 @@ describe('POST variant-change confirm', () => {
 
   // ── REFUND ─────────────────────────────────────────────────────────────
   describe('refund settlement', () => {
-    it('400 when razorpay disabled', async () => {
+    it('applies the change and leaves the refund for an admin to issue', async () => {
+      const rzp = makeRazorpay()
+      vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
       vi.mocked(db.queryOne).mockResolvedValueOnce(BASE_VCR as any)
-      vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
-      expect((await POST(makeReq(), PARAMS)).status).toBe(400)
-    })
-
-    it('400 when no payment to refund', async () => {
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(BASE_VCR as any) // vcr
-        .mockResolvedValueOnce(null as any) // payment
-      expect((await POST(makeReq(), PARAMS)).status).toBe(400)
-    })
-
-    it('refunds and applies (gateway_response as string)', async () => {
-      const rzp = makeRazorpay()
-      vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(BASE_VCR as any)
-        .mockResolvedValueOnce({ id: 'pay-1', transaction_id: 'pay_rzp', gateway_response: '{"a":1}' } as any)
-      const res = await POST(makeReq(), PARAMS)
-      const body = await res.json()
-      expect(res.status).toBe(200)
-      expect(body.settlement).toBe('refund')
-      expect(body.refundId).toBe('rfnd_1')
-      expect(rzp.payments.refund).toHaveBeenCalledWith('pay_rzp', { amount: 2000 })
-    })
-
-    it('uses original_order_id when present; gateway_response object', async () => {
-      const rzp = makeRazorpay()
-      vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce({ ...BASE_VCR, original_order_id: 'orig-9' } as any)
-        .mockResolvedValueOnce({ id: 'pay-1', transaction_id: 'pay_rzp', gateway_response: { existing: true } } as any)
       const res = await POST(makeReq(), PARAMS)
       expect(res.status).toBe(200)
-      // payment lookup used original_order_id
-      expect(vi.mocked(db.queryOne).mock.calls[1][1]).toEqual(['orig-9'])
+      expect((await res.json()).settlement).toBe('refund_pending')
+      expect(vc.applyVariantChange).toHaveBeenCalled()
+      expect(rzp.payments.refund).not.toHaveBeenCalled()
     })
 
-    it('409 when apply fails after refund', async () => {
-      const rzp = makeRazorpay()
-      vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({ instance: rzp as any } as any)
+    it('409 when apply fails', async () => {
       vi.mocked(vc.applyVariantChange).mockResolvedValue({ applied: false, reason: 'order_not_eligible' } as any)
-      vi.mocked(db.queryOne)
-        .mockResolvedValueOnce(BASE_VCR as any)
-        .mockResolvedValueOnce({ id: 'pay-1', transaction_id: 'pay_rzp', gateway_response: null } as any)
+      vi.mocked(db.queryOne).mockResolvedValueOnce(BASE_VCR as any)
       const res = await POST(makeReq(), PARAMS)
       expect(res.status).toBe(409)
       expect((await res.json()).error).toContain('order_not_eligible')
