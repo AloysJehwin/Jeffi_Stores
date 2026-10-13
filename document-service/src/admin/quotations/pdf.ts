@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from '../../shim'
-import { authenticateAdmin } from '../../shim'
+import { NextRequest, NextResponse } from '../../next'
+import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryMany, queryOne } from '@jeffi/tenancy'
 import { generateQuotationPDF, QuotationBusiness } from '../../lib/quotation-pdf'

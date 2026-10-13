@@ -1,6 +1,6 @@
 import { documentUrl, orderUrlById } from '../../lib/customer-links'
-import { NextRequest, NextResponse } from '../../shim'
-import { authenticateAdmin } from '../../shim'
+import { NextRequest, NextResponse } from '../../next'
+import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryOne, queryMany, query, withTransaction } from '@jeffi/tenancy'
 import {
@@ -13,7 +13,7 @@ import {
 import { deductOrderStock, checkLineStock, InsufficientStockError } from '../../lib/inventory-deduct'
 import { CUSTOM_UNIT_MAX, formatShortfall, type Shortfall } from '../../lib/invoice-line-items'
 import { sendInvoiceFinalizedEmail } from '../../lib/mail'
-import { sendBusinessInvoiceGeneratedEmail } from '../../lib/mail'
+import { sendBusinessInvoiceGeneratedEmail } from '../../lib/mail-business'
 import { lineItemExGst } from '../../lib/pricing'
 import { getFeatureFlags, getBusinessValues } from '../../lib/site-controls'
 import { findDigitalProductIds } from '../../lib/digital-guard'

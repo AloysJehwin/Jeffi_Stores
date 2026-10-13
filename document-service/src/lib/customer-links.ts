@@ -1,4 +1,4 @@
-import { queryOne, requireTenant, documentHostForSlug } from '@jeffi/tenancy'
+import { queryOne, currentTenant, ROOT_DOMAIN } from '@jeffi/tenancy'
 import { businessBaseUrlAsync, storeBaseUrlAsync } from './brand'
 
 export type DocumentApp = 'invoice' | 'quotation' | 'purchaseorder'
@@ -23,7 +23,8 @@ export async function orderUrlById(orderId: string): Promise<string> {
 }
 
 export async function documentUrl(app: DocumentApp, token: string): Promise<string> {
-  const host = documentHostForSlug(app, requireTenant().slug)
+  const slug = currentTenant()?.slug
+  const host = slug ? `${app}-${slug}.${ROOT_DOMAIN}` : `${app}.${ROOT_DOMAIN}`
   const proto = host.endsWith('.localhost') ? 'http' : 'https'
   const port = process.env.DEV_PUBLIC_PORT ? `:${process.env.DEV_PUBLIC_PORT}` : ''
   return `${proto}://${host}${port}/${encodeURIComponent(token)}`

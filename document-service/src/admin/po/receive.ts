@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from '../../shim'
+import { NextRequest, NextResponse } from '../../next'
 import { resolveGrainUnit } from '../../lib/selling-unit'
-import { authenticateAdmin } from '../../shim'
+import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryOne, queryMany, getClient } from '@jeffi/tenancy'
 import { round2 } from '../../lib/gst'
@@ -338,7 +338,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               item.sub_variant_id || null,
               qtyReceived,
               `GRN receive — PO ${po.po_number}`,
-              admin.principalId
+              admin.adminId
             )
           } else {
             // Non-perishable with no shelf location: inventory_quantity was bumped but

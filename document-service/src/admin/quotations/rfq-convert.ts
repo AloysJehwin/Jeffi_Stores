@@ -1,9 +1,9 @@
 import { documentUrl } from '../../lib/customer-links'
-import { NextRequest, NextResponse } from '../../shim'
-import { requireAdminScope } from '../../shim'
+import { NextRequest, NextResponse } from '../../next'
+import { requireAdminScope } from '../../auth'
 import { queryOne, queryMany, query } from '@jeffi/tenancy'
 import { stackDiscounts, applyDiscount, lineItemExGst } from '../../lib/pricing'
-import { sendRfqConvertedToQuotationEmail } from '../../lib/mail'
+import { sendRfqConvertedToQuotationEmail } from '../../lib/mail-business'
 
 function buildQuoteNumber(now: Date, seq: number): string {
   const month = now.getMonth()
@@ -254,7 +254,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       cgst.toFixed(4),
       sgst.toFixed(4),
       total.toFixed(4),
-      admin.principalId,
+      admin.adminId,
     ]
   )
 

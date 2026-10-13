@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from '../../shim'
-import { authenticateAdmin } from '../../shim'
+import { NextRequest, NextResponse } from '../../next'
+import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { query, queryOne } from '@jeffi/tenancy'
 import { z } from 'zod'
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   }
   const row = await queryOne(
     `SELECT * FROM po_drafts WHERE id = $1 AND admin_id = $2 AND promoted_po_id IS NULL`,
-    [id, admin.principalId]
+    [id, admin.id]
   )
   if (!row) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   return NextResponse.json({ draft: row })
@@ -47,7 +47,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   if (!hasScope(admin.role, admin.scopes, 'inventory:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  if (!(await assertOwned(admin.principalId, id))) {
+  if (!(await assertOwned(admin.id, id))) {
     return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   }
 
@@ -75,7 +75,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     vals.push(JSON.stringify(d.line_items ?? []))
   }
   if (sets.length === 0) return NextResponse.json({ ok: true })
-  vals.push(id, admin.principalId)
+  vals.push(id, admin.id)
   await query(
     `UPDATE po_drafts SET ${sets.join(', ')}, updated_at = now()
      WHERE id = $${i++} AND admin_id = $${i} AND promoted_po_id IS NULL`,
@@ -93,7 +93,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   }
   await query(
     `DELETE FROM po_drafts WHERE id = $1 AND admin_id = $2 AND promoted_po_id IS NULL`,
-    [id, admin.principalId]
+    [id, admin.id]
   )
   return NextResponse.json({ ok: true })
 }

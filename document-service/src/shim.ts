@@ -1,48 +1,11 @@
-// Minimal Next.js request/response stand-ins so admin handlers lifted from the monolith stay
-// near-verbatim. Auth already happened in the Next proxy; claims arrive in the service token.
 import type { FastifyInstance, FastifyReply, FastifyRequest, HTTPMethods } from 'fastify'
-import type { ServiceClaims } from '@jeffi/service-auth'
 import { lookupTenantContextById, runWithTenant } from '@jeffi/tenancy'
+import { NextRequest } from './next'
 
-export class NextResponse {
-  constructor(public body: any, public init: { status?: number; headers?: Record<string, string> } = {}) {}
-  static json(body: any, init: { status?: number } = {}) {
-    const r = new NextResponse(JSON.stringify(body), { status: init.status ?? 200, headers: { 'content-type': 'application/json' } })
-    return r
-  }
-  static redirect(url: string, status = 302) {
-    return new NextResponse(null, { status, headers: { location: url } })
-  }
-}
+export { NextRequest, NextResponse } from './next'
+export * from './auth'
 
-export interface NextRequest {
-  url: string
-  nextUrl: URL
-  method: string
-  headers: Headers
-  json(): Promise<any>
-  claims: ServiceClaims
-}
-
-export interface AdminClaims {
-  principalId: string
-  tenantId: string
-  role: string
-  scopes: string[]
-}
-
-export async function authenticateAdmin(req: NextRequest): Promise<AdminClaims | null> {
-  const c = req.claims
-  if (!c?.internal || !c.adminId) return null
-  return { principalId: c.adminId, tenantId: c.tenantId, role: c.role ?? '', scopes: c.scopes ?? [] }
-}
-
-export async function authenticateAnyUser(req: NextRequest): Promise<{ userId: string } | null> {
-  const c = req.claims
-  return c?.internal && c.userId ? { userId: c.userId } : null
-}
-
-type Handler = (req: NextRequest, ctx: { params: Promise<any> }) => Promise<NextResponse>
+type Handler = (req: NextRequest, ctx: { params: Promise<any> }) => Promise<Response>
 
 export function mount(app: FastifyInstance, method: HTTPMethods, path: string, handler: Handler) {
   app.route({
@@ -53,33 +16,18 @@ export function mount(app: FastifyInstance, method: HTTPMethods, path: string, h
       if (!c?.internal) return reply.code(403).send({ error: 'forbidden', message: 'Internal calls only' })
       const tenant = await lookupTenantContextById(c.tenantId)
       if (!tenant) return reply.code(404).send({ error: 'tenant_not_found' })
-      const base = `http://documents${req.url}`
-      const shim: NextRequest = {
-        url: base,
-        nextUrl: new URL(base),
+      const hasBody = req.body != null && req.method !== 'GET' && req.method !== 'HEAD'
+      const shim = new NextRequest(`http://documents${req.url}`, {
         method: req.method,
-        headers: new Headers(Object.entries(req.headers).filter(([, v]) => typeof v === 'string') as [string, string][]),
-        json: async () => {
-          if (req.body == null || req.body === '') throw new Error('No body')
-          return req.body
-        },
-        claims: c,
-      }
+        headers: Object.entries(req.headers).filter(([, v]) => typeof v === 'string') as [string, string][],
+        body: hasBody ? JSON.stringify(req.body) : undefined,
+      })
+      shim.claims = c
       const res = await runWithTenant(tenant, () => handler(shim, { params: Promise.resolve(req.params as Record<string, string>) }), c.adminId ?? null)
-      reply.code(res.init.status ?? 200)
-      for (const [k, v] of Object.entries(res.init.headers ?? {})) reply.header(k, v)
-      if (res.body == null) return reply.send()
-      return reply.send(res.body instanceof Uint8Array ? Buffer.from(res.body) : res.body)
+      reply.code(res.status)
+      res.headers.forEach((v, k) => reply.header(k, v))
+      const buf = Buffer.from(await res.arrayBuffer())
+      return reply.send(buf.length ? buf : undefined)
     },
   })
-}
-
-export async function requireAdminScope(req: NextRequest, scope: string | null): Promise<AdminClaims | NextResponse> {
-  const admin = await authenticateAdmin(req)
-  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (scope) {
-    const { hasScope } = await import('./lib/scopes')
-    if (!hasScope(admin.role, admin.scopes, scope)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  }
-  return admin
 }

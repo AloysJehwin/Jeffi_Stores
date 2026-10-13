@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from '../../shim'
+import { NextRequest, NextResponse } from '../../next'
 import { queryOne, queryMany, query } from '@jeffi/tenancy'
-import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '../../shim'
+import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '../../auth'
 import {
   generateInvoicePDF,
   InvoiceBusinessSettings,

@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from '../../shim'
-import { authenticateAdmin } from '../../shim'
+import { NextRequest, NextResponse } from '../../next'
+import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryOne, queryMany } from '@jeffi/tenancy'
 import { generateIRN, cancelIRN, isEInvoiceConfigured, EInvoicePayload, EInvoiceItem } from '../../lib/einvoice'
