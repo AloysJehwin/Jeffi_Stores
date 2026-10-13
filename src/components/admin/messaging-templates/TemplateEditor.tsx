@@ -11,6 +11,7 @@ import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
 import { Smile, Link2, ImageIcon, Loader2, Upload, RefreshCw } from 'lucide-react'
 import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
 import PhonePreview from './PhonePreview'
+import ApiCurlHint from './ApiCurlHint'
 import { emailPreviewDoc, emailBodyDoc, previewSubject } from '@/lib/templates/email-preview'
 import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
 
@@ -71,6 +72,8 @@ type Props = {
   campaignKind?: string | null
   /** Variables to offer in the insert menu when not a campaign template (e.g. the picked template's own). */
   variableNames?: string[]
+  /** Extra line under the "Send via API" curl (e.g. which copy the API uses). */
+  apiNote?: string
 }
 
 const SMS_GSM_LIMIT = 160
@@ -85,7 +88,7 @@ type WaBlocks = {
   carousel?: { cards: WaCarouselCard[] }
 }
 
-export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave: rawSave, saving, embedded, campaignKind, variableNames }: Props) {
+export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave: rawSave, saving, embedded, campaignKind, variableNames, apiNote }: Props) {
   const derived = campaignKind ?? (value.slug?.startsWith('campaign/') ? value.slug.slice('campaign/'.length) : null)
   const kind = isCampaignKind(derived) && value.channel !== 'whatsapp' ? derived : null
   const kindText = `${value.channel === 'email' ? value.subject ?? '' : ''}\n${value.body ?? ''}`
@@ -613,6 +616,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
         {preview?.missing && preview.missing.length > 0 && (
           <p className="mt-3 text-xs text-foreground-secondary">Sample values used for: {preview.missing.join(', ')}</p>
         )}
+        {value.slug && <div className="mt-4"><ApiCurlHint value={value} note={apiNote} /></div>}
       </div>
       )}
     </div>
