@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { isOwnHost } from '@/lib/client/google-oauth-popup'
 
 export default function GoogleCallbackPage() {
   useEffect(() => {
@@ -29,15 +30,19 @@ export default function GoogleCallbackPage() {
     // Popup was blocked and Google opened this as a new tab / redirected the
     // top-level window. Read the return_to path from the state param (encoded
     // by openGoogleOAuthPopup) — fall back to /admin/login if absent or invalid.
+    // Same-tab sign-in (or a blocked popup): state is "nonce|<return URL>". Only our own hosts are honoured,
+    // so this page can't be used as an open redirect.
     const state = params.get('state') || ''
     let returnTo = '/admin/login'
     try {
-      // state may be "randomPart|/return/path" — parse the second segment if present
       const pipe = state.indexOf('|')
       if (pipe !== -1) {
         const candidate = decodeURIComponent(state.slice(pipe + 1))
-        // only allow same-origin paths
-        if (candidate.startsWith('/')) returnTo = candidate
+        if (candidate.startsWith('/') && !candidate.startsWith('//')) returnTo = candidate
+        else {
+          const u = new URL(candidate)
+          if ((u.protocol === 'https:' || u.protocol === 'http:') && isOwnHost(u.hostname)) returnTo = u.origin + u.pathname + u.search
+        }
       }
     } catch {
       /* ignore */

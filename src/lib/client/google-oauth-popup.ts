@@ -13,6 +13,25 @@ export interface GoogleOAuthResult {
   error: string | null
 }
 
+/** jeffistores.in, its subdomains and localhost — the only hosts the callback will send a tab back to. */
+export function isOwnHost(host: string): boolean {
+  return /(^|\.)jeffistores\.in$/i.test(host) || /(^|\.)localhost$/i.test(host) || host === '127.0.0.1'
+}
+
+/**
+ * On a page that started Google sign-in: the returned token (or error) from the URL hash, removed from the
+ * address bar. null when this page load isn't a Google return.
+ */
+export function consumeGoogleRedirect(): GoogleOAuthResult | null {
+  if (typeof window === 'undefined') return null
+  const params = new URLSearchParams(window.location.hash.slice(1))
+  const accessToken = params.get('access_token')
+  const error = params.get('error')
+  if (!accessToken && !error) return null
+  window.history.replaceState(null, '', window.location.pathname + window.location.search)
+  return { accessToken, error: accessToken ? null : error }
+}
+
 export function openGoogleOAuthPopup({
   clientId,
   scope = 'openid email profile',
@@ -46,10 +65,12 @@ export function openGoogleOAuthPopup({
     const mainOrigin = stripAppSubdomain(window.location.origin)
     const redirectUri = `${mainOrigin}/auth/google/callback`
 
-    // Encode a random nonce + the return path in state so the callback page can
-    // redirect back here if the popup was blocked and Google opened a new tab.
+    // State carries the FULL return URL (origin included) so the callback, which always runs on the root
+    // domain, sends the tab back to the exact page it came from (admin./business./ecom./tenant hosts).
     const nonce = Math.random().toString(36).slice(2)
-    const destination = returnTo || window.location.pathname + window.location.search
+    const path = returnTo || window.location.pathname
+    // Keep the query (e.g. ?redirect=) — every caller is the sign-in page itself.
+    const destination = `${window.location.origin}${path}${window.location.search}`
     const state = `${nonce}|${encodeURIComponent(destination)}`
 
     const params = new URLSearchParams({
@@ -62,6 +83,14 @@ export function openGoogleOAuthPopup({
       prompt: 'select_account',
     })
     const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
+
+    // Same-tab flow on our own hosts: popups/new tabs could get stuck and need a manual reload. The page
+    // unloads, so this promise never settles; the page completes sign-in on return (consumeGoogleRedirect).
+    // Custom tenant domains keep the popup: the callback can only safely send a tab back to our hosts.
+    if (isOwnHost(window.location.hostname)) {
+      window.location.assign(url)
+      return
+    }
 
     const dualScreenLeft = window.screenLeft ?? window.screenX ?? 0
     const dualScreenTop = window.screenTop ?? window.screenY ?? 0

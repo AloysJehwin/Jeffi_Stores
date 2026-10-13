@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import type { GoogleOAuthResult } from '@/lib/client/google-oauth-popup'
 
 // OTP + Google auth form for ecom owners. mode 'signup' collects a name; 'signin'
 // doesn't. Both hit the same ecom auth endpoints (findOrCreateOwner upserts).
@@ -162,7 +163,16 @@ function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (
   const router = useRouter()
   const [busy, setBusy] = useState(false)
 
-  async function start() {
+  // Back from Google in this tab: finish sign-in with the returned token.
+  useEffect(() => {
+    import('@/lib/client/google-oauth-popup').then(m => {
+      const r = m.consumeGoogleRedirect()
+      if (r) start(r)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function start(returned?: GoogleOAuthResult) {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
     if (!clientId) {
       onError('Google sign-in is not configured in this environment.')
@@ -171,7 +181,7 @@ function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (
     setBusy(true)
     try {
       const { openGoogleOAuthPopup } = await import('@/lib/client/google-oauth-popup')
-      const result = await openGoogleOAuthPopup({ clientId })
+      const result = returned ?? (await openGoogleOAuthPopup({ clientId }))
       if (!result.accessToken) {
         if (result.error && result.error !== 'popup_closed') onError(result.error)
         return
@@ -197,7 +207,7 @@ function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (
 
   return (
     <button
-      onClick={start}
+      onClick={() => start()}
       disabled={busy}
       className="org-sand org-sand-hover w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-foreground transition-colors disabled:opacity-50"
     >

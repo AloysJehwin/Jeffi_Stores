@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
-import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
+import { openGoogleOAuthPopup, consumeGoogleRedirect, type GoogleOAuthResult } from '@/lib/client/google-oauth-popup'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { bp } from '@/lib/shared/business-path'
 import DatePicker from '@/components/ui/DatePicker'
@@ -228,7 +228,14 @@ function BusinessSignUpPage() {
     }
   }
 
-  const handleGoogleSignUp = async () => {
+  // Back from Google in this tab: finish sign-up with the returned token.
+  useEffect(() => {
+    const r = consumeGoogleRedirect()
+    if (r) handleGoogleSignUp(r)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleGoogleSignUp = async (returned?: GoogleOAuthResult) => {
     setError('')
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
     if (!clientId) {
@@ -236,7 +243,7 @@ function BusinessSignUpPage() {
       return
     }
     setGoogleLoading(true)
-    const result = await openGoogleOAuthPopup({ clientId, returnTo: '/business/signup' })
+    const result = returned ?? (await openGoogleOAuthPopup({ clientId, returnTo: '/business/signup' }))
     if (!result.accessToken) {
       if (result.error && result.error !== 'popup_closed') setError(result.error)
       setGoogleLoading(false)
@@ -447,7 +454,7 @@ function BusinessSignUpPage() {
                   <>
                     <button
                       type="button"
-                      onClick={handleGoogleSignUp}
+                      onClick={() => handleGoogleSignUp()}
                       disabled={googleLoading}
                       className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg border border-border-secondary bg-surface hover:bg-surface-secondary transition-colors text-sm font-medium text-foreground disabled:opacity-60 mb-5"
                     >
