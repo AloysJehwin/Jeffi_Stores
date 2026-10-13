@@ -73,3 +73,13 @@ export function mount(app: FastifyInstance, method: HTTPMethods, path: string, h
     },
   })
 }
+
+export async function requireAdminScope(req: NextRequest, scope: string | null): Promise<AdminClaims | NextResponse> {
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (scope) {
+    const { hasScope } = await import('./lib/scopes')
+    if (!hasScope(admin.role, admin.scopes, scope)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+  return admin
+}

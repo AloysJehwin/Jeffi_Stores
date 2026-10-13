@@ -25,6 +25,9 @@ import * as poResend from './po/resend-email'
 import * as poDrafts from './po/drafts'
 import * as poDraft from './po/draft'
 import * as poUnit from './po/purchase-unit'
+import * as poReceive from './po/receive'
+import * as poReceiveDraft from './po/receive-draft'
+import * as rfqConvert from './quotations/rfq-convert'
 
 // Same paths as the monolith's /api/admin/* so the Next proxy forwards 1:1.
 export async function adminRoutes(app: FastifyInstance) {
@@ -59,7 +62,6 @@ export async function adminRoutes(app: FastifyInstance) {
   mount(app, 'POST', '/admin/quotations/:id/resend-email', qResend.POST)
   mount(app, 'POST', '/admin/quotations/:id/convert-to-invoice', qConvert.POST)
 
-  // GRN / receive stays in the monolith (inventory).
   mount(app, 'GET', '/admin/inventory/po', poList.GET)
   mount(app, 'POST', '/admin/inventory/po', poList.POST)
   mount(app, 'GET', '/admin/inventory/po/purchase-unit', poUnit.GET)
@@ -71,4 +73,9 @@ export async function adminRoutes(app: FastifyInstance) {
   mount(app, 'GET', '/admin/inventory/po/:id', poItem.GET)
   mount(app, 'PATCH', '/admin/inventory/po/:id', poItem.PATCH)
   mount(app, 'POST', '/admin/inventory/po/:id/resend-email', poResend.POST)
+  mount(app, 'POST', '/admin/inventory/po/:id/receive', poReceive.POST)
+  mount(app, 'GET', '/admin/inventory/po/:id/receive/draft', poReceiveDraft.GET)
+  mount(app, 'PATCH', '/admin/inventory/po/:id/receive/draft', poReceiveDraft.PATCH)
+  mount(app, 'DELETE', '/admin/inventory/po/:id/receive/draft', poReceiveDraft.DELETE)
+  mount(app, 'POST', '/admin/business/rfqs/:id/convert-to-quotation', rfqConvert.POST)
 }
