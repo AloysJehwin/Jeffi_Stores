@@ -103,6 +103,8 @@ export default function NewMessagePage() {
 
   const active = CHANNELS.map(c => c.key).filter(k => channels[k])
   const ready = active.length > 0 && active.every(k => channels[k]!.slug)
+  // Email can be left empty in step 1 — step 2's AI Assist writes it.
+  const step1Ready = active.length > 0 && active.every(k => k === 'email' || channels[k]!.slug)
 
   // What the send stores: shared named vars for email/SMS, numbered slots for WhatsApp.
   const payloadChannels = useMemo<Channels>(() => {
@@ -480,43 +482,17 @@ export default function NewMessagePage() {
                       onChange={slug => pickTemplate(c.key, slug)}
                       allowNone={false}
                     />
+                    {c.key === 'email' && canUseAi && !channels.email?.slug && (
+                      <p className="mt-1.5 text-[11px] text-foreground-muted">Or leave it empty and write one with AI in the next step.</p>
+                    )}
                   </div>
                 )}
               </div>
             )
           })}
 
-          {canUseAi && (
-            <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-violet-500 shrink-0" />
-                <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">Write a new email with AI</p>
-              </div>
-              <textarea
-                value={scenarioPrompt}
-                onChange={e => setScenarioPrompt(e.target.value)}
-                rows={2}
-                className={`${inputClass} resize-none`}
-                placeholder="e.g. 'Diwali sale 20% off power tools, CTA to /products' — saved as a new template and picked for Email"
-              />
-              <div className="flex items-center gap-2">
-                <RequireWrite scope="mailer:write">
-                  <button
-                    type="button"
-                    onClick={generateFromScenario}
-                    disabled={scenarioLoading || scenarioPrompt.trim().length < 10}
-                    className="inline-flex items-center gap-2 px-4 h-control-sm bg-violet-500 hover:bg-violet-600 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {scenarioLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-                    {scenarioLoading ? 'Generating…' : 'Generate email'}
-                  </button>
-                </RequireWrite>
-                {scenarioError && <span className="text-xs text-red-500">{scenarioError}</span>}
-              </div>
-            </div>
-          )}
 
-          <button type="button" onClick={() => setStep(2)} disabled={!ready} className={btnPrimary}>Continue</button>
+          <button type="button" onClick={() => setStep(2)} disabled={!step1Ready} className={btnPrimary}>Continue</button>
         </div>
       )}
 
@@ -524,6 +500,35 @@ export default function NewMessagePage() {
       {step === 2 && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
           <div className="space-y-5">
+            {canUseAi && (
+              <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-violet-500 shrink-0" />
+                  <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">Write a new email with AI</p>
+                </div>
+                <textarea
+                  value={scenarioPrompt}
+                  onChange={e => setScenarioPrompt(e.target.value)}
+                  rows={2}
+                  className={`${inputClass} resize-none`}
+                  placeholder="e.g. 'Diwali sale 20% off power tools, CTA to /products' — saved as a new email template and used for this message"
+                />
+                <div className="flex items-center gap-2">
+                  <RequireWrite scope="mailer:write">
+                    <button
+                      type="button"
+                      onClick={generateFromScenario}
+                      disabled={scenarioLoading || scenarioPrompt.trim().length < 10}
+                      className="inline-flex items-center gap-2 px-4 h-control-sm bg-violet-500 hover:bg-violet-600 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {scenarioLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                      {scenarioLoading ? 'Generating…' : 'Generate email'}
+                    </button>
+                  </RequireWrite>
+                  {scenarioError && <span className="text-xs text-red-500">{scenarioError}</span>}
+                </div>
+              </div>
+            )}
             <div>
               <label className={labelClass}>Title (internal)</label>
               <input value={title} onChange={e => setTitle(e.target.value)} className={inputClass} placeholder="e.g. May review push" />
@@ -603,6 +608,7 @@ export default function NewMessagePage() {
             </div>
             {editing && channels[editing]?.slug && (
               <LinkedTemplateEditor
+                variableNames={fields}
                 channel={editing}
                 slug={channels[editing]!.slug}
                 onMirror={t => setLoaded(p => ({ ...p, [editing]: { slug: channels[editing]!.slug, subject: t.subject ?? null, body: t.body ?? '', approval_status: null } }))}
