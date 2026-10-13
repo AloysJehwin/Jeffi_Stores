@@ -22,6 +22,11 @@ const SELF_BASE = (process.env.SELF_BASE_URL || `http://localhost:${process.env.
 const PREFIX: Record<string, string> = { invoice: 'INV', quotation: 'QT', receipt: 'RCT', packing_slip: 'PS', label: 'LBL', purchase_order: 'PO' }
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' } })
+// Proxied POST/DELETE calls may carry content-type without a body.
+app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+  if (!body || !String(body).trim()) return done(null, undefined)
+  try { done(null, JSON.parse(String(body))) } catch (e: any) { e.statusCode = 400; done(e, undefined) }
+})
 declare module 'fastify' {
   interface FastifyRequest {
     claims: ServiceClaims

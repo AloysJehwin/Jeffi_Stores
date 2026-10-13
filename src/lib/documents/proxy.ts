@@ -26,7 +26,7 @@ async function forward(request: NextRequest, path: string, claims: Record<string
     method: request.method,
     headers: {
       authorization: `Bearer ${token({ tenantId: tenant.tenantId, tenantSlug: tenant.slug, ...claims })}`,
-      'content-type': request.headers.get('content-type') || 'application/json',
+      ...(body ? { 'content-type': request.headers.get('content-type') || 'application/json' } : {}),
     },
     body: body || undefined,
     cache: 'no-store',

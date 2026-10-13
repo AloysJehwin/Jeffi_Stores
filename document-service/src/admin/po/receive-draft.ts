@@ -47,7 +47,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   await query(
     `INSERT INTO po_receive_drafts (po_id, admin_id, line_items, serials)
-       VALUES ($1, $2, $3::jsonb, $4::jsonb)
+       VALUES ($1, $2, COALESCE($3::jsonb, '[]'::jsonb), COALESCE($4::jsonb, '[]'::jsonb))
      ON CONFLICT (po_id) DO UPDATE
        SET line_items = COALESCE(EXCLUDED.line_items, po_receive_drafts.line_items),
            serials = COALESCE(EXCLUDED.serials, po_receive_drafts.serials),
