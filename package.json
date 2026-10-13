@@ -16,7 +16,12 @@
     "test:coverage": "vitest run --coverage",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "dev:messaging": "npm --prefix messaging-service run dev",
+    "dev:documents": "npm --prefix document-service run dev",
+    "dev:public-api": "npm --prefix public-api-service run dev",
+    "dev:services": "concurrently -n msg,doc,api -c blue,green,magenta \"npm run dev:messaging\" \"npm run dev:documents\" \"npm run dev:public-api\"",
+    "typecheck:services": "npm --prefix messaging-service run typecheck && npm --prefix document-service run typecheck && npm --prefix public-api-service run typecheck"
   },
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.1038.0",
@@ -98,6 +103,7 @@
     "@types/react-dom": "^18.2.18",
     "@vitest/coverage-v8": "^4.1.9",
     "autoprefixer": "^10.4.17",
+    "concurrently": "^10.0.6",
     "eslint": "^8.56.0",
     "eslint-config-next": "^15.5.19",
     "happy-dom": "^20.10.6",

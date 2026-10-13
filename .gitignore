@@ -109,3 +109,4 @@ public/models/onboarding/ort/*.mjs
 .env.local.overrides
 
 **/node_modules/
+**/.env.local

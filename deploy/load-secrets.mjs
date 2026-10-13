@@ -33,6 +33,8 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = resolve(__dirname, '..')
+// Services (messaging-service etc.) reuse this loader and write their own .env.local.
+const OUT_DIR = process.env.ENV_OUT_DIR ? resolve(process.env.ENV_OUT_DIR) : REPO_ROOT
 
 const isProduction = process.env.NODE_ENV === 'production' || process.env.SM_ENV === 'production'
 const DEFAULT_SECRET = isProduction ? 'jeffi/production' : 'jeffi/local'
@@ -84,7 +86,7 @@ async function loadSecrets() {
     // Local-only overrides that must survive this regeneration (e.g. TENANT_MTLS_ENFORCED=false
     // for local tenant-admin access). .env.local.overrides is gitignored and NEVER read in prod.
     // Appended last so its KEY=VALUE lines win over the Secrets Manager values above.
-    const overridePath = resolve(REPO_ROOT, '.env.local.overrides')
+    const overridePath = resolve(OUT_DIR, '.env.local.overrides')
     let overrideCount = 0
     if (existsSync(overridePath)) {
       const extra = readFileSync(overridePath, 'utf8')
@@ -94,7 +96,7 @@ async function loadSecrets() {
       overrideCount = extra.length
       lines.push(...extra)
     }
-    const envPath = resolve(REPO_ROOT, '.env.local')
+    const envPath = resolve(OUT_DIR, '.env.local')
     writeFileSync(envPath, lines.join('\n') + '\n', 'utf8')
     process.stdout.write(
       `[load-secrets] Wrote ${Object.keys(secrets).length} secrets from "${SECRET_ID}"` +
