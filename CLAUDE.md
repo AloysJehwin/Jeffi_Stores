@@ -18,3 +18,12 @@ Rules:
 - DDL lives in split, `pg_dump`-style schema files under `database/` — tables in a topic file (`catalog.sql`, `logs.sql`, `amazon.sql`, …), primary keys / CHECK constraints / sequence-owner ALTERs in `constraints.sql`, and indexes in `indexes.sql`. A schema pipeline applies these; **do NOT write migration files** in `database/migrations/` for new tables.
 - To add a table: put `CREATE TABLE public.<name> (...)` (+ any `CREATE SEQUENCE`) in the topic schema file, its PK/CHECK in `constraints.sql`, and its indexes in `indexes.sql` — mirroring an existing table's split (e.g. the `merchant_*` / `amazon_*` tables). The pipeline handles applying them; never hand-run migrations.
 - Apply only to the LOCAL DB (port 5432); never the live RDS.
+
+## Microservices — services split, DB unified
+
+**Today only the services are segregated (monolith + messaging-service + document-service). They ALL connect to the same DB** — `jeffi_production_ready` locally, the single Jeffi DB in prod. Every entity (control-plane, messaging, documents, templates library, business tables) lives in that one DB. See `docs/MICROSERVICES.md`.
+
+- Do NOT create new DBs. `jeffi_control_plane`, `jeffi_messaging`, `jeffi_documents` are legacy from an earlier design and are deprecated.
+- New tables for any service go in the main `database/*.sql` pipeline (topic file + `constraints.sql` + `indexes.sql`), applied to `jeffi_production_ready` locally.
+- `.env` DB URLs across every service all point at the same main DB.
+- Per-service DB split and per-tenant DBs come later with multi-tenancy; resolved via `packages/tenancy` using the service-auth `tenant_id` claim.
