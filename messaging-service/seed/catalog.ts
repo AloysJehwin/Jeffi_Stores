@@ -16,8 +16,9 @@ const email = (slug: string, name: string, category: string, subject: string, bo
 const sms = (slug: string, name: string, category: string, body: string, tags?: string[]): TemplateSeed =>
   ({ slug, channel: 'sms', name, category, body, blocks_format: 'sms-text', tags })
 
-const wa = (slug: string, name: string, category: string, body: string, metaCategory: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION', tags?: string[]): TemplateSeed =>
-  ({ slug, channel: 'whatsapp', name, category, body, meta_category: metaCategory, blocks_format: 'wa-content', blocks: { types: { 'twilio/text': { body } } }, tags })
+// samples = Meta approval sample values per {{n}} (required before submission).
+const wa = (slug: string, name: string, category: string, body: string, metaCategory: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION', samples?: Record<string, string>, tags?: string[]): TemplateSeed =>
+  ({ slug, channel: 'whatsapp', name, category, body, meta_category: metaCategory, blocks_format: 'wa-content', blocks: { types: { 'twilio/text': { body } }, ...(samples ? { variables: samples } : {}) }, tags })
 
 export const CATALOG: TemplateSeed[] = [
   // ────────────── EMAIL — TRANSACTIONAL (order lifecycle) ──────────────
@@ -259,19 +260,19 @@ export const CATALOG: TemplateSeed[] = [
   wa('promo/offer', 'Promo', 'marketing',
     "Jeffi Stores: {{1}}! Use code {{2}} to get {{3}} off your next order. Shop now at jeffistores.in", 'MARKETING'),
   wa('winback', 'Winback', 'marketing',
-    'Hi {{1}}, we miss you! {{2}}% off, code {{3}}. {{4}}', 'MARKETING'),
+    "Jeffi Stores: Hi {{1}}, we miss you! Enjoy {{2}} off your next order with code {{3}}. Shop now at jeffistores.in", 'MARKETING', {"1": "Priya", "2": "20%", "3": "WELCOME20"}),
   wa('kyc/approved', 'KYC approved', 'transactional',
-    'Hi {{1}}, your KYC is approved. You now have full access.', 'UTILITY'),
+    "Jeffi Stores: Hi {{1}}, your KYC verification is approved. You now have full access to your account.", 'UTILITY', {"1": "Priya"}),
   wa('invoice/ready', 'Invoice ready', 'transactional',
-    'Invoice #{{1}} for ₹{{2}} is ready. Download: {{3}}', 'UTILITY'),
+    "Jeffi Stores: Invoice {{1}} for {{2}} is ready. Download it here: {{3}} Thank you for your business.", 'UTILITY', {"1": "INV-2026-0042", "2": "₹12,500", "3": "https://jeffistores.in/invoice/INV-2026-0042"}),
   wa('quotation/ready', 'Quotation ready', 'transactional',
-    'Quotation #{{1}} is ready. View and approve: {{2}}', 'UTILITY'),
+    "Jeffi Stores: Your quotation {{1}} is ready. View and approve it here: {{2}} Thank you for your interest.", 'UTILITY', {"1": "QT-2026-0017", "2": "https://jeffistores.in/quotation/QT-2026-0017"}),
   wa('order/access-granted', 'Access granted', 'transactional',
     "Jeffi Stores: Access granted for your order {{1}}. Open your vault to watch, read or listen here: {{2}} . Thank you for shopping with us!", 'UTILITY'),
   wa('order/variant-change-requested', 'Variant change requested', 'transactional',
-    'Order #{{1}} needs your approval for a variant change. Review: {{2}}', 'UTILITY'),
+    "Jeffi Stores: Your order {{1}} needs your approval for a variant change. Please review it here: {{2}} Thank you for shopping with us!", 'UTILITY', {"1": "JS-10234", "2": "https://jeffistores.in/account/orders/JS-10234"}),
   wa('order/payment-failed', 'Payment failed', 'transactional',
-    'Payment for order #{{1}} failed. Please retry.', 'UTILITY'),
+    "Jeffi Stores: Payment for your order {{1}} did not go through. Please retry from your orders page at jeffistores.in/orders. Thank you.", 'UTILITY', {"1": "JS-10234"}),
   wa('promo/new-arrivals', 'New arrivals', 'marketing',
     "Jeffi Stores: New arrivals just landed! {{1}} now in stock. Explore the collection at jeffistores.in", 'MARKETING'),
   wa('restock', 'Back in stock', 'automation',
