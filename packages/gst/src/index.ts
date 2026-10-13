@@ -44,6 +44,12 @@ export function getStateCode(stateName: string): string {
   return STATE_CODES[normalized] || ''
 }
 
+/** '33' → 'Tamil Nadu' (first two digits of a GSTIN). */
+export function stateFromCode(code: string): string {
+  const hit = Object.entries(STATE_CODES).find(([, c]) => c === code)
+  return hit ? hit[0].replace(/\b\w/g, m => m.toUpperCase()) : ''
+}
+
 export function isInterState(buyerState: string, sellerStateCode: string): boolean {
   const buyerCode = getStateCode(buyerState)
   if (!buyerCode || !sellerStateCode) return false

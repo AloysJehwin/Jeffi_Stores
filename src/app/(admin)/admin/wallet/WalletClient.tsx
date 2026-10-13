@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { topupAmounts } from '@/lib/billing/topup-amounts'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
@@ -150,7 +151,7 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
           if (!vres.ok) {
             setToast({ ok: false, text: `Paid, but crediting failed. Payment ID: ${response.razorpay_payment_id}` })
           } else {
-            setToast({ ok: true, text: 'Wallet topped up.' })
+            setToast({ ok: true, text: `Added ₹${amountInr.toLocaleString('en-IN')} to the wallet. The tax invoice is on its way to your email.` })
             setAmount('')
             refresh()
           }
@@ -231,6 +232,11 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
             <button className={btnPrimary} onClick={topUp} disabled={busy}>
               {busy ? 'Processing…' : 'Top up'}
             </button>
+            {Number(amount) > 0 && (
+              <span className="text-xs text-foreground-muted pb-1.5 tabular-nums">
+                ₹{Number(amount).toLocaleString('en-IN')} credit + ₹{topupAmounts(Number(amount)).gst.toLocaleString('en-IN')} GST (18%) = pay ₹{topupAmounts(Number(amount)).total.toLocaleString('en-IN')} · tax invoice emailed
+              </span>
+            )}
             {low && <span className="text-xs text-amber-600 dark:text-amber-400 pb-1.5">Balance is below the minimum — shipments may be blocked.</span>}
           </div>
           {toast && (

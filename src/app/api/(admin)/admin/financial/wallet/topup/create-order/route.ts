@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { topupAmounts, topupNotes } from '@/lib/billing/topup'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
@@ -29,7 +30,8 @@ export async function POST(request: NextRequest) {
   const amountInr = Number(body?.amountInr)
   if (!(amountInr > 0)) return NextResponse.json({ error: 'amountInr must be positive' }, { status: 400 })
 
-  const amountInPaise = Math.round(amountInr * 100)
+  const a = topupAmounts(amountInr)
+  const amountInPaise = Math.round(a.total * 100)
   try {
     const razorpay = getRazorpayInstance()
     const receipt = `wtop-${tenant.tenantId.slice(0, 8)}-${Date.now().toString(36)}`.slice(0, 40)
@@ -37,13 +39,16 @@ export async function POST(request: NextRequest) {
       amount: amountInPaise,
       currency: 'INR',
       receipt,
-      notes: { purpose: 'wallet_topup', tenant_id: tenant.tenantId, tenant_slug: tenant.slug ?? '' },
+      notes: topupNotes({ id: tenant.tenantId, slug: tenant.slug }, amountInr),
     })
     return NextResponse.json({
       razorpayOrderId: order.id,
       amount: amountInPaise,
       currency: 'INR',
       key_id: process.env.RAZORPAY_KEY_ID,
+      credit: a.credit,
+      gst: a.gst,
+      total: a.total,
     })
   } catch (error: any) {
     const msg = error?.error?.description || error?.message || 'Failed to create top-up order'

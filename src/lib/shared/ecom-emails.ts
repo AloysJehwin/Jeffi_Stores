@@ -104,7 +104,7 @@ function toText(html: string): string {
     .trim()
 }
 
-async function send(to: string, subject: string, html: string) {
+async function send(to: string, subject: string, html: string, attachments?: Array<{ filename: string; content: Buffer; contentType: string }>) {
   // Every outbound mail goes through the audited chokepoint so it is visible in
   // /admin/audit?tab=mail_log alongside the rest.
   await sendAuditedMail({
@@ -115,6 +115,7 @@ async function send(to: string, subject: string, html: string) {
     subject,
     html,
     text: toText(html),
+    ...(attachments?.length ? { attachments } : {}),
   }).catch(e => {
     process.stderr.write(`[ecom-email] failed to send to ${to}: ${e?.message}\n`)
   })
@@ -237,4 +238,32 @@ export async function sendStoreLiveEmail(
   `
   )
   await send(owner.email, `${tenant.display_name} is live`, html)
+}
+
+const inr = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+/** Jeffi's tax invoice for a plan charge or wallet top-up, PDF attached. */
+export async function sendPlatformInvoiceEmail(
+  to: string,
+  inv: { kind: 'subscription' | 'wallet_topup'; number: string; store: string; description: string; taxable: number; gst: number; total: number; credited?: number; viewUrl: string },
+  pdf: Buffer
+) {
+  const what = inv.kind === 'wallet_topup' ? 'wallet top-up' : 'subscription'
+  const html = baseHtml(
+    `Tax invoice ${inv.number} for your ${what}.`,
+    'Tax invoice',
+    `
+    <p style="margin:0 0 14px;">Thanks for your payment. Your tax invoice for <strong>${inv.store}</strong> is attached.</p>
+    ${detailTable([
+      { label: 'Invoice', value: inv.number },
+      { label: 'For', value: inv.description },
+      ...(inv.credited != null ? [{ label: 'Wallet credit', value: inr(inv.credited) }] : []),
+      { label: 'Taxable value', value: inr(inv.taxable) },
+      { label: 'GST (18%)', value: inr(inv.gst) },
+      { label: 'Total paid', value: inr(inv.total) },
+    ])}
+    ${button(inv.viewUrl, 'View invoice')}
+  `
+  )
+  await send(to, `Tax invoice ${inv.number} — ${inv.store}`, html, [{ filename: `${inv.number.replace(/\//g, '-')}.pdf`, content: pdf, contentType: 'application/pdf' }])
 }

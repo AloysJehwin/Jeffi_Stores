@@ -113,7 +113,7 @@ async function createDocument(ctx: { tenantId: string; apiKeyId?: string | null 
   if (body.template && !resolveDesign(body.template)) throw badTemplate()
   const { tenantId, apiKeyId } = ctx
   const { design, branding } = await resolveBranding(db, tenantId, body.template, body.branding)
-  const designKey = resolveDesign(design) ? design! : DEFAULT_DESIGN
+  const designKey = design && resolveDesign(design) ? design : DEFAULT_DESIGN
   const totals = computeTotals(body)
   const id = randomUUID()
   const token = randomBytes(18).toString('base64url')

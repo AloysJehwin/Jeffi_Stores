@@ -4,7 +4,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
 import { getRazorpayInstance } from '@/lib/payments/razorpay'
-import { rechargeWallet } from '@/lib/payments/wallet'
+import { creditTopup } from '@/lib/billing/topup'
 import { controlPlanePool } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'
@@ -43,30 +43,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid payment signature' }, { status: 400 })
   }
 
-  // Idempotency is enforced by uq_wallet_ledger_tenant_external_ref inside rechargeWallet, not
-  // by a check here: a SELECT-then-INSERT lets two concurrent verifies both pass the check and
-  // credit the same payment twice.
-  const noteRef = `Razorpay top-up ${razorpay_payment_id}`
+  // Idempotency is enforced by uq_wallet_ledger_tenant_external_ref inside rechargeWallet (via
+  // creditTopup), not by a check here: a SELECT-then-INSERT lets two concurrent verifies both pass.
 
-  let amountInr: number
+  let paidPaise: number
+  let notes: Record<string, unknown> | null = null
   try {
     const order = await getRazorpayInstance().orders.fetch(razorpay_order_id)
     if (order?.notes?.purpose !== 'wallet_topup' || order?.notes?.tenant_id !== tenant.tenantId) {
       return NextResponse.json({ error: 'Order does not belong to this wallet' }, { status: 400 })
     }
-    amountInr = Number(order.amount_paid || order.amount) / 100
+    paidPaise = Number(order.amount_paid || order.amount)
+    notes = order.notes as any
   } catch (error: any) {
     const msg = error?.error?.description || error?.message || 'Could not verify top-up order'
     return NextResponse.json({ error: msg }, { status: 500 })
   }
-  if (!(amountInr > 0)) return NextResponse.json({ error: 'Top-up amount must be positive' }, { status: 400 })
+  if (!(paidPaise > 0)) return NextResponse.json({ error: 'Top-up amount must be positive' }, { status: 400 })
 
-  const result = await rechargeWallet({
-    tenantId: tenant.tenantId,
-    amountInr,
-    note: noteRef,
-    externalRef: razorpay_payment_id,
-  })
+  const result = await creditTopup({ tenantId: tenant.tenantId, paymentId: razorpay_payment_id, paidPaise, notes })
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 500 })
 
   return NextResponse.json({

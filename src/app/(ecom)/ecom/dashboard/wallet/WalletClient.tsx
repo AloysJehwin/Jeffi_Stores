@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Card } from '../_components/Card'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import Pager from '../_components/Pager'
+import { topupAmounts } from '@/lib/billing/topup-amounts'
 
 interface Entry { entry_type: string; category: string | null; amount: number; note: string | null; occurred_at: string }
 
@@ -35,7 +36,7 @@ export default function WalletClient({ initial, keyId, tenantName }: { initial: 
         })
         rz.open()
       })
-      setMsg(`Added ${fmt(amount)}`); router.refresh()
+      setMsg(`Added ${fmt(amount)} to your wallet. The tax invoice is on its way to your email.`); router.refresh()
     } catch (e: any) { setMsg(e.message) } finally { setBusy(false) }
   }
 
@@ -53,6 +54,11 @@ export default function WalletClient({ initial, keyId, tenantName }: { initial: 
           <input type="number" min={100} value={amount} onChange={e => setAmount(Number(e.target.value))} className="w-32 rounded-xl bg-surface-elevated px-3 py-2 text-sm" />
           <button onClick={topUp} disabled={busy || amount < 100} className="ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Opening…' : 'Pay with Razorpay'}</button>
         </div>
+        {amount >= 100 && (
+          <p className="mt-3 text-xs tabular-nums text-foreground-muted">
+            {fmt(amount)} credit + {fmt(topupAmounts(amount).gst)} GST (18%) = you pay <strong className="text-foreground">{fmt(topupAmounts(amount).total)}</strong>. A tax invoice is emailed after payment.
+          </p>
+        )}
         {msg && <p className="mt-3 text-sm text-foreground-secondary">{msg}</p>}
       </Card>
       <Card title="Ledger">

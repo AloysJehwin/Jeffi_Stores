@@ -3444,3 +3444,7 @@ ALTER TABLE ONLY public.bulk_jobs ADD CONSTRAINT bulk_jobs_status_check CHECK ((
 ALTER TABLE ONLY public.bulk_job_items ADD CONSTRAINT bulk_job_items_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.bulk_job_items ADD CONSTRAINT bulk_job_items_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'done'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])));
 ALTER TABLE ONLY public.bulk_job_items ADD CONSTRAINT bulk_job_items_job_fkey FOREIGN KEY (job_id) REFERENCES public.bulk_jobs(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.platform_invoices ADD CONSTRAINT platform_invoices_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.platform_invoices ADD CONSTRAINT platform_invoices_kind_ref_key UNIQUE (kind, external_ref);
+ALTER TABLE ONLY public.platform_invoices ADD CONSTRAINT platform_invoices_kind_check CHECK (((kind)::text = ANY ((ARRAY['subscription'::character varying, 'wallet_topup'::character varying])::text[])));
