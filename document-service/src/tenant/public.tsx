@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { readFileSync } from 'node:fs'
 import { resolveTenantFromHost, runWithTenant, appFromHost, type TenantContext } from '@jeffi/tenancy'
 import { loadInvoice, invoicePdf, loadQuotation, quotationPdf, loadPurchaseOrder, purchaseOrderPdf } from './loaders'
 import InvoiceView from './views/InvoiceView'
@@ -10,9 +11,11 @@ type App = 'invoice' | 'quotation' | 'purchaseorder'
 const APPS: App[] = ['invoice', 'quotation', 'purchaseorder']
 const TITLES: Record<App, string> = { invoice: 'Invoice', quotation: 'Quotation', purchaseorder: 'Purchase Order' }
 
+// Tailwind compiled from the view components at build time (npm run build:css) and inlined: the pages
+// must not depend on a CDN (tenant CSP) or on a static-file route.
+const CSS = readFileSync(new URL('./views/styles.css', import.meta.url), 'utf8')
 function page(title: string, body: string) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
-<script src="https://cdn.tailwindcss.com/3.4.17"></script><style>body{margin:0;background:#f3f4f6}</style></head><body>${body}</body></html>`
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>${CSS}body{margin:0;background:#f3f4f6}</style></head><body>${body}</body></html>`
 }
 
 // Host: invoice-{slug}.<root> (Traefik in prod) or x-forwarded-host (Next dev rewrite).
