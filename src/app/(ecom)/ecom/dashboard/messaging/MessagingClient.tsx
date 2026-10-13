@@ -98,7 +98,15 @@ export default function MessagingClient() {
                       <input className="mt-1 w-full rounded-xl bg-surface-elevated px-3 py-2 text-sm" value={selected.slug} onChange={e => setSelected({ ...selected, slug: e.target.value })} />
                     </label>
                   )}
-                  <TemplateEditor value={selected} apiBase={`${API}/v2/templates`} onChange={setSelected} onSave={save} saving={saving} />
+                  <TemplateEditor
+                    value={selected}
+                    apiBase={`${API}/v2/templates`}
+                    assetsBase="/api/ecom/messaging/assets/upload"
+                    shortLinksBase={`${API}/short-links`}
+                    onChange={setSelected}
+                    onSave={save}
+                    saving={saving}
+                  />
                 </Card>
               )}
             </section>

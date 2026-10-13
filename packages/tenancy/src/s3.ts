@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { randomUUID } from 'node:crypto'
 import { currentTenant } from './context.js'
 
 const REGION = process.env.AWS_REGION || 'us-east-1'
@@ -39,4 +40,25 @@ export async function uploadInvoicePDF(pdf: Buffer, invoiceNumber: string, finan
     })
   )
   return getS3Url(key)
+}
+
+const EXT_BY_MIME: Record<string, string> = {
+  'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg',
+  'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
+  'video/mp4': 'mp4', 'application/pdf': 'pdf',
+}
+
+export async function uploadTemplateAsset(
+  buf: Buffer, templateId: string | null, mime: string
+): Promise<{ key: string; url: string }> {
+  const ext = EXT_BY_MIME[mime] || 'bin'
+  const key = `template-assets/${templateId ?? 'library'}/${randomUUID()}.${ext}`
+  await s3().send(new PutObjectCommand({
+    Bucket: currentBucket(),
+    Key: `${KEY_PREFIX}${key}`,
+    Body: buf,
+    ContentType: mime,
+    CacheControl: 'public, max-age=31536000, immutable',
+  }))
+  return { key, url: getS3Url(key) }
 }
