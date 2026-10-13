@@ -112,11 +112,10 @@ async function proxy(req: FastifyRequest, reply: FastifyReply, base: string, pat
   })
   const ctype = String(res.headers['content-type'] ?? '')
   if (!ctype.includes('json')) {
-    // Binary passthrough (PDFs, images).
-    const buf = Buffer.from(await res.body.arrayBuffer())
+    // Binary passthrough (PDFs, images, ZIPs) — streamed, not buffered.
     touchKey(req.key.id, null)
     for (const h of ['content-type', 'content-disposition', 'cache-control']) if (res.headers[h]) reply.header(h, res.headers[h] as string)
-    return reply.code(res.statusCode).send(buf)
+    return reply.code(res.statusCode).send(res.body)
   }
   const text = await res.body.text()
   let body: any = text
@@ -130,6 +129,8 @@ async function proxy(req: FastifyRequest, reply: FastifyReply, base: string, pat
   return reply.code(res.statusCode).send(body)
 }
 
+const enc = (s: string) => encodeURIComponent(s)
+const publicBase = (req: FastifyRequest) => (process.env.PUBLIC_API_URL || `${req.protocol}://${req.host}`).replace(/\/$/, '')
 const qs = (req: FastifyRequest) => {
   const i = req.url.indexOf('?')
   return i === -1 ? '' : req.url.slice(i)
@@ -142,6 +143,14 @@ app.register(async v1 => {
 
   v1.post('/messages', { preHandler: need('messages:send', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/messages', 'messages'))
   v1.post('/messages/batch', { preHandler: need('messages:send', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/messages/batch', 'messages'))
+  // Bulk = async jobs: POST returns 202 + the job; poll GET …/bulk/:id, then page through …/items.
+  const msgBulk = { preHandler: need('messages:send', 'messaging') }
+  v1.post('/messages/bulk', { ...msgBulk, bodyLimit: 10_000_000 }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/messages/bulk', null))
+  v1.get('/messages/bulk', msgBulk, (req, reply) => proxy(req, reply, MESSAGING_URL, '/messages/bulk' + qs(req), null))
+  v1.get<{ Params: { id: string } }>('/messages/bulk/:id', msgBulk, (req, reply) => proxy(req, reply, MESSAGING_URL, `/messages/bulk/${enc(req.params.id)}`, null))
+  v1.get<{ Params: { id: string } }>('/messages/bulk/:id/items', msgBulk, (req, reply) => proxy(req, reply, MESSAGING_URL, `/messages/bulk/${enc(req.params.id)}/items` + qs(req), null))
+  v1.post<{ Params: { id: string } }>('/messages/bulk/:id/cancel', msgBulk, (req, reply) => proxy(req, reply, MESSAGING_URL, `/messages/bulk/${enc(req.params.id)}/cancel`, null))
+  v1.post<{ Params: { id: string } }>('/messages/bulk/:id/retry', msgBulk, (req, reply) => proxy(req, reply, MESSAGING_URL, `/messages/bulk/${enc(req.params.id)}/retry`, null))
   v1.get('/messages', { preHandler: need('messages:send', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/messages' + qs(req), null))
   v1.get<{ Params: { id: string } }>('/messages/:id', { preHandler: need('messages:send', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, `/messages/${req.params.id}`, null))
   // Templates = the templates library (the same records as the dashboard's Messaging → Templates):
@@ -149,7 +158,6 @@ app.register(async v1 => {
   // Slugs contain '/', so URL-encode them in paths (cart%2Fabandoned).
   const read = { preHandler: need('templates:read', 'messaging') }
   const write = { preHandler: need('templates:write', 'messaging') }
-  const enc = (slug: string) => encodeURIComponent(slug)
   v1.get('/templates', read, (req, reply) => proxy(req, reply, MESSAGING_URL, '/v2/templates' + qs(req), null))
   v1.get<{ Params: { channel: string; slug: string } }>('/templates/:channel/:slug', read, (req, reply) =>
     proxy(req, reply, MESSAGING_URL, `/v2/templates/${req.params.channel}/${enc(req.params.slug)}` + qs(req), null))
@@ -169,8 +177,17 @@ app.register(async v1 => {
   v1.post<{ Params: { type: string } }>('/documents/:type', { preHandler: need('documents:render', 'documents') }, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/${req.params.type}`, 'documents'))
   const docsRead = { preHandler: need('documents:read', 'documents') }
   v1.get('/documents', docsRead, (req, reply) => proxy(req, reply, DOCUMENTS_URL, '/documents' + qs(req), null))
+  const docsRender = { preHandler: need('documents:render', 'documents') }
+  const zipUrl = (req: FastifyRequest) => (j: any) => ({ ...j, zip_url: j.zip_url ? `${publicBase(req)}/v1${j.zip_url}` : undefined })
+  v1.post('/documents/bulk', { ...docsRender, bodyLimit: 10_000_000 }, (req, reply) => proxy(req, reply, DOCUMENTS_URL, '/documents/bulk', null, zipUrl(req)))
+  v1.get('/documents/bulk', docsRead, (req, reply) => proxy(req, reply, DOCUMENTS_URL, '/documents/bulk' + qs(req), null, b => ({ ...b, items: b.items.map(zipUrl(req)) })))
+  v1.get<{ Params: { id: string } }>('/documents/bulk/:id', docsRead, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/bulk/${enc(req.params.id)}`, null, zipUrl(req)))
+  v1.get<{ Params: { id: string } }>('/documents/bulk/:id/items', docsRead, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/bulk/${enc(req.params.id)}/items` + qs(req), null))
+  v1.get<{ Params: { id: string } }>('/documents/bulk/:id/zip', docsRead, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/bulk/${enc(req.params.id)}/zip`, null))
+  v1.post<{ Params: { id: string } }>('/documents/bulk/:id/cancel', docsRender, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/bulk/${enc(req.params.id)}/cancel`, null, zipUrl(req)))
+  v1.post<{ Params: { id: string } }>('/documents/bulk/:id/retry', docsRender, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/bulk/${enc(req.params.id)}/retry`, null, zipUrl(req)))
   v1.get('/documents/designs', docsRead, (req, reply) => proxy(req, reply, DOCUMENTS_URL, '/designs', null, b => ({
-    ...b, designs: b.designs.map((d: any) => ({ ...d, thumbnail_url: `${process.env.PUBLIC_API_URL || `${req.protocol}://${req.host}`}/v1/documents${d.thumbnail_url}` })),
+    ...b, designs: b.designs.map((d: any) => ({ ...d, thumbnail_url: `${publicBase(req)}/v1/documents${d.thumbnail_url}` })),
   })))
   v1.get<{ Params: { key: string; type: string } }>('/documents/designs/:key/preview/:type', docsRead, (req, reply) =>
     proxy(req, reply, DOCUMENTS_URL, `/designs/${encodeURIComponent(req.params.key)}/preview/${encodeURIComponent(req.params.type)}` + qs(req), null))

@@ -129,6 +129,45 @@ r.registerPath({
   responses: { 200: { description: 'Prices' } },
 })
 
+// ── bulk ──
+const Job = { 'application/json': { schema: C.BulkJob } }
+const jobId = z.object({ id: z.string().uuid() })
+const itemsQuery = z.object({ status: z.enum(['pending', 'running', 'done', 'failed', 'skipped']).optional(), cursor: z.string().optional(), limit: z.coerce.number().int().min(1).max(500).optional() })
+const BULK_HOW = 'Async: returns **202** with a job right away; a worker processes the items. Poll `GET …/bulk/{id}` until `status` is `completed`, `partial`, `failed` or `cancelled`, then page through `…/items`. Each item is charged like a single call. If the wallet runs out the job stops as `partial` (remaining items `skipped`); top up and `POST …/retry`. Send an `Idempotency-Key` so a retried POST does not create a second job.'
+r.registerPath({
+  method: 'post', path: '/v1/documents/bulk', tags: ['Bulk'], security: sec, summary: 'Render up to 1000 documents',
+  description: BULK_HOW + ' Documents are numbered in item order. When done, `zip_url` downloads every PDF as one ZIP.',
+  request: { body: { content: { 'application/json': { schema: C.BulkDocumentsRequest } } } },
+  responses: { 202: { description: 'Job created', content: Job }, ...err(400, 'Invalid items (details list each index)') },
+})
+r.registerPath({
+  method: 'post', path: '/v1/messages/bulk', tags: ['Bulk'], security: sec, summary: 'Send a template to up to 10 000 recipients',
+  description: BULK_HOW + ' Per-recipient `variables` are merged over the job-level ones. Each message carries `batch_id` = the job id (`GET /v1/messages?batch_id=…`).',
+  request: { body: { content: { 'application/json': { schema: C.BulkMessagesRequest } } } },
+  responses: { 202: { description: 'Job created', content: Job }, ...err(404, 'Template not found') },
+})
+for (const kind of ['documents', 'messages'] as const) {
+  const base = `/v1/${kind}/bulk`
+  r.registerPath({ method: 'get', path: base, tags: ['Bulk'], security: sec, summary: `List ${kind} bulk jobs`,
+    request: { query: z.object({ cursor: z.string().optional(), limit: z.coerce.number().int().min(1).max(100).optional() }) },
+    responses: { 200: { description: 'Jobs', content: { 'application/json': { schema: z.object({ items: z.array(C.BulkJob), next_cursor: z.string().nullable() }) } } } } })
+  r.registerPath({ method: 'get', path: `${base}/{id}`, tags: ['Bulk'], security: sec, summary: `Get a ${kind} bulk job (progress)`,
+    request: { params: jobId }, responses: { 200: { description: 'Job', content: Job }, ...err(404, 'Not found') } })
+  r.registerPath({ method: 'get', path: `${base}/{id}/items`, tags: ['Bulk'], security: sec, summary: `Per-item results`,
+    description: kind === 'documents' ? '`result` is the document (number, pdf_url, view_url …).' : '`result` is the message (status, charged_inr …).',
+    request: { params: jobId, query: itemsQuery },
+    responses: { 200: { description: 'Items', content: { 'application/json': { schema: z.object({ items: z.array(C.BulkItem), next_cursor: z.string().nullable() }) } } } } })
+  r.registerPath({ method: 'post', path: `${base}/{id}/cancel`, tags: ['Bulk'], security: sec, summary: 'Cancel (pending items are skipped)',
+    request: { params: jobId }, responses: { 200: { description: 'Job', content: Job } } })
+  r.registerPath({ method: 'post', path: `${base}/{id}/retry`, tags: ['Bulk'], security: sec, summary: 'Re-run failed and skipped items',
+    request: { params: jobId }, responses: { 200: { description: 'Job', content: Job } } })
+}
+r.registerPath({
+  method: 'get', path: '/v1/documents/bulk/{id}/zip', tags: ['Bulk'], security: sec, summary: 'Download all PDFs of a job as a ZIP',
+  request: { params: jobId },
+  responses: { 200: { description: 'ZIP', content: { 'application/zip': { schema: z.string().openapi({ format: 'binary' }) } } }, ...err(404, 'No documents yet') },
+})
+
 export function buildOpenApi() {
   return new OpenApiGeneratorV31(r.definitions).generateDocument({
     openapi: '3.1.0',
