@@ -10,10 +10,10 @@ export async function setTenantStatus(tenantId: string, status: string): Promise
 }
 
 /**
- * Reconciliation sweep: find tenants marked 'active' but whose infra is gone (rds_endpoint
- * NULL) — an inconsistent state where the resolver would route to a non-existent DB (or, if
- * infra is null, silently fall back to the platform DB). Flip them to 'suspended' so they
- * stop being served and surface for operator attention. Returns the affected tenant ids.
+ * Reconciliation sweep: find tenants marked 'active' whose provisioned DB is gone — a tenant_infra
+ * row with rds_endpoint NULL (what deprovision leaves behind). Flip them to 'suspended' so they stop
+ * being served and surface for operator attention. Tenants with no tenant_infra row at all are not
+ * orphans: the platform tenant lives in the flagship DB and never has one. Returns the affected ids.
  * Safe + idempotent; run periodically from the provisioning cron worker.
  */
 export async function reconcileOrphanedTenants(): Promise<string[]> {
@@ -21,9 +21,8 @@ export async function reconcileOrphanedTenants(): Promise<string[]> {
   const res = await pool.query(
     `UPDATE tenants t SET status='suspended', updated_at=now()
      WHERE t.status='active' AND 'store' = ANY(t.service_types)
-       AND t.id <> '00000000-0000-0000-0000-000000000000' -- platform tenant IS the flagship DB; no tenant_infra by design
-       AND NOT EXISTS (
-         SELECT 1 FROM tenant_infra i WHERE i.tenant_id = t.id AND i.rds_endpoint IS NOT NULL
+       AND EXISTS (
+         SELECT 1 FROM tenant_infra i WHERE i.tenant_id = t.id AND i.rds_endpoint IS NULL
        )
      RETURNING t.id`
   )
