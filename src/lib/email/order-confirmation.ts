@@ -161,6 +161,19 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
   const from = adminMailFrom()
   const brand = await currentBrandNameAsync()
   const subject = `New Order - ${order.order_number}`
+  const inr = (n: unknown) => `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const qtyText = (item: any) =>
+    item.buy_mode === 'weight' || item.buy_mode === 'length'
+      ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}`
+      : `${Math.round(Number(item.quantity))}${item.sold_unit && item.sold_unit !== 'unit' ? ` ${item.sold_unit}` : ''}`
+  const isCod = order.payment_mode === 'cod'
+  const paid = order.payment_status === 'paid' || order.payment_status === 'cod_collected'
+  const discount = Number(order.discount_amount || 0) + Number(order.business_discount_amount || 0)
+  const statusText = String(order.status || 'pending').replace(/_/g, ' ').toUpperCase()
+  const statusColor = order.status === 'cancelled' ? '#ef4444' : order.status === 'pending' ? '#d97706' : '#16a34a'
+  // payment_mode defaults to 'cash' for online (Razorpay) orders.
+  const modeLabel = isCod ? 'Cash on delivery' : order.payment_mode === 'upi_qr' ? 'UPI QR' : order.payment_mode === 'credit' ? 'On credit' : 'Online'
+  const paymentText = `${modeLabel} — ${paid ? (isCod ? 'collected' : 'paid') : String(order.payment_status || 'pending').replace(/_/g, ' ')}`
   const html = mailShell({
     brand,
     kicker: 'Admin Notification',
@@ -181,19 +194,17 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
         <h3>Order Information</h3>
         <p><strong>Order Number:</strong> ${order.order_number}</p>
         <p><strong>Order Date:</strong> ${new Date(order.created_at).toLocaleString('en-IN')}</p>
-        <p><strong>Status:</strong> PENDING</p>
+        <p><strong>Status:</strong> <span style="color: ${statusColor}; font-weight: bold;">${statusText}</span></p>
+        <p><strong>Payment:</strong> ${paymentText}</p>
         ${order.notes ? `<p><strong>Customer Notes:</strong> ${order.notes}</p>` : ''}
       </div>
 
       <h3>Order Items</h3>
-      <table class="rows">
+      <table class="rows" style="width: 100%; table-layout: fixed; border-collapse: collapse;">
         <thead>
           <tr>
-            <th>Product</th>
-            <th>SKU</th>
-            <th>Qty</th>
-            <th>Unit Price</th>
-            <th>Total</th>
+            <th style="width: 62%;">Item</th>
+            <th style="width: 38%; text-align: right;">Amount</th>
           </tr>
         </thead>
         <tbody>
@@ -201,25 +212,30 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
             .map(
               item => `
             <tr>
-              <td>${item.product_name}</td>
-              <td>${item.product_sku}</td>
-              <td>${item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</td>
-              <td>₹${item.unit_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-              <td>₹${item.total_price.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td style="word-break: break-word; overflow-wrap: anywhere;">
+                <strong>${item.product_name}</strong>
+                ${item.product_sku ? `<br><span style="font-size: 12px; color: #888;">SKU: ${item.product_sku}</span>` : ''}
+                <br><span style="font-size: 12px; color: #888;">${qtyText(item)} × ${inr(item.unit_price)}</span>
+              </td>
+              <td style="text-align: right; white-space: nowrap;">${inr(item.total_price)}</td>
             </tr>
           `
             )
             .join('')}
+          ${Number(order.subtotal) > 0 ? `<tr><td style="text-align: right; color: #666;">Subtotal</td><td style="text-align: right;">${inr(order.subtotal)}</td></tr>` : ''}
+          ${discount > 0 ? `<tr><td style="text-align: right; color: #666;">Discount</td><td style="text-align: right;">− ${inr(discount)}</td></tr>` : ''}
+          ${Number(order.shipping_amount) > 0 ? `<tr><td style="text-align: right; color: #666;">Shipping</td><td style="text-align: right;">${inr(order.shipping_amount)}</td></tr>` : ''}
+          ${Number(order.cod_fee_amount) > 0 ? `<tr><td style="text-align: right; color: #666;">COD fee</td><td style="text-align: right;">${inr(order.cod_fee_amount)}</td></tr>` : ''}
           <tr style="background-color: #fff3cd; font-weight: bold;">
-            <td colspan="4" style="text-align: right;">Total:</td>
-            <td>₹${order.total_amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td style="text-align: right;">Total</td>
+            <td style="text-align: right; white-space: nowrap;">${inr(order.total_amount)}</td>
           </tr>
         </tbody>
       </table>
 
-      <div class="warning">
-        <h4 style="margin-top: 0;">Action Required</h4>
-        <p>Please contact the customer within 24 hours to confirm the order and payment details.</p>
+      <div class="${paid ? 'success' : 'warning'}">
+        <h4 style="margin-top: 0;">${paid ? 'Ready to fulfil' : 'Action Required'}</h4>
+        <p>${paid ? 'Payment is received. Pack the items and create the shipment from the admin panel.' : isCod ? 'Cash on delivery — confirm the order with the customer before packing.' : 'Payment is not confirmed yet — check the payment and contact the customer within 24 hours.'}</p>
       </div>
 
       <div class="cta">
