@@ -13,6 +13,18 @@ import * as cashSale from './invoices/cash-sale'
 import * as einvoice from './invoices/einvoice'
 import * as orderInvoice from './invoices/order-invoice'
 import * as system from './invoices/system'
+import * as qList from './quotations/list'
+import * as qItem from './quotations/item'
+import * as qProducts from './quotations/products'
+import * as qPdf from './quotations/pdf'
+import * as qResend from './quotations/resend-email'
+import * as qConvert from './quotations/convert-to-invoice'
+import * as poList from './po/list'
+import * as poItem from './po/item'
+import * as poResend from './po/resend-email'
+import * as poDrafts from './po/drafts'
+import * as poDraft from './po/draft'
+import * as poUnit from './po/purchase-unit'
 
 // Same paths as the monolith's /api/admin/* so the Next proxy forwards 1:1.
 export async function adminRoutes(app: FastifyInstance) {
@@ -36,4 +48,27 @@ export async function adminRoutes(app: FastifyInstance) {
   mount(app, 'POST', '/orders/:id/invoice/draft', system.draft)
   mount(app, 'POST', '/orders/:id/invoice/number', system.number)
   mount(app, 'POST', '/orders/:id/invoice/generate', system.generate)
+
+  mount(app, 'GET', '/admin/quotations', qList.GET)
+  mount(app, 'POST', '/admin/quotations', qList.POST)
+  mount(app, 'GET', '/admin/quotations/products', qProducts.GET)
+  mount(app, 'GET', '/admin/quotations/:id', qItem.GET)
+  mount(app, 'PATCH', '/admin/quotations/:id', qItem.PATCH)
+  mount(app, 'DELETE', '/admin/quotations/:id', qItem.DELETE)
+  mount(app, 'GET', '/admin/quotations/:id/pdf', qPdf.GET)
+  mount(app, 'POST', '/admin/quotations/:id/resend-email', qResend.POST)
+  mount(app, 'POST', '/admin/quotations/:id/convert-to-invoice', qConvert.POST)
+
+  // GRN / receive stays in the monolith (inventory).
+  mount(app, 'GET', '/admin/inventory/po', poList.GET)
+  mount(app, 'POST', '/admin/inventory/po', poList.POST)
+  mount(app, 'GET', '/admin/inventory/po/purchase-unit', poUnit.GET)
+  mount(app, 'GET', '/admin/inventory/po/draft', poDrafts.GET)
+  mount(app, 'POST', '/admin/inventory/po/draft', poDrafts.POST)
+  mount(app, 'GET', '/admin/inventory/po/draft/:id', poDraft.GET)
+  mount(app, 'PATCH', '/admin/inventory/po/draft/:id', poDraft.PATCH)
+  mount(app, 'DELETE', '/admin/inventory/po/draft/:id', poDraft.DELETE)
+  mount(app, 'GET', '/admin/inventory/po/:id', poItem.GET)
+  mount(app, 'PATCH', '/admin/inventory/po/:id', poItem.PATCH)
+  mount(app, 'POST', '/admin/inventory/po/:id/resend-email', poResend.POST)
 }

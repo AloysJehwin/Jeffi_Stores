@@ -17,6 +17,7 @@ export class NextResponse {
 
 export interface NextRequest {
   url: string
+  nextUrl: URL
   method: string
   headers: Headers
   json(): Promise<any>
@@ -55,6 +56,7 @@ export function mount(app: FastifyInstance, method: HTTPMethods, path: string, h
       const base = `http://documents${req.url}`
       const shim: NextRequest = {
         url: base,
+        nextUrl: new URL(base),
         method: req.method,
         headers: new Headers(Object.entries(req.headers).filter(([, v]) => typeof v === 'string') as [string, string][]),
         json: async () => {
