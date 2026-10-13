@@ -47,7 +47,7 @@ app.addHook('onRequest', async (req, reply) => {
 app.setErrorHandler((err: any, _req, reply) => {
   if (err instanceof SendError) return reply.code(err.status).send({ error: err.code, message: err.message, details: err.details })
   if (err instanceof ZodError) return reply.code(400).send({ error: 'validation_error', message: 'Invalid request', details: err.issues })
-  if (err?.status) return reply.code(err.status).send({ error: 'request_error', message: err.message })
+  if (err?.status) return reply.code(err.status).send({ error: typeof err.code === 'string' && !err.code.startsWith('FST_') ? err.code : 'request_error', message: err.message })
   app.log.error(err)
   return reply.code(500).send({ error: 'internal_error', message: 'Something went wrong' })
 })
