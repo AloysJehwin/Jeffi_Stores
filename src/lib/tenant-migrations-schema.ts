@@ -44,7 +44,10 @@ export function buildTenantSchemaSql(): string {
   const built = guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(syncTableColumns(raw))))
   // Tenant-only cleanup: demote any pre-existing 'administrator' admin to 'super_admin' (the top of
   // the tenant hierarchy). Idempotent; only reaches tenant DBs because this build is the tenant blob.
-  return `${built}\n\n-- ==== tenant role cleanup (#488) ====\nUPDATE public.admins SET role = 'super_admin' WHERE role = 'administrator';`
+  // template_family is unique per (tenant, space, slug) now; the old per-(tenant, slug) key would stop a
+  // store copy and an API copy sharing a slug. The fan-out only adds constraints, so drop it here.
+  return `${built}\n\n-- ==== tenant role cleanup (#488) ====\nUPDATE public.admins SET role = 'super_admin' WHERE role = 'administrator';` +
+    `\n\n-- ==== template spaces ====\nALTER TABLE IF EXISTS public.template_family DROP CONSTRAINT IF EXISTS template_family_tenant_slug_key;`
 }
 
 export interface DesiredColumn {
