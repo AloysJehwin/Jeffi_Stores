@@ -94,6 +94,10 @@ export async function findBySlugWithDefaults(p: Pools, tenantId: string, channel
   return findBySlug(p.platform, PLATFORM_TENANT_ID, channel, slug, locale)
 }
 
+/** Body/subject of the version Meta approved (the one the live provider_ref points at). */
+export const liveVersion = (e: Executor, variantId: string, providerRef: string) =>
+  first<VersionRow>(e, `SELECT * FROM template_version WHERE variant_id=$1 AND provider_ref=$2 ORDER BY version DESC LIMIT 1`, [variantId, providerRef])
+
 export async function findBySlug(e: Executor, tenantId: string, channel: string, slug: string, locale = 'en'): Promise<FullTemplate | null> {
   const family = await first<FamilyRow>(e, `SELECT * FROM template_family WHERE tenant_id=$1 AND slug=$2`, [tenantId, slug])
   if (!family) return null
@@ -274,6 +278,8 @@ export const toApi = (t: FullTemplate) => ({
   provider_ref: t.variant?.provider_ref,
   approval_status: t.variant?.approval_status,
   approval_reason: t.variant?.approval_reason,
+  // Saved edit not yet submitted: customers keep receiving the approved (live) version.
+  needs_resubmission: t.template.channel === 'whatsapp' && !!t.variant?.provider_ref && !!t.version && !t.version.provider_ref,
   meta_category: t.variant?.meta_category,
   media_type: t.variant?.media_type,
   current_version: t.version ? {

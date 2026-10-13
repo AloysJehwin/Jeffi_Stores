@@ -5,7 +5,7 @@ import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import AdminSelect from '@/components/admin/AdminSelect'
 import EmojiPicker from './EmojiPicker'
 import { useToast } from '@/contexts/ToastContext'
-import { usePrompt } from '@/contexts/ConfirmContext'
+import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
 import { Smile, Link2, ImageIcon, Loader2, Upload, RefreshCw } from 'lucide-react'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
@@ -24,6 +24,7 @@ export type EditorTemplate = {
   media_type?: string | null
   approval_status?: string | null
   approval_reason?: string | null
+  needs_resubmission?: boolean
 }
 
 // messaging-service nests the published snapshot under current_version; the editor edits a flat shape.
@@ -34,6 +35,7 @@ export function toEditorTemplate(api: any): EditorTemplate {
     subject: v.subject ?? api.subject ?? '', body: v.body ?? api.body ?? '', blocks: v.blocks ?? api.blocks,
     blocks_format: v.blocks_format ?? api.blocks_format ?? null, meta_category: api.meta_category ?? null,
     media_type: api.media_type ?? null, approval_status: api.approval_status ?? null, approval_reason: api.approval_reason ?? null,
+    needs_resubmission: !!api.needs_resubmission,
   }
 }
 
@@ -52,7 +54,8 @@ type Props = {
   assetsBase?: string
   shortLinksBase?: string
   onChange: (t: EditorTemplate) => void
-  onSave: (publish: boolean) => Promise<void>
+  // Resolves to the saved template (a tenant's first save forks a standard one → new id), or null.
+  onSave: (publish: boolean) => Promise<EditorTemplate | null>
   saving?: boolean
 }
 
@@ -76,6 +79,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
   const [showEmoji, setShowEmoji] = useState(false)
   const { showToast } = useToast()
   const askText = usePrompt()
+  const confirm = useConfirm()
   const fileRef = useRef<HTMLInputElement | null>(null)
   const textRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -290,31 +294,40 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
           }
 
           async function onSubmitForApproval() {
-            if (!value.id) { showToast('Save the template first.', 'warning'); return }
-            const name = await askText({ title: 'Submit to Meta for approval', message: 'Template name submitted to Meta (lowercase, underscores only).', defaultValue: value.slug.replace(/[^a-z0-9_]/gi, '_').toLowerCase(), confirmLabel: 'Submit' })
-            if (!name) return
+            const ok = await confirm({
+              title: 'Submit to Meta for approval',
+              message: `"${value.name || value.slug}" (${(value.meta_category ?? 'UTILITY').toLowerCase()}) will be saved and sent to Meta for review — usually minutes, up to 24 hours.\n\nUntil it's approved, customers keep receiving the currently approved version.`,
+              confirmLabel: 'Save & submit',
+            })
+            if (!ok) return
             setSubmitting(true)
             try {
+              const saved = await onSave(true)
+              if (!saved?.id) return
               const r = await fetch(`${apiBase}/wa/submit-approval`, {
                 method: 'POST', headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ templateId: value.id, locale: 'en', name, category: value.meta_category ?? 'UTILITY' }),
+                body: JSON.stringify({ templateId: saved.id, category: saved.meta_category ?? 'UTILITY' }),
               })
               const data = await r.json().catch(() => ({}))
-              if (!r.ok) { showToast(data?.error || `Submit failed (HTTP ${r.status})`, 'error'); return }
-              onChange({ ...value, approval_status: data.status ?? 'pending' })
-              showToast('Submitted to Meta for approval.', 'success')
+              if (!r.ok) { showToast(data?.message || data?.error || `Submit failed (HTTP ${r.status})`, 'error'); return }
+              onChange({ ...saved, approval_status: data.status ?? 'pending', approval_reason: null, needs_resubmission: false })
+              showToast(`Submitted to Meta as ${data.name}. Status updates automatically.`, 'success')
             } finally { setSubmitting(false) }
           }
 
           async function onReCheckApproval() {
             setSubmitting(true)
             try {
-              const r = await fetch(`${apiBase}/wa/sync-approval`, {
-                method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
-              })
-              showToast(r.ok ? 'Approval status re-synced.' : `Re-sync failed (HTTP ${r.status})`, r.ok ? 'success' : 'error')
+              const r = await fetch(`${apiBase}/wa/sync-approval`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+              if (!r.ok) { showToast(`Re-check failed (HTTP ${r.status})`, 'error'); return }
+              const t = await fetch(`${apiBase}/${value.channel}/${encodeURIComponent(value.slug)}`).then(x => x.ok ? x.json() : null)
+              if (t) onChange(toEditorTemplate(t))
+              showToast('Approval status refreshed.', 'success')
             } finally { setSubmitting(false) }
           }
+
+          const vars = [...new Set([...(value.body || '').matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(m => m[1]))].sort((x, y) => +x - +y)
+          const samples = waBlocks.variables ?? {}
 
           return (
             <>
@@ -427,28 +440,52 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {value.approval_status && (
-                  <span className={`inline-block px-2 py-1 text-xs rounded ${
-                    value.approval_status === 'approved' ? 'bg-green-100 text-green-800'
-                    : value.approval_status === 'rejected' ? 'bg-red-100 text-red-800'
-                    : value.approval_status === 'paused' ? 'bg-orange-100 text-orange-800'
-                    : value.approval_status === 'disabled' ? 'bg-surface-secondary text-foreground-muted'
-                    : 'bg-yellow-100 text-yellow-800'
-                  }`}>Approval: {value.approval_status}</span>
-                )}
-                <button type="button" disabled={submitting || !value.id} className="px-3 py-1 text-xs border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={onSubmitForApproval}>
-                  {submitting ? '…' : 'Submit for approval'}
-                </button>
-                <button type="button" disabled={submitting} className="px-3 py-1 text-xs border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={onReCheckApproval}>
-                  Re-check
-                </button>
-              </div>
-              {value.approval_status === 'rejected' && value.approval_reason && (
-                <p className="text-xs text-red-700 bg-red-50 border border-border-default border-red-200 rounded p-2">
-                  <b>Meta rejection:</b> {value.approval_reason}
-                </p>
+              {vars.length > 0 && (
+                <div className="border border-border-default rounded-lg p-3 bg-surface-elevated">
+                  <div className="text-sm font-medium text-foreground mb-1">Sample values for Meta review</div>
+                  <p className="text-xs text-foreground-muted mb-2">Meta checks the template with these examples. They are never sent to customers.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {vars.map(v => (
+                      <label key={v} className="flex items-center gap-2 text-xs">
+                        <code className="shrink-0 text-foreground-secondary">{`{{${v}}}`}</code>
+                        <input
+                          className="w-full px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-xs"
+                          placeholder="Auto-filled if empty"
+                          value={samples[v] ?? ''}
+                          onChange={e => setBlocks({ variables: { ...samples, [v]: e.target.value } })}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
               )}
+
+              <div className="border border-border-default rounded-lg p-3 bg-surface-elevated space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-foreground mr-auto">Meta approval</span>
+                  <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${
+                    value.approval_status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                    : value.approval_status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                    : value.approval_status === 'pending' || value.approval_status === 'received' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                    : 'bg-surface-secondary text-foreground-muted'
+                  }`}>{value.approval_status === 'received' ? 'pending' : value.approval_status || 'unsubmitted'}</span>
+                  <button type="button" disabled={submitting || !value.slug} className={`${TOOL} text-xs`} onClick={onSubmitForApproval}>
+                    {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Save &amp; submit to Meta
+                  </button>
+                  <button type="button" disabled={submitting || !value.id} className={`${TOOL} text-xs`} onClick={onReCheckApproval}>
+                    <RefreshCw className="w-3.5 h-3.5" />Re-check
+                  </button>
+                </div>
+                {value.needs_resubmission && (
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300">You have saved changes Meta hasn&apos;t reviewed. Customers still receive the approved version until you submit and it&apos;s approved.</p>
+                )}
+                {(value.approval_status === 'pending' || value.approval_status === 'received') && (
+                  <p className="text-xs text-foreground-muted">Waiting for Meta — checked automatically every 10 minutes. Customers receive the previously approved version meanwhile.</p>
+                )}
+                {value.approval_status === 'rejected' && (
+                  <p className="text-xs text-red-700 dark:text-red-300"><b>Rejected by Meta:</b> {value.approval_reason || 'no reason given'}. Edit the text and submit again.</p>
+                )}
+              </div>
             </>
           )
         })()}

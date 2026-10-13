@@ -320,4 +320,10 @@ export const WA_APPROVED_SIDS: Record<string, string | undefined> = {
   'support/reply': process.env.TWILIO_WA_SUPPORT_REPLY_SID || 'HX16911ee6dd59658012abcc99d5a7d61a',
   'support/resolved': process.env.TWILIO_WA_SUPPORT_RESOLVED_SID || 'HXde26b207aff33bb29e4f420ac1f1f9fb',
   'support/ticket-created': process.env.TWILIO_WA_SUPPORT_TICKET_SID || 'HX3fee423887ba430b9d9c83f78ba6a2bb',
+  'invoice/ready': process.env.TWILIO_WA_INVOICE_READY_SID || 'HX8190dab45815a3982fbdffc62ebfe939',
+  'kyc/approved': process.env.TWILIO_WA_KYC_APPROVED_SID || 'HX345dfbff29607fa983667954fbd17216',
+  'order/payment-failed': process.env.TWILIO_WA_PAYMENT_FAILED_SID || 'HX922a612d50b8e65ce492467a3e0eb559',
+  'order/variant-change-requested': process.env.TWILIO_WA_VARIANT_CHANGE_SID || 'HX791373e155f17a7f08e22229a70f4cf5',
+  'quotation/ready': process.env.TWILIO_WA_QUOTATION_READY_SID || 'HX0266508008e76fea73cf1dffad37e25a',
+  'winback': process.env.TWILIO_WA_WINBACK_SID || 'HX8db8b7dfa4813c9c95ec9740e54c8dc5',
 }

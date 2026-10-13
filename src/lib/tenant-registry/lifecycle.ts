@@ -21,6 +21,7 @@ export async function reconcileOrphanedTenants(): Promise<string[]> {
   const res = await pool.query(
     `UPDATE tenants t SET status='suspended', updated_at=now()
      WHERE t.status='active' AND 'store' = ANY(t.service_types)
+       AND t.id <> '00000000-0000-0000-0000-000000000000' -- platform tenant IS the flagship DB; no tenant_infra by design
        AND NOT EXISTS (
          SELECT 1 FROM tenant_infra i WHERE i.tenant_id = t.id AND i.rds_endpoint IS NOT NULL
        )

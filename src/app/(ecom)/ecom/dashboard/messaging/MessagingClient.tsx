@@ -36,15 +36,21 @@ export default function MessagingClient() {
     setSelected({ slug: '', channel, name: '', subject: '', body: '', blocks_format: channel === 'email' ? 'tiptap' : channel === 'sms' ? 'sms-text' : 'wa-content' })
   }
 
-  async function save(publish: boolean) {
-    if (!selected) return
+  async function save(publish: boolean): Promise<EditorTemplate | null> {
+    if (!selected) return null
     setSaving(true)
     try {
       const url = selected.id ? `${API}/v2/templates/${selected.id}` : `${API}/v2/templates`
       const method = selected.id ? 'PUT' : 'POST'
       const r = await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...selected, publish }) })
-      if (r.ok) { setSelected(toEditorTemplate(await r.json())); await loadTpls(); showToast(publish ? 'Template published.' : 'Draft saved.', 'success') }
-      else showToast('Save failed', 'error')
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}))
+        showToast(`Save failed: ${err?.message || err?.error || r.status}`, 'error')
+        return null
+      }
+      const saved = toEditorTemplate(await r.json())
+      setSelected(saved); await loadTpls(); showToast(publish ? 'Template published.' : 'Draft saved.', 'success')
+      return saved
     } finally { setSaving(false) }
   }
 
