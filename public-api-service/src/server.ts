@@ -28,6 +28,19 @@ app.get('/healthz', async () => ({ ok: true, service: 'public-api' }))
 const openapi = buildOpenApi()
 app.get('/openapi.json', async () => openapi)
 await app.register(apiReference, { routePrefix: '/docs', configuration: { content: openapi, theme: 'kepler' } })
+// Scalar's /docs → /docs/ 301 bounces with Next's trailingSlash:false (which 308s /docs/ back
+// to /docs), creating an infinite redirect loop when served through the public.* Next rewrite.
+// Rewrite the redirect in place: serve /docs/'s HTML on /docs with a 200.
+app.addHook('onSend', async (req, reply, payload) => {
+  if (req.url === '/docs' && reply.statusCode === 301) {
+    const r = await app.inject({ method: 'GET', url: '/docs/' })
+    reply.code(200)
+    const ct = r.headers['content-type']
+    if (ct) reply.header('content-type', ct)
+    return r.payload
+  }
+  return payload
+})
 app.get('/', async (_req, reply) => reply.redirect('/docs'))
 app.get('/v1/pricing', async () => priceList())
 
