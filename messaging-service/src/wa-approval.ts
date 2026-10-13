@@ -23,6 +23,12 @@ function actions(buttons: Button[] | undefined) {
     : { type: 'PHONE_NUMBER', title: b.label.trim(), phone: b.value ?? '' })
 }
 
+/** {{n}} used outside the body: header media URL and URL-button suffixes (per-send image / link). */
+export function extraSlots(blocks: Blocks | null | undefined): string[] {
+  const b = blocks ?? {}
+  return placeholders([b.types?.['twilio/media']?.media?.[0] ?? '', ...(b.buttons ?? []).map(x => x.value ?? '')].join(' '))
+}
+
 /** One Twilio Content type built from what the editor stores. Body always comes from the saved body. */
 export function composeTypes(body: string, blocks: Blocks | null | undefined): Record<string, any> {
   const b = blocks ?? {}
@@ -53,6 +59,9 @@ export function validateForMeta(body: string, blocks: Blocks | null | undefined,
   const words = text.replace(PH, '').split(/\s+/).filter(Boolean).length
   if (vars.length && words < vars.length * 3) errs.push('Too many variables for the message length — add more text around them.')
   for (const v of vars) if (!samples[v]?.trim()) errs.push(`Add a sample value for {{${v}}}.`)
+  const extra = extraSlots(blocks)
+  extra.forEach((v, i) => { if (+v !== vars.length + i + 1) errs.push(`Image/button variables must continue the numbering after the body (expected {{${vars.length + i + 1}}}).`) })
+  for (const v of extra) if (!samples[v]?.trim()) errs.push(`Add a sample value for {{${v}}} (image path or link code).`)
   const all = [...(blocks?.buttons ?? []), ...(blocks?.carousel?.cards ?? []).flatMap(c => c.buttons ?? [])]
   if ((blocks?.buttons?.length ?? 0) > 3) errs.push('At most 3 buttons.')
   for (const btn of all) {
@@ -96,7 +105,7 @@ export async function submit(pool: pg.Pool, tenantId: string, tenantSlug: string
   if (t.version.provider_ref && ['pending', 'received', 'approved'].includes(t.variant.approval_status))
     throw Object.assign(new Error('This version is already submitted. Edit and save to submit a new version.'), { status: 409 })
   const blocks = (t.version.blocks ?? {}) as Blocks
-  const samples = samplesFor(t.version.body, blocks.variables)
+  const samples = { ...samplesFor(t.version.body, blocks.variables), ...Object.fromEntries(extraSlots(blocks).map(n => [n, blocks.variables?.[n] ?? ''])) }
   const errors = validateForMeta(t.version.body, blocks, samples)
   if (errors.length) throw Object.assign(new Error(errors.join(' ')), { status: 422, errors })
   const category = (opts.category ?? t.variant.meta_category ?? 'UTILITY') as 'MARKETING' | 'UTILITY' | 'AUTHENTICATION'

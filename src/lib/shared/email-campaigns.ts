@@ -513,6 +513,7 @@ async function sendLibraryMessaging(
   const { renderCampaignTemplate } = await import('@/lib/shared/automation-emails')
   const { sendCampaignSMS } = await import('@/lib/shared/sms')
   const { sendByTemplate } = await import('@/lib/shared/send-by-template')
+  const { fillActionSlots, plainSlug } = await import('@/lib/messaging/action-slots')
   const { renderBlocks } = await import('@/lib/templates/blocks')
 
   const [emailT, smsT, waT] = await Promise.all([
@@ -578,7 +579,9 @@ async function sendLibraryMessaging(
         const variables = Object.fromEntries(
           waSlots.map(n => [n, renderCampaignTemplate(channels.whatsapp!.vars![n], vars, registered, false)])
         )
-        const res = await sendByTemplate({ channel: 'whatsapp', slug: waT!.slug, to: r.phone, variables, reference: `messaging:${campaignId}` })
+        const extra = await fillActionSlots(waT!, { imageUrl: null, linkUrl: null })
+        Object.assign(variables, extra ?? {})
+        const res = await sendByTemplate({ channel: 'whatsapp', slug: extra ? waT!.slug : plainSlug(waT!.slug), to: r.phone, variables, reference: `messaging:${campaignId}` })
         const ok = res.status !== 'failed' && res.status !== 'skipped'
         await logSend(campaignId, 'whatsapp', r.phone, ok, ok ? undefined : res.error || res.status); tally(ok)
       }
