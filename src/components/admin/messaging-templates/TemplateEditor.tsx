@@ -455,14 +455,14 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                   {buttons.map((btn, i) => (
                     <div key={i} className="flex flex-wrap items-center gap-2 border border-border-default rounded-lg p-2 bg-surface-secondary">
                       <AdminSelect
-                        compact
+                        sm
                         className="w-36"
                         value={btn.type}
                         onChange={v => updateButton(i, { type: v as WaButton['type'], value: '' })}
                         options={[{ value: 'quick_reply', label: 'Quick reply' }, { value: 'url', label: 'Visit URL' }, { value: 'phone', label: 'Call phone' }]}
                       />
                       <input
-                        className="border border-border-default rounded-lg px-2 py-1 text-xs flex-1 min-w-[8rem]"
+                        className="field-sm border border-border-secondary rounded-lg bg-surface text-sm text-foreground flex-1 min-w-[8rem] focus:outline-none focus:ring-2 focus:ring-accent-500"
                         placeholder="Label (max 25 chars)"
                         maxLength={25}
                         value={btn.label}
@@ -470,7 +470,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                       />
                       {btn.type !== 'quick_reply' && (
                         <input
-                          className="border border-border-default rounded-lg px-2 py-1 text-xs flex-1 min-w-[10rem]"
+                          className="field-sm border border-border-secondary rounded-lg bg-surface text-sm text-foreground flex-1 min-w-[10rem] focus:outline-none focus:ring-2 focus:ring-accent-500"
                           placeholder={btn.type === 'url' ? 'https://… (or {{1}})' : '+911234567890'}
                           value={btn.value ?? ''}
                           onChange={e => updateButton(i, { value: e.target.value })}
