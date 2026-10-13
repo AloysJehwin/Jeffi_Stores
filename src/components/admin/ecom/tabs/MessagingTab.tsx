@@ -5,6 +5,7 @@ import { Check, Loader2, Plus, Search, X } from 'lucide-react'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 import PhonePreview from '@/components/admin/messaging-templates/PhonePreview'
 import { useToast } from '@/contexts/ToastContext'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 
 // Jeffi's controls over one customer's Messaging API templates: which standard templates they get,
 // whether they may edit, review of their changes, and editing their templates for them.
@@ -192,6 +193,7 @@ function ReviewCard({ row, onDecide }: { row: ReviewRow; onDecide: (r: ReviewRow
       {rejecting && (
         <div className="mb-4 flex gap-2">
           <input value={note} onChange={e => setNote(e.target.value)} placeholder="What should they change? (shown to the customer)" className="h-9 flex-1 rounded-lg border border-border-default bg-surface px-3 text-sm" />
+          <AIEnrichButton placement="inline" fieldLabel="Review note to the customer" value={note} onChange={setNote} scope="mailer:write" format="plain" maxLength={300} write context={`Jeffi is rejecting a customer's ${row.channel} template "${row.name}" (slug ${row.slug}). Proposed text: "${(row.proposed_body ?? '').replace(/<[^>]+>/g, ' ').slice(0, 300)}". Write a polite, specific one- or two-sentence note telling them what to change.`} />
           <button disabled={!note.trim()} className={`${btn} bg-red-600 text-white`} onClick={() => onDecide(row, 'rejected', note)}>Send</button>
         </div>
       )}

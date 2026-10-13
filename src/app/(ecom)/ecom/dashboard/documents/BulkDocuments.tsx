@@ -7,6 +7,7 @@ import { Card } from '../_components/Card'
 import BulkJobs, { type BulkItem } from '../_components/BulkJobs'
 import { fmt } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
+import AIEnrichButton, { ECOM_ENRICH_ENDPOINT } from '@/components/admin/AIEnrichButton'
 
 export interface Seller { name: string; gstin?: string; address?: string; phone?: string }
 type Row = Record<string, string>
@@ -127,7 +128,8 @@ export default function BulkDocuments({ seller, prices, balance }: { seller: Sel
             </div>
           </div>
           <label className="block text-xs text-foreground-muted">Job name
-            <input value={reference} onChange={e => setReference(e.target.value.slice(0, 120))} className="mt-1 block h-9 w-full max-w-sm rounded-lg border border-border-default bg-surface-elevated px-3 text-sm text-foreground" />
+            <div className="mt-1 flex max-w-sm items-center gap-2"><input value={reference} onChange={e => setReference(e.target.value.slice(0, 120))} className="block h-9 w-full rounded-lg border border-border-default bg-surface-elevated px-3 text-sm text-foreground" />
+              <AIEnrichButton placement="inline" fieldLabel="Bulk job name" value={reference} onChange={v => setReference(v.slice(0, 120))} scope="mailer:write" endpoint={ECOM_ENRICH_ENDPOINT} format="plain" maxLength={120} write context={`A short internal name for a bulk document render job (${parsed?.docs.length ?? 0} documents of type ${type}).`} /></div>
           </label>
           {parsed!.docs.length > 0 && (
             <div className="overflow-x-auto rounded-lg border border-border-default">

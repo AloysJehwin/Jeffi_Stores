@@ -12,6 +12,7 @@ import { Smile, Link2, ImageIcon, Loader2, Upload, RefreshCw } from 'lucide-reac
 import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
 import PhonePreview from './PhonePreview'
 import ApiCurlHint from './ApiCurlHint'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { emailPreviewDoc, emailBodyDoc, previewSubject } from '@/lib/templates/email-preview'
 import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
 
@@ -74,6 +75,8 @@ type Props = {
   variableNames?: string[]
   /** Extra line under the "Send via API" curl (e.g. which copy the API uses). */
   apiNote?: string
+  /** AI enrich endpoint — admin route by default; the ecom console passes its own. */
+  aiEndpoint?: string
 }
 
 const SMS_GSM_LIMIT = 160
@@ -88,7 +91,7 @@ type WaBlocks = {
   carousel?: { cards: WaCarouselCard[] }
 }
 
-export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave: rawSave, saving, embedded, campaignKind, variableNames, apiNote }: Props) {
+export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave: rawSave, saving, embedded, campaignKind, variableNames, apiNote, aiEndpoint }: Props) {
   const derived = campaignKind ?? (value.slug?.startsWith('campaign/') ? value.slug.slice('campaign/'.length) : null)
   const kind = isCampaignKind(derived) && value.channel !== 'whatsapp' ? derived : null
   const kindText = `${value.channel === 'email' ? value.subject ?? '' : ''}\n${value.body ?? ''}`
@@ -105,6 +108,16 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
     const human = (k: string) => k.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, c => c.toUpperCase())
     return names.length ? names.map(k => ({ key: k, label: human(k), description: 'Used by this template', sample: '', group: 'order' as const, builtIn: true, section: 'This template' })) : undefined
   }, [kind, variableNames, ownVars])
+  // Everything the AI may use as a merge variable in this template.
+  const aiVars = useMemo(() => [...new Set([...(variableNames ?? []), ...ownVars, ...(kind ? campaignVariables(kind, value.channel === 'whatsapp' ? 'whatsapp' : value.channel).map(v => v.key) : [])])], [variableNames, ownVars, kind, value.channel])
+  const ai = { scope: 'mailer:write' as const, endpoint: aiEndpoint, variables: aiVars, write: true, broadcast: !!kind || value.slug.startsWith('campaign/') || value.slug.startsWith('promo/') }
+  const aiCtx = `${value.channel} template "${value.name || value.slug}"${kind ? ` for the ${kind} campaign` : ''}.`
+  const aiLabel = ({ label, field, value: v, onChange: oc, format, maxLength, context }: { label: string; field: string; value: string; onChange: (s: string) => void; format: 'plain' | 'sms' | 'whatsapp' | 'html' | 'label' | 'subject'; maxLength?: number; context?: string }) => (
+    <div className="mb-1.5 flex items-center justify-between gap-2">
+      <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide">{label}</label>
+      <AIEnrichButton placement="inline" fieldLabel={field} value={v} onChange={oc} {...ai} format={format} maxLength={maxLength} context={context ?? aiCtx} />
+    </div>
+  )
   const [preview, setPreview] = useState<{ subject?: string | null; body?: string; missing?: string[]; renderedFor?: string } | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -239,7 +252,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
       <input ref={fileRef} type="file" accept="image/*" className="hidden" />
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Name</label>
+          {aiLabel({ label: "Name", field: "Template name", value: value.name, onChange: name => onChange({ ...value, name }), format: "plain", maxLength: 80, context: `A short human name for a ${value.channel} template with slug "${value.slug}". Body starts: "${(value.body ?? '').replace(/<[^>]+>/g, ' ').slice(0, 160)}"` })}
           <input
             className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
             value={value.name}
@@ -250,7 +263,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
         {value.channel === 'email' && (
           <>
             <div>
-              <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Subject</label>
+              {aiLabel({ label: "Subject", field: "Email subject", value: value.subject ?? '', onChange: subject => onChange({ ...value, subject }), format: "subject", context: `${aiCtx} Email text: "${(value.body ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 400)}"` })}
               <input
                 className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
                 value={value.subject ?? ''}
@@ -280,7 +293,8 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                   blocks={(value.blocks as any)?.blocks ?? []}
                   onChange={b => onChange({ ...value, blocks: { blocks: b }, body: renderBlocks(b), blocks_format: 'email-blocks' })}
                 />
-              ) : (
+              ) : (<>
+                <div className="mb-1.5 flex justify-end"><AIEnrichButton placement="inline" fieldLabel="Email body (HTML)" value={typeof value.body === 'string' ? value.body : ''} onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })} {...ai} format="html" context={`${aiCtx} Subject: "${value.subject ?? ''}". Keep the structure; a single call-to-action button linking to ${kind ? '{ctaUrl}' : '{storeUrl}'}.`} /></div>
                 <EmailComposer
                   value={typeof value.body === 'string' ? value.body : ''}
                   onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })}
@@ -288,7 +302,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                   ctaHref={kind ? '{ctaUrl}' : '{storeUrl}'}
                   extraVariables={composerVars}
                 />
-              )}
+              </>)}
               {kind && <div className="mt-2"><CampaignVariables kind={kind} channel="email" text={kindText} /></div>}
               <p className="mt-1 text-xs text-foreground-secondary">
                 Tokens like <code>{'{customer_first_name}'}</code> are replaced with the actual customer details when the email is sent.
@@ -299,7 +313,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
 
         {value.channel === 'sms' && (
           <div className="relative">
-            <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Body</label>
+            {aiLabel({ label: "Body", field: "SMS body", value: value.body, onChange: body => onChange({ ...value, body, blocks_format: 'sms-text' }), format: "sms" })}
             <textarea
               ref={textRef}
               className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm font-mono"
@@ -433,7 +447,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
               </div>
 
               <div className="relative">
-                <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Body (use {'{{1}}'}, {'{{2}}'} … placeholders)</label>
+                {aiLabel({ label: `Body (use {{1}}, {{2}} … placeholders)`, field: "WhatsApp body", value: value.body, onChange: body => onChange({ ...value, body, blocks_format: 'wa-content' }), format: "whatsapp" })}
                 <textarea
                   ref={textRef}
                   className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm font-mono"
@@ -461,6 +475,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                         onChange={v => updateButton(i, { type: v as WaButton['type'], value: '' })}
                         options={[{ value: 'quick_reply', label: 'Quick reply' }, { value: 'url', label: 'Visit URL' }, { value: 'phone', label: 'Call phone' }]}
                       />
+                      <AIEnrichButton placement="inline" fieldLabel="WhatsApp button label" value={btn.label} onChange={label => updateButton(i, { label })} {...ai} format="label" maxLength={25} context={`${aiCtx} Button type: ${btn.type}.`} />
                       <input
                         className="field-sm border border-border-secondary rounded-lg bg-surface text-sm text-foreground flex-1 min-w-[8rem] focus:outline-none focus:ring-2 focus:ring-accent-500"
                         placeholder="Label (max 25 chars)"
@@ -493,8 +508,8 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                     <div key={i} className="border border-border-default rounded-lg p-2 bg-surface-secondary relative">
                       <button type="button" className="absolute top-1 right-1 text-xs text-red-600 hover:underline" onClick={() => removeCard(i)}>remove</button>
                       <div className="text-xs text-foreground-secondary mb-1">Card {i + 1}</div>
-                      <input className="w-full border border-border-default rounded-lg px-2 py-1 text-sm mb-1" placeholder="Title" value={card.title ?? ''} onChange={e => updateCard(i, { title: e.target.value })} />
-                      <textarea className="w-full border border-border-default rounded-lg px-2 py-1 text-sm font-mono" rows={2} placeholder="Body — use {{1}}, {{2}} …" value={card.body ?? ''} onChange={e => updateCard(i, { body: e.target.value })} />
+                      <div className="flex items-center gap-1 mb-1"><input className="w-full border border-border-default rounded-lg px-2 py-1 text-sm" placeholder="Title" value={card.title ?? ''} onChange={e => updateCard(i, { title: e.target.value })} /><AIEnrichButton placement="inline" fieldLabel={`Carousel card ${i + 1} title`} value={card.title ?? ''} onChange={title => updateCard(i, { title })} {...ai} format="label" maxLength={60} /></div>
+                      <div className="flex items-start gap-1"><textarea className="w-full border border-border-default rounded-lg px-2 py-1 text-sm font-mono" rows={2} placeholder="Body — use {{1}}, {{2}} …" value={card.body ?? ''} onChange={e => updateCard(i, { body: e.target.value })} /><AIEnrichButton placement="inline" fieldLabel={`Carousel card ${i + 1} body`} value={card.body ?? ''} onChange={body => updateCard(i, { body })} {...ai} format="whatsapp" maxLength={160} /></div>
                       <div className="flex items-center gap-2 mt-1">
                         <button type="button" disabled={uploading} className={`${TOOL} text-xs`} onClick={() => onPickCardMedia(i)}>
                           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : card.media_url ? <RefreshCw className="w-3.5 h-3.5" /> : <ImageIcon className="w-3.5 h-3.5" />}

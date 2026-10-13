@@ -7,6 +7,7 @@ import { Card } from '../_components/Card'
 import BulkJobs, { Pill, type BulkItem } from '../_components/BulkJobs'
 import { fmt } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
+import AIEnrichButton, { ECOM_ENRICH_ENDPOINT } from '@/components/admin/AIEnrichButton'
 
 type Channel = 'email' | 'sms' | 'whatsapp'
 type Row = Record<string, string>
@@ -164,7 +165,8 @@ export default function BulkMessages({ prices, balance }: { prices: Record<strin
               {parsed!.missing.map(c => <span key={c} className="rounded-full bg-[#f6d5cc] px-2 py-0.5 text-[#8a2e1f]">missing: {c}</span>)}
             </div>
             <label className="block text-xs text-foreground-muted">Job name
-              <input value={reference} onChange={e => setReference(e.target.value.slice(0, 120))} className="mt-1 block h-9 w-full max-w-sm rounded-lg border border-border-default bg-surface-elevated px-3 text-sm text-foreground" />
+              <div className="mt-1 flex max-w-sm items-center gap-2"><input value={reference} onChange={e => setReference(e.target.value.slice(0, 120))} className="block h-9 w-full rounded-lg border border-border-default bg-surface-elevated px-3 text-sm text-foreground" />
+                <AIEnrichButton placement="inline" fieldLabel="Bulk send name" value={reference} onChange={v => setReference(v.slice(0, 120))} scope="mailer:write" endpoint={ECOM_ENRICH_ENDPOINT} format="plain" maxLength={120} write context={`A short internal name for a bulk message job (channel ${channel}, template ${tpl?.name ?? ''}).`} /></div>
             </label>
             {parsed!.errors.length > 0 && (
               <div className="rounded-lg bg-[#f6d5cc]/60 p-3 text-xs text-[#8a2e1f]">

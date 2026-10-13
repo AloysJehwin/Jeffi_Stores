@@ -9,6 +9,7 @@ import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
 import BulkMessages from './BulkMessages'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
+import { ECOM_ENRICH_ENDPOINT } from '@/components/admin/AIEnrichButton'
 
 interface ListItem { id: string; slug: string; channel: Channel; name: string; category?: string | null; approval_status?: string | null; source?: 'tenant' | 'platform'; review_status?: string | null }
 interface Msg { id: string; channel: string; to: string; template: string | null; status: string; price_inr: number; charged_inr: number; error: string | null; created_at: string }
@@ -271,6 +272,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                     onChange={setSelected}
                     onSave={save}
                     saving={saving}
+                    aiEndpoint={ECOM_ENRICH_ENDPOINT}
                   />
                   </fieldset>
                 </Card>
