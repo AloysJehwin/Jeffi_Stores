@@ -5,6 +5,7 @@ import { orderUrlByNumber } from '@/lib/shared/customer-links'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { getSmsProvider } from '@/lib/shared/messaging'
 import { messagingGateAllows } from '@/lib/shared/messaging/billing'
+import { sendByTemplate } from '@/lib/shared/send-by-template'
 
 // SMS send path. The provider (Twilio today, AWS later) is chosen per-tenant by the Site Controls
 // selector in src/lib/shared/messaging; this file owns the shared concerns: phone normalization,
@@ -137,10 +138,30 @@ export async function sendCampaignSMS(params: {
 
 // ── Notification templates ────────────────────────────────────────────────────
 
-// The order's own page on its store (or business portal), with the scheme so phones make it
-// tappable. Falls back to the store's order list if the number is unknown.
 async function orderLink(orderNumber: string): Promise<string> {
   return (await orderUrlByNumber(orderNumber)) ?? `${await storeBaseUrlAsync()}/account/orders`
+}
+
+// Each wrapper normalizes the phone, honors the kill switch, resolves store_name + any derived vars,
+// then dispatches via sendByTemplate. Message body lives in the templates library (seed slug shown).
+async function sendBySlug(
+  phone: string | null | undefined,
+  slug: string,
+  variables: Record<string, string | number>,
+  reference?: string
+): Promise<boolean> {
+  const normalized = normalizePhone(phone)
+  if (!normalized) return false
+  if (!(await smsChannelEnabled())) return false
+  const { name: store_name } = await storeSignature()
+  const res = await sendByTemplate({
+    channel: 'sms',
+    slug,
+    to: normalized,
+    variables: { store_name, ...variables },
+    reference,
+  })
+  return res.status !== 'failed' && res.status !== 'skipped'
 }
 
 export async function sendOrderConfirmedSMS(params: {
@@ -148,17 +169,12 @@ export async function sendOrderConfirmedSMS(params: {
   orderNumber: string
   total: number
 }): Promise<boolean> {
-  const amount = new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(params.total)
-  const { name: STORE_NAME } = await storeSignature()
-  return sendSMS(
-    params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} is confirmed! Total: ${amount}. Track it: ${await orderLink(params.orderNumber)}`,
-    'order_confirmed'
-  )
+  const total = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(params.total)
+  return sendBySlug(params.phone, 'order/confirmed', {
+    order_number: params.orderNumber,
+    total,
+    short_url: await orderLink(params.orderNumber),
+  })
 }
 
 export async function sendOrderShippedSMS(params: {
@@ -167,23 +183,19 @@ export async function sendOrderShippedSMS(params: {
   trackingId?: string | null
   courier?: string | null
 }): Promise<boolean> {
-  const tracking = params.trackingId ? ` Tracking: ${params.trackingId}.` : ''
-  const courier = params.courier ? ` via ${params.courier}` : ''
-  const { name: STORE_NAME } = await storeSignature()
-  return sendSMS(
-    params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} has been shipped${courier}!${tracking} Track it: ${await orderLink(params.orderNumber)}`,
-    'order_shipped'
-  )
+  return sendBySlug(params.phone, 'order/shipped', {
+    order_number: params.orderNumber,
+    courier: params.courier ?? '',
+    awb: params.trackingId ?? '',
+    short_url: await orderLink(params.orderNumber),
+  })
 }
 
 export async function sendOrderDeliveredSMS(params: { phone?: string | null; orderNumber: string }): Promise<boolean> {
-  const { name: STORE_NAME } = await storeSignature()
-  return sendSMS(
-    params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} has been delivered. Thank you for shopping with us! View your order: ${await orderLink(params.orderNumber)}`,
-    'order_delivered'
-  )
+  return sendBySlug(params.phone, 'order/delivered', {
+    order_number: params.orderNumber,
+    short_url: await orderLink(params.orderNumber),
+  })
 }
 
 export async function sendAccessGrantedSMS(params: {
@@ -191,12 +203,10 @@ export async function sendAccessGrantedSMS(params: {
   orderNumber: string
   vaultUrl: string
 }): Promise<boolean> {
-  const { name: STORE_NAME } = await storeSignature()
-  return sendSMS(
-    params.phone,
-    `${STORE_NAME}: Access granted for order ${params.orderNumber} — open your vault: ${params.vaultUrl}`,
-    'order_granted'
-  )
+  return sendBySlug(params.phone, 'order/access-granted', {
+    order_number: params.orderNumber,
+    vault_url: params.vaultUrl,
+  })
 }
 
 export async function sendOrderCancelledSMS(params: {
@@ -204,22 +214,18 @@ export async function sendOrderCancelledSMS(params: {
   orderNumber: string
   reason?: string | null
 }): Promise<boolean> {
-  const reason = params.reason ? ` Reason: ${params.reason}.` : ''
-  const { name: STORE_NAME } = await storeSignature()
-  return sendSMS(
-    params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} has been cancelled.${reason} Details: ${await orderLink(params.orderNumber)}`,
-    'order_cancelled'
-  )
+  return sendBySlug(params.phone, 'order/cancelled', {
+    order_number: params.orderNumber,
+    refund_amount: '',
+    reason: params.reason ?? '',
+  })
 }
 
 export async function sendOTPSMS(params: { phone?: string | null; otp: string }): Promise<boolean> {
-  const { name: STORE_NAME } = await storeSignature()
-  return sendSMS(
-    params.phone,
-    `${STORE_NAME}: Your OTP is ${params.otp}. Valid for 10 minutes. Do not share this with anyone.`,
-    'otp'
-  )
+  return sendBySlug(params.phone, 'otp/verify', {
+    code: params.otp,
+    ttl_minutes: 10,
+  })
 }
 
 export async function sendVariantChangeRequestedSMS(params: {
@@ -227,28 +233,22 @@ export async function sendVariantChangeRequestedSMS(params: {
   orderNumber: string
   orderUrl: string
 }): Promise<boolean> {
-  const { name: STORE_NAME } = await storeSignature()
-  return sendSMS(
-    params.phone,
-    `${STORE_NAME}: Order ${params.orderNumber} needs your approval for a variant change. Review & confirm: ${params.orderUrl}`,
-    'variant_change_requested'
-  )
+  return sendBySlug(params.phone, 'order/variant-change-requested', {
+    order_number: params.orderNumber,
+    order_url: params.orderUrl,
+  })
 }
 
 export async function sendPaymentFailedSMS(params: { phone?: string | null; orderNumber: string }): Promise<boolean> {
-  const { name: STORE_NAME } = await storeSignature()
-  return sendSMS(
-    params.phone,
-    `${STORE_NAME}: Payment for order ${params.orderNumber} failed. Retry it here: ${await orderLink(params.orderNumber)}`,
-    'payment_failed'
-  )
+  return sendBySlug(params.phone, 'order/payment-failed', {
+    order_number: params.orderNumber,
+    short_url: await orderLink(params.orderNumber),
+  })
 }
 
 export async function sendOutForDeliverySMS(params: { phone?: string | null; orderNumber: string }): Promise<boolean> {
-  const { name: STORE_NAME } = await storeSignature()
-  return sendSMS(
-    params.phone,
-    `${STORE_NAME}: Great news! Your order ${params.orderNumber} is out for delivery today. Please be available.`,
-    'out_for_delivery'
-  )
+  return sendBySlug(params.phone, 'order/out-for-delivery', {
+    order_number: params.orderNumber,
+    customer_phone: '',
+  })
 }
