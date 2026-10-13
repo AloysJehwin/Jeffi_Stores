@@ -26,8 +26,8 @@ export const MAIL_BASE_CSS = `
   .cta { text-align: center; margin: 30px 0; }
   .muted { color: #666; font-size: 13px; }
   .mono { font-family: 'SFMono-Regular', Consolas, Menlo, monospace; }
-  table.rows { width: 100%; border-collapse: collapse; background-color: white; border-radius: 8px; }
-  table.rows th, table.rows td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  table.rows { width: 100%; border-collapse: collapse; background-color: white; border-radius: 8px; table-layout: fixed; }
+  table.rows th, table.rows td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; word-break: break-word; overflow-wrap: anywhere; }
   table.rows th { color: #555; font-weight: bold; }
   .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 14px; }
   .footer p { margin: 2px 0; }
