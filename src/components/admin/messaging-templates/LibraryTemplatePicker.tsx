@@ -33,8 +33,8 @@ export default function LibraryTemplatePicker({
   kind?: string | null
   allowNone?: boolean
   noneLabel?: string
-  /** Variable names the caller can fill; others are flagged as "will be blank". */
-  supplied?: Iterable<string>
+  /** Variable names the caller can fill (or a predicate); others are flagged as "will be blank". */
+  supplied?: Iterable<string> | ((name: string) => boolean)
   onLoaded?: (t: PickedTemplate | null) => void
 }) {
   const host = useAdminHost()
@@ -88,8 +88,8 @@ export default function LibraryTemplatePicker({
 
   const unfilled = useMemo(() => {
     if (!picked || !supplied) return []
-    const ok = new Set(supplied)
-    return picked.variables.filter(v => !/^\d+$/.test(v) && !ok.has(v))
+    const ok = typeof supplied === 'function' ? supplied : (n: string) => new Set(supplied).has(n)
+    return picked.variables.filter(v => !/^\d+$/.test(v) && !ok(v))
   }, [picked, supplied])
 
   if (items === null) return <div className="h-10 rounded-lg bg-surface-secondary animate-pulse" />

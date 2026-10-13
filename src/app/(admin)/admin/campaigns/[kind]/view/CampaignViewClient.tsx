@@ -48,6 +48,7 @@ interface ViewCampaign extends CampaignRow {
   blocks?: EmailBlock[] | null
   sms_template?: string | null
   wa_template_sid?: string | null
+  wa_template_slug?: string | null
   wa_variables?: Record<string, string> | null
   wa_header_image_url?: string | null
   parameters?: Record<string, unknown> | null
@@ -98,7 +99,7 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
   const previewDoc = renderVars(renderLayoutPreview(c.template_layout, renderVars(bodySource, vars)), vars)
   const smsPreview = c.sms_template ? renderVars(c.sms_template, vars) : ''
   const layoutLabel = EMAIL_LAYOUT_OPTIONS.find(l => l.key === c.template_layout)?.label ?? 'Classic'
-  const waEnabled = campaignSupportsWhatsApp(kind) && !!c.parameters?.whatsappEnabled && !!c.wa_template_sid
+  const waEnabled = campaignSupportsWhatsApp(kind) && !!c.parameters?.whatsappEnabled && !!c.wa_template_slug
 
   return (
     <div className="space-y-5">
@@ -182,14 +183,7 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
           {waEnabled && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
               <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">WhatsApp</h3>
-              <WhatsAppPreview
-                value={{
-                  key: c.wa_template_sid ?? null,
-                  variables: c.wa_variables ?? {},
-                  headerImageUrl: c.wa_header_image_url ?? '',
-                }}
-                vars={vars}
-              />
+              <WhatsAppPreview value={{ slug: c.wa_template_slug ?? null, variables: c.wa_variables ?? {} }} vars={vars} />
             </div>
           )}
         </div>
