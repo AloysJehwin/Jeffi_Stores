@@ -95,3 +95,40 @@ export async function sendBusinessInvoiceGeneratedEmail(toEmail: string, name: s
     <div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>`)
   return send(toEmail, `Invoice ${invoiceNumber} — ${brand}`, html, 'business_invoice_generated', { invoiceNumber, orderNumber, totalAmount })
 }
+
+export async function sendPOReceiveNotificationEmail(
+  toEmail: string, contactName: string, supplierName: string, poNumber: string, grnNumber: string, newStatus: string,
+  items: Array<{ product_name: string; variant_name?: string | null; quantity_received: number; unit_cost: number }>
+): Promise<Result> {
+  const statusLabel = newStatus === 'received' ? 'Fully Received' : 'Partially Received'
+  const rows = items.map(it => `<tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${it.product_name}${it.variant_name ? ` / ${it.variant_name}` : ''}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">${it.quantity_received}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right">₹${inr(it.unit_cost)}</td></tr>`).join('')
+  const { html } = await shell('Purchase Order', 'Goods Receipt Confirmation', `
+    <p>Dear ${contactName || supplierName},</p>
+    <p>We have recorded receipt of goods against your purchase order.</p>
+    <div class="success">
+      <p style="margin:0 0 6px"><strong>PO Number:</strong> ${poNumber}</p>
+      <p style="margin:0 0 6px"><strong>GRN Number:</strong> ${grnNumber}</p>
+      <p style="margin:0"><strong>Status:</strong> ${statusLabel}</p>
+    </div>
+    <table class="rows"><thead><tr><th>Product</th><th style="text-align:right">Qty Received</th><th style="text-align:right">Unit Cost</th></tr></thead><tbody>${rows}</tbody></table>
+    <p style="margin-top:20px">Thank you for your supply.</p>`)
+  return send(toEmail, `Goods Receipt Confirmation — PO ${poNumber} (${statusLabel})`, html, 'po_receive', { poNumber, grnNumber, newStatus, supplierName })
+}
+
+export async function sendRfqConvertedToQuotationEmail(toEmail: string, name: string, rfqNumber: string, quoteNumber: string, totalAmount: number, viewUrl: string): Promise<Result> {
+  const brand = await currentBrandNameAsync()
+  const contact = await storeContactLine()
+  const html = mailShell({ brand, kicker: 'Business Portal', title: `Quotation ${quoteNumber} ready`, content: `
+    <p>Dear ${name},</p>
+    <p>Your RFQ <strong>${rfqNumber}</strong> has been reviewed and a quotation has been prepared for you.</p>
+    <div class="info">
+      <p style="margin:0 0 6px"><strong>Quotation No.:</strong> ${quoteNumber}</p>
+      <p style="margin:0"><strong>Total Amount:</strong> ₹${inr(totalAmount)}</p>
+    </div>
+    <div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Quotation</a></div>
+    <p>Please review the quotation. If you have any questions, just reply to this email.</p>`, footerLines: [contact] })
+  return send(toEmail, `Quotation ${quoteNumber} ready — ${brand}`, html, 'rfq_converted_to_quotation', { rfqNumber, quoteNumber, totalAmount })
+}
