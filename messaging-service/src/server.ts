@@ -9,7 +9,14 @@ import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
 import { sendMessage, getMessage, toApi as msgToApi, SendError, type MessageRow } from './send.js'
 import { listTemplates, upsertTemplate, archiveTemplate, toApi as tplToApi } from './templates.js'
+import * as tpl from './templates-v2.js'
+import { CATALOG, WA_APPROVED_SIDS } from '../seed/catalog.js'
+import * as twContent from './providers/twilio-content.js'
 import { priceUsd } from './providers/twilio.js'
+import { lookupTenantContextById } from '@jeffi/tenancy'
+import { tenantPool } from '@jeffi/tenancy'
+import { render as renderVars, missingKeys } from './render.js'
+import { randomBytes } from 'node:crypto'
 
 export const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' } })
 await app.register(formbody)
@@ -22,7 +29,7 @@ declare module 'fastify' {
 
 // Every non-webhook route needs a gateway-issued service token.
 app.addHook('onRequest', async (req, reply) => {
-  if (req.url.startsWith('/webhooks') || req.url === '/healthz') return
+  if (req.url.startsWith('/webhooks') || req.url.startsWith('/s/') || req.url === '/healthz') return
   const claims = verifyServiceToken(bearer(req as FastifyRequest))
   if (!claims) return reply.code(401).send({ error: 'unauthorized', message: 'Missing or invalid service token' })
   req.claims = claims
@@ -102,6 +109,197 @@ app.delete<{ Params: { channel: string; slug: string } }>('/templates/:channel/:
   const n = await archiveTemplate(req.claims.tenantId, Channel.parse(req.params.channel), req.params.slug)
   if (!n) return reply.code(404).send({ error: 'not_found', message: 'Template not found' })
   return { ok: true }
+})
+
+// ── templates v2 (three-level: family → template → variant → version) ──
+
+async function poolFor(req: FastifyRequest) {
+  const ctx = await lookupTenantContextById(req.claims.tenantId)
+  if (!ctx) throw Object.assign(new Error('Tenant not found'), { status: 404 })
+  return { ctx, pool: tenantPool(ctx) }
+}
+
+app.get<{ Params: { channel: string; slug: string }; Querystring: { locale?: string } }>(
+  '/v2/templates/:channel/:slug',
+  async (req, reply) => {
+    const { pool } = await poolFor(req)
+    const t = await tpl.findBySlug(pool, req.claims.tenantId, Channel.parse(req.params.channel), req.params.slug, req.query.locale ?? 'en')
+    if (!t) return reply.code(404).send({ error: 'not_found' })
+    return tpl.toApi(t)
+  }
+)
+
+app.get<{ Params: { id: string } }>('/v2/templates/:id/versions', async req => {
+  const { pool } = await poolFor(req)
+  const t = await tpl.findById(pool, req.claims.tenantId, req.params.id)
+  if (!t?.variant) return { items: [] }
+  return { items: await tpl.listVersions(pool, t.variant.id) }
+})
+
+app.post('/v2/templates', async req => {
+  const { pool } = await poolFor(req)
+  return tpl.toApi(await tpl.upsertTemplate(pool, req.claims.tenantId, req.body as tpl.UpsertInput))
+})
+
+app.put<{ Params: { id: string } }>('/v2/templates/:id', async (req, reply) => {
+  const { pool } = await poolFor(req)
+  const existing = await tpl.findById(pool, req.claims.tenantId, req.params.id)
+  if (!existing) return reply.code(404).send({ error: 'not_found' })
+  const input: tpl.UpsertInput = {
+    ...(req.body as any),
+    slug: existing.family.slug,
+    channel: existing.template.channel as any,
+    name: (req.body as any).name ?? existing.family.name,
+  }
+  return tpl.toApi(await tpl.upsertTemplate(pool, req.claims.tenantId, input))
+})
+
+app.post<{ Params: { id: string }; Body: { versionId: string } }>(
+  '/v2/templates/:id/publish',
+  async (req, reply) => {
+    const { pool } = await poolFor(req)
+    const t = await tpl.findById(pool, req.claims.tenantId, req.params.id)
+    if (!t?.variant) return reply.code(404).send({ error: 'not_found' })
+    const ok = await tpl.publishVersion(pool, req.claims.tenantId, t.variant.id, req.body.versionId)
+    if (!ok) return reply.code(404).send({ error: 'version_not_found' })
+    return { ok: true }
+  }
+)
+
+app.post<{ Body: { channel: string; slug: string; locale?: string; versionId?: string; variables?: Record<string, any> } }>(
+  '/v2/templates/preview',
+  async (req, reply) => {
+    const { pool } = await poolFor(req)
+    const t = await tpl.findBySlug(pool, req.claims.tenantId, req.body.channel, req.body.slug, req.body.locale ?? 'en')
+    if (!t?.version) return reply.code(404).send({ error: 'not_found' })
+    const vars = req.body.variables ?? {}
+    const subject = t.version.subject ? renderVars(t.version.subject, vars) : null
+    const body = renderVars(t.version.body, vars, t.template.channel === 'email')
+    const missing = [...new Set([
+      ...missingKeys(t.version.subject ?? '', vars),
+      ...missingKeys(t.version.body, vars),
+    ])]
+    return { channel: t.template.channel, subject, body, missing }
+  }
+)
+
+app.post<{ Body: { channel: string; subject?: string; body: string; variables?: Record<string, any> } }>(
+  '/v2/templates/validate',
+  async req => {
+    const b = req.body
+    const vars = b.variables ?? {}
+    const missing = [...new Set([...missingKeys(b.subject ?? '', vars), ...missingKeys(b.body, vars)])]
+    const warnings: string[] = []
+    if (b.channel === 'sms') {
+      const hasEmoji = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(b.body)
+      const limit = hasEmoji ? 70 : 160
+      const segments = Math.max(1, Math.ceil(b.body.length / limit))
+      if (segments > 1) warnings.push(`SMS will send as ${segments} segments (${hasEmoji ? 'UCS-2' : 'GSM-7'} ${b.body.length}/${limit}).`)
+    }
+    return { ok: missing.length === 0, missing, warnings }
+  }
+)
+
+// Short-link shortener (first-party, lives in messaging-service).
+app.post<{ Body: { destination_url: string; kind?: string; variant_id?: string; expires_at?: string } }>(
+  '/short-links',
+  async req => {
+    const { pool } = await poolFor(req)
+    const code = randomBytes(6).toString('base64url').slice(0, 8)
+    await pool.query(
+      `INSERT INTO short_link (code, tenant_id, variant_id, destination_url, kind, expires_at)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [code, req.claims.tenantId, req.body.variant_id ?? null, req.body.destination_url, req.body.kind ?? 'page', req.body.expires_at ?? null]
+    )
+    return { code, url: `${process.env.SHORT_LINK_BASE || 'https://img.jeffistores.in'}/${code}` }
+  }
+)
+
+app.get<{ Params: { code: string } }>('/s/:code', { config: { skipAuth: true } }, async (req, reply) => {
+  // Public, no auth. onRequest hook skips /s/* via url prefix check — see below.
+  const row = (await db.query<{ destination_url: string; tenant_id: string }>(
+    `SELECT destination_url, tenant_id FROM short_link WHERE code=$1 AND (expires_at IS NULL OR expires_at > now())`,
+    [req.params.code]
+  )).rows[0]
+  if (!row) return reply.code(404).send({ error: 'not_found' })
+  // Fire-and-forget click increment.
+  db.query(`UPDATE short_link SET click_count=click_count+1 WHERE code=$1`, [req.params.code]).catch(() => {})
+  return reply.redirect(row.destination_url, 302)
+})
+
+// WhatsApp approval wiring (Twilio Content API).
+app.post<{ Body: { templateId: string; locale?: string; name: string; category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION' } }>(
+  '/wa/submit-approval',
+  async (req, reply) => {
+    const { pool } = await poolFor(req)
+    const t = await tpl.findById(pool, req.claims.tenantId, req.body.templateId)
+    if (!t?.variant || !t.version) return reply.code(404).send({ error: 'not_found' })
+    if (t.template.channel !== 'whatsapp') return reply.code(400).send({ error: 'not_whatsapp' })
+    const content = await twContent.createContent({
+      friendly_name: `${t.family.slug}:${t.variant.locale}`,
+      language: t.variant.locale,
+      types: (t.version.blocks as any)?.types ?? { 'twilio/text': { body: t.version.body } },
+      variables: (t.version.blocks as any)?.variables ?? {},
+    })
+    const approval = await twContent.submitForApproval(content.sid, {
+      name: req.body.name, category: req.body.category, allow_category_change: true,
+    })
+    await pool.query(
+      `UPDATE template_variant SET provider_ref=$2, meta_category=$3,
+         approval_status=$4, approval_raw_status=$5, approval_submitted_at=now(), approval_checked_at=now()
+       WHERE id=$1`,
+      [t.variant.id, content.sid, req.body.category, twContent.mapApprovalStatus(approval.status), approval.status]
+    )
+    return { sid: content.sid, status: twContent.mapApprovalStatus(approval.status) }
+  }
+)
+
+app.post('/wa/sync-approval', async req => {
+  const { pool } = await poolFor(req)
+  const variants = await pool.query<{ id: string; provider_ref: string }>(
+    `SELECT id, provider_ref FROM template_variant
+      WHERE tenant_id=$1 AND provider_ref IS NOT NULL
+        AND approval_status NOT IN ('approved','rejected','disabled')`,
+    [req.claims.tenantId]
+  )
+  let checked = 0, changed = 0
+  for (const v of variants.rows) {
+    try {
+      const res = await twContent.getApprovalStatus(v.provider_ref)
+      const next = twContent.mapApprovalStatus(res.whatsapp?.status)
+      const now = new Date()
+      await tpl.setApprovalStatus(pool, v.id, {
+        status: next,
+        raw: res.whatsapp?.status ?? null,
+        reason: res.whatsapp?.rejection_reason ?? null,
+        approvedAt: next === 'approved' ? now : null,
+      })
+      checked++
+      if (next === 'approved' || next === 'rejected') changed++
+    } catch (e: any) {
+      app.log.warn({ err: e, variantId: v.id }, 'wa sync failed')
+    }
+  }
+  return { checked, changed }
+})
+
+// Bulk-copy the seed catalog into the caller's tenant. Idempotent per slug+channel.
+app.post<{ Querystring: { force?: string } }>('/system-templates/install', async req => {
+  if (!req.claims.internal) throw Object.assign(new Error('internal only'), { status: 403 })
+  const { pool } = await poolFor(req)
+  let created = 0, skipped = 0
+  for (const seed of CATALOG) {
+    const existing = await tpl.findBySlug(pool, req.claims.tenantId, seed.channel, seed.slug, seed.locale ?? 'en')
+    if (existing && req.query.force !== '1') { skipped++; continue }
+    const providerRef = seed.channel === 'whatsapp' ? WA_APPROVED_SIDS[seed.slug] : undefined
+    await tpl.upsertTemplate(pool, req.claims.tenantId, {
+      ...seed,
+      provider_ref: providerRef ?? seed.provider_ref,
+      publish: true,
+    })
+    created++
+  }
+  return { created, skipped, total: CATALOG.length }
 })
 
 // ── webhooks ──
