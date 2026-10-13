@@ -50,3 +50,9 @@ export async function storeAddressLine(): Promise<string> {
   const rows = await queryMany<{ value: string }>(`SELECT value FROM site_settings WHERE key = 'business_address'`).catch(() => [])
   return rows[0]?.value?.trim() || ''
 }
+
+export async function storeOrigin(): Promise<{ city: string; state: string }> {
+  const rows = await queryMany<{ key: string; value: string }>(`SELECT key, value FROM site_settings WHERE key IN ('business_city', 'business_state')`).catch(() => [])
+  const m = Object.fromEntries(rows.map(r => [r.key, (r.value || '').trim()]))
+  return { city: m.business_city || '', state: m.business_state || '' }
+}

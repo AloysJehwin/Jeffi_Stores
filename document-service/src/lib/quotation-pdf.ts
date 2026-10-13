@@ -134,7 +134,7 @@ export async function generateQuotationPDF(
 ): Promise<Buffer> {
   const logoBuf = await tenantLogoBuffer()
   return new Promise((resolve, reject) => {
-    const fontsDir = path.join(process.cwd(), 'public', 'fonts')
+    const fontsDir = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'fonts')
     const F = path.join(fontsDir, 'NotoSans-Regular.ttf')
     const FB = path.join(fontsDir, 'NotoSans-Bold.ttf')
     const FI = path.join(fontsDir, 'NotoSans-Italic.ttf')
