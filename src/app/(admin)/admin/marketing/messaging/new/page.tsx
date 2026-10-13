@@ -316,7 +316,7 @@ export default function NewMessagePage() {
       const res = await fetch('/api/admin/ai-generate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario: scenarioPrompt, subject }),
+        body: JSON.stringify({ scenario: scenarioPrompt, subject, variables: fields }),
       })
       const data = (await res.json()) as { html?: string; error?: string }
       if (!res.ok || !data.html) return setScenarioError(data.error || 'Generation failed')
