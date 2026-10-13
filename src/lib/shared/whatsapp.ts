@@ -39,38 +39,6 @@ async function sendBySlug(
   return res.status !== 'failed' && res.status !== 'skipped'
 }
 
-// Campaign-chosen approved template (direct SID path, bypasses slug library).
-export async function sendCampaignTemplateWhatsApp(params: {
-  phone?: string | null
-  sidEnvVar: string
-  variables: Record<string, string>
-  headerImageUrl?: string | null
-  imageSlot?: number | null
-  kind: string
-  entity?: { entityType?: string; entityId?: string }
-}): Promise<boolean> {
-  const contentSid = process.env[params.sidEnvVar] || ''
-  if (!contentSid) return false
-  const normalized = normalizePhone(params.phone)
-  if (!normalized) return false
-  if (!(await whatsappChannelEnabled())) return false
-  if (!(await messagingGateAllows('whatsapp', true))) return false
-  const vars: Record<string, string> = { ...params.variables }
-  if (params.headerImageUrl && params.imageSlot != null) vars[String(params.imageSlot)] = params.headerImageUrl
-  const provider = await getWhatsAppProvider()
-  if (!provider.configured) return false
-  const summary = `WhatsApp: ${params.kind}`
-  try {
-    const sid = await provider.sendTemplate(normalized, contentSid, vars)
-    debitMessageEstimate({ channel: 'whatsapp', providerSid: sid }).catch(() => {})
-    logMessage({ channel: 'whatsapp', to: normalized, from: provider.from, body: summary, kind: params.kind, status: 'sent', providerSid: sid, entityType: params.entity?.entityType, entityId: params.entity?.entityId, provider: provider.name, price: estimateFor('whatsapp'), deliveryStatus: 'estimated' })
-    return true
-  } catch (err: any) {
-    logMessage({ channel: 'whatsapp', to: normalized, from: provider.from, body: summary, kind: params.kind, status: 'failed', error: err?.message, entityType: params.entity?.entityType, entityId: params.entity?.entityId, provider: provider.name })
-    return false
-  }
-}
-
 export async function sendOTPWhatsApp(p: { phone?: string | null; otp: string }): Promise<boolean> {
   return sendBySlug(p.phone, 'otp/verify', { '1': p.otp })
 }

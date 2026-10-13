@@ -3,7 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
-vi.mock('@/lib/shared/marketing', () => ({
+vi.mock('@/lib/shared/marketing', async orig => ({
+  ...(await orig<any>()),
   canSendMarketing: vi.fn(),
   alreadySentForReference: vi.fn().mockResolvedValue(false),
   recordSent: vi.fn().mockResolvedValue('sent-1'),
@@ -16,8 +17,11 @@ vi.mock('@/lib/shared/whatsapp', () => ({
   sendBackInStockWhatsApp: vi.fn(),
   sendPromoOfferWhatsApp: vi.fn(),
   sendFeedbackRequestWhatsApp: vi.fn(),
-  sendCampaignTemplateWhatsApp: vi.fn().mockResolvedValue(true),
 }))
+vi.mock('@/lib/messaging/library', () => ({ getLibraryTemplate: vi.fn() }))
+vi.mock('@/lib/shared/send-by-template', () => ({ sendByTemplate: vi.fn().mockResolvedValue({ id: 'm1', status: 'sent' }) }))
+vi.mock('@/lib/shared/message-log', () => ({ logMessage: vi.fn() }))
+vi.mock('@/lib/templates/variables', async orig => ({ ...(await orig<any>()), resolveTemplateVariables: vi.fn().mockResolvedValue({}) }))
 vi.mock('@/lib/shared/sms', () => ({ sendCampaignSMS: vi.fn().mockResolvedValue(true) }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -30,8 +34,9 @@ import {
   sendBackInStockWhatsApp,
   sendPromoOfferWhatsApp,
   sendFeedbackRequestWhatsApp,
-  sendCampaignTemplateWhatsApp,
 } from '@/lib/shared/whatsapp'
+import { getLibraryTemplate } from '@/lib/messaging/library'
+import { sendByTemplate } from '@/lib/shared/send-by-template'
 import { sendCampaignSMS } from '@/lib/shared/sms'
 
 const mockQueryOne = vi.mocked(queryOne)
@@ -47,7 +52,7 @@ const mockSendSMS = vi.mocked(sendCampaignSMS)
 // Default happy-path setup: phone on file + marketing allowed + not in cooldown + sender succeeds.
 // Campaign row carries smsEnabled:true so the opt-in SMS leg fires (mirrors whatsappEnabled).
 function allowAndSend() {
-  mockQueryOne.mockResolvedValue({ phone: '+919876543210', parameters: { smsEnabled: true } } as any)
+  mockQueryOne.mockResolvedValue({ phone: '+919876543210', parameters: { whatsappEnabled: true, smsEnabled: true } } as any)
   mockCanSend.mockResolvedValue({ ok: true } as any)
   mockAlreadySent.mockResolvedValue(false)
   mockRecordSent.mockResolvedValue('sent-1')
@@ -272,7 +277,7 @@ describe('sendCampaignWhatsApp missing vars', () => {
 
   it('does NOT send SMS when the campaign has smsEnabled off (default)', async () => {
     allowAndSend()
-    mockQueryOne.mockResolvedValue({ phone: '+919876543210', parameters: {} } as any)
+    mockQueryOne.mockResolvedValue({ phone: '+919876543210', parameters: { whatsappEnabled: true } } as any)
     await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt, Nut' }, 1)
     expect(mockAbandonedCart).toHaveBeenCalled()
     expect(mockSendSMS).not.toHaveBeenCalled()
@@ -339,68 +344,25 @@ describe('var cleanup', () => {
   })
 })
 
-describe('admin-chosen approved template — variable resolution', () => {
-  it('resolves {firstName}/{productImageUrl} in slots + header before sending (not raw tokens)', async () => {
-    mockCanSend.mockResolvedValue({ ok: true } as any)
-    mockAlreadySent.mockResolvedValue(false)
-    mockRecordSent.mockResolvedValue('sent-1')
-    const mockTemplate = vi.mocked(sendCampaignTemplateWhatsApp)
-    mockTemplate.mockResolvedValue(true)
-    // 1st queryOne = user phone; 2nd = campaign row with an admin-chosen template + token slots.
-    mockQueryOne.mockResolvedValueOnce({ phone: '+919876543210' } as any).mockResolvedValueOnce({
-      sms_template: null,
-      wa_template_sid: 'back_in_stock',
-      wa_variables: { '1': '{product}' },
-      wa_header_image_url: '{imageUrl}',
-    } as any)
-
-    await sendCampaignWhatsApp('restock', 'user-1', { product: 'Widget', imageUrl: 'https://cdn/x.jpg' } as any)
-
-    expect(mockTemplate).toHaveBeenCalledOnce()
-    const arg = mockTemplate.mock.calls[0][0]
-    expect(arg.variables['1']).toBe('Widget') // {product} resolved, not literal
-    expect(arg.headerImageUrl).toBe('https://cdn/x.jpg') // {imageUrl} resolved
-    expect(arg.sidEnvVar).toBe('TWILIO_WA_BACK_IN_STOCK_SID')
-  })
-})
-
-describe('admin-chosen template — CTA link is click-tracked', () => {
-  it('wraps the urlSlot http(s) value in the click-tracking redirect keyed to the WhatsApp sentId', async () => {
+describe('linked library WhatsApp template', () => {
+  it('fills {{n}} slots with resolved campaign vars and click-tracks URL slots', async () => {
     mockCanSend.mockResolvedValue({ ok: true } as any)
     mockAlreadySent.mockResolvedValue(false)
     mockRecordSent.mockResolvedValue('wa-sent-9')
-    const mockTemplate = vi.mocked(sendCampaignTemplateWhatsApp)
-    mockTemplate.mockResolvedValue(true)
+    vi.mocked(getLibraryTemplate).mockResolvedValue({
+      slug: 'restock', body: '{{1}} is back. Shop: {{2}}', approval_status: 'approved',
+    } as any)
     mockQueryOne.mockResolvedValueOnce({ phone: '+919876543210' } as any).mockResolvedValueOnce({
-      sms_template: null,
-      wa_template_sid: 'back_in_stock', // urlSlot = 3
-      wa_variables: { '1': '{product}', '3': '{productUrl}' },
-      wa_header_image_url: null,
+      wa_template_slug: 'restock',
+      wa_variables: { '1': '{product}', '2': '{productUrl}' },
+      parameters: { whatsappEnabled: true },
     } as any)
 
     await sendCampaignWhatsApp('restock', 'u1', { product: 'Widget', productUrl: 'https://shop/p/widget' } as any)
 
-    const arg = vi.mocked(sendCampaignTemplateWhatsApp).mock.calls[0][0]
-    // slot 3 resolved {productUrl} then got wrapped in the tracking redirect (keyed to the sentId).
-    expect(arg.variables['3']).toContain('/api/email-events/click?id=wa-sent-9')
-    expect(arg.variables['3']).toContain(encodeURIComponent('https://shop/p/widget'))
-    // a non-URL text slot is left as the resolved value.
-    expect(arg.variables['1']).toBe('Widget')
-  })
-
-  it('leaves the urlSlot untouched when its value is not an http(s) URL', async () => {
-    mockCanSend.mockResolvedValue({ ok: true } as any)
-    mockAlreadySent.mockResolvedValue(false)
-    mockRecordSent.mockResolvedValue('wa-sent-10')
-    vi.mocked(sendCampaignTemplateWhatsApp).mockResolvedValue(true)
-    mockQueryOne.mockResolvedValueOnce({ phone: '+919876543210' } as any).mockResolvedValueOnce({
-      sms_template: null,
-      wa_template_sid: 'back_in_stock',
-      wa_variables: { '1': 'Widget', '3': 'see store' },
-      wa_header_image_url: null,
-    } as any)
-    await sendCampaignWhatsApp('restock', 'u1', {} as any)
-    const arg = vi.mocked(sendCampaignTemplateWhatsApp).mock.calls[0][0]
-    expect(arg.variables['3']).toBe('see store')
+    const arg = vi.mocked(sendByTemplate).mock.calls[0][0]
+    expect(arg.slug).toBe('restock')
+    expect(arg.variables!['1']).toBe('Widget')
+    expect(arg.variables!['2']).toContain('/api/email-events/click?id=wa-sent-9')
   })
 })
