@@ -670,7 +670,7 @@ export function courierPhone(raw: string | null | undefined): string | null {
   if (d.length === 12 && d.startsWith('91')) d = d.slice(2)
   else if (d.length === 11 && d.startsWith('0')) d = d.slice(1)
   if (!/^[6-9]\d{9}$/.test(d)) return null
-  if (/^(\d)\1{9}$/.test(d) || d === '1234567890' || d === '9876543210') return null
+  if (/^(\d)\1{9}$/.test(d) || d === '1234567890') return null
   return d
 }
 
@@ -688,7 +688,7 @@ export function courierConsignee(o: {
   const problems: string[] = []
   if (!/[A-Za-z]{2,}/.test(name) || /^(test|customer|na|n\/a|abc|xyz)$/i.test(name)) problems.push('a real consignee name')
   if (!phone) problems.push('a valid 10-digit mobile number')
-  if (address.replace(/[^A-Za-z0-9]/g, '').length < 10) problems.push('a complete street address')
+  if (address.replace(/[^A-Za-z0-9]/g, '').length < 8) problems.push('a complete street address')
   if (problems.length) return { ok: false, error: `Delhivery will reject this shipment as suspicious — the delivery address needs ${problems.join(', ')}. Edit the order's address and try again.` }
   return { ok: true, name, phone: phone!, address, city: courierText(o.city, 50), state: courierText(o.state, 50) }
 }

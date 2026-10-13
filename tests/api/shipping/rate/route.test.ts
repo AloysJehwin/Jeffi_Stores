@@ -6,6 +6,7 @@ vi.mock('@/lib/shared/db', () => ({
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
+vi.mock('@/lib/catalog/unit-factor', () => ({ piecesPerUnit: async (l: unknown[]) => l.map(() => 1) }))
 vi.mock('@/lib/shipping/shipping', () => ({
   packIntoCartons: vi.fn(),
   fallbackShippingRate: vi.fn(),
