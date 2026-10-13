@@ -14,7 +14,8 @@ const ALIASES: Array<[camel: string, snake: string[]]> = [
   ['productCard', ['product_card']],
   ['itemCount', ['item_count']],
   ['total', ['cart_total']],
-  ['ctaUrl', ['cta_url', 'cart_url', 'product_url', 'collection_url', 'review_url', 'redeem_url', 'reorder_url']],
+  ['ctaUrl', ['cta_url', 'short_url', 'cart_url', 'product_url', 'collection_url', 'review_url', 'redeem_url', 'reorder_url']],
+  ['firstName', ['first_name', 'customer_first_name']],
 ]
 
 const present = (v: unknown) => v !== undefined && v !== null && v !== ''

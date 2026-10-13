@@ -1,4 +1,6 @@
 import { queryOne } from '@/lib/shared/db'
+import { storeBaseUrlAsync } from '@/lib/catalog/brand'
+import { bridgeVars } from '@/lib/templates/var-bridge'
 import { canSendMarketing, alreadySentForReference, recordSent } from '@/lib/shared/marketing'
 import type { CampaignKind } from '@/lib/shared/marketing'
 import { days } from '@/lib/campaigns/duration'
@@ -89,6 +91,34 @@ async function dispatch(
   }
 }
 
+/** The values a campaign's WhatsApp/SMS text is rendered with (recipient + store + scenario, under every alias). */
+export async function campaignMessageRenderer(
+  vars: CampaignWaVars,
+  user: { email: string | null; first_name: string | null; last_name: string | null }
+) {
+  // Product names can carry stray whitespace ("Earthing Rod ?" in the SMS).
+  const clean = Object.fromEntries(
+    Object.entries(vars).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])
+  ) as CampaignWaVars
+  const registered = await resolveTemplateVariables({
+    recipient: { email: user.email ?? '', first_name: user.first_name, last_name: user.last_name },
+  })
+  const full: Record<string, string> = Object.fromEntries(Object.entries({
+    ...clean, firstName: user.first_name || 'there', productName: clean.product, couponCode: clean.code,
+    discountPercent: clean.discount, ctaUrl: clean.url || (await storeBaseUrlAsync()), productImageUrl: clean.imageUrl,
+    headline: clean.headline || 'A special offer for you',
+  }).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
+  const render = (t: string) => renderCampaignTemplate(t, full, registered, false).replace(/[ \t]{2,}/g, ' ').trim()
+  // Variables a template needs that this campaign can't fill (blocks behind a false {#if} don't count).
+  const known: Record<string, string> = { ...registered, ...bridgeVars(full) }
+  const has = (k: string) => !!String(known[k] ?? '').trim()
+  const missing = (t: string) => {
+    const live = t.replace(/\{#if\s+(\w+)\}([\s\S]*?)\{\/if\}/g, (_m, c, inner) => (has(c) ? inner : ''))
+    return [...new Set([...live.matchAll(/\{\{?\s*([a-zA-Z_]\w*)\s*\}?\}/g)].map(m => m[1]).filter(k => !has(k)))]
+  }
+  return { clean, full, registered, render, missing }
+}
+
 export async function sendCampaignWhatsApp(
   kind: string,
   userId: string,
@@ -119,20 +149,7 @@ export async function sendCampaignWhatsApp(
     const gate = await canSendMarketing(userId, kind as CampaignKind, { phoneChannel: true })
     if (!gate.ok) { console.warn(`[campaign-wa] ${kind} user=${userId} gated: ${gate.reason}`); return { ok: false, reason: gate.reason || 'opted_out' } }
 
-    // Product names can carry stray whitespace ("Earthing Rod ?" in the SMS).
-    const clean = Object.fromEntries(
-      Object.entries(vars).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])
-    ) as CampaignWaVars
-    // Full variable set for library templates: recipient + store vars and the scenario values under
-    // their campaign/library names (so {firstName} / {{coupon_code}} no longer render blank).
-    const registered = await resolveTemplateVariables({
-      recipient: { email: user.email ?? '', first_name: user.first_name, last_name: user.last_name },
-    })
-    const full: Record<string, string> = Object.fromEntries(Object.entries({
-      ...clean, firstName: user.first_name || 'there', productName: clean.product, couponCode: clean.code,
-      discountPercent: clean.discount, ctaUrl: clean.url, productImageUrl: clean.imageUrl, headline: clean.headline || 'A special offer for you',
-    }).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
-    const render = (t: string) => renderCampaignTemplate(t, full, registered, false).replace(/[ \t]{2,}/g, ' ').trim()
+    const { clean, render, missing } = await campaignMessageRenderer(vars, user)
     const window = typeof cooldownMin === 'number' && cooldownMin > 0 ? cooldownMin : days(1)
 
     // Each channel dedups independently (wa:/sms:<kind> in email_campaigns_sent), recorded BEFORE sending
@@ -149,7 +166,7 @@ export async function sendCampaignWhatsApp(
     if (params.whatsappEnabled === true) {
       const waSentId = await claim('whatsapp')
       if (waSentId === null) deduped = true
-      else { attempted = true; ok = await sendWhatsAppPart(kind, user.phone, row, clean, render, waSentId) }
+      else { attempted = true; ok = await sendWhatsAppPart(kind, user.phone, row, clean, render, missing, waSentId) }
     }
     const smsClaim = params.smsEnabled === true ? await claim('sms') : undefined
     if (smsClaim === null) deduped = true
@@ -158,7 +175,9 @@ export async function sendCampaignWhatsApp(
       let body = ''
       if (row?.sms_template_slug) body = (await getLibraryTemplate('sms', row.sms_template_slug))?.body ?? ''
       if (!body && row?.sms_template?.trim()) body = row.sms_template
-      body = body ? render(body) : campaignSmsBody(kind, clean)
+      const gaps = body ? missing(body) : []
+      if (gaps.length) console.warn(`[campaign-sms] ${kind}: template needs ${gaps.map(g => `{${g}}`).join(', ')} which this campaign can't fill — sending the built-in SMS`)
+      body = body && !gaps.length ? render(body) : campaignSmsBody(kind, clean)
       if (body) {
         const { sendCampaignSMS } = await import('@/lib/shared/sms')
         ok = (await sendCampaignSMS({ phone: user.phone, body, kind, userId }).catch(() => false)) || ok
@@ -181,6 +200,7 @@ async function sendWhatsAppPart(
   row: { wa_template_slug: string | null; wa_variables: Record<string, string> | null } | null,
   clean: CampaignWaVars,
   render: (t: string) => string,
+  missing: (t: string) => string[],
   waSentId: string
 ): Promise<boolean> {
   const entity = { entityType: 'campaign', entityId: kind }
@@ -192,7 +212,9 @@ async function sendWhatsAppPart(
     const t = await getLibraryTemplate('whatsapp', row.wa_template_slug)
     const slots = t ? [...new Set([...t.body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(m => m[1]))] : []
     const raw = row.wa_variables ?? {}
-    if (t?.approval_status === 'approved' && slots.every(n => raw[n]?.trim())) {
+    const gaps = [...new Set(slots.flatMap(n => (raw[n]?.trim() ? missing(raw[n]) : [])))]
+    if (gaps.length) console.warn(`[campaign-wa] ${kind}: slots use ${gaps.map(g => `{${g}}`).join(', ')} which this campaign can't fill — sending the built-in WhatsApp`)
+    if (t?.approval_status === 'approved' && slots.every(n => raw[n]?.trim()) && !gaps.length) {
       const variables: Record<string, string> = {}
       for (const n of slots) variables[n] = await track(render(raw[n]))
       // _action templates: product photo (else store banner) + tracked CTA link; none on the CDN → plain template.
