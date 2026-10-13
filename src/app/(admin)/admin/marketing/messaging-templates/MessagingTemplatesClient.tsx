@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useToast } from '@/contexts/ToastContext'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp']
@@ -37,6 +38,7 @@ export default function MessagingTemplatesClient() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [query, setQuery] = useState(q)
+  const { showToast } = useToast()
 
   const updateUrl = useCallback((patch: Record<string, string | null>) => {
     const next = new URLSearchParams(sp.toString())
@@ -97,11 +99,12 @@ export default function MessagingTemplatesClient() {
       if (res.ok) {
         const saved = await res.json()
         setSelected(toEditorTemplate(saved))
+        showToast(publish ? 'Template published.' : 'Draft saved.', 'success')
         if (saved?.slug) updateUrl({ slug: saved.slug })
         await load()
       } else {
         const err = await res.json().catch(() => ({}))
-        alert(`Save failed: ${err?.error || res.status}`)
+        showToast(`Save failed: ${err?.error || res.status}`, 'error')
       }
     } finally {
       setSaving(false)
