@@ -2099,3 +2099,11 @@ CREATE INDEX IF NOT EXISTS idx_pub_short_link_user ON public.pub_short_link (pub
 CREATE INDEX IF NOT EXISTS idx_email_campaign_logs_campaign_channel ON public.email_campaign_logs (campaign_id, channel);
 
 CREATE INDEX IF NOT EXISTS idx_documents_tenant_created ON public.documents (tenant_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_messages_tenant_created ON public.messages (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_provider_ref ON public.messages (provider_ref);
+CREATE INDEX IF NOT EXISTS idx_messages_batch ON public.messages (batch_id);
+CREATE INDEX IF NOT EXISTS idx_message_events_message ON public.message_events (message_id);
+CREATE INDEX IF NOT EXISTS idx_bulk_jobs_tenant_kind ON public.bulk_jobs (tenant_id, kind, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bulk_items_claim ON public.bulk_job_items (status, job_id, seq);
+CREATE INDEX IF NOT EXISTS idx_bulk_items_job ON public.bulk_job_items (job_id, seq);

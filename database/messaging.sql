@@ -299,3 +299,35 @@ CREATE TABLE IF NOT EXISTS public.pub_short_link (
     created_by uuid,
     created_at timestamp with time zone NOT NULL DEFAULT now()
 );
+
+-- Public Messaging API send log (messaging-service). batch_id = bulk job id for bulk sends.
+CREATE TABLE IF NOT EXISTS public.messages (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id uuid NOT NULL,
+    api_key_id uuid,
+    batch_id uuid,
+    channel character varying(16) NOT NULL,
+    to_address character varying(255) NOT NULL,
+    from_address character varying(255),
+    template_slug character varying(80),
+    subject character varying(200),
+    body text NOT NULL,
+    status character varying(16) NOT NULL DEFAULT 'queued',
+    provider character varying(16),
+    provider_ref character varying(80),
+    price_inr numeric(10,4) NOT NULL DEFAULT 0,
+    charged_inr numeric(10,4) NOT NULL DEFAULT 0,
+    error text,
+    reference character varying(120),
+    metadata jsonb,
+    created_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.message_events (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    message_id uuid NOT NULL,
+    event character varying(32) NOT NULL,
+    payload jsonb,
+    occurred_at timestamp with time zone NOT NULL DEFAULT now()
+);

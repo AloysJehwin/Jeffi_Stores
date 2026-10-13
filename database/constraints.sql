@@ -3434,3 +3434,13 @@ ALTER TABLE ONLY public.documents ADD CONSTRAINT documents_view_token_key UNIQUE
 ALTER TABLE ONLY public.documents ADD CONSTRAINT documents_type_check CHECK (((type)::text = ANY ((ARRAY['invoice'::character varying, 'quotation'::character varying, 'receipt'::character varying, 'packing_slip'::character varying, 'label'::character varying, 'purchase_order'::character varying])::text[])));
 ALTER TABLE ONLY public.document_sequences ADD CONSTRAINT document_sequences_pkey PRIMARY KEY (tenant_id, type, financial_year);
 ALTER TABLE ONLY public.document_settings ADD CONSTRAINT document_settings_pkey PRIMARY KEY (tenant_id);
+
+ALTER TABLE ONLY public.messages ADD CONSTRAINT messages_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.messages ADD CONSTRAINT messages_status_check CHECK (((status)::text = ANY ((ARRAY['queued'::character varying, 'sent'::character varying, 'delivered'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])));
+ALTER TABLE ONLY public.message_events ADD CONSTRAINT message_events_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.bulk_jobs ADD CONSTRAINT bulk_jobs_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.bulk_jobs ADD CONSTRAINT bulk_jobs_kind_check CHECK (((kind)::text = ANY ((ARRAY['documents'::character varying, 'messages'::character varying])::text[])));
+ALTER TABLE ONLY public.bulk_jobs ADD CONSTRAINT bulk_jobs_status_check CHECK (((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying, 'completed'::character varying, 'partial'::character varying, 'failed'::character varying, 'cancelled'::character varying])::text[])));
+ALTER TABLE ONLY public.bulk_job_items ADD CONSTRAINT bulk_job_items_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.bulk_job_items ADD CONSTRAINT bulk_job_items_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'done'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])));
+ALTER TABLE ONLY public.bulk_job_items ADD CONSTRAINT bulk_job_items_job_fkey FOREIGN KEY (job_id) REFERENCES public.bulk_jobs(id) ON DELETE CASCADE;

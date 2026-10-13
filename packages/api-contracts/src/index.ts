@@ -69,6 +69,21 @@ export const BatchMessageRequest = z.object({
   media_url: z.string().url().optional(),
   button_url: z.string().url().optional(),
 })
+const BulkRecipient = z.object({
+  to: z.string().min(3), variables: Vars.optional(), reference: z.string().optional(),
+  media_url: z.string().url().optional(), button_url: z.string().url().optional(),
+})
+export const BulkMessagesRequest = z.object({
+  channel: Channel,
+  template: Slug,
+  recipients: z.array(BulkRecipient).min(1).max(10000),
+  variables: Vars.optional(),
+  subject: z.string().max(200).optional(),
+  media_url: z.string().url().optional(),
+  button_url: z.string().url().optional(),
+  reference: z.string().max(120).optional(),
+})
+export type BulkMessagesRequest = z.infer<typeof BulkMessagesRequest>
 export const BatchMessageResponse = z.object({ batch_id: z.string().uuid(), accepted: z.number(), rejected: z.array(z.object({ to: z.string(), reason: z.string() })) })
 
 // ── templates ──
@@ -200,6 +215,29 @@ export const Document = z.object({
   created_at: z.string(),
 })
 export type Document = z.infer<typeof Document>
+// Bulk: job-level type/template/branding/seller are defaults; each item is a render request that may omit them.
+export const BulkDocumentsRequest = z.object({
+  type: DocumentType.optional(),
+  template: Slug.optional(),
+  branding: DocumentBranding.optional(),
+  seller: Party.optional(),
+  reference: z.string().max(120).optional(),
+  items: z.array(z.record(z.string(), z.unknown())).min(1).max(1000)
+    .describe('Each item: the POST /v1/documents/{type} body, plus optional `type`. Missing type/template/branding/seller come from the job.'),
+})
+export type BulkDocumentsRequest = z.infer<typeof BulkDocumentsRequest>
+export const BulkJob = z.object({
+  id: z.string().uuid(), kind: z.enum(['documents', 'messages']),
+  status: z.enum(['queued', 'running', 'completed', 'partial', 'failed', 'cancelled']),
+  total: z.number(), succeeded: z.number(), failed: z.number(), skipped: z.number(), pending: z.number(),
+  spent_inr: z.number(), reference: z.string().nullable(), error: z.string().nullable(),
+  created_at: z.string(), started_at: z.string().nullable(), finished_at: z.string().nullable(),
+  zip_url: z.string().optional(),
+})
+export const BulkItem = z.object({
+  seq: z.number(), status: z.enum(['pending', 'running', 'done', 'failed', 'skipped']), error: z.string().nullable(),
+  reference: z.string().nullable(), result: z.record(z.string(), z.unknown()).nullable(),
+})
 export const DocumentDesign = z.object({ key: z.string(), name: z.string(), description: z.string(), accent: z.string(), font: DocumentFont, thumbnail_url: z.string() })
 export const DocumentSettings = z.object({ design: z.string().nullable(), accent: HexColor.nullable(), font: DocumentFont.nullable(), has_logo: z.boolean() })
 export const DocumentSettingsUpdate = z.object({ design: Slug.nullable().optional(), accent: HexColor.nullable().optional(), font: DocumentFont.nullable().optional() })

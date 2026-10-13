@@ -17,6 +17,7 @@
     "@jeffi/pricing": "*",
     "@jeffi/service-auth": "*",
     "@jeffi/tenancy": "*",
+    "@jeffi/bulk": "*",
     "@jeffi/wallet": "*",
     "fastify": "^5.2.1",
     "@fastify/formbody": "^8.0.2",
