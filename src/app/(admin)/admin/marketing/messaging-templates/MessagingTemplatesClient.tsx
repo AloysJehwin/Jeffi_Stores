@@ -257,7 +257,7 @@ export default function MessagingTemplatesClient() {
                   <p className="text-xs text-foreground-muted mt-1">Stable key the store code sends by. Lowercase, use / to group.</p>
                 </div>
               )}
-              <TemplateEditor value={selected} apiBase={API} onChange={setSelected} onSave={save} saving={saving} />
+              <TemplateEditor value={selected} apiBase={API} onChange={setSelected} onSave={save} saving={saving} apiNote="API sends use the Messaging-API copy of this template (ecom console → Messaging), so edits to the store copy here do not change them." />
             </>
           )}
         </section>
