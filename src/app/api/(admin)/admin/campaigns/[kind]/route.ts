@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, queryMany } from '@/lib/shared/db'
 import { withLibraryContent } from '@/lib/campaigns/library-content'
 import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
+import { migrateLegacyCampaignDrafts } from '@/lib/campaigns/ensure-builtin-campaigns'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
   const limit = 20
   const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10))
 
+  await migrateLegacyCampaignDrafts()
   const campaign = await queryOne<Record<string, any>>(
     `SELECT c.*, cd.campaign_id AS draft_campaign_id, cd.fields AS draft_fields_new
      FROM campaigns c

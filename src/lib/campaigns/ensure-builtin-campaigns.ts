@@ -91,3 +91,13 @@ export async function ensureBuiltinCampaignRows(): Promise<void> {
 const RETIRED_BUILTIN_PARAMS: { kind: string; key: string; retired: number }[] = [
   { kind: 'winback_180', key: 'healthScoreMax', retired: 25 },
 ]
+
+/** Old drafts lived in campaigns.draft_fields; move them into campaign_drafts so list, editor and Publish agree. */
+export async function migrateLegacyCampaignDrafts() {
+  await query(
+    `INSERT INTO campaign_drafts (kind, fields, updated_at)
+     SELECT kind, draft_fields, now() FROM campaigns WHERE draft_fields IS NOT NULL AND draft_fields <> '{}'::jsonb
+     ON CONFLICT (kind) DO UPDATE SET fields = EXCLUDED.fields, updated_at = now() WHERE campaign_drafts.fields = '{}'::jsonb`
+  )
+  await query(`UPDATE campaigns SET draft_fields = NULL WHERE draft_fields IS NOT NULL`)
+}
