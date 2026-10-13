@@ -88,8 +88,8 @@ export default function MessagingTemplatesClient() {
     updateUrl({ slug: null })
   }
 
-  async function save(publish: boolean) {
-    if (!selected) return
+  async function save(publish: boolean): Promise<EditorTemplate | null> {
+    if (!selected) return null
     setSaving(true)
     try {
       const body = { ...selected, publish }
@@ -97,14 +97,16 @@ export default function MessagingTemplatesClient() {
       const method = selected.id ? 'PUT' : 'POST'
       const res = await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
       if (res.ok) {
-        const saved = await res.json()
-        setSelected(toEditorTemplate(saved))
+        const saved = toEditorTemplate(await res.json())
+        setSelected(saved)
         showToast(publish ? 'Template published.' : 'Draft saved.', 'success')
-        if (saved?.slug) updateUrl({ slug: saved.slug })
+        if (saved.slug) updateUrl({ slug: saved.slug })
         await load()
+        return saved
       } else {
         const err = await res.json().catch(() => ({}))
-        showToast(`Save failed: ${err?.error || res.status}`, 'error')
+        showToast(`Save failed: ${err?.message || err?.error || res.status}`, 'error')
+        return null
       }
     } finally {
       setSaving(false)

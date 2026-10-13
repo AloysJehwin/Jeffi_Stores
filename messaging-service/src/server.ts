@@ -14,6 +14,7 @@ import { CATALOG, WA_APPROVED_SIDS } from '../seed/catalog.js'
 import * as twContent from './providers/twilio-content.js'
 import { priceUsd } from './providers/twilio.js'
 import { poolsForTenant } from './pools.js'
+import * as wa from './wa-approval.js'
 import { render as renderVars, missingKeys } from './render.js'
 import { wrapEmail } from './mail-shell.js'
 import { randomBytes } from 'node:crypto'
@@ -145,7 +146,9 @@ app.post('/v2/templates', async req => {
 
 app.put<{ Params: { id: string } }>('/v2/templates/:id', async (req, reply) => {
   const { pool } = await poolFor(req)
+  // A tenant's first save of a standard template forks it into the tenant's own DB.
   const existing = await tpl.findById(pool, req.claims.tenantId, req.params.id)
+    ?? (req.claims.tenantId !== tpl.PLATFORM_TENANT_ID ? await tpl.findById(db, tpl.PLATFORM_TENANT_ID, req.params.id) : null)
   if (!existing) return reply.code(404).send({ error: 'not_found' })
   const input: tpl.UpsertInput = {
     ...(req.body as any),
@@ -242,60 +245,19 @@ app.get<{ Params: { code: string } }>('/s/:code', { config: { skipAuth: true } }
 })
 
 // WhatsApp approval wiring (Twilio Content API).
-app.post<{ Body: { templateId: string; locale?: string; name: string; category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION' } }>(
-  '/wa/submit-approval',
-  async (req, reply) => {
-    const { pool } = await poolFor(req)
-    const t = await tpl.findById(pool, req.claims.tenantId, req.body.templateId)
-    if (!t?.variant || !t.version) return reply.code(404).send({ error: 'not_found' })
-    if (t.template.channel !== 'whatsapp') return reply.code(400).send({ error: 'not_whatsapp' })
-    const content = await twContent.createContent({
-      friendly_name: `${t.family.slug}:${t.variant.locale}`,
-      language: t.variant.locale,
-      types: (t.version.blocks as any)?.types ?? { 'twilio/text': { body: t.version.body } },
-      variables: (t.version.blocks as any)?.variables ?? {},
-    })
-    const approval = await twContent.submitForApproval(content.sid, {
-      name: req.body.name, category: req.body.category, allow_category_change: true,
-    })
-    await pool.query(
-      `UPDATE template_variant SET provider_ref=$2, meta_category=$3,
-         approval_status=$4, approval_raw_status=$5, approval_submitted_at=now(), approval_checked_at=now()
-       WHERE id=$1`,
-      [t.variant.id, content.sid, req.body.category, twContent.mapApprovalStatus(approval.status), approval.status]
-    )
-    return { sid: content.sid, status: twContent.mapApprovalStatus(approval.status) }
-  }
-)
-
-app.post('/wa/sync-approval', async req => {
+const submitHandler = async (req: FastifyRequest<{ Body: { templateId: string; name?: string; category?: string } }>) => {
   const { pool } = await poolFor(req)
-  const variants = await pool.query<{ id: string; provider_ref: string }>(
-    `SELECT id, provider_ref FROM template_variant
-      WHERE tenant_id=$1 AND provider_ref IS NOT NULL
-        AND approval_status NOT IN ('approved','rejected','disabled')`,
-    [req.claims.tenantId]
-  )
-  let checked = 0, changed = 0
-  for (const v of variants.rows) {
-    try {
-      const res = await twContent.getApprovalStatus(v.provider_ref)
-      const next = twContent.mapApprovalStatus(res.whatsapp?.status)
-      const now = new Date()
-      await tpl.setApprovalStatus(pool, v.id, {
-        status: next,
-        raw: res.whatsapp?.status ?? null,
-        reason: res.whatsapp?.rejection_reason ?? null,
-        approvedAt: next === 'approved' ? now : null,
-      })
-      checked++
-      if (next === 'approved' || next === 'rejected') changed++
-    } catch (e: any) {
-      app.log.warn({ err: e, variantId: v.id }, 'wa sync failed')
-    }
-  }
-  return { checked, changed }
-})
+  return wa.submit(pool, req.claims.tenantId, req.claims.tenantSlug, req.body.templateId, { name: req.body.name, category: req.body.category })
+}
+app.post('/wa/submit-approval', submitHandler)
+app.post('/v2/templates/wa/submit-approval', submitHandler)
+
+const syncHandler = async (req: FastifyRequest) => {
+  const { pool } = await poolFor(req)
+  return wa.syncTenant(pool, req.claims.tenantId)
+}
+app.post('/wa/sync-approval', syncHandler)
+app.post('/v2/templates/wa/sync-approval', syncHandler)
 
 // Bulk-copy the seed catalog into the caller's tenant. Idempotent per slug+channel.
 app.post<{ Querystring: { force?: string } }>('/system-templates/install', async req => {
@@ -343,4 +305,5 @@ app.post<{ Querystring: { m?: string }; Body: Record<string, string> }>('/webhoo
 if (!process.env.VITEST) {
   const port = Number(process.env.PORT || 3101)
   await app.listen({ port, host: '0.0.0.0' })
+  wa.startApprovalSync(m => app.log.info(m))
 }

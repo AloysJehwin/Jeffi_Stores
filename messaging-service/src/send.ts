@@ -68,10 +68,17 @@ interface Ctx {
 // v2 library (tenant copy → platform default) first; legacy message_templates as fallback.
 async function resolveTemplate(tenantId: string, channel: string, slug: string) {
   const { pools } = await poolsForTenant(tenantId)
-  const t = await tpl.findBySlugWithDefaults(pools, tenantId, channel, slug)
+  let t = await tpl.findBySlugWithDefaults(pools, tenantId, channel, slug)
+  // WhatsApp only delivers approved templates: a tenant copy that isn't approved yet falls back to the
+  // standard approved one, and an edited-but-unapproved version sends the approved text it replaces.
+  if (channel === 'whatsapp' && t && !t.variant.provider_ref && tenantId !== tpl.PLATFORM_TENANT_ID)
+    t = (await tpl.findBySlug(pools.platform, tpl.PLATFORM_TENANT_ID, channel, slug)) ?? t
   if (t?.version) {
-    const { subject, body } = t.version
-    return { subject, body, provider_ref: t.variant.provider_ref ?? t.version.provider_ref }
+    const pool = t.family.tenant_id === tpl.PLATFORM_TENANT_ID ? pools.platform : pools.tenant
+    const live = channel === 'whatsapp' && t.variant.provider_ref
+      ? (await tpl.liveVersion(pool, t.variant.id, t.variant.provider_ref)) ?? t.version
+      : t.version
+    return { subject: live.subject, body: live.body, provider_ref: t.variant.provider_ref ?? undefined }
   }
   return findTemplate(tenantId, channel, slug)
 }
