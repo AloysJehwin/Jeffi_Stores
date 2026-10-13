@@ -7,6 +7,7 @@ import { findTemplate } from './templates.js'
 import { render, missingKeys, type Vars } from './render.js'
 import { sendEmail } from './providers/email.js'
 import { sendSms, sendWhatsApp } from './providers/twilio.js'
+import { wrapEmail } from './mail-shell.js'
 
 export class SendError extends Error {
   constructor(public status: number, public code: string, message: string, public details?: unknown) {
@@ -108,7 +109,8 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     let ref: string
     if (req.channel === 'email') {
       provider = 'ses'
-      ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html: body })
+      const html = wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact })
+      ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html })
     } else if (req.channel === 'sms') {
       ref = await sendSms({ to: req.to, body, messageId: id })
     } else {

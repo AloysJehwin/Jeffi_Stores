@@ -1,91 +1,44 @@
-import { sendAuditedMail } from '@/lib/shared/mail-audit'
+import { sendByTemplate } from '@/lib/shared/send-by-template'
 import {
-  customerMailFromAsync,
-  currentBrandNameAsync,
   currentAdminBaseUrlAsync,
-  storeContactLine,
   businessBaseUrlAsync,
 } from '@/lib/catalog/brand'
 import { getAdminNotificationEmails } from '@/lib/email/shared'
-import { mailShell } from '@/lib/shared/mail-template'
 
-// The business portal for whichever store this mail belongs to ({slug}.business. only on the plans
-// that have that host; businessBaseUrlAsync knows which).
 const businessUrl = () => businessBaseUrlAsync()
 
-async function baseLayout(title: string, body: string) {
-  const brand = await currentBrandNameAsync()
-  const contact = await storeContactLine()
-  return mailShell({ brand, kicker: 'Business Portal', title, content: body, footerLines: [contact] })
+function fmtAmount(n: number): string {
+  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-async function send(
-  to: string,
-  subject: string,
-  html: string,
-  audit: { templateName: string; entityType?: string | null; entityId?: string | null; userId?: string | null }
-) {
-  try {
-    const info = await sendAuditedMail({
-      from: await customerMailFromAsync(),
-      to,
-      subject,
-      html,
-      kind: 'business',
-      templateName: audit.templateName,
-      entityType: audit.entityType ?? null,
-      entityId: audit.entityId ?? null,
-      userId: audit.userId ?? null,
-    })
-    return { success: true, messageId: info.messageId }
-  } catch (error) {
-    return { success: false, error }
-  }
-}
-
-// RFQ submitted — notify business user + admin
 export async function sendRfqSubmittedEmail(toEmail: string, name: string, rfqNumber: string, rfqId?: string) {
-  // The RFQ's own page: /quotes/<id> on the portal, /business/rfqs/<id> in admin.
   const rfqPath = rfqId ? `/${encodeURIComponent(rfqId)}` : ''
-  const [portal, adminBase] = await Promise.all([businessUrl(), currentAdminBaseUrlAsync()])
-  const userHtml = await baseLayout(
-    `RFQ ${rfqNumber} submitted`,
-    `
-    <p>Dear ${name},</p>
-    <p>Your Request for Quotation has been submitted successfully. Our team will review it and send you a quotation shortly.</p>
-    <div class="info">
-      <p style="margin:0 0 6px"><strong>RFQ No.:</strong> ${rfqNumber}</p>
-    </div>
-    <p>You can track the status of your RFQ by logging into your account.</p>
-    <div class="cta"><a href="${portal}/quotes${rfqPath}" class="button" style="color:#ffffff;">${rfqId ? 'View Your RFQ' : 'View My RFQs'}</a></div>
-  `
-  )
-
-  const adminHtml = await baseLayout(
-    `New RFQ ${rfqNumber}`,
-    `
-    <p>A new RFQ has been submitted.</p>
-    <div class="info">
-      <p style="margin:0 0 6px"><strong>RFQ No.:</strong> ${rfqNumber}</p>
-      <p style="margin:0"><strong>Submitted By:</strong> ${name} (${toEmail})</p>
-    </div>
-    <div class="cta"><a href="${adminBase}/business/rfqs${rfqPath}" class="button" style="color:#ffffff;">${rfqId ? 'Review RFQ' : 'View RFQs'}</a></div>
-  `
-  )
-
-  const brand = await currentBrandNameAsync()
+  const [portal, adminBase, adminTo] = await Promise.all([
+    businessUrl(),
+    currentAdminBaseUrlAsync(),
+    getAdminNotificationEmails(),
+  ])
   await Promise.allSettled([
-    send(toEmail, `RFQ ${rfqNumber} submitted — ${brand}`, userHtml, {
-      templateName: 'rfq_submitted_user',
+    sendByTemplate({
+      channel: 'email',
+      slug: 'b2b/rfq-submitted',
+      to: toEmail,
+      variables: { customer_name: name, rfq_number: rfqNumber, rfq_url: `${portal}/quotes${rfqPath}` },
     }),
-    // This store's own admins (the platform's only off-tenant).
-    send(await getAdminNotificationEmails(), `New RFQ ${rfqNumber} from ${name}`, adminHtml, {
-      templateName: 'rfq_submitted_admin',
+    sendByTemplate({
+      channel: 'email',
+      slug: 'b2b/rfq-submitted-admin',
+      to: adminTo,
+      variables: {
+        customer_name: name,
+        customer_email: toEmail,
+        rfq_number: rfqNumber,
+        rfq_url: `${adminBase}/business/rfqs${rfqPath}`,
+      },
     }),
   ])
 }
 
-// RFQ converted to quotation — notify business user
 export async function sendRfqConvertedToQuotationEmail(
   toEmail: string,
   name: string,
@@ -94,67 +47,48 @@ export async function sendRfqConvertedToQuotationEmail(
   totalAmount: number,
   viewUrl: string
 ) {
-  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const html = await baseLayout(
-    `Quotation ${quoteNumber} ready`,
-    `
-    <p>Dear ${name},</p>
-    <p>Your RFQ <strong>${rfqNumber}</strong> has been reviewed and a quotation has been prepared for you.</p>
-    <div class="info">
-      <p style="margin:0 0 6px"><strong>Quotation No.:</strong> ${quoteNumber}</p>
-      <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
-    </div>
-    <div class="cta"><a href="${viewUrl}" class="button" style="color:#ffffff;">View Quotation</a></div>
-    <p>Please review the quotation. If you have any questions, just reply to this email.</p>
-  `
-  )
-  const brand = await currentBrandNameAsync()
-  return send(toEmail, `Quotation ${quoteNumber} ready — ${brand}`, html, {
-    templateName: 'rfq_converted_to_quotation',
+  return sendByTemplate({
+    channel: 'email',
+    slug: 'b2b/quotation-ready',
+    to: toEmail,
+    variables: {
+      customer_name: name,
+      rfq_number: rfqNumber,
+      quotation_number: quoteNumber,
+      total: fmtAmount(totalAmount),
+      quotation_url: viewUrl,
+    },
   })
 }
 
-// Business account approved
 export async function sendBusinessAccountApprovedEmail(toEmail: string, name: string, companyName: string) {
-  const html = await baseLayout(
-    'Business account approved',
-    `
-    <p>Dear ${name},</p>
-    <p>We are pleased to inform you that your business account for <strong>${companyName}</strong> has been <strong>approved</strong>.</p>
-    <p>You can now log in and start placing RFQs and orders.</p>
-    <div class="cta"><a href="${await businessUrl()}/signin" class="button" style="color:#ffffff;">Log In to Business Portal</a></div>
-  `
-  )
-  const brand = await currentBrandNameAsync()
-  return send(toEmail, `Business account approved — ${brand}`, html, {
-    templateName: 'business_account_approved',
+  const signinUrl = `${await businessUrl()}/signin`
+  return sendByTemplate({
+    channel: 'email',
+    slug: 'b2b/account-approved',
+    to: toEmail,
+    variables: { customer_name: name, company_name: companyName, signin_url: signinUrl },
   })
 }
 
-// Business account rejected
 export async function sendBusinessAccountRejectedEmail(
   toEmail: string,
   name: string,
   companyName: string,
   rejectionNote?: string | null
 ) {
-  const contact = await storeContactLine()
-  const html = await baseLayout(
-    'Business account application update',
-    `
-    <p>Dear ${name},</p>
-    <p>We regret to inform you that your business account application for <strong>${companyName}</strong> could not be approved at this time.</p>
-    ${rejectionNote ? `<div class="info"><p style="margin:0"><strong>Reason:</strong> ${rejectionNote}</p></div>` : ''}
-    <p>If you believe this is an error or would like to reapply, please contact us${contact ? ` at ${contact}` : ''}.</p>
-  `
-  )
-  const brand = await currentBrandNameAsync()
-  return send(toEmail, `Business account application update — ${brand}`, html, {
-    templateName: 'business_account_rejected',
+  return sendByTemplate({
+    channel: 'email',
+    slug: 'b2b/account-rejected',
+    to: toEmail,
+    variables: {
+      customer_name: name,
+      company_name: companyName,
+      reason: rejectionNote ? `Reason: ${rejectionNote}` : '',
+    },
   })
 }
 
-// Business invoice generated (quotation converted to invoice)
 export async function sendBusinessInvoiceGeneratedEmail(
   toEmail: string,
   name: string,
@@ -163,29 +97,20 @@ export async function sendBusinessInvoiceGeneratedEmail(
   totalAmount: number,
   invoiceViewUrl: string
 ) {
-  const contact = await storeContactLine()
-  const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const html = await baseLayout(
-    `Invoice ${invoiceNumber}`,
-    `
-    <p>Dear ${name},</p>
-    <p>Your invoice has been generated. Please find the details below.</p>
-    <div class="info">
-      <p style="margin:0 0 6px"><strong>Invoice No.:</strong> ${invoiceNumber}</p>
-      <p style="margin:0 0 6px"><strong>Order No.:</strong> ${orderNumber}</p>
-      <p style="margin:0"><strong>Amount Due:</strong> ₹${formatted}</p>
-    </div>
-    <div class="cta"><a href="${invoiceViewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>
-    <p>For payment enquiries, contact us${contact ? ` at ${contact}` : ''}.</p>
-  `
-  )
-  const brand = await currentBrandNameAsync()
-  return send(toEmail, `Invoice ${invoiceNumber} — ${brand}`, html, {
-    templateName: 'business_invoice_generated',
+  return sendByTemplate({
+    channel: 'email',
+    slug: 'b2b/invoice-generated',
+    to: toEmail,
+    variables: {
+      customer_name: name,
+      invoice_number: invoiceNumber,
+      order_number: orderNumber,
+      total: fmtAmount(totalAmount),
+      invoice_url: invoiceViewUrl,
+    },
   })
 }
 
-// Business order status update
 export async function sendBusinessOrderStatusEmail(
   toEmail: string,
   name: string,
@@ -193,7 +118,6 @@ export async function sendBusinessOrderStatusEmail(
   status: string,
   invoiceViewUrl?: string
 ) {
-  const contact = await storeContactLine()
   const statusLabel: Record<string, string> = {
     processing: 'Processing',
     shipped: 'Shipped',
@@ -203,18 +127,20 @@ export async function sendBusinessOrderStatusEmail(
   }
   const label = statusLabel[status] || status
   const vaultUrl = status === 'granted' ? await import('@/lib/vault/links').then(m => m.vaultLibraryUrl()) : null
-  const html = await baseLayout(
-    `Order ${orderNumber} — ${label}`,
-    `
-    <p>Dear ${name},</p>
-    <p>Your order <strong>${orderNumber}</strong> is now <strong>${label}</strong>.</p>
-    ${vaultUrl ? `<p>Access granted — open your vault to view your digital items.</p><div class="cta"><a href="${vaultUrl}" class="button" style="color:#ffffff;">Open my vault</a></div>` : ''}
-    ${invoiceViewUrl ? `<div class="cta"><a href="${invoiceViewUrl}" class="button" style="color:#ffffff;">View Invoice</a></div>` : ''}
-    <p>For any queries, contact us${contact ? ` at ${contact}` : ''}.</p>
-  `
-  )
-  const brand = await currentBrandNameAsync()
-  return send(toEmail, `Order ${orderNumber} — ${label} | ${brand}`, html, {
-    templateName: 'business_order_status',
+  const extraCta = vaultUrl
+    ? `Open your vault: ${vaultUrl}`
+    : invoiceViewUrl
+      ? `View invoice: ${invoiceViewUrl}`
+      : ''
+  return sendByTemplate({
+    channel: 'email',
+    slug: 'b2b/order-status',
+    to: toEmail,
+    variables: {
+      customer_name: name,
+      order_number: orderNumber,
+      status_label: label,
+      extra_cta: extraCta,
+    },
   })
 }
