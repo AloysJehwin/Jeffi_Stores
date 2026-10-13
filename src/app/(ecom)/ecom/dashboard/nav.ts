@@ -40,7 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/dashboard/wallet', label: 'Wallet', icon: Wallet },
       { href: '/dashboard/transactions', label: 'Transactions', icon: Receipt, requires: 'store' },
       { href: '/dashboard/ledger', label: 'Settlement ledger', icon: BookOpen, requires: 'store' },
-      { href: '/dashboard/payouts', label: 'Payouts', icon: Landmark, requires: 'store' },
+      { href: '/dashboard/payouts', label: 'Payouts', icon: Landmark },
     ],
   },
   {
