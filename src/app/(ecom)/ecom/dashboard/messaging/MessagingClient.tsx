@@ -7,6 +7,7 @@ import { SkeletonRows } from '../_components/Skeleton'
 import Pager, { useCursorPages } from '../_components/Pager'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
+import BulkMessages from './BulkMessages'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 
 interface ListItem { id: string; slug: string; channel: Channel; name: string; category?: string | null; approval_status?: string | null; source?: 'tenant' | 'platform' }
@@ -20,8 +21,8 @@ const CHANNELS: Array<{ key: Channel; label: string; icon: typeof Mail }> = [
 const API = '/api/ecom/svc/messaging'
 const WA_TONE: Record<string, string> = { approved: 'org-sage org-sage-text', rejected: 'bg-[#f6d5cc] text-[#8a2e1f]' }
 
-export default function MessagingClient() {
-  const [tab, setTab] = useState<'log' | 'templates'>('log')
+export default function MessagingClient(props: { prices: Record<string, number>; balance: number }) {
+  const [tab, setTab] = useState<'log' | 'templates' | 'bulk'>('log')
   const { showToast } = useToast()
   const [channel, setChannel] = useState<Channel>('email')
   const { items: msgs, page: logPage, hasNext: logNext, go: logGo } = useCursorPages<Msg>(`${API}/messages`)
@@ -85,12 +86,14 @@ export default function MessagingClient() {
   return (
     <div className="space-y-6">
       <div className="flex gap-2">
-        {(['log', 'templates'] as const).map(t => (
+        {(['log', 'templates', 'bulk'] as const).map(t => (
           <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${tab === t ? 'ecom-accent-bg text-white' : 'org-sand org-sand-hover'}`}>
-            {t === 'log' ? 'Message log' : 'Templates'}
+            {t === 'log' ? 'Message log' : t === 'templates' ? 'Templates' : 'Bulk'}
           </button>
         ))}
       </div>
+
+      {tab === 'bulk' && <BulkMessages {...props} />}
 
       {tab === 'log' && (
         <div>
