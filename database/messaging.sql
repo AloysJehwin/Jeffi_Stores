@@ -149,11 +149,11 @@ CREATE TABLE IF NOT EXISTS public.wa_pricing (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Platform messaging-templates catalog (singleton, admin-owned).
--- The DEFAULT library shared across every tenant and every public-API customer.
--- Not scoped by any owner column — it's the SINGLETON catalog.
--- Copied into template_* (per-tenant) and pub_template_* (public-API user) on provision.
--- Lives in the control-plane entity of the main DB (jeffi_production_ready today).
+-- Platform messaging-templates catalog (singleton, admin-owned) — RESERVED, currently unused.
+-- Tenant-facing defaults are NOT copied on provision: they live in template_* under the platform
+-- tenant (tenant_id = 00000000-…) in the flagship DB and are merged at read time by
+-- messaging-service (templates-v2 *WithDefaults) with the tenant's own template_* rows.
+-- These tables remain for the public-API customer copy (pub_template_*) story below.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.platform_template_family (
