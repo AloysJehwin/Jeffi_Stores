@@ -61,20 +61,59 @@ Return ONLY JSON: {"result":"<text>"} — no explanation, no markdown fences.`
   return [{ role: 'system' as const, content: system }, { role: 'user' as const, content: user }]
 }
 
+const TOKEN = /\{\{?\s*(#if\s+[a-zA-Z_]\w*|\/if|[a-zA-Z_]\w*|\d+)\s*\}?\}/g
+const tokens = (t: string) => [...t.matchAll(TOKEN)].map(m => ({ raw: m[0], key: m[1].replace(/\s+/g, ' ') }))
+
+/**
+ * Models drift on merge tags (brace style, dropped slots, invented tokens). Put every original token
+ * back in its exact form; report what cannot be repaired so the caller can retry or fail.
+ */
+export function preserveTokens(original: string, result: string, allowed: Set<string>): { text: string; problems: string[] } {
+  const want = tokens(original)
+  let text = result
+  const problems: string[] = []
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  // Exact form only: "{x}" inside "{{x}}" does not count.
+  const exact = (raw: string) => new RegExp(`(?<!\\{)${esc(raw)}(?!\\})`).test(text)
+  for (const t of want) {
+    if (exact(t.raw)) continue
+    // Same key, different braces → normalise back.
+    const alt = text.match(new RegExp(`\\{\\{?\\s*${esc(t.key)}\\s*\\}?\\}`))
+    if (alt) text = text.replace(alt[0], t.raw)
+    else problems.push(`missing ${t.raw}`)
+  }
+  const wantKeys = new Set(want.map(t => t.key))
+  for (const t of tokens(text)) {
+    if (wantKeys.has(t.key) || allowed.has(t.key) || /^(#if|\/if)/.test(t.key)) continue
+    problems.push(`invented ${t.raw}`)
+  }
+  return { text, problems }
+}
+
 /** Runs the model and returns the enriched text (throws with a user-facing message on failure). */
 export async function enrichField(i: EnrichInput): Promise<string> {
   if (!i.write && i.value.trim().length < 2) throw Object.assign(new Error('Value too short to enrich'), { status: 400 })
-  const r = await aiChat({
-    modelHint: 'enrich',
-    jsonMode: true,
-    temperature: i.value.trim() ? 0.3 : 0.6,
-    noCache: true,
-    messages: buildEnrichMessages(i),
-  })
-  const obj = parseAiJson<{ result?: string }>(r.content)
-  const result = String(obj?.result || '').trim()
-  if (!result) throw Object.assign(new Error('AI returned an empty result'), { status: 502 })
-  return i.maxLength && result.length > i.maxLength ? result.slice(0, i.maxLength) : result
+  const allowed = new Set([...(i.builtins ?? BUILTIN_TEMPLATE_VARIABLES).map(d => d.key), ...(i.variables ?? [])])
+  // WhatsApp bodies: only the numbered slots that already exist may be used.
+  if (i.format === 'whatsapp') allowed.clear()
+  const messages = buildEnrichMessages(i)
+  let strict = ''
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await aiChat({
+      modelHint: 'enrich',
+      jsonMode: true,
+      temperature: i.value.trim() ? 0.3 : 0.6,
+      noCache: true,
+      messages: strict ? [...messages, { role: 'user' as const, content: strict }] : messages,
+    })
+    const obj = parseAiJson<{ result?: string }>(r.content)
+    const raw = String(obj?.result || '').trim()
+    if (!raw) throw Object.assign(new Error('AI returned an empty result'), { status: 502 })
+    const { text, problems } = preserveTokens(i.value, raw, allowed)
+    if (!problems.length) return i.maxLength && text.length > i.maxLength ? text.slice(0, i.maxLength) : text
+    strict = `Your previous answer broke the merge-variable rules (${problems.join(', ')}). Rewrite it: keep every original token exactly as written and add no new tokens. Return only {"result":"…"}.`
+  }
+  throw Object.assign(new Error('AI kept changing the merge variables — try again or edit by hand'), { status: 502 })
 }
 
 export function parseEnrichBody(body: any) {
