@@ -25,6 +25,7 @@ import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import { resolveSubscriptionTenant, runInTenant, type WebhookTenant } from '@/lib/payments/webhook-tenant'
 import { processSubscriptionEvent } from '@/lib/subscriptions/cycle'
+import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 
 // Customer-subscription events we route to handleSubscriptionEvent. Kept as a Set so the POST
 // dispatch stays a single membership test and new states only touch this list.
@@ -250,6 +251,24 @@ async function handlePaymentCaptured(payment: any) {
      LIMIT 1`,
     [razorpayOrderId]
   )
+
+  // Product-adjustment top-up (fallback when the browser never reached verify). Its notes name the tenant,
+  // so the lookup and the apply run against that tenant's database.
+  if (payment?.notes?.purpose === 'order_adjustment' && razorpayOrderId) {
+    const slug = (payment.notes.tenant_slug ?? '').toString().trim()
+    const { lookupTenantContextBySlug } = await import('@/lib/tenant-registry')
+    const ctx = slug ? await lookupTenantContextBySlug(slug).catch(() => null) : null
+    const { settleAdjustmentPayment } = await import('@/lib/orders/adjustments')
+    const run = () =>
+      settleAdjustmentPayment({
+        razorpayOrderId,
+        razorpayPaymentId,
+        amountPaise: Number(payment.amount) || 0,
+        tenant: ctx ? { tenantId: ctx.tenantId, slug: ctx.slug } : null,
+      })
+    await (ctx ? runWithTenantContext(ctx, run) : run()).catch(e => console.error('[webhook] order adjustment settle failed', e))
+    return
+  }
 
   if (!paymentRecord) {
     // Variant-change top-up: order created for a pending variant_change request.

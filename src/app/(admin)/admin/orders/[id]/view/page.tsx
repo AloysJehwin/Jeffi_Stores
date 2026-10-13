@@ -22,7 +22,7 @@ import InitiateRefundButton from '@/app/(admin)/admin/orders/[id]/_components/In
 import RetryPaymentEmailButton from '@/app/(admin)/admin/orders/[id]/_components/RetryPaymentEmailButton'
 import CreateShipmentButton from '@/app/(admin)/admin/orders/[id]/_components/CreateShipmentButton'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
-import VariantChangeRequest from '@/app/(admin)/admin/orders/[id]/_components/VariantChangeRequest'
+import ProductAdjustments from '@/app/(admin)/admin/orders/[id]/_components/ProductAdjustments'
 import AddressChangeReview from '@/app/(admin)/admin/orders/[id]/_components/AddressChangeReview'
 import { listAddressChangeRequests, addressChangeBlockReason } from '@/lib/orders/address-change'
 import CustomerMailPanel from '@/app/(admin)/admin/orders/[id]/_components/CustomerMailPanel'
@@ -890,15 +890,17 @@ export default async function OrderDetailsPage({
           />
 
           {order.status === 'confirmed' && !order.awb_number && canWrite && (
-            <VariantChangeRequest
+            <ProductAdjustments
               orderId={order.id}
               items={(order.order_items || []).map((it: any) => ({
                 id: it.id,
                 productId: it.product_id,
                 productName: it.product_name,
-                variantName: it.variant_name,
-                unitPrice: Number(it.unit_price),
                 quantity: Number(it.quantity),
+                unit: it.sold_unit || (it.buy_unit && it.buy_unit !== 'unit' ? it.buy_unit : null),
+                unitPrice: Number(it.unit_price),
+                totalPrice: Number(it.total_price),
+                isDigital: !!it.is_digital,
               }))}
             />
           )}

@@ -95,6 +95,18 @@ interface OrderDetails {
     phone: string
   } | null
   items: OrderItem[]
+  pendingAdjustment?: {
+    id: string
+    status: string
+    settlement_type: 'refund' | 'collect' | 'cod_adjust' | 'none'
+    net_diff: string | number
+    new_total: string | number
+    lines: Array<{
+      action: 'switch' | 'remove' | 'quantity'
+      old: { name: string; quantity: number; unit: string | null }
+      new: { productName: string; quantity: number; unit: string | null; total: number } | null
+    }> | null
+  } | null
   pendingVariantChange?: {
     id: string
     productName: string
@@ -576,11 +588,29 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  const handleConfirmVariantChange = async () => {
+  const handleConfirmVariantChange = () => confirmChange(`/api/orders/${order?.id}/variant-change/confirm`, 'Variant change')
+  const handleConfirmAdjustment = (adjId: string) => confirmChange(`/api/orders/${order?.id}/adjustments/${adjId}/confirm`, 'Order changes')
+  const handleRejectAdjustment = async (adjId: string) => {
     if (!order) return
     setVcrBusy(true)
     try {
-      const res = await fetch(`/api/orders/${order.id}/variant-change/confirm`, {
+      const res = await fetch(`/api/orders/${order.id}/adjustments/${adjId}/reject`, { method: 'POST', credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Could not decline the changes')
+      await fetchOrder()
+    } catch (err: any) {
+      showToast(err.message, 'error')
+    } finally {
+      setVcrBusy(false)
+    }
+  }
+
+  // Confirm a proposed change; when extra is due, pay it in Checkout (on the store's own keys) and verify.
+  async function confirmChange(confirmUrl: string, label: string) {
+    if (!order) return
+    setVcrBusy(true)
+    try {
+      const res = await fetch(confirmUrl, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -597,7 +627,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           amount: data.amount,
           currency: data.currency,
           name: storeIdentity.name,
-          description: `Variant change — Order #${order.orderNumber}`,
+          description: `${label} — Order #${order.orderNumber}`,
           order_id: data.razorpayOrderId,
           handler: async function (response: any) {
             try {
@@ -1064,6 +1094,48 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             )}
 
             {/* Pending variant-change request — awaiting this customer's approval */}
+            {order.pendingAdjustment && (() => {
+              const a = order.pendingAdjustment
+              const amt = `₹${Math.abs(Number(a.net_diff)).toFixed(2)}`
+              const qty = (q: number, u: string | null) => `${q}${u ? ` ${u}` : ''}`
+              return (
+                <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+                  <h3 className="font-semibold text-foreground">
+                    {a.status === 'awaiting_payment' ? 'Complete the payment to apply the changes' : 'Changes to your order need your approval'}
+                  </h3>
+                  <ul className="mt-2 space-y-1 text-sm text-foreground-secondary">
+                    {(a.lines || []).map((l, i) => (
+                      <li key={i}>
+                        {l.action === 'remove' ? (
+                          <>Remove <span className="line-through">{l.old.name}</span> ({qty(l.old.quantity, l.old.unit)})</>
+                        ) : l.action === 'quantity' ? (
+                          <>{l.old.name}: {qty(l.old.quantity, l.old.unit)} → <strong>{qty(l.new!.quantity, l.new!.unit)}</strong></>
+                        ) : (
+                          <><span className="line-through">{l.old.name}</span> → <strong>{l.new!.productName}</strong> ({qty(l.new!.quantity, l.new!.unit)})</>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-sm mt-2">
+                    {a.settlement_type === 'refund' ? <>We&apos;ll <strong>refund {amt}</strong> to your original payment.</>
+                      : a.settlement_type === 'collect' ? <>An extra <strong>{amt}</strong> is payable — you&apos;ll pay it securely on confirm.</>
+                      : a.settlement_type === 'cod_adjust' ? <>Your new total is <strong>₹{Number(a.new_total).toFixed(2)}</strong>, payable on delivery.</>
+                      : <>No change to what you pay.</>}
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <button onClick={() => handleConfirmAdjustment(a.id)} disabled={vcrBusy}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg disabled:opacity-50">
+                      {vcrBusy ? 'Processing…' : a.settlement_type === 'collect' ? `Confirm & pay ${amt}` : 'Confirm changes'}
+                    </button>
+                    <button onClick={() => handleRejectAdjustment(a.id)} disabled={vcrBusy}
+                      className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground disabled:opacity-50">
+                      Decline
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
+
             {order.pendingVariantChange && order.pendingVariantChange.status === 'pending_customer' && (
               <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
                 <div className="flex items-start gap-3">

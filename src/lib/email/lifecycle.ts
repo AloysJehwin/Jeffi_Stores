@@ -340,6 +340,65 @@ export async function sendVariantChangeRequestedEmail(params: {
   }
 }
 
+export async function sendOrderAdjustmentEmail(params: {
+  customerEmail: string
+  customerName: string
+  orderNumber: string
+  orderId: string
+  changes: Array<{ action: 'switch' | 'remove' | 'quantity'; from: string; to: string | null }>
+  netDiff: number
+  settlementType: 'refund' | 'collect' | 'cod_adjust' | 'none'
+  newTotal: number
+}): Promise<{ success: boolean; messageId?: string; error?: unknown }> {
+  const from = await customerMailFromAsync()
+  const brand = await currentBrandNameAsync()
+  const orderUrl = await orderUrlById(params.orderId)
+  const amt = `&#8377;${Math.abs(params.netDiff).toFixed(2)}`
+  const money =
+    params.settlementType === 'refund'
+      ? `We'll <strong>refund ${amt}</strong> to your original payment once you confirm.`
+      : params.settlementType === 'collect'
+        ? `An additional <strong>${amt}</strong> is payable — you'll pay it securely when you confirm.`
+        : params.settlementType === 'cod_adjust'
+          ? `Your order total becomes <strong>&#8377;${params.newTotal.toFixed(2)}</strong>, payable on delivery.`
+          : `There is no change to what you pay.`
+  const rows = params.changes
+    .map(c =>
+      c.action === 'remove'
+        ? `<p style="margin:0 0 8px;"><span style="color:#ef4444;">Removed:</span> ${c.from}</p>`
+        : `<p style="margin:0 0 8px;"><span style="color:#6b7280;">${c.action === 'quantity' ? 'Quantity' : 'Replace'}:</span> ${c.from} &#8594; <strong>${c.to}</strong></p>`
+    )
+    .join('')
+  const html = mailShell({
+    brand,
+    kicker: 'Order Update',
+    title: 'Changes to your order',
+    content: `
+      <p>Hi ${params.customerName || 'there'},</p>
+      <p>We'd like to make these changes to your order <strong>${params.orderNumber}</strong>. Please review and confirm:</p>
+      <div class="card">${rows}</div>
+      <p>${money}</p>
+      <div class="cta"><a href="${orderUrl}" class="button">Review &amp; Confirm</a></div>
+      <p class="muted" style="text-align:center;">Nothing changes until you confirm. You can also decline.</p>
+    `,
+  })
+  try {
+    const info = await sendAuditedMail({
+      from,
+      to: params.customerEmail,
+      subject: `Action needed: changes to order ${params.orderNumber}`,
+      html,
+      kind: 'variant_change_requested',
+      templateName: 'order_adjustment_requested',
+      entityType: 'orders',
+      entityId: params.orderId,
+    })
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
 /**
  * Operational report for background jobs (marketplace syncs and similar).
  *
