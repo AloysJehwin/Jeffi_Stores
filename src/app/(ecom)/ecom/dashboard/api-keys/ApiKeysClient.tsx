@@ -84,7 +84,10 @@ export default function ApiKeysClient({ services, review, docsUrl }: { services:
           <pre className="mt-4 rounded-xl bg-[#2a2822] text-[#f3ead9] p-4 text-xs overflow-x-auto">{`curl ${docsUrl}/v1/messages \\
   -H "Authorization: Bearer ${created}" \\
   -H "Content-Type: application/json" \\
-  -d '{"channel":"sms","to":"9876543210","template":"system/otp","variables":{"code":"4821","brand":"Nova","minutes":5}}'`}</pre>
+  -d '${services.messaging
+    ? '{"channel":"sms","to":"+91<your mobile number>","template":"otp/login","variables":{"code":"4821","ttl_minutes":"10"}}'
+    : '{"seller":{"name":"Your Store","state":"Karnataka"},"buyer":{"name":"Priya Sharma","state":"Tamil Nadu"},"items":[{"description":"Cordless drill","quantity":1,"unit_price":6499}]}'}'`.replace('/v1/messages', services.messaging ? '/v1/messages' : '/v1/documents/invoice')}</pre>
+          <p className="mt-2 text-xs text-foreground-secondary">Replace the number with yours to receive it. Every template and its variables are listed under Messaging → Templates (Send via API).</p>
           <button onClick={() => setCreated(null)} className="mt-4 text-sm org-brown font-semibold hover:underline">Done</button>
         </div>
       )}
