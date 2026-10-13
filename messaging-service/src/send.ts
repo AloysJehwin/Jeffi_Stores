@@ -67,7 +67,7 @@ interface Ctx {
 }
 
 // v2 library (tenant copy → platform default) first; legacy message_templates as fallback.
-async function resolveTemplate(tenantId: string, channel: string, slug: string, space: tpl.Space = 'store') {
+export async function resolveTemplate(tenantId: string, channel: string, slug: string, space: tpl.Space = 'store') {
   const { pools } = await poolsForTenant(tenantId)
   let t = await tpl.findBySlugWithDefaults(pools, tenantId, channel, slug, 'en', space)
   // WhatsApp only delivers approved templates: a tenant copy that isn't approved yet falls back to the
