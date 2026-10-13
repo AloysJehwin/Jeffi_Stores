@@ -3,7 +3,6 @@ import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { queryOne, query, resolveRequestTenant } from '@/lib/shared/db'
 import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/payments/razorpay'
 import { applyVariantChange } from '@/lib/orders/variant-change'
-import { applyRouteRefund } from '@/lib/payments/route-settlement'
 import { logActivity } from '@/lib/shared/activity'
 
 export const dynamic = 'force-dynamic'
@@ -43,60 +42,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const priceDiff = Number(vcr.price_diff)
     const settlement = vcr.settlement_type as 'refund' | 'collect' | 'cod_adjust' | 'none'
 
-    // ── REFUND: partial Razorpay refund of the difference, then apply ──────────
+    // ── REFUND: apply now; an admin issues the refund from the order page ─────
     if (settlement === 'refund') {
-      if (!(await isRazorpayEnabled()))
-        return NextResponse.json({ error: 'Payment gateway not configured.' }, { status: 400 })
-      const paymentOrderId = vcr.original_order_id || orderId
-      const payment = await queryOne<any>(
-        `SELECT id, transaction_id, gateway_response FROM payments
-         WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed' LIMIT 1`,
-        [paymentOrderId]
-      )
-      if (!payment?.transaction_id)
-        return NextResponse.json({ error: 'No Razorpay payment found to refund against.' }, { status: 400 })
-
-      const diffPaise = Math.round(Math.abs(priceDiff) * 100)
-      // Tenant-aware: getRazorpayInstanceFor refunds from the account that collected (own keys, else
-      // platform). applyRouteRefund decides own-vs-platform ledger effects and claws back the tenant's
-      // share of the diff. This usually runs BEFORE dispatch, so the transfer is still on_hold and the
-      // reversal is the cleanest of the three refund paths.
-      const tenant = await resolveRequestTenant()
-      const { instance: razorpay } = await getRazorpayInstanceFor(tenant?.tenantId)
-      const refund = await razorpay.payments.refund(payment.transaction_id, { amount: diffPaise })
-
-      const outcome = await applyRouteRefund({
-        tenantId: tenant?.tenantId,
-        paymentId: payment.transaction_id,
-        refundId: refund.id,
-        refundPaise: diffPaise,
-        orderRef: vcr.order_number,
-      })
-      if (outcome.unrecoveredPaise > 0) {
-        console.error(
-          `[variant-change] transfer reversal INCOMPLETE order=${orderId} payment=${payment.transaction_id} ` +
-            `unrecoveredPaise=${outcome.unrecoveredPaise}`
-        )
-      }
-
-      const existing =
-        typeof payment.gateway_response === 'string'
-          ? JSON.parse(payment.gateway_response)
-          : payment.gateway_response || {}
-      // Keep payment_status = 'paid' (this is a partial diff refund, not a full refund).
-      await query(`UPDATE payments SET gateway_response = $1, updated_at = NOW() WHERE id = $2`, [
-        JSON.stringify({ ...existing, variantChangeRefund: refund }),
-        payment.id,
-      ])
-      await query(`UPDATE variant_change_requests SET refund_id = $1, updated_at = NOW() WHERE id = $2`, [
-        refund.id,
-        vcr.id,
-      ])
-
       const applied = await applyVariantChange(vcr.id)
       if (!applied.applied)
         return NextResponse.json({ error: `Could not apply change: ${applied.reason}` }, { status: 409 })
-      return NextResponse.json({ success: true, settlement: 'refund', refundId: refund.id })
+      return NextResponse.json({ success: true, settlement: 'refund_pending' })
     }
 
     // ── COD adjust / no-diff: just apply ───────────────────────────────────────

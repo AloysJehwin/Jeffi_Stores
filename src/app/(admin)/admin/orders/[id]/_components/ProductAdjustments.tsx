@@ -231,7 +231,11 @@ export default function ProductAdjustments({ orderId, items }: { orderId: string
           {history.map(h => (
             <div key={h.id} className="rounded-lg border border-border-default px-3 py-2 text-xs space-y-1">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-foreground">{STATUS[h.status] ?? h.status}{h.legacy ? ' · variant change' : ''}</span>
+                <span className="font-semibold text-foreground">
+                  {STATUS[h.status] ?? h.status}{h.legacy ? ' · variant change' : ''}
+                  {h.refund_status === 'pending' && <span className="ml-1.5 text-amber-600">· refund pending — use “Refund for approved changes”</span>}
+                  {h.refund_status === 'refunded' && <span className="ml-1.5 text-green-600">· refunded</span>}
+                </span>
                 <span className="text-foreground-muted">
                   {Number(h.net_diff) === 0 ? 'no difference' : `${Number(h.net_diff) < 0 ? 'refund' : 'extra'} ${inr(Number(h.net_diff))}`} · {new Date(h.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                 </span>

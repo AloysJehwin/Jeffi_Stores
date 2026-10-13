@@ -1080,6 +1080,10 @@ ALTER TABLE ONLY public.order_adjustments
     ADD CONSTRAINT order_adjustments_status_check
     CHECK (status::text = ANY (ARRAY['pending_customer'::text, 'awaiting_payment'::text, 'applied'::text, 'rejected'::text, 'cancelled'::text]));
 
+ALTER TABLE ONLY public.order_adjustments
+    ADD CONSTRAINT order_adjustments_refund_status_check
+    CHECK (refund_status IS NULL OR refund_status::text = ANY (ARRAY['pending'::text, 'refunded'::text]));
+
 ALTER TABLE ONLY public.order_adjustment_lines
     ADD CONSTRAINT order_adjustment_lines_pkey PRIMARY KEY (id);
 

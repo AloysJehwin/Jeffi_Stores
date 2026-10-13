@@ -3,12 +3,11 @@ import { authenticateAnyUser as authenticateUser } from '@/lib/auth/jwt'
 import { queryOne, query, resolveRequestTenant } from '@/lib/shared/db'
 import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/payments/razorpay'
 import { applyAdjustment } from '@/lib/orders/adjustments'
-import { refundAcrossPayments } from '@/lib/payments/refund'
 
 export const dynamic = 'force-dynamic'
 
 // POST — the customer accepts the proposed changes.
-//   refund      → refund the difference across the order's payments (tenant's keys), then apply
+//   refund      → apply; the refund is issued by an admin from the order page
 //   collect     → open a Razorpay order on the tenant's keys; applied by verify/webhook once paid
 //   cod_adjust / none → apply now
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string; adjId: string }> }) {
@@ -32,34 +31,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const amount = Math.abs(Number(adj.net_diff))
     const tenant = await resolveRequestTenant()
 
+    // Refund owed: the change applies now; the refund itself waits for an admin to issue it from the
+    // order page (every refund is an explicit admin action).
     if (adj.settlement_type === 'refund') {
-      if (!(await isRazorpayEnabled())) return NextResponse.json({ error: 'Payment gateway not configured.' }, { status: 400 })
-      // Claim first so a double click can't refund twice.
-      const claimed = await queryOne(
-        `UPDATE order_adjustments SET status = 'awaiting_payment', updated_at = NOW() WHERE id = $1 AND status = 'pending_customer' RETURNING id`,
-        [adjId]
-      )
-      if (!claimed) return NextResponse.json({ error: 'This change is already being processed.' }, { status: 409 })
-      try {
-        const { refunds } = await refundAcrossPayments({
-          orderId: adj.original_order_id || orderId,
-          amount,
-          orderRef: adj.order_number,
-          purpose: 'order_adjustment',
-          tenantId: tenant?.tenantId,
-        })
-        await query(`UPDATE order_adjustments SET refunds = $1::jsonb, updated_at = NOW() WHERE id = $2`, [JSON.stringify(refunds), adjId])
-      } catch (e: any) {
-        const done = e?.refunds ?? []
-        await query(`UPDATE order_adjustments SET status = $1, refunds = $2::jsonb, updated_at = NOW() WHERE id = $3`, [
-          done.length ? 'awaiting_payment' : 'pending_customer', JSON.stringify(done), adjId,
-        ])
-        console.error(`[order-adjustment] refund failed adj=${adjId}`, e)
-        return NextResponse.json({ error: e?.error?.description || e?.message || 'Refund failed — please contact support.' }, { status: 502 })
-      }
       const r = await applyAdjustment(adjId)
-      if (!r.applied && r.reason !== 'already_applied') return NextResponse.json({ error: `Refunded, but the change could not be applied: ${r.reason}. Contact support.` }, { status: 409 })
-      return NextResponse.json({ success: true, settlement: 'refund' })
+      if (!r.applied && r.reason !== 'already_applied') return NextResponse.json({ error: `Could not apply the change: ${r.reason}` }, { status: 409 })
+      await query(`UPDATE order_adjustments SET refund_status = 'pending', updated_at = NOW() WHERE id = $1 AND refund_status IS NULL`, [adjId])
+      return NextResponse.json({ success: true, settlement: 'refund_pending' })
     }
 
     if (adj.settlement_type === 'collect') {
