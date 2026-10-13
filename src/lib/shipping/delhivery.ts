@@ -435,17 +435,18 @@ export async function createRVPShipment(params: {
     quantity,
   } = params
 
-  const rawPhone = params.phone.replace(/\D/g, '')
-  const phone = rawPhone.length === 12 && rawPhone.startsWith('91') ? rawPhone.slice(2) : rawPhone.slice(-10)
+  const c = courierConsignee({ name: consigneeName, phones: [params.phone], addressParts: [address], city, state })
+  if (!c.ok) throw new Error(c.error)
+  const phone = c.phone
 
   const shipmentPayload = {
     shipments: [
       {
-        name: consigneeName,
-        add: address,
+        name: c.name,
+        add: c.address,
         pin,
-        city,
-        state,
+        city: c.city,
+        state: c.state,
         country: 'India',
         phone,
         order: `RVP-${invoiceRef}`,
@@ -647,4 +648,47 @@ export async function fetchDelhiveryInvoiceCharges(q: InvoiceChargeQuery): Promi
     console.warn(`[delhivery] invoice charges failed for ${q.awb}:`, err)
     return null
   }
+}
+
+// Delhivery rejects packages whose consignee looks fake or carries characters it can't store
+// (ER0005 "suspicious order/consignee"): placeholder phones (9999999999), symbols like & # ; % " and
+// emoji/newlines in the name or address. Every shipment's consignee goes through this first.
+const courierText = (s: string | null | undefined, max: number) =>
+  (s ?? '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[^A-Za-z0-9 ,.\-/()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s*(,\s*)+/g, ', ')
+    .replace(/^[\s,.-]+|[\s,.-]+$/g, '')
+    .slice(0, max)
+    .trim()
+
+export function courierPhone(raw: string | null | undefined): string | null {
+  let d = String(raw ?? '').replace(/\D/g, '')
+  if (d.length === 12 && d.startsWith('91')) d = d.slice(2)
+  else if (d.length === 11 && d.startsWith('0')) d = d.slice(1)
+  if (!/^[6-9]\d{9}$/.test(d)) return null
+  if (/^(\d)\1{9}$/.test(d) || d === '1234567890' || d === '9876543210') return null
+  return d
+}
+
+/** Courier-safe consignee fields, or the reason the order can't be shipped as-is (shown to the admin). */
+export function courierConsignee(o: {
+  name?: string | null
+  phones: Array<string | null | undefined>
+  addressParts: Array<string | null | undefined>
+  city?: string | null
+  state?: string | null
+}): { ok: true; name: string; phone: string; address: string; city: string; state: string } | { ok: false; error: string } {
+  const name = courierText(o.name, 60)
+  const phone = o.phones.map(courierPhone).find(Boolean) ?? null
+  const address = courierText(o.addressParts.filter(Boolean).join(', '), 200)
+  const problems: string[] = []
+  if (!/[A-Za-z]{2,}/.test(name) || /^(test|customer|na|n\/a|abc|xyz)$/i.test(name)) problems.push('a real consignee name')
+  if (!phone) problems.push('a valid 10-digit mobile number')
+  if (address.replace(/[^A-Za-z0-9]/g, '').length < 10) problems.push('a complete street address')
+  if (problems.length) return { ok: false, error: `Delhivery will reject this shipment as suspicious — the delivery address needs ${problems.join(', ')}. Edit the order's address and try again.` }
+  return { ok: true, name, phone: phone!, address, city: courierText(o.city, 50), state: courierText(o.state, 50) }
 }
