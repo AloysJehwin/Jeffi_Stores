@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '../_components/Card'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
+import Pager from '../_components/Pager'
 
 interface Entry { entry_type: string; category: string | null; amount: number; note: string | null; occurred_at: string }
 
@@ -14,6 +15,7 @@ export default function WalletClient({ initial, keyId, tenantName }: { initial: 
   const [amount, setAmount] = useState(1000)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
 
   async function topUp() {
     setBusy(true); setMsg(null)
@@ -55,8 +57,9 @@ export default function WalletClient({ initial, keyId, tenantName }: { initial: 
       </Card>
       <Card title="Ledger">
         <div className="-mx-6 -mb-6 overflow-x-auto"><table className="w-full text-sm min-w-[560px]"><thead className="org-sand text-foreground-secondary"><tr>{['When', 'Category', 'Amount', 'Note'].map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
-          <tbody className="divide-y divide-border-default">{initial.ledger.map((e, i) => <tr key={i}><td className="px-6 py-2.5 whitespace-nowrap text-foreground-secondary">{fmtDate(e.occurred_at)}</td><td className="px-6 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${e.amount >= 0 ? STATUS_PILL.captured : 'org-sand'}`}>{(e.category ?? e.entry_type).replace(/_/g, ' ')}</span></td><td className={`px-6 py-2.5 font-semibold tabular-nums ${e.amount >= 0 ? 'text-green-600' : ''}`}>{e.amount >= 0 ? '+' : '−'}{fmt(e.amount)}</td><td className="px-6 py-2.5 text-xs text-foreground-secondary">{e.note ?? '—'}</td></tr>)}</tbody></table></div>
+          <tbody className="divide-y divide-border-default">{initial.ledger.slice((page - 1) * 20, page * 20).map((e, i) => <tr key={i}><td className="px-6 py-2.5 whitespace-nowrap text-foreground-secondary">{fmtDate(e.occurred_at)}</td><td className="px-6 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${e.amount >= 0 ? STATUS_PILL.captured : 'org-sand'}`}>{(e.category ?? e.entry_type).replace(/_/g, ' ')}</span></td><td className={`px-6 py-2.5 font-semibold tabular-nums ${e.amount >= 0 ? 'text-green-600' : ''}`}>{e.amount >= 0 ? '+' : '−'}{fmt(e.amount)}</td><td className="px-6 py-2.5 text-xs text-foreground-secondary">{e.note ?? '—'}</td></tr>)}</tbody></table></div>
       </Card>
+      <Pager page={page} total={initial.ledger.length} onPage={setPage} />
     </div>
   )
 }

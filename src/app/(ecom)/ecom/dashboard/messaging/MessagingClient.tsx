@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Mail, MessageSquare, MessageCircle, Plus, Search } from 'lucide-react'
 import { Card } from '../_components/Card'
 import { SkeletonRows } from '../_components/Skeleton'
+import Pager, { useCursorPages } from '../_components/Pager'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
@@ -23,7 +24,7 @@ export default function MessagingClient() {
   const [tab, setTab] = useState<'log' | 'templates'>('log')
   const { showToast } = useToast()
   const [channel, setChannel] = useState<Channel>('email')
-  const [msgs, setMsgs] = useState<Msg[] | null>(null)
+  const { items: msgs, page: logPage, hasNext: logNext, go: logGo } = useCursorPages<Msg>(`${API}/messages`)
   const [items, setItems] = useState<ListItem[] | null>(null)
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<EditorTemplate | null>(null)
@@ -35,9 +36,6 @@ export default function MessagingClient() {
     return fetch(`${API}/v2/templates?channel=${channel}`).then(r => r.json()).then(d => setItems(d.items ?? [])).catch(() => setItems([]))
   }, [channel])
 
-  useEffect(() => {
-    fetch(`${API}/messages?limit=100`).then(r => r.json()).then(d => setMsgs(d.items ?? [])).catch(() => setMsgs([]))
-  }, [])
   useEffect(() => { if (tab === 'templates') loadTpls() }, [tab, loadTpls])
 
   const grouped = useMemo(() => {
@@ -95,12 +93,15 @@ export default function MessagingClient() {
       </div>
 
       {tab === 'log' && (
+        <div>
         <Card>
           {msgs === null ? <SkeletonRows rows={6} cols={5} /> : msgs.length === 0 ? <p className="text-sm text-foreground-secondary">No messages yet.</p> : (
             <div className="-m-6 overflow-x-auto"><table className="w-full text-sm min-w-[720px]"><thead className="org-sand text-foreground-secondary"><tr>{['When', 'Channel', 'To', 'Template', 'Status', 'Charged'].map(h => <th key={h} className="px-6 py-2 text-left text-xs font-semibold">{h}</th>)}</tr></thead>
               <tbody className="divide-y divide-border-default">{msgs.map(m => <tr key={m.id}><td className="px-6 py-2.5 whitespace-nowrap text-foreground-secondary">{fmtDate(m.created_at)}</td><td className="px-6 py-2.5 capitalize">{m.channel}</td><td className="px-6 py-2.5 font-mono text-xs">{m.to}</td><td className="px-6 py-2.5 text-xs">{m.template ?? '—'}</td><td className="px-6 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${TONE[m.status] ?? 'org-sand'}`} title={m.error ?? ''}>{m.status}</span></td><td className="px-6 py-2.5 tabular-nums">{fmt(m.charged_inr)}</td></tr>)}</tbody></table></div>
           )}
         </Card>
+        <Pager page={logPage} hasNext={logNext} onPage={logGo} />
+        </div>
       )}
 
       {tab === 'templates' && (
