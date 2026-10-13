@@ -23,7 +23,7 @@ export default function BlogTeaserEditor(props: EditorProps) {
           { key: 'title', label: 'Title', placeholder: 'How to choose the right drill bit' },
           { key: 'excerpt', label: 'Summary', kind: 'textarea' },
           { key: 'url', label: 'Link', placeholder: 'https://… or /page' },
-          { key: 'imageUrl', label: 'Image URL', placeholder: 'https://…' },
+          { key: 'imageUrl', label: 'Image', kind: 'image', placeholder: 'https://… or upload' },
         ]}
         blank={{ title: '', excerpt: '', url: '', imageUrl: '' }}
         disabled={!canWrite}

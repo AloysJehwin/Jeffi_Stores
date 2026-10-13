@@ -6,6 +6,7 @@ import {
   CtaFields,
   Grid,
   HeadingFields,
+  Image,
   LABEL_CLASS,
   Text,
   TextArea,
@@ -44,12 +45,12 @@ export default function AboutEditor(props: EditorProps) {
         hint={copyHint(body == null && !!d.body)}
         onCommit={v => b.saveConfig({ body: optional(v) })}
       />
-      <Text
+      <Image
         label="Photo"
         value={imageUrl ?? d.imageUrl ?? ''}
         disabled={!canWrite}
-        placeholder="/images/about.jpg or https://…"
-        hint={copyHint(imageUrl == null && !!d.imageUrl, 'Image URL shown beside the story.')}
+        placeholder="/images/about.jpg, https://… or upload"
+        hint={copyHint(imageUrl == null && !!d.imageUrl, 'Image shown beside the story.')}
         onCommit={v => b.saveConfig({ imageUrl: optional(v) })}
       />
       <div>

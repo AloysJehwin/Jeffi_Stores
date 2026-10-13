@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Braces, ImageIcon, Link2, MessageCircle } from 'lucide-react'
 import { BUILTIN_TEMPLATE_VARIABLES } from '@/lib/templates/variables-shared'
+import ImageUrlInput from '@/components/admin/ImageUrlInput'
 
 // Every parameter an approved WhatsApp template needs on send: body {{n}} slots, plus the header
 // image and link button of `_action` templates (their {{n}} sit after a Meta-approved prefix).
@@ -125,11 +126,8 @@ export default function WaParamsForm({ params, vars, setVars, mediaUrl, setMedia
       {params.media && (
         <div>
           <label className="flex items-center gap-1.5 text-sm font-medium text-foreground"><ImageIcon className="w-3.5 h-3.5" /> Header image</label>
-          <p className="mb-1.5 text-[11px] text-foreground-muted">An image URL starting with <code>{params.media.prefix}</code> (any product or banner image from your store). Leave empty to use your store logo.</p>
-          <div className="flex gap-3">
-            <input value={mediaUrl} onChange={e => setMediaUrl(e.target.value.trim())} placeholder={`${params.media.prefix}${params.media.sample || 'products/…/photo.jpg'}`} className={`${inputClass} flex-1 min-w-0`} />
-            {mediaUrl && !badImage && /* eslint-disable-next-line @next/next/no-img-element */ <img src={mediaUrl} alt="" className="h-10 w-10 shrink-0 rounded object-cover" />}
-          </div>
+          <p className="mb-1.5 text-[11px] text-foreground-muted">Upload an image, or paste a URL starting with <code>{params.media.prefix}</code> (any product or banner image from your store). Leave empty to use your store logo.</p>
+          <ImageUrlInput value={mediaUrl} onChange={v => setMediaUrl(v.trim())} placeholder={`${params.media.prefix}${params.media.sample || 'products/…/photo.jpg'}`} className={inputClass} />
           {badImage && <p className="mt-1 text-xs text-red-600">WhatsApp only accepts images under {params.media.prefix} for this template.</p>}
         </div>
       )}

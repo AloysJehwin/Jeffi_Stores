@@ -20,7 +20,7 @@ export default function SocialStripEditor(props: EditorProps) {
         hint="Each photo links to a post. Posts without an image or link are not shown."
         tiles={items}
         fields={[
-          { key: 'imageUrl', label: 'Image URL', placeholder: 'https://…' },
+          { key: 'imageUrl', label: 'Image', kind: 'image', placeholder: 'https://… or upload' },
           { key: 'url', label: 'Post link', placeholder: 'https://instagram.com/p/…' },
           { key: 'caption', label: 'Caption', placeholder: 'Shown on hover' },
         ]}

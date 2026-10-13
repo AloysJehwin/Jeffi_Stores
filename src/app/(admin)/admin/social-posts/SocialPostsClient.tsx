@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import ImageUrlInput from '@/components/admin/ImageUrlInput'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -407,13 +408,7 @@ export default function SocialPostsClient({ canWrite: canWriteProp = false }: { 
               <label className={labelCls}>
                 Image URL {platform === 'ig' && <span className="text-red-500">*</span>}
               </label>
-              <input
-                type="text"
-                value={imageUrl}
-                onChange={e => setImageUrl(e.target.value)}
-                className={inputCls}
-                placeholder="https://…"
-              />
+              <ImageUrlInput value={imageUrl} onChange={setImageUrl} className={inputCls} placeholder="https://… or upload" />
             </div>
             <div>
               <label className={labelCls}>

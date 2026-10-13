@@ -264,7 +264,7 @@ function TemplatesPanel({ base, onChanged }: { base: string; onChanged: () => vo
               ) : <span className="font-mono text-xs text-foreground-muted">{selected.slug}</span>}
               {selected.id && <button className={`${btn} ml-auto border border-border-default`} onClick={archive}>Archive customer copy</button>}
             </div>
-            <TemplateEditor value={selected} apiBase={`${base}/v2/templates`} onChange={setSelected} onSave={save} saving={saving} />
+            <TemplateEditor value={selected} apiBase={`${base}/v2/templates`} assetsBase="/api/admin/uploads/image" onChange={setSelected} onSave={save} saving={saving} />
           </>
         )}
       </div>
