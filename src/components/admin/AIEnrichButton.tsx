@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { RequireAi } from '@/contexts/AdminScopesContext'
 import type { AiActionScope } from '@/lib/auth/ai-scope'
+import type { EnrichFormat } from '@/lib/ai/enrich-field'
+
+export const ECOM_ENRICH_ENDPOINT = '/api/ecom/ai/enrich-field'
 
 interface Props {
   fieldLabel: string
@@ -11,23 +14,36 @@ interface Props {
   scope: AiActionScope
   context?: string
   multiline?: boolean
-  children: React.ReactNode // the raw <input> or <textarea>
+  /** What the field holds — the prompt keeps variables and obeys the format's limits. */
+  format?: EnrichFormat
+  /** Variable names the caller's template fills (built-ins are always known). */
+  variables?: string[]
+  maxLength?: number
+  /** Allow writing from scratch when the field is empty. */
+  write?: boolean
+  /** Broadcast message: order variables are not available. */
+  broadcast?: boolean
+  /** Admin route by default; the ecom console passes ECOM_ENRICH_ENDPOINT (gated server-side). */
+  endpoint?: string
+  /** 'corner' overlays the field; 'inline' renders as a sibling (for rows that already have buttons). */
+  placement?: 'corner' | 'inline'
+  children?: React.ReactNode // the raw <input> or <textarea> (omit with placement 'inline')
 }
 
-export default function AIEnrichButton({ fieldLabel, value, onChange, scope, context, multiline, children }: Props) {
+export default function AIEnrichButton({ fieldLabel, value, onChange, scope, context, multiline, format, variables, maxLength, write, broadcast, endpoint = '/api/admin/ai-enrich-field', placement = 'corner', children }: Props) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [prev, setPrev] = useState<string | null>(null)
 
   async function handleEnrich() {
-    if (!value.trim() || loading) return
+    if ((!value.trim() && !write) || loading) return
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/admin/ai-enrich-field', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fieldLabel, value, context, scope }),
+        body: JSON.stringify({ fieldLabel, value, context, scope, format, variables, maxLength, write, broadcast }),
       })
       const data = (await res.json()) as { result?: string; error?: string }
       if (!res.ok || !data.result) {
@@ -51,12 +67,11 @@ export default function AIEnrichButton({ fieldLabel, value, onChange, scope, con
     }
   }
 
-  return (
-    <div className="space-y-1">
-      <div className={`relative ${multiline ? '' : 'flex items-center'}`}>
-        {children}
-        <RequireAi scope={scope}>
-          <div className={`${multiline ? 'absolute bottom-2 right-2' : 'absolute right-2'} flex items-center gap-1`}>
+  const canRun = !loading && (!!value.trim() || !!write)
+  // The ecom console has no admin scope context; its route checks approval instead.
+  const gate = (node: React.ReactNode) => (endpoint === ECOM_ENRICH_ENDPOINT ? node : <RequireAi scope={scope}>{node}</RequireAi>)
+  const buttons = (
+    <>
             {prev !== null && (
               <button
                 type="button"
@@ -72,8 +87,8 @@ export default function AIEnrichButton({ fieldLabel, value, onChange, scope, con
             <button
               type="button"
               onClick={handleEnrich}
-              disabled={loading || !value.trim()}
-              title="Enrich with AI"
+              disabled={!canRun}
+              title={value.trim() ? 'Enrich with AI' : 'Write with AI'}
               className="inline-flex items-center justify-center w-6 h-6 rounded text-violet-500 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-800/40 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -91,8 +106,22 @@ export default function AIEnrichButton({ fieldLabel, value, onChange, scope, con
                 </svg>
               )}
             </button>
-          </div>
-        </RequireAi>
+    </>
+  )
+
+  if (placement === 'inline') {
+    return gate(
+      <>
+        <div className="flex items-center gap-1 self-center">{buttons}</div>
+        {error && <p className="text-[11px] text-red-500 dark:text-red-400">{error}</p>}
+      </>
+    )
+  }
+  return (
+    <div className="space-y-1">
+      <div className={`relative ${multiline ? '' : 'flex items-center'}`}>
+        {children}
+        {gate(<div className={`${multiline ? 'absolute bottom-2 right-2' : 'absolute right-2'} flex items-center gap-1`}>{buttons}</div>)}
       </div>
       {error && <p className="text-[11px] text-red-500 dark:text-red-400">{error}</p>}
     </div>
