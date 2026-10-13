@@ -2097,3 +2097,5 @@ CREATE INDEX IF NOT EXISTS idx_pub_asset_user_kind ON public.pub_template_asset 
 CREATE INDEX IF NOT EXISTS idx_pub_short_link_user ON public.pub_short_link (public_user_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_email_campaign_logs_campaign_channel ON public.email_campaign_logs (campaign_id, channel);
+
+CREATE INDEX IF NOT EXISTS idx_documents_tenant_created ON public.documents (tenant_id, created_at DESC);

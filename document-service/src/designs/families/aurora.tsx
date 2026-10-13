@@ -11,7 +11,7 @@ export const aurora: Design = {
     const header = (
       <View style={{ backgroundColor: t.accent, marginHorizontal: -40, marginTop: -40, paddingHorizontal: 40, paddingTop: 34, paddingBottom: 26, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <View>
-          <Logo m={m} height={30} fallback={<Text style={{ fontFamily: t.head, fontWeight: 700, fontSize: 15, color: fg }}>{m.seller.name}</Text>} />
+          <Logo m={m} height={30} plate fallback={<Text style={{ fontFamily: t.head, fontWeight: 700, fontSize: 15, color: fg }}>{m.seller.name}</Text>} />
           <Text style={{ fontFamily: t.head, fontWeight: 700, fontSize: 26, color: fg, marginTop: 12 }}>{m.title}</Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>

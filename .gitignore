@@ -110,3 +110,4 @@ public/models/onboarding/ort/*.mjs
 
 **/node_modules/
 **/.env.local
+document-service/.documents/

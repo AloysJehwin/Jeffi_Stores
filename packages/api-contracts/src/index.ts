@@ -165,8 +165,13 @@ export const LineItem = z.object({
   gst_rate: z.number().min(0).max(28).default(18),
   discount: Money.default(0),
 })
+export const DocumentFont = z.enum(['modern', 'geometric', 'classic', 'editorial', 'technical', 'system'])
+const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a #rrggbb colour')
+// Per-call branding; each field overrides the workspace's saved document settings.
+export const DocumentBranding = z.object({ logo_url: z.string().url().optional(), accent: HexColor.optional(), font: DocumentFont.optional() })
 export const RenderDocumentRequest = z.object({
-  template: Slug.default('classic'),
+  template: Slug.optional(), // design key; omitted = the workspace default
+  branding: DocumentBranding.optional(),
   number: z.string().max(40).optional(),
   date: z.string().optional(),
   due_date: z.string().optional(),
@@ -195,6 +200,9 @@ export const Document = z.object({
   created_at: z.string(),
 })
 export type Document = z.infer<typeof Document>
+export const DocumentDesign = z.object({ key: z.string(), name: z.string(), description: z.string(), accent: z.string(), font: DocumentFont, thumbnail_url: z.string() })
+export const DocumentSettings = z.object({ design: z.string().nullable(), accent: HexColor.nullable(), font: DocumentFont.nullable(), has_logo: z.boolean() })
+export const DocumentSettingsUpdate = z.object({ design: Slug.nullable().optional(), accent: HexColor.nullable().optional(), font: DocumentFont.nullable().optional() })
 
 // ── wallet / pricing ──
 export const Wallet = z.object({ balance_inr: z.number(), spent_today_inr: z.number(), currency: z.literal('INR') })

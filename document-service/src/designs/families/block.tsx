@@ -15,7 +15,7 @@ export const block: Design = {
       <Doc m={m}>
         <Page size={A4} style={{ paddingTop: 40, paddingBottom: 60, paddingLeft: 214, paddingRight: 36, fontFamily: t.body, color: t.ink, fontSize: 9 }}>
           <View fixed style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 184, backgroundColor: t.accent, paddingHorizontal: 22, paddingTop: 40 }}>
-            <Logo m={m} height={30} fallback={<Text style={{ color: fg, fontFamily: t.head, fontWeight: 700, fontSize: 13 }}>{m.seller.name}</Text>} />
+            <Logo m={m} height={30} plate fallback={<Text style={{ color: fg, fontFamily: t.head, fontWeight: 700, fontSize: 13 }}>{m.seller.name}</Text>} />
             <Text style={{ color: fg, fontFamily: t.head, fontWeight: 700, fontSize: 22, marginTop: 22, lineHeight: 1.1 }}>{m.title}</Text>
             <View style={{ marginTop: 14 }}><Meta m={m} t={side} /></View>
             <View style={{ marginTop: 22 }}><PartyBlock label={m.labels.from} p={m.seller} t={side} size={8} /></View>

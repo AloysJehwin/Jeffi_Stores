@@ -8,9 +8,11 @@ const BUCKET = process.env.DOCUMENTS_BUCKET
 const LOCAL_DIR = process.env.DOCUMENTS_LOCAL_DIR || path.join(process.cwd(), '.documents')
 const s3 = BUCKET ? new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' }) : null
 
-export async function putPdf(key: string, body: Buffer): Promise<void> {
+export const putPdf = (key: string, body: Buffer) => putObject(key, body, 'application/pdf')
+
+export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
   if (s3) {
-    await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body, ContentType: 'application/pdf' }))
+    await s3.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body, ContentType: contentType }))
     return
   }
   const file = path.join(LOCAL_DIR, key)
