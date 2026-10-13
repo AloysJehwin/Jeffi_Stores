@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany } from '@/lib/shared/db'
-
-interface Recipient {
-  email: string
-  phone: string | null
-  first_name: string | null
-}
+import { resolveAudience } from '@/lib/shared/email-campaigns'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -16,20 +10,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { audience_type, audience_filter } = await request.json()
-
-  const base = `SELECT u.email, u.phone, u.first_name FROM users u`
-  const where = `WHERE u.is_active = true AND u.is_guest = false AND u.email IS NOT NULL AND u.marketing_opt_out = false`
-
-  let recipients: Recipient[]
-
-  if (audience_type === 'order_history') {
-    const days = (audience_filter?.daysSinceOrder as number) || 30
-    recipients = await queryMany<Recipient>(
-      `${base} ${where} AND u.id IN (SELECT DISTINCT user_id FROM orders WHERE created_at > NOW() - INTERVAL '${days} days' AND user_id IS NOT NULL)`
-    )
-  } else {
-    recipients = await queryMany<Recipient>(`${base} ${where}`)
-  }
-
-  return NextResponse.json({ count: recipients.length, withPhone: recipients.filter(r => r.phone).length, recipients })
+  // Preview exactly what the send would resolve, so every audience option is accurate.
+  const recipients = await resolveAudience(audience_type || 'all', audience_filter || {})
+  return NextResponse.json({
+    count: recipients.length,
+    withPhone: recipients.filter(r => r.phone).length,
+    recipients: recipients.map(r => ({ email: r.email, phone: r.phone, first_name: r.first_name })),
+  })
 }
