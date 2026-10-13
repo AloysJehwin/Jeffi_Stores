@@ -41,7 +41,7 @@ export interface VariantRow {
 export interface VersionRow {
   id: string; variant_id: string; version: number
   subject: string | null; body: string; blocks: any; blocks_format: string | null
-  variables: string[]; provider_ref: string | null; note: string | null
+  variables: string[]; provider_ref: string | null; note: string | null; layout: 'store' | 'none'
   created_by: string | null; created_at: string
 }
 export interface FullTemplate {
@@ -151,6 +151,8 @@ export interface UpsertInput {
   note?: string
   createdBy?: string
   publish?: boolean
+  /** Email: 'store' wraps the body in the store's email layout; 'none' sends the HTML as written. */
+  layout?: 'store' | 'none'
 }
 
 export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertInput, space: Space = 'store'): Promise<FullTemplate> {
@@ -208,12 +210,14 @@ export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertI
     ])]
     const ver = (await c.query<VersionRow>(
       `INSERT INTO template_version
-         (variant_id, version, subject, body, blocks, blocks_format, variables, provider_ref, note, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         (variant_id, version, subject, body, blocks, blocks_format, variables, provider_ref, note, created_by, layout)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,
+         -- Not given → keep the current version's layout.
+         COALESCE($11, (SELECT layout FROM template_version WHERE id=$12), 'store'))
        RETURNING *`,
       [variant.id, version, i.subject ?? null, i.body, i.blocks ?? null,
        i.blocks_format ?? defaultBlocksFormat(i.channel), variables, i.provider_ref ?? null,
-       i.note ?? null, i.createdBy ?? null])).rows[0]
+       i.note ?? null, i.createdBy ?? null, i.layout ?? null, variant.current_version_id ?? null])).rows[0]
 
     if (i.publish !== false) {
       await c.query(`UPDATE template_variant SET current_version_id=$2, updated_at=now() WHERE id=$1`, [variant.id, ver.id])
@@ -295,6 +299,7 @@ export const toApi = (t: FullTemplate) => ({
     blocks: t.version.blocks,
     blocks_format: t.version.blocks_format,
     variables: t.version.variables,
+    layout: t.version.layout ?? 'store',
     created_at: new Date(t.version.created_at).toISOString(),
   } : null,
 })

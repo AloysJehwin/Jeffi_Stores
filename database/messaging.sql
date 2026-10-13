@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS public.template_version (
     blocks_format character varying(16),
     variables text[] NOT NULL DEFAULT '{}',
     provider_ref character varying(80),
+    layout character varying(16) DEFAULT 'store'::character varying NOT NULL,
     note text,
     created_by uuid,
     created_at timestamp with time zone NOT NULL DEFAULT now()
