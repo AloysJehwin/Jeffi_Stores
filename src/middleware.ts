@@ -64,6 +64,8 @@ function resolveTrustedHost(request: NextRequest): string {
   if (!fwd) return raw
   const secret = process.env.EDGE_PROXY_SECRET
   if (secret) return request.headers.get('x-edge-secret') === secret ? fwd : raw
+  // A Server Action redirect is re-fetched by Next from its own origin (localhost) with the browser's host forwarded.
+  if (process.env.NODE_ENV !== 'production' && /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(raw)) return fwd
   if (!raw) return fwd
   const a = slugFromHost(fwd)
   const b = slugFromHost(raw)

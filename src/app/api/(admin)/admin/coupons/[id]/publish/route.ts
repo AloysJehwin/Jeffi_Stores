@@ -24,8 +24,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const f = draft.fields as any
   // Edit-draft publish: apply the drafted changes to the existing live coupon (COALESCE keeps
-  // unset fields). Create-drafts are inactive coupons published via the create-draft publish
-  // action, not this edit-draft route.
+  // unset fields). A create-draft (never published) goes live and active.
   await query(
     `UPDATE coupons SET
        code = COALESCE($2, code),
@@ -38,7 +37,8 @@ export async function POST(req: NextRequest, { params }: Params) {
        usage_limit_per_user = $9::integer,
        valid_from = $10::timestamptz,
        valid_until = $11::timestamptz,
-       is_active = COALESCE($12::boolean, is_active)
+       is_active = CASE WHEN is_draft THEN true ELSE COALESCE($12::boolean, is_active) END,
+       is_draft = false
      WHERE id = $1`,
     [
       id,
