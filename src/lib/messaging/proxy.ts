@@ -14,8 +14,11 @@ function token(claims: Record<string, unknown>) {
   return `${Buffer.from(payload).toString('base64url')}.${sig.toString('base64url')}`
 }
 
-async function forward(request: NextRequest, path: string, claims: Record<string, unknown>): Promise<NextResponse> {
-  const tenant = await resolveTenant()
+const PLATFORM_TENANT = { tenantId: '00000000-0000-0000-0000-000000000000', slug: 'platform' }
+
+async function forward(request: NextRequest, path: string, claims: Record<string, unknown>, allowPlatform = false): Promise<NextResponse> {
+  // Platform admin host has no tenant: it curates the platform defaults (templates library).
+  const tenant = (await resolveTenant()) ?? (allowPlatform ? PLATFORM_TENANT : null)
   if (!tenant) return NextResponse.json({ error: 'Messaging is only available on a tenant host' }, { status: 501 })
   const url = new URL(request.url)
   const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.text()
@@ -41,7 +44,7 @@ export async function proxyAdminMessaging(request: NextRequest, path: string, sc
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, scope)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  return forward(request, path, { adminId: admin.adminId, role: admin.role, scopes: admin.scopes })
+  return forward(request, path, { adminId: admin.adminId, role: admin.role, scopes: admin.scopes }, true)
 }
 
 export async function proxyUserMessaging(request: NextRequest, path: string): Promise<NextResponse> {

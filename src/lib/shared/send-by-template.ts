@@ -33,7 +33,7 @@ function token(tenantId: string, tenantSlug: string): string {
   return `${Buffer.from(payload).toString('base64url')}.${sig.toString('base64url')}`
 }
 
-async function brandFields(channel: Channel): Promise<{ brand?: string; kicker?: string; footer_contact?: string }> {
+export async function brandFields(channel: Channel): Promise<{ brand?: string; kicker?: string; footer_contact?: string }> {
   if (channel !== 'email') return {}
   try {
     const { currentBrandNameAsync, storeContactLine } = await import('@/lib/catalog/brand')

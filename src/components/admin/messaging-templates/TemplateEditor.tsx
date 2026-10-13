@@ -471,16 +471,21 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
       </div>
 
       <div className="border rounded p-4 bg-gray-50">
-        <div className="text-xs uppercase tracking-wide text-gray-500 mb-2">Preview</div>
-        {!preview && <p className="text-sm text-gray-400">Click Preview to render with sample data.</p>}
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs uppercase tracking-wide text-gray-500">Preview</div>
+          <button type="button" onClick={runPreview} disabled={previewing || !value.slug} className="text-xs px-3 py-1 border rounded bg-white">
+            {previewing ? 'Rendering…' : 'Render with sample data'}
+          </button>
+        </div>
+        {!preview && <p className="text-sm text-gray-400">Save first, then render to see the message as customers get it.</p>}
         {preview?.subject && <div className="font-semibold mb-2">{preview.subject}</div>}
         {preview?.body && (
           value.channel === 'email'
-            ? <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: preview.body }} />
+            ? <iframe title="Email preview" srcDoc={preview.body} sandbox="" className="w-full bg-white border rounded" style={{ minHeight: 520 }} />
             : <pre className="whitespace-pre-wrap font-mono text-sm">{preview.body}</pre>
         )}
         {preview?.missing && preview.missing.length > 0 && (
-          <p className="mt-3 text-xs text-amber-700">Missing variables: {preview.missing.join(', ')}</p>
+          <p className="mt-3 text-xs text-gray-500">Sample values used for: {preview.missing.join(', ')}</p>
         )}
       </div>
     </div>

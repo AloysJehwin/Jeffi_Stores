@@ -179,7 +179,7 @@ export default function MessagingTemplatesClient() {
                         <div className="font-medium text-sm">{it.name || it.slug}</div>
                         <div className="text-xs text-gray-500 flex gap-2 items-center">
                           <code>{it.slug}</code>
-                          {it.approval_status && (
+                          {it.channel === 'whatsapp' && it.approval_status && (
                             <span className={`px-1 rounded text-[10px] ${
                               it.approval_status === 'approved' ? 'bg-green-100 text-green-800'
                               : it.approval_status === 'rejected' ? 'bg-red-100 text-red-800'
