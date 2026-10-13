@@ -69,7 +69,9 @@ export default function BulkJobs({ base, form, columns, row, refreshKey = 0 }: {
   return (
     <div className="space-y-6">
       {form}
-      <Card title="Bulk jobs">
+      <div>
+      <h2 className="mb-3 text-xs font-semibold uppercase tracking-widest text-foreground-muted">Bulk jobs</h2>
+      <Card>
         {jobs === null ? <SkeletonRows rows={4} cols={5} /> : jobs.length === 0 ? (
           <p className="text-sm text-foreground-secondary">No bulk jobs yet. Upload a CSV above or call the bulk API.</p>
         ) : (
@@ -95,6 +97,7 @@ export default function BulkJobs({ base, form, columns, row, refreshKey = 0 }: {
           </div>
         )}
       </Card>
+      </div>
     </div>
   )
 }
