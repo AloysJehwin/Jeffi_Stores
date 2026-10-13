@@ -66,6 +66,8 @@ type Props = {
   embedded?: boolean
   /** Campaign kind whose variables this template must use (else derived from a campaign/<kind> slug). */
   campaignKind?: string | null
+  /** Variables to offer in the insert menu when not a campaign template (e.g. the picked template's own). */
+  variableNames?: string[]
 }
 
 const SMS_GSM_LIMIT = 160
@@ -80,14 +82,23 @@ type WaBlocks = {
   carousel?: { cards: WaCarouselCard[] }
 }
 
-export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave: rawSave, saving, embedded, campaignKind }: Props) {
+export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave: rawSave, saving, embedded, campaignKind, variableNames }: Props) {
   const derived = campaignKind ?? (value.slug?.startsWith('campaign/') ? value.slug.slice('campaign/'.length) : null)
   const kind = isCampaignKind(derived) && value.channel !== 'whatsapp' ? derived : null
   const kindText = `${value.channel === 'email' ? value.subject ?? '' : ''}\n${value.body ?? ''}`
-  const composerVars = useMemo(
-    () => (kind ? campaignVariables(kind, 'email').map(v => ({ key: v.key, label: v.label, description: v.description, sample: v.sample, group: 'order' as const, builtIn: true, section: 'Campaign' })) : undefined),
-    [kind]
+  const ownVars = useMemo(
+    () => [...new Set([...(`${value.subject ?? ''} ${value.body ?? ''}`).matchAll(/\{\{?\s*([a-zA-Z][a-zA-Z0-9_]*)\s*\}?\}/g)].map(m => m[1]))]
+      .filter(k => !/^(customer_|store_)|^(current_year|date)$/.test(k)),
+    // Recomputed per template, not per keystroke, so the menu doesn't shift while typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [value.slug, value.channel]
   )
+  const composerVars = useMemo(() => {
+    if (kind) return campaignVariables(kind, 'email').map(v => ({ key: v.key, label: v.label, description: v.description, sample: v.sample, group: 'order' as const, builtIn: true, section: 'Campaign' }))
+    const names = [...new Set([...(variableNames ?? []), ...ownVars])]
+    const human = (k: string) => k.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, c => c.toUpperCase())
+    return names.length ? names.map(k => ({ key: k, label: human(k), description: 'Used by this template', sample: '', group: 'order' as const, builtIn: true, section: 'This template' })) : undefined
+  }, [kind, variableNames, ownVars])
   const [preview, setPreview] = useState<{ subject?: string | null; body?: string; missing?: string[] } | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [uploading, setUploading] = useState(false)
