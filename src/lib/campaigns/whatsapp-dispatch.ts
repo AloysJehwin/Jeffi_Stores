@@ -105,11 +105,11 @@ export async function sendCampaignWhatsApp(
 
     const row = await queryOne<{
       sms_template: string | null; sms_template_slug: string | null
-      wa_template_sid: string | null; wa_template_slug: string | null
-      wa_variables: Record<string, string> | null; wa_header_image_url: string | null
+      wa_template_slug: string | null
+      wa_variables: Record<string, string> | null
       parameters: Record<string, unknown> | null
     }>(
-      `SELECT sms_template, sms_template_slug, wa_template_sid, wa_template_slug, wa_variables, wa_header_image_url, parameters
+      `SELECT sms_template, sms_template_slug, wa_template_slug, wa_variables, parameters
          FROM campaigns WHERE kind = $1`, [kind]).catch(() => null)
     const params = row?.parameters ?? {}
 
@@ -142,11 +142,17 @@ export async function sendCampaignWhatsApp(
     }
 
     let ok = false
+    let attempted = false
+    let deduped = false
     if (params.whatsappEnabled === true) {
       const waSentId = await claim('whatsapp')
-      if (waSentId !== null) ok = await sendWhatsAppPart(kind, user.phone, row, clean, render, waSentId)
+      if (waSentId === null) deduped = true
+      else { attempted = true; ok = await sendWhatsAppPart(kind, user.phone, row, clean, render, waSentId) }
     }
-    if (params.smsEnabled === true && (await claim('sms')) !== null) {
+    const smsClaim = params.smsEnabled === true ? await claim('sms') : undefined
+    if (smsClaim === null) deduped = true
+    if (smsClaim != null) {
+      attempted = true
       let body = ''
       if (row?.sms_template_slug) body = (await getLibraryTemplate('sms', row.sms_template_slug))?.body ?? ''
       if (!body && row?.sms_template?.trim()) body = row.sms_template
@@ -156,18 +162,18 @@ export async function sendCampaignWhatsApp(
         ok = (await sendCampaignSMS({ phone: user.phone, body, kind, userId }).catch(() => false)) || ok
       }
     }
-    return { ok, reason: ok ? undefined : 'send_failed' }
+    return { ok, reason: ok ? undefined : !attempted && deduped ? 'cooldown' : 'send_failed' }
   } catch {
     return { ok: false, reason: 'error' }
   }
 }
 
-// WhatsApp: a linked library template (approved) with the admin's {{n}} values, else the legacy
-// registry pick, else the built-in per-kind template.
+// WhatsApp: a linked library template (approved) with the admin's {{n}} values, else the built-in
+// per-kind template.
 async function sendWhatsAppPart(
   kind: string,
   phone: string,
-  row: { wa_template_sid: string | null; wa_template_slug: string | null; wa_variables: Record<string, string> | null; wa_header_image_url: string | null } | null,
+  row: { wa_template_slug: string | null; wa_variables: Record<string, string> | null } | null,
   clean: CampaignWaVars,
   render: (t: string) => string,
   waSentId: string
@@ -194,21 +200,6 @@ async function sendWhatsAppPart(
     return dispatch(kind, phone, clean, entity)
   }
 
-  if (row?.wa_template_sid) {
-    const { getWhatsAppTemplate } = await import('@/lib/templates/whatsapp-registry')
-    const def = getWhatsAppTemplate(row.wa_template_sid)
-    if (def) {
-      const { sendCampaignTemplateWhatsApp } = await import('@/lib/shared/whatsapp')
-      const resolvedVars: Record<string, string> = {}
-      for (const [k, v] of Object.entries(row.wa_variables ?? {})) resolvedVars[k] = render(String(v ?? ''))
-      if (def.urlSlot != null && resolvedVars[String(def.urlSlot)]) resolvedVars[String(def.urlSlot)] = await track(resolvedVars[String(def.urlSlot)])
-      return sendCampaignTemplateWhatsApp({
-        phone, sidEnvVar: def.sidEnv, variables: resolvedVars,
-        headerImageUrl: row.wa_header_image_url ? render(row.wa_header_image_url) : null,
-        imageSlot: def.imageSlot ?? null, kind, entity,
-      })
-    }
-  }
   return dispatch(kind, phone, clean, entity)
 }
 

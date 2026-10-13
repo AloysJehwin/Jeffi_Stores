@@ -2,8 +2,6 @@
 // pickers. Client-safe. The exact match is always the campaign's own imported template
 // (campaign/<kind>); hints add related standard templates. A hint ending in '/' matches by prefix.
 
-import { WHATSAPP_TEMPLATES } from '@/lib/templates/whatsapp-registry'
-
 type Channel = 'email' | 'sms' | 'whatsapp'
 
 /** Old campaign WhatsApp registry keys → the approved library templates they correspond to. */
@@ -35,9 +33,17 @@ const HINTS: Record<string, string[]> = {
   messaging: ['messaging/', 'promo/', 'starter/'],
 }
 
-function waHints(kind: string): string[] {
-  return WHATSAPP_TEMPLATES.filter(t => t.kinds.includes(kind)).map(t => LEGACY_WA_KEY_TO_SLUG[t.key]).filter(Boolean)
+// Approved WhatsApp templates that suit each kind.
+const WA_HINTS: Record<string, string[]> = {
+  'cart/abandoned': ['abandoned_cart', 'abandoned_checkout', 'high_value_cart', 'cart_price_drop'],
+  'promo/offer': ['winback_90', 'winback_180', 'first_purchase_nudge', 'second_purchase_nudge', 'signup_anniversary', 'loyalty_tier_upgrade', 'loyalty_points_reminder'],
+  restock: ['restock', 'back_in_stock_wishlist', 'price_drop', 'wishlist_reminder', 'viewed_product'],
+  'promo/new-arrivals': ['viewed_category', 'replenishment'],
+  'promo/reorder': ['replenishment', 'subscription_renewal', 'post_purchase'],
+  'promo/festive': ['birthday', 'signup_anniversary'],
+  'feedback/request': ['review_request', 'review_reminder', 'review_photo_followup', 'post_purchase'],
 }
+const waHints = (kind: string) => Object.keys(WA_HINTS).filter(slug => WA_HINTS[slug].includes(kind))
 
 /** 0 = not recommended; higher = better fit (exact campaign template first). */
 export function recommendScore(kind: string | null | undefined, channel: Channel, slug: string): number {
