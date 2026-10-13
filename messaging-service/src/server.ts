@@ -1,7 +1,8 @@
 import Fastify, { type FastifyRequest } from 'fastify'
 import formbody from '@fastify/formbody'
 import { randomUUID } from 'node:crypto'
-import { ZodError } from 'zod'
+import { ZodError, z } from 'zod'
+import type pg from 'pg'
 import { SendMessageRequest, BatchMessageRequest, BulkMessagesRequest, UpsertTemplateRequest, UpsertLibraryTemplateRequest, UpdateLibraryTemplateRequest, TemplateQuery, Channel } from '@jeffi/api-contracts'
 import { verifyServiceToken, bearer, type ServiceClaims } from '@jeffi/service-auth'
 import { usdToInr } from '@jeffi/pricing'
@@ -15,6 +16,7 @@ import * as twContent from './providers/twilio-content.js'
 import { priceUsd } from './providers/twilio.js'
 import { poolsForTenant } from './pools.js'
 import * as wa from './wa-approval.js'
+import * as gov from './governance.js'
 import { render as renderVars, missingKeys } from './render.js'
 import { wrapEmail } from './mail-shell.js'
 import { randomBytes } from 'node:crypto'
@@ -163,12 +165,58 @@ const poolFor = (req: FastifyRequest) => poolsForTenant(req.claims.tenantId)
 // Store (admin + store sends) and Messaging API (console + API keys) keep separate template copies.
 const spaceOf = (req: FastifyRequest): tpl.Space => req.claims.space ?? (req.claims.service === 'public-api' ? 'api' : 'store')
 
+// Jeffi's controls apply to API customers (space 'api'), never to admin (internal) calls.
+const governed = (req: FastifyRequest) => spaceOf(req) === 'api' && req.claims.tenantId !== tpl.PLATFORM_TENANT_ID
+const settingsFor = (req: FastifyRequest) => (governed(req) ? gov.getSettings(req.claims.tenantId) : null)
+const isAdmin = (req: FastifyRequest) => !!req.claims.internal
+const by = (req: FastifyRequest) => (req.claims as any).actor ?? (isAdmin(req) ? 'jeffi-admin' : null)
+
+async function guardEdit(req: FastifyRequest) {
+  const s = await settingsFor(req)
+  if (s) gov.assertCanEdit(s, isAdmin(req))
+  return s
+}
+async function afterSave(req: FastifyRequest, pool: pg.Pool, saved: tpl.FullTemplate, s: gov.MessagingSettings | null) {
+  if (!s || !saved.variant) return saved
+  await gov.markReview(pool, saved.variant.id, isAdmin(req) || !s.review_required, by(req))
+  return (await tpl.findById(pool, req.claims.tenantId, saved.template.id, spaceOf(req))) ?? saved
+}
+
+app.get('/v2/settings', async req => (governed(req) ? gov.getSettings(req.claims.tenantId) : gov.getSettings(tpl.PLATFORM_TENANT_ID)))
+app.put('/v2/settings', async req => {
+  if (!isAdmin(req)) throw Object.assign(new Error('Only Jeffi can change these settings'), { status: 403, code: 'forbidden' })
+  const b = z.object({
+    standard_templates: z.enum(['all', 'selected']).optional(),
+    allowed: z.array(z.object({ channel: Channel, slug: z.string().min(1).max(120) })).max(1000).optional(),
+    editing_enabled: z.boolean().optional(),
+    review_required: z.boolean().optional(),
+  }).parse(req.body ?? {})
+  return gov.putSettings(req.claims.tenantId, b, by(req))
+})
+app.get('/v2/templates/review', async req => {
+  if (!isAdmin(req)) throw Object.assign(new Error('internal only'), { status: 403 })
+  const { pool } = await poolFor(req)
+  return { items: await gov.reviewQueue(pool, req.claims.tenantId) }
+})
+app.post<{ Params: { id: string } }>('/v2/templates/:id/review', async (req, reply) => {
+  if (!isAdmin(req)) throw Object.assign(new Error('internal only'), { status: 403 })
+  const b = z.object({ decision: z.enum(['approved', 'rejected']), note: z.string().max(1000).optional() }).parse(req.body ?? {})
+  const { pool } = await poolFor(req)
+  const ok = await gov.reviewDecision(pool, req.claims.tenantId, req.params.id, b.decision, b.note ?? null, by(req))
+  if (!ok) return reply.code(409).send({ error: 'not_pending', message: 'That template has no change waiting for review' })
+  return { ok: true }
+})
+
 app.get<{ Params: { channel: string; slug: string }; Querystring: { locale?: string } }>(
   '/v2/templates/:channel/:slug',
   async (req, reply) => {
     const { pools } = await poolFor(req)
-    const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, Channel.parse(req.params.channel), req.params.slug, req.query.locale ?? 'en', spaceOf(req))
+    const channel = Channel.parse(req.params.channel)
+    const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, channel, req.params.slug, req.query.locale ?? 'en', spaceOf(req))
     if (!t) return reply.code(404).send({ error: 'not_found' })
+    const s = await settingsFor(req)
+    if (s && !isAdmin(req) && t.family.tenant_id === tpl.PLATFORM_TENANT_ID && !gov.standardAllowed(s, channel, t.family.slug))
+      return reply.code(404).send({ error: 'not_found' })
     return tpl.toApi(t)
   }
 )
@@ -182,8 +230,10 @@ app.get<{ Params: { id: string } }>('/v2/templates/:id/versions', async req => {
 
 app.get<{ Querystring: { channel?: string } }>('/v2/templates', async req => {
   const { pools } = await poolFor(req)
-  const items = await tpl.listTemplatesWithDefaults(pools, req.claims.tenantId, req.query.channel, spaceOf(req))
-  return { items }
+  let items = await tpl.listTemplatesWithDefaults(pools, req.claims.tenantId, req.query.channel, spaceOf(req))
+  const s = await settingsFor(req)
+  if (s && !isAdmin(req)) items = items.filter((i: any) => i.source !== 'platform' || gov.standardAllowed(s, i.channel, i.slug))
+  return { items, settings: s ? { editing_enabled: s.editing_enabled, review_required: s.review_required } : null }
 })
 
 // API-key callers get strict validation; the dashboards post the editor's richer shape.
@@ -191,11 +241,13 @@ const upsertBody = (req: FastifyRequest, partial = false) =>
   (req.claims.service === 'public-api' ? (partial ? UpdateLibraryTemplateRequest : UpsertLibraryTemplateRequest).parse(req.body) : req.body) as tpl.UpsertInput
 
 app.post('/v2/templates', async req => {
+  const s = await guardEdit(req)
   const { pool } = await poolFor(req)
-  return tpl.toApi(await tpl.upsertTemplate(pool, req.claims.tenantId, upsertBody(req), spaceOf(req)))
+  return tpl.toApi(await afterSave(req, pool, await tpl.upsertTemplate(pool, req.claims.tenantId, upsertBody(req), spaceOf(req)), s))
 })
 
 app.delete<{ Params: { channel: string; slug: string } }>('/v2/templates/:channel/:slug', async (req, reply) => {
+  await guardEdit(req)
   const { pool } = await poolFor(req)
   const own = await tpl.findBySlug(pool, req.claims.tenantId, Channel.parse(req.params.channel), req.params.slug, 'en', spaceOf(req))
   if (!own) return reply.code(404).send({ error: 'not_found', message: 'No template of yours with that slug (standard templates cannot be deleted)' })
@@ -204,6 +256,7 @@ app.delete<{ Params: { channel: string; slug: string } }>('/v2/templates/:channe
 })
 
 app.put<{ Params: { id: string } }>('/v2/templates/:id', async (req, reply) => {
+  const s = await guardEdit(req)
   const { pool } = await poolFor(req)
   // A tenant's first save of a standard template forks it into the tenant's own DB.
   const existing = await tpl.findById(pool, req.claims.tenantId, req.params.id, spaceOf(req))
@@ -215,17 +268,19 @@ app.put<{ Params: { id: string } }>('/v2/templates/:id', async (req, reply) => {
     channel: existing.template.channel as any,
     name: (req.body as any).name ?? existing.family.name,
   }
-  return tpl.toApi(await tpl.upsertTemplate(pool, req.claims.tenantId, input, spaceOf(req)))
+  return tpl.toApi(await afterSave(req, pool, await tpl.upsertTemplate(pool, req.claims.tenantId, input, spaceOf(req)), s))
 })
 
 app.post<{ Params: { id: string }; Body: { versionId: string } }>(
   '/v2/templates/:id/publish',
   async (req, reply) => {
+    const s = await guardEdit(req)
     const { pool } = await poolFor(req)
     const t = await tpl.findById(pool, req.claims.tenantId, req.params.id, spaceOf(req))
     if (!t?.variant) return reply.code(404).send({ error: 'not_found' })
     const ok = await tpl.publishVersion(pool, req.claims.tenantId, t.variant.id, req.body.versionId, spaceOf(req))
     if (!ok) return reply.code(404).send({ error: 'version_not_found' })
+    if (s) await gov.markReview(pool, t.variant.id, isAdmin(req) || !s.review_required, by(req))
     return { ok: true }
   }
 )
@@ -305,7 +360,12 @@ app.get<{ Params: { code: string } }>('/s/:code', { config: { skipAuth: true } }
 
 // WhatsApp approval wiring (Twilio Content API).
 const submitHandler = async (req: FastifyRequest<{ Body: { templateId: string; name?: string; category?: string } }>) => {
+  await guardEdit(req)
   const { pool } = await poolFor(req)
+  // Meta only sees what Jeffi has approved.
+  const t = governed(req) ? await tpl.findById(pool, req.claims.tenantId, req.body.templateId, spaceOf(req)) : null
+  if (t?.variant && (t.variant as any).review_status !== 'approved')
+    throw Object.assign(new Error('This template is waiting for Jeffi’s review — it can be submitted to WhatsApp once approved.'), { status: 409, code: 'template_pending_review' })
   return wa.submit(pool, req.claims.tenantId, req.claims.tenantSlug, req.body.templateId, { name: req.body.name, category: req.body.category, space: spaceOf(req) })
 }
 app.post('/wa/submit-approval', submitHandler)

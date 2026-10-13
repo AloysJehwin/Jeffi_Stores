@@ -3452,3 +3452,7 @@ ALTER TABLE ONLY public.platform_invoices ADD CONSTRAINT platform_invoices_kind_
 ALTER TABLE ONLY public.tenant_service_approvals ADD CONSTRAINT tenant_service_approvals_pkey PRIMARY KEY (tenant_id, service);
 ALTER TABLE ONLY public.tenant_service_approvals ADD CONSTRAINT tenant_service_approvals_service_check CHECK (((service)::text = ANY ((ARRAY['messaging'::character varying, 'documents'::character varying])::text[])));
 ALTER TABLE ONLY public.tenant_service_approvals ADD CONSTRAINT tenant_service_approvals_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'approved'::character varying, 'rejected'::character varying])::text[])));
+
+ALTER TABLE ONLY public.template_variant ADD CONSTRAINT template_variant_review_status_check CHECK (((review_status)::text = ANY ((ARRAY['approved'::character varying, 'pending'::character varying, 'rejected'::character varying])::text[])));
+ALTER TABLE ONLY public.messaging_tenant_settings ADD CONSTRAINT messaging_tenant_settings_pkey PRIMARY KEY (tenant_id);
+ALTER TABLE ONLY public.messaging_tenant_settings ADD CONSTRAINT messaging_tenant_settings_mode_check CHECK (((standard_templates)::text = ANY ((ARRAY['all'::character varying, 'selected'::character varying])::text[])));

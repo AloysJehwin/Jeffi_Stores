@@ -65,7 +65,7 @@ export const listTemplates = (e: Executor, tenantId: string, channel?: string, s
   rows(e,
     `SELECT t.id, t.family_id, t.channel, t.status, t.current_variant_id, t.tenant_id,
             f.slug, f.name, f.category,
-            v.id AS variant_id, v.locale, v.provider_ref, v.approval_status,
+            v.id AS variant_id, v.locale, v.provider_ref, v.approval_status, v.review_status, v.review_note,
             ver.version AS current_version, ver.subject
        FROM template t
        JOIN template_family f ON f.id=t.family_id
@@ -292,6 +292,10 @@ export const toApi = (t: FullTemplate) => ({
   needs_resubmission: t.template.channel === 'whatsapp' && !!t.variant?.provider_ref && !!t.version && !t.version.provider_ref,
   meta_category: t.variant?.meta_category,
   media_type: t.variant?.media_type,
+  // Jeffi's review (API customers): 'pending' → sends keep using approved_version_id.
+  review_status: (t.variant as any)?.review_status ?? 'approved',
+  review_note: (t.variant as any)?.review_note ?? null,
+  approved_version_id: (t.variant as any)?.approved_version_id ?? null,
   current_version: t.version ? {
     id: t.version.id,
     version: t.version.version,

@@ -6,6 +6,7 @@ import { db, one } from './db.js'
 import { findTemplate } from './templates.js'
 import * as tpl from './templates-v2.js'
 import { poolsForTenant } from './pools.js'
+import * as gov from './governance.js'
 import { render, missingKeys, type Vars } from './render.js'
 import { sendEmail } from './providers/email.js'
 import { sendSms, sendWhatsApp } from './providers/twilio.js'
@@ -70,6 +71,18 @@ interface Ctx {
 export async function resolveTemplate(tenantId: string, channel: string, slug: string, space: tpl.Space = 'store') {
   const { pools } = await poolsForTenant(tenantId)
   let t = await tpl.findBySlugWithDefaults(pools, tenantId, channel, slug, 'en', space)
+  // Jeffi's controls for API customers: only allowed standard templates; reviewed versions only.
+  if (t && space === 'api' && tenantId !== tpl.PLATFORM_TENANT_ID) {
+    const s = await gov.getSettings(tenantId)
+    if (t.family.tenant_id === tpl.PLATFORM_TENANT_ID && !gov.standardAllowed(s, channel, slug))
+      throw new SendError(404, 'template_not_available', `The ${channel} template '${slug}' is not enabled for this workspace`)
+    const v = t.variant as any
+    if (t.family.tenant_id !== tpl.PLATFORM_TENANT_ID && v.review_status !== 'approved') {
+      if (!v.approved_version_id) throw new SendError(422, 'template_pending_review', `'${slug}' is waiting for Jeffi's review and has no approved version yet`)
+      const approved = await pools.tenant.query(`SELECT * FROM template_version WHERE id=$1`, [v.approved_version_id]).then(r => r.rows[0])
+      if (approved) t = { ...t, version: approved }
+    }
+  }
   // WhatsApp only delivers approved templates: a tenant copy that isn't approved yet falls back to the
   // standard approved one, and an edited-but-unapproved version sends the approved text it replaces.
   if (channel === 'whatsapp' && t && !t.variant.provider_ref && tenantId !== tpl.PLATFORM_TENANT_ID)
