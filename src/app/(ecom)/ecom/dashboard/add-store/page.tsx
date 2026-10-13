@@ -1,5 +1,5 @@
 import { loadOwnerContext } from '@/lib/ecom/owner-context'
-import { hasService, listPlans } from '@/lib/tenant-registry'
+import { hasService, listPlans, hasVerifiedBank } from '@/lib/tenant-registry'
 import { StatusPill } from '@/components/admin/ecom/EcomUI'
 import PageHeader from '../_components/PageHeader'
 import { Card } from '../_components/Card'
@@ -8,7 +8,7 @@ import AddStoreClient from './AddStoreClient'
 export const dynamic = 'force-dynamic'
 
 export default async function AddStorePage() {
-  const { tenant } = await loadOwnerContext()
+  const { tenant, owner } = await loadOwnerContext()
   const plans = (await listPlans()).filter(p => p.slug !== 'services')
   if (hasService(tenant, 'store')) {
     return (
@@ -26,7 +26,7 @@ export default async function AddStorePage() {
   return (
     <>
       <PageHeader eyebrow="Store" title="Add an online store" description={`Your store will live at ${tenant.slug}.jeffistores.in and share this workspace's wallet, API keys and business details.`} />
-      <AddStoreClient plans={plans.map(p => ({ slug: p.slug, name: p.name, monthly: Number(p.monthly_price_inr) }))} />
+      <AddStoreClient plans={plans.map(p => ({ slug: p.slug, name: p.name, monthly: Number(p.monthly_price_inr) }))} bankVerified={await hasVerifiedBank(owner.id).catch(() => false)} />
     </>
   )
 }
