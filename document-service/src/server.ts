@@ -10,6 +10,8 @@ import * as wallet from '@jeffi/wallet'
 import { computeTotals } from './totals.js'
 import { renderPdf, LAYOUTS } from './pdf.js'
 import { putPdf, getPdf, pdfUrl } from './storage.js'
+import { appFromHost } from '@jeffi/tenancy'
+import { publicRoutes } from './tenant/public.js'
 
 const url = process.env.DOCUMENTS_DATABASE_URL
 if (!url) throw new Error('DOCUMENTS_DATABASE_URL is not set')
@@ -25,8 +27,20 @@ declare module 'fastify' {
   }
 }
 
+const DOC_HOSTS = new Set(['invoice', 'quotation', 'purchaseorder'])
+// Tenant document hosts (invoice-{slug}. etc.) are token-gated, not service-token-gated.
+function isPublicDocHost(req: FastifyRequest): boolean {
+  const fwd = req.headers['x-forwarded-host']
+  const host = String((Array.isArray(fwd) ? fwd[0] : fwd) || req.headers.host || '')
+  return DOC_HOSTS.has(appFromHost(host) ?? '')
+}
+
 app.addHook('onRequest', async (req, reply) => {
-  if (req.url.startsWith('/view/') || req.url === '/healthz') return
+  if (req.url.startsWith('/view/') || req.url.startsWith('/t/') || req.url === '/healthz') return
+  if (isPublicDocHost(req)) {
+    if (!/^\/[^/]+(\/(pdf|json))?$/.test(req.url.split('?')[0])) return reply.code(404).send({ error: 'not_found' })
+    return
+  }
   const claims = verifyServiceToken(bearer(req as FastifyRequest))
   if (!claims) return reply.code(401).send({ error: 'unauthorized', message: 'Missing or invalid service token' })
   req.claims = claims
@@ -38,6 +52,7 @@ app.setErrorHandler((err: any, _req, reply) => {
   return reply.code(500).send({ error: 'internal_error', message: 'Something went wrong' })
 })
 app.get('/healthz', async () => ({ ok: true, service: 'documents' }))
+await app.register(publicRoutes)
 
 interface DocRow {
   id: string
