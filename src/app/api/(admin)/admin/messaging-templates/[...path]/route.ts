@@ -5,7 +5,7 @@ const scopeFor = (method: string) => (method === 'GET' ? 'templates:read' : 'tem
 
 async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params
-  return proxyAdminMessaging(req, `/v2/templates/${path.join('/')}`, scopeFor(req.method))
+  return proxyAdminMessaging(req, `/v2/templates/${path.map(encodeURIComponent).join('/')}`, scopeFor(req.method))
 }
 
 export const GET = handle
