@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
+import { useAdminHost } from '@/contexts/AdminHostContext'
 
 interface NavLink {
   href: string
@@ -12,9 +13,9 @@ interface NavLink {
   exactMatch?: boolean
 }
 
-function isMobileNavActive(link: NavLink, currentPath: string | null): boolean {
+function isMobileNavActive(link: NavLink, currentPath: string | null, host: string): boolean {
   if (!currentPath) return false
-  const href = ap(link.href)
+  const href = ap(link.href, host)
   if (currentPath === href) return true
   if (link.exactMatch || link.href === '/admin/dashboard') return false
   return currentPath.startsWith(href + '/')
@@ -27,6 +28,7 @@ interface AdminMobileNavProps {
 }
 
 export default function AdminMobileNav({ navLinks, username, role }: AdminMobileNavProps) {
+  const host = useAdminHost()
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
 
@@ -94,9 +96,9 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
           <nav className="flex flex-col p-3 gap-1 flex-1 overflow-y-auto">
             {scanLink && (
               <a
-                href={ap(scanLink.href)}
+                href={ap(scanLink.href, host)}
                 className={`flex items-center gap-3 px-4 py-3.5 rounded-xl font-semibold transition-colors mb-1 ${
-                  pathname === ap(scanLink.href)
+                  pathname === ap(scanLink.href, host)
                     ? 'bg-secondary-400/40 text-white'
                     : 'bg-white/10 text-white hover:bg-white/20'
                 }`}
@@ -125,9 +127,9 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
             {ungrouped.map(link => (
               <a
                 key={link.href}
-                href={ap(link.href)}
+                href={ap(link.href, host)}
                 className={`px-4 py-3 rounded-lg font-medium transition-colors ${
-                  isMobileNavActive(link, pathname)
+                  isMobileNavActive(link, pathname, host)
                     ? 'bg-primary-500/20 text-primary-400'
                     : 'text-gray-300 hover:bg-white/10 hover:text-white'
                 }`}
@@ -154,7 +156,8 @@ function MobileNavGroup({
   links: NavLink[]
   pathname: string | null
 }) {
-  const isAnyActive = links.some(l => isMobileNavActive(l, pathname))
+  const host = useAdminHost()
+  const isAnyActive = links.some(l => isMobileNavActive(l, pathname, host))
   const [isOpen, setIsOpen] = useState(isAnyActive)
 
   return (
@@ -180,9 +183,9 @@ function MobileNavGroup({
           {links.map(link => (
             <a
               key={link.href}
-              href={ap(link.href)}
+              href={ap(link.href, host)}
               className={`px-4 py-2.5 rounded-lg font-medium transition-colors ${
-                isMobileNavActive(link, pathname)
+                isMobileNavActive(link, pathname, host)
                   ? 'bg-primary-500/20 text-primary-400'
                   : 'text-gray-400 hover:bg-white/10 hover:text-white'
               }`}

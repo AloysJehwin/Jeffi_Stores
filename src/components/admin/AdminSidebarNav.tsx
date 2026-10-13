@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
+import { useAdminHost } from '@/contexts/AdminHostContext'
 
 interface NavLink {
   href: string
@@ -415,15 +416,16 @@ interface Props {
   collapsed: boolean
 }
 
-function isNavActive(link: NavLink, currentPath: string | null): boolean {
+function isNavActive(link: NavLink, currentPath: string | null, host: string): boolean {
   if (!currentPath) return false
-  const href = ap(link.href)
+  const href = ap(link.href, host)
   if (currentPath === href) return true
   if (link.exactMatch || link.href === '/admin/dashboard') return false
   return currentPath.startsWith(href + '/')
 }
 
 export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
+  const host = useAdminHost()
   const pathname = usePathname()
 
   const ungrouped = navLinks.filter(l => !l.group)
@@ -442,11 +444,11 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
       >
         <nav className="flex flex-col items-center gap-0 p-1.5 flex-1 overflow-y-auto pt-2">
           {ungrouped.map(link => {
-            const isActive = isNavActive(link, pathname)
+            const isActive = isNavActive(link, pathname, host)
             return (
               <a
                 key={link.href}
-                href={ap(link.href)}
+                href={ap(link.href, host)}
                 title={link.label}
                 className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${
                   isActive ? 'bg-white/20 text-white' : 'text-gray-400 hover:bg-white/10 hover:text-white'
@@ -463,11 +465,11 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
                 {groupName.slice(0, 3)}
               </span>
               {links.map(link => {
-                const isActive = isNavActive(link, pathname)
+                const isActive = isNavActive(link, pathname, host)
                 return (
                   <a
                     key={link.href}
-                    href={ap(link.href)}
+                    href={ap(link.href, host)}
                     title={link.label}
                     className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors ${
                       isActive ? 'bg-white/20 text-white' : 'text-gray-400 hover:bg-white/10 hover:text-white'
@@ -490,9 +492,9 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
         {ungrouped.map(link => (
           <a
             key={link.href}
-            href={ap(link.href)}
+            href={ap(link.href, host)}
             className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              isNavActive(link, pathname)
+              isNavActive(link, pathname, host)
                 ? 'bg-white/20 text-white'
                 : 'text-gray-300 hover:bg-white/10 hover:text-white'
             }`}
@@ -520,7 +522,8 @@ function SidebarGroup({
   links: NavLink[]
   pathname: string | null
 }) {
-  const isAnyActive = links.some(l => isNavActive(l, pathname))
+  const host = useAdminHost()
+  const isAnyActive = links.some(l => isNavActive(l, pathname, host))
   const [isOpen, setIsOpen] = useState(isAnyActive)
   const lastActiveRef = useRef(isAnyActive)
 
@@ -554,9 +557,9 @@ function SidebarGroup({
           {links.map(link => (
             <a
               key={link.href}
-              href={ap(link.href)}
+              href={ap(link.href, host)}
               className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isNavActive(link, pathname)
+                isNavActive(link, pathname, host)
                   ? 'bg-white/20 text-white'
                   : 'text-gray-400 hover:bg-white/10 hover:text-white'
               }`}

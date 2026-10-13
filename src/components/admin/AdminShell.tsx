@@ -10,6 +10,7 @@ import ScanActionPopup from './ScanActionPopup'
 import ThemeToggle from '@/components/ThemeToggle'
 import AdminSessionController from './AdminSessionController'
 import { AdminScopesProvider } from '@/contexts/AdminScopesContext'
+import { AdminHostProvider } from '@/contexts/AdminHostContext'
 
 const COOKIE_NAME = 'sidebar_collapsed'
 
@@ -67,6 +68,7 @@ export default function AdminShell({
   }
 
   return (
+    <AdminHostProvider host={host}>
     <div className="fixed inset-0 flex flex-col bg-surface-secondary">
       {/* Top bar — full width, spans above sidebar + content */}
       <div className="flex items-center px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0 gap-3">
@@ -134,5 +136,6 @@ export default function AdminShell({
       <ScanActionPopup role={role} scopes={scopes} host={host} />
       <div id="dropdown-portal" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, pointerEvents: 'none' }} />
     </div>
+    </AdminHostProvider>
   )
 }
