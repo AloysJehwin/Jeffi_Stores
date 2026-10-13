@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
-import { createTenant, getOwnerTenants, linkOwnerTenant, updateOwnerName, saveKyc, markDraftSubmitted, requestServiceApproval } from '@/lib/tenant-registry'
+import { createTenant, getOwnerTenants, linkOwnerTenant, updateOwnerName, saveKyc, markDraftSubmitted, requestServiceApproval, controlPlanePool } from '@/lib/tenant-registry'
 import { sendServicesRequestedEmail } from '@/lib/shared/ecom-emails'
 import { parseBody } from '@/lib/shared/validate'
 
@@ -54,6 +54,9 @@ export async function POST(request: NextRequest) {
   })
   // KYC stays 'pending': Jeffi reviews API workspaces too. Until then they can explore but not send.
   await requestServiceApproval(result.tenantId, d.services)
+  // New Messaging customers: Jeffi reviews their template changes before they are sent.
+  if (d.services.includes('messaging'))
+    await controlPlanePool().query(`INSERT INTO messaging_tenant_settings (tenant_id, review_required) VALUES ($1, true) ON CONFLICT DO NOTHING`, [result.tenantId])
   await markDraftSubmitted(owner.id).catch(() => {})
   sendServicesRequestedEmail({ email: owner.email, name: d.ownerName }, d.displayName, d.services).catch(() => {})
   return NextResponse.json({ ok: true, tenantId: result.tenantId, slug: result.slug })

@@ -43,6 +43,12 @@ CREATE TABLE IF NOT EXISTS public.template_variant (
     approval_submitted_at timestamp with time zone,
     approval_approved_at timestamp with time zone,
     approval_checked_at timestamp with time zone,
+    -- Jeffi's review of an API customer's template (separate from Meta's approval_status above).
+    review_status character varying(16) NOT NULL DEFAULT 'approved',
+    approved_version_id uuid,
+    review_note text,
+    reviewed_at timestamp with time zone,
+    reviewed_by character varying(200),
     created_at timestamp with time zone NOT NULL DEFAULT now(),
     updated_at timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -330,4 +336,16 @@ CREATE TABLE IF NOT EXISTS public.message_events (
     event character varying(32) NOT NULL,
     payload jsonb,
     occurred_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Per API customer: which standard templates they get, whether they may edit, whether Jeffi reviews
+-- their changes. No row = everything allowed, no review.
+CREATE TABLE IF NOT EXISTS public.messaging_tenant_settings (
+    tenant_id uuid NOT NULL,
+    standard_templates character varying(16) NOT NULL DEFAULT 'all',
+    allowed jsonb NOT NULL DEFAULT '[]'::jsonb,
+    editing_enabled boolean NOT NULL DEFAULT true,
+    review_required boolean NOT NULL DEFAULT false,
+    updated_at timestamp with time zone NOT NULL DEFAULT now(),
+    updated_by character varying(200)
 );
