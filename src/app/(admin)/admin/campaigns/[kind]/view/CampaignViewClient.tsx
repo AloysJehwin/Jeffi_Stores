@@ -10,6 +10,7 @@ import { renderLayoutPreview, EMAIL_LAYOUT_OPTIONS } from '@/lib/templates/email
 import { renderBlocks, type EmailBlock } from '@/lib/templates/blocks'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import { WhatsAppPreview } from '@/components/admin/campaigns/WhatsAppTemplateEditor'
+import { CampaignDetailSkeleton, CampaignPageSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import {
   type CampaignRow,
   getChannels,
@@ -88,7 +89,7 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
     })()
   }, [kind])
 
-  if (loading) return <div className="p-6 text-sm text-foreground-muted">Loading…</div>
+  if (loading) return <CampaignPageSkeleton><CampaignDetailSkeleton /></CampaignPageSkeleton>
   if (error || !c) return <div className="p-6 text-sm text-red-600">{error || 'Not found'}</div>
 
   const vars = { ...sampleVariableMap(), ...SAMPLE_VARS }
