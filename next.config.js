@@ -84,6 +84,8 @@ const nextConfig = {
     return [
       {
         source: '/(.*)',
+        // public.<domain> is public-api-service (proxied through Next only in dev); it sets its own headers.
+        missing: [{ type: 'host', value: 'public\\..*' }],
         headers: [{ key: 'Content-Security-Policy', value: CSP }],
       },
       {

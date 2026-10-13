@@ -193,8 +193,14 @@ app.get<{ Params: { key: string } }>('/v1/documents/designs/:key/thumbnail.png',
 })
 
 // Public document viewer (token-only; no API key) — proxied to the document service.
+app.get<{ Params: { token: string } }>('/d/:token/pdf', async (req, reply) => {
+  const res = await undici(`${DOCUMENTS_URL}/view/${encodeURIComponent(req.params.token)}/pdf`)
+  if (res.statusCode !== 200) { await res.body.dump(); return fail(reply, 404, 'not_found', 'Document not found') }
+  for (const h of ['content-type', 'content-disposition']) if (res.headers[h]) reply.header(h, res.headers[h] as string)
+  return reply.send(Buffer.from(await res.body.arrayBuffer()))
+})
 app.get<{ Params: { token: string } }>('/d/:token', async (req, reply) => {
-  const res = await undici(`${DOCUMENTS_URL}/view/${req.params.token}`)
+  const res = await undici(`${DOCUMENTS_URL}/view/${encodeURIComponent(req.params.token)}`)
   reply.header('content-type', res.headers['content-type'] ?? 'text/html')
   return reply.code(res.statusCode).send(await res.body.text())
 })
