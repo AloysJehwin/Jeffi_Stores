@@ -1403,6 +1403,31 @@ CREATE INDEX idx_return_requests_user_id ON public.return_requests USING btree (
 
 
 --
+-- Name: idx_order_adjustments_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_order_adjustments_order_id ON public.order_adjustments USING btree (order_id);
+
+--
+-- Name: idx_order_adjustments_rzp_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_order_adjustments_rzp_order ON public.order_adjustments USING btree (razorpay_order_id) WHERE (razorpay_order_id IS NOT NULL);
+
+--
+-- Name: idx_order_adjustments_one_open; Type: INDEX; Schema: public; Owner: -
+-- At most one open (pending / awaiting payment) adjustment per order.
+--
+
+CREATE UNIQUE INDEX idx_order_adjustments_one_open ON public.order_adjustments USING btree (order_id) WHERE ((status)::text = ANY (ARRAY['pending_customer'::text, 'awaiting_payment'::text]));
+
+--
+-- Name: idx_order_adjustment_lines_adjustment; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_order_adjustment_lines_adjustment ON public.order_adjustment_lines USING btree (adjustment_id);
+
+--
 -- Name: idx_variant_change_requests_order_id; Type: INDEX; Schema: public; Owner: -
 --
 

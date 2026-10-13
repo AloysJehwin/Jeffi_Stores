@@ -1065,6 +1065,28 @@ ALTER TABLE ONLY public.variant_change_requests
     ADD CONSTRAINT variant_change_requests_settlement_type_check
     CHECK (settlement_type::text = ANY (ARRAY['refund'::text, 'collect'::text, 'cod_adjust'::text, 'none'::text]));
 
+--
+-- Name: order_adjustments order_adjustments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.order_adjustments
+    ADD CONSTRAINT order_adjustments_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.order_adjustments
+    ADD CONSTRAINT order_adjustments_settlement_type_check
+    CHECK (settlement_type::text = ANY (ARRAY['refund'::text, 'collect'::text, 'cod_adjust'::text, 'none'::text]));
+
+ALTER TABLE ONLY public.order_adjustments
+    ADD CONSTRAINT order_adjustments_status_check
+    CHECK (status::text = ANY (ARRAY['pending_customer'::text, 'awaiting_payment'::text, 'applied'::text, 'rejected'::text, 'cancelled'::text]));
+
+ALTER TABLE ONLY public.order_adjustment_lines
+    ADD CONSTRAINT order_adjustment_lines_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.order_adjustment_lines
+    ADD CONSTRAINT order_adjustment_lines_action_check
+    CHECK (action::text = ANY (ARRAY['switch'::text, 'remove'::text, 'quantity'::text]));
+
 ALTER TABLE ONLY public.variant_change_requests
     ADD CONSTRAINT variant_change_requests_status_check
     CHECK (status::text = ANY (ARRAY['pending_customer'::text, 'awaiting_payment'::text, 'applied'::text, 'rejected'::text, 'cancelled'::text]));

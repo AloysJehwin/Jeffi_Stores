@@ -389,6 +389,73 @@ ALTER TABLE ONLY public.variant_change_requests
     FOREIGN KEY (requested_by_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
 
 --
+-- Name: order_adjustments; Type: TABLE; Schema: public; Owner: -
+-- Admin "product adjustments" on a CONFIRMED (pre-shipment) order: several lines switched (product /
+-- variant / sub-variant / selling unit), removed or re-quantified at once. The customer approves; the net
+-- difference is refunded, collected, absorbed into the COD total, or waived (settle_payment = false).
+--
+
+CREATE TABLE public.order_adjustments (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid NOT NULL,
+    requested_by_admin_id uuid,
+    status character varying(30) DEFAULT 'pending_customer'::character varying NOT NULL,
+    settle_payment boolean DEFAULT true NOT NULL,
+    settlement_type character varying(20) NOT NULL,
+    net_diff numeric(12,2) NOT NULL,
+    old_subtotal numeric(12,2) NOT NULL,
+    new_subtotal numeric(12,2) NOT NULL,
+    old_discount numeric(12,2) DEFAULT 0 NOT NULL,
+    new_discount numeric(12,2) DEFAULT 0 NOT NULL,
+    new_business_discount numeric(12,2) DEFAULT 0 NOT NULL,
+    old_total numeric(12,2) NOT NULL,
+    new_total numeric(12,2) NOT NULL,
+    admin_notes text,
+    razorpay_order_id character varying(255),
+    razorpay_payment_id character varying(255),
+    refunds jsonb DEFAULT '[]'::jsonb NOT NULL,
+    applied_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+ALTER TABLE ONLY public.order_adjustments
+    ADD CONSTRAINT order_adjustments_order_id_fkey
+    FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.order_adjustments
+    ADD CONSTRAINT order_adjustments_requested_by_admin_id_fkey
+    FOREIGN KEY (requested_by_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+
+--
+-- Name: order_adjustment_lines; Type: TABLE; Schema: public; Owner: -
+-- One changed order line. order_item_id has no FK: a removed line's row is deleted, the snapshot stays here.
+--
+
+CREATE TABLE public.order_adjustment_lines (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    adjustment_id uuid NOT NULL,
+    order_item_id uuid NOT NULL,
+    action character varying(20) NOT NULL,
+    old_snapshot jsonb NOT NULL,
+    new_product_id uuid,
+    new_variant_id uuid,
+    new_sub_variant_id uuid,
+    new_unit character varying(20),
+    new_unit_factor numeric(14,6),
+    new_quantity numeric(10,3),
+    new_unit_price numeric(12,2),
+    new_line jsonb,
+    old_total numeric(12,2) NOT NULL,
+    new_total numeric(12,2) DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+ALTER TABLE ONLY public.order_adjustment_lines
+    ADD CONSTRAINT order_adjustment_lines_adjustment_id_fkey
+    FOREIGN KEY (adjustment_id) REFERENCES public.order_adjustments(id) ON DELETE CASCADE;
+
+--
 -- Name: address_change_requests; Type: TABLE; Schema: public; Owner: -
 -- Customer-initiated delivery address change on a CONFIRMED order (pre-shipment).
 -- An admin approves or rejects; the order's address only changes on approval.
