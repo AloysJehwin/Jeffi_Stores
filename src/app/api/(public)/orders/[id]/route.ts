@@ -656,11 +656,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             client
           )
         }
-        // Assign the invoice number/document at processing for ALL orders,
-        // including COD (never payment_status='paid' until remittance). The PDF is
-        // still rendered later by generateOrderInvoice once the order is paid.
-        await assignInvoiceNumber(client, orderId)
       })
+      // Number the invoice (document-service, own transaction) once stock is committed. Idempotent.
+      await assignInvoiceNumber(null, orderId)
     }
 
     const response = NextResponse.json({ success: true })

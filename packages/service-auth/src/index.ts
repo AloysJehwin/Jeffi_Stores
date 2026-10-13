@@ -9,6 +9,7 @@ export interface ServiceClaims {
   tenantSlug?: string
   internal?: boolean // platform-originated send: charged at provider cost, no public margin
   adminId?: string // admin-session-originated call (proxied from the monolith)
+  userId?: string // customer-session-originated call (proxied from the monolith)
   role?: string
   scopes?: string[]
   exp: number
