@@ -45,7 +45,7 @@ function isPublicDocHost(req: FastifyRequest): boolean {
 }
 
 app.addHook('onRequest', async (req, reply) => {
-  if (req.url.startsWith('/view/') || req.url.startsWith('/t/') || req.url === '/healthz') return
+  if (req.url.startsWith('/view/') || req.url.startsWith('/t/') || req.url === '/healthz' || /^\/designs\/[a-z0-9-]+\/thumbnail\.png$/.test(req.url)) return
   if (isPublicDocHost(req)) {
     if (!/^\/[^/]+(\/(pdf|json))?$/.test(req.url.split('?')[0])) return reply.code(404).send({ error: 'not_found' })
     return

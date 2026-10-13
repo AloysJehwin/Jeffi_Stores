@@ -91,7 +91,7 @@ r.registerPath({
   responses: { 200: { description: 'Archived' }, ...err(404, 'Not found') },
 })
 r.registerPath({
-  method: 'post', path: '/v1/documents/{type}', tags: ['Documents'], security: sec, summary: 'Render a PDF document', description: 'GST is computed server-side. Returns a signed PDF URL (1 h) and a shareable viewer URL.',
+  method: 'post', path: '/v1/documents/{type}', tags: ['Documents'], security: sec, summary: 'Render a PDF document', description: 'GST is computed server-side. Returns a signed PDF URL (1 h) and a shareable viewer URL.\n\n**Design** — `template` picks one of the 10 designs (`aurora`, `ledger`, `minimal`, `block`, `editorial`, `grid`, `mono`, `corporate`, `boutique`, `compact`; see `GET /v1/documents/designs`). Omit it to use the design chosen in your dashboard (Documents → Designs), else `aurora`. Older keys still work: `classic`, `bold`, `gst-detailed`, `thermal-80mm` (80 mm roll for receipts and labels).\n\n**Branding** — `branding.accent` (#rrggbb), `branding.font` (`modern` · `geometric` · `classic` · `editorial` · `technical` · `system`) and `branding.logo_url` (public https image) override your dashboard settings for this call.',
   request: { params: z.object({ type: C.DocumentType }), body: { content: { 'application/json': { schema: C.RenderDocumentRequest } } } },
   responses: { 200: { description: 'Document', content: { 'application/json': { schema: C.Document } } }, ...err(402, 'Insufficient wallet balance') },
 })
@@ -99,6 +99,26 @@ r.registerPath({
   method: 'get', path: '/v1/documents/{id}', tags: ['Documents'], security: sec, summary: 'Get a document (fresh signed URL)',
   request: { params: z.object({ id: z.string().uuid() }) },
   responses: { 200: { description: 'Document', content: { 'application/json': { schema: C.Document } } }, ...err(404, 'Not found') },
+})
+r.registerPath({
+  method: 'get', path: '/v1/documents', tags: ['Documents'], security: sec, summary: 'List documents (newest first)',
+  request: { query: z.object({ type: C.DocumentType.optional(), limit: z.coerce.number().int().min(1).max(200).optional(), cursor: z.string().optional().openapi({ description: '`next_cursor` from the previous page' }) }) },
+  responses: { 200: { description: 'Page of documents', content: { 'application/json': { schema: z.object({ items: z.array(C.Document), next_cursor: z.string().nullable() }) } } } },
+})
+r.registerPath({
+  method: 'get', path: '/v1/documents/designs', tags: ['Documents'], security: sec, summary: 'List the document designs and font pairings',
+  responses: { 200: { description: 'Designs', content: { 'application/json': { schema: z.object({ designs: z.array(C.DocumentDesign), fonts: z.array(z.object({ key: C.DocumentFont, label: z.string() })), default: z.string() }) } } } },
+})
+r.registerPath({
+  method: 'get', path: '/v1/documents/designs/{key}/preview/{type}', tags: ['Documents'], security: sec, summary: 'Preview a design with sample data (PDF, free)',
+  description: 'Uses your saved logo and branding; `accent` / `font` query parameters try alternatives.',
+  request: { params: z.object({ key: z.string(), type: C.DocumentType }), query: z.object({ accent: z.string().optional().openapi({ example: '#4f46e5' }), font: C.DocumentFont.optional() }) },
+  responses: { 200: { description: 'PDF', content: { 'application/pdf': { schema: z.string().openapi({ format: 'binary' }) } } }, ...err(404, 'Unknown design') },
+})
+r.registerPath({
+  method: 'get', path: '/v1/documents/{id}/pdf', tags: ['Documents'], security: sec, summary: 'Download a document PDF',
+  request: { params: z.object({ id: z.string().uuid() }) },
+  responses: { 200: { description: 'PDF', content: { 'application/pdf': { schema: z.string().openapi({ format: 'binary' }) } } }, ...err(404, 'Not found') },
 })
 r.registerPath({
   method: 'get', path: '/v1/wallet', tags: ['Account'], security: sec, summary: 'Wallet balance and today’s spend',

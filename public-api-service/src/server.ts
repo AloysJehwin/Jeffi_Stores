@@ -103,13 +103,21 @@ async function remember(req: FastifyRequest, status: number, body: unknown) {
 }
 
 /** Forward to a service with a short-lived HMAC token carrying the tenant. */
-async function proxy(req: FastifyRequest, reply: FastifyReply, base: string, path: string, kind: 'messages' | 'documents' | null) {
+async function proxy(req: FastifyRequest, reply: FastifyReply, base: string, path: string, kind: 'messages' | 'documents' | null, map?: (body: any) => any) {
   const token = signServiceToken({ service: 'public-api', tenantId: req.key.tenant_id, tenantSlug: req.key.tenant_slug, apiKeyId: req.key.id }, 60)
   const res = await undici(base + path, {
     method: req.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
     headers: { authorization: `Bearer ${token}`, 'x-request-id': req.id, ...(req.method === 'POST' || req.method === 'PUT' ? { 'content-type': 'application/json' } : {}) },
     body: req.method === 'POST' || req.method === 'PUT' ? JSON.stringify(req.body ?? {}) : undefined,
   })
+  const ctype = String(res.headers['content-type'] ?? '')
+  if (!ctype.includes('json')) {
+    // Binary passthrough (PDFs, images).
+    const buf = Buffer.from(await res.body.arrayBuffer())
+    touchKey(req.key.id, null)
+    for (const h of ['content-type', 'content-disposition', 'cache-control']) if (res.headers[h]) reply.header(h, res.headers[h] as string)
+    return reply.code(res.statusCode).send(buf)
+  }
   const text = await res.body.text()
   let body: any = text
   try {
@@ -117,6 +125,7 @@ async function proxy(req: FastifyRequest, reply: FastifyReply, base: string, pat
   } catch {}
   const spend = res.statusCode === 200 && kind ? toPaise(Number(body?.charged_inr ?? body?.price_inr ?? 0)) : 0
   touchKey(req.key.id, res.statusCode === 200 ? kind : null, spend)
+  if (map && res.statusCode === 200) body = map(body)
   await remember(req, res.statusCode, body)
   return reply.code(res.statusCode).send(body)
 }
@@ -158,6 +167,13 @@ app.register(async v1 => {
   v1.delete<{ Params: { channel: string; slug: string } }>('/templates/:channel/:slug', write, (req, reply) =>
     proxy(req, reply, MESSAGING_URL, `/v2/templates/${req.params.channel}/${enc(req.params.slug)}`, null))
   v1.post<{ Params: { type: string } }>('/documents/:type', { preHandler: need('documents:render', 'documents') }, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/${req.params.type}`, 'documents'))
+  const docsRead = { preHandler: need('documents:read', 'documents') }
+  v1.get('/documents', docsRead, (req, reply) => proxy(req, reply, DOCUMENTS_URL, '/documents' + qs(req), null))
+  v1.get('/documents/designs', docsRead, (req, reply) => proxy(req, reply, DOCUMENTS_URL, '/designs', null, b => ({
+    ...b, designs: b.designs.map((d: any) => ({ ...d, thumbnail_url: `${process.env.PUBLIC_API_URL || `${req.protocol}://${req.host}`}/v1/documents${d.thumbnail_url}` })),
+  })))
+  v1.get<{ Params: { key: string; type: string } }>('/documents/designs/:key/preview/:type', docsRead, (req, reply) =>
+    proxy(req, reply, DOCUMENTS_URL, `/designs/${encodeURIComponent(req.params.key)}/preview/${encodeURIComponent(req.params.type)}` + qs(req), null))
   v1.get<{ Params: { id: string } }>('/documents/:id', { preHandler: need('documents:read', 'documents') }, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/${req.params.id}`, null))
   v1.get<{ Params: { id: string } }>('/documents/:id/pdf', { preHandler: need('documents:read', 'documents') }, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/${req.params.id}/pdf`, null))
   v1.get('/wallet', { preHandler: async (req, reply) => { if (!req.key.scopes.includes('wallet:read')) return fail(reply, 403, 'forbidden', "This key lacks the 'wallet:read' scope") } }, async req => {
@@ -168,6 +184,13 @@ app.register(async v1 => {
     return { balance_inr: balance, spent_today_inr: spent, currency: 'INR' }
   })
 }, { prefix: '/v1' })
+
+// Design thumbnails are the same for everyone, so they need no key (usable as plain <img> sources).
+app.get<{ Params: { key: string } }>('/v1/documents/designs/:key/thumbnail.png', async (req, reply) => {
+  const res = await undici(`${DOCUMENTS_URL}/designs/${encodeURIComponent(req.params.key)}/thumbnail.png`)
+  if (res.statusCode !== 200) { await res.body.dump(); return fail(reply, 404, 'not_found', 'Unknown design') }
+  return reply.header('content-type', 'image/png').header('cache-control', 'public, max-age=86400').send(Buffer.from(await res.body.arrayBuffer()))
+})
 
 // Public document viewer (token-only; no API key) — proxied to the document service.
 app.get<{ Params: { token: string } }>('/d/:token', async (req, reply) => {
