@@ -32,7 +32,22 @@ declare module 'fastify' {
 app.get('/healthz', async () => ({ ok: true, service: 'public-api' }))
 const openapi = buildOpenApi()
 app.get('/openapi.json', async () => openapi)
-await app.register(apiReference, { routePrefix: '/docs', configuration: { content: openapi, theme: 'kepler' } })
+await app.register(apiReference, {
+  routePrefix: '/docs',
+  configuration: {
+    content: openapi,
+    theme: 'kepler',
+    metaData: {
+      title: 'Jeffi API Reference',
+      description: 'Messaging and document rendering API for Jeffi Stores.',
+    },
+  },
+})
+// The browser tab reads the HTML <title>. Scalar's default ("Scalar API Reference") is rewritten
+// to Jeffi's here so both the /docs 301-served HTML and /docs/ match. (Favicon left as-is.)
+const brandDocHtml = (html: string) =>
+  html.replace(/<title>[^<]*<\/title>/i, '<title>Jeffi API Reference</title>')
+
 // Scalar's /docs → /docs/ 301 bounces with Next's trailingSlash:false (which 308s /docs/ back
 // to /docs), creating an infinite redirect loop behind the public.* Next rewrite. Serve
 // /docs/'s HTML directly on /docs with a 200 AND rewrite the HTML's relative asset paths
@@ -41,12 +56,20 @@ await app.register(apiReference, { routePrefix: '/docs', configuration: { conten
 app.addHook('onSend', async (req, reply, payload) => {
   if (req.url === '/docs' && reply.statusCode === 301) {
     const r = await app.inject({ method: 'GET', url: '/docs/' })
-    const html = r.payload
-      .replace(/(src|href)="(?!https?:|\/|data:)([^"]+)"/g, '$1="/docs/$2"')
-      .replace(/"\.?\/?openapi\.json"/g, '"/openapi.json"')
+    const html = brandDocHtml(
+      r.payload
+        .replace(/(src|href)="(?!https?:|\/|data:)([^"]+)"/g, '$1="/docs/$2"')
+        .replace(/"\.?\/?openapi\.json"/g, '"/openapi.json"')
+    )
     reply.code(200)
     const ct = r.headers['content-type']
     if (ct) reply.header('content-type', ct)
+    reply.header('content-length', Buffer.byteLength(html))
+    return html
+  }
+  // Direct /docs/ hit (and any other Scalar HTML): rebrand the tab in place.
+  if (req.url.startsWith('/docs') && typeof payload === 'string' && String(reply.getHeader('content-type') || '').includes('text/html')) {
+    const html = brandDocHtml(payload)
     reply.header('content-length', Buffer.byteLength(html))
     return html
   }
