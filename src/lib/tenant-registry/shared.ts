@@ -49,19 +49,8 @@ export function controlPlanePool(): Pool {
   if (cpGlobal.__cpPool) return cpGlobal.__cpPool
   let url = process.env.CONTROL_PLANE_DATABASE_URL || ''
   const iam = process.env.CONTROL_PLANE_IAM_AUTH === 'true'
-  // Local-dev fallback: predev regenerates .env.local from Secrets Manager and may not
-  // carry CONTROL_PLANE_DATABASE_URL. In development, derive the local control-plane DB
-  // from the app's own DATABASE_URL (same host/user), swapping the db name to
-  // jeffi_control_plane — so `npm run dev` just works without manual env upkeep.
-  if (!url && !iam && process.env.NODE_ENV !== 'production' && process.env.DATABASE_URL) {
-    try {
-      const u = new URL(process.env.DATABASE_URL)
-      u.pathname = '/jeffi_control_plane'
-      url = u.toString()
-    } catch {
-      /* leave url empty; the guard below throws a clear error */
-    }
-  }
+  // Control-plane tables live in the unified app DB (docs/MICROSERVICES.md); no separate DB.
+  if (!url && !iam && process.env.DATABASE_URL) url = process.env.DATABASE_URL
   if (!url && !iam) {
     throw new Error('Control-plane DB not configured: set CONTROL_PLANE_DATABASE_URL (or CONTROL_PLANE_IAM_AUTH=true).')
   }

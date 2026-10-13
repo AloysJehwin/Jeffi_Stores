@@ -4,8 +4,16 @@ import { tokenKeys } from './render.js'
 // Three-level model: template_family → template → template_variant → template_version.
 // Pool is injected by the caller (control-plane pool today, per-tenant pool tomorrow — see
 // packages/tenancy/pools.ts tenantPool()). tenant_id scopes rows until each tenant moves to its own DB.
+//
+// Platform defaults + tenant overrides: rows under PLATFORM_TENANT_ID live in the flagship
+// (control-plane) DB and are visible to every tenant as read-only defaults. Tenant rows live in
+// the tenant's own DB. Reads merge the two pools (tenant row shadows the platform row with the same
+// slug+channel); writes always go to the tenant pool. See listTemplatesWithDefaults/findBySlugWithDefaults.
+
+export const PLATFORM_TENANT_ID = '00000000-0000-0000-0000-000000000000'
 
 type Executor = pg.Pool | pg.PoolClient
+export type Pools = { tenant: Executor; platform: Executor }
 const rows = async <T extends pg.QueryResultRow = any>(e: Executor, text: string, params?: unknown[]) =>
   (await e.query<T>(text, params)).rows
 const first = async <T extends pg.QueryResultRow = any>(e: Executor, text: string, params?: unknown[]) =>
@@ -52,7 +60,7 @@ export const listFamilies = (e: Executor, tenantId: string, channel?: string, ca
 
 export const listTemplates = (e: Executor, tenantId: string, channel?: string) =>
   rows(e,
-    `SELECT t.id, t.family_id, t.channel, t.status, t.current_variant_id,
+    `SELECT t.id, t.family_id, t.channel, t.status, t.current_variant_id, t.tenant_id,
             f.slug, f.name, f.category,
             v.id AS variant_id, v.locale, v.provider_ref, v.approval_status,
             ver.version AS current_version, ver.subject
@@ -63,6 +71,28 @@ export const listTemplates = (e: Executor, tenantId: string, channel?: string) =
       WHERE t.tenant_id=$1 AND ($2::text IS NULL OR t.channel=$2)
       ORDER BY f.name, t.channel`,
     [tenantId, channel ?? null])
+
+// Tenant rows (tenant pool) + platform defaults (flagship pool); tenant shadows same slug+channel.
+// A tenant DB that lacks the template tables yet (42P01) just yields no overrides.
+const noTable = (e: any) => e?.code === '42P01'
+export async function listTemplatesWithDefaults(p: Pools, tenantId: string, channel?: string) {
+  const own = await listTemplates(p.tenant, tenantId, channel).catch(e => { if (noTable(e)) return []; throw e })
+  if (tenantId === PLATFORM_TENANT_ID) return own.map(r => ({ ...r, source: 'platform' }))
+  const defaults = await listTemplates(p.platform, PLATFORM_TENANT_ID, channel)
+  const key = (r: any) => `${r.slug}|${r.channel}`
+  const seen = new Set(own.map(key))
+  return [
+    ...own.map(r => ({ ...r, source: 'tenant' })),
+    ...defaults.filter(r => !seen.has(key(r))).map(r => ({ ...r, source: 'platform' })),
+  ].sort((a, b) => a.name.localeCompare(b.name) || a.channel.localeCompare(b.channel))
+}
+
+// Tenant copy first; else the platform default (flagship pool) with the same slug.
+export async function findBySlugWithDefaults(p: Pools, tenantId: string, channel: string, slug: string, locale = 'en'): Promise<FullTemplate | null> {
+  const own = await findBySlug(p.tenant, tenantId, channel, slug, locale).catch(e => { if (noTable(e)) return null; throw e })
+  if (own || tenantId === PLATFORM_TENANT_ID) return own
+  return findBySlug(p.platform, PLATFORM_TENANT_ID, channel, slug, locale)
+}
 
 export async function findBySlug(e: Executor, tenantId: string, channel: string, slug: string, locale = 'en'): Promise<FullTemplate | null> {
   const family = await first<FamilyRow>(e, `SELECT * FROM template_family WHERE tenant_id=$1 AND slug=$2`, [tenantId, slug])
