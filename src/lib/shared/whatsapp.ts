@@ -1,5 +1,5 @@
 import { logMessage } from '@/lib/shared/message-log'
-import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
+import { storeBaseUrlAsync } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { getWhatsAppProvider } from '@/lib/shared/messaging'
@@ -8,6 +8,7 @@ import { estimateFor } from '@/lib/shared/messaging/pricing'
 import { sendByTemplate } from '@/lib/shared/send-by-template'
 
 // WhatsApp wrappers now dispatch via sendByTemplate (slug → messaging-service).
+// Variable numbering must match the Meta-approved Twilio Content templates (see seed/catalog.ts).
 // Infra kept here: channel gate, phone normalize, free-text (24h window), campaign-SID path, registry.
 
 async function whatsappChannelEnabled(): Promise<boolean> {
@@ -71,24 +72,22 @@ export async function sendCampaignTemplateWhatsApp(params: {
 }
 
 export async function sendOTPWhatsApp(p: { phone?: string | null; otp: string }): Promise<boolean> {
-  return sendBySlug(p.phone, 'otp/verify', { '1': p.otp, '2': 10 })
+  return sendBySlug(p.phone, 'otp/verify', { '1': p.otp })
 }
 
 export async function sendOrderConfirmedWhatsApp(p: { phone?: string | null; orderNumber: string; total: number }): Promise<boolean> {
   const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(p.total)
-  const url = (await orderUrlByNumber(p.orderNumber)) || `${await storeBaseUrlAsync()}/account/orders`
-  return sendBySlug(p.phone, 'order/confirmed', { '1': p.orderNumber, '2': amount, '3': url })
+  return sendBySlug(p.phone, 'order/confirmed', { '1': p.orderNumber, '2': amount })
 }
 
 export async function sendOrderShippedWhatsApp(p: { phone?: string | null; orderNumber: string; courier?: string | null; trackingId?: string | null }): Promise<boolean> {
   const courier = p.courier || 'courier'
   const tracking = p.trackingId || (await orderUrlByNumber(p.orderNumber)) || `${await storeBaseUrlAsync()}/account/orders`
-  return sendBySlug(p.phone, 'order/shipped', { '1': p.orderNumber, '2': courier, '3': tracking, '4': tracking })
+  return sendBySlug(p.phone, 'order/shipped', { '1': p.orderNumber, '2': courier, '3': tracking })
 }
 
 export async function sendOrderDeliveredWhatsApp(p: { phone?: string | null; orderNumber: string }): Promise<boolean> {
-  const url = (await orderUrlByNumber(p.orderNumber)) || `${await storeBaseUrlAsync()}/account/orders`
-  return sendBySlug(p.phone, 'order/delivered', { '1': p.orderNumber, '2': url })
+  return sendBySlug(p.phone, 'order/delivered', { '1': p.orderNumber })
 }
 
 export async function sendAccessGrantedWhatsApp(p: { phone?: string | null; orderNumber: string; vaultUrl: string }): Promise<boolean> {
@@ -96,11 +95,11 @@ export async function sendAccessGrantedWhatsApp(p: { phone?: string | null; orde
 }
 
 export async function sendOrderCancelledWhatsApp(p: { phone?: string | null; orderNumber: string }): Promise<boolean> {
-  return sendBySlug(p.phone, 'order/cancelled', { '1': p.orderNumber, '2': '' })
+  return sendBySlug(p.phone, 'order/cancelled', { '1': p.orderNumber })
 }
 
 export async function sendOutForDeliveryWhatsApp(p: { phone?: string | null; orderNumber: string }): Promise<boolean> {
-  return sendBySlug(p.phone, 'order/out-for-delivery', { '1': p.orderNumber, '2': '' })
+  return sendBySlug(p.phone, 'order/out-for-delivery', { '1': p.orderNumber })
 }
 
 export async function sendPaymentFailedWhatsApp(p: { phone?: string | null; orderNumber: string }): Promise<boolean> {
@@ -108,15 +107,13 @@ export async function sendPaymentFailedWhatsApp(p: { phone?: string | null; orde
 }
 
 export async function sendPromoOfferWhatsApp(p: { phone?: string | null; headline: string; code: string; discount: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendBySlug(p.phone, 'promo/offer', { '1': STORE, '2': p.discount, '3': p.code, '4': '', '5': p.headline }, p.entity?.entityId)
+  return sendBySlug(p.phone, 'promo/offer', { '1': p.headline, '2': p.code, '3': p.discount }, p.entity?.entityId)
 }
 export async function sendNewArrivalsWhatsApp(p: { phone?: string | null; items: string }): Promise<boolean> {
   return sendBySlug(p.phone, 'promo/new-arrivals', { '1': p.items })
 }
 export async function sendAbandonedCartWhatsApp(p: { phone?: string | null; items: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendBySlug(p.phone, 'cart/abandoned', { '1': STORE, '2': p.items, '3': '' }, p.entity?.entityId)
+  return sendBySlug(p.phone, 'cart/abandoned', { '1': p.items }, p.entity?.entityId)
 }
 export async function sendBackInStockWhatsApp(p: { phone?: string | null; product: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
   return sendBySlug(p.phone, 'restock', { '1': p.product }, p.entity?.entityId)

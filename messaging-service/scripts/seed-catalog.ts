@@ -13,11 +13,12 @@ for (const seed of CATALOG) {
   const existing = await tpl.findBySlug(db, PLATFORM_TENANT_ID, seed.channel, seed.slug, seed.locale ?? 'en')
   if (existing && !force) { skipped++; continue }
   const providerRef = seed.channel === 'whatsapp' ? WA_APPROVED_SIDS[seed.slug] : undefined
-  await tpl.upsertTemplate(db, PLATFORM_TENANT_ID, {
+  const t = await tpl.upsertTemplate(db, PLATFORM_TENANT_ID, {
     ...seed,
     provider_ref: providerRef ?? seed.provider_ref,
     publish: true,
   })
+  if (providerRef && t.variant) await tpl.setApprovalStatus(db, t.variant.id, { status: 'approved', raw: 'approved' })
   created++
 }
 console.log(JSON.stringify({ created, skipped, total: CATALOG.length }))
