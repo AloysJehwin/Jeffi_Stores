@@ -335,6 +335,21 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/mailer'],
     group: 'Marketing',
   },
+  // Messaging templates library (email / SMS / WhatsApp bodies). Sold with Mailer.
+  {
+    key: 'templates:read',
+    label: 'Messaging Templates (Read)',
+    description: 'View email, SMS and WhatsApp message templates',
+    routes: ['/admin/marketing/messaging-templates'],
+    group: 'Marketing',
+  },
+  {
+    key: 'templates:write',
+    label: 'Messaging Templates (Write)',
+    description: 'Edit message templates and submit WhatsApp templates for approval',
+    routes: ['/admin/marketing/messaging-templates'],
+    group: 'Marketing',
+  },
   // Campaigns — previously piggybacked on mailer:read. Dedicated key for tiering.
   {
     key: 'campaigns:read',
@@ -695,6 +710,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/offers')) return 'coupons:read'
   if (pathname.startsWith('/api/admin/review-forms')) return 'review_forms:read'
   if (pathname.startsWith('/api/admin/mailer')) return 'mailer:read'
+  if (pathname.startsWith('/api/admin/messaging-templates')) return 'templates:read'
   if (pathname.startsWith('/api/admin/suggest')) return null
   if (pathname.startsWith('/api/admin/social-posts')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/traffic')) return 'traffic:read'
@@ -737,6 +753,8 @@ const LEGACY_SCOPE_PARENTS: Record<string, string> = {
   'shelving:write': 'inventory:write',
   'campaigns:read': 'mailer:read',
   'campaigns:write': 'mailer:write',
+  'templates:read': 'mailer:read',
+  'templates:write': 'mailer:write',
   'controls:read': 'inflation:read',
   'controls:write': 'inflation:write',
 }
