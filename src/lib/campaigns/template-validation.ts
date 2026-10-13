@@ -6,13 +6,13 @@ const HAS_CART_ITEMS_RE = /\{cartItems\}/
 const PRODUCT_COPY_HINT_RE =
   /\b(your items?|the items?|your cart|your favou?rites?|your wishlist|back in stock|price drop|featured products?|recommendations?|recommended products?|these products?)\b/i
 
-const SINGLE_PRODUCT_KINDS = new Set([
+export const SINGLE_PRODUCT_KINDS = new Set([
   'restock',
   'price_drop',
   'back_in_stock_wishlist',
   'review_photo_followup',
 ])
-const MULTI_PRODUCT_KINDS = new Set([
+export const MULTI_PRODUCT_KINDS = new Set([
   'abandoned_cart',
   'abandoned_checkout',
   'post_purchase',

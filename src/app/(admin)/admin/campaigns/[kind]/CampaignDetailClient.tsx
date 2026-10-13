@@ -18,7 +18,8 @@ import EmailBlockBuilder from '@/components/admin/email-composer/EmailBlockBuild
 import { EMAIL_LAYOUT_OPTIONS, layoutStarterBody, renderLayoutPreview } from '@/lib/templates/email-layouts'
 import type { EmailBlock } from '@/lib/templates/blocks'
 import { renderBlocks } from '@/lib/templates/blocks'
-import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
+import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
+import { campaignVariables } from '@/lib/campaigns/kind-variables'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
@@ -398,6 +399,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       }
     : SAMPLE_VARS
   const linked = form.email_template_slug && linkedEmail ? linkedEmail : null
+  const varsKind = form.scenario_kind || kind
+  const composerVars = campaignVariables(varsKind, 'email').map(v => ({
+    key: v.key, label: v.label, description: v.description, sample: v.sample, group: 'order' as const, builtIn: true, section: 'Campaign',
+  }))
   const linkedBlocks = linked?.blocks_format === 'email-blocks' ? ((linked.blocks as any)?.blocks as EmailBlock[] | undefined) : undefined
   const bridgedPreview = bridgeVars(previewVars as Record<string, string | number>)
   const previewSubject = renderTemplate(linked ? linked.subject ?? '' : form.subject_template, bridgedPreview)
@@ -548,7 +553,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           {form.email_template_slug ? (
             <>
               <div className="mt-4">
-                <LinkedTemplateEditor channel="email" slug={form.email_template_slug} currentKind={kind} onMirror={setLinkedEmail} />
+                <LinkedTemplateEditor channel="email" slug={form.email_template_slug} currentKind={kind} campaignKind={varsKind} onMirror={setLinkedEmail} />
               </div>
               <div className="mt-4">
                 <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
@@ -651,6 +656,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           <div className="mt-2">
             {form.template_mode === 'blocks' ? (
               <EmailBlockBuilder
+                extraVariables={composerVars}
                 blocks={form.blocks}
                 onChange={b =>
                   setForm(f =>
@@ -682,20 +688,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                       : f
                   )
                 }
-                extraVariables={CAMPAIGN_VARIABLES}
+                extraVariables={composerVars}
                 ctaHref="{ctaUrl}"
                 minHeight={260}
               />
             )}
-            <p className="text-[10px] text-foreground-muted mt-1">
-              Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code>{' '}
-              <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code>{' '}
-              <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code>{' '}
-              <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code>{' '}
-              <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code>{' '}
-              <code className="px-1 bg-surface-secondary rounded">{'{productImageUrl}'}</code>{' '}
-              <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
-            </p>
+            <div className="mt-2"><CampaignVariables kind={varsKind} channel="email" text={`${form.subject_template}\n${form.template_mode === 'blocks' ? renderBlocks(form.blocks ?? []) : form.body_template}`} /></div>
           </div>
             </>
           )}
@@ -715,7 +713,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               />
               <div className="mt-2">
                 {form.sms_template_slug ? (
-                  <LinkedTemplateEditor channel="sms" slug={form.sms_template_slug} currentKind={kind} />
+                  <LinkedTemplateEditor channel="sms" slug={form.sms_template_slug} currentKind={kind} campaignKind={varsKind} />
                 ) : (
                   <>
               <textarea
