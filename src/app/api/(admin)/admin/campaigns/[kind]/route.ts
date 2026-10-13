@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { query, queryOne, queryMany } from '@/lib/shared/db'
+import { withLibraryContent } from '@/lib/campaigns/library-content'
 import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
 
 export const dynamic = 'force-dynamic'
@@ -92,7 +93,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
   ])
 
   return NextResponse.json({
-    campaign: { ...campaign, ...(statsRow || {}) },
+    // Linked campaigns show their library template's current content (view page, previews).
+    campaign: { ...(await withLibraryContent(campaign as any)), ...(statsRow || {}) },
     recentSends,
     whatsappLogs,
     total: parseInt(countRow?.total || '0', 10),

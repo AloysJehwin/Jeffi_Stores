@@ -34,3 +34,12 @@ export function bridgeVars<T extends string | number>(vars: Record<string, T>): 
 
 /** Library variable names a campaign scenario can supply (for "can't fill" warnings in pickers). */
 export const CAMPAIGN_SUPPLIED = new Set(ALIASES.flatMap(([c, s]) => [c, ...s]))
+
+// Registered (recipient/store) variables every send resolves.
+const REGISTERED = new Set(['customer_first_name', 'customer_last_name', 'customer_name', 'customer_email', 'store_name',
+  'store_email', 'store_phone', 'store_web', 'current_year', 'date'])
+
+/** Can a campaign send fill this variable? camelCase names are scenario variables (each scenario supplies its own). */
+export function campaignCanFill(name: string): boolean {
+  return REGISTERED.has(name) || CAMPAIGN_SUPPLIED.has(name) || !name.includes('_')
+}

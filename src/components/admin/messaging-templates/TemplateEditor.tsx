@@ -59,6 +59,8 @@ type Props = {
   // Resolves to the saved template (a tenant's first save forks a standard one → new id), or null.
   onSave: (publish: boolean) => Promise<EditorTemplate | null>
   saving?: boolean
+  /** Inside another editor (campaigns, Messaging): single column, no preview panel, one save action. */
+  embedded?: boolean
 }
 
 const SMS_GSM_LIMIT = 160
@@ -73,7 +75,7 @@ type WaBlocks = {
   carousel?: { cards: WaCarouselCard[] }
 }
 
-export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave, saving }: Props) {
+export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave, saving, embedded }: Props) {
   const [preview, setPreview] = useState<{ subject?: string | null; body?: string; missing?: string[] } | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -195,7 +197,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
   )
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className={embedded ? 'space-y-4' : 'grid grid-cols-1 lg:grid-cols-2 gap-6'}>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" />
       <div className="space-y-4">
         <div>
@@ -500,13 +502,23 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
           )
         })()}
 
+        {embedded ? (
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => onSave(true)} disabled={saving} className="px-5 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">
+              {saving ? 'Saving…' : 'Save template'}
+            </button>
+            <span className="text-[11px] text-foreground-muted">Saved to the Templates library — the same template everywhere it&apos;s used.</span>
+          </div>
+        ) : (
         <div className="flex gap-2">
           <button type="button" onClick={() => onSave(false)} disabled={saving} className="px-5 h-control bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">Save draft</button>
           <button type="button" onClick={() => onSave(true)} disabled={saving} className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">Publish</button>
           <button type="button" onClick={runPreview} disabled={previewing} className="px-5 h-control bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">Preview</button>
         </div>
+        )}
       </div>
 
+      {!embedded && (
       <div className="bg-surface-secondary/50 rounded-lg border border-border-default p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Preview</div>
@@ -525,6 +537,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
           <p className="mt-3 text-xs text-foreground-secondary">Sample values used for: {preview.missing.join(', ')}</p>
         )}
       </div>
+      )}
     </div>
   )
 }

@@ -42,9 +42,12 @@ export async function POST(req: NextRequest, { params }: Params) {
        template_mode = COALESCE($11, template_mode),
        blocks = COALESCE($12::jsonb, blocks),
        sms_template = COALESCE($13, sms_template),
-       wa_template_sid = COALESCE($14, wa_template_sid),
+       wa_template_sid = CASE WHEN $17::boolean THEN $14 ELSE wa_template_sid END,
        wa_variables = COALESCE($15::jsonb, wa_variables),
        wa_header_image_url = COALESCE($16, wa_header_image_url),
+       email_template_slug = CASE WHEN $18::boolean THEN $19 ELSE email_template_slug END,
+       sms_template_slug = CASE WHEN $20::boolean THEN $21 ELSE sms_template_slug END,
+       wa_template_slug = CASE WHEN $22::boolean THEN $23 ELSE wa_template_slug END,
        updated_at = NOW()
      WHERE kind = $1`,
     [
@@ -61,9 +64,14 @@ export async function POST(req: NextRequest, { params }: Params) {
       d.template_mode || null,
       d.blocks != null ? JSON.stringify(d.blocks) : null,
       d.sms_template != null ? d.sms_template : null,
-      d.wa_template_sid || null,
+      d.wa_template_sid ?? null,
       d.wa_variables != null ? JSON.stringify(d.wa_variables) : null,
       d.wa_header_image_url != null ? d.wa_header_image_url : null,
+      // Present-in-draft (even null) sets the column, so a template choice can be cleared.
+      'wa_template_sid' in d,
+      'email_template_slug' in d, d.email_template_slug ?? null,
+      'sms_template_slug' in d, d.sms_template_slug ?? null,
+      'wa_template_slug' in d, d.wa_template_slug ?? null,
     ]
   )
   // Clear the draft (keep the row so campaign_id stays stable).

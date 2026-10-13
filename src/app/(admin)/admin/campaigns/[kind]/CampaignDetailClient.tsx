@@ -28,6 +28,10 @@ import DurationField from '@/components/admin/campaigns/DurationField'
 import type { DurationUnit } from '@/lib/campaigns/duration'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 import { useEditSession } from '@/hooks/useEditSession'
+import LibraryTemplatePicker from '@/components/admin/messaging-templates/LibraryTemplatePicker'
+import LinkedTemplateEditor from '@/components/admin/messaging-templates/LinkedTemplateEditor'
+import type { EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
+import { bridgeVars, campaignCanFill } from '@/lib/templates/var-bridge'
 
 interface Campaign {
   kind: string
@@ -132,6 +136,8 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [testBusy, setTestBusy] = useState(false)
   const [coupons, setCoupons] = useState<CouponOption[]>([])
   const [scenarios, setScenarios] = useState<ScenarioOption[]>([])
+  // The linked library email as edited (the preview and checks read it instead of the inline fields).
+  const [linkedEmail, setLinkedEmail] = useState<EditorTemplate | null>(null)
   const [form, setForm] = useState<{
     enabled: boolean
     delay_hours: number
@@ -147,6 +153,9 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     wa_template_sid: string | null
     wa_variables: Record<string, string>
     wa_header_image_url: string
+    email_template_slug: string | null
+    sms_template_slug: string | null
+    wa_template_slug: string | null
     parameters: Record<string, number | boolean | string>
   } | null>(null)
 
@@ -180,6 +189,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           wa_template_sid: src.wa_template_sid ?? data.campaign.wa_template_sid ?? null,
           wa_variables: (src.wa_variables ?? data.campaign.wa_variables ?? {}) as Record<string, string>,
           wa_header_image_url: src.wa_header_image_url ?? data.campaign.wa_header_image_url ?? '',
+          // A draft can unlink (null), so 'in' — not ?? — decides whether the draft set it.
+          email_template_slug: ('email_template_slug' in src ? src.email_template_slug : data.campaign.email_template_slug) ?? null,
+          sms_template_slug: ('sms_template_slug' in src ? src.sms_template_slug : data.campaign.sms_template_slug) ?? null,
+          wa_template_slug: ('wa_template_slug' in src ? src.wa_template_slug : data.campaign.wa_template_slug) ?? null,
           parameters: (src.parameters || {}) as Record<string, number | boolean | string>,
         })
       }
@@ -384,13 +397,17 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         discountPercent: selectedCoupon.discount_type === 'percentage' ? selectedCoupon.discount_value : 0,
       }
     : SAMPLE_VARS
-  const previewSubject = renderTemplate(form.subject_template, previewVars)
-  const previewBodySource =
-    form.template_mode === 'blocks' && form.blocks?.length ? renderBlocks(form.blocks) : form.body_template
-  const previewBody = renderTemplate(previewBodySource, previewVars)
+  const linked = form.email_template_slug && linkedEmail ? linkedEmail : null
+  const linkedBlocks = linked?.blocks_format === 'email-blocks' ? ((linked.blocks as any)?.blocks as EmailBlock[] | undefined) : undefined
+  const bridgedPreview = bridgeVars(previewVars as Record<string, string | number>)
+  const previewSubject = renderTemplate(linked ? linked.subject ?? '' : form.subject_template, bridgedPreview)
+  const previewBodySource = linked
+    ? linkedBlocks?.length ? renderBlocks(linkedBlocks) : linked.body
+    : form.template_mode === 'blocks' && form.blocks?.length ? renderBlocks(form.blocks) : form.body_template
+  const previewBody = renderTemplate(previewBodySource, bridgedPreview)
   // Full themed document for the preview iframe, so the selected layout (Fresh vs Promo…) renders
   // with its own shell + CSS. renderLayoutPreview also fills {store_name}/{store_web} via previewVars.
-  const previewDoc = renderTemplate(renderLayoutPreview(form.template_layout, previewBody), previewVars)
+  const previewDoc = renderTemplate(renderLayoutPreview(form.template_layout, previewBody), bridgedPreview)
 
   const SINGLE_PRODUCT_KINDS = new Set(['restock', 'price_drop'])
   const MULTI_PRODUCT_KINDS = new Set([
@@ -403,7 +420,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   ])
   const refKind = (form.scenario_kind || campaign?.kind || '').toLowerCase()
   const tplWarning = (() => {
-    const b = form.body_template || ''
+    const b = previewBodySource || ''
     const hasCard = /\{productCard\}/.test(b)
     const hasItems = /\{itemsHtml\}/.test(b) || /\{cartItems\}/.test(b)
     const usesProductTokens = /\{(productName|productImageUrl|oldPrice|newPrice|itemCount)\}/i.test(b)
@@ -514,6 +531,42 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             )}
           </div>
 
+          <div className="mt-4">
+            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+              Email template
+            </label>
+            <LibraryTemplatePicker
+              channel="email"
+              kind={form.scenario_kind || kind}
+              value={form.email_template_slug}
+              onChange={slug => { setLinkedEmail(null); setForm(f => (f ? { ...f, email_template_slug: slug } : f)) }}
+              noneLabel="Inline email (written only for this campaign)"
+              supplied={campaignCanFill}
+            />
+          </div>
+
+          {form.email_template_slug ? (
+            <>
+              <div className="mt-4">
+                <LinkedTemplateEditor channel="email" slug={form.email_template_slug} currentKind={kind} onMirror={setLinkedEmail} />
+              </div>
+              <div className="mt-4">
+                <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                  Theme
+                </label>
+                <AdminSelect
+                  value={form.template_layout}
+                  onChange={key => setForm(f => (f ? { ...f, template_layout: key } : f))}
+                  options={EMAIL_LAYOUT_OPTIONS.map(l => ({ value: l.key, label: l.label }))}
+                />
+                <p className="text-[10px] text-foreground-muted mt-1">
+                  {EMAIL_LAYOUT_OPTIONS.find(l => l.key === form.template_layout)?.description} The theme wraps the template; the
+                  wording lives in the template.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
           <div className="mt-4">
             <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
               Subject line
@@ -644,12 +697,27 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
             </p>
           </div>
+            </>
+          )}
 
           {campaignSupportsWhatsApp(kind) && (
             <div className="mt-4">
               <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
                 SMS message
               </label>
+              <LibraryTemplatePicker
+                channel="sms"
+                kind={form.scenario_kind || kind}
+                value={form.sms_template_slug}
+                onChange={slug => setForm(f => (f ? { ...f, sms_template_slug: slug } : f))}
+                noneLabel="Inline SMS (written only for this campaign)"
+                supplied={campaignCanFill}
+              />
+              <div className="mt-2">
+                {form.sms_template_slug ? (
+                  <LinkedTemplateEditor channel="sms" slug={form.sms_template_slug} currentKind={kind} />
+                ) : (
+                  <>
               <textarea
                 value={form.sms_template}
                 onChange={e => setForm(f => (f ? { ...f, sms_template: e.target.value } : f))}
@@ -663,6 +731,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                 {form.sms_template.length === 0 ? 0 : Math.ceil(form.sms_template.length / 160)} segment
                 {Math.ceil((form.sms_template.length || 0) / 160) === 1 ? '' : 's'} · plain text only, no images.
               </p>
+                  </>
+                )}
+              </div>
+              <p className="text-[10px] text-foreground-muted mt-1">
+                Sent when SMS is switched on in this campaign&apos;s settings — independently of WhatsApp.
+              </p>
             </div>
           )}
 
@@ -672,24 +746,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                 WhatsApp message
               </label>
               <WhatsAppTemplateEditor
-                kind={kind}
-                value={{
-                  key: form.wa_template_sid,
-                  variables: form.wa_variables,
-                  headerImageUrl: form.wa_header_image_url,
-                }}
-                onChange={v =>
-                  setForm(f =>
-                    f
-                      ? {
-                          ...f,
-                          wa_template_sid: v.key,
-                          wa_variables: v.variables,
-                          wa_header_image_url: v.headerImageUrl,
-                        }
-                      : f
-                  )
-                }
+                kind={form.scenario_kind || kind}
+                value={{ slug: form.wa_template_slug, variables: form.wa_variables }}
+                // Picking a library template retires the old registry choice for this campaign.
+                onChange={v => setForm(f => (f ? { ...f, wa_template_slug: v.slug, wa_variables: v.variables, wa_template_sid: null } : f))}
+                needsReview={!!form.parameters?.waNeedsReview}
+                onReviewed={() => setForm(f => (f ? { ...f, parameters: { ...f.parameters, waNeedsReview: false } } : f))}
               />
             </div>
           )}
@@ -717,19 +779,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             />
           </div>
 
-          {campaignSupportsWhatsApp(kind) && !!form.parameters?.whatsappEnabled && form.wa_template_sid && (
+          {campaignSupportsWhatsApp(kind) && !!form.parameters?.whatsappEnabled && form.wa_template_slug && (
             <div className="mt-5">
               <p className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-2">
                 WhatsApp preview
               </p>
-              <WhatsAppPreview
-                value={{
-                  key: form.wa_template_sid,
-                  variables: form.wa_variables,
-                  headerImageUrl: form.wa_header_image_url,
-                }}
-                vars={previewVars}
-              />
+              <WhatsAppPreview value={{ slug: form.wa_template_slug, variables: form.wa_variables }} vars={previewVars} />
             </div>
           )}
         </div>
