@@ -9,6 +9,7 @@ export interface ApiKeyRow {
   tenant_id: string
   tenant_slug: string
   service_types: string[]
+  pending_services: { service: string; status: string }[] // awaiting (or refused) admin approval
   name: string
   key_prefix: string
   scopes: ApiScope[]
@@ -41,7 +42,9 @@ export async function lookupKey(plain: string): Promise<ApiKeyRow | null> {
   const hit = cache.get(h)
   if (hit && Date.now() - hit.at < TTL) return hit.row
   const r = await cp().query<ApiKeyRow>(
-    `SELECT k.id, k.owner_id, k.tenant_id, t.slug AS tenant_slug, t.service_types, k.name, k.key_prefix, k.scopes, k.rate_limit_per_min, k.status
+    `SELECT k.id, k.owner_id, k.tenant_id, t.slug AS tenant_slug, t.service_types, k.name, k.key_prefix, k.scopes, k.rate_limit_per_min, k.status,
+            COALESCE((SELECT json_agg(json_build_object('service', a.service, 'status', a.status)) FROM tenant_service_approvals a
+                       WHERE a.tenant_id = k.tenant_id AND a.status <> 'approved'), '[]'::json) AS pending_services
        FROM api_keys k JOIN tenants t ON t.id = k.tenant_id
       WHERE k.key_hash = $1`,
     [h]

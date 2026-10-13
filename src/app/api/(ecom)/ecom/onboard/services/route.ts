@@ -3,8 +3,8 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import { extractSessionSignals } from '@/lib/auth/session-signals-request'
-import { createTenant, getOwnerTenants, linkOwnerTenant, updateOwnerName, saveKyc, markDraftSubmitted } from '@/lib/tenant-registry'
-import { controlPlanePool } from '@/lib/tenant-registry/shared'
+import { createTenant, getOwnerTenants, linkOwnerTenant, updateOwnerName, saveKyc, markDraftSubmitted, requestServiceApproval } from '@/lib/tenant-registry'
+import { sendServicesRequestedEmail } from '@/lib/shared/ecom-emails'
 import { parseBody } from '@/lib/shared/validate'
 
 export const dynamic = 'force-dynamic'
@@ -52,8 +52,9 @@ export async function POST(request: NextRequest) {
     mobile: d.mobile,
     legals_accepted: true,
   })
-  // No store → no KYC review gate. A GSTIN is still recorded for invoices but not held for approval.
-  await controlPlanePool().query(`UPDATE tenant_kyc SET status='approved', reviewed_at=now() WHERE tenant_id=$1`, [result.tenantId])
+  // KYC stays 'pending': Jeffi reviews API workspaces too. Until then they can explore but not send.
+  await requestServiceApproval(result.tenantId, d.services)
   await markDraftSubmitted(owner.id).catch(() => {})
+  sendServicesRequestedEmail({ email: owner.email, name: d.ownerName }, d.displayName, d.services).catch(() => {})
   return NextResponse.json({ ok: true, tenantId: result.tenantId, slug: result.slug })
 }

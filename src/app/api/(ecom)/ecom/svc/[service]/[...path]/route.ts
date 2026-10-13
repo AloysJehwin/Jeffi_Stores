@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ownerApi } from '@/lib/ecom/owner-api'
-import { hasService } from '@/lib/tenant-registry'
+import { hasService, listServiceApprovals, blockedServices } from '@/lib/tenant-registry'
 import { fetchService } from '@/lib/ecom/service-client'
 
 export const dynamic = 'force-dynamic'
@@ -12,6 +12,14 @@ async function handle(request: NextRequest, { params }: { params: Promise<{ serv
   const ctx = await ownerApi(request)
   if (ctx instanceof NextResponse) return ctx
   if (!hasService(ctx.tenant, service)) return NextResponse.json({ error: `${service} is not enabled for this workspace` }, { status: 403 })
+  // Sends and renders wait for Jeffi's approval; browsing, templates and previews don't.
+  if (request.method === 'POST' && (path[0] === 'messages' || path[0] === 'documents')) {
+    const gate = blockedServices(await listServiceApprovals(ctx.tenant.id)).get(service)
+    if (gate) return NextResponse.json({
+      error: gate === 'rejected' ? 'service_rejected' : 'service_pending_approval',
+      message: gate === 'rejected' ? `Your ${service} access was not approved. Contact support@jeffistores.in.` : `Your ${service} access is under review — sending starts once Jeffi approves it.`,
+    }, { status: 403 })
+  }
   const qs = request.nextUrl.search
   const body = (request.method === 'POST' || request.method === 'PUT') ? await request.json().catch(() => ({})) : undefined
   // Re-encode segments: slugs contain '/', which Next decodes in the catch-all.

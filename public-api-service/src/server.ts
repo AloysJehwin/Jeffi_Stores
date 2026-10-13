@@ -82,6 +82,13 @@ const need =
   async (req: FastifyRequest, reply: FastifyReply) => {
     if (!req.key.scopes.includes(scope)) return fail(reply, 403, 'forbidden', `This key lacks the '${scope}' scope`)
     if (!req.key.service_types.includes(service)) return fail(reply, 403, 'service_not_enabled', `Enable the ${service} service in your dashboard first`)
+    // Sending/rendering waits for Jeffi's approval; reads and previews don't.
+    const gate = req.key.pending_services.find(p => p.service === service)
+    if (gate && (scope === 'messages:send' || scope === 'documents:render')) {
+      return gate.status === 'rejected'
+        ? fail(reply, 403, 'service_rejected', `Your ${service} access was not approved. Contact support@jeffistores.in.`)
+        : fail(reply, 403, 'service_pending_approval', `Your ${service} access is under review — sending starts once Jeffi approves it (usually the same day).`)
+    }
   }
 
 // Idempotency: replay the stored response for a repeated POST with the same key within 24 h.
