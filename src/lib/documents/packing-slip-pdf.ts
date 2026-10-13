@@ -433,10 +433,12 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
       ? `${Number(item.quantity).toFixed(3)} ${unitLabel}`
       : `${Math.round(Number(item.quantity))} ${unitLabel}`
 
-    // Discount %
+    // MRP is per piece while quantity is in selling units (a set of 10 → factor 10).
+    const factor = !isWL && Number(item.sell_unit_factor) > 0 ? Number(item.sell_unit_factor) : 1
+    const hasMrp = item.mrp != null && item.mrp > 0
     let discPct = 0
-    if (item.mrp != null && item.mrp > 0 && item.quantity > 0) {
-      const mrpTotal = item.mrp * item.quantity
+    if (hasMrp && item.quantity > 0) {
+      const mrpTotal = item.mrp! * item.quantity * factor
       discPct = mrpTotal > item.total_price ? ((mrpTotal - item.total_price) / mrpTotal) * 100 : 0
     } else if (item.discount_amount && item.discount_amount > 0) {
       const gross = item.total_price + item.discount_amount
@@ -444,7 +446,12 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     }
     const discStr = discPct >= 0.01 ? `${discPct.toFixed(1)}%` : ''
 
-    const rateInclTax = item.mrp != null && item.mrp > 0 ? item.mrp : item.unit_price
+    // Rate per selling unit, before discount.
+    const rateInclTax = hasMrp
+      ? item.mrp! * factor
+      : item.quantity > 0
+        ? (item.total_price + Number(item.discount_amount || 0)) / item.quantity
+        : item.unit_price
     const gstStr = item.gst_rate ? `${item.gst_rate}%` : ''
 
     // Thumbnail
