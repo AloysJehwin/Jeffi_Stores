@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
 
-const TEMPLATES = [
+type TemplateOption = { id: string; label: string; subject: string; body: string }
+
+const FALLBACK_TEMPLATES: TemplateOption[] = [
   {
     id: 'delay_processing',
     label: 'Processing Delay',
@@ -66,7 +68,32 @@ interface Props {
 
 export default function CustomerMailPanel({ orderId, orderNumber, customerName, customerEmail }: Props) {
   const [open, setOpen] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id)
+  const [templates, setTemplates] = useState<TemplateOption[]>(FALLBACK_TEMPLATES)
+  const [selectedTemplate, setSelectedTemplate] = useState(FALLBACK_TEMPLATES[0].id)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/admin/messaging-templates?channel=email')
+      .then(r => (r.ok ? r.json() : null))
+      .then(async data => {
+        if (cancelled || !data?.items?.length) return
+        const items: TemplateOption[] = []
+        for (const row of data.items) {
+          if (row.category && !['transactional', 'automation'].includes(row.category)) continue
+          const full = await fetch(`/api/admin/messaging-templates/email/${encodeURIComponent(row.slug)}`)
+            .then(r => (r.ok ? r.json() : null)).catch(() => null)
+          if (!full) continue
+          items.push({ id: row.slug, label: row.name ?? row.slug, subject: full.subject ?? '', body: full.body ?? '' })
+        }
+        if (items.length) {
+          items.push({ id: 'custom', label: 'Custom Message', subject: `Message from {store_name}`, body: '' })
+          setTemplates(items)
+        }
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
   const [sending, setSending] = useState(false)
@@ -81,7 +108,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
   const canUseAi = useCanUseAi('mailer:write')
 
   function applyTemplate(templateId: string) {
-    const t = TEMPLATES.find(t => t.id === templateId)
+    const t = templates.find(t => t.id === templateId)
     if (!t) return
     setSelectedTemplate(templateId)
     const filled = (s: string) => s.replace(/\{order_number\}/g, orderNumber)
@@ -159,7 +186,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
         setResult({ success: true, message: 'Email sent successfully.' })
         setSubject('')
         setBody('')
-        setSelectedTemplate(TEMPLATES[0].id)
+        setSelectedTemplate(templates[0].id)
       } else {
         setResult({ success: false, message: data.error || 'Failed to send email.' })
       }
@@ -176,7 +203,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
         type="button"
         onClick={() => {
           setOpen(o => !o)
-          if (!open) applyTemplate(TEMPLATES[0].id)
+          if (!open) applyTemplate(templates[0].id)
         }}
         className="w-full px-6 py-4 flex items-center justify-between text-left"
       >
@@ -220,7 +247,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
           <div>
             <label className="block text-xs font-medium text-foreground-muted mb-1.5">Template</label>
             <div className="flex flex-wrap gap-2">
-              {TEMPLATES.map(t => (
+              {templates.map(t => (
                 <button
                   key={t.id}
                   type="button"
