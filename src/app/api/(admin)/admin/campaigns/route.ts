@@ -3,7 +3,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, query, queryOne } from '@/lib/shared/db'
 import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validation'
-import { ensureBuiltinCampaignRows } from '@/lib/campaigns/ensure-builtin-campaigns'
+import { ensureBuiltinCampaignRows, migrateLegacyCampaignDrafts } from '@/lib/campaigns/ensure-builtin-campaigns'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 
@@ -27,12 +27,14 @@ export async function GET(req: NextRequest) {
 
   // Backfill a disabled campaign row for any built-in scenario missing one, so the full catalogue shows.
   await ensureBuiltinCampaignRows()
+  await migrateLegacyCampaignDrafts()
 
   const [campaigns, countRow] = await Promise.all([
     queryMany(
       `
       SELECT
         c.*,
+        (SELECT NULLIF(cd.fields, '{}'::jsonb) FROM campaign_drafts cd WHERE cd.kind = c.kind) AS draft_fields,
         COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind), 0) AS total_sent,
         COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.opened_at IS NOT NULL), 0) AS total_opened,
         COALESCE((SELECT COUNT(*) FROM email_campaigns_sent ecs WHERE ecs.campaign_kind = c.kind AND ecs.clicked_at IS NOT NULL), 0) AS total_clicked,

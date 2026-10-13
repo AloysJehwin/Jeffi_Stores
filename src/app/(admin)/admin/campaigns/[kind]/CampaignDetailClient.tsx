@@ -1,7 +1,7 @@
 'use client'
 
 import { CAMPAIGN_SAMPLE_VARS as SAMPLE_VARS, renderPreviewTemplate as renderTemplate } from '@/lib/templates/email-preview'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { CampaignDetailSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -169,103 +169,90 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   }, [kind])
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-  const [paramsBaseline, setParamsBaseline] = useState<string>('')
-  const [scenarioBaseline, setScenarioBaseline] = useState<string | null>(null)
+  const [baseline, setBaseline] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!campaign) return
-    setParamsBaseline(JSON.stringify(campaign.parameters || {}))
-    setScenarioBaseline(campaign.scenario_kind || null)
-  }, [campaign])
+  const writeDraft = useCallback(async (f: NonNullable<typeof form>) => {
+    const res = await fetch(`/api/admin/campaigns/${kind}/draft`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(f),
+    })
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to save draft')
+    setHasDraft(true)
+  }, [kind])
 
+  // Opening the editor starts a draft (from the live values if there is none); every change autosaves it.
   useEffect(() => {
     if (!form || !campaign) return
-    const currentParams = JSON.stringify(form.parameters || {})
-    const currentScenario = form.scenario_kind || null
-    if (currentParams === paramsBaseline && currentScenario === scenarioBaseline) return
+    const cur = JSON.stringify(form)
+    if (baseline === null) {
+      setBaseline(cur)
+      if (!hasDraft) writeDraft(form).catch(() => {})
+      return
+    }
+    if (cur === baseline) return
     const t = setTimeout(async () => {
       setAutoSaveStatus('saving')
       try {
-        const res = await fetch(`/api/admin/campaigns/${kind}/draft`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          // Send the WHOLE form: the draft PATCH replaces draft_fields wholesale, so a params-only
-          // body would wipe the subject/body/layout/blocks/sms/whatsapp the user is editing.
-          body: JSON.stringify(form),
-        })
-        if (res.ok) {
-          setAutoSaveStatus('saved')
-          setParamsBaseline(currentParams)
-          setScenarioBaseline(currentScenario)
-          setHasDraft(true)
-          setTimeout(() => setAutoSaveStatus('idle'), 1500)
-        } else {
-          const data = await res.json().catch(() => ({}))
-          setAutoSaveStatus('error')
-          showToast(data.error || 'Auto-save failed', 'error')
-        }
-      } catch {
+        await writeDraft(form)
+        setBaseline(cur)
+        setAutoSaveStatus('saved')
+        setTimeout(() => setAutoSaveStatus('idle'), 1500)
+      } catch (e: any) {
         setAutoSaveStatus('error')
+        showToast(e.message || 'Auto-save failed', 'error')
       }
     }, 700)
     return () => clearTimeout(t)
-  }, [form?.parameters, form?.scenario_kind, paramsBaseline, scenarioBaseline, campaign, kind, showToast, form])
+  }, [form, baseline, campaign, hasDraft, writeDraft, showToast])
 
   async function save() {
     if (!form) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/admin/campaigns/${kind}/draft`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(form),
-      })
-      if (res.ok) {
-        setHasDraft(true)
-        if (edit.sessionId) await edit.save()
-        showToast('Draft saved', 'success')
-      } else {
-        const data = await res.json().catch(() => ({}))
-        showToast(data.error || 'Failed to save draft', 'error')
-      }
+      await writeDraft(form)
+      if (edit.sessionId) await edit.save()
+      showToast('Draft saved', 'success')
+      router.push(ap('/admin/campaigns'))
+    } catch (e: any) {
+      showToast(e.message || 'Failed to save draft', 'error')
     } finally {
       setSaving(false)
     }
   }
 
+  // Publishes exactly what is on screen.
   async function publish() {
+    if (!form) return
     setPublishing(true)
     try {
-      const res = await fetch(`/api/admin/campaigns/${kind}/publish`, {
-        method: 'POST',
-        credentials: 'include',
-      })
+      await writeDraft(form)
+      const res = await fetch(`/api/admin/campaigns/${kind}/publish`, { method: 'POST', credentials: 'include' })
       if (res.ok) {
         setHasDraft(false)
         if (edit.sessionId) await edit.save()
-        await load()
-        router.refresh()
         showToast('Campaign published', 'success')
+        router.push(ap(`/admin/campaigns/${kind}/view`))
       } else {
         const data = await res.json().catch(() => ({}))
         showToast(data.error || 'Failed to publish', 'error')
       }
+    } catch (e: any) {
+      showToast(e.message || 'Failed to publish', 'error')
     } finally {
       setPublishing(false)
     }
   }
 
   async function discardDraft() {
-    const res = await fetch(`/api/admin/campaigns/${kind}/draft`, {
-      method: 'DELETE',
-      credentials: 'include',
-    })
+    const ok = await confirm({ title: 'Discard draft?', message: 'All unpublished changes to this campaign are removed. The live campaign stays as-is.', confirmLabel: 'Discard', variant: 'danger' })
+    if (!ok) return
+    const res = await fetch(`/api/admin/campaigns/${kind}/draft`, { method: 'DELETE', credentials: 'include' })
     if (res.ok) {
-      setHasDraft(false)
-      await load()
+      if (edit.sessionId) await edit.save()
       showToast('Draft discarded', 'success')
+      router.push(ap('/admin/campaigns'))
     }
   }
 
@@ -898,7 +885,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               <button
                 type="button"
                 onClick={discardDraft}
-                className="text-xs text-amber-600 dark:text-amber-400 hover:underline"
+                className="h-control-sm inline-flex items-center px-2.5 rounded-md border border-amber-300 dark:border-amber-700 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40"
               >
                 Discard
               </button>

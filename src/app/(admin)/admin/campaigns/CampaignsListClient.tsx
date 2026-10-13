@@ -86,6 +86,19 @@ export default function CampaignsListClient() {
     }
   }
 
+  async function publishDraft(c: CampaignRow) {
+    setBusy(c.kind)
+    try {
+      const res = await fetch(`/api/admin/campaigns/${c.kind}/publish`, { method: 'POST', credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) showToast(`${c.name} published`, 'success')
+      else showToast(data.error || 'Failed to publish', 'error')
+      await load(offset)
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function toggle(c: CampaignRow) {
     setBusy(c.kind)
     try {
@@ -268,12 +281,14 @@ export default function CampaignsListClient() {
                   </Link>
                   <div className="flex items-center gap-2 shrink-0">
                     <RequireWrite scope="campaigns:write">
-                      <Link
-                        href={ap(`/admin/campaigns/${d.kind}/edit`)}
-                        className="px-2.5 py-1 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
+                      <button
+                        type="button"
+                        onClick={() => publishDraft(d)}
+                        disabled={busy === d.kind}
+                        className="px-2.5 h-control-sm text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50"
                       >
                         Publish
-                      </Link>
+                      </button>
                       <button
                         type="button"
                         onClick={() => discardDraft(d)}
