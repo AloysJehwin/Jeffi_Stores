@@ -1,0 +1,1 @@
+{ "name": "@jeffi/bulk", "version": "0.1.0", "private": true, "type": "module", "main": "src/index.ts", "types": "src/index.ts", "dependencies": { "pg": "^8.13.0" } }

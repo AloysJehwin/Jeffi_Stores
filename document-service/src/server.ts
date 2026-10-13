@@ -2,7 +2,9 @@ import Fastify, { type FastifyRequest } from 'fastify'
 import pg from 'pg'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { ZodError } from 'zod'
-import { RenderDocumentRequest, DocumentType, DocumentSettingsUpdate, DocumentFont } from '@jeffi/api-contracts'
+import { RenderDocumentRequest, DocumentType, DocumentSettingsUpdate, DocumentFont, BulkDocumentsRequest } from '@jeffi/api-contracts'
+import { createJob, getJob, listJobs, listItems, cancelJob, retryJob, jobToApi, startWorker, BulkItemError, type BulkJobRow } from '@jeffi/bulk'
+import archiver from 'archiver'
 import { verifyServiceToken, bearer, type ServiceClaims } from '@jeffi/service-auth'
 import { documentPriceInr } from '@jeffi/pricing'
 import { getFinancialYear, generateInvoiceNumber } from '@jeffi/gst'
@@ -104,11 +106,12 @@ async function nextNumber(c: pg.PoolClient, tenantId: string, type: string): Pro
   return generateInvoiceNumber(PREFIX[type] ?? 'DOC', fy, Number(r.rows[0].seq))
 }
 
-app.post<{ Params: { type: string } }>('/documents/:type', async (req, reply) => {
-  const type = DocumentType.parse(req.params.type)
-  const body = RenderDocumentRequest.parse(req.body)
-  if (body.template && !resolveDesign(body.template)) return reply.code(400).send({ error: 'unknown_template', message: `Designs: ${DESIGNS.map(d => d.key).join(', ')}` })
-  const { tenantId, apiKeyId } = req.claims
+const badTemplate = () => Object.assign(new Error(`Designs: ${DESIGNS.map(d => d.key).join(', ')}`), { status: 400, code: 'unknown_template' })
+
+/** Render, store and record one document (debits the wallet; refunds if anything fails). */
+async function createDocument(ctx: { tenantId: string; apiKeyId?: string | null }, type: DocumentType, body: RenderDocumentRequest): Promise<DocRow> {
+  if (body.template && !resolveDesign(body.template)) throw badTemplate()
+  const { tenantId, apiKeyId } = ctx
   const { design, branding } = await resolveBranding(db, tenantId, body.template, body.branding)
   const designKey = resolveDesign(design) ? design! : DEFAULT_DESIGN
   const totals = computeTotals(body)
@@ -117,7 +120,7 @@ app.post<{ Params: { type: string } }>('/documents/:type', async (req, reply) =>
   const price = documentPriceInr(type)
 
   const debit = await wallet.debit({ tenantId, amountInr: price, category: 'document', externalRef: `doc:${id}`, note: `${type} render` })
-  if (!debit.ok) return reply.code(402).send({ error: 'insufficient_balance', message: `Wallet balance ₹${debit.balance.toFixed(2)} is below ₹${price.toFixed(2)}. Top up ₹${debit.needed.toFixed(2)}.` })
+  if (!debit.ok) throw Object.assign(new Error(`Wallet balance ₹${debit.balance.toFixed(2)} is below ₹${price.toFixed(2)}. Top up ₹${debit.needed.toFixed(2)}.`), { status: 402, code: 'insufficient_balance' })
 
   const c = await db.connect()
   try {
@@ -139,8 +142,85 @@ app.post<{ Params: { type: string } }>('/documents/:type', async (req, reply) =>
   } finally {
     c.release()
   }
-  const row = (await db.query<DocRow>(`SELECT * FROM documents WHERE id=$1`, [id])).rows[0]
-  return toApi(row)
+  return (await db.query<DocRow>(`SELECT * FROM documents WHERE id=$1`, [id])).rows[0]
+}
+
+app.post<{ Params: { type: string } }>('/documents/:type', async req => {
+  const type = DocumentType.parse(req.params.type)
+  return toApi(await createDocument(req.claims, type, RenderDocumentRequest.parse(req.body)))
+})
+
+// ── bulk ──
+// Item = job defaults (type/template/branding/seller) merged under the item, validated up front.
+function bulkInputs(b: BulkDocumentsRequest) {
+  const errors: { index: number; message: string }[] = []
+  const inputs = b.items.map((raw, index) => {
+    const type = DocumentType.safeParse(raw.type ?? b.type)
+    const body = RenderDocumentRequest.safeParse({
+      ...raw, type: undefined,
+      template: raw.template ?? b.template,
+      branding: raw.branding ?? b.branding,
+      seller: raw.seller ?? b.seller,
+    })
+    if (!type.success) errors.push({ index, message: 'type is required (job or item): invoice, quotation, receipt, packing_slip, label or purchase_order' })
+    else if (!body.success) errors.push({ index, message: body.error.issues.map(i => `${i.path.join('.') || 'item'}: ${i.message}`).join('; ') })
+    else if (body.data.template && !resolveDesign(body.data.template)) errors.push({ index, message: `unknown template '${body.data.template}'` })
+    return { type: type.data, body: body.data }
+  })
+  return { inputs, errors }
+}
+
+const bulkItemOut = async (it: { seq: number; status: string; error: string | null; input: any; result_id: string | null }, docs: Map<string, DocRow>) => {
+  const d = it.result_id ? docs.get(it.result_id) : undefined
+  return { seq: it.seq, status: it.status, error: it.error, reference: it.input?.body?.reference ?? null, result: d ? await toApi(d) : null }
+}
+const withZip = (j: BulkJobRow) => ({ ...jobToApi(j), zip_url: j.succeeded > 0 ? `/documents/bulk/${j.id}/zip` : undefined })
+
+app.post('/documents/bulk', { bodyLimit: 10_000_000 }, async (req, reply) => {
+  const b = BulkDocumentsRequest.parse(req.body)
+  const { inputs, errors } = bulkInputs(b)
+  if (errors.length) return reply.code(400).send({ error: 'validation_error', message: `${errors.length} item(s) are invalid`, details: errors.slice(0, 50) })
+  const job = await createJob(db, { kind: 'documents', tenantId: req.claims.tenantId, apiKeyId: req.claims.apiKeyId, reference: b.reference, inputs })
+  return reply.code(202).send(withZip(job))
+})
+app.get<{ Querystring: { limit?: string; cursor?: string } }>('/documents/bulk', async req => {
+  const r = await listJobs(db, req.claims.tenantId, 'documents', { limit: Number(req.query.limit), cursor: req.query.cursor })
+  return { ...r, items: r.items.map(j => ({ ...j, zip_url: j.succeeded > 0 ? `/documents/bulk/${j.id}/zip` : undefined })) }
+})
+async function bulkJob(req: FastifyRequest<{ Params: { id: string } }>) {
+  const job = await getJob(db, req.claims.tenantId, 'documents', req.params.id)
+  if (!job) throw Object.assign(new Error('Bulk job not found'), { status: 404, code: 'not_found' })
+  return job
+}
+app.get<{ Params: { id: string } }>('/documents/bulk/:id', async req => withZip(await bulkJob(req)))
+app.get<{ Params: { id: string }; Querystring: { status?: string; cursor?: string; limit?: string } }>('/documents/bulk/:id/items', async req => {
+  const job = await bulkJob(req)
+  const { rows, next_cursor } = await listItems(db, job.id, { status: req.query.status, cursor: req.query.cursor, limit: Number(req.query.limit) })
+  const ids = rows.map(r => r.result_id).filter(Boolean)
+  const docs = new Map((await db.query<DocRow>(`SELECT * FROM documents WHERE id = ANY($1)`, [ids])).rows.map(d => [d.id, d]))
+  return { items: await Promise.all(rows.map(r => bulkItemOut(r, docs))), next_cursor }
+})
+app.post<{ Params: { id: string } }>('/documents/bulk/:id/cancel', async req => withZip(await cancelJob(db, await bulkJob(req))))
+app.post<{ Params: { id: string } }>('/documents/bulk/:id/retry', async req => withZip(await retryJob(db, await bulkJob(req))))
+// Streamed on demand from storage — nothing extra stored, so it can't go stale.
+app.get<{ Params: { id: string } }>('/documents/bulk/:id/zip', async (req, reply) => {
+  const job = await bulkJob(req)
+  const docs = (await db.query<DocRow>(
+    `SELECT d.* FROM bulk_job_items i JOIN documents d ON d.id = i.result_id WHERE i.job_id=$1 AND i.status='done' ORDER BY i.seq`, [job.id])).rows
+  if (!docs.length) return reply.code(404).send({ error: 'not_found', message: 'No documents in this job yet' })
+  const zip = archiver('zip', { zlib: { level: 1 } })
+  reply.header('content-type', 'application/zip').header('content-disposition', `attachment; filename="documents-${job.id.slice(0, 8)}.zip"`)
+  void (async () => {
+    const used = new Set<string>()
+    for (const d of docs) {
+      let name = `${d.number.replace(/[\\/:*?"<>|]/g, '-')}.pdf`
+      if (used.has(name)) name = `${d.number.replace(/[\\/:*?"<>|]/g, '-')}-${d.id.slice(0, 6)}.pdf`
+      used.add(name)
+      zip.append(await getPdf(d.s3_key), { name })
+    }
+    await zip.finalize()
+  })().catch(e => zip.destroy(e))
+  return reply.send(zip)
 })
 
 app.get<{ Params: { id: string } }>('/documents/:id', async (req, reply) => {
@@ -227,3 +307,15 @@ const esc = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
 
 const port = Number(process.env.PORT || 3102)
 await app.listen({ port, host: '0.0.0.0' })
+
+startWorker(db, 'documents', async (item, job) => {
+  const { type, body } = item.input as { type: DocumentType; body: RenderDocumentRequest }
+  try {
+    const d = await createDocument({ tenantId: job.tenant_id, apiKeyId: job.api_key_id }, type, body)
+    return { resultId: d.id, spentInr: Number(d.price_inr), usage: 'documents' }
+  } catch (e: any) {
+    if (e?.code === 'insufficient_balance') throw new BulkItemError(e.message, { stop: true })
+    if (e?.status === 400) throw new BulkItemError(e.message)
+    throw e
+  }
+}, { concurrency: Number(process.env.DOCUMENT_BULK_CONCURRENCY || 4), sequential: true, log: (m, e) => app.log.error({ err: e }, m) })
