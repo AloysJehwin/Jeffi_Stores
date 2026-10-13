@@ -25,7 +25,9 @@ export function normalizePhone(raw: string): string {
 
 function callback(messageId: string) {
   const base = process.env.PUBLIC_BASE_URL
-  return base ? `${base.replace(/\/$/, '')}/webhooks/twilio/status?m=${messageId}` : undefined
+  // Twilio rejects the whole send for a non-public callback (http://…localhost in dev).
+  if (!base || !/^https:\/\//.test(base) || /localhost|127\.0\.0\.1/.test(base)) return undefined
+  return `${base.replace(/\/$/, '')}/webhooks/twilio/status?m=${messageId}`
 }
 
 export async function sendSms(o: { to: string; body: string; messageId: string }): Promise<string> {

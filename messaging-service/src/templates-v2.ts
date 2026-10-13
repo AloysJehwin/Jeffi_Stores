@@ -71,7 +71,7 @@ export const listTemplates = (e: Executor, tenantId: string, channel?: string, s
        JOIN template_family f ON f.id=t.family_id
        LEFT JOIN template_variant v ON v.id=t.current_variant_id
        LEFT JOIN template_version ver ON ver.id=v.current_version_id
-      WHERE t.tenant_id=$1 AND f.space=$3 AND ($2::text IS NULL OR t.channel=$2)
+      WHERE t.tenant_id=$1 AND f.space=$3 AND t.status <> 'archived' AND ($2::text IS NULL OR t.channel=$2)
       ORDER BY f.name, t.channel`,
     [tenantId, channel ?? null, space])
 
@@ -104,7 +104,7 @@ export const liveVersion = (e: Executor, variantId: string, providerRef: string)
 export async function findBySlug(e: Executor, tenantId: string, channel: string, slug: string, locale = 'en', space: Space = 'store'): Promise<FullTemplate | null> {
   const family = await first<FamilyRow>(e, `SELECT * FROM template_family WHERE tenant_id=$1 AND slug=$2 AND space=$3`, [tenantId, slug, space])
   if (!family) return null
-  const template = await first<TemplateRow>(e, `SELECT * FROM template WHERE family_id=$1 AND channel=$2`, [family.id, channel])
+  const template = await first<TemplateRow>(e, `SELECT * FROM template WHERE family_id=$1 AND channel=$2 AND status <> 'archived'`, [family.id, channel])
   if (!template) return null
   let variant = await first<VariantRow>(e, `SELECT * FROM template_variant WHERE template_id=$1 AND locale=$2`, [template.id, locale])
   if (!variant && template.current_variant_id)
@@ -170,7 +170,7 @@ export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertI
     const template = (await c.query<TemplateRow>(
       `INSERT INTO template (family_id, tenant_id, channel, status)
        VALUES ($1,$2,$3,'active')
-       ON CONFLICT (family_id, channel) DO UPDATE SET updated_at=now()
+       ON CONFLICT (family_id, channel) DO UPDATE SET status='active', updated_at=now()
        RETURNING *`,
       [family.id, tenantId, i.channel])).rows[0]
 

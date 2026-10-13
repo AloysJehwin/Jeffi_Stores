@@ -37,7 +37,7 @@ export async function fillActionSlots(
     const r = await fetch(`${MESSAGING_URL}/short-links`, {
       method: 'POST',
       headers: { authorization: `Bearer ${serviceToken(tenantId, slug)}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ destination_url: destination, kind: 'whatsapp-button' }),
+      body: JSON.stringify({ destination_url: destination, kind: 'page' }),
     }).catch(() => null)
     const code = r?.ok ? (await r.json()).code : null
     if (!code) return null

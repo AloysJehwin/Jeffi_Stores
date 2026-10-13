@@ -17,6 +17,11 @@ const redis = process.env.REDIS_URL ? new Redis(process.env.REDIS_URL) : null
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' }, genReqId: () => randomUUID() })
 
+// Accept an empty JSON body (DELETE / body-less POST with Content-Type: application/json).
+app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+  try { done(null, body ? JSON.parse(body as string) : {}) } catch (e: any) { e.statusCode = 400; done(e, undefined) }
+})
+
 declare module 'fastify' {
   interface FastifyRequest {
     key: ApiKeyRow
@@ -101,9 +106,9 @@ async function remember(req: FastifyRequest, status: number, body: unknown) {
 async function proxy(req: FastifyRequest, reply: FastifyReply, base: string, path: string, kind: 'messages' | 'documents' | null) {
   const token = signServiceToken({ service: 'public-api', tenantId: req.key.tenant_id, tenantSlug: req.key.tenant_slug, apiKeyId: req.key.id }, 60)
   const res = await undici(base + path, {
-    method: req.method as 'GET' | 'POST' | 'DELETE',
-    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'x-request-id': req.id },
-    body: req.method === 'POST' ? JSON.stringify(req.body ?? {}) : undefined,
+    method: req.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
+    headers: { authorization: `Bearer ${token}`, 'x-request-id': req.id, ...(req.method === 'POST' || req.method === 'PUT' ? { 'content-type': 'application/json' } : {}) },
+    body: req.method === 'POST' || req.method === 'PUT' ? JSON.stringify(req.body ?? {}) : undefined,
   })
   const text = await res.body.text()
   let body: any = text
@@ -130,11 +135,28 @@ app.register(async v1 => {
   v1.post('/messages/batch', { preHandler: need('messages:send', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/messages/batch', 'messages'))
   v1.get('/messages', { preHandler: need('messages:send', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/messages' + qs(req), null))
   v1.get<{ Params: { id: string } }>('/messages/:id', { preHandler: need('messages:send', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, `/messages/${req.params.id}`, null))
-  v1.get('/templates', { preHandler: need('templates:read', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/templates' + qs(req), null))
-  v1.post('/templates', { preHandler: need('templates:write', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/templates', null))
-  v1.delete<{ Params: { channel: string; slug: string } }>('/templates/:channel/:slug', { preHandler: need('templates:write', 'messaging') }, (req, reply) =>
-    proxy(req, reply, MESSAGING_URL, `/templates/${req.params.channel}/${req.params.slug}`, null)
-  )
+  // Templates = the templates library (the same records as the dashboard's Messaging → Templates):
+  // your copies plus the standard templates; saving a standard slug creates your own copy.
+  // Slugs contain '/', so URL-encode them in paths (cart%2Fabandoned).
+  const read = { preHandler: need('templates:read', 'messaging') }
+  const write = { preHandler: need('templates:write', 'messaging') }
+  const enc = (slug: string) => encodeURIComponent(slug)
+  v1.get('/templates', read, (req, reply) => proxy(req, reply, MESSAGING_URL, '/v2/templates' + qs(req), null))
+  v1.get<{ Params: { channel: string; slug: string } }>('/templates/:channel/:slug', read, (req, reply) =>
+    proxy(req, reply, MESSAGING_URL, `/v2/templates/${req.params.channel}/${enc(req.params.slug)}` + qs(req), null))
+  v1.get<{ Params: { channel: string } }>('/templates/:channel/versions', read, (req, reply) => proxy(req, reply, MESSAGING_URL, `/v2/templates/${req.params.channel}/versions`, null)) // :channel = template id
+  v1.post('/templates/preview', read, (req, reply) => proxy(req, reply, MESSAGING_URL, '/v2/templates/preview', null))
+  v1.post('/templates/validate', read, (req, reply) => proxy(req, reply, MESSAGING_URL, '/v2/templates/validate', null))
+  v1.post('/templates', write, (req, reply) => proxy(req, reply, MESSAGING_URL, '/v2/templates', null))
+  v1.put<{ Params: { id: string } }>('/templates/:id', write, (req, reply) => proxy(req, reply, MESSAGING_URL, `/v2/templates/${req.params.id}`, null))
+  v1.post<{ Params: { id: string } }>('/templates/:id/publish', write, (req, reply) => proxy(req, reply, MESSAGING_URL, `/v2/templates/${req.params.id}/publish`, null))
+  v1.post<{ Params: { id: string }; Body: Record<string, unknown> }>('/templates/:id/submit-approval', write, (req, reply) => {
+    req.body = { ...(req.body ?? {}), templateId: req.params.id }
+    return proxy(req, reply, MESSAGING_URL, '/v2/templates/wa/submit-approval', null)
+  })
+  v1.post('/templates/sync-approval', write, (req, reply) => proxy(req, reply, MESSAGING_URL, '/v2/templates/wa/sync-approval', null))
+  v1.delete<{ Params: { channel: string; slug: string } }>('/templates/:channel/:slug', write, (req, reply) =>
+    proxy(req, reply, MESSAGING_URL, `/v2/templates/${req.params.channel}/${enc(req.params.slug)}`, null))
   v1.post<{ Params: { type: string } }>('/documents/:type', { preHandler: need('documents:render', 'documents') }, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/${req.params.type}`, 'documents'))
   v1.get<{ Params: { id: string } }>('/documents/:id', { preHandler: need('documents:read', 'documents') }, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/${req.params.id}`, null))
   v1.get<{ Params: { id: string } }>('/documents/:id/pdf', { preHandler: need('documents:read', 'documents') }, (req, reply) => proxy(req, reply, DOCUMENTS_URL, `/documents/${req.params.id}/pdf`, null))
