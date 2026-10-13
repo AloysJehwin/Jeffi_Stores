@@ -241,7 +241,7 @@ export const viewedProduct: ScenarioModule<Params, Row> = {
       },
     })
 
-    if (params.whatsappEnabled) {
+    if (params.whatsappEnabled || (params as any).smsEnabled) {
       sendCampaignWhatsApp(campaign.kind, row.user_id, { items: primary.name }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult

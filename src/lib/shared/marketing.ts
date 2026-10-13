@@ -53,6 +53,10 @@ export interface Campaign {
   wa_template_sid?: string | null
   wa_variables?: Record<string, string> | null
   wa_header_image_url?: string | null
+  /** Linked templates-library slugs (null = legacy inline content above). */
+  email_template_slug?: string | null
+  sms_template_slug?: string | null
+  wa_template_slug?: string | null
 }
 
 function resolveAppUrl(): string {

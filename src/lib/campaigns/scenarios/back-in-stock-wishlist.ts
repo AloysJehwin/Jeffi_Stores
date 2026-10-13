@@ -148,7 +148,7 @@ export const backInStockWishlist: ScenarioModule<Params, Row> = {
 
     await settleWishlistEvent(emailResult, row.user_id, row.product_id)
 
-    if (params.whatsappEnabled) {
+    if (params.whatsappEnabled || (params as any).smsEnabled) {
       sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }, cooldownMinutes(params)).catch(
         () => {}
       )

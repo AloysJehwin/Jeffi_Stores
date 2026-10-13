@@ -178,7 +178,7 @@ export const reviewPhotoFollowup: ScenarioModule<Params, Row> = {
       },
     })
 
-    if (params.whatsappEnabled) {
+    if (params.whatsappEnabled || (params as any).smsEnabled) {
       sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }, cooldownMinutes(params)).catch(
         () => {}
       )

@@ -1,4 +1,5 @@
 import { query } from '@/lib/shared/db'
+import { defaultCampaignSlugs } from '@/lib/campaigns/template-hints'
 import { listScenarios } from './scenarios/_registry'
 import { DEFAULT_COUPON_DISCOUNT, getBuiltinTemplate, RETIRED_BUILTIN_TEMPLATES } from './default-templates'
 import { validateCampaignBodyTemplate } from './template-validation'
@@ -45,12 +46,13 @@ export async function ensureBuiltinCampaignRows(): Promise<void> {
       subject = `${s.name} — a note for {firstName}`
       body = `<p style="font-size:16px;color:#333;margin:0 0 12px;">Hi {firstName},</p><p style="color:#555;line-height:1.6;">${s.description || s.name}</p><p style="margin:20px 0 0;"><a href="{ctaUrl}">Visit the store</a></p>`
     }
-    values.push(`($${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, false)`)
-    params.push(s.kind, s.name, s.description || null, s.kind, subject, body, DEFAULT_COUPON_DISCOUNT[s.kind] ?? 0)
+    const slugs = defaultCampaignSlugs(s.kind)
+    values.push(`($${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, false, $${i++}, $${i++})`)
+    params.push(s.kind, s.name, s.description || null, s.kind, subject, body, DEFAULT_COUPON_DISCOUNT[s.kind] ?? 0, slugs.email, slugs.sms)
   }
   await query(
     `
-    INSERT INTO campaigns (kind, name, description, scenario_kind, subject_template, body_template, discount_percent, enabled)
+    INSERT INTO campaigns (kind, name, description, scenario_kind, subject_template, body_template, discount_percent, enabled, email_template_slug, sms_template_slug)
     VALUES ${values.join(', ')}
     ON CONFLICT (kind) DO NOTHING
     `,

@@ -17,6 +17,7 @@ import pg from 'pg'
 import { BUILTIN_TEMPLATES } from '@/lib/campaigns/default-templates'
 import { EMAIL_LAYOUT_OPTIONS } from '@/lib/templates/email-layouts'
 import { serviceToken } from '@/lib/messaging/library'
+import { defaultCampaignSlugs, LEGACY_WA_KEY_TO_SLUG } from '@/lib/campaigns/template-hints'
 
 const OUT = 'messaging-service/seed/campaign-catalog.json'
 const MESSAGING_URL = (process.env.MESSAGING_URL || 'http://localhost:3101').replace(/\/$/, '')
@@ -52,16 +53,18 @@ const MAILER: Seed[] = [
   { slug: 'messaging/review-form-share', name: 'Review form share', subject: 'Share your experience — get a reward!', body: greet + h2('{formTitle}') + para("We'd love to hear what you think! Leave us a review and we'll send you a special discount as a thank-you.") + btn('Leave a review & claim reward', '{formUrl}') },
 ].map(s => ({ ...s, channel: 'email' as const, category: 'messaging', blocks_format: 'tiptap-html' }))
 
+  // The 26 built-in scenario kinds (src/lib/campaigns/scenarios/_registry.ts). Custom campaigns are not standards.
+const BUILTIN_KINDS = ['abandoned_cart', 'abandoned_checkout', 'post_purchase', 'review_reminder', 'review_request', 'winback_90',
+  'winback_180', 'restock', 'price_drop', 'viewed_product', 'viewed_category', 'high_value_cart', 'cart_price_drop',
+  'wishlist_reminder', 'review_photo_followup', 'back_in_stock_wishlist', 'first_purchase_nudge', 'second_purchase_nudge',
+  'signup_anniversary', 'replenishment', 'subscription_renewal', 'loyalty_tier_upgrade', 'loyalty_points_reminder',
+  'referral_invite', 'birthday', 'birthday_collect']
+
 const db = () => new pg.Pool({ connectionString: process.env.DATABASE_URL })
 
 async function standards(): Promise<Seed[]> {
   const pool = db()
-  // The 26 built-in scenario kinds (src/lib/campaigns/scenarios/_registry.ts). Custom campaigns are not standards.
-  const kinds = ['abandoned_cart', 'abandoned_checkout', 'post_purchase', 'review_reminder', 'review_request', 'winback_90',
-    'winback_180', 'restock', 'price_drop', 'viewed_product', 'viewed_category', 'high_value_cart', 'cart_price_drop',
-    'wishlist_reminder', 'review_photo_followup', 'back_in_stock_wishlist', 'first_purchase_nudge', 'second_purchase_nudge',
-    'signup_anniversary', 'replenishment', 'subscription_renewal', 'loyalty_tier_upgrade', 'loyalty_points_reminder',
-    'referral_invite', 'birthday', 'birthday_collect']
+  const kinds = BUILTIN_KINDS
   const rows = new Map((await pool.query(`SELECT kind, name, subject_template, body_template FROM campaigns WHERE kind = ANY($1)`, [kinds])).rows.map(r => [r.kind, r]))
   await pool.end()
   const out: Seed[] = []
@@ -121,6 +124,38 @@ async function tenants() {
   }
 }
 
+// Point every built-in campaign at its library templates; map the old WhatsApp registry key to the
+// approved library slug. Only fills NULL slugs, so it never undoes a choice made in the editor.
+async function linkPool(pool: pg.Pool, label: string) {
+  const rows = (await pool.query(`SELECT kind, wa_template_sid FROM campaigns`)).rows
+  let n = 0
+  for (const r of rows) {
+    if (!/^[a-z0-9_]+$/.test(r.kind) || !BUILTIN_KINDS.includes(r.kind)) continue
+    const s = defaultCampaignSlugs(r.kind)
+    const wa = r.wa_template_sid ? LEGACY_WA_KEY_TO_SLUG[r.wa_template_sid] ?? null : null
+    const res = await pool.query(
+      `UPDATE campaigns SET email_template_slug = COALESCE(email_template_slug, $2), sms_template_slug = COALESCE(sms_template_slug, $3),
+         wa_template_slug = COALESCE(wa_template_slug, $4),
+         parameters = CASE WHEN $4::text IS NOT NULL THEN parameters || '{"waNeedsReview": true}'::jsonb ELSE parameters END
+       WHERE kind = $1 AND (email_template_slug IS NULL OR sms_template_slug IS NULL OR ($4::text IS NOT NULL AND wa_template_slug IS NULL))`,
+      [r.kind, s.email, s.sms, wa])
+    n += res.rowCount ?? 0
+  }
+  console.log(`${label}: linked ${n} campaign(s)`)
+}
+
+async function link() {
+  const flagship = db()
+  await linkPool(flagship, 'flagship')
+  const ids = (await flagship.query(`SELECT id FROM tenants WHERE status='active' AND id <> $1`, [PLATFORM])).rows.map(r => r.id)
+  await flagship.end()
+  const { lookupTenantContextById, tenantPool } = await import('@jeffi/tenancy')
+  for (const id of ids) {
+    const ctx = await lookupTenantContextById(id)
+    if (ctx?.infra?.rdsEndpoint) await linkPool(tenantPool(ctx), ctx.slug)
+  }
+}
+
 async function main() {
   const mode = process.argv[2]
   if (mode === '--generate') {
@@ -129,8 +164,10 @@ async function main() {
     console.log(`wrote ${s.length} standard templates → ${OUT}`)
   } else if (mode === '--tenants') {
     await tenants()
+  } else if (mode === '--link') {
+    await link()
   } else {
-    console.log('usage: --generate | --tenants')
+    console.log('usage: --generate | --tenants | --link')
   }
 }
 main().then(() => process.exit(0), e => { console.error(e); process.exit(1) })

@@ -152,7 +152,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       html,
       ampHtml,
     })
-    if ((params as any).whatsappEnabled) {
+    if ((params as any).whatsappEnabled || (params as any).smsEnabled) {
       // Reuse the same token-based review link the email uses as the feedback URL.
       const feedbackUrl = itemsWithLinks[0]?.reviewUrl ?? `${user.baseUrl}/account/orders/${encodeURIComponent(row.id)}`
       sendCampaignWhatsApp(campaign.kind, row.user_id, {

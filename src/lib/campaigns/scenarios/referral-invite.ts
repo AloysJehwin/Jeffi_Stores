@@ -177,7 +177,7 @@ export const referralInvite: ScenarioModule<Params, Row> = {
       },
     })
 
-    if (params.whatsappEnabled) {
+    if (params.whatsappEnabled || (params as any).smsEnabled) {
       // No coupon: the promo template then sends just the headline, which carries the link.
       sendCampaignWhatsApp(
         campaign.kind,

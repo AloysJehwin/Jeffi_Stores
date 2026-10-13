@@ -109,7 +109,7 @@ export const restock: ScenarioModule<Params, Row> = {
 
     await settleWishlistEvent(result, row.user_id, row.product_id)
 
-    if ((params as any).whatsappEnabled) {
+    if ((params as any).whatsappEnabled || (params as any).smsEnabled) {
       sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }).catch(() => {})
     }
 

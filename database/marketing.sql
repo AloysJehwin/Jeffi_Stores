@@ -40,7 +40,10 @@ CREATE TABLE public.campaigns (
     sms_template text,
     wa_template_sid character varying(64),
     wa_variables jsonb,
-    wa_header_image_url text
+    wa_header_image_url text,
+    email_template_slug character varying(80),
+    sms_template_slug character varying(80),
+    wa_template_slug character varying(80)
 );
 
 
@@ -127,10 +130,12 @@ CREATE TABLE public.campaign_drafts (
 CREATE TABLE public.email_campaign_logs (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     campaign_id uuid NOT NULL,
-    email character varying(255) NOT NULL,
+    email character varying(255),
     status character varying(20) DEFAULT 'sent'::character varying NOT NULL,
     error text,
-    sent_at timestamp with time zone DEFAULT now()
+    sent_at timestamp with time zone DEFAULT now(),
+    channel character varying(16) DEFAULT 'email'::character varying NOT NULL,
+    to_address character varying(255)
 );
 
 
@@ -153,7 +158,8 @@ CREATE TABLE public.email_campaigns (
     created_by uuid,
     created_at timestamp with time zone DEFAULT now(),
     wizard_step smallint DEFAULT 1 NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    channels jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 

@@ -1,4 +1,5 @@
 import { query } from '@/lib/shared/db'
+import { withLibraryContent } from '@/lib/campaigns/library-content'
 import { getCampaign } from '@/lib/shared/marketing'
 import type { AnyScenarioModule, ScenarioModule, SweepResult } from './types'
 import { resolveParams } from './types'
@@ -26,7 +27,7 @@ export async function runScenario<P extends Record<string, unknown>, Row>(
 
   // A throwing scenario must not abort the rest of the sweep.
   try {
-    const campaign = await getCampaign(campaignKind)
+    const campaign = await withLibraryContent(await getCampaign(campaignKind))
     if (!campaign?.enabled) return result
 
     const params = resolveScenarioParams(scenario, (campaign as any).parameters)

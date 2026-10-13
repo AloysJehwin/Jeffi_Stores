@@ -2,6 +2,11 @@ import { queryOne } from '@/lib/shared/db'
 import { canSendMarketing, alreadySentForReference, recordSent } from '@/lib/shared/marketing'
 import type { CampaignKind } from '@/lib/shared/marketing'
 import { days } from '@/lib/campaigns/duration'
+import { resolveTemplateVariables } from '@/lib/templates/variables'
+import { renderCampaignTemplate } from '@/lib/shared/automation-emails'
+import { getLibraryTemplate } from '@/lib/messaging/library'
+import { sendByTemplate } from '@/lib/shared/send-by-template'
+import { logMessage } from '@/lib/shared/message-log'
 import { CAMPAIGN_WA_KINDS, campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 import {
   sendAbandonedCartWhatsApp,
@@ -94,120 +99,122 @@ export async function sendCampaignWhatsApp(
   try {
     if (!campaignSupportsWhatsApp(kind)) return { ok: false, reason: 'unsupported_kind' }
 
-    const user = await queryOne<{ phone: string | null }>(`SELECT phone FROM users WHERE id = $1`, [userId])
+    const user = await queryOne<{ phone: string | null; email: string | null; first_name: string | null; last_name: string | null }>(
+      `SELECT phone, email, first_name, last_name FROM users WHERE id = $1`, [userId])
     if (!user?.phone) return { ok: false, reason: 'no_phone' }
 
-    // Admin-authored overrides for this campaign: a custom SMS line, and/or an explicitly chosen
-    // approved WhatsApp template (registry key) with filled variable slots + optional header image.
-    const campaignRow = await queryOne<{
-      sms_template: string | null
-      wa_template_sid: string | null
-      wa_variables: Record<string, string> | null
-      wa_header_image_url: string | null
+    const row = await queryOne<{
+      sms_template: string | null; sms_template_slug: string | null
+      wa_template_sid: string | null; wa_template_slug: string | null
+      wa_variables: Record<string, string> | null; wa_header_image_url: string | null
       parameters: Record<string, unknown> | null
     }>(
-      `SELECT sms_template, wa_template_sid, wa_variables, wa_header_image_url, parameters FROM campaigns WHERE kind = $1`,
-      [kind]
-    ).catch(() => null)
+      `SELECT sms_template, sms_template_slug, wa_template_sid, wa_template_slug, wa_variables, wa_header_image_url, parameters
+         FROM campaigns WHERE kind = $1`, [kind]).catch(() => null)
+    const params = row?.parameters ?? {}
 
     // Respect marketing opt-out (same gate as email campaigns).
     const gate = await canSendMarketing(userId, kind as CampaignKind)
     if (!gate.ok) return { ok: false, reason: gate.reason || 'opted_out' }
 
-    // Dedup the WhatsApp send independently of email: a 'wa:<kind>' reference in email_campaigns_sent,
-    // windowed by the campaign cooldown (MINUTES). Default to 1 day when unknown so a bug can never fan
-    // out unbounded again. Record BEFORE sending so a crash mid-send can't cause a resend storm.
-    const waRef = `wa:${kind}`
-    const window = typeof cooldownMin === 'number' && cooldownMin > 0 ? cooldownMin : days(1)
-    if (await alreadySentForReference(kind as CampaignKind, userId, waRef, window)) {
-      return { ok: false, reason: 'cooldown' }
-    }
-    const waSentId = await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: waRef, channel: 'whatsapp' }).catch(
-      () => null
-    )
-
     // Product names can carry stray whitespace ("Earthing Rod ?" in the SMS).
     const clean = Object.fromEntries(
       Object.entries(vars).map(([k, v]) => [k, typeof v === 'string' ? v.trim() : v])
     ) as CampaignWaVars
+    // Full variable set for library templates: recipient + store vars and the scenario values under
+    // their campaign/library names (so {firstName} / {{coupon_code}} no longer render blank).
+    const registered = await resolveTemplateVariables({
+      recipient: { email: user.email ?? '', first_name: user.first_name, last_name: user.last_name },
+    })
+    const full: Record<string, string> = Object.fromEntries(Object.entries({
+      ...clean, firstName: user.first_name || 'there', productName: clean.product, couponCode: clean.code,
+      discountPercent: clean.discount, ctaUrl: clean.url, headline: clean.headline || 'A special offer for you',
+    }).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
+    const render = (t: string) => renderCampaignTemplate(t, full, registered, false).replace(/[ \t]{2,}/g, ' ').trim()
+    const window = typeof cooldownMin === 'number' && cooldownMin > 0 ? cooldownMin : days(1)
 
-    // Admin-chosen approved template takes precedence over the built-in per-kind dispatch. The
-    // registry maps the chosen key → the env Content SID; variable slots were filled by the admin.
-    let ok: boolean
-    const waKey = campaignRow?.wa_template_sid
-    if (waKey) {
-      const { getWhatsAppTemplate } = await import('@/lib/templates/whatsapp-registry')
-      const def = getWhatsAppTemplate(waKey)
-      if (def) {
-        const { sendCampaignTemplateWhatsApp } = await import('@/lib/shared/whatsapp')
-        // Resolve the admin's slot values + header image through the send vars, so {firstName} →
-        // the recipient's name and {productImageUrl} → the subject product's image (same pipeline as
-        // SMS/email). Raw values were being sent literally. (#campaign templates)
-        const rawVars = (campaignRow?.wa_variables as Record<string, string>) || {}
-        const resolvedVars: Record<string, string> = {}
-        for (const [k, v] of Object.entries(rawVars)) resolvedVars[k] = renderSmsTemplate(String(v ?? ''), clean)
-        // Click-track the CTA link slot: wrap the resolved http(s) URL in the shared click redirect so
-        // the delivered link records a click (keyed to this WhatsApp send) then forwards to the store.
-        if (def.urlSlot != null && waSentId) {
-          const raw = resolvedVars[String(def.urlSlot)]
-          if (raw && /^https?:\/\//i.test(raw)) {
-            const { buildClickTrackingUrl } = await import('@/lib/shared/marketing')
-            const { apiBaseUrl } = await import('@/lib/shared/customer-links')
-            resolvedVars[String(def.urlSlot)] = buildClickTrackingUrl(waSentId, raw, await apiBaseUrl())
-          }
-        }
-        const resolvedImage = campaignRow?.wa_header_image_url
-          ? renderSmsTemplate(campaignRow.wa_header_image_url, clean)
-          : null
-        ok = await sendCampaignTemplateWhatsApp({
-          phone: user.phone,
-          sidEnvVar: def.sidEnv,
-          variables: resolvedVars,
-          headerImageUrl: resolvedImage,
-          imageSlot: def.imageSlot ?? null,
-          kind,
-          entity: { entityType: 'campaign', entityId: kind },
-        })
-      } else {
-        ok = await dispatch(kind, user.phone, clean, { entityType: 'campaign', entityId: kind })
-      }
-    } else {
-      ok = await dispatch(kind, user.phone, clean, { entityType: 'campaign', entityId: kind })
+    // Each channel dedups independently (wa:/sms:<kind> in email_campaigns_sent), recorded BEFORE sending
+    // so a crash mid-send can't cause a resend storm.
+    const claim = async (channel: 'whatsapp' | 'sms') => {
+      const ref = `${channel === 'whatsapp' ? 'wa' : 'sms'}:${kind}`
+      if (await alreadySentForReference(kind as CampaignKind, userId, ref, window)) return null
+      return (await recordSent({ campaignKind: kind as CampaignKind, userId, referenceId: ref, channel }).catch(() => null)) ?? ''
     }
 
-    // Campaign SMS alongside WhatsApp — opt-in per campaign via the smsEnabled scenario param
-    // (default off), mirroring whatsappEnabled. Transactional SMS (OTP/order) is unaffected.
-    if (campaignRow?.parameters?.smsEnabled === true) {
-      const smsBody = campaignRow?.sms_template?.trim()
-        ? renderSmsTemplate(campaignRow.sms_template, clean)
-        : campaignSmsBody(kind, clean)
-      if (smsBody) {
+    let ok = false
+    if (params.whatsappEnabled === true) {
+      const waSentId = await claim('whatsapp')
+      if (waSentId !== null) ok = await sendWhatsAppPart(kind, user.phone, row, clean, render, waSentId)
+    }
+    if (params.smsEnabled === true && (await claim('sms')) !== null) {
+      let body = ''
+      if (row?.sms_template_slug) body = (await getLibraryTemplate('sms', row.sms_template_slug))?.body ?? ''
+      if (!body && row?.sms_template?.trim()) body = row.sms_template
+      body = body ? render(body) : campaignSmsBody(kind, clean)
+      if (body) {
         const { sendCampaignSMS } = await import('@/lib/shared/sms')
-        sendCampaignSMS({ phone: user.phone, body: smsBody, kind, userId }).catch(() => {})
+        ok = (await sendCampaignSMS({ phone: user.phone, body, kind, userId }).catch(() => false)) || ok
       }
     }
-
     return { ok, reason: ok ? undefined : 'send_failed' }
   } catch {
     return { ok: false, reason: 'error' }
   }
 }
 
+// WhatsApp: a linked library template (approved) with the admin's {{n}} values, else the legacy
+// registry pick, else the built-in per-kind template.
+async function sendWhatsAppPart(
+  kind: string,
+  phone: string,
+  row: { wa_template_sid: string | null; wa_template_slug: string | null; wa_variables: Record<string, string> | null; wa_header_image_url: string | null } | null,
+  clean: CampaignWaVars,
+  render: (t: string) => string,
+  waSentId: string
+): Promise<boolean> {
+  const entity = { entityType: 'campaign', entityId: kind }
+  const { buildClickTrackingUrl } = await import('@/lib/shared/marketing')
+  const { apiBaseUrl } = await import('@/lib/shared/customer-links')
+  const track = async (v: string) => (waSentId && /^https?:\/\//i.test(v) ? buildClickTrackingUrl(waSentId, v, await apiBaseUrl()) : v)
+
+  if (row?.wa_template_slug) {
+    const t = await getLibraryTemplate('whatsapp', row.wa_template_slug)
+    const slots = t ? [...new Set([...t.body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(m => m[1]))] : []
+    const raw = row.wa_variables ?? {}
+    if (t?.approval_status === 'approved' && slots.every(n => raw[n]?.trim())) {
+      const variables: Record<string, string> = {}
+      for (const n of slots) variables[n] = await track(render(raw[n]))
+      const res = await sendByTemplate({ channel: 'whatsapp', slug: t.slug, to: phone, variables, reference: `campaign:${kind}` })
+      const sent = res.status !== 'failed' && res.status !== 'skipped'
+      logMessage({ channel: 'whatsapp', to: phone, from: 'messaging-service', body: t.body.replace(/\{\{\s*(\d+)\s*\}\}/g, (_m, n) => variables[n] ?? ''),
+        kind, status: sent ? 'sent' : 'failed', error: res.error, providerSid: res.id, provider: 'messaging-service', ...entity })
+      return sent
+    }
+    // Not approved yet / slots not filled → the built-in template for this kind still goes out.
+    return dispatch(kind, phone, clean, entity)
+  }
+
+  if (row?.wa_template_sid) {
+    const { getWhatsAppTemplate } = await import('@/lib/templates/whatsapp-registry')
+    const def = getWhatsAppTemplate(row.wa_template_sid)
+    if (def) {
+      const { sendCampaignTemplateWhatsApp } = await import('@/lib/shared/whatsapp')
+      const resolvedVars: Record<string, string> = {}
+      for (const [k, v] of Object.entries(row.wa_variables ?? {})) resolvedVars[k] = render(String(v ?? ''))
+      if (def.urlSlot != null && resolvedVars[String(def.urlSlot)]) resolvedVars[String(def.urlSlot)] = await track(resolvedVars[String(def.urlSlot)])
+      return sendCampaignTemplateWhatsApp({
+        phone, sidEnvVar: def.sidEnv, variables: resolvedVars,
+        headerImageUrl: row.wa_header_image_url ? render(row.wa_header_image_url) : null,
+        imageSlot: def.imageSlot ?? null, kind, entity,
+      })
+    }
+  }
+  return dispatch(kind, phone, clean, entity)
+}
+
 // Scenarios pass the bare percent ("10"), which read as "for 10." in the SMS.
 function smsDiscount(discount: string): string {
   return /^\d+(\.\d+)?$/.test(discount.trim()) ? `${discount.trim()}% off` : discount
-}
-
-// Render an admin-authored SMS template: {token} / {{token}} filled from the campaign vars, unknown
-// tokens dropped. Plain text only (SMS has no markup). Collapses whitespace from removed tokens.
-function renderSmsTemplate(template: string, vars: CampaignWaVars): string {
-  return template
-    .replace(/\{\{?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}?\}/g, (_m, key: string) => {
-      const v = (vars as Record<string, unknown>)[key]
-      return v == null ? '' : String(v)
-    })
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim()
 }
 
 // A short SMS line per campaign kind, built from the same vars as the WhatsApp template. Returns ''
