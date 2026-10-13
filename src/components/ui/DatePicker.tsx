@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { portalRoot } from '@/lib/shared/portal-root'
 
 interface DatePickerProps {
   value: string
@@ -222,6 +223,7 @@ export default function DatePicker({
           <div
             ref={popupRef}
             style={{ position: 'fixed', top: popupPos.top, left: popupPos.left }}
+            data-datepicker-popup
             className="z-[1000] w-64 bg-surface-elevated border border-border-default rounded-xl shadow-lg p-3 select-none"
           >
             {mode === 'day' && (
@@ -385,7 +387,7 @@ export default function DatePicker({
               </>
             )}
           </div>,
-          document.body
+          portalRoot()
         )}
     </div>
   )

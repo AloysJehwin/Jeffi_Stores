@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Eyebrow, Display, Pill } from '../_ui'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 // Short onboarding for messaging/documents-only customers: no plan, warehouse or bank step.
 type Form = {
@@ -75,7 +76,7 @@ export default function ServicesOnboard({ services, ownerName, onBack }: { servi
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Legal business name"><input className={input} value={f.businessName} onChange={e => set('businessName', e.target.value)} /></Field>
-          <Field label="Business type"><select className={input} value={f.businessType} onChange={e => set('businessType', e.target.value)}>{TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
+          <Field label="Business type"><AdminSelect value={f.businessType} onChange={v => set('businessType', v)} options={TYPES.map(([value, label]) => ({ value, label }))} /></Field>
           <Field label="PAN"><input className={input} value={f.pan} onChange={e => set('pan', e.target.value.toUpperCase())} maxLength={10} placeholder="ABCDE1234F" /></Field>
           <Field label="GSTIN" hint="Optional — printed on invoices you generate"><input className={input} value={f.gstNumber} onChange={e => set('gstNumber', e.target.value.toUpperCase())} maxLength={15} /></Field>
         </div>

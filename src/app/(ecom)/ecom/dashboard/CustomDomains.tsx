@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { SkeletonRows } from './_components/Skeleton'
 import { useToast } from '@/contexts/ToastContext'
 
 interface Domain {
@@ -21,6 +22,7 @@ export default function CustomDomains({
 }) {
   const { showToast } = useToast()
   const [domains, setDomains] = useState<Domain[]>([])
+  const [loaded, setLoaded] = useState(false)
   const [cnameTarget, setCnameTarget] = useState(`${slug}.jeffistores.in`)
   const [newDomain, setNewDomain] = useState('')
   const [busy, setBusy] = useState(false)
@@ -29,6 +31,7 @@ export default function CustomDomains({
     const res = await fetch(`/api/ecom/domains?tenantId=${tenantId}`)
       .then(r => r.json())
       .catch(() => null)
+    setLoaded(true)
     if (res?.domains) {
       setDomains(res.domains)
       if (res.cnameTarget) setCnameTarget(res.cnameTarget)
@@ -94,6 +97,7 @@ export default function CustomDomains({
         </span>
       </div>
 
+      {!loaded && <SkeletonRows rows={2} cols={3} />}
       {domains.map(d => (
         <div key={d.id} className="flex items-center justify-between py-2.5 border-b border-border-default/60 text-sm">
           <div className="flex items-center gap-2 min-w-0">

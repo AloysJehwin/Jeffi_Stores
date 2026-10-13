@@ -106,3 +106,17 @@ html:has(.ecom-scope),
 html:has(.ecom-scope) body {
   overscroll-behavior-y: none;
 }
+
+/* Selects and calendars (portalled into .ecom-scope): rounded organic popovers. */
+.ecom-scope button[role='combobox'] { border-radius: 0.75rem; background-color: var(--color-surface-elevated); }
+.ecom-scope [data-adminselect-dropdown],
+.ecom-scope [data-datepicker-popup] {
+  border-radius: 1rem;
+  border-color: var(--org-sand-deep);
+  background-color: var(--color-surface-elevated);
+  box-shadow: 0 16px 40px -16px rgba(27, 23, 20, 0.28);
+}
+.ecom-scope [data-adminselect-dropdown] ul { padding: 0.25rem; }
+.ecom-scope [data-adminselect-dropdown] button { border-radius: 0.625rem; }
+.ecom-scope [data-adminselect-dropdown] [class*='uppercase'] { background-color: var(--org-chrome); border-radius: 0.5rem; }
+.ecom-scope [data-datepicker-popup] button { border-radius: 9999px; }
