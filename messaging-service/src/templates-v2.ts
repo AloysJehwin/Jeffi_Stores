@@ -141,7 +141,7 @@ export interface UpsertInput {
   subject?: string
   body: string
   blocks?: any
-  blocks_format?: 'tiptap' | 'maily' | 'mjml' | 'wa-content' | 'sms-text'
+  blocks_format?: 'tiptap' | 'tiptap-html' | 'email-blocks' | 'maily' | 'mjml' | 'wa-content' | 'sms-text'
   meta_category?: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION'
   media_type?: 'image' | 'video' | 'document'
   provider_ref?: string

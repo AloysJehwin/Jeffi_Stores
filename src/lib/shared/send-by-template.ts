@@ -2,8 +2,7 @@
 // Collapses the ~40 `send*Email|SMS|WhatsApp` wrappers that each used to inline their body.
 // Wrappers keep their public shape so callers don't change; they now one-line into here.
 
-import { createHmac } from 'node:crypto'
-import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { messagingTenant, serviceToken } from '@/lib/messaging/library'
 
 const MESSAGING_URL = (process.env.MESSAGING_URL || 'http://localhost:3101').replace(/\/$/, '')
 
@@ -25,14 +24,6 @@ export interface SendResult {
   error?: string
 }
 
-function token(tenantId: string, tenantSlug: string): string {
-  const secret = process.env.SERVICE_AUTH_SECRET
-  if (!secret) throw new Error('SERVICE_AUTH_SECRET is not set')
-  const payload = JSON.stringify({ service: 'platform', internal: true, tenantId, tenantSlug, exp: Math.floor(Date.now() / 1000) + 60 })
-  const sig = createHmac('sha256', secret).update(payload).digest()
-  return `${Buffer.from(payload).toString('base64url')}.${sig.toString('base64url')}`
-}
-
 export async function brandFields(channel: Channel): Promise<{ brand?: string; kicker?: string; footer_contact?: string }> {
   if (channel !== 'email') return {}
   try {
@@ -43,8 +34,7 @@ export async function brandFields(channel: Channel): Promise<{ brand?: string; k
 }
 
 export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult> {
-  const tenant = await resolveTenant()
-  if (!tenant) return { status: 'skipped', error: 'no tenant context' }
+  const tenant = await messagingTenant()
   const extra = await brandFields(i.channel)
   const body = {
     channel: i.channel,
@@ -59,7 +49,7 @@ export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult
   try {
     const res = await fetch(`${MESSAGING_URL}/messages`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${token(tenant.tenantId, tenant.slug)}`, 'content-type': 'application/json' },
+      headers: { authorization: `Bearer ${serviceToken(tenant.tenantId, tenant.slug)}`, 'content-type': 'application/json' },
       body: JSON.stringify(body),
       cache: 'no-store',
     })

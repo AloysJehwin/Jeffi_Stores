@@ -8,6 +8,10 @@ export interface SelectOption {
   label: string
   group?: string
   indent?: boolean
+  /** Shown but not selectable; `hint` explains why. */
+  disabled?: boolean
+  /** Secondary line under the label (e.g. why an option is disabled). */
+  hint?: string
 }
 
 interface AdminSelectProps {
@@ -128,7 +132,7 @@ export default function AdminSelect({
       case ' ':
         e.preventDefault()
         if (isOpen && highlightedIndex >= 0) {
-          handleSelect(options[highlightedIndex].value)
+          if (!options[highlightedIndex].disabled) handleSelect(options[highlightedIndex].value)
         } else {
           openDropdown()
         }
@@ -236,16 +240,21 @@ export default function AdminSelect({
                         type="button"
                         role="option"
                         aria-selected={option.value === currentValue}
-                        onClick={() => handleSelect(option.value)}
+                        disabled={option.disabled}
+                        onClick={() => !option.disabled && handleSelect(option.value)}
                         onMouseEnter={() => setHighlightedIndex(index)}
                         className={`w-full text-left transition-colors flex items-center justify-between
                         ${compact || xs ? 'px-2.5 py-1 text-xs' : sm ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-sm'}
                         ${option.indent ? (compact || xs ? 'pl-5' : sm ? 'pl-6' : 'pl-8') : ''}
                         ${highlightedIndex === index ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300' : 'text-foreground-secondary'}
                         ${option.value === currentValue ? 'font-medium text-accent-600 dark:text-accent-400' : ''}
+                        ${option.disabled ? 'opacity-50 cursor-not-allowed' : ''}
                       `}
                       >
-                        <span>{option.label}</span>
+                        <span className="min-w-0">
+                          <span className="block truncate">{option.label}</span>
+                          {option.hint && <span className="block text-[10px] text-foreground-muted truncate">{option.hint}</span>}
+                        </span>
                         {option.value === currentValue && (
                           <svg
                             className={`text-accent-500 shrink-0 ${compact || xs ? 'w-3 h-3' : 'w-4 h-4'}`}
