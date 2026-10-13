@@ -137,7 +137,7 @@ export default function MessagingTemplatesClient() {
     <div className="p-4 sm:p-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Messaging Templates</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Templates</h1>
           <p className="text-foreground-secondary mt-1 text-sm">
             Standard email / SMS / WhatsApp bodies ship with every store. Edit one to customise it for this tenant, or add your own.
           </p>

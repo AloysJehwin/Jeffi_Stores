@@ -65,6 +65,21 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.amazonaws.com' },
     ],
   },
+  // Approved WhatsApp templates (Meta-locked text) link to jeffistores.in/orders; the page is
+  // /account/orders. Storefront hosts only — on admin/business/app hosts /orders is a real page.
+  async redirects() {
+    return [
+      {
+        source: '/orders',
+        destination: '/account/orders',
+        permanent: false,
+        missing: [
+          { type: 'host', value: '(admin|ecom|business|invoice|quotation|purchaseorder|forms|vault|certportal)([.-].*)?' },
+          { type: 'host', value: '.*\\.business\\..*' },
+        ],
+      },
+    ]
+  },
   async headers() {
     return [
       {

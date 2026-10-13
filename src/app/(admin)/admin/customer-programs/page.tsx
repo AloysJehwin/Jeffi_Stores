@@ -49,7 +49,7 @@ export default async function CustomerProgramsPage({
     }
   } catch {}
   if (!(await hasPlanScope(role, scopes, 'campaigns:read'))) {
-    return <AccessDenied scopeKey="campaigns" scopeLabel="Customer Programs" />
+    return <AccessDenied scopeKey="campaigns" scopeLabel="Programs" />
   }
 
   const tab: TabKey = TABS.find(t => t.key === params.tab)?.key ?? 'loyalty'
@@ -60,7 +60,7 @@ export default async function CustomerProgramsPage({
   return (
     <div className="p-4 sm:p-6 space-y-5">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Customer Programs</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Programs</h1>
         <p className="text-foreground-secondary mt-1 text-sm">
           Rewards that keep customers coming back. Switch each one on or off in Site Controls.
         </p>
