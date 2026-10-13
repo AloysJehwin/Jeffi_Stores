@@ -285,7 +285,7 @@ function renderCampaignEmailRaw(
   }
 }
 
-interface Recipient {
+export interface Recipient {
   user_id: string
   email: string
   phone?: string | null
@@ -299,7 +299,7 @@ export type MessagingChannels = {
   whatsapp?: { slug: string; vars?: Record<string, string>; media_url?: string; button_url?: string }
 }
 
-async function resolveAudience(audienceType: string, audienceFilter: Record<string, unknown>): Promise<Recipient[]> {
+export async function resolveAudience(audienceType: string, audienceFilter: Record<string, unknown>): Promise<Recipient[]> {
   const base = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u`
   const base_cp = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
   const where = `WHERE u.is_active = true AND u.is_guest = false AND u.email IS NOT NULL AND u.marketing_opt_out = false`
@@ -321,6 +321,15 @@ async function resolveAudience(audienceType: string, audienceFilter: Record<stri
     return queryMany<Recipient>(
       `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u WHERE u.id = $1 AND u.email IS NOT NULL AND u.marketing_opt_out = false`,
       [userId]
+    )
+  }
+
+  if (audienceType === 'tag') {
+    const tags = (audienceFilter.tags as string[])?.filter(Boolean) ?? []
+    if (!tags.length) return []
+    return queryMany<Recipient>(
+      `${base} ${where} AND u.id IN (SELECT user_id FROM customer_tags WHERE tag = ANY($1))`,
+      [tags]
     )
   }
 

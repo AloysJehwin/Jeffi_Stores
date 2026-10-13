@@ -41,6 +41,21 @@ const LEGACY_SLUG: Record<string, string> = {
 const AUDIENCE_OPTIONS = [
   { value: 'all', label: 'All customers' },
   { value: 'order_history', label: 'By recent order history' },
+  { value: 'segment', label: 'By customer segment' },
+  { value: 'tag', label: 'By CRM tag' },
+  { value: 'specific_user', label: 'A specific customer' },
+]
+
+const SEGMENT_OPTIONS = [
+  { value: 'vip', label: 'VIP (₹50k+ lifetime)' },
+  { value: 'loyal', label: 'Loyal (5+ paid, ₹25k+)' },
+  { value: 'repeat', label: 'Repeat buyers (3+ orders)' },
+  { value: 'one_time', label: 'One-time buyers' },
+  { value: 'new', label: 'New (joined in last 30 days)' },
+  { value: 'at_risk', label: 'At risk (90–180 days quiet)' },
+  { value: 'dormant', label: 'Dormant (180+ days quiet)' },
+  { value: 'b2b', label: 'B2B / business' },
+  { value: 'lead', label: 'Leads (no orders yet)' },
 ]
 
 // Filled per recipient at send time — never asked for in the form.
@@ -81,6 +96,12 @@ export default function NewMessagePage() {
   const [title, setTitle] = useState('')
   const [audienceType, setAudienceType] = useState('all')
   const [daysSinceOrder, setDaysSinceOrder] = useState('30')
+  const [segment, setSegment] = useState('vip')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [tagDefs, setTagDefs] = useState<string[]>([])
+  const [specificUser, setSpecificUser] = useState<{ id: string; label: string } | null>(null)
+  const [customerQuery, setCustomerQuery] = useState('')
+  const [customerResults, setCustomerResults] = useState<{ id: string; full_name: string; email: string }[]>([])
   const [scheduledAt, setScheduledAt] = useState('')
   const [previewHtml, setPreviewHtml] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -122,6 +143,10 @@ export default function NewMessagePage() {
 
   useEffect(() => {
     fetch('/api/admin/review-forms?page=1').then(r => r.json()).then(d => setReviewForms(d.forms || [])).catch(() => {})
+    fetch('/api/admin/customer-tag-definitions', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setTagDefs((d?.definitions || []).map((x: { tag: string }) => x.tag)))
+      .catch(() => {})
     const fromUrl = new URLSearchParams(window.location.search).get('draftId')
     if (fromUrl) {
       localStorage.setItem(DRAFT_STORAGE_KEY, fromUrl)
@@ -133,6 +158,14 @@ export default function NewMessagePage() {
   }, [])
 
   useEffect(() => { draftIdRef.current = draftId }, [draftId])
+
+  const buildAudienceFilter = useCallback((): Record<string, unknown> => {
+    if (audienceType === 'order_history') return { daysSinceOrder: parseInt(daysSinceOrder, 10) || 30 }
+    if (audienceType === 'segment') return { segment }
+    if (audienceType === 'tag') return { tags: selectedTags }
+    if (audienceType === 'specific_user') return { userId: specificUser?.id }
+    return {}
+  }, [audienceType, daysSinceOrder, segment, selectedTags, specificUser])
 
   // Picked templates' current content (drives the variable inputs and previews).
   const slugKey = active.map(k => `${k}:${channels[k]?.slug ?? ''}`).join('|')
@@ -174,7 +207,7 @@ export default function NewMessagePage() {
             subject,
             channels: payloadChannels,
             audience_type: audienceType,
-            audience_filter: audienceType === 'order_history' ? { daysSinceOrder } : {},
+            audience_filter: buildAudienceFilter(),
             scheduled_at: scheduledAt || null,
             wizard_step: step,
           }),
@@ -191,7 +224,7 @@ export default function NewMessagePage() {
         setSaveState('error')
       }
     }, 1500)
-  }, [step, title, subject, payloadChannels, audienceType, daysSinceOrder, scheduledAt])
+  }, [step, title, subject, payloadChannels, audienceType, buildAudienceFilter, scheduledAt])
 
   useEffect(() => { triggerAutoSave() }, [triggerAutoSave])
 
@@ -232,6 +265,9 @@ export default function NewMessagePage() {
       setAudienceType(campaign.audience_type || 'all')
       const dso = campaign.audience_filter?.daysSinceOrder
       if (dso != null) setDaysSinceOrder(String(dso))
+      if (campaign.audience_filter?.segment) setSegment(campaign.audience_filter.segment)
+      if (Array.isArray(campaign.audience_filter?.tags)) setSelectedTags(campaign.audience_filter.tags)
+      if (campaign.audience_filter?.userId) setSpecificUser({ id: campaign.audience_filter.userId, label: 'Selected customer' })
       if (campaign.scheduled_at) {
         const d = new Date(campaign.scheduled_at)
         const pad = (n: number) => String(n).padStart(2, '0')
@@ -276,11 +312,10 @@ export default function NewMessagePage() {
   const loadAudience = useCallback(async () => {
     setAudienceLoading(true)
     try {
-      const audienceFilter = audienceType === 'order_history' ? { daysSinceOrder: parseInt(daysSinceOrder, 10) } : {}
       const res = await fetch('/api/admin/mailer/audience-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audience_type: audienceType, audience_filter: audienceFilter }),
+        body: JSON.stringify({ audience_type: audienceType, audience_filter: buildAudienceFilter() }),
       })
       const data = await res.json()
       setAudienceRecipients(data.recipients || [])
@@ -290,7 +325,7 @@ export default function NewMessagePage() {
     } finally {
       setAudienceLoading(false)
     }
-  }, [audienceType, daysSinceOrder])
+  }, [audienceType, buildAudienceFilter])
 
   useEffect(() => {
     if (step !== 3) return
@@ -298,6 +333,18 @@ export default function NewMessagePage() {
     audienceDebounceRef.current = setTimeout(loadAudience, 400)
     return () => { if (audienceDebounceRef.current) clearTimeout(audienceDebounceRef.current) }
   }, [step, loadAudience])
+
+  // Live customer search for the "specific customer" audience.
+  useEffect(() => {
+    if (audienceType !== 'specific_user' || customerQuery.trim().length < 2) { setCustomerResults([]); return }
+    const t = setTimeout(() => {
+      fetch(`/api/admin/customers/search?q=${encodeURIComponent(customerQuery.trim())}`, { credentials: 'include' })
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => setCustomerResults(d?.results || []))
+        .catch(() => {})
+    }, 300)
+    return () => clearTimeout(t)
+  }, [audienceType, customerQuery])
 
   function toggleChannel(k: Channel) {
     setChannels(p => {
@@ -351,7 +398,7 @@ export default function NewMessagePage() {
     setSubmitting(true)
     setError('')
     try {
-      const audienceFilter = audienceType === 'order_history' ? { daysSinceOrder: parseInt(daysSinceOrder, 10) } : {}
+      const audienceFilter = buildAudienceFilter()
       const emailSubject = subject || loaded.email?.subject || title || 'Message'
       const fields = {
         title: title || emailSubject,
@@ -676,6 +723,58 @@ export default function NewMessagePage() {
               <div>
                 <label className={labelClass}>Ordered within the last N days</label>
                 <input type="number" min="1" max="365" value={daysSinceOrder} onChange={e => setDaysSinceOrder(e.target.value)} className={inputClass} style={{ maxWidth: '140px' }} />
+              </div>
+            )}
+            {audienceType === 'segment' && (
+              <AdminSelect label="Segment" options={SEGMENT_OPTIONS} value={segment} onChange={setSegment} />
+            )}
+            {audienceType === 'tag' && (
+              <div>
+                <label className={labelClass}>CRM tags {selectedTags.length > 0 && `(${selectedTags.length} selected)`}</label>
+                {tagDefs.length === 0 ? (
+                  <p className="text-xs text-foreground-muted">No customer tags defined yet — add them in Customers → settings.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {tagDefs.map(t => {
+                      const on = selectedTags.includes(t)
+                      return (
+                        <button key={t} type="button"
+                          onClick={() => setSelectedTags(p => on ? p.filter(x => x !== t) : [...p, t])}
+                          className={`px-2.5 h-control-sm rounded-full text-xs font-semibold border transition-colors ${on ? 'bg-accent-500 border-accent-500 text-white' : 'border-border-default text-foreground hover:bg-surface-secondary'}`}>
+                          {t}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                <p className="mt-1.5 text-[11px] text-foreground-muted">Customers carrying any selected tag are included.</p>
+              </div>
+            )}
+            {audienceType === 'specific_user' && (
+              <div>
+                <label className={labelClass}>Find a customer</label>
+                {specificUser ? (
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 h-control inline-flex items-center rounded-lg border border-border-default bg-surface-secondary text-sm">{specificUser.label}</span>
+                    <button type="button" onClick={() => { setSpecificUser(null); setCustomerQuery('') }} className="text-xs text-accent-500 hover:underline">Change</button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <input value={customerQuery} onChange={e => setCustomerQuery(e.target.value)} placeholder="Name, email or phone" className={inputClass} />
+                    {customerResults.length > 0 && (
+                      <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-border-default bg-surface-elevated shadow-lg">
+                        {customerResults.map(c => (
+                          <button key={c.id} type="button"
+                            onClick={() => { setSpecificUser({ id: c.id, label: `${c.full_name || c.email} · ${c.email}` }); setCustomerResults([]) }}
+                            className="flex w-full flex-col items-start px-3 py-2 text-left hover:bg-surface-secondary">
+                            <span className="text-sm text-foreground">{c.full_name || c.email}</span>
+                            <span className="text-xs text-foreground-muted">{c.email}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             <div>
