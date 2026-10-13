@@ -6,7 +6,7 @@ import { applyRouteRefund } from '@/lib/payments/route-settlement'
 import { sendPaymentStatusUpdate } from '@/lib/email'
 import { logActivity } from '@/lib/shared/activity'
 import { getReturnRequest } from '@/lib/queries'
-import { computeRefundableAmount } from '@/lib/payments/refund'
+import { computeRefundableAmount, refundCapacity } from '@/lib/payments/refund'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const returnRequest = order.status === 'returned' ? await getReturnRequest(orderId).catch(() => null) : null
-    const capturedTotal = refundable.reduce((s: number, p: any) => s + (parseFloat(p.amount) || 0), 0)
+    const capturedTotal = refundable.reduce((s: number, p: any) => s + refundCapacity(p), 0)
     const targetRefund = Math.min(capturedTotal, await computeRefundableAmount(order, returnRequest))
 
     if (!(targetRefund > 0)) {
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let remaining = targetRefund
     for (const paymentRecord of refundable) {
       if (remaining <= 0) break
-      const captured = parseFloat(paymentRecord.amount) || 0
+      const captured = refundCapacity(paymentRecord)
       const thisRefund = Math.min(captured, remaining)
       if (!(thisRefund > 0)) continue
       const amountInPaise = Math.round(thisRefund * 100)
