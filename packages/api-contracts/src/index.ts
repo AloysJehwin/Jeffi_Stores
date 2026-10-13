@@ -26,6 +26,9 @@ export const SendMessageRequest = z
     provider_ref: z.string().max(80).optional(), // WhatsApp: a Twilio content SID when not using a stored template
     reference: z.string().max(120).optional(),
     metadata: z.record(z.string(), z.unknown()).optional(),
+    brand: z.string().max(120).optional(),
+    kicker: z.string().max(120).optional(),
+    footer_contact: z.string().max(200).optional(),
   })
   .refine(m => m.template || m.body, { message: 'Provide template or body' })
   .refine(m => (m.channel === 'email' ? Email.safeParse(m.to).success : Phone.safeParse(m.to).success), {

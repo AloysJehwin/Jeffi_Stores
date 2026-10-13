@@ -33,9 +33,19 @@ function token(tenantId: string, tenantSlug: string): string {
   return `${Buffer.from(payload).toString('base64url')}.${sig.toString('base64url')}`
 }
 
+async function brandFields(channel: Channel): Promise<{ brand?: string; kicker?: string; footer_contact?: string }> {
+  if (channel !== 'email') return {}
+  try {
+    const { currentBrandNameAsync, storeContactLine } = await import('@/lib/catalog/brand')
+    const [brand, footer_contact] = await Promise.all([currentBrandNameAsync(), storeContactLine()])
+    return { brand, kicker: 'Notifications', footer_contact: footer_contact || undefined }
+  } catch { return {} }
+}
+
 export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult> {
   const tenant = await resolveTenant()
   if (!tenant) return { status: 'skipped', error: 'no tenant context' }
+  const extra = await brandFields(i.channel)
   const body = {
     channel: i.channel,
     to: i.to,
@@ -44,6 +54,7 @@ export async function sendByTemplate(i: SendByTemplateInput): Promise<SendResult
     subject: i.subject,
     reference: i.reference,
     locale: i.locale,
+    ...extra,
   }
   try {
     const res = await fetch(`${MESSAGING_URL}/messages`, {
