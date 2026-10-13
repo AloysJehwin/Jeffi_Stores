@@ -13,20 +13,26 @@ function token(tenantId: string, tenantSlug: string, internal = false, space: 's
   return `${Buffer.from(payload).toString('base64url')}.${sig.toString('base64url')}`
 }
 
-export async function callService(
-  service: 'messaging' | 'documents',
-  tenant: { id: string; slug: string },
-  path: string,
-  // space 'api' = the Messaging-API product's own template copies (the console); 'store' = the store's.
-  init: { method?: string; body?: unknown; internal?: boolean; space?: 'store' | 'api' } = {}
-): Promise<{ status: number; body: unknown }> {
+type Init = { method?: string; body?: unknown; internal?: boolean; space?: 'store' | 'api' }
+
+export function fetchService(service: 'messaging' | 'documents', tenant: { id: string; slug: string }, path: string, init: Init = {}) {
   const base = service === 'messaging' ? MESSAGING_URL : DOCUMENTS_URL
-  const res = await fetch(base + path, {
+  return fetch(base + path, {
     method: init.method ?? 'GET',
     headers: { authorization: `Bearer ${token(tenant.id, tenant.slug, init.internal, init.space)}`, 'content-type': 'application/json' },
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
     cache: 'no-store',
   })
+}
+
+export async function callService(
+  service: 'messaging' | 'documents',
+  tenant: { id: string; slug: string },
+  path: string,
+  // space 'api' = the Messaging-API product's own template copies (the console); 'store' = the store's.
+  init: Init = {}
+): Promise<{ status: number; body: unknown }> {
+  const res = await fetchService(service, tenant, path, init)
   const text = await res.text()
   try {
     return { status: res.status, body: JSON.parse(text) }

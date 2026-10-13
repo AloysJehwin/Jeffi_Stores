@@ -9,7 +9,7 @@ export default async function DocumentsPage() {
   const { tenant } = await loadOwnerContext()
   return (
     <>
-      <PageHeader eyebrow="Developers" title="Documents" description="Every PDF rendered through your API keys, with a shareable link." />
+      <PageHeader eyebrow="Developers" title="Documents" description="Every PDF rendered through your API keys, and the design they use." />
       {hasService(tenant, 'documents') ? <DocumentsClient /> : <p className="text-sm text-foreground-secondary">Documents is not enabled. Turn it on from API keys.</p>}
     </>
   )

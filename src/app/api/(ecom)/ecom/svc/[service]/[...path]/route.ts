@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ownerApi } from '@/lib/ecom/owner-api'
 import { hasService } from '@/lib/tenant-registry'
-import { callService } from '@/lib/ecom/service-client'
+import { fetchService } from '@/lib/ecom/service-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +15,14 @@ async function handle(request: NextRequest, { params }: { params: Promise<{ serv
   const qs = request.nextUrl.search
   const body = (request.method === 'POST' || request.method === 'PUT') ? await request.json().catch(() => ({})) : undefined
   // Re-encode segments: slugs contain '/', which Next decodes in the catch-all.
-  const r = await callService(service, ctx.tenant, '/' + path.map(encodeURIComponent).join('/') + qs, { method: request.method, body, space: 'api' })
-  return NextResponse.json(r.body, { status: r.status })
+  const res = await fetchService(service, ctx.tenant, '/' + path.map(encodeURIComponent).join('/') + qs, { method: request.method, body, space: 'api' })
+  const type = res.headers.get('content-type') ?? ''
+  if (!type.includes('json')) {
+    // PDFs / images pass through as-is.
+    const headers = new Headers({ 'content-type': type || 'application/octet-stream' })
+    for (const h of ['content-disposition', 'cache-control']) { const v = res.headers.get(h); if (v) headers.set(h, v) }
+    return new NextResponse(await res.arrayBuffer(), { status: res.status, headers })
+  }
+  return NextResponse.json(await res.json().catch(() => ({})), { status: res.status })
 }
 export { handle as GET, handle as POST, handle as PUT, handle as DELETE }
