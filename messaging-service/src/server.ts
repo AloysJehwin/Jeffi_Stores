@@ -306,11 +306,12 @@ app.post<{ Querystring: { force?: string } }>('/system-templates/install', async
     const existing = await tpl.findBySlug(pool, req.claims.tenantId, seed.channel, seed.slug, seed.locale ?? 'en')
     if (existing && req.query.force !== '1') { skipped++; continue }
     const providerRef = seed.channel === 'whatsapp' ? WA_APPROVED_SIDS[seed.slug] : undefined
-    await tpl.upsertTemplate(pool, req.claims.tenantId, {
+    const t = await tpl.upsertTemplate(pool, req.claims.tenantId, {
       ...seed,
       provider_ref: providerRef ?? seed.provider_ref,
       publish: true,
     })
+    if (providerRef && t.variant) await tpl.setApprovalStatus(pool, t.variant.id, { status: 'approved', raw: 'approved' })
     created++
   }
   return { created, skipped, total: CATALOG.length }
