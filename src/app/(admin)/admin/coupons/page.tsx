@@ -158,13 +158,16 @@ async function CouponsStats() {
     queryMany<{ coupon_id: string; code: string; updated_at: string }>(
       `SELECT cd.coupon_id, c.code, cd.updated_at
        FROM coupon_drafts cd
-       JOIN coupons c ON c.id = cd.coupon_id
+       JOIN coupons c ON c.id = cd.coupon_id AND c.is_draft = false
        ORDER BY cd.updated_at DESC
        LIMIT 20`
     ),
     // Create-drafts: brand-new coupons never published to the live list (is_draft = true).
-    queryMany<{ id: string; code: string; created_at: string }>(
-      `SELECT id, code, created_at FROM coupons WHERE is_draft = true ORDER BY created_at DESC LIMIT 20`
+    // A new coupon edited before its first publish also has a coupon_drafts row — list it once.
+    queryMany<{ id: string; code: string; created_at: string; staged: boolean }>(
+      `SELECT c.id, COALESCE(cd.fields->>'code', c.code) AS code, c.created_at, cd.coupon_id IS NOT NULL AS staged
+       FROM coupons c LEFT JOIN coupon_drafts cd ON cd.coupon_id = c.id
+       WHERE c.is_draft = true ORDER BY c.created_at DESC LIMIT 20`
     ),
   ])
   const pendingDrafts = editDrafts
@@ -226,9 +229,9 @@ async function CouponsStats() {
                     subtitle="New coupon — not yet published"
                     updatedAt={d.created_at}
                     editHref={ap(`/admin/coupons/${d.id}/edit`, host)}
-                    publishPath={`/api/admin/coupons/${d.id}`}
-                    publishMethod="PATCH"
-                    publishBody={{ is_draft: false, is_active: true }}
+                    publishPath={d.staged ? `/api/admin/coupons/${d.id}/publish` : `/api/admin/coupons/${d.id}`}
+                    publishMethod={d.staged ? undefined : 'PATCH'}
+                    publishBody={d.staged ? undefined : { is_draft: false, is_active: true }}
                     publishConfirm={`Publish "${d.code}" to the live coupon list?`}
                     discardPath={`/api/admin/coupons/${d.id}`}
                     discardConfirm={`Delete the draft coupon "${d.code}"? This cannot be undone.`}

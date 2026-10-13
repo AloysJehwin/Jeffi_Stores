@@ -73,13 +73,16 @@ async function BrandsStats() {
     queryMany<{ brand_id: string; name: string; updated_at: string }>(
       `SELECT bd.brand_id, b.name, bd.updated_at
        FROM brand_drafts bd
-       JOIN brands b ON b.id = bd.brand_id
+       JOIN brands b ON b.id = bd.brand_id AND b.is_draft = false
        ORDER BY bd.updated_at DESC
        LIMIT 20`
     ),
     // Create-drafts: brand-new brands never published to the live list (is_draft = true).
-    queryMany<{ id: string; name: string; created_at: string }>(
-      `SELECT id, name, created_at FROM brands WHERE is_draft = true ORDER BY created_at DESC LIMIT 20`
+    // A new brand edited before its first publish also has a brand_drafts row — list it once.
+    queryMany<{ id: string; name: string; created_at: string; staged: boolean }>(
+      `SELECT b.id, COALESCE(bd.fields->>'name', b.name) AS name, b.created_at, bd.brand_id IS NOT NULL AS staged
+       FROM brands b LEFT JOIN brand_drafts bd ON bd.brand_id = b.id
+       WHERE b.is_draft = true ORDER BY b.created_at DESC LIMIT 20`
     ),
   ])
 
@@ -132,9 +135,9 @@ async function BrandsStats() {
                   subtitle="New brand — not yet published"
                   updatedAt={d.created_at}
                   editHref={ap(`/admin/brands/${d.id}/edit`, host)}
-                  publishPath={`/api/admin/brands/${d.id}`}
-                  publishMethod="PATCH"
-                  publishBody={{ is_draft: false, is_active: true }}
+                  publishPath={d.staged ? `/api/admin/brands/${d.id}/publish` : `/api/admin/brands/${d.id}`}
+                  publishMethod={d.staged ? undefined : 'PATCH'}
+                  publishBody={d.staged ? undefined : { is_draft: false, is_active: true }}
                   publishConfirm={`Publish "${d.name}" to the live brand list?`}
                   discardPath={`/api/brands/${d.id}`}
                   discardConfirm={`Delete the draft brand "${d.name}"? This cannot be undone.`}
