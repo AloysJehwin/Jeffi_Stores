@@ -700,7 +700,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             </>
           )}
 
-          {campaignSupportsWhatsApp(kind) && (
+          {campaignSupportsWhatsApp(kind) && !!form.parameters?.smsEnabled && (
             <div className="mt-4">
               <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
                 SMS message
@@ -735,7 +735,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                 )}
               </div>
               <p className="text-[10px] text-foreground-muted mt-1">
-                Sent when SMS is switched on in this campaign&apos;s settings — independently of WhatsApp.
+                Sent to customers with a phone on file — independently of WhatsApp.
               </p>
             </div>
           )}
