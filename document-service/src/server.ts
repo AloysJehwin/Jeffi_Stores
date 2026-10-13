@@ -21,7 +21,6 @@ const url = process.env.DOCUMENTS_DATABASE_URL
 if (!url) throw new Error('DOCUMENTS_DATABASE_URL is not set')
 const db = new pg.Pool({ connectionString: url, max: 10 })
 const PUBLIC_BASE = (process.env.PUBLIC_BASE_URL || 'http://localhost:3100').replace(/\/$/, '')
-const SELF_BASE = (process.env.SELF_BASE_URL || `http://localhost:${process.env.PORT || 3102}`).replace(/\/$/, '')
 const PREFIX: Record<string, string> = { invoice: 'INV', quotation: 'QT', receipt: 'RCT', packing_slip: 'PS', label: 'LBL', purchase_order: 'PO' }
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' } })
@@ -86,7 +85,7 @@ async function toApi(d: DocRow) {
     number: d.number,
     template: d.template,
     totals: { subtotal: d.totals.subtotal, cgst: d.totals.cgst, sgst: d.totals.sgst, igst: d.totals.igst, total: d.totals.total },
-    pdf_url: await pdfUrl(d.s3_key, `${SELF_BASE}/view/${d.view_token}/pdf`),
+    pdf_url: await pdfUrl(d.s3_key, `${PUBLIC_BASE}/d/${d.view_token}/pdf`),
     view_url: `${PUBLIC_BASE}/d/${d.view_token}`,
     price_inr: Number(d.price_inr),
     reference: d.reference,
@@ -210,10 +209,11 @@ app.get<{ Params: { token: string } }>('/view/:token', async (req, reply) => {
   const r = await db.query<DocRow>(`SELECT * FROM documents WHERE view_token=$1`, [req.params.token])
   const d = r.rows[0]
   if (!d) return reply.code(404).type('text/html').send('<h1>Document not found</h1>')
-  const pdf = await pdfUrl(d.s3_key, `${SELF_BASE}/view/${d.view_token}/pdf`)
-  reply.type('text/html')
+  // Relative fallback: the viewer is served on the public host, which also serves /d/:token/pdf.
+  const pdf = esc(await pdfUrl(d.s3_key, `/d/${d.view_token}/pdf`))
+  reply.type('text/html; charset=utf-8')
   const number = esc(d.number)
-  return `<!doctype html><title>${number}</title><style>body{margin:0;font-family:system-ui;background:#f5f0e6}header{padding:12px 20px;display:flex;justify-content:space-between;align-items:center;background:#fffdf7;border-bottom:1px solid #e3dacb}a{color:#a9552f;font-weight:600}iframe{width:100%;height:calc(100vh - 53px);border:0}</style><header><strong>${d.type.replace('_', ' ')} · ${number}</strong><a href="${pdf}" download>Download PDF</a></header><iframe src="${pdf}"></iframe>`
+  return `<!doctype html><meta charset="utf-8"><title>${number}</title><style>body{margin:0;font-family:system-ui;background:#f5f0e6}header{padding:12px 20px;display:flex;justify-content:space-between;align-items:center;background:#fffdf7;border-bottom:1px solid #e3dacb}a{color:#a9552f;font-weight:600}iframe{width:100%;height:calc(100vh - 53px);border:0}</style><header><strong>${esc(TITLES[d.type] ?? d.type)} · ${number}</strong><a href="${pdf}" download>Download PDF</a></header><iframe src="${pdf}"></iframe>`
 })
 app.get<{ Params: { token: string } }>('/view/:token/pdf', async (req, reply) => {
   const r = await db.query<DocRow>(`SELECT s3_key, number FROM documents WHERE view_token=$1`, [req.params.token])
@@ -222,6 +222,7 @@ app.get<{ Params: { token: string } }>('/view/:token/pdf', async (req, reply) =>
   return getPdf(r.rows[0].s3_key)
 })
 
+const TITLES: Record<string, string> = { invoice: 'Invoice', quotation: 'Quotation', receipt: 'Receipt', packing_slip: 'Packing slip', label: 'Shipping label', purchase_order: 'Purchase order' }
 const esc = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
 
 const port = Number(process.env.PORT || 3102)
