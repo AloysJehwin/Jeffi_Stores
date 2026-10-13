@@ -38,7 +38,7 @@ import {
   FONT_FAMILIES,
   FONT_SIZES,
   getLinkState,
-  insertCta,
+  applyButton,
   removeLink,
   setBlockType,
   type BlockType,
@@ -60,7 +60,7 @@ export interface EmailComposerProps {
 }
 
 type Mode = 'visual' | 'source'
-type PopoverKind = 'link' | 'vars' | 'color'
+type PopoverKind = 'link' | 'vars' | 'color' | 'button'
 type PopoverState = null | { kind: PopoverKind; left: number }
 
 // Every toolbar control uses the admin `sm` tier (34px, see globals.css) so rows line up.
@@ -447,7 +447,8 @@ function Toolbar({
             <ToolBtn
               label="Insert button"
               className="px-2.5 text-xs font-semibold"
-              onClick={() => insertCta(editor, ctaHref)}
+              active={popover?.kind === 'button'}
+              onClick={e => toggle('button', e)}
             >
               <MousePointerClick className="w-4 h-4" />
               Button
@@ -519,6 +520,7 @@ function Toolbar({
         </Pop>
       )}
       {popover?.kind === 'link' && <LinkDialog editor={editor} left={popover.left} onClose={() => setPopover(null)} />}
+      {popover?.kind === 'button' && <ButtonDialog editor={editor} left={popover.left} defaultUrl={ctaHref} onClose={() => setPopover(null)} />}
       {popover?.kind === 'vars' && (
         <VariablePicker
           left={popover.left}
@@ -571,6 +573,46 @@ function Pop({
         {children}
       </div>
     </>
+  )
+}
+
+function ButtonDialog({ editor, left, defaultUrl, onClose }: { editor: Editor; left: number; defaultUrl?: string; onClose: () => void }) {
+  const [text, setText] = useState('Shop Now')
+  const [url, setUrl] = useState(defaultUrl || 'https://')
+  const [error, setError] = useState('')
+  return (
+    <Pop left={left} onClose={onClose} className="w-80 !p-3">
+      <form
+        onSubmit={e => {
+          e.preventDefault()
+          const res = applyButton(editor, { url, text })
+          if (!res.ok) return setError(res.error)
+          onClose()
+        }}
+        aria-label="Insert button"
+      >
+        <h3 className="text-xs font-semibold text-foreground mb-2">Insert button</h3>
+        <label className="block text-[11px] text-foreground-muted mb-1" htmlFor="ec-btn-text">Button text</label>
+        <input id="ec-btn-text" autoFocus type="text" value={text} onChange={e => setText(e.target.value)} className={`${INPUT} mb-2`} />
+        <label className="block text-[11px] text-foreground-muted mb-1" htmlFor="ec-btn-url">Link</label>
+        <input
+          id="ec-btn-url"
+          type="text"
+          inputMode="url"
+          value={url}
+          onChange={e => { setUrl(e.target.value); setError('') }}
+          placeholder="https://example.com, mailto:, tel: or {variable}"
+          aria-invalid={!!error}
+          className={INPUT}
+        />
+        {error && <p role="alert" className="text-[11px] text-red-600 dark:text-red-400 mt-1">{error}</p>}
+        <p className="text-[10px] text-foreground-muted mt-1">To change it later, click the button text and use Link.</p>
+        <div className="flex items-center justify-end gap-2 mt-3">
+          <button type="button" onClick={onClose} className="px-2.5 py-1 text-xs text-foreground-muted hover:text-foreground">Cancel</button>
+          <button type="submit" className="px-3 py-1 text-xs bg-accent-500 hover:bg-accent-600 text-white rounded font-medium">Insert</button>
+        </div>
+      </form>
+    </Pop>
   )
 }
 

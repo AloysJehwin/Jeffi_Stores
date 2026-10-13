@@ -125,6 +125,16 @@ export function insertCta(editor: Editor, href = 'https://{store_web}', label = 
     .run()
 }
 
+const escHtml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/** Button = a styled CTA link: same URL rules as a hyperlink ({variables}, mailto:, tel: allowed). */
+export function applyButton(editor: Editor, input: { url: string; text?: string }): LinkCheck {
+  const check = normalizeLinkUrl(input.url)
+  if (!check.ok) return check
+  insertCta(editor, escHtml(check.href), escHtml((input.text || '').trim() || 'Shop Now'))
+  return check
+}
+
 export function clearFormatting(editor: Editor) {
   editor
     .chain()
