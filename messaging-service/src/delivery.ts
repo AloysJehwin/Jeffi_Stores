@@ -47,7 +47,7 @@ export function startDeliverySync(log: (m: string) => void) {
     const rows = await db.query<{ id: string; provider_ref: string }>(
       `SELECT id, provider_ref FROM messages
        WHERE provider='twilio' AND status='sent' AND provider_ref IS NOT NULL AND created_at > now() - interval '24 hours'
-         AND updated_at < now() - greatest(interval '60 seconds', (now() - created_at) / 4)
+         AND updated_at < now() - greatest(interval '10 seconds', (now() - created_at) / 4)
        ORDER BY created_at DESC LIMIT 50`)
     for (const r of rows.rows) {
       try {

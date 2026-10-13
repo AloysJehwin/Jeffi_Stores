@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
 import Pagination from '@/components/admin/Pagination'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
+import AutoRefresh from '@/components/admin/AutoRefresh'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 
@@ -86,9 +87,13 @@ export default async function CampaignDetailPage({
 
   const sentCount = logs.filter(l => l.status === 'sent').length
   const failedCount = logs.filter(l => l.status === 'failed').length
+  // SMS/WhatsApp outcomes land after the send — keep refreshing for 10 minutes.
+  const awaiting = campaign.status === 'sending' || logs.some(l =>
+    l.status === 'sent' && l.channel !== 'email' && Date.now() - new Date(l.sent_at).getTime() < 600_000)
 
   return (
     <div className="p-4 sm:p-6">
+      <AutoRefresh active={awaiting} />
       <div className="flex items-center gap-3 mb-6">
         <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
