@@ -7,7 +7,19 @@ import { aiDenial } from '@/lib/auth/ai-scope'
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
 
-const SYSTEM_PROMPT = (store: string, storeUrl: string, variables: string) => `You write marketing/support emails for ${store}.
+// Broadcast messages (Messaging): per-customer values exist, order values don't.
+const CAMPAIGN_RULES = `
+PLACEMENT — every variable has one right place:
+- {customer_first_name}: only in the greeting ("Dear {customer_first_name},"). Never in headings or buttons.
+- {couponCode}: in its own highlighted line right above the button, and ONLY inside a conditional block so customers without a coupon don't see an empty code:
+  {#if couponCode}<p style="text-align:center;margin:16px 0;font-size:16px;">Use code <strong>{couponCode}</strong> for {discountPercent}% off</p>{/if}
+- {discountPercent}: a bare number — always write it as "{discountPercent}% off", and only inside {#if couponCode}…{/if}.
+- {store_name}: brand mentions and the sign-off ("— The {store_name} team"). {store_web}/{store_email}/{store_phone}: contact lines only; a URL variable may be an href, but never a button label.
+- Date variables ({date}, {current_year}): plain text only.
+- Never put a variable inside a button label or an href other than the storefront URL.
+- This message is sent to many customers at once: there is no order, so never mention order numbers, tracking or totals.`
+
+const SYSTEM_PROMPT = (store: string, storeUrl: string, variables: string, campaign = false) => `You write marketing/support emails for ${store}.
 Return ONLY valid JSON: {"html":"<email body html>"}
 
 STRUCTURE — the html goes inside an existing branded email shell (logo + footer are already added), so output ONLY the body. No <html>/<head>/<body>/<style> tags.
@@ -32,7 +44,7 @@ URLs — use ${storeUrl} for the storefront. For "track order" / "view order" ac
 
 VARIABLES — insert these tokens verbatim (replaced per recipient at send time). Do NOT wrap them in styling spans. Use every one that fits the message instead of writing the value out:
 ${variables}
-Sign off referencing the {store_name} team. Do not fabricate customer names, codes, prices or order numbers — use variables instead.`
+Sign off referencing the {store_name} team. Do not fabricate customer names, codes, prices or order numbers — use variables instead.${campaign ? CAMPAIGN_RULES : ''}`
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -40,7 +52,7 @@ export async function POST(request: NextRequest) {
   const denied = aiDenial(admin.role, admin.scopes, 'mailer:write')
   if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
-  let body: { scenario?: string; subject?: string; variables?: string[] }
+  let body: { scenario?: string; subject?: string; variables?: string[]; campaign?: boolean }
   try {
     body = await request.json()
   } catch {
@@ -59,9 +71,11 @@ export async function POST(request: NextRequest) {
     const [descriptor, storeUrl, defs] = await Promise.all([storeDescriptorForPrompt(), storeBaseUrlAsync(), listTemplateVariables()])
     // Every variable the composer offers: store/customer ones + the ones the caller's template fills.
     const extra = (body.variables ?? []).filter(k => /^[a-zA-Z][a-zA-Z0-9_]{0,40}$/.test(k) && !defs.some(d => d.key === k)).slice(0, 30)
+    const campaign = body.campaign === true
     const variables = [
-      ...defs.map(d => `  {${d.key}} — ${d.label}${d.description ? `: ${d.description}` : ''}`),
-      ...extra.map(k => `  {${k}} — filled for this message`),
+      ...defs.filter(d => !campaign || d.group !== 'order').map(d => `  {${d.key}} — ${d.label}${d.description ? `: ${d.description}` : ''}`),
+      ...(campaign ? ['  {couponCode} — the coupon attached to this message (may be empty)', '  {discountPercent} — that coupon\'s % discount, a bare number'] : []),
+      ...extra.filter(k => !campaign || !['couponCode', 'discountPercent', 'firstName'].includes(k)).map(k => `  {${k}} — filled for this message`),
     ].join('\n')
     // 'email' hint = the fast model: the large copy model truncates the HTML mid-JSON.
     const r = await aiChat({
@@ -71,7 +85,7 @@ export async function POST(request: NextRequest) {
       maxTokens: 1500,
       noCache: true,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT(descriptor, storeUrl, variables) },
+        { role: 'system', content: SYSTEM_PROMPT(descriptor, storeUrl, variables, campaign) },
         { role: 'user', content: userPrompt },
       ],
     })
