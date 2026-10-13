@@ -313,7 +313,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       const names = items.map(i => i.name)
       const summary = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
       // Pass the cooldown so WhatsApp dedups per user within the window (stops the resend storm).
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, cooldownMinutes(params)).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary, imageUrl: items.find(i => i.image_url)?.image_url ?? undefined, url: `${user.baseUrl}/cart` }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

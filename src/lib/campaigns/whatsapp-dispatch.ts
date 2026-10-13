@@ -35,7 +35,8 @@ export interface CampaignWaVars {
   code?: string
   discount?: string
   orderNumber?: string // review / post_purchase
-  url?: string // feedback URL
+  url?: string // feedback URL / the campaign's link (WhatsApp button)
+  imageUrl?: string // product photo (WhatsApp image header)
 }
 
 async function dispatch(
@@ -102,7 +103,7 @@ export async function sendCampaignWhatsApp(
 
     const user = await queryOne<{ phone: string | null; email: string | null; first_name: string | null; last_name: string | null }>(
       `SELECT phone, email, first_name, last_name FROM users WHERE id = $1`, [userId])
-    if (!user?.phone) return { ok: false, reason: 'no_phone' }
+    if (!user?.phone) { console.warn(`[campaign-wa] ${kind} user=${userId} no_phone`); return { ok: false, reason: 'no_phone' } }
 
     const row = await queryOne<{
       sms_template: string | null; sms_template_slug: string | null
@@ -115,8 +116,8 @@ export async function sendCampaignWhatsApp(
     const params = row?.parameters ?? {}
 
     // Respect marketing opt-out (same gate as email campaigns).
-    const gate = await canSendMarketing(userId, kind as CampaignKind)
-    if (!gate.ok) return { ok: false, reason: gate.reason || 'opted_out' }
+    const gate = await canSendMarketing(userId, kind as CampaignKind, { phoneChannel: true })
+    if (!gate.ok) { console.warn(`[campaign-wa] ${kind} user=${userId} gated: ${gate.reason}`); return { ok: false, reason: gate.reason || 'opted_out' } }
 
     // Product names can carry stray whitespace ("Earthing Rod ?" in the SMS).
     const clean = Object.fromEntries(
@@ -129,7 +130,7 @@ export async function sendCampaignWhatsApp(
     })
     const full: Record<string, string> = Object.fromEntries(Object.entries({
       ...clean, firstName: user.first_name || 'there', productName: clean.product, couponCode: clean.code,
-      discountPercent: clean.discount, ctaUrl: clean.url, headline: clean.headline || 'A special offer for you',
+      discountPercent: clean.discount, ctaUrl: clean.url, productImageUrl: clean.imageUrl, headline: clean.headline || 'A special offer for you',
     }).filter(([, v]) => v != null).map(([k, v]) => [k, String(v)]))
     const render = (t: string) => renderCampaignTemplate(t, full, registered, false).replace(/[ \t]{2,}/g, ' ').trim()
     const window = typeof cooldownMin === 'number' && cooldownMin > 0 ? cooldownMin : days(1)
@@ -163,8 +164,11 @@ export async function sendCampaignWhatsApp(
         ok = (await sendCampaignSMS({ phone: user.phone, body, kind, userId }).catch(() => false)) || ok
       }
     }
-    return { ok, reason: ok ? undefined : !attempted && deduped ? 'cooldown' : 'send_failed' }
-  } catch {
+    const reason = ok ? undefined : !attempted && deduped ? 'cooldown' : 'send_failed'
+    if (!ok) console.warn(`[campaign-wa] ${kind} user=${userId} ${reason} (wa=${params.whatsappEnabled === true} sms=${params.smsEnabled === true})`)
+    return { ok, reason }
+  } catch (e) {
+    console.error(`[campaign-wa] ${kind} user=${userId} error:`, e)
     return { ok: false, reason: 'error' }
   }
 }

@@ -33,3 +33,13 @@ export const CAMPAIGN_WA_KINDS = [
 export function campaignSupportsWhatsApp(kind: string): boolean {
   return (CAMPAIGN_WA_KINDS as readonly string[]).includes(kind)
 }
+
+// What each slot of the standard WhatsApp templates should hold (the `_action` variants share their base's).
+const WA_SLOT_DEFAULTS: Record<string, Record<string, string>> = {
+  'cart/abandoned': { '1': '{items}' },
+  restock: { '1': '{productName}' },
+  'promo/offer': { '1': '{headline}', '2': '{couponCode}', '3': '{discountPercent}' },
+  'feedback/request': { '1': '{orderNumber}', '2': '{ctaUrl}' },
+}
+export const waSlotDefaults = (slug: string | null | undefined): Record<string, string> =>
+  (slug && WA_SLOT_DEFAULTS[slug.replace(/_action$/, '')]) || {}

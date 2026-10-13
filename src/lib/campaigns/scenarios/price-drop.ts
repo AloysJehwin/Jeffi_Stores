@@ -1,4 +1,5 @@
 import { queryMany } from '@/lib/shared/db'
+import { cooldownMinutes } from '../duration'
 import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
 import {
   fetchUserContext,
@@ -132,7 +133,7 @@ export const priceDrop: ScenarioModule<Params, Row> = {
         headline: `${row.product_name} is now ₹${Math.round(newPrice).toLocaleString('en-IN')}`,
         code: couponCode || '',
         discount: discountPercent ? String(discountPercent) : '',
-      }).catch(() => {})
+      }, cooldownMinutes(params)).catch(() => {})
     }
 
     return result

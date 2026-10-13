@@ -89,20 +89,24 @@ export async function getAllCampaigns(): Promise<Campaign[]> {
 
 export async function canSendMarketing(
   userId: string,
-  campaignKind: CampaignKind
+  campaignKind: CampaignKind,
+  // Phone channels (WhatsApp/SMS) ride along with the email the same run just sent and dedup per channel
+  // themselves — the email frequency cap would always block them. They also don't need an email address.
+  opts: { phoneChannel?: boolean } = {}
 ): Promise<{ ok: boolean; reason?: string }> {
   const user = await queryOne<{ marketing_opt_out: boolean; email: string | null; is_active: boolean }>(
     `SELECT marketing_opt_out, email, is_active FROM users WHERE id = $1`,
     [userId]
   )
   if (!user) return { ok: false, reason: 'user_not_found' }
-  if (!user.email) return { ok: false, reason: 'no_email' }
+  if (!user.email && !opts.phoneChannel) return { ok: false, reason: 'no_email' }
   if (!user.is_active) return { ok: false, reason: 'inactive_user' }
   if (user.marketing_opt_out) return { ok: false, reason: 'opted_out' }
 
   const campaign = await getCampaign(campaignKind)
   if (!campaign) return { ok: false, reason: 'campaign_not_found' }
   if (!campaign.enabled) return { ok: false, reason: 'campaign_disabled' }
+  if (opts.phoneChannel) return { ok: true }
 
   // Per-campaign anti-spam window: the campaign's own send cooldown is authoritative when configured
   // (so a deliberately short cooldown isn't force-held). Fall back to the global FREQUENCY_CAP_HOURS

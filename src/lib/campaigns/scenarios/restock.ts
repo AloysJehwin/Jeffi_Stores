@@ -1,4 +1,5 @@
 import { queryMany } from '@/lib/shared/db'
+import { cooldownMinutes } from '../duration'
 import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
 import {
   fetchUserContext,
@@ -110,7 +111,7 @@ export const restock: ScenarioModule<Params, Row> = {
     await settleWishlistEvent(result, row.user_id, row.product_id)
 
     if ((params as any).whatsappEnabled || (params as any).smsEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { product: row.product_name }, cooldownMinutes(params)).catch(() => {})
     }
 
     return result

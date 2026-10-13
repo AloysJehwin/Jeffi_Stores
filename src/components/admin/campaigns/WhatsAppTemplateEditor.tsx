@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import LibraryTemplatePicker, { type PickedTemplate } from '@/components/admin/messaging-templates/LibraryTemplatePicker'
 import { campaignVariables } from '@/lib/campaigns/kind-variables'
+import { waSlotDefaults } from '@/lib/campaigns/whatsapp-kinds'
 import PhonePreview from '@/components/admin/messaging-templates/PhonePreview'
 
 // Campaign WhatsApp = an APPROVED template from the templates library (Meta only delivers approved
@@ -41,6 +42,7 @@ export default function WhatsAppTemplateEditor({
   const slots = tpl ? waSlots(tpl.body) : []
   const samples = ((tpl?.blocks as any)?.variables ?? {}) as Record<string, string>
   const missing = slots.filter(n => !value.variables[n]?.trim())
+  const defaults = waSlotDefaults(value.slug)
 
   return (
     <div className="space-y-3">
@@ -48,7 +50,7 @@ export default function WhatsAppTemplateEditor({
         channel="whatsapp"
         kind={kind}
         value={value.slug}
-        onChange={slug => onChange({ slug, variables: {} })}
+        onChange={slug => onChange({ slug, variables: { ...waSlotDefaults(slug) } })}
         noneLabel="Built-in WhatsApp message for this campaign"
         onLoaded={setTpl}
       />
@@ -67,8 +69,14 @@ export default function WhatsAppTemplateEditor({
             className={inputCls}
             value={value.variables[n] ?? ''}
             onChange={e => onChange({ ...value, variables: { ...value.variables, [n]: e.target.value } })}
-            placeholder={samples[n] ? `e.g. ${samples[n]} — or a variable like {firstName}` : 'A variable like {firstName}, or fixed text'}
+            placeholder={defaults[n] ?? (samples[n] ? `e.g. ${samples[n]}` : 'A variable or fixed text')}
           />
+          {defaults[n] && value.variables[n]?.trim() !== defaults[n] && (
+            <button type="button" onClick={() => onChange({ ...value, variables: { ...value.variables, [n]: defaults[n] } })}
+              className="mt-1 text-[11px] text-accent-600 hover:underline">
+              This slot is meant for <code>{defaults[n]}</code> — use it
+            </button>
+          )}
         </div>
       ))}
       {tpl && slots.length > 0 && (

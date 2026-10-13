@@ -271,7 +271,7 @@ export const viewedCategory: ScenarioModule<Params, Row> = {
     })
 
     if (params.whatsappEnabled || (params as any).smsEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: categoryName }, cooldownMinutes(params)).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: categoryName, imageUrl: items.find(i => i.image_url)?.image_url ?? undefined, url: categorySlug ? `${user.baseUrl}/categories/${categorySlug}` : `${user.baseUrl}/products` }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

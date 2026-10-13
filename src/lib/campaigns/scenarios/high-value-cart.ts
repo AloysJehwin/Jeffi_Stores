@@ -244,7 +244,7 @@ export const highValueCart: ScenarioModule<Params, Row> = {
     })
 
     if (params.whatsappEnabled || (params as any).smsEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, cooldownMinutes(params)).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary, imageUrl: items.find(i => i.image_url)?.image_url ?? undefined, url: `${user.baseUrl}/cart` }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },
