@@ -1,7 +1,7 @@
 'use client'
 
 import AdminImage from '@/components/admin/AdminImage'
-import { CtaFields, Grid, HeadingFields, Note, Select, Text, useSectionBinding, type EditorProps } from './fields'
+import { CtaFields, Grid, HeadingFields, Image, Note, Select, Text, useSectionBinding, type EditorProps } from './fields'
 
 const BACKGROUNDS = [
   { value: '', label: 'Default' },
@@ -47,18 +47,16 @@ export default function PromoBannerEditor(props: EditorProps) {
 
   return (
     <Grid>
-      <Text
-        label="Image URL (desktop)"
+      <Image
+        label="Image (desktop)"
         value={imageUrl}
         disabled={!canWrite}
-        placeholder="https://…"
         onCommit={v => b.saveConfig({ imageUrl: v || null })}
       />
-      <Text
-        label="Image URL (mobile)"
+      <Image
+        label="Image (mobile)"
         value={imageUrlMobile}
         disabled={!canWrite}
-        placeholder="https://…"
         hint="Optional — falls back to the desktop image."
         onCommit={v => b.saveConfig({ imageUrlMobile: v || null })}
       />

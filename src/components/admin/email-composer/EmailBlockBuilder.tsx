@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext } from 'react'
+import ImageUrlInput from '@/components/admin/ImageUrlInput'
 import {
   DndContext,
   closestCenter,
@@ -120,12 +121,7 @@ function BlockRow({
 
       {(block.type === 'hero_image' || block.type === 'image') && (
         <div className="space-y-2">
-          <input
-            className={inputCls}
-            value={block.url}
-            onChange={e => onPatch({ ...block, url: e.target.value })}
-            placeholder="Image URL (https://…)"
-          />
+          <ImageUrlInput className={inputCls} value={block.url} onChange={url => onPatch({ ...block, url })} placeholder="Image URL (https://…) or upload" preview={false} />
           <input
             className={inputCls}
             value={block.alt ?? ''}

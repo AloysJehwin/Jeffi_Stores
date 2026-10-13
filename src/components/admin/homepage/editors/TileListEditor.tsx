@@ -3,14 +3,14 @@
 import { useState } from 'react'
 import IconByName from '@/components/visitor/home/IconByName'
 import { ICON_OPTIONS } from './icon-options'
-import { LABEL_CLASS, Select, Text, TextArea } from './fields'
+import { LABEL_CLASS, Image, Select, Text, TextArea } from './fields'
 
 export type Tile = Record<string, string>
 
 export interface TileField {
   key: string
   label: string
-  kind?: 'text' | 'textarea' | 'select'
+  kind?: 'text' | 'textarea' | 'select' | 'image'
   options?: { value: string; label: string }[]
   placeholder?: string
 }
@@ -181,6 +181,15 @@ export default function TileListEditor({
                     value={tile[f.key] ?? ''}
                     disabled={disabled}
                     rows={2}
+                    onCommit={v => replace(i, { [f.key]: v })}
+                  />
+                ) : f.kind === 'image' ? (
+                  <Image
+                    key={`${i}-${f.key}`}
+                    label={f.label}
+                    value={tile[f.key] ?? ''}
+                    disabled={disabled}
+                    placeholder={f.placeholder}
                     onCommit={v => replace(i, { [f.key]: v })}
                   />
                 ) : f.kind === 'select' ? (

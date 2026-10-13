@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import ImageUrlInput from '@/components/admin/ImageUrlInput'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import Toggle from '@/components/ui/Toggle'
@@ -28,6 +29,7 @@ export default function BrandForm({
   hasReturns = true,
 }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [logoUrl, setLogoUrl] = useState(brand?.logo_url || '')
   const [error, setError] = useState<string | null>(null)
   const [brandName, setBrandName] = useState<string>(brand?.name || '')
   const [description, setDescription] = useState<string>(brand?.description || '')
@@ -182,16 +184,13 @@ export default function BrandForm({
           </div>
 
           <div>
-            <label htmlFor="logo_url" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Logo URL
-            </label>
-            <input
-              type="url"
-              id="logo_url"
+            <label className="block text-sm font-medium text-foreground-secondary mb-2">Logo</label>
+            <ImageUrlInput
               name="logo_url"
-              defaultValue={brand?.logo_url || ''}
+              value={logoUrl}
+              onChange={setLogoUrl}
               className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="https://example.com/logo.png"
+              placeholder="https://example.com/logo.png or upload"
             />
           </div>
 
