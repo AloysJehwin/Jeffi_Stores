@@ -307,34 +307,14 @@ async function handle(request: NextRequest) {
     )
   }
 
-  if (hostApp === 'quotation') {
-    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
-    const slug = pathname === '/' ? '' : pathname
-    return addSecurityHeaders(
-      NextResponse.rewrite(new URL(`/quotation${slug}${request.nextUrl.search}`, request.url), {
-        request: { headers: stripped },
-      })
-    )
-  }
-
-  if (hostApp === 'invoice') {
-    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
-    const slug = pathname === '/' ? '' : pathname
-    return addSecurityHeaders(
-      NextResponse.rewrite(new URL(`/invoice${slug}${request.nextUrl.search}`, request.url), {
-        request: { headers: stripped },
-      })
-    )
-  }
-
-  if (hostApp === 'purchaseorder') {
-    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
-    const slug = pathname === '/' ? '' : pathname
-    return addSecurityHeaders(
-      NextResponse.rewrite(new URL(`/purchaseorder${slug}${request.nextUrl.search}`, request.url), {
-        request: { headers: stripped },
-      })
-    )
+  // invoice-/quotation-/purchaseorder-{slug} hosts are served by document-service. In production
+  // Traefik routes the host there; in dev the Next server proxies so the .localhost hosts just work.
+  if (hostApp === 'quotation' || hostApp === 'invoice' || hostApp === 'purchaseorder') {
+    if (process.env.NODE_ENV !== 'production') {
+      const target = new URL(`/t/${hostApp}${pathname}${request.nextUrl.search}`, process.env.DOCUMENTS_URL || 'http://localhost:3102')
+      return NextResponse.rewrite(target, { request: { headers: new Headers({ ...Object.fromEntries(request.headers), 'x-forwarded-host': hostname }) } })
+    }
+    return new NextResponse('Not found', { status: 404 })
   }
 
   if (hostApp === 'business') {
