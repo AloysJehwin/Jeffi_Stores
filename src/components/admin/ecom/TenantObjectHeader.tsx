@@ -2,12 +2,16 @@ import Link from 'next/link'
 import type { TenantDetail, ProvisioningJob } from '@/lib/tenant-registry'
 import { StatusPill } from './EcomUI'
 import TenantActions from './TenantActions'
+import { hasService } from '@/lib/tenant-registry'
 
 /**
  * Shared header for the three tenant object pages (customers, instances, store-status).
  * Each lives under its own list's path prefix because the sidebar marks a group active with
  * startsWith(href + '/') — an object page off that prefix would never expand its nav group.
  */
+export const apiServices = (t: { service_types?: string[] | null }) =>
+  (t.service_types ?? []).filter(s => s !== 'store').map(s => (s === 'messaging' ? 'Messaging' : 'Documents')).join(' + ') || 'no services'
+
 export default function TenantObjectHeader({
   tenant: t,
   backHref,
@@ -40,10 +44,13 @@ export default function TenantObjectHeader({
               </span>
             )}
           </div>
-          <p className="text-sm text-foreground-muted mt-1 break-all">{t.slug}.jeffistores.in</p>
+          <p className="text-sm text-foreground-muted mt-1 break-all">
+            {hasService(t, 'store') ? `${t.slug}.jeffistores.in` : `API workspace · ${apiServices(t)} · no store`}
+          </p>
         </div>
 
-        <div className="shrink-0">
+        {/* Deprovision / backup / instance actions only exist for a store. */}
+        {hasService(t, 'store') && <div className="shrink-0">
           <TenantActions
             tenantId={t.id}
             slug={t.slug}
@@ -53,7 +60,7 @@ export default function TenantObjectHeader({
             jobStep={job?.step ?? null}
             rolledBack={(job?.created_resources as Record<string, unknown> | null)?.rolledBack === true}
           />
-        </div>
+        </div>}
       </div>
 
       {related && related.length > 0 && (

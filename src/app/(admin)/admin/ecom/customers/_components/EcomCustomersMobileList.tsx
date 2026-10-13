@@ -17,7 +17,12 @@ interface CustomerTenant {
   daily_payout: boolean | null
   status: string
   created_at: string
+  service_types?: string[] | null
 }
+
+// API workspaces (Messaging/Documents only) have no store: no subdomain, plan price or purge.
+const isStore = (t: CustomerTenant) => (t.service_types ?? ['store']).includes('store')
+const where = (t: CustomerTenant) => (isStore(t) ? `${t.slug}.jeffistores.in` : 'API workspace')
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -45,7 +50,7 @@ export default function EcomCustomersMobileList({ tenants }: { tenants: Customer
     (t.monthly_price_inr ? '₹' + Number(t.monthly_price_inr).toLocaleString('en-IN') : '—') +
     (t.daily_payout ? ' +daily' : '')
 
-  const purgeable = (t: CustomerTenant) => t.status === 'terminated' || t.status === 'deprovisioned'
+  const purgeable = (t: CustomerTenant) => isStore(t) && (t.status === 'terminated' || t.status === 'deprovisioned')
 
   const actions = (t: CustomerTenant): MobileAction[] => [
     {
@@ -62,12 +67,12 @@ export default function EcomCustomersMobileList({ tenants }: { tenants: Customer
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="font-medium text-foreground truncate">{t.display_name}</p>
-              <p className="text-xs text-foreground-muted truncate mt-0.5">{t.slug}.jeffistores.in</p>
+              <p className="text-xs text-foreground-muted truncate mt-0.5">{where(t)}</p>
             </div>
             <StatusPill status={t.status} />
           </div>
           <div className="mt-2 text-xs text-foreground-secondary capitalize">
-            {t.plan || '—'} · {price(t)}
+            {isStore(t) ? <>{t.plan || '—'} · {price(t)}</> : 'Messaging / Documents · pay as you go'}
           </div>
         </MobileListCard>
       ))}
@@ -76,7 +81,7 @@ export default function EcomCustomersMobileList({ tenants }: { tenants: Customer
         open={!!selected}
         onClose={() => setSelected(null)}
         title={selected?.display_name}
-        subtitle={selected ? `${selected.slug}.jeffistores.in` : undefined}
+        subtitle={selected ? where(selected) : undefined}
         footer={
           selected && purgeable(selected) ? (
             <div className="flex items-center justify-between gap-3">
@@ -102,9 +107,13 @@ export default function EcomCustomersMobileList({ tenants }: { tenants: Customer
       >
         {selected && (
           <div className="px-5 py-3">
-            <Field label="Subdomain" value={`${selected.slug}.jeffistores.in`} />
-            <Field label="Plan" value={<span className="capitalize">{selected.plan || '—'}</span>} />
-            <Field label="Price" value={price(selected)} />
+            {isStore(selected) ? (
+              <>
+                <Field label="Subdomain" value={`${selected.slug}.jeffistores.in`} />
+                <Field label="Plan" value={<span className="capitalize">{selected.plan || '—'}</span>} />
+                <Field label="Price" value={price(selected)} />
+              </>
+            ) : <Field label="Type" value="API workspace (Messaging / Documents)" />}
             <Field label="Status" value={<StatusPill status={selected.status} />} />
             <Field label="Created" value={new Date(selected.created_at).toLocaleDateString('en-IN')} />
           </div>
