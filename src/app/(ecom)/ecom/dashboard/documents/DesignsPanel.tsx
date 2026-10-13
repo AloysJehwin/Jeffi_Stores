@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Copy, ImagePlus, Loader2, Terminal, Trash2 } from 'lucide-react'
 import { Card } from '../_components/Card'
+import PdfPreview from './PdfPreview'
 import { useToast } from '@/contexts/ToastContext'
 
 interface Design { key: string; name: string; description: string; accent: string; font: string; thumbnail_url: string }
@@ -56,7 +57,7 @@ export default function DesignsPanel() {
     if (accent) q.set('accent', accent)
     if (font) q.set('font', font)
     q.set('v', String(logoV))
-    const t = setTimeout(() => setPreviewUrl(`${API}/designs/${design}/preview/${type}?${q}#toolbar=0&view=FitH`), 250)
+    const t = setTimeout(() => setPreviewUrl(`${API}/designs/${design}/preview/${type}?${q}`), 250)
     return () => clearTimeout(t)
   }, [design, type, accent, font, logoV])
 
@@ -211,8 +212,8 @@ export default function DesignsPanel() {
         <div role="tablist" className="flex flex-wrap gap-1 rounded-full org-sand p-1">
           {TYPES.map(t => <button key={t.key} role="tab" aria-selected={type === t.key} type="button" onClick={() => setType(t.key)} className={pill(type === t.key)}>{t.label}</button>)}
         </div>
-        <div className="overflow-hidden rounded-2xl border border-border-default bg-zinc-100">
-          {previewUrl && <iframe key={previewUrl} src={previewUrl} title="Document preview" className="h-[78vh] min-h-[560px] w-full" />}
+        <div className="max-h-[80vh] overflow-y-auto rounded-2xl border border-border-default bg-zinc-100 p-3">
+          <PdfPreview url={previewUrl} />
         </div>
         <p className="text-xs text-foreground-muted">Sample data · your logo and the colour/font above. Previews are free.</p>
       </div>
