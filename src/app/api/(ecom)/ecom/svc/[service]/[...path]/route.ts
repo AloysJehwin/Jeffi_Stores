@@ -15,7 +15,7 @@ async function handle(request: NextRequest, { params }: { params: Promise<{ serv
   const qs = request.nextUrl.search
   const body = (request.method === 'POST' || request.method === 'PUT') ? await request.json().catch(() => ({})) : undefined
   // Re-encode segments: slugs contain '/', which Next decodes in the catch-all.
-  const r = await callService(service, ctx.tenant, '/' + path.map(encodeURIComponent).join('/') + qs, { method: request.method, body })
+  const r = await callService(service, ctx.tenant, '/' + path.map(encodeURIComponent).join('/') + qs, { method: request.method, body, space: 'api' })
   return NextResponse.json(r.body, { status: r.status })
 }
 export { handle as GET, handle as POST, handle as PUT, handle as DELETE }

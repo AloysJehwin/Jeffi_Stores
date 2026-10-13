@@ -89,8 +89,8 @@ export function metaName(tenantSlug: string | undefined, slug: string, version: 
 }
 
 export async function submit(pool: pg.Pool, tenantId: string, tenantSlug: string | undefined, templateId: string,
-  opts: { category?: string; name?: string } = {}) {
-  const t = await tpl.findById(pool, tenantId, templateId)
+  opts: { category?: string; name?: string; space?: tpl.Space } = {}) {
+  const t = await tpl.findById(pool, tenantId, templateId, opts.space)
   if (!t?.variant || !t.version) throw Object.assign(new Error('Template not found — save it first.'), { status: 404 })
   if (t.template.channel !== 'whatsapp') throw Object.assign(new Error('Only WhatsApp templates need Meta approval.'), { status: 400 })
   if (t.version.provider_ref && ['pending', 'received', 'approved'].includes(t.variant.approval_status))
@@ -100,7 +100,7 @@ export async function submit(pool: pg.Pool, tenantId: string, tenantSlug: string
   const errors = validateForMeta(t.version.body, blocks, samples)
   if (errors.length) throw Object.assign(new Error(errors.join(' ')), { status: 422, errors })
   const category = (opts.category ?? t.variant.meta_category ?? 'UTILITY') as 'MARKETING' | 'UTILITY' | 'AUTHENTICATION'
-  const name = opts.name || metaName(tenantSlug, t.family.slug, t.version.version)
+  const name = opts.name || metaName(opts.space === 'api' ? `${tenantSlug ?? 'jeffi'}_api` : tenantSlug, t.family.slug, t.version.version)
   const content = await twContent.createContent({
     friendly_name: name, language: t.variant.locale, types: composeTypes(t.version.body, blocks), variables: samples,
   })

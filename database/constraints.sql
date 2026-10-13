@@ -3341,7 +3341,8 @@ ALTER TABLE ONLY public.po_receive_drafts
 -- ─────────────────────────────────────────────────────────────────────────────
 
 ALTER TABLE ONLY public.template_family ADD CONSTRAINT template_family_pkey PRIMARY KEY (id);
-ALTER TABLE ONLY public.template_family ADD CONSTRAINT template_family_tenant_slug_key UNIQUE (tenant_id, slug);
+ALTER TABLE ONLY public.template_family ADD CONSTRAINT template_family_tenant_space_slug_key UNIQUE (tenant_id, space, slug);
+ALTER TABLE ONLY public.template_family ADD CONSTRAINT template_family_space_check CHECK (((space)::text = ANY ((ARRAY['store'::character varying, 'api'::character varying])::text[])));
 
 ALTER TABLE ONLY public.template ADD CONSTRAINT template_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.template ADD CONSTRAINT template_channel_check CHECK (channel IN ('email','sms','whatsapp'));
