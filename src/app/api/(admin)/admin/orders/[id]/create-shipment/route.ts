@@ -12,6 +12,7 @@ import { listDelhiveryPickupLocations, cancelDelhiveryShipment } from '@/lib/shi
 import { checkWalletForShipment, chargeDeliveryEstimate } from '@/lib/payments/wallet'
 import { resolveShippingAccount } from '@/lib/shipping/delhivery-account'
 import { applyCourierEdd } from '@/lib/shipping/courier-edd'
+import { orderItemFactorSql } from '@/lib/orders/unit-conversion'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const orderItemRows = await queryMany<any>(
       `
       SELECT
-        oi.quantity,
+        COALESCE(oi.base_quantity, oi.quantity * COALESCE(${orderItemFactorSql()}, 1)) AS pieces,
         oi.variant_id,
         COALESCE(pv.variant_name, '') AS variant_name,
         COALESCE(oi.weight_grams, sv.weight_grams, pv.weight_grams, p.weight_grams, 500) AS weight_grams,
@@ -127,7 +128,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const shipmentItems: ShipmentItem[] = (orderItemRows || []).map((row: any) => ({
       packageType: (row.package_type as PackageType) || null,
       weightGrams: parseFloat(row.weight_grams) || 500,
-      quantity: parseInt(row.quantity) || 1,
+      // Weight/dimensions are per piece; ship every piece of a set.
+      quantity: Number(row.pieces) || 1,
       storedDims: {
         length_cm: row.length_cm ? parseFloat(row.length_cm) : null,
         breadth_cm: row.breadth_cm ? parseFloat(row.breadth_cm) : null,

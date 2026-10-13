@@ -9,6 +9,7 @@ import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { checkWalletForShipment, chargeDeliveryEstimate } from '@/lib/payments/wallet'
 import { resolveShippingAccount } from '@/lib/shipping/delhivery-account'
 import { fallbackShippingRate } from '@/lib/shipping/shipping'
+import { orderItemFactorSql } from '@/lib/orders/unit-conversion'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const orderItems = await queryOne<{ total_weight: number; total_qty: number }>(
       `
       SELECT
-        COALESCE(SUM(COALESCE(pv.weight_grams, p.weight_grams, 500) * oi.quantity::numeric), 500) AS total_weight,
+        COALESCE(SUM(COALESCE(oi.weight_grams, pv.weight_grams, p.weight_grams, 500) * COALESCE(oi.base_quantity, oi.quantity::numeric * COALESCE(${orderItemFactorSql()}, 1))), 500) AS total_weight,
         COALESCE(SUM(oi.quantity::numeric), 1) AS total_qty
       FROM order_items oi
       LEFT JOIN products p ON p.id = oi.product_id

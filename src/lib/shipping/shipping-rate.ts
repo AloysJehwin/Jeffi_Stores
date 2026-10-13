@@ -12,6 +12,7 @@ import { getBusinessValues, type BusinessValues } from '@/lib/catalog/site-contr
 import { getCurrentTenantId, resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { listDelhiveryPickupLocations, checkPincodeServiceability } from '@/lib/shipping/delhivery'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { piecesPerUnit } from '@/lib/catalog/unit-factor'
 
 const DELHIVERY_API = 'https://track.delhivery.com/api/kinko/v1/invoice/charges/.json'
 
@@ -39,7 +40,7 @@ export interface RateBreakdown {
 
 export interface RateInput {
   destinationPin: string
-  cartItems: Array<{ productId?: string; variantId?: string | null; subVariantId?: string | null; quantity?: number }>
+  cartItems: Array<{ productId?: string; variantId?: string | null; subVariantId?: string | null; quantity?: number; buyUnit?: string | null }>
   /** Subtotal of the PHYSICAL lines (digital lines don't count towards the free-shipping threshold). */
   subtotal?: number
   isCod?: boolean
@@ -163,6 +164,9 @@ async function computePhysicalShippingRate(input: RateInput): Promise<RateBreakd
     .map(i => i.productId as string)
 
   const shipmentItems: ShipmentItem[] = []
+  // Weight and dimensions are per piece; quantity is in selling units (a set of 10 = 10 pieces).
+  const factors = await piecesPerUnit((cartItems || []).map(i => ({ productId: i.productId, variantId: i.variantId, subVariantId: i.subVariantId, unit: i.buyUnit })))
+  const pieces = new Map((cartItems || []).map((it, k) => [it, (it.quantity || 1) * factors[k]]))
 
   if (subVariantIds.length > 0) {
     const subVariants = await queryMany(
@@ -184,7 +188,7 @@ async function computePhysicalShippingRate(input: RateInput): Promise<RateBreakd
         shipmentItems.push({
           packageType: (sv.package_type as PackageType) || null,
           weightGrams: resolveShipWeight(sv.weight_grams, bv),
-          quantity: item.quantity || 1,
+          quantity: pieces.get(item) ?? (item.quantity || 1),
           storedDims: {
             length_cm: sv.length_cm ? parseFloat(sv.length_cm) : null,
             breadth_cm: sv.breadth_cm ? parseFloat(sv.breadth_cm) : null,
@@ -215,7 +219,7 @@ async function computePhysicalShippingRate(input: RateInput): Promise<RateBreakd
         shipmentItems.push({
           packageType: (v.package_type as PackageType) || null,
           weightGrams: resolveShipWeight(v.weight_grams, bv),
-          quantity: item.quantity || 1,
+          quantity: pieces.get(item) ?? (item.quantity || 1),
           storedDims: {
             length_cm: v.length_cm ? parseFloat(v.length_cm) : null,
             breadth_cm: v.breadth_cm ? parseFloat(v.breadth_cm) : null,
@@ -239,7 +243,7 @@ async function computePhysicalShippingRate(input: RateInput): Promise<RateBreakd
         shipmentItems.push({
           packageType: (p.package_type as PackageType) || null,
           weightGrams: resolveShipWeight(p.weight_grams, bv),
-          quantity: item.quantity || 1,
+          quantity: pieces.get(item) ?? (item.quantity || 1),
           storedDims: {
             length_cm: p.length_cm ? parseFloat(p.length_cm) : null,
             breadth_cm: p.breadth_cm ? parseFloat(p.breadth_cm) : null,
