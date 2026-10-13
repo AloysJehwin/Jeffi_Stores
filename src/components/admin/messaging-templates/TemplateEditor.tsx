@@ -170,9 +170,9 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
   }
 
   const emojiPanel = showEmoji && (
-    <div className="absolute z-10 mt-1 p-2 bg-white border rounded shadow grid grid-cols-5 gap-1">
+    <div className="absolute z-10 mt-1 p-2 bg-surface-elevated border border-border-default rounded-lg shadow grid grid-cols-5 gap-1">
       {QUICK_EMOJI.map(e => (
-        <button key={e} type="button" className="px-2 py-1 hover:bg-gray-100 rounded text-lg"
+        <button key={e} type="button" className="px-2 py-1 hover:bg-surface-secondary rounded text-lg"
           onClick={() => { insertAtCursor(e); setShowEmoji(false) }}>{e}</button>
       ))}
     </div>
@@ -183,9 +183,9 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
       <input ref={fileRef} type="file" accept="image/*" className="hidden" />
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+          <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Name</label>
           <input
-            className="w-full border rounded px-3 py-2"
+            className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
             value={value.name}
             onChange={e => onChange({ ...value, name: e.target.value })}
           />
@@ -194,23 +194,23 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
         {value.channel === 'email' && (
           <>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+              <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Subject</label>
               <input
-                className="w-full border rounded px-3 py-2"
+                className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
                 value={value.subject ?? ''}
                 onChange={e => onChange({ ...value, subject: e.target.value })}
                 placeholder="e.g. Order #{{order_number}} confirmed"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+              <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Message</label>
               <EmailComposer
                 value={typeof value.body === 'string' ? value.body : ''}
                 onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })}
                 minHeight={360}
                 ctaHref="{storeUrl}"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-foreground-secondary">
                 Tokens like <code>{'{customer_first_name}'}</code> are replaced with the actual customer details when the email is sent.
               </p>
             </div>
@@ -219,24 +219,24 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
 
         {value.channel === 'sms' && (
           <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Body</label>
+            <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Body</label>
             <textarea
               ref={textRef}
-              className="w-full border rounded px-3 py-2 font-mono text-sm"
+              className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm font-mono"
               rows={6}
               value={value.body}
               onChange={e => onChange({ ...value, body: e.target.value, blocks_format: 'sms-text' })}
             />
             <div className="flex flex-wrap gap-1 mt-1 text-xs">
-              <button type="button" className="px-2 py-1 border rounded hover:bg-gray-100" onClick={() => setShowEmoji(s => !s)}>😊 Emoji</button>
-              <button type="button" className="px-2 py-1 border rounded hover:bg-gray-100" onClick={onInsertShortLink}>🔗 Short link</button>
-              <button type="button" disabled={uploading} className="px-2 py-1 border rounded hover:bg-gray-100 disabled:opacity-50" onClick={onPickImageTextual}>
+              <button type="button" className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary" onClick={() => setShowEmoji(s => !s)}>😊 Emoji</button>
+              <button type="button" className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary" onClick={onInsertShortLink}>🔗 Short link</button>
+              <button type="button" disabled={uploading} className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={onPickImageTextual}>
                 {uploading ? '⏳' : '🖼️ Image → short link'}
               </button>
             </div>
             {emojiPanel}
             {smsStats && (
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-foreground-secondary">
                 {smsStats.length}/{smsStats.limit} chars · {smsStats.encoding} · {smsStats.segments} segment{smsStats.segments === 1 ? '' : 's'}
                 {smsStats.encoding === 'UCS-2' && ' · emoji flips to UCS-2 (DLT may need re-registration)'}
               </p>
@@ -314,9 +314,9 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
           return (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Meta category</label>
+                <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Meta category</label>
                 <select
-                  className="w-full border rounded px-3 py-2"
+                  className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
                   value={value.meta_category ?? 'UTILITY'}
                   onChange={e => onChange({ ...value, meta_category: e.target.value })}
                 >
@@ -327,12 +327,12 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Header media type {mediaLocked && <span className="text-xs text-amber-700">(locked after approval)</span>}
+                <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">
+                  Header media type {mediaLocked && <span className="text-xs text-foreground-muted">(locked after approval)</span>}
                 </label>
                 <div className="flex gap-2 items-center">
                   <select
-                    className="border rounded px-3 py-2 text-sm"
+                    className="border border-border-default rounded-lg px-3 py-2 text-sm"
                     disabled={mediaLocked}
                     value={value.media_type ?? ''}
                     onChange={e => onChange({ ...value, media_type: e.target.value || null })}
@@ -343,48 +343,48 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                     <option value="document">Document</option>
                   </select>
                   {value.media_type && (
-                    <button type="button" disabled={uploading} className="px-2 py-1 border rounded text-xs hover:bg-gray-100" onClick={onPickHeaderMedia}>
+                    <button type="button" disabled={uploading} className="px-2 py-1 border border-border-default rounded-lg text-xs hover:bg-surface-secondary" onClick={onPickHeaderMedia}>
                       {uploading ? '⏳' : '🖼️ Upload header media'}
                     </button>
                   )}
                 </div>
                 {(waBlocks.types as any)?.['twilio/media']?.media?.[0] && (
-                  <p className="mt-1 text-xs text-gray-500 truncate">
+                  <p className="mt-1 text-xs text-foreground-secondary truncate">
                     Current: {(waBlocks.types as any)['twilio/media'].media[0]}
                   </p>
                 )}
               </div>
 
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Body (use {'{{1}}'}, {'{{2}}'} … placeholders)</label>
+                <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Body (use {'{{1}}'}, {'{{2}}'} … placeholders)</label>
                 <textarea
                   ref={textRef}
-                  className="w-full border rounded px-3 py-2 font-mono text-sm"
+                  className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm font-mono"
                   rows={6}
                   value={value.body}
                   onChange={e => onChange({ ...value, body: e.target.value, blocks_format: 'wa-content' })}
                 />
                 <div className="flex flex-wrap gap-1 mt-1 text-xs">
-                  <button type="button" className="px-2 py-1 border rounded hover:bg-gray-100" onClick={() => setShowEmoji(s => !s)}>😊 Emoji</button>
-                  <button type="button" className="px-2 py-1 border rounded hover:bg-gray-100" onClick={onInsertShortLink}>🔗 Short link</button>
-                  <button type="button" disabled={uploading} className="px-2 py-1 border rounded hover:bg-gray-100 disabled:opacity-50" onClick={onPickImageTextual}>
+                  <button type="button" className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary" onClick={() => setShowEmoji(s => !s)}>😊 Emoji</button>
+                  <button type="button" className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary" onClick={onInsertShortLink}>🔗 Short link</button>
+                  <button type="button" disabled={uploading} className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={onPickImageTextual}>
                     {uploading ? '⏳' : '🖼️ Image → short link'}
                   </button>
                 </div>
                 {emojiPanel}
               </div>
 
-              <div className="border rounded p-3 bg-white">
+              <div className="border border-border-default rounded-lg p-3 bg-surface-elevated">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium text-gray-700">Action buttons ({buttons.length}/3)</span>
-                  <button type="button" disabled={buttons.length >= 3} className="px-2 py-1 text-xs border rounded hover:bg-gray-100 disabled:opacity-50" onClick={addButton}>+ Add button</button>
+                  <span className="text-sm font-medium text-foreground">Action buttons ({buttons.length}/3)</span>
+                  <button type="button" disabled={buttons.length >= 3} className="px-2 py-1 text-xs border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={addButton}>+ Add button</button>
                 </div>
-                <p className="text-xs text-gray-400 mb-2">Shown as tappable chips below the WhatsApp message body.</p>
+                <p className="text-xs text-foreground-muted mb-2">Shown as tappable chips below the WhatsApp message body.</p>
                 <div className="space-y-2">
                   {buttons.map((btn, i) => (
-                    <div key={i} className="flex flex-wrap items-center gap-2 border rounded p-2 bg-gray-50">
+                    <div key={i} className="flex flex-wrap items-center gap-2 border border-border-default rounded-lg p-2 bg-surface-secondary">
                       <select
-                        className="border rounded px-2 py-1 text-xs"
+                        className="border border-border-default rounded-lg px-2 py-1 text-xs"
                         value={btn.type}
                         onChange={e => updateButton(i, { type: e.target.value as WaButton['type'], value: '' })}
                       >
@@ -393,7 +393,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                         <option value="phone">Call phone</option>
                       </select>
                       <input
-                        className="border rounded px-2 py-1 text-xs flex-1 min-w-[8rem]"
+                        className="border border-border-default rounded-lg px-2 py-1 text-xs flex-1 min-w-[8rem]"
                         placeholder="Label (max 25 chars)"
                         maxLength={25}
                         value={btn.label}
@@ -401,7 +401,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                       />
                       {btn.type !== 'quick_reply' && (
                         <input
-                          className="border rounded px-2 py-1 text-xs flex-1 min-w-[10rem]"
+                          className="border border-border-default rounded-lg px-2 py-1 text-xs flex-1 min-w-[10rem]"
                           placeholder={btn.type === 'url' ? 'https://… (or {{1}})' : '+911234567890'}
                           value={btn.value ?? ''}
                           onChange={e => updateButton(i, { value: e.target.value })}
@@ -413,24 +413,24 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                 </div>
               </div>
 
-              <div className="border rounded p-3 bg-white">
+              <div className="border border-border-default rounded-lg p-3 bg-surface-elevated">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Carousel cards ({cards.length}/10)</span>
-                  <button type="button" disabled={cards.length >= 10} className="px-2 py-1 text-xs border rounded hover:bg-gray-100 disabled:opacity-50" onClick={addCard}>+ Add card</button>
+                  <span className="text-sm font-medium text-foreground">Carousel cards ({cards.length}/10)</span>
+                  <button type="button" disabled={cards.length >= 10} className="px-2 py-1 text-xs border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={addCard}>+ Add card</button>
                 </div>
-                {cards.length === 0 && <p className="text-xs text-gray-400">No cards yet. Add 1–10 to turn this into a carousel template.</p>}
+                {cards.length === 0 && <p className="text-xs text-foreground-muted">No cards yet. Add 1–10 to turn this into a carousel template.</p>}
                 <div className="space-y-3">
                   {cards.map((card, i) => (
-                    <div key={i} className="border rounded p-2 bg-gray-50 relative">
+                    <div key={i} className="border border-border-default rounded-lg p-2 bg-surface-secondary relative">
                       <button type="button" className="absolute top-1 right-1 text-xs text-red-600 hover:underline" onClick={() => removeCard(i)}>remove</button>
-                      <div className="text-xs text-gray-500 mb-1">Card {i + 1}</div>
-                      <input className="w-full border rounded px-2 py-1 text-sm mb-1" placeholder="Title" value={card.title ?? ''} onChange={e => updateCard(i, { title: e.target.value })} />
-                      <textarea className="w-full border rounded px-2 py-1 text-sm font-mono" rows={2} placeholder="Body — use {{1}}, {{2}} …" value={card.body ?? ''} onChange={e => updateCard(i, { body: e.target.value })} />
+                      <div className="text-xs text-foreground-secondary mb-1">Card {i + 1}</div>
+                      <input className="w-full border border-border-default rounded-lg px-2 py-1 text-sm mb-1" placeholder="Title" value={card.title ?? ''} onChange={e => updateCard(i, { title: e.target.value })} />
+                      <textarea className="w-full border border-border-default rounded-lg px-2 py-1 text-sm font-mono" rows={2} placeholder="Body — use {{1}}, {{2}} …" value={card.body ?? ''} onChange={e => updateCard(i, { body: e.target.value })} />
                       <div className="flex items-center gap-2 mt-1">
-                        <button type="button" disabled={uploading} className="px-2 py-1 text-xs border rounded hover:bg-gray-100 disabled:opacity-50" onClick={() => onPickCardMedia(i)}>
+                        <button type="button" disabled={uploading} className="px-2 py-1 text-xs border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={() => onPickCardMedia(i)}>
                           {uploading ? '⏳' : card.media_url ? '🔄 Replace media' : '🖼️ Add media'}
                         </button>
-                        {card.media_url && <span className="text-xs text-gray-500 truncate flex-1">{card.media_url}</span>}
+                        {card.media_url && <span className="text-xs text-foreground-secondary truncate flex-1">{card.media_url}</span>}
                       </div>
                     </div>
                   ))}
@@ -443,19 +443,19 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                     value.approval_status === 'approved' ? 'bg-green-100 text-green-800'
                     : value.approval_status === 'rejected' ? 'bg-red-100 text-red-800'
                     : value.approval_status === 'paused' ? 'bg-orange-100 text-orange-800'
-                    : value.approval_status === 'disabled' ? 'bg-gray-200 text-gray-700'
+                    : value.approval_status === 'disabled' ? 'bg-surface-secondary text-foreground-muted'
                     : 'bg-yellow-100 text-yellow-800'
                   }`}>Approval: {value.approval_status}</span>
                 )}
-                <button type="button" disabled={submitting || !value.id} className="px-3 py-1 text-xs border rounded hover:bg-gray-100 disabled:opacity-50" onClick={onSubmitForApproval}>
+                <button type="button" disabled={submitting || !value.id} className="px-3 py-1 text-xs border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={onSubmitForApproval}>
                   {submitting ? '…' : 'Submit for approval'}
                 </button>
-                <button type="button" disabled={submitting} className="px-3 py-1 text-xs border rounded hover:bg-gray-100 disabled:opacity-50" onClick={onReCheckApproval}>
+                <button type="button" disabled={submitting} className="px-3 py-1 text-xs border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={onReCheckApproval}>
                   Re-check
                 </button>
               </div>
               {value.approval_status === 'rejected' && value.approval_reason && (
-                <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded p-2">
+                <p className="text-xs text-red-700 bg-red-50 border border-border-default border-red-200 rounded p-2">
                   <b>Meta rejection:</b> {value.approval_reason}
                 </p>
               )}
@@ -464,28 +464,28 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
         })()}
 
         <div className="flex gap-2">
-          <button type="button" onClick={() => onSave(false)} disabled={saving} className="px-4 py-2 border rounded">Save draft</button>
-          <button type="button" onClick={() => onSave(true)} disabled={saving} className="px-4 py-2 bg-black text-white rounded">Publish</button>
-          <button type="button" onClick={runPreview} disabled={previewing} className="px-4 py-2 border rounded">Preview</button>
+          <button type="button" onClick={() => onSave(false)} disabled={saving} className="px-5 h-control bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">Save draft</button>
+          <button type="button" onClick={() => onSave(true)} disabled={saving} className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">Publish</button>
+          <button type="button" onClick={runPreview} disabled={previewing} className="px-5 h-control bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">Preview</button>
         </div>
       </div>
 
-      <div className="border rounded p-4 bg-gray-50">
+      <div className="bg-surface-secondary/50 rounded-lg border border-border-default p-4">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-xs uppercase tracking-wide text-gray-500">Preview</div>
-          <button type="button" onClick={runPreview} disabled={previewing || !value.slug} className="text-xs px-3 py-1 border rounded bg-white">
+          <div className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Preview</div>
+          <button type="button" onClick={runPreview} disabled={previewing || !value.slug} className="text-xs px-3 py-1.5 bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors disabled:opacity-60">
             {previewing ? 'Rendering…' : 'Render with sample data'}
           </button>
         </div>
-        {!preview && <p className="text-sm text-gray-400">Save first, then render to see the message as customers get it.</p>}
+        {!preview && <p className="text-sm text-foreground-muted">Save first, then render to see the message as customers get it.</p>}
         {preview?.subject && <div className="font-semibold mb-2">{preview.subject}</div>}
         {preview?.body && (
           value.channel === 'email'
-            ? <iframe title="Email preview" srcDoc={preview.body} sandbox="" className="w-full bg-white border rounded" style={{ minHeight: 520 }} />
+            ? <iframe title="Email preview" srcDoc={preview.body} sandbox="" className="w-full bg-surface-elevated border border-border-default rounded-lg" style={{ minHeight: 520 }} />
             : <pre className="whitespace-pre-wrap font-mono text-sm">{preview.body}</pre>
         )}
         {preview?.missing && preview.missing.length > 0 && (
-          <p className="mt-3 text-xs text-gray-500">Sample values used for: {preview.missing.join(', ')}</p>
+          <p className="mt-3 text-xs text-foreground-secondary">Sample values used for: {preview.missing.join(', ')}</p>
         )}
       </div>
     </div>
