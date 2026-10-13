@@ -5,6 +5,7 @@ import {
   getTenant,
   getTenantBilling,
   getKyc,
+  listServiceApprovals,
   getProvisioningJob,
   getTenantOwners,
   getTenantSocialAccounts,
@@ -61,8 +62,8 @@ export default async function TenantObjectPage({
   // Cheap single-row reads that feed the header or more than one tab: KYC drives the header
   // badge everywhere, the job feeds Overview's health and Infrastructure's resource ids.
   // Anything used by exactly one tab is loaded inside that tab's branch instead.
-  const [kyc, headerJob] = await Promise.all([getKyc(id).catch(() => null), getProvisioningJob(id).catch(() => null)])
-  const kycPending = kyc?.status === 'pending'
+  const [kyc, headerJob, approvals] = await Promise.all([getKyc(id).catch(() => null), getProvisioningJob(id).catch(() => null), listServiceApprovals(id).catch(() => [])])
+  const kycPending = kyc?.status === 'pending' || approvals.some(a => a.status === 'pending')
 
   return (
     <div className="p-6 w-full max-w-full min-w-0 overflow-x-hidden">
@@ -95,7 +96,7 @@ export default async function TenantObjectPage({
           <ShipmentsTab tenantId={t.id} ownDelhivery={t.own_delhivery === true} shipments={await shipmentData(id)} />
         )}
         {tab === 'access' && <AccessTab tenant={t} {...await accessData(id)} />}
-        {tab === 'kyc' && <KycTab tenant={t} kyc={kyc} />}
+        {tab === 'kyc' && <KycTab tenant={t} kyc={kyc} approvals={approvals} />}
       </div>
     </div>
   )

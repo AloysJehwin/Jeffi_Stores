@@ -23,7 +23,8 @@ import {
   normalizeIndianPhone,
   isValidCompanyPan,
 } from '@/lib/payments/razorpay-route'
-import { sendKycApprovedEmail } from '@/lib/shared/ecom-emails'
+import { sendKycApprovedEmail, sendServicesReviewedEmail } from '@/lib/shared/ecom-emails'
+import { hasService, reviewServiceApproval, controlPlanePool } from '@/lib/tenant-registry'
 // TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
 import { isPaymentBypassed, bypassAuditNote } from '@/lib/payments/ecom-payment-bypass'
@@ -46,6 +47,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const owner = await getOwnerById(kyc.owner_id)
   if (!owner) return NextResponse.json({ error: 'Owner not found' }, { status: 404 })
+
+  // API-only workspace (Messaging/Documents): approve KYC + its pending services; no plan, no payment.
+  if (!hasService(tenant, 'store')) {
+    await controlPlanePool().query(`UPDATE tenant_kyc SET status='approved', reviewed_at=now(), reviewed_by=$2 WHERE tenant_id=$1`, [tenantId, admin.email ?? 'admin'])
+    const approved = await reviewServiceApproval(tenantId, 'all-pending', 'approved', admin.email ?? 'admin')
+    if (approved.length) sendServicesReviewedEmail({ email: owner.email, name: owner.name }, tenant.display_name, approved, 'approved').catch(() => {})
+    return NextResponse.json({ ok: true, services: approved })
+  }
 
   // Don't start billing a plan we can't build yet.
   const capacityError = await dedicatedCapacityError(tenant.plan)
