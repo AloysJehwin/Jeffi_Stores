@@ -1,3 +1,4 @@
+import { listTemplateVariables } from '@/lib/templates/variables'
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { aiChat } from '@/lib/shared/ai-client'
@@ -6,7 +7,7 @@ import { aiDenial } from '@/lib/auth/ai-scope'
 export const maxDuration = 120
 export const dynamic = 'force-dynamic'
 
-const SYSTEM_PROMPT = (store: string, storeUrl: string) => `You write marketing/support emails for ${store}.
+const SYSTEM_PROMPT = (store: string, storeUrl: string, variables: string) => `You write marketing/support emails for ${store}.
 Return ONLY valid JSON: {"html":"<email body html>"}
 
 STRUCTURE — the html goes inside an existing branded email shell (logo + footer are already added), so output ONLY the body. No <html>/<head>/<body>/<style> tags.
@@ -29,9 +30,9 @@ LINKS & BUTTONS — NEVER write placeholders like [Tracking Link] or [Link]. Use
 
 URLs — use ${storeUrl} for the storefront. For "track order" / "view order" actions use ${storeUrl}/account/orders. Never invent tracking numbers or fake URLs; if a specific order link isn't known, link to the account orders page.
 
-VARIABLES — insert these tokens verbatim (replaced per recipient at send time). Do NOT wrap them in styling spans:
-  {customer_first_name} {customer_name} {store_name} {store_phone} {store_email} {store_web}
-Sign off referencing the {store_name} team. Do not fabricate customer names or order numbers — use variables instead.`
+VARIABLES — insert these tokens verbatim (replaced per recipient at send time). Do NOT wrap them in styling spans. Use every one that fits the message instead of writing the value out:
+${variables}
+Sign off referencing the {store_name} team. Do not fabricate customer names, codes, prices or order numbers — use variables instead.`
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
   const denied = aiDenial(admin.role, admin.scopes, 'mailer:write')
   if (denied) return NextResponse.json({ error: denied }, { status: 403 })
 
-  let body: { scenario?: string; subject?: string }
+  let body: { scenario?: string; subject?: string; variables?: string[] }
   try {
     body = await request.json()
   } catch {
@@ -55,7 +56,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const { storeDescriptorForPrompt, storeBaseUrlAsync } = await import('@/lib/catalog/brand')
-    const [descriptor, storeUrl] = await Promise.all([storeDescriptorForPrompt(), storeBaseUrlAsync()])
+    const [descriptor, storeUrl, defs] = await Promise.all([storeDescriptorForPrompt(), storeBaseUrlAsync(), listTemplateVariables()])
+    // Every variable the composer offers: store/customer ones + the ones the caller's template fills.
+    const extra = (body.variables ?? []).filter(k => /^[a-zA-Z][a-zA-Z0-9_]{0,40}$/.test(k) && !defs.some(d => d.key === k)).slice(0, 30)
+    const variables = [
+      ...defs.map(d => `  {${d.key}} — ${d.label}${d.description ? `: ${d.description}` : ''}`),
+      ...extra.map(k => `  {${k}} — filled for this message`),
+    ].join('\n')
     // 'email' hint = the fast model: the large copy model truncates the HTML mid-JSON.
     const r = await aiChat({
       modelHint: 'email',
@@ -64,7 +71,7 @@ export async function POST(request: NextRequest) {
       maxTokens: 1500,
       noCache: true,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT(descriptor, storeUrl) },
+        { role: 'system', content: SYSTEM_PROMPT(descriptor, storeUrl, variables) },
         { role: 'user', content: userPrompt },
       ],
     })
