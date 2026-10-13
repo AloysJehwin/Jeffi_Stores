@@ -77,6 +77,12 @@ export const CATALOG: TemplateSeed[] = [
   email('account/email-changed', 'Email changed', 'transactional',
     'Email changed on your {{store_name}} account',
     'Hi {{customer_name}}, your account email was changed to {{new_email}}. If this was not you, contact support.'),
+  email('order/address-change-approved', 'Address change approved', 'transactional',
+    'Delivery address updated for order {{order_number}}',
+    'Hi {{customer_name}}, your request to change the delivery address for order {{order_number}} has been approved. New address: {{address_block}}. View order: {{order_url}}'),
+  email('order/address-change-rejected', 'Address change declined', 'transactional',
+    'Address change declined for order {{order_number}}',
+    'Hi {{customer_name}}, we could not approve your request to change the delivery address for order {{order_number}} to: {{address_block}}. {{reason}} Your order will be delivered to the original address. View order: {{order_url}}'),
 
   // ────────────── EMAIL — KYC / B2B ──────────────
   email('kyc/submitted', 'KYC submitted', 'transactional',
@@ -228,6 +234,12 @@ export const CATALOG: TemplateSeed[] = [
     '{{store_name}}: {{product_name}} is back in stock. {{short_url}}'),
   sms('delivery/eta', 'Delivery ETA (SMS)', 'transactional',
     '{{store_name}}: #{{order_number}} arriving {{eta}}. Track: {{short_url}}'),
+  sms('order/access-granted', 'Access granted (SMS)', 'transactional',
+    '{{store_name}}: Access granted for order {{order_number}} — open your vault: {{vault_url}}'),
+  sms('order/variant-change-requested', 'Variant change requested (SMS)', 'transactional',
+    '{{store_name}}: Order {{order_number}} needs your approval for a variant change. Review: {{order_url}}'),
+  sms('order/payment-failed', 'Payment failed (SMS)', 'transactional',
+    '{{store_name}}: Payment for order {{order_number}} failed. Retry: {{short_url}}'),
 
   // ────────────── WHATSAPP — Twilio Content, numbered placeholders ──────────────
   wa('order/confirmed', 'Order confirmed (WA)', 'transactional',
