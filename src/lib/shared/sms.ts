@@ -93,10 +93,12 @@ export async function sendCampaignSMS(params: {
   userId?: string | null
 }): Promise<boolean> {
   const normalized = normalizePhone(params.phone)
-  if (!normalized || !(await smsChannelEnabled())) return false
-  if (!(await messagingGateAllows('sms', true))) return false
+  const skip = (why: string) => (console.warn(`[campaign-sms] ${params.kind} skipped: ${why}`), false)
+  if (!normalized) return skip('invalid phone')
+  if (!(await smsChannelEnabled())) return skip('SMS turned off')
+  if (!(await messagingGateAllows('sms', true))) return skip('messaging wallet balance too low')
   const provider = await getSmsProvider()
-  if (!provider.configured) return false
+  if (!provider.configured) return skip(`provider ${provider.name} not configured`)
   try {
     const sid = await provider.sendText(normalized, params.body)
     const { debitMessageEstimate } = await import('@/lib/shared/messaging/billing')

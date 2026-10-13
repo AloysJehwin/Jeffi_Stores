@@ -237,7 +237,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     if ((params as any).whatsappEnabled || (params as any).smsEnabled) {
       const names = items.map(i => i.name)
       const summary = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }).catch(() => {})
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary, imageUrl: items.find(i => i.image_url)?.image_url ?? undefined, url: ctaUrl }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

@@ -5,7 +5,7 @@ import { fetchUserContext, resolveCoupon, sendCampaignEmailRendered } from '@/li
 import { renderCampaignEmail } from '@/lib/shared/email-campaigns'
 import { apiBaseUrl } from '@/lib/shared/customer-links'
 import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
-import { days, minutes, readDurationParam } from '../duration'
+import { days, minutes, readDurationParam, cooldownMinutes } from '../duration'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -158,7 +158,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       sendCampaignWhatsApp(campaign.kind, row.user_id, {
         orderNumber: row.order_number,
         url: feedbackUrl,
-      }).catch(() => {})
+      }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult
   },

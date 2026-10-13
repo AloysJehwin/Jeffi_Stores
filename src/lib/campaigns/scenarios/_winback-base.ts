@@ -173,7 +173,7 @@ export function buildWinbackScenario(opts: {
           headline: 'We miss you!',
           code: couponCode || '',
           discount: discountPercent ? String(discountPercent) : '',
-        }).catch(() => {})
+        }, cooldownMinutes(params)).catch(() => {})
       }
       return emailResult
     },

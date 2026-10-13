@@ -204,7 +204,7 @@ export const subscriptionRenewal: ScenarioModule<Params, Row> = {
     })
 
     if (params.whatsappEnabled || (params as any).smsEnabled) {
-      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: row.product_name }, cooldownMinutes(params)).catch(
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: row.product_name, imageUrl: imageUrl ?? undefined }, cooldownMinutes(params)).catch(
         () => {}
       )
     }
