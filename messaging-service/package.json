@@ -8,7 +8,7 @@
     "start": "node --import tsx src/server.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "predev": "SM_SECRET_ID=${SM_SECRET_ID:-jeffi/services/local} ENV_OUT_DIR=. node ../deploy/load-secrets.mjs",
+    "predev": "SM_SECRET_ID=${SM_SECRET_ID:-jeffi/messaging/local} ENV_OUT_DIR=. node ../deploy/load-secrets.mjs",
     "seed:catalog": "node --env-file=.env.local --import tsx scripts/seed-catalog.ts",
     "wa:sync": "node --env-file=.env.local --import tsx scripts/wa-approval-sync.ts"
   },
