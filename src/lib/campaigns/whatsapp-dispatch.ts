@@ -5,6 +5,7 @@ import { days } from '@/lib/campaigns/duration'
 import { resolveTemplateVariables } from '@/lib/templates/variables'
 import { renderCampaignTemplate } from '@/lib/shared/automation-emails'
 import { getLibraryTemplate } from '@/lib/messaging/library'
+import { fillActionSlots, plainSlug } from '@/lib/messaging/action-slots'
 import { sendByTemplate } from '@/lib/shared/send-by-template'
 import { logMessage } from '@/lib/shared/message-log'
 import { CAMPAIGN_WA_KINDS, campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
@@ -190,7 +191,11 @@ async function sendWhatsAppPart(
     if (t?.approval_status === 'approved' && slots.every(n => raw[n]?.trim())) {
       const variables: Record<string, string> = {}
       for (const n of slots) variables[n] = await track(render(raw[n]))
-      const res = await sendByTemplate({ channel: 'whatsapp', slug: t.slug, to: phone, variables, reference: `campaign:${kind}` })
+      // _action templates: product photo (else store banner) + tracked CTA link; none on the CDN → plain template.
+      const extra = await fillActionSlots(t, { imageUrl: render('{productImageUrl}') || null, linkUrl: (await track(render('{ctaUrl}'))) || null })
+      const slug = extra ? t.slug : plainSlug(t.slug)
+      Object.assign(variables, extra ?? {})
+      const res = await sendByTemplate({ channel: 'whatsapp', slug, to: phone, variables, reference: `campaign:${kind}` })
       const sent = res.status !== 'failed' && res.status !== 'skipped'
       logMessage({ channel: 'whatsapp', to: phone, from: 'messaging-service', body: t.body.replace(/\{\{\s*(\d+)\s*\}\}/g, (_m, n) => variables[n] ?? ''),
         kind, status: sent ? 'sent' : 'failed', error: res.error, providerSid: res.id, provider: 'messaging-service', ...entity })
