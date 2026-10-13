@@ -2,12 +2,12 @@ import Fastify, { type FastifyRequest } from 'fastify'
 import formbody from '@fastify/formbody'
 import { randomUUID } from 'node:crypto'
 import { ZodError } from 'zod'
-import { SendMessageRequest, BatchMessageRequest, UpsertTemplateRequest, UpsertLibraryTemplateRequest, UpdateLibraryTemplateRequest, TemplateQuery, Channel } from '@jeffi/api-contracts'
+import { SendMessageRequest, BatchMessageRequest, BulkMessagesRequest, UpsertTemplateRequest, UpsertLibraryTemplateRequest, UpdateLibraryTemplateRequest, TemplateQuery, Channel } from '@jeffi/api-contracts'
 import { verifyServiceToken, bearer, type ServiceClaims } from '@jeffi/service-auth'
 import { usdToInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
-import { sendMessage, getMessage, systemVars, toApi as msgToApi, SendError, type MessageRow } from './send.js'
+import { sendMessage, getMessage, resolveTemplate, systemVars, toApi as msgToApi, SendError, type MessageRow } from './send.js'
 import { listTemplates, upsertTemplate, archiveTemplate, toApi as tplToApi } from './templates.js'
 import * as tpl from './templates-v2.js'
 import { CATALOG, WA_APPROVED_SIDS } from '../seed/catalog.js'
@@ -18,6 +18,7 @@ import * as wa from './wa-approval.js'
 import { render as renderVars, missingKeys } from './render.js'
 import { wrapEmail } from './mail-shell.js'
 import { randomBytes } from 'node:crypto'
+import { createJob, getJob, listJobs, listItems, cancelJob, retryJob, jobToApi, startWorker, BulkItemError } from '@jeffi/bulk'
 
 export const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' } })
 
@@ -87,18 +88,55 @@ app.post('/messages/batch', async req => {
   return { batch_id: batchId, accepted, rejected }
 })
 
+// ── bulk (async; worker below) ──
+app.post('/messages/bulk', { bodyLimit: 10_000_000 }, async (req, reply) => {
+  const b = BulkMessagesRequest.parse(req.body)
+  const { tenantId, tenantSlug, apiKeyId } = req.claims
+  if (!(await resolveTemplate(tenantId, b.channel, b.template, spaceOf(req)))) throw new SendError(404, 'template_not_found', `No ${b.channel} template '${b.template}'`)
+  const inputs = b.recipients.map(r => ({
+    channel: b.channel, to: r.to, template: b.template, subject: b.subject,
+    variables: { ...(b.variables ?? {}), ...(r.variables ?? {}) }, reference: r.reference,
+    media_url: r.media_url ?? b.media_url, button_url: r.button_url ?? b.button_url,
+  }))
+  const job = await createJob(db, { kind: 'messages', tenantId, apiKeyId, reference: b.reference, inputs,
+    options: { channel: b.channel, template: b.template, space: spaceOf(req), tenantSlug } })
+  return reply.code(202).send(jobToApi(job))
+})
+app.get<{ Querystring: { limit?: string; cursor?: string } }>('/messages/bulk', async req =>
+  listJobs(db, req.claims.tenantId, 'messages', { limit: Number(req.query.limit), cursor: req.query.cursor }))
+async function bulkJob(req: FastifyRequest<{ Params: { id: string } }>) {
+  const job = await getJob(db, req.claims.tenantId, 'messages', req.params.id)
+  if (!job) throw new SendError(404, 'not_found', 'Bulk job not found')
+  return job
+}
+app.get<{ Params: { id: string } }>('/messages/bulk/:id', async req => jobToApi(await bulkJob(req)))
+app.get<{ Params: { id: string }; Querystring: { status?: string; cursor?: string; limit?: string } }>('/messages/bulk/:id/items', async req => {
+  const job = await bulkJob(req)
+  const { rows, next_cursor } = await listItems(db, job.id, { status: req.query.status, cursor: req.query.cursor, limit: Number(req.query.limit) })
+  const ids = rows.map(r => r.result_id).filter(Boolean)
+  const msgs = new Map((await db.query<MessageRow>(`SELECT * FROM messages WHERE id = ANY($1)`, [ids])).rows.map(m => [m.id, m]))
+  return {
+    items: rows.map(r => ({ seq: r.seq, status: r.status, error: r.error, reference: r.input?.reference ?? null, to: r.input?.to,
+      result: r.result_id && msgs.get(r.result_id) ? msgToApi(msgs.get(r.result_id)!) : null })),
+    next_cursor,
+  }
+})
+app.post<{ Params: { id: string } }>('/messages/bulk/:id/cancel', async req => jobToApi(await cancelJob(db, await bulkJob(req))))
+app.post<{ Params: { id: string } }>('/messages/bulk/:id/retry', async req => jobToApi(await retryJob(db, await bulkJob(req))))
+
 app.get<{ Params: { id: string } }>('/messages/:id', async (req, reply) => {
   const m = await getMessage(req.claims.tenantId, req.params.id)
   if (!m) return reply.code(404).send({ error: 'not_found', message: 'Message not found' })
   return msgToApi(m)
 })
 
-app.get<{ Querystring: { limit?: string; cursor?: string; channel?: string } }>('/messages', async req => {
+app.get<{ Querystring: { limit?: string; cursor?: string; channel?: string; batch_id?: string } }>('/messages', async req => {
   const limit = Math.min(Number(req.query.limit ?? 50), 200)
   const rows = await db.query<MessageRow>(
     `SELECT * FROM messages WHERE tenant_id=$1 AND ($2::text IS NULL OR channel=$2) AND ($3::timestamptz IS NULL OR created_at < $3)
+       AND ($5::uuid IS NULL OR batch_id=$5)
      ORDER BY created_at DESC LIMIT $4`,
-    [req.claims.tenantId, req.query.channel ?? null, req.query.cursor ?? null, limit]
+    [req.claims.tenantId, req.query.channel ?? null, req.query.cursor ?? null, limit, /^[0-9a-f-]{36}$/i.test(req.query.batch_id ?? '') ? req.query.batch_id : null]
   )
   const items = rows.rows.map(msgToApi)
   return { items, next_cursor: items.length === limit ? items[items.length - 1].created_at : null }
@@ -327,4 +365,16 @@ if (!process.env.VITEST) {
   const port = Number(process.env.PORT || 3101)
   await app.listen({ port, host: '0.0.0.0' })
   wa.startApprovalSync(m => app.log.info(m))
+  startWorker(db, 'messages', async (item, job) => {
+    const o = job.options as { space?: 'store' | 'api'; tenantSlug?: string }
+    try {
+      const m = await sendMessage({ tenantId: job.tenant_id, tenantSlug: o.tenantSlug, apiKeyId: job.api_key_id ?? undefined, batchId: job.id, space: o.space },
+        SendMessageRequest.parse(item.input))
+      if (m.status !== 'sent') throw new BulkItemError(m.error ?? m.status)
+      return { resultId: m.id, spentInr: Number(m.charged_inr), usage: 'messages' }
+    } catch (e: any) {
+      if (e instanceof SendError) throw new BulkItemError(e.message, { stop: e.code === 'insufficient_balance' })
+      throw e
+    }
+  }, { concurrency: Number(process.env.MESSAGING_BULK_CONCURRENCY || 2), log: (m, e) => app.log.error({ err: e }, m) })
 }
