@@ -9,6 +9,7 @@ import Pagination from '@/components/admin/Pagination'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import LibraryTemplatePicker from '@/components/admin/messaging-templates/LibraryTemplatePicker'
 import LinkedTemplateEditor from '@/components/admin/messaging-templates/LinkedTemplateEditor'
+import PhonePreview from '@/components/admin/messaging-templates/PhonePreview'
 import { WhatsAppPreview, waSlots } from '@/components/admin/campaigns/WhatsAppTemplateEditor'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
@@ -393,7 +394,6 @@ export default function NewMessagePage() {
         ? 'Fill every WhatsApp slot — otherwise WhatsApp is skipped.'
         : null
   const previewVars = { firstName: 'Priya', ...vars }
-  const smsPreview = (loaded.sms?.body ?? '').replace(VAR_RE, (_m, k: string) => previewVars[k as keyof typeof previewVars] ?? (AUTO.test(k) ? `[${humanize(k)}]` : ''))
 
   return (
     <MobileEditBlock>
@@ -647,12 +647,7 @@ export default function NewMessagePage() {
               </div>
             )}
             {(channels[previewTab] ? previewTab : active[0]) === 'sms' && (
-              <div className="rounded-lg border border-border-default p-4 bg-surface-elevated min-h-[160px]">
-                <div className="max-w-[80%] rounded-2xl rounded-bl-sm bg-surface-secondary px-3 py-2 text-sm text-foreground whitespace-pre-line">
-                  {smsPreview || '—'}
-                </div>
-                <p className="text-[10px] text-foreground-muted mt-2">{smsPreview.length} characters</p>
-              </div>
+              <PhonePreview channel="sms" body={loaded.sms?.body ?? ''} vars={previewVars} />
             )}
             {(channels[previewTab] ? previewTab : active[0]) === 'whatsapp' && (
               <WhatsAppPreview value={{ slug: channels.whatsapp?.slug || null, variables: waVars }} vars={previewVars} />

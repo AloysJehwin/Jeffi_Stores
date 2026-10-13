@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MessageCircle } from 'lucide-react'
 import LibraryTemplatePicker, { type PickedTemplate } from '@/components/admin/messaging-templates/LibraryTemplatePicker'
 import { campaignVariables } from '@/lib/campaigns/kind-variables'
+import PhonePreview from '@/components/admin/messaging-templates/PhonePreview'
 
 // Campaign WhatsApp = an APPROVED template from the templates library (Meta only delivers approved
 // templates to customers who haven't messaged first). The admin fills its numbered {{n}} slots with
@@ -86,30 +86,30 @@ export default function WhatsAppTemplateEditor({
   )
 }
 
-// ── Preview (right-hand Preview column) ──
+// ── Preview (right-hand Preview column): the approved template on a phone, slots filled. ──
 export function WhatsAppPreview({ value, vars }: { value: WhatsAppTemplateValue; vars: Record<string, string | number> }) {
-  const [body, setBody] = useState<string | null>(null)
+  const [tpl, setTpl] = useState<{ body: string; blocks: any } | null>(null)
   useEffect(() => {
     let live = true
-    if (!value.slug) { setBody(null); return }
+    if (!value.slug) { setTpl(null); return }
     fetch(`/api/admin/messaging-templates/whatsapp/${encodeURIComponent(value.slug)}`)
-      .then(r => (r.ok ? r.json() : null)).then(a => live && setBody(a?.current_version?.body ?? null)).catch(() => {})
+      .then(r => (r.ok ? r.json() : null)).then(a => live && setTpl(a ? { body: a.current_version?.body ?? '', blocks: a.current_version?.blocks ?? {} } : null)).catch(() => {})
     return () => { live = false }
   }, [value.slug])
-  if (!value.slug || body === null) {
+  if (!value.slug || !tpl) {
     return <p className="text-xs text-foreground-muted">Select a WhatsApp template to preview the message.</p>
   }
-  // Slot values (which may contain {firstName}…) resolved against the sample vars, then placed in {{n}}.
+  // Slot values (which may contain {firstName}…) resolved against the sample vars.
   const fill = (s: string) => s.replace(/\{\{?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}?\}/g, (_m, k: string) => (vars[k] != null ? String(vars[k]) : ''))
-  const text = body.replace(PH, (_m, n: string) => fill(value.variables[n] ?? '') || `{{${n}}}`)
+  const slotVars = Object.fromEntries(waSlots(tpl.body).map(n => [n, fill(value.variables[n] ?? '')]))
   return (
-    <div className="rounded-lg p-3 bg-[#e5ddd5] dark:bg-zinc-800 min-h-[120px]">
-      <div className="max-w-[88%] rounded-lg rounded-tl-none bg-white dark:bg-zinc-700 shadow-sm px-3 py-2">
-        <p className="text-[13px] text-zinc-900 dark:text-zinc-100 whitespace-pre-line leading-snug">{text}</p>
-        <p className="text-[10px] text-zinc-400 mt-1 flex items-center justify-end gap-1">
-          <MessageCircle className="w-3 h-3" /> WhatsApp
-        </p>
-      </div>
-    </div>
+    <PhonePreview
+      channel="whatsapp"
+      body={tpl.body}
+      vars={slotVars}
+      headerMedia={tpl.blocks?.types?.['twilio/media']?.media?.[0] ?? null}
+      buttons={tpl.blocks?.buttons ?? []}
+      cards={tpl.blocks?.carousel?.cards ?? []}
+    />
   )
 }

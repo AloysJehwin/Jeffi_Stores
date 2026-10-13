@@ -10,6 +10,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
 import { Smile, Link2, ImageIcon, Loader2, Upload, RefreshCw } from 'lucide-react'
 import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
+import PhonePreview from './PhonePreview'
 import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
@@ -537,7 +538,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
         <div className="flex gap-2">
           <button type="button" onClick={() => onSave(false)} disabled={saving} className="px-5 h-control bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">Save draft</button>
           <button type="button" onClick={() => onSave(true)} disabled={saving} className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">Publish</button>
-          <button type="button" onClick={runPreview} disabled={previewing} className="px-5 h-control bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">Preview</button>
+          {value.channel === 'email' && <button type="button" onClick={runPreview} disabled={previewing} className="px-5 h-control bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-60">Preview</button>}
         </div>
         )}
       </div>
@@ -546,16 +547,29 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
       <div className="bg-surface-secondary/50 rounded-lg border border-border-default p-4">
         <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Preview</div>
-          <button type="button" onClick={runPreview} disabled={previewing || !value.slug} className="text-xs px-3 py-1.5 bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors disabled:opacity-60">
+          {value.channel === 'email' && <button type="button" onClick={runPreview} disabled={previewing || !value.slug} className="text-xs px-3 py-1.5 bg-surface border border-border-default border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors disabled:opacity-60">
             {previewing ? 'Rendering…' : 'Render with sample data'}
-          </button>
+          </button>}
         </div>
-        {!preview && <p className="text-sm text-foreground-muted">Save first, then render to see the message as customers get it.</p>}
-        {preview?.subject && <div className="font-semibold mb-2">{preview.subject}</div>}
-        {preview?.body && (
-          value.channel === 'email'
-            ? <iframe title="Email preview" srcDoc={preview.body} sandbox="" className="w-full bg-surface-elevated border border-border-default rounded-lg" style={{ minHeight: 520 }} />
-            : <pre className="whitespace-pre-wrap font-mono text-sm">{preview.body}</pre>
+        {value.channel !== 'email' ? (() => {
+          // SMS / WhatsApp: live handset preview of what's being edited (buttons, carousel, media included).
+          const wb = (value.blocks as WaBlocks | undefined) ?? {}
+          return (
+            <PhonePreview
+              channel={value.channel}
+              body={value.body}
+              vars={value.channel === 'whatsapp' ? wb.variables ?? {} : {}}
+              headerMedia={value.channel === 'whatsapp' ? (wb.types as any)?.['twilio/media']?.media?.[0] ?? null : null}
+              buttons={value.channel === 'whatsapp' ? wb.buttons ?? [] : []}
+              cards={value.channel === 'whatsapp' ? wb.carousel?.cards ?? [] : []}
+            />
+          )
+        })() : (
+          <>
+            {!preview && <p className="text-sm text-foreground-muted">Save first, then render to see the message as customers get it.</p>}
+            {preview?.subject && <div className="font-semibold mb-2">{preview.subject}</div>}
+            {preview?.body && <iframe title="Email preview" srcDoc={preview.body} sandbox="" className="w-full bg-surface-elevated border border-border-default rounded-lg" style={{ minHeight: 520 }} />}
+          </>
         )}
         {preview?.missing && preview.missing.length > 0 && (
           <p className="mt-3 text-xs text-foreground-secondary">Sample values used for: {preview.missing.join(', ')}</p>
