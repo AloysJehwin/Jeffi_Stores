@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Menu, X, LogOut, ExternalLink, ChevronDown } from 'lucide-react'
+import { Menu, X, LogOut, ExternalLink } from 'lucide-react'
 import { navFor } from './nav'
+import TenantSwitcher from './TenantSwitcher'
 
 interface TenantLite {
   slug: string
@@ -58,23 +59,7 @@ export default function ConsoleShell({ owner, tenants, current, children }: Prop
         <span className="font-display font-black text-lg text-foreground leading-none">Jeffi Commerce</span>
       </Link>
 
-      <div className="relative mb-6">
-        <select
-          value={current.slug}
-          disabled={switching || tenants.length < 2}
-          onChange={e => switchTenant(e.target.value)}
-          className="w-full appearance-none rounded-xl border border-border-default bg-surface-elevated pl-3 pr-9 py-2.5 text-sm font-semibold text-foreground disabled:opacity-100"
-        >
-          {tenants.map(t => (
-            <option key={t.slug} value={t.slug}>
-              {t.display_name}
-            </option>
-          ))}
-        </select>
-        {tenants.length > 1 && (
-          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted" />
-        )}
-      </div>
+      <TenantSwitcher items={tenants} value={current.slug} disabled={switching} onChange={switchTenant} />
 
       <nav className="flex-1 space-y-5 overflow-y-auto">
         {groups.map((g, gi) => (
