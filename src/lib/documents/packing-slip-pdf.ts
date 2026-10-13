@@ -444,7 +444,8 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
       const gross = item.total_price + item.discount_amount
       discPct = gross > 0 ? (item.discount_amount / gross) * 100 : 0
     }
-    const discStr = discPct >= 0.01 ? `${discPct.toFixed(1)}%` : ''
+    // An MRP with no markdown is a real 0% — show it rather than leave the column looking unfilled.
+    const discStr = discPct >= 0.01 ? `${discPct.toFixed(1)}%` : hasMrp || item.discount_amount != null ? '0%' : ''
 
     // Rate per selling unit, before discount.
     const rateInclTax = hasMrp
@@ -500,11 +501,19 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
       align: 'center',
       lineBreak: false,
     })
-    doc.text(rs(rateInclTax), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, midY, {
+    // Rate per piece (the unit stock is counted in); the note below gives the total pieces.
+    doc.text(rs(rateInclTax / factor), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, midY, {
       width: COL_RATE,
       align: 'right',
       lineBreak: false,
     })
+    // What the rate is for: pieces in a set/box (with the per-piece rate), or the length/weight unit.
+    const rateNote = factor > 1 ? `× ${Number((Number(item.quantity) * factor).toFixed(3))} PCS` : isWL ? `per ${unitLabel}` : ''
+    if (rateNote) {
+      doc.font('Helvetica').fontSize(6.5).fillColor(TEXT_MUTED)
+      doc.text(rateNote, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, midY + 10, { width: COL_RATE, align: 'right', lineBreak: false })
+      doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_DARK)
+    }
     doc.text(discStr, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, midY, {
       width: COL_DISC,
       align: 'center',
