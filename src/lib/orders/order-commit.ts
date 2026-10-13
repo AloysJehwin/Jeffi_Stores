@@ -8,6 +8,7 @@ import type { DraftBuyNowItem, DraftCartItem } from '@/lib/orders/order-draft'
 import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
 import { grantOrderEntitlements } from '@/lib/orders/entitlements'
 import { digitalUnitError } from '@/lib/catalog/digital-units'
+import { sellingUnitsFor } from '@/lib/catalog/unit-factor'
 
 export interface CartLine {
   product_id: string
@@ -727,7 +728,10 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     )
     const created = orderResult.rows[0]
 
-    for (const r of itemRows) {
+    // Selling-unit snapshot (unit, pieces per unit, total pieces) for packing, shipping, stock and adjustments.
+    const soldUnits = await sellingUnitsFor(itemRows.map(r => ({ productId: r.productId, variantId: r.variantId, subVariantId: r.subVariantId, unit: r.buyUnit })))
+    for (const [k, r] of itemRows.entries()) {
+      const su = soldUnits[k]
       // When GST is off we charge the ex-GST price, so there is NO embedded tax
       // to strip — the per-item tax is 0, not a back-calculated amount.
       const taxAmt = r.gst ? r.gst.totalTax : 0
@@ -737,8 +741,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name,
           quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate,
           taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp,
-          is_digital, is_returnable
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)`,
+          is_digital, is_returnable, sold_unit, sold_unit_factor, base_quantity
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)`,
         [
           created.id,
           r.productId,
@@ -762,6 +766,9 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           r.mrp ?? null,
           isDigital,
           !isDigital,
+          su.unit,
+          su.factor,
+          Number(r.qty) * su.factor,
         ]
       )
     }

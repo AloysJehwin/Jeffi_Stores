@@ -291,6 +291,26 @@ export default function UnitsManager({
     }
   }
 
+  async function makeDefault(u: ProductUnit) {
+    setDeletingId(u.id)
+    try {
+      const res = await fetch(unitUrl(u.id), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ is_base: true }),
+      })
+      if (!res.ok) {
+        showToast((await res.json().catch(() => ({}))).error || 'Could not change the default unit', 'error')
+        return
+      }
+      showToast(`${u.display_label || u.unit} is now the default selling unit`, 'success')
+      await load()
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
   async function handleDeleteExtra(u: ProductUnit) {
     setDeletingId(u.id)
     try {
@@ -660,6 +680,17 @@ export default function UnitsManager({
                     )}
                   </div>
                   <div className="flex items-center gap-2 ml-2 shrink-0">
+                    {!readOnly && (isDraft || !isSubVariantScope) && (
+                      <button
+                        type="button"
+                        onClick={() => makeDefault(u)}
+                        disabled={deletingId === u.id}
+                        title="Customers buy in the default unit; the others are for invoices and quotations"
+                        className="text-xs text-foreground-secondary hover:text-accent-600 hover:underline disabled:opacity-50"
+                      >
+                        Make default
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -686,8 +717,8 @@ export default function UnitsManager({
 
           {extraCountUnits.length === 0 && formMode !== 'extra' && (
             <p className="text-[11px] text-foreground-muted italic px-1">
-              No additional units. Add a box, carton, dozen, etc. to let admin staff sell in bulk units on
-              invoices/quotations.
+              No additional units. Add a box, carton, dozen, etc. — customers buy in the default unit; staff can
+              pick any unit on invoices, quotations and cash sales.
             </p>
           )}
 

@@ -285,9 +285,13 @@ export async function fetchSeedLineItem(productId: string, variantId?: string | 
   }
 }
 
-async function fetchProductUnits(productId: string, variantId?: string | null): Promise<SellUnit[]> {
-  const toUnits = (rows: any[]) =>
-    rows.map((u: any) => ({
+async function fetchProductUnits(productId: string, variantId?: string | null, subVariantId?: string | null): Promise<SellUnit[]> {
+  try {
+    // Every unit this line can be sold in (sub-variant → variant → product), default first.
+    const q = new URLSearchParams({ chain: '1', ...(variantId ? { variant_id: variantId } : {}), ...(subVariantId ? { sub_variant_id: subVariantId } : {}) })
+    const res = await fetch(`/api/admin/products/${productId}/units?${q}`, { credentials: 'include' })
+    if (!res.ok) return []
+    return ((await res.json()).units || []).map((u: any) => ({
       unit: u.unit,
       display_label: u.display_label || u.unit,
       factor: Number(u.factor) || 1,
@@ -297,29 +301,6 @@ async function fetchProductUnits(productId: string, variantId?: string | null): 
       max_qty: u.max_qty != null ? Number(u.max_qty) : null,
       qty_step: Number(u.qty_step) || 1,
     }))
-  try {
-    // Always fetch product-level units (includes base + extra count units)
-    const res = await fetch(`/api/admin/products/${productId}/units`, { credentials: 'include' })
-    if (!res.ok) return []
-    const productUnits = toUnits((await res.json()).units || [])
-
-    if (variantId) {
-      // Fetch variant-specific units; if present, use variant's base unit
-      // but keep product-level non-base (extra) units (box, dozen, etc.)
-      const vres = await fetch(`/api/admin/products/${productId}/units?variant_id=${variantId}`, {
-        credentials: 'include',
-      })
-      if (vres.ok) {
-        const vunits = toUnits((await vres.json()).units || [])
-        if (vunits.length) {
-          const variantBase = vunits.find(u => u.is_base) ?? vunits[0]
-          const productExtras = productUnits.filter(u => !u.is_base)
-          return [variantBase, ...productExtras]
-        }
-      }
-    }
-
-    return productUnits
   } catch {
     return []
   }
@@ -470,7 +451,7 @@ export default function LineItemsSection({
     if (!needsUnits.length) return
     let cancelled = false
     Promise.all(
-      needsUnits.map(it => fetchProductUnits(it.product_id!, it.variant_id).then(units => ({ it, units })))
+      needsUnits.map(it => fetchProductUnits(it.product_id!, it.variant_id, it.sub_variant_id).then(units => ({ it, units })))
     ).then(results => {
       if (cancelled) return
       onChange(
@@ -570,7 +551,7 @@ export default function LineItemsSection({
 
   async function populateUnits(populated: LineItem): Promise<LineItem> {
     if (!populated.product_id) return populated
-    const units = await fetchProductUnits(populated.product_id, populated.variant_id)
+    const units = await fetchProductUnits(populated.product_id, populated.variant_id, populated.sub_variant_id)
     if (!units.length) return { ...populated, available_units: [], selected_unit_key: '', buy_unit: null }
     const defaultUnit = units[0]
     // Normalize quantity to the unit's grid so the <input min/step> doesn't reject

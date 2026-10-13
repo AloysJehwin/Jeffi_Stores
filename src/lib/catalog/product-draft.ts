@@ -1307,6 +1307,15 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
       )
     }
 
+    // Variants follow their default unit too (the storefront reads sell_unit_id before is_base).
+    await client.query(
+      `UPDATE product_variants pv SET sell_unit_id = pu.id, updated_at = NOW()
+         FROM product_units pu
+        WHERE pu.variant_id = pv.id AND pu.sub_variant_id IS NULL AND pu.is_base = true
+          AND pv.product_id = $1 AND pv.sell_unit_id IS DISTINCT FROM pu.id`,
+      [productId]
+    )
+
     // UPSERT sub-variant-level units from draft (scope: sub_variant_id set). These
     // are stored with variant_id null + sub_variant_id in the draft; without this
     // branch they were silently dropped on publish. Cleared ones are deleted first.

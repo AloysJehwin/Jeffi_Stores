@@ -14,6 +14,11 @@ export interface UnitLineRef {
  * count units convert — length/weight units and unknown lines are 1.
  */
 export async function piecesPerUnit(input: UnitLineRef[]): Promise<number[]> {
+  return (await sellingUnitsFor(input)).map(u => u.factor)
+}
+
+/** The resolved selling unit per line: its name (null when none is configured) and pieces per unit. */
+export async function sellingUnitsFor(input: UnitLineRef[]): Promise<{ unit: string | null; factor: number }[]> {
   // Callers sometimes send only the variant/sub-variant id.
   const orphanV = input.filter(l => !l.productId && l.variantId).map(l => l.variantId!)
   const orphanS = input.filter(l => !l.productId && !l.variantId && l.subVariantId).map(l => l.subVariantId!)
@@ -26,7 +31,7 @@ export async function piecesPerUnit(input: UnitLineRef[]): Promise<number[]> {
     : []
   const lines = input.map(l => l.productId ? l : { ...l, productId: owners.find(o => o.id === (l.variantId || l.subVariantId))?.product_id ?? null })
   const productIds = [...new Set(lines.map(l => l.productId).filter(Boolean))] as string[]
-  if (!productIds.length) return lines.map(() => 1)
+  if (!productIds.length) return lines.map(() => ({ unit: null, factor: 1 }))
   const rows = await queryMany<{
     product_id: string; variant_id: string | null; sub_variant_id: string | null
     unit: string; factor: string | number; is_base: boolean; dimension: string | null
@@ -44,6 +49,6 @@ export async function piecesPerUnit(input: UnitLineRef[]): Promise<number[]> {
     const want = l.unit?.trim().toLowerCase()
     const row = (want && pick(r => r.unit.toLowerCase() === want)) || pick(r => r.is_base)
     const f = Number(row?.factor)
-    return row && (row.dimension ?? 'count') === 'count' && f > 0 ? f : 1
+    return { unit: row?.unit ?? null, factor: row && (row.dimension ?? 'count') === 'count' && f > 0 ? f : 1 }
   })
 }
