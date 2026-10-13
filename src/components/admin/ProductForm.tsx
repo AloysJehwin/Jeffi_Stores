@@ -3027,7 +3027,7 @@ export default function ProductForm({
             {!hasVariants && (
               <div>
                 <label htmlFor="weight_grams" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Shipping Weight (g) *
+                  Weight per piece (g) *
                 </label>
                 <input
                   type="number"
@@ -4735,7 +4735,7 @@ export default function ProductForm({
                                   <>
                                     <div>
                                       <label className="block text-xs font-medium text-foreground-secondary mb-1">
-                                        Shipping Weight (g) *
+                                        Weight per piece (g) *
                                       </label>
                                       <input
                                         type="number"
@@ -4780,7 +4780,7 @@ export default function ProductForm({
                                     ) && (
                                       <div>
                                         <label className="block text-xs font-medium text-foreground-secondary mb-1">
-                                          Dimensions (L × B × H cm)
+                                          Dimensions per piece (L × B × H cm)
                                         </label>
                                         <div className="grid grid-cols-3 gap-1">
                                           <input
@@ -5635,7 +5635,7 @@ export default function ProductForm({
                         {STORED_DIMS_TYPES.includes(popupVariant.package_type || 'flat_poly_auto') && (
                           <div className="mt-3">
                             <label className="block text-xs font-medium text-foreground-secondary mb-1">
-                              Dimensions (L × B × H cm)
+                              Dimensions per piece (L × B × H cm)
                             </label>
                             <div className="grid grid-cols-3 gap-1.5">
                               <input
