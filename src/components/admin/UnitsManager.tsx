@@ -6,7 +6,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import UnitRulesPanel, { ProductUnitRule } from '@/components/admin/UnitRulesPanel'
 import BaseUnitForm, { BaseUnitRow } from '@/components/admin/BaseUnitForm'
 import { type ProductUnit } from '@/components/admin/BaseUnitForm'
-import { Dimension, UNITS, computeAreaFactor, computeVolumeFactor } from '@/lib/catalog/units'
+import { Dimension, DIMENSION_LABEL, UNITS, computeAreaFactor, computeVolumeFactor } from '@/lib/catalog/units'
 
 export interface UnitLoadedInfo {
   unitKey: string
@@ -118,7 +118,7 @@ export default function UnitsManager({
         setAllUnits(units)
         setInherited(isInherited)
         setRules(data.rules || [])
-        const base = units.find(u => u.is_base) ?? units[0] ?? null
+        const base = units.find(u => u.is_base) ?? (variantId ? null : units[0] ?? null)
         onUnitLoaded?.({
           unitKey: base?.unit ?? '',
           displayLabel: base?.display_label ?? null,
@@ -332,7 +332,7 @@ export default function UnitsManager({
       return
     }
 
-    const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
+    const baseUnit = allUnits.find(u => u.is_base) ?? (isVariantScope || isSubVariantScope ? null : allUnits[0] ?? null)
 
     let factorNum: number
     let conversionMeta: object | null = null
@@ -481,7 +481,7 @@ export default function UnitsManager({
   if (loading) return <div className="text-xs text-foreground-muted py-3">Loading…</div>
 
   if (readOnly || !canWrite) {
-    const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
+    const baseUnit = allUnits.find(u => u.is_base) ?? (isVariantScope || isSubVariantScope ? null : allUnits[0] ?? null)
     const extras = allUnits.filter(u => !u.is_base)
     if (!baseUnit) return <p className="text-xs text-foreground-muted py-2">No selling unit configured.</p>
     return (
@@ -506,9 +506,13 @@ export default function UnitsManager({
     )
   }
 
-  const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
-  const extraCountUnits = allUnits.filter(u => !u.is_base && u.dimension === 'count')
+  // A variant/sub-variant may carry only additional units while inheriting its default — never treat an extra as
+  // the default there (legacy product rows without the flag keep the first-unit fallback).
+  const baseUnit = allUnits.find(u => u.is_base) ?? (isVariantScope || isSubVariantScope ? null : allUnits[0] ?? null)
+  // Inherited units belong to the parent; this scope's own extras are only listed when it has rows of its own.
+  const extraCountUnits = inherited ? [] : allUnits.filter(u => !u.is_base && u.dimension === 'count')
   const showExtraSection = !baseUnit || baseUnit.dimension === 'count'
+  const extraDimension = DIMENSION_LABEL[(baseUnit?.dimension as Dimension) || 'count'] ?? 'Count / Pieces'
 
   const dimUnits = UNITS[draftDimension] || []
   const selectedDef = dimUnits.find(u => u.key === draftUnit)
@@ -627,7 +631,7 @@ export default function UnitsManager({
       )}
 
       {/* Additional count units */}
-      {showExtraSection && !inherited && (
+      {showExtraSection && (!inherited || isVariantScope || isSubVariantScope) && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <h5 className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
@@ -727,6 +731,10 @@ export default function UnitsManager({
               <p className="text-[10px] uppercase tracking-wide text-foreground-muted">
                 {editingExtraId ? 'Edit selling unit' : 'Add selling unit'}
               </p>
+              <div>
+                <label className="block text-[10px] text-foreground-muted mb-0.5">Dimension</label>
+                <div className={lockedCls} title="Same as the default selling unit">{extraDimension}</div>
+              </div>
               <div className="grid grid-cols-4 gap-x-2 items-end">
                 <div>
                   <label className="block text-[10px] text-foreground-muted mb-0.5">Unit name *</label>
