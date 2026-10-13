@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Mail, MessageSquare, MessageCircle, Plus, Search } from 'lucide-react'
 import { Card } from '../_components/Card'
 import { SkeletonRows } from '../_components/Skeleton'
@@ -50,6 +50,38 @@ export default function MessagingClient(props: { prices: Record<string, number>;
     }
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, v.sort((a, b) => (a.name || a.slug).localeCompare(b.name || b.slug))] as const)
   }, [items, query])
+
+  // Tab, channel and the open template live in the URL (?tab=&channel=&template=) so links and Back work.
+  const ready = useRef(false)
+  const fromUrl = useCallback(() => {
+    const p = new URLSearchParams(location.search)
+    const t = p.get('tab'), c = p.get('channel') as Channel | null, slug = p.get('template')
+    const ch = c && CHANNELS.some(x => x.key === c) ? c : 'email'
+    setTab(t === 'templates' || t === 'bulk' ? t : 'log')
+    setChannel(ch)
+    if (t === 'templates' && slug) void open({ slug, channel: ch } as ListItem)
+    else setSelected(null)
+    // Start writing the URL only after this state has rendered.
+    setTimeout(() => { ready.current = true }, 0)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    fromUrl()
+    window.addEventListener('popstate', fromUrl)
+    return () => window.removeEventListener('popstate', fromUrl)
+  }, [fromUrl])
+  const slugInUrl = selected?.slug || opening
+  useEffect(() => {
+    if (!ready.current) return
+    const p = new URLSearchParams()
+    if (tab !== 'log') p.set('tab', tab)
+    if (tab === 'templates') {
+      p.set('channel', channel)
+      if (slugInUrl) p.set('template', slugInUrl)
+    }
+    const url = `${location.pathname}${p.size ? `?${p}` : ''}`
+    if (url !== `${location.pathname}${location.search}`) history.pushState(null, '', url)
+  }, [tab, channel, slugInUrl])
 
   async function open(it: ListItem) {
     setOpening(it.slug)
