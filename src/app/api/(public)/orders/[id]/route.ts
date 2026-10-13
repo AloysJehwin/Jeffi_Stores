@@ -199,6 +199,22 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       [orderId]
     )
 
+    // Product adjustment waiting for the customer (a tenant DB without the table just hides it).
+    let pendingAdjustment: any = null
+    try {
+      pendingAdjustment = await queryOne<any>(
+      `SELECT a.id, a.status, a.settlement_type, a.net_diff, a.new_total, a.razorpay_order_id,
+              (SELECT json_agg(json_build_object('action', l.action, 'old', l.old_snapshot, 'new', l.new_line) ORDER BY l.created_at)
+                 FROM order_adjustment_lines l WHERE l.adjustment_id = a.id) AS lines
+         FROM order_adjustments a
+        WHERE a.order_id = $1 AND a.status IN ('pending_customer','awaiting_payment')
+        ORDER BY a.created_at DESC LIMIT 1`,
+        [orderId]
+      )
+    } catch {
+      pendingAdjustment = null
+    }
+
     // A tenant database the schema fan-out has not reached yet must not break the order page,
     // so a failed lookup just hides the address-change feature.
     let addressChange: any = null
@@ -298,6 +314,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             : false,
         replacementWindowDays: parseInt(item.replacement_window_days) || 7,
       })),
+      pendingAdjustment,
       pendingVariantChange: pendingVcr
         ? {
             id: pendingVcr.id,

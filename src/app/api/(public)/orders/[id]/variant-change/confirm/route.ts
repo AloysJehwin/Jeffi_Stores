@@ -117,12 +117,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // that carries their Route linked account — never a bare platform instance, which would
       // take an own-account tenant's buyer payment into Jeffi's account.
       const collectTenant = await resolveRequestTenant()
-      const { instance: razorpay } = await getRazorpayInstanceFor(collectTenant?.tenantId)
+      const { instance: razorpay, creds } = await getRazorpayInstanceFor(collectTenant?.tenantId)
       const rzpOrder = await razorpay.orders.create({
         amount: diffPaise,
         currency: 'INR',
         receipt: `vcr-${vcr.id.slice(0, 30)}`,
-        notes: { purpose: 'variant_change', vcrId: vcr.id, orderId },
+        notes: { purpose: 'variant_change', vcrId: vcr.id, orderId, tenant_id: collectTenant?.tenantId ?? '', tenant_slug: collectTenant?.slug ?? '' },
       })
       await query(
         `UPDATE variant_change_requests SET status = 'awaiting_payment', razorpay_order_id = $1, updated_at = NOW() WHERE id = $2`,
@@ -144,6 +144,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         razorpayOrderId: rzpOrder.id,
         amount: diffPaise,
         currency: 'INR',
+        key_id: creds?.key_id,
       })
     }
 

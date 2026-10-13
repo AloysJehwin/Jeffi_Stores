@@ -114,6 +114,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, settlement: 'variant_change_applied' })
     }
 
+    // Product-adjustment top-up: the extra amount for an approved adjustment.
+    let adjRow: { id: string } | null = null
+    try {
+      adjRow = await queryOne<{ id: string }>(
+        `SELECT id FROM order_adjustments WHERE razorpay_order_id = $1 AND status = 'awaiting_payment'`,
+        [razorpay_order_id]
+      )
+    } catch {
+      /* a tenant DB without the table has no adjustments */
+    }
+    if (adjRow) {
+      let amountPaise = 0
+      try {
+        const { instance: rzp } = await getRazorpayInstanceFor(tenant?.tenantId)
+        amountPaise = Number((await (rzp as any).orders.fetch(razorpay_order_id))?.amount) || 0
+      } catch {
+        /* settle falls back to the adjustment's amount */
+      }
+      const { settleAdjustmentPayment } = await import('@/lib/orders/adjustments')
+      const result = await settleAdjustmentPayment({ razorpayOrderId: razorpay_order_id, razorpayPaymentId: razorpay_payment_id, amountPaise, tenant })
+      if (!result.applied && result.reason !== 'already_applied')
+        return NextResponse.json({ error: `Payment received but the change could not be applied: ${result.reason}. Contact support.` }, { status: 409 })
+      return NextResponse.json({ success: true, settlement: 'order_adjustment_applied' })
+    }
+
     return NextResponse.json({ error: 'draftToken or orderId is required' }, { status: 400 })
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Payment verification failed' }, { status: 500 })
