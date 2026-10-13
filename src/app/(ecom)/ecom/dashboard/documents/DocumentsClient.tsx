@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { FileText, Palette } from 'lucide-react'
+import { FileText, Layers, Palette } from 'lucide-react'
 import DesignsPanel from './DesignsPanel'
+import BulkDocuments, { type Seller } from './BulkDocuments'
 import { SkeletonRows } from '../_components/Skeleton'
 import Pager, { useCursorPages } from '../_components/Pager'
 import { Card } from '../_components/Card'
@@ -10,21 +11,23 @@ import { fmt, fmtDate } from '../_components/finance'
 
 interface Doc { id: string; type: string; number: string; template: string; totals: { total: number }; pdf_url: string; view_url: string; price_inr: number; created_at: string }
 
-export default function DocumentsClient() {
-  const [tab, setTab] = useState<'documents' | 'designs'>('documents')
-  useEffect(() => { if (location.hash === '#designs') setTab('designs') }, [])
-  const pick = (t: typeof tab) => { setTab(t); history.replaceState(null, '', t === 'designs' ? '#designs' : location.pathname) }
+type Tab = 'documents' | 'designs' | 'bulk'
+
+export default function DocumentsClient(props: { seller: Seller | null; prices: Record<string, number>; balance: number }) {
+  const [tab, setTab] = useState<Tab>('documents')
+  useEffect(() => { const h = location.hash.slice(1); if (h === 'designs' || h === 'bulk') setTab(h) }, [])
+  const pick = (t: Tab) => { setTab(t); history.replaceState(null, '', t === 'documents' ? location.pathname : `#${t}`) }
   return (
     <div className="space-y-6">
       <div role="tablist" className="inline-flex rounded-full org-sand p-1">
-        {([['documents', 'Documents', FileText], ['designs', 'Designs', Palette]] as const).map(([k, label, Icon]) => (
+        {([['documents', 'Documents', FileText], ['designs', 'Designs', Palette], ['bulk', 'Bulk', Layers]] as const).map(([k, label, Icon]) => (
           <button key={k} role="tab" aria-selected={tab === k} type="button" onClick={() => pick(k)}
             className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${tab === k ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
             <Icon className={`w-4 h-4 ${tab === k ? 'ecom-accent-text' : ''}`} /> {label}
           </button>
         ))}
       </div>
-      {tab === 'documents' ? <DocumentList /> : <DesignsPanel />}
+      {tab === 'documents' ? <DocumentList /> : tab === 'designs' ? <DesignsPanel /> : <BulkDocuments {...props} />}
     </div>
   )
 }
