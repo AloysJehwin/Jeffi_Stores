@@ -6,6 +6,7 @@
 // email seed with a Tiptap doc on first edit (stored in `blocks`, `blocks_format='tiptap'`).
 
 import type { UpsertInput } from '../src/templates-v2.js'
+import campaignCatalog from './campaign-catalog.json' with { type: 'json' }
 
 export type TemplateSeed = Omit<UpsertInput, 'publish'> & { tags?: string[] }
 
@@ -295,6 +296,8 @@ export const CATALOG: TemplateSeed[] = [
     "Jeffi Stores: A refund of {{1}} for order {{2}} has been processed and will reflect in 5-7 business days. Thank you.", 'UTILITY'),
   wa('feedback/request', 'Feedback request', 'automation',
     "Jeffi Stores: How was your order {{1}}? We would love your feedback. Share it here: {{2}} Thank you for shopping with us!", 'UTILITY'),
+  // Imported from campaigns / mailer — regenerate with scripts/import-campaign-templates.ts --generate.
+  ...(campaignCatalog as TemplateSeed[]),
 ]
 
 // Meta-approved Twilio Content templates (account-wide). Env overrides; fallback = the approved SID.
