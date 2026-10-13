@@ -16,6 +16,7 @@ import * as twContent from './providers/twilio-content.js'
 import { priceUsd } from './providers/twilio.js'
 import { poolsForTenant } from './pools.js'
 import * as wa from './wa-approval.js'
+import { applyStatus, startDeliverySync } from './delivery.js'
 import * as gov from './governance.js'
 import { render as renderVars, missingKeys } from './render.js'
 import { wrapEmail } from './mail-shell.js'
@@ -407,10 +408,7 @@ app.post<{ Querystring: { m?: string }; Body: Record<string, string> }>('/webhoo
   if (!id || !status) return reply.code(400).send({ ok: false })
   const m = await one<MessageRow>(`SELECT * FROM messages WHERE id=$1`, [id])
   if (!m) return { ok: true }
-  const terminal: Record<string, string> = { delivered: 'delivered', failed: 'failed', undelivered: 'failed', read: 'delivered' }
-  const next = terminal[status]
-  await db.query(`INSERT INTO message_events (message_id, event, payload) VALUES ($1,$2,$3)`, [id, status, req.body])
-  if (next) await db.query(`UPDATE messages SET status=$2, error=COALESCE($3,error), updated_at=now() WHERE id=$1`, [id, next, req.body?.ErrorMessage ?? null])
+  await applyStatus(id, status, { code: req.body?.ErrorCode, message: req.body?.ErrorMessage, payload: req.body })
   const usd = priceUsd(req.body?.Price)
   if (usd !== null) {
     const { withMargin } = await import('@jeffi/pricing')
@@ -425,6 +423,7 @@ if (!process.env.VITEST) {
   const port = Number(process.env.PORT || 3101)
   await app.listen({ port, host: '0.0.0.0' })
   wa.startApprovalSync(m => app.log.info(m))
+  startDeliverySync(m => app.log.warn(m))
   startWorker(db, 'messages', async (item, job) => {
     const o = job.options as { space?: 'store' | 'api'; tenantSlug?: string }
     try {

@@ -59,3 +59,13 @@ export function priceUsd(raw: string | undefined): number | null {
   const n = Number(raw)
   return Number.isFinite(n) ? Math.abs(n) : null
 }
+
+/** No public callback URL (local dev) → delivery outcomes have to be polled. */
+export const callbacksEnabled = () => callback('x') !== undefined
+
+export async function fetchStatus(sid: string): Promise<{ status: string; code?: string; message?: string }> {
+  const c = client()
+  if (!c) throw new Error('Twilio not configured')
+  const m = await c.messages(sid).fetch()
+  return { status: m.status, code: m.errorCode ? String(m.errorCode) : undefined, message: m.errorMessage ?? undefined }
+}
