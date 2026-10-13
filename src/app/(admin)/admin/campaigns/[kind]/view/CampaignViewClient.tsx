@@ -47,6 +47,7 @@ interface ViewCampaign extends CampaignRow {
   template_mode?: string | null
   blocks?: EmailBlock[] | null
   sms_template?: string | null
+  sms_template_slug?: string | null
   wa_template_sid?: string | null
   wa_template_slug?: string | null
   wa_variables?: Record<string, string> | null
@@ -69,6 +70,7 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
   const [recentSends, setRecentSends] = useState<RecentSend[]>([])
   const [sendsTotal, setSendsTotal] = useState(0)
   const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([])
+  const [smsLibraryBody, setSmsLibraryBody] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -90,6 +92,16 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
     })()
   }, [kind])
 
+  // SMS body can come from a linked library template (slug) instead of an inline template.
+  useEffect(() => {
+    const slug = c?.sms_template_slug
+    if (!slug) { setSmsLibraryBody(null); return }
+    fetch(`/api/admin/messaging-templates/sms/${encodeURIComponent(slug)}`, { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(a => setSmsLibraryBody(a?.current_version?.body ?? null))
+      .catch(() => {})
+  }, [c?.sms_template_slug])
+
   if (loading) return <CampaignPageSkeleton><CampaignDetailSkeleton /></CampaignPageSkeleton>
   if (error || !c) return <div className="p-6 text-sm text-red-600">{error || 'Not found'}</div>
 
@@ -97,7 +109,10 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
   const bodySource = c.template_mode === 'blocks' && c.blocks?.length ? renderBlocks(c.blocks) : c.body_template
   const previewSubject = renderVars(c.subject_template, vars)
   const previewDoc = renderVars(renderLayoutPreview(c.template_layout, renderVars(bodySource, vars)), vars)
-  const smsPreview = c.sms_template ? renderVars(c.sms_template, vars) : ''
+  // SMS preview: linked library template wins, else the inline template.
+  const smsSource = c.sms_template?.trim() || smsLibraryBody || ''
+  const smsEnabled = !!c.parameters?.smsEnabled || !!c.sms_template?.trim()
+  const smsPreview = smsEnabled && smsSource ? renderVars(smsSource, vars) : ''
   const layoutLabel = EMAIL_LAYOUT_OPTIONS.find(l => l.key === c.template_layout)?.label ?? 'Classic'
   const waEnabled = campaignSupportsWhatsApp(kind) && !!c.parameters?.whatsappEnabled && !!c.wa_template_slug
 
