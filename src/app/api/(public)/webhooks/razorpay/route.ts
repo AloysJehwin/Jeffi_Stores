@@ -230,15 +230,12 @@ async function handlePaymentCaptured(payment: any) {
   // credit exactly once.
   if (payment?.notes?.purpose === 'wallet_topup') {
     const tenantId = (payment.notes.tenant_id ?? '').toString().trim()
-    const amountInr = (Number(payment.amount) || 0) / 100
-    if (tenantId && amountInr > 0) {
-      const { rechargeWallet } = await import('@/lib/payments/wallet')
-      await rechargeWallet({
-        tenantId,
-        amountInr,
-        note: `Razorpay top-up ${razorpayPaymentId}`,
-        externalRef: razorpayPaymentId,
-      }).catch(() => {})
+    if (tenantId && Number(payment.amount) > 0) {
+      // The order's notes carry credit_inr (the payment's may not): credit excludes the GST.
+      const { getRazorpayInstance } = await import('@/lib/payments/razorpay')
+      const order = razorpayOrderId ? await getRazorpayInstance().orders.fetch(razorpayOrderId).catch(() => null) : null
+      const { creditTopup } = await import('@/lib/billing/topup')
+      await creditTopup({ tenantId, paymentId: razorpayPaymentId, paidPaise: Number(payment.amount), notes: (order?.notes as any) ?? payment.notes }).catch(() => {})
     }
     return
   }

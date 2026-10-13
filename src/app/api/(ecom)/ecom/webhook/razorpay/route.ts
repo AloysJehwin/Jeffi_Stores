@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyWebhookSignature } from '@/lib/payments/razorpay-subscriptions'
 import { getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
 import { sendStoreLiveEmail } from '@/lib/shared/ecom-emails'
+import { issuePlatformInvoiceLater } from '@/lib/billing/platform-invoice'
 import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'
@@ -108,6 +109,7 @@ export async function POST(request: NextRequest) {
         // Recurring charge on an already-live tenant — just keep the subscription active.
         await setSubscriptionStatus(tenant.id, 'active')
       }
+      await invoiceSubscriptionCharge(tenant.id, sub, payload.payload?.payment?.entity)
       break
 
     case 'subscription.halted':
@@ -146,4 +148,20 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ ok: true })
+}
+
+// Tax invoice for every successful plan charge (first and recurring). Plan prices include GST.
+async function invoiceSubscriptionCharge(tenantId: string, sub: any, payment: any) {
+  if (!payment?.id || !(Number(payment.amount) > 0)) return
+  const plan = (await controlPlanePool().query(
+    `SELECT p.slug, p.name, t.billing_interval FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id WHERE t.id=$1`, [tenantId]
+  ).catch(() => null))?.rows[0]
+  const d = (sec?: number) => (sec ? new Date(sec * 1000).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null)
+  const period = d(sub?.current_start) && d(sub?.current_end) ? ` · ${d(sub.current_start)} – ${d(sub.current_end)}` : ''
+  const name = plan?.name || (plan?.slug ? plan.slug[0].toUpperCase() + plan.slug.slice(1) : 'Store')
+  issuePlatformInvoiceLater({
+    tenantId, kind: 'subscription', externalRef: payment.id, sac: '998315',
+    description: `Jeffi Commerce ${name} plan (${plan?.billing_interval === 'yearly' ? 'yearly' : 'monthly'})${period}`,
+    amountInr: Number(payment.amount) / 100, pricesIncludeGst: true,
+  })
 }

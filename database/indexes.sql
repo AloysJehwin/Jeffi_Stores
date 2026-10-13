@@ -2107,3 +2107,5 @@ CREATE INDEX IF NOT EXISTS idx_message_events_message ON public.message_events (
 CREATE INDEX IF NOT EXISTS idx_bulk_jobs_tenant_kind ON public.bulk_jobs (tenant_id, kind, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_bulk_items_claim ON public.bulk_job_items (status, job_id, seq);
 CREATE INDEX IF NOT EXISTS idx_bulk_items_job ON public.bulk_job_items (job_id, seq);
+
+CREATE INDEX IF NOT EXISTS idx_platform_invoices_tenant ON public.platform_invoices (tenant_id, created_at DESC);
