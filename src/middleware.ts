@@ -78,7 +78,7 @@ function isMobileUA(ua: string | null): boolean {
 }
 
 function isAdminWritePath(pathname: string): boolean {
-  return /\/admin\/(products|categories|brands|coupons|review-forms|suppliers|inventory\/po|mailer|campaigns|service-accounts|team)\/(?:(?:add|new)(?:\/|$)|(?:[^/]+\/)?edit(?:\/|$))/i.test(
+  return /\/admin\/(products|categories|brands|coupons|review-forms|suppliers|inventory\/po|mailer|marketing\/messaging|campaigns|service-accounts|team)\/(?:(?:add|new)(?:\/|$)|(?:[^/]+\/)?edit(?:\/|$))/i.test(
     pathname
   )
 }

@@ -32,6 +32,7 @@ const HINTS: Record<string, string[]> = {
   replenishment: ['promo/reorder'], subscription_renewal: ['promo/reorder'],
   loyalty_tier_upgrade: ['loyalty/', 'promo/vip-tier'], loyalty_points_reminder: ['loyalty/'],
   referral_invite: ['referral/'],
+  messaging: ['messaging/', 'promo/', 'starter/'],
 }
 
 function waHints(kind: string): string[] {

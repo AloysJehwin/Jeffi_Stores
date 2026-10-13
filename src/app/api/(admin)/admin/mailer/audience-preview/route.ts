@@ -5,6 +5,7 @@ import { queryMany } from '@/lib/shared/db'
 
 interface Recipient {
   email: string
+  phone: string | null
   first_name: string | null
 }
 
@@ -16,8 +17,8 @@ export async function POST(request: NextRequest) {
 
   const { audience_type, audience_filter } = await request.json()
 
-  const base = `SELECT u.email, u.first_name FROM users u`
-  const where = `WHERE u.is_active = true AND u.is_guest = false AND u.email IS NOT NULL`
+  const base = `SELECT u.email, u.phone, u.first_name FROM users u`
+  const where = `WHERE u.is_active = true AND u.is_guest = false AND u.email IS NOT NULL AND u.marketing_opt_out = false`
 
   let recipients: Recipient[]
 
@@ -30,5 +31,5 @@ export async function POST(request: NextRequest) {
     recipients = await queryMany<Recipient>(`${base} ${where}`)
   }
 
-  return NextResponse.json({ count: recipients.length, recipients })
+  return NextResponse.json({ count: recipients.length, withPhone: recipients.filter(r => r.phone).length, recipients })
 }

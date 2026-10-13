@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   const [campaigns, total] = await Promise.all([
     queryMany(
-      `SELECT id, title, template_key, subject, audience_type, recipient_count, status, scheduled_at, sent_at, created_at
+      `SELECT id, title, template_key, subject, channels, audience_type, recipient_count, status, scheduled_at, sent_at, created_at
        FROM email_campaigns ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
       [pageSize, offset]
     ),
@@ -34,15 +34,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
-  const { title, template_key, subject, template_data, audience_type, audience_filter } = body
+  const { title, template_key, subject, template_data, audience_type, audience_filter, channels } = body
 
   if (!title || !template_key || !subject || !audience_type) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
   const result = await query(
-    `INSERT INTO email_campaigns (title, template_key, subject, template_data, audience_type, audience_filter, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    `INSERT INTO email_campaigns (title, template_key, subject, template_data, audience_type, audience_filter, created_by, channels)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
     [
       title,
       template_key,
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       audience_type,
       JSON.stringify(audience_filter || {}),
       admin.adminId,
+      JSON.stringify(channels || {}),
     ]
   )
 

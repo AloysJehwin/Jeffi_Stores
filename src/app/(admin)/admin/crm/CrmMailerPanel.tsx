@@ -294,8 +294,8 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
     }
     setSendError(null)
     const ok = await confirm({
-      title: 'Send Mailer',
-      message: `Send mailer to ${recipientCount} ${segmentLabel} customers?`,
+      title: 'Send message',
+      message: `Send a message to ${recipientCount} ${segmentLabel} customers?`,
       confirmLabel: 'Send',
     })
     if (!ok) return
@@ -318,7 +318,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
         }),
       })
       if (!createRes.ok) {
-        showToast('Failed to create mailer.', 'error')
+        showToast('Failed to create message.', 'error')
         return
       }
       const { id } = await createRes.json()
@@ -330,7 +330,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
         const result = await sendRes.json()
         setSendResult(result)
       } else {
-        showToast('Failed to send. Check Mailer page.', 'error')
+        showToast('Failed to send. Check the Messaging page.', 'error')
       }
     } finally {
       setSending(false)
@@ -345,7 +345,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
         <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
           <Mail className="w-6 h-6 text-green-600 dark:text-green-400" />
         </div>
-        <p className="text-sm font-semibold text-foreground">Mailer sent!</p>
+        <p className="text-sm font-semibold text-foreground">Message sent!</p>
         <p className="text-xs text-foreground-muted">
           {sendResult.sent} sent · {sendResult.failed} failed
         </p>

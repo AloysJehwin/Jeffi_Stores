@@ -14,6 +14,7 @@ interface Campaign {
   id: string
   title: string
   template_key: string
+  channels?: Record<string, { slug: string }> | null
   subject: string
   audience_type: string
   recipient_count: number | null
@@ -30,6 +31,11 @@ interface Props {
   currentListUrl: string
   host?: string
 }
+
+const channelLabel = (c: { template_key: string; channels?: Record<string, { slug: string }> | null }, labels: Record<string, string>) =>
+  c.template_key === 'library'
+    ? Object.entries(c.channels ?? {}).map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`).join(' · ') || 'No channels'
+    : labels[c.template_key] || c.template_key
 
 function formatDate(c: Campaign): string {
   if (c.status === 'scheduled' && c.scheduled_at) {
@@ -57,8 +63,8 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
   const viewUrl = (c: Campaign) =>
     ap(
       c.status === 'draft'
-        ? `/admin/mailer/new?draftId=${c.id}`
-        : `/admin/mailer/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`,
+        ? `/admin/marketing/messaging/new?draftId=${c.id}`
+        : `/admin/marketing/messaging/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`,
       host
     )
 
@@ -66,7 +72,7 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
     if (busy) return
     setBusy(true)
     try {
-      await fetch(`/api/admin/mailer/${c.id}/send`, {
+      await fetch(`/api/admin/marketing/messaging/${c.id}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dispatchNow: true }),
@@ -89,7 +95,7 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
     if (!ok || busy) return
     setBusy(true)
     try {
-      await fetch(`/api/admin/mailer/${c.id}`, { method: 'DELETE' })
+      await fetch(`/api/admin/marketing/messaging/${c.id}`, { method: 'DELETE' })
       setSelected(null)
       router.refresh()
     } finally {
@@ -148,7 +154,7 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
             {statusBadge(c.status)}
           </div>
           <p className="text-xs text-foreground-muted mt-2">
-            {templateLabels[c.template_key] || c.template_key} · {c.audience_type.replace('_', ' ')}
+            {channelLabel(c, templateLabels)} · {c.audience_type.replace('_', ' ')}
           </p>
           {c.recipient_count != null && (
             <p className="text-xs text-foreground-muted mt-0.5">{c.recipient_count} recipients</p>
@@ -180,7 +186,7 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
             <div className="flex items-center justify-between gap-3">
               <dt className="text-foreground-muted">Template</dt>
               <dd className="text-foreground text-right">
-                {templateLabels[selected.template_key] || selected.template_key}
+                {channelLabel(selected, templateLabels)}
               </dd>
             </div>
             <div className="flex items-center justify-between gap-3">

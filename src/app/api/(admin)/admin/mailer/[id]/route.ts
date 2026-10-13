@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const logPageSize = 50
   const [logs, logTotal] = await Promise.all([
     queryMany(
-      'SELECT email, status, error, sent_at FROM email_campaign_logs WHERE campaign_id = $1 ORDER BY sent_at DESC LIMIT $2 OFFSET $3',
+      'SELECT email, channel, to_address, status, error, sent_at FROM email_campaign_logs WHERE campaign_id = $1 ORDER BY sent_at DESC LIMIT $2 OFFSET $3',
       [id, logPageSize, (logPage - 1) * logPageSize]
     ),
     queryCount('SELECT COUNT(*) FROM email_campaign_logs WHERE campaign_id = $1', [id]),
@@ -42,7 +42,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const body = await request.json()
-  const { title, template_key, subject, template_data, audience_type, audience_filter } = body
+  const { title, template_key, subject, template_data, audience_type, audience_filter, channels } = body
   // Normalise scheduled_at to IST-aware timestamp
   const rawSched = body.scheduled_at as string | undefined | null
   const scheduled_at = rawSched
@@ -61,7 +61,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       template_data = COALESCE($4, template_data),
       audience_type = COALESCE($5, audience_type),
       audience_filter = COALESCE($6, audience_filter),
-      scheduled_at = $7
+      scheduled_at = $7,
+      channels = COALESCE($9, channels)
      WHERE id = $8`,
     [
       title,
@@ -72,6 +73,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       audience_filter ? JSON.stringify(audience_filter) : null,
       scheduled_at || null,
       id,
+      channels ? JSON.stringify(channels) : null,
     ]
   )
 

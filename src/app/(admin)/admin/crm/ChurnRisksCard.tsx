@@ -133,7 +133,7 @@ export default function ChurnRisksCard({ items }: { items: ChurnRisk[] }) {
                   <div className="flex flex-col flex-1 min-w-0">
                     <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
                       <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">
-                        Send Mailer
+                        Send message
                       </h3>
                       <Link
                         href={ap('/admin/customers?segment=dormant')}
