@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import UnitRulesPanel, { ProductUnitRule } from '@/components/admin/UnitRulesPanel'
 import BaseUnitForm, { BaseUnitRow } from '@/components/admin/BaseUnitForm'
+import AdminSelect from '@/components/admin/AdminSelect'
 import { type ProductUnit } from '@/components/admin/BaseUnitForm'
 import { Dimension, DIMENSION_LABEL, UNITS, computeAreaFactor, computeVolumeFactor } from '@/lib/catalog/units'
 
@@ -106,6 +107,16 @@ export default function UnitsManager({
   const [extraLabel, setExtraLabel] = useState('')
   const [extraMinQty, setExtraMinQty] = useState('1')
   const [extraMaxQty, setExtraMaxQty] = useState('')
+  const [isCustomExtra, setIsCustomExtra] = useState(false)
+
+  // Names an additional unit can't reuse in this scope: the default unit and the other extras.
+  function takenUnitNames(): Map<string, string> {
+    const taken = new Map<string, string>()
+    if (!inherited) for (const u of allUnits) if (!u.is_base && u.id !== editingExtraId) taken.set(u.unit.toLowerCase(), 'Already added')
+    const base = allUnits.find(u => u.is_base) ?? (isVariantScope || isSubVariantScope ? null : allUnits[0] ?? null)
+    if (base) taken.set(base.unit.toLowerCase(), 'The default unit')
+    return taken
+  }
 
   async function load() {
     setLoading(true)
@@ -184,6 +195,7 @@ export default function UnitsManager({
   function openExtraEdit(u?: ProductUnit) {
     if (u) {
       setExtraUnit(u.unit)
+      setIsCustomExtra(!UNITS.count.some(d => d.key === u.unit))
       setExtraFactor(String(parseFloat(String(u.factor)) || ''))
       setExtraLabel(u.display_label || '')
       setExtraMinQty(u.min_qty != null ? String(Number(u.min_qty)) : '1')
@@ -191,6 +203,7 @@ export default function UnitsManager({
       setEditingExtraId(u.id)
     } else {
       setExtraUnit('')
+      setIsCustomExtra(false)
       setExtraFactor('')
       setExtraLabel('')
       setExtraMinQty('1')
@@ -198,6 +211,19 @@ export default function UnitsManager({
       setEditingExtraId(null)
     }
     setFormMode('extra')
+  }
+
+  function handleExtraUnitChange(v: string) {
+    if (v === '__custom') {
+      setExtraUnit('')
+      setIsCustomExtra(true)
+      setExtraFactor('')
+      return
+    }
+    setIsCustomExtra(false)
+    setExtraUnit(v)
+    const def = UNITS.count.find(u => u.key === v)
+    setExtraFactor(def?.multiplier != null ? String(def.multiplier) : '')
   }
 
   function handleDimensionChange(v: string) {
@@ -423,6 +449,11 @@ export default function UnitsManager({
       showToast('Unit name is required', 'error')
       return
     }
+    const clash = takenUnitNames().get(key.toLowerCase())
+    if (clash) {
+      showToast(`${key} is already ${clash === 'The default unit' ? 'the default unit' : 'added'} here`, 'error')
+      return
+    }
 
     const factorNum = parseFloat(extraFactor)
     if (!Number.isFinite(factorNum) || factorNum <= 0) {
@@ -513,6 +544,12 @@ export default function UnitsManager({
   const extraCountUnits = inherited ? [] : allUnits.filter(u => !u.is_base && u.dimension === 'count')
   const showExtraSection = !baseUnit || baseUnit.dimension === 'count'
   const extraDimension = DIMENSION_LABEL[(baseUnit?.dimension as Dimension) || 'count'] ?? 'Count / Pieces'
+  const takenNames = takenUnitNames()
+  const extraUnitOptions = [
+    ...UNITS.count.map(d => ({ value: d.key, label: d.label, disabled: takenNames.has(d.key), hint: takenNames.get(d.key) })),
+    { value: '__custom', label: 'Custom…' },
+  ]
+  const extraPredefined = !isCustomExtra && UNITS.count.find(u => u.key === extraUnit)?.multiplier != null
 
   const dimUnits = UNITS[draftDimension] || []
   const selectedDef = dimUnits.find(u => u.key === draftUnit)
@@ -738,25 +775,54 @@ export default function UnitsManager({
               <div className="grid grid-cols-4 gap-x-2 items-end">
                 <div>
                   <label className="block text-[10px] text-foreground-muted mb-0.5">Unit name *</label>
-                  <input
-                    value={extraUnit}
-                    onChange={e => setExtraUnit(e.target.value)}
-                    className={inputCls}
-                    placeholder="e.g. box, dozen, carton"
-                    autoFocus
-                  />
+                  {isCustomExtra ? (
+                    <div className="flex gap-1">
+                      <input
+                        value={extraUnit}
+                        onChange={e => setExtraUnit(e.target.value)}
+                        className={`${inputCls} flex-1`}
+                        placeholder="e.g. carton, pallet"
+                        autoFocus
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleExtraUnitChange('')}
+                        className="px-2 text-[10px] text-foreground-muted hover:text-foreground border border-border-secondary rounded shrink-0"
+                        title="Pick from list"
+                      >
+                        &#x25C4;
+                      </button>
+                    </div>
+                  ) : (
+                    <AdminSelect
+                      value={extraUnit}
+                      onChange={handleExtraUnitChange}
+                      placeholder="— pick —"
+                      options={extraUnitOptions}
+                      sm
+                    />
+                  )}
                 </div>
                 <div>
-                  <label className="block text-[10px] text-foreground-muted mb-0.5">Pcs per unit *</label>
-                  <input
-                    type="number"
-                    step="1"
-                    min="2"
-                    value={extraFactor}
-                    onChange={e => setExtraFactor(e.target.value)}
-                    className={inputCls}
-                    placeholder="e.g. 100"
-                  />
+                  <label className="block text-[10px] text-foreground-muted mb-0.5">
+                    {extraPredefined ? 'Pcs per unit (locked)' : 'Pcs per unit *'}
+                  </label>
+                  {extraPredefined ? (
+                    <div className={lockedCls} title="Predefined — value is fixed">
+                      <span className="text-foreground font-mono">{extraFactor}</span>
+                      <span className="ml-2 text-[10px] text-foreground-muted">(fixed)</span>
+                    </div>
+                  ) : (
+                    <input
+                      type="number"
+                      step="1"
+                      min="2"
+                      value={extraFactor}
+                      onChange={e => setExtraFactor(e.target.value)}
+                      className={inputCls}
+                      placeholder="e.g. 100"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-[10px] text-foreground-muted mb-0.5">Label (UI)</label>
