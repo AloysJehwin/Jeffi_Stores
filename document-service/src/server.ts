@@ -12,6 +12,7 @@ import { renderPdf, LAYOUTS } from './pdf.js'
 import { putPdf, getPdf, pdfUrl } from './storage.js'
 import { appFromHost } from '@jeffi/tenancy'
 import { publicRoutes } from './tenant/public.js'
+import { adminRoutes } from './admin/index.js'
 
 const url = process.env.DOCUMENTS_DATABASE_URL
 if (!url) throw new Error('DOCUMENTS_DATABASE_URL is not set')
@@ -53,6 +54,7 @@ app.setErrorHandler((err: any, _req, reply) => {
 })
 app.get('/healthz', async () => ({ ok: true, service: 'documents' }))
 await app.register(publicRoutes)
+await app.register(adminRoutes)
 
 interface DocRow {
   id: string
