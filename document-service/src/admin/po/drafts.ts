@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from '../../shim'
-import { authenticateAdmin } from '../../shim'
+import { NextRequest, NextResponse } from '../../next'
+import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { query, queryMany, queryOne } from '@jeffi/tenancy'
 import { z } from 'zod'
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
        LEFT JOIN suppliers s ON s.id = d.supplier_id
       WHERE d.admin_id = $1 AND d.promoted_po_id IS NULL
       ORDER BY d.updated_at DESC`,
-    [admin.principalId]
+    [admin.id]
   )
   return NextResponse.json({ drafts: rows })
 }
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   // Partial unique index enforces one open draft per admin — reuse if one is already open.
   const existing = await queryOne<{ id: string }>(
     `SELECT id FROM po_drafts WHERE admin_id = $1 AND promoted_po_id IS NULL LIMIT 1`,
-    [admin.principalId]
+    [admin.id]
   )
   if (existing) return NextResponse.json({ id: existing.id, resumed: true })
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
      RETURNING id`,
     [
-      admin.principalId,
+      admin.id,
       d.supplier_id ?? null,
       d.order_date ?? null,
       d.expected_date ?? null,

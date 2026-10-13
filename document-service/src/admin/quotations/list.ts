@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from '../../shim'
-import { authenticateAdmin } from '../../shim'
+import { NextRequest, NextResponse } from '../../next'
+import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { queryMany, queryOne, withTransaction } from '@jeffi/tenancy'
 import { buildVectorSearchClause } from '../../lib/search'
@@ -189,7 +189,7 @@ export async function POST(request: NextRequest) {
             totals.cgst_amount,
             totals.sgst_amount,
             totals.total_amount,
-            admin.principalId,
+            admin.adminId,
           ]
         )
       ).rows[0]

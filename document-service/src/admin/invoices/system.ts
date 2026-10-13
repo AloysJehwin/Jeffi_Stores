@@ -1,6 +1,6 @@
 // Monolith-originated calls with no admin session (checkout, webhooks, subscription cycles).
 import { withTransaction } from '@jeffi/tenancy'
-import { NextResponse, type NextRequest } from '../../shim'
+import { NextResponse, type NextRequest } from '../../next'
 import { createDraftInvoice, assignInvoiceNumber, generateOrderInvoice } from '../../lib/invoice'
 
 const idOf = async (ctx: { params: Promise<{ id: string }> }) => (await ctx.params).id

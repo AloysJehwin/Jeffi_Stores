@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { NextResponse } from '../shim'
+import { NextResponse } from '../next'
 
 export const zUuid = z.string().uuid()
 export const zNonEmpty = z.string().trim().min(1, 'Must not be empty')

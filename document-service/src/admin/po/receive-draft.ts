@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from '../../shim'
-import { authenticateAdmin } from '../../shim'
+import { NextRequest, NextResponse } from '../../next'
+import { authenticateAdmin } from '../../auth'
 import { hasScope } from '../../lib/scopes'
 import { query, queryOne } from '@jeffi/tenancy'
 import { z } from 'zod'
@@ -55,7 +55,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
            updated_at = now()`,
     [
       id,
-      admin.principalId,
+      admin.adminId,
       d.line_items !== undefined ? JSON.stringify(d.line_items) : null,
       d.serials !== undefined ? JSON.stringify(d.serials) : null,
     ]
