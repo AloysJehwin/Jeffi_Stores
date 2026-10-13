@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { portalRoot } from '@/lib/shared/portal-root'
 
 export interface SelectOption {
   value: string
@@ -272,7 +273,7 @@ export default function AdminSelect({
                 })}
               </ul>
             </div>,
-            document.body
+            portalRoot()
           )}
       </div>
 
