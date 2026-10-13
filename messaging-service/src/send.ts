@@ -63,12 +63,13 @@ interface Ctx {
   apiKeyId?: string
   batchId?: string
   internal?: boolean
+  space?: tpl.Space
 }
 
 // v2 library (tenant copy → platform default) first; legacy message_templates as fallback.
-async function resolveTemplate(tenantId: string, channel: string, slug: string) {
+async function resolveTemplate(tenantId: string, channel: string, slug: string, space: tpl.Space = 'store') {
   const { pools } = await poolsForTenant(tenantId)
-  let t = await tpl.findBySlugWithDefaults(pools, tenantId, channel, slug)
+  let t = await tpl.findBySlugWithDefaults(pools, tenantId, channel, slug, 'en', space)
   // WhatsApp only delivers approved templates: a tenant copy that isn't approved yet falls back to the
   // standard approved one, and an edited-but-unapproved version sends the approved text it replaces.
   if (channel === 'whatsapp' && t && !t.variant.provider_ref && tenantId !== tpl.PLATFORM_TENANT_ID)
@@ -90,7 +91,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   let body = req.body ?? ''
   let providerRef: string | undefined = req.provider_ref
   if (req.template) {
-    const t = await resolveTemplate(ctx.tenantId, req.channel, req.template)
+    const t = await resolveTemplate(ctx.tenantId, req.channel, req.template, ctx.space)
     if (!t) throw new SendError(404, 'template_not_found', `No ${req.channel} template '${req.template}'`)
     const missing = missingKeys(t.body + ' ' + (t.subject ?? ''), vars)
     if (missing.length) throw new SendError(422, 'missing_variables', `Template needs: ${missing.join(', ')}`, { missing })

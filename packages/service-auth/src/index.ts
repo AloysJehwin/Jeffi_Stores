@@ -12,6 +12,7 @@ export interface ServiceClaims {
   userId?: string // customer-session-originated call (proxied from the monolith)
   role?: string
   scopes?: string[]
+  space?: 'store' | 'api' // which template copies the caller reads/edits (default by service)
   exp: number
 }
 

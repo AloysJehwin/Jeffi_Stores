@@ -48,17 +48,20 @@ export interface FullTemplate {
   family: FamilyRow; template: TemplateRow; variant: VariantRow; version: VersionRow | null
 }
 
-export const listFamilies = (e: Executor, tenantId: string, channel?: string, category?: string) =>
+// A tenant can run a store and the Messaging API; each keeps its own template copies ('space').
+export type Space = 'store' | 'api'
+
+export const listFamilies = (e: Executor, tenantId: string, channel?: string, category?: string, space: Space = 'store') =>
   rows(e,
     `SELECT f.*, COALESCE(array_agg(t.channel ORDER BY t.channel) FILTER (WHERE t.id IS NOT NULL), '{}') AS channels
        FROM template_family f
        LEFT JOIN template t ON t.family_id=f.id AND ($2::text IS NULL OR t.channel=$2)
-      WHERE f.tenant_id=$1 AND ($3::text IS NULL OR f.category=$3)
+      WHERE f.tenant_id=$1 AND f.space=$4 AND ($3::text IS NULL OR f.category=$3)
       GROUP BY f.id
       ORDER BY f.name`,
-    [tenantId, channel ?? null, category ?? null])
+    [tenantId, channel ?? null, category ?? null, space])
 
-export const listTemplates = (e: Executor, tenantId: string, channel?: string) =>
+export const listTemplates = (e: Executor, tenantId: string, channel?: string, space: Space = 'store') =>
   rows(e,
     `SELECT t.id, t.family_id, t.channel, t.status, t.current_variant_id, t.tenant_id,
             f.slug, f.name, f.category,
@@ -68,15 +71,15 @@ export const listTemplates = (e: Executor, tenantId: string, channel?: string) =
        JOIN template_family f ON f.id=t.family_id
        LEFT JOIN template_variant v ON v.id=t.current_variant_id
        LEFT JOIN template_version ver ON ver.id=v.current_version_id
-      WHERE t.tenant_id=$1 AND ($2::text IS NULL OR t.channel=$2)
+      WHERE t.tenant_id=$1 AND f.space=$3 AND ($2::text IS NULL OR t.channel=$2)
       ORDER BY f.name, t.channel`,
-    [tenantId, channel ?? null])
+    [tenantId, channel ?? null, space])
 
 // Tenant rows (tenant pool) + platform defaults (flagship pool); tenant shadows same slug+channel.
 // A tenant DB that lacks the template tables yet (42P01) just yields no overrides.
 const noTable = (e: any) => e?.code === '42P01'
-export async function listTemplatesWithDefaults(p: Pools, tenantId: string, channel?: string) {
-  const own = await listTemplates(p.tenant, tenantId, channel).catch(e => { if (noTable(e)) return []; throw e })
+export async function listTemplatesWithDefaults(p: Pools, tenantId: string, channel?: string, space: Space = 'store') {
+  const own = await listTemplates(p.tenant, tenantId, channel, space).catch(e => { if (noTable(e)) return []; throw e })
   if (tenantId === PLATFORM_TENANT_ID) return own.map(r => ({ ...r, source: 'platform' }))
   const defaults = await listTemplates(p.platform, PLATFORM_TENANT_ID, channel)
   const key = (r: any) => `${r.slug}|${r.channel}`
@@ -88,8 +91,8 @@ export async function listTemplatesWithDefaults(p: Pools, tenantId: string, chan
 }
 
 // Tenant copy first; else the platform default (flagship pool) with the same slug.
-export async function findBySlugWithDefaults(p: Pools, tenantId: string, channel: string, slug: string, locale = 'en'): Promise<FullTemplate | null> {
-  const own = await findBySlug(p.tenant, tenantId, channel, slug, locale).catch(e => { if (noTable(e)) return null; throw e })
+export async function findBySlugWithDefaults(p: Pools, tenantId: string, channel: string, slug: string, locale = 'en', space: Space = 'store'): Promise<FullTemplate | null> {
+  const own = await findBySlug(p.tenant, tenantId, channel, slug, locale, space).catch(e => { if (noTable(e)) return null; throw e })
   if (own || tenantId === PLATFORM_TENANT_ID) return own
   return findBySlug(p.platform, PLATFORM_TENANT_ID, channel, slug, locale)
 }
@@ -98,8 +101,8 @@ export async function findBySlugWithDefaults(p: Pools, tenantId: string, channel
 export const liveVersion = (e: Executor, variantId: string, providerRef: string) =>
   first<VersionRow>(e, `SELECT * FROM template_version WHERE variant_id=$1 AND provider_ref=$2 ORDER BY version DESC LIMIT 1`, [variantId, providerRef])
 
-export async function findBySlug(e: Executor, tenantId: string, channel: string, slug: string, locale = 'en'): Promise<FullTemplate | null> {
-  const family = await first<FamilyRow>(e, `SELECT * FROM template_family WHERE tenant_id=$1 AND slug=$2`, [tenantId, slug])
+export async function findBySlug(e: Executor, tenantId: string, channel: string, slug: string, locale = 'en', space: Space = 'store'): Promise<FullTemplate | null> {
+  const family = await first<FamilyRow>(e, `SELECT * FROM template_family WHERE tenant_id=$1 AND slug=$2 AND space=$3`, [tenantId, slug, space])
   if (!family) return null
   const template = await first<TemplateRow>(e, `SELECT * FROM template WHERE family_id=$1 AND channel=$2`, [family.id, channel])
   if (!template) return null
@@ -113,10 +116,10 @@ export async function findBySlug(e: Executor, tenantId: string, channel: string,
   return { family, template, variant, version }
 }
 
-export async function findById(e: Executor, tenantId: string, templateId: string): Promise<FullTemplate | null> {
+export async function findById(e: Executor, tenantId: string, templateId: string, space: Space = 'store'): Promise<FullTemplate | null> {
   const template = await first<TemplateRow>(e, `SELECT * FROM template WHERE id=$1 AND tenant_id=$2`, [templateId, tenantId])
   if (!template) return null
-  const family = await first<FamilyRow>(e, `SELECT * FROM template_family WHERE id=$1`, [template.family_id])
+  const family = await first<FamilyRow>(e, `SELECT * FROM template_family WHERE id=$1 AND space=$2`, [template.family_id, space])
   if (!family) return null
   const variant = template.current_variant_id
     ? await first<VariantRow>(e, `SELECT * FROM template_variant WHERE id=$1`, [template.current_variant_id])
@@ -150,19 +153,19 @@ export interface UpsertInput {
   publish?: boolean
 }
 
-export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertInput): Promise<FullTemplate> {
+export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertInput, space: Space = 'store'): Promise<FullTemplate> {
   const c = await pool.connect()
   try {
     await c.query('BEGIN')
     const family = (await c.query<FamilyRow>(
-      `INSERT INTO template_family (tenant_id, slug, name, category, description)
-       VALUES ($1,$2,$3,$4,$5)
-       ON CONFLICT (tenant_id, slug) DO UPDATE SET name=EXCLUDED.name,
+      `INSERT INTO template_family (tenant_id, slug, name, category, description, space)
+       VALUES ($1,$2,$3,$4,$5,$6)
+       ON CONFLICT (tenant_id, space, slug) DO UPDATE SET name=EXCLUDED.name,
          category=COALESCE(EXCLUDED.category, template_family.category),
          description=COALESCE(EXCLUDED.description, template_family.description),
          updated_at=now()
        RETURNING *`,
-      [tenantId, i.slug, i.name, i.category ?? null, i.description ?? null])).rows[0]
+      [tenantId, i.slug, i.name, i.category ?? null, i.description ?? null, space])).rows[0]
 
     const template = (await c.query<TemplateRow>(
       `INSERT INTO template (family_id, tenant_id, channel, status)
@@ -229,19 +232,21 @@ export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertI
   }
 }
 
-export async function publishVersion(e: Executor, tenantId: string, variantId: string, versionId: string) {
+export async function publishVersion(e: Executor, tenantId: string, variantId: string, versionId: string, space: Space = 'store') {
   const r = await e.query(
     `UPDATE template_variant SET current_version_id=$2, updated_at=now()
       WHERE id=$1 AND tenant_id=$3
-        AND EXISTS (SELECT 1 FROM template_version WHERE id=$2 AND variant_id=$1)`,
-    [variantId, versionId, tenantId])
+        AND EXISTS (SELECT 1 FROM template_version WHERE id=$2 AND variant_id=$1)
+        AND EXISTS (SELECT 1 FROM template t JOIN template_family f ON f.id=t.family_id WHERE t.id=template_variant.template_id AND f.space=$4)`,
+    [variantId, versionId, tenantId, space])
   return (r.rowCount ?? 0) > 0
 }
 
-export async function archiveTemplate(e: Executor, tenantId: string, templateId: string) {
+export async function archiveTemplate(e: Executor, tenantId: string, templateId: string, space: Space = 'store') {
   const r = await e.query(
-    `UPDATE template SET status='archived', updated_at=now() WHERE id=$1 AND tenant_id=$2`,
-    [templateId, tenantId])
+    `UPDATE template SET status='archived', updated_at=now() WHERE id=$1 AND tenant_id=$2
+        AND EXISTS (SELECT 1 FROM template_family f WHERE f.id=template.family_id AND f.space=$3)`,
+    [templateId, tenantId, space])
   return (r.rowCount ?? 0) > 0
 }
 

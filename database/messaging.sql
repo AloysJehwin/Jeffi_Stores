@@ -6,6 +6,7 @@
 CREATE TABLE IF NOT EXISTS public.template_family (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     tenant_id uuid NOT NULL,
+    space character varying(16) DEFAULT 'store'::character varying NOT NULL,
     slug character varying(80) NOT NULL,
     name character varying(120) NOT NULL,
     category character varying(32),

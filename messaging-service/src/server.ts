@@ -50,7 +50,7 @@ app.get('/healthz', async () => ({ ok: true, service: 'messaging' }))
 app.post('/messages', async req => {
   const body = SendMessageRequest.parse(req.body)
   const { tenantId, tenantSlug, apiKeyId, internal } = req.claims
-  return msgToApi(await sendMessage({ tenantId, tenantSlug, apiKeyId, internal }, body))
+  return msgToApi(await sendMessage({ tenantId, tenantSlug, apiKeyId, internal, space: spaceOf(req) }, body))
 })
 
 app.post('/messages/batch', async req => {
@@ -62,7 +62,7 @@ app.post('/messages/batch', async req => {
   // Sequential on purpose: provider rate limits + wallet row lock. A worker queue comes with scale.
   for (const r of body.recipients) {
     try {
-      const m = await sendMessage({ tenantId, tenantSlug, apiKeyId, batchId }, {
+      const m = await sendMessage({ tenantId, tenantSlug, apiKeyId, batchId, space: spaceOf(req) }, {
         channel: body.channel,
         to: r.to,
         template: body.template,
@@ -115,12 +115,14 @@ app.delete<{ Params: { channel: string; slug: string } }>('/templates/:channel/:
 // ── templates v2 (three-level: family → template → variant → version) ──
 
 const poolFor = (req: FastifyRequest) => poolsForTenant(req.claims.tenantId)
+// Store (admin + store sends) and Messaging API (console + API keys) keep separate template copies.
+const spaceOf = (req: FastifyRequest): tpl.Space => req.claims.space ?? (req.claims.service === 'public-api' ? 'api' : 'store')
 
 app.get<{ Params: { channel: string; slug: string }; Querystring: { locale?: string } }>(
   '/v2/templates/:channel/:slug',
   async (req, reply) => {
     const { pools } = await poolFor(req)
-    const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, Channel.parse(req.params.channel), req.params.slug, req.query.locale ?? 'en')
+    const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, Channel.parse(req.params.channel), req.params.slug, req.query.locale ?? 'en', spaceOf(req))
     if (!t) return reply.code(404).send({ error: 'not_found' })
     return tpl.toApi(t)
   }
@@ -128,26 +130,26 @@ app.get<{ Params: { channel: string; slug: string }; Querystring: { locale?: str
 
 app.get<{ Params: { id: string } }>('/v2/templates/:id/versions', async req => {
   const { pool } = await poolFor(req)
-  const t = await tpl.findById(pool, req.claims.tenantId, req.params.id)
+  const t = await tpl.findById(pool, req.claims.tenantId, req.params.id, spaceOf(req))
   if (!t?.variant) return { items: [] }
   return { items: await tpl.listVersions(pool, t.variant.id) }
 })
 
 app.get<{ Querystring: { channel?: string } }>('/v2/templates', async req => {
   const { pools } = await poolFor(req)
-  const items = await tpl.listTemplatesWithDefaults(pools, req.claims.tenantId, req.query.channel)
+  const items = await tpl.listTemplatesWithDefaults(pools, req.claims.tenantId, req.query.channel, spaceOf(req))
   return { items }
 })
 
 app.post('/v2/templates', async req => {
   const { pool } = await poolFor(req)
-  return tpl.toApi(await tpl.upsertTemplate(pool, req.claims.tenantId, req.body as tpl.UpsertInput))
+  return tpl.toApi(await tpl.upsertTemplate(pool, req.claims.tenantId, req.body as tpl.UpsertInput, spaceOf(req)))
 })
 
 app.put<{ Params: { id: string } }>('/v2/templates/:id', async (req, reply) => {
   const { pool } = await poolFor(req)
   // A tenant's first save of a standard template forks it into the tenant's own DB.
-  const existing = await tpl.findById(pool, req.claims.tenantId, req.params.id)
+  const existing = await tpl.findById(pool, req.claims.tenantId, req.params.id, spaceOf(req))
     ?? (req.claims.tenantId !== tpl.PLATFORM_TENANT_ID ? await tpl.findById(db, tpl.PLATFORM_TENANT_ID, req.params.id) : null)
   if (!existing) return reply.code(404).send({ error: 'not_found' })
   const input: tpl.UpsertInput = {
@@ -156,16 +158,16 @@ app.put<{ Params: { id: string } }>('/v2/templates/:id', async (req, reply) => {
     channel: existing.template.channel as any,
     name: (req.body as any).name ?? existing.family.name,
   }
-  return tpl.toApi(await tpl.upsertTemplate(pool, req.claims.tenantId, input))
+  return tpl.toApi(await tpl.upsertTemplate(pool, req.claims.tenantId, input, spaceOf(req)))
 })
 
 app.post<{ Params: { id: string }; Body: { versionId: string } }>(
   '/v2/templates/:id/publish',
   async (req, reply) => {
     const { pool } = await poolFor(req)
-    const t = await tpl.findById(pool, req.claims.tenantId, req.params.id)
+    const t = await tpl.findById(pool, req.claims.tenantId, req.params.id, spaceOf(req))
     if (!t?.variant) return reply.code(404).send({ error: 'not_found' })
-    const ok = await tpl.publishVersion(pool, req.claims.tenantId, t.variant.id, req.body.versionId)
+    const ok = await tpl.publishVersion(pool, req.claims.tenantId, t.variant.id, req.body.versionId, spaceOf(req))
     if (!ok) return reply.code(404).send({ error: 'version_not_found' })
     return { ok: true }
   }
@@ -185,7 +187,7 @@ app.post<{ Body: { channel: string; slug: string; locale?: string; versionId?: s
   '/v2/templates/preview',
   async (req, reply) => {
     const { pools } = await poolFor(req)
-    const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, req.body.channel, req.body.slug, req.body.locale ?? 'en')
+    const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, req.body.channel, req.body.slug, req.body.locale ?? 'en', spaceOf(req))
     if (!t?.version) return reply.code(404).send({ error: 'not_found' })
     const given = req.body.variables ?? {}
     // Preview = sample data: anything the caller didn't supply gets a sample value.
@@ -247,7 +249,7 @@ app.get<{ Params: { code: string } }>('/s/:code', { config: { skipAuth: true } }
 // WhatsApp approval wiring (Twilio Content API).
 const submitHandler = async (req: FastifyRequest<{ Body: { templateId: string; name?: string; category?: string } }>) => {
   const { pool } = await poolFor(req)
-  return wa.submit(pool, req.claims.tenantId, req.claims.tenantSlug, req.body.templateId, { name: req.body.name, category: req.body.category })
+  return wa.submit(pool, req.claims.tenantId, req.claims.tenantSlug, req.body.templateId, { name: req.body.name, category: req.body.category, space: spaceOf(req) })
 }
 app.post('/wa/submit-approval', submitHandler)
 app.post('/v2/templates/wa/submit-approval', submitHandler)
