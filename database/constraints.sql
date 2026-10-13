@@ -533,6 +533,9 @@ ALTER TABLE ONLY public.delhivery_pickup_requests
 ALTER TABLE ONLY public.email_campaign_logs
     ADD CONSTRAINT email_campaign_logs_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY public.email_campaign_logs
+    ADD CONSTRAINT email_campaign_logs_channel_check CHECK (channel IN ('email','sms','whatsapp'));
+
 
 
 --

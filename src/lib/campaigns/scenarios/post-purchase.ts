@@ -131,7 +131,7 @@ export const postPurchase: ScenarioModule<Params, Row> = {
         ctaUrl,
       },
     })
-    if ((params as any).whatsappEnabled) {
+    if ((params as any).whatsappEnabled || (params as any).smsEnabled) {
       sendCampaignWhatsApp(campaign.kind, row.user_id, {
         orderNumber: row.order_number,
         url: ctaUrl,

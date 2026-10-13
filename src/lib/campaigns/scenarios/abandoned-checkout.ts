@@ -234,7 +234,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         ctaUrl,
       },
     })
-    if ((params as any).whatsappEnabled) {
+    if ((params as any).whatsappEnabled || (params as any).smsEnabled) {
       const names = items.map(i => i.name)
       const summary = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
       sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }).catch(() => {})

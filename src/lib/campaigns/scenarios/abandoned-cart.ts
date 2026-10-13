@@ -309,7 +309,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         isFollowUp: sequence === 2 ? 'true' : '',
       },
     })
-    if ((params as any).whatsappEnabled) {
+    if ((params as any).whatsappEnabled || (params as any).smsEnabled) {
       const names = items.map(i => i.name)
       const summary = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
       // Pass the cooldown so WhatsApp dedups per user within the window (stops the resend storm).

@@ -47,3 +47,11 @@ export function recommendScore(kind: string | null | undefined, channel: Channel
   if (hints.some(h => h.endsWith('/') && slug.startsWith(h))) return 1
   return 0
 }
+
+/** Library templates a built-in campaign kind links to by default (see scripts/import-campaign-templates.ts). */
+export function defaultCampaignSlugs(kind: string): { email: string | null; sms: string | null } {
+  return {
+    email: kind === 'review_request' ? null : `campaign/${kind}`, // review_request keeps its AMP renderer
+    sms: kind === 'birthday_collect' ? null : `campaign/${kind}`,
+  }
+}

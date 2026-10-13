@@ -194,7 +194,7 @@ export const secondPurchaseNudge: ScenarioModule<Params, Row> = {
       },
     })
 
-    if (params.whatsappEnabled) {
+    if (params.whatsappEnabled || (params as any).smsEnabled) {
       sendCampaignWhatsApp(
         campaign.kind,
         row.user_id,

@@ -21,6 +21,7 @@ import {
 } from '@/lib/templates/variables'
 import { cooldownMinutes } from '@/lib/campaigns/duration'
 import { bridgeVars } from '@/lib/templates/var-bridge'
+import { withLibraryContent } from '@/lib/campaigns/library-content'
 import { DEFAULT_COUPON_DISCOUNT } from '@/lib/campaigns/default-templates'
 import { queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
@@ -94,7 +95,8 @@ export async function sendCampaignEmail(params: {
   vars: Record<string, string | number>
   metadata?: Record<string, unknown>
 }): Promise<{ ok: boolean; sentId?: string; reason?: string }> {
-  const { campaign, user, referenceId, vars, metadata } = params
+  const { user, referenceId, vars, metadata } = params
+  const campaign = await withLibraryContent(params.campaign)
 
   const eligibility = await canSendMarketing(user.id, campaign.kind as CampaignKind)
   if (!eligibility.ok) return { ok: false, reason: eligibility.reason }
@@ -535,7 +537,7 @@ export async function sendPriceDropEmail(
 }
 
 export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string) {
-  const campaign = await getCampaign(kind)
+  const campaign = await withLibraryContent(await getCampaign(kind))
   if (!campaign) return { ok: false, reason: 'campaign_not_found' }
 
   const { storeBaseUrlAsync, campaignMailFromAsync } = await import('@/lib/catalog/brand')

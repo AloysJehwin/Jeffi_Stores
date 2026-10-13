@@ -2095,3 +2095,5 @@ CREATE INDEX IF NOT EXISTS idx_pub_variant_template ON public.pub_template_varia
 CREATE INDEX IF NOT EXISTS idx_pub_version_variant ON public.pub_template_version (variant_id, version DESC);
 CREATE INDEX IF NOT EXISTS idx_pub_asset_user_kind ON public.pub_template_asset (public_user_id, kind);
 CREATE INDEX IF NOT EXISTS idx_pub_short_link_user ON public.pub_short_link (public_user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_email_campaign_logs_campaign_channel ON public.email_campaign_logs (campaign_id, channel);

@@ -168,7 +168,7 @@ export function buildWinbackScenario(opts: {
           ctaUrl: `${user.baseUrl}/products`,
         },
       })
-      if (params.whatsappEnabled) {
+      if (params.whatsappEnabled || (params as any).smsEnabled) {
         sendCampaignWhatsApp(campaign.kind, row.id, {
           headline: 'We miss you!',
           code: couponCode || '',

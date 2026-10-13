@@ -218,7 +218,7 @@ export const wishlistReminder: ScenarioModule<Params, Row> = {
       },
     })
 
-    if (params.whatsappEnabled) {
+    if (params.whatsappEnabled || (params as any).smsEnabled) {
       sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }, cooldownMinutes(params)).catch(() => {})
     }
     return emailResult

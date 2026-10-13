@@ -127,7 +127,7 @@ export const priceDrop: ScenarioModule<Params, Row> = {
     })
 
     await settleWishlistEvent(result, row.user_id, row.product_id)
-    if (params.whatsappEnabled && result.ok) {
+    if ((params.whatsappEnabled || (params as any).smsEnabled) && result.ok) {
       sendCampaignWhatsApp(campaign.kind, row.user_id, {
         headline: `${row.product_name} is now ₹${Math.round(newPrice).toLocaleString('en-IN')}`,
         code: couponCode || '',
