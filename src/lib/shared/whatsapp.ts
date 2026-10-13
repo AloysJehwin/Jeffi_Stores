@@ -1,65 +1,18 @@
 import { logMessage } from '@/lib/shared/message-log'
-import { messagingInline, remoteSend } from '@/lib/shared/messaging/remote'
 import { storeBaseUrlAsync, storeSignature } from '@/lib/catalog/brand'
 import { orderUrlByNumber } from '@/lib/shared/customer-links'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { getWhatsAppProvider } from '@/lib/shared/messaging'
-import { messagingGateAllows, isMarketingKind, debitMessageEstimate } from '@/lib/shared/messaging/billing'
+import { messagingGateAllows, debitMessageEstimate } from '@/lib/shared/messaging/billing'
 import { estimateFor } from '@/lib/shared/messaging/pricing'
+import { sendByTemplate } from '@/lib/shared/send-by-template'
 
-// WhatsApp notifications. The provider (Twilio today, AWS later) is chosen per-tenant by the Site
-// Controls selector in src/lib/shared/messaging; this file owns the shared concerns: the channel
-// gate, phone normalization, audit logging, and the approved-template registry.
-//
-// Business-initiated WhatsApp messages must use approved Content Templates (templateRef + numbered
-// variables), NOT free-form text — WhatsApp only allows free text within a 24h customer-service
-// window. Template SIDs are created in Twilio/approved by Meta; override via env (e.g.
-// TWILIO_WA_OTP_SID) to swap templates without a deploy.
-//
-// WhatsApp can be turned off two ways: the Site Controls "WhatsApp" toggle (per-tenant,
-// feature_whatsapp_enabled) or the env WHATSAPP_DISABLED kill-switch. The env value is the DEFAULT
-// the Site Controls flag falls back to, so checking the flag honors both.
+// WhatsApp wrappers now dispatch via sendByTemplate (slug → messaging-service).
+// Infra kept here: channel gate, phone normalize, free-text (24h window), campaign-SID path, registry.
 
-// Is WhatsApp enabled for the current tenant? Honors the Site Controls toggle
-// (feature_whatsapp_enabled), which defaults to `WHATSAPP_DISABLED !== 'true'`.
 async function whatsappChannelEnabled(): Promise<boolean> {
-  try {
-    return (await getFeatureFlags()).whatsappEnabled
-  } catch {
-    return process.env.WHATSAPP_DISABLED !== 'true'
-  }
-}
-
-const TEMPLATES = {
-  otp: process.env.TWILIO_WA_OTP_SID || 'HX8efbe15a7d9c7cf152fd65874e6ac240',
-  orderConfirmed: process.env.TWILIO_WA_ORDER_CONFIRMED_SID || 'HXb817cebc70c7d8658a4cb5a9b1126208',
-  orderShipped: process.env.TWILIO_WA_ORDER_SHIPPED_SID || 'HX1a387a882358cf55cc4be47a1ec76129',
-  orderDelivered: process.env.TWILIO_WA_ORDER_DELIVERED_SID || 'HX3d1393a9898a8d9e87c0dbc55497a6af',
-  orderCancelled: process.env.TWILIO_WA_ORDER_CANCELLED_SID || 'HX05b47f8c139e462a443a428af823f8dc',
-  outForDelivery: process.env.TWILIO_WA_OUT_FOR_DELIVERY_SID || 'HXfa11093ed4bc99a14151f8b3bc90b749',
-  paymentFailed: process.env.TWILIO_WA_PAYMENT_FAILED_SID || '',
-  // Marketing
-  promoOffer: process.env.TWILIO_WA_PROMO_OFFER_SID || 'HX4500f4beac783d988ccaea62396927a3',
-  newArrivals: process.env.TWILIO_WA_NEW_ARRIVALS_SID || 'HXe16b084ecee38483663765275d3afd20',
-  abandonedCart: process.env.TWILIO_WA_ABANDONED_CART_SID || 'HX3b662d590c448e238ee4d6d4d638ef24',
-  backInStock: process.env.TWILIO_WA_BACK_IN_STOCK_SID || 'HXd4d3cf0ced879c6fb2397e25d21805f6',
-  festiveGreeting: process.env.TWILIO_WA_FESTIVE_GREETING_SID || 'HX5c3fad2143bddcd9709c5e4ffc7a5564',
-  reorderReminder: process.env.TWILIO_WA_REORDER_REMINDER_SID || 'HX1f3a4b0168671e57ff5f54c9dd155984',
-  // Support
-  supportAck: process.env.TWILIO_WA_SUPPORT_ACK_SID || 'HX95ce2cea26825b06e22b24aa802dddf8',
-  supportTicketCreated: process.env.TWILIO_WA_SUPPORT_TICKET_SID || 'HX3fee423887ba430b9d9c83f78ba6a2bb',
-  supportReply: process.env.TWILIO_WA_SUPPORT_REPLY_SID || 'HX16911ee6dd59658012abcc99d5a7d61a',
-  supportResolved: process.env.TWILIO_WA_SUPPORT_RESOLVED_SID || 'HXde26b207aff33bb29e4f420ac1f1f9fb',
-  returnInitiated: process.env.TWILIO_WA_RETURN_INITIATED_SID || 'HX7b0dfa4a553817d5a14d3920d7beb3c4',
-  refundProcessed: process.env.TWILIO_WA_REFUND_PROCESSED_SID || 'HX97f829b9e7f9222341e3c5ab3a861205',
-  feedbackRequest: process.env.TWILIO_WA_FEEDBACK_REQUEST_SID || 'HX4f34db44ae6e5e4c31c0048745cafb82',
-  // Post-order variant change — needs a Meta-approved template with {1}=order, {2}=url.
-  // Set TWILIO_WA_VARIANT_CHANGE_SID once approved; until then sendTemplate's
-  // freeform fallback text (below) carries the message within the 24h window,
-  // and the notify.ts dispatcher falls back to SMS if WhatsApp returns false.
-  variantChange: process.env.TWILIO_WA_VARIANT_CHANGE_SID || '',
-  // Digital access granted — no Meta-approved template yet; empty SID → caller falls back to SMS.
-  accessGranted: process.env.TWILIO_WA_ACCESS_GRANTED_SID || '',
+  try { return (await getFeatureFlags()).whatsappEnabled }
+  catch { return process.env.WHATSAPP_DISABLED !== 'true' }
 }
 
 function normalizePhone(phone: string | null | undefined): string | null {
@@ -72,65 +25,20 @@ function normalizePhone(phone: string | null | undefined): string | null {
   return null
 }
 
-async function sendTemplate(
-  to: string | null | undefined,
-  contentSid: string,
-  variables: Record<string, string>,
-  kind: string,
-  summary: string,
-  entity?: { entityType?: string; entityId?: string }
+async function sendBySlug(
+  phone: string | null | undefined,
+  slug: string,
+  variables: Record<string, string | number>,
+  reference?: string
 ): Promise<boolean> {
-  const normalized = normalizePhone(to)
+  const normalized = normalizePhone(phone)
   if (!normalized) return false
   if (!(await whatsappChannelEnabled())) return false
-  if (!contentSid) return false // not configured → caller falls back to SMS
-  if (!(await messagingGateAllows('whatsapp', isMarketingKind(kind)))) return false
-  if (!messagingInline()) {
-    const r = await remoteSend({ channel: 'whatsapp', to: normalized, body: summary, provider_ref: contentSid, variables, metadata: { kind } })
-    logMessage({ channel: 'whatsapp', to: normalized, from: 'messaging-service', body: summary, kind, status: r.ok ? 'sent' : 'failed', providerSid: r.providerRef, provider: 'messaging-service', error: r.error, entityType: entity?.entityType, entityId: entity?.entityId, deliveryStatus: r.ok ? 'estimated' : undefined })
-    return r.ok
-  }
-  const provider = await getWhatsAppProvider()
-  if (!provider.configured) return false
-  try {
-    const sid = await provider.sendTemplate(normalized, contentSid, variables)
-    debitMessageEstimate({ channel: 'whatsapp', providerSid: sid }).catch(() => {})
-    logMessage({
-      channel: 'whatsapp',
-      to: normalized,
-      from: provider.from,
-      body: summary,
-      kind,
-      status: 'sent',
-      providerSid: sid,
-      entityType: entity?.entityType,
-      entityId: entity?.entityId,
-      provider: provider.name,
-      price: estimateFor('whatsapp'),
-      deliveryStatus: 'estimated',
-    })
-    return true
-  } catch (err: any) {
-    logMessage({
-      channel: 'whatsapp',
-      to: normalized,
-      from: provider.from,
-      body: summary,
-      kind,
-      status: 'failed',
-      error: err?.message,
-      entityType: entity?.entityType,
-      entityId: entity?.entityId,
-      provider: provider.name,
-    })
-    return false
-  }
+  const res = await sendByTemplate({ channel: 'whatsapp', slug, to: normalized, variables, reference })
+  return res.status !== 'failed' && res.status !== 'skipped'
 }
 
-// Campaign-chosen approved template: resolve a registry key → env Content SID and send with the admin's
-// filled variable slots. If the approved template has a media header, its URL goes into the numbered
-// {{n}} slot the template declares (imageSlot) — Twilio fills the media component from that variable.
-// Returns false (caller falls back to SMS) if the SID isn't configured.
+// Campaign-chosen approved template (direct SID path, bypasses slug library).
 export async function sendCampaignTemplateWhatsApp(params: {
   phone?: string | null
   sidEnvVar: string
@@ -142,325 +50,110 @@ export async function sendCampaignTemplateWhatsApp(params: {
 }): Promise<boolean> {
   const contentSid = process.env[params.sidEnvVar] || ''
   if (!contentSid) return false
+  const normalized = normalizePhone(params.phone)
+  if (!normalized) return false
+  if (!(await whatsappChannelEnabled())) return false
+  if (!(await messagingGateAllows('whatsapp', true))) return false
   const vars: Record<string, string> = { ...params.variables }
   if (params.headerImageUrl && params.imageSlot != null) vars[String(params.imageSlot)] = params.headerImageUrl
-  return sendTemplate(params.phone, contentSid, vars, params.kind, `WhatsApp: ${params.kind}`, params.entity)
+  const provider = await getWhatsAppProvider()
+  if (!provider.configured) return false
+  const summary = `WhatsApp: ${params.kind}`
+  try {
+    const sid = await provider.sendTemplate(normalized, contentSid, vars)
+    debitMessageEstimate({ channel: 'whatsapp', providerSid: sid }).catch(() => {})
+    logMessage({ channel: 'whatsapp', to: normalized, from: provider.from, body: summary, kind: params.kind, status: 'sent', providerSid: sid, entityType: params.entity?.entityType, entityId: params.entity?.entityId, provider: provider.name, price: estimateFor('whatsapp'), deliveryStatus: 'estimated' })
+    return true
+  } catch (err: any) {
+    logMessage({ channel: 'whatsapp', to: normalized, from: provider.from, body: summary, kind: params.kind, status: 'failed', error: err?.message, entityType: params.entity?.entityType, entityId: params.entity?.entityId, provider: provider.name })
+    return false
+  }
 }
 
-export async function sendOTPWhatsApp(params: { phone?: string | null; otp: string }): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    params.phone,
-    TEMPLATES.otp,
-    { '1': params.otp },
-    'otp',
-    `${STORE}: Your verification code is ${params.otp}.`
-  )
+export async function sendOTPWhatsApp(p: { phone?: string | null; otp: string }): Promise<boolean> {
+  return sendBySlug(p.phone, 'otp/verify', { '1': p.otp, '2': 10 })
 }
 
-export async function sendOrderConfirmedWhatsApp(params: {
-  phone?: string | null
-  orderNumber: string
-  total: number
-}): Promise<boolean> {
-  const amount = new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(params.total)
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    params.phone,
-    TEMPLATES.orderConfirmed,
-    { '1': params.orderNumber, '2': amount },
-    'order_confirmed',
-    `${STORE}: Your order ${params.orderNumber} is confirmed! Total: ${amount}.`
-  )
+export async function sendOrderConfirmedWhatsApp(p: { phone?: string | null; orderNumber: string; total: number }): Promise<boolean> {
+  const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(p.total)
+  const url = (await orderUrlByNumber(p.orderNumber)) || `${await storeBaseUrlAsync()}/account/orders`
+  return sendBySlug(p.phone, 'order/confirmed', { '1': p.orderNumber, '2': amount, '3': url })
 }
 
-export async function sendOrderShippedWhatsApp(params: {
-  phone?: string | null
-  orderNumber: string
-  courier?: string | null
-  trackingId?: string | null
-}): Promise<boolean> {
-  const courier = params.courier || 'courier'
-  // No AWB yet: the order's own page, where tracking appears once it has one.
-  const tracking =
-    params.trackingId || (await orderUrlByNumber(params.orderNumber)) || `${await storeBaseUrlAsync()}/account/orders`
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    params.phone,
-    TEMPLATES.orderShipped,
-    {
-      '1': params.orderNumber,
-      '2': courier,
-      '3': tracking,
-    },
-    'order_shipped',
-    `${STORE}: Your order ${params.orderNumber} has been shipped via ${courier}. Tracking: ${tracking}.`
-  )
+export async function sendOrderShippedWhatsApp(p: { phone?: string | null; orderNumber: string; courier?: string | null; trackingId?: string | null }): Promise<boolean> {
+  const courier = p.courier || 'courier'
+  const tracking = p.trackingId || (await orderUrlByNumber(p.orderNumber)) || `${await storeBaseUrlAsync()}/account/orders`
+  return sendBySlug(p.phone, 'order/shipped', { '1': p.orderNumber, '2': courier, '3': tracking, '4': tracking })
 }
 
-export async function sendOrderDeliveredWhatsApp(params: {
-  phone?: string | null
-  orderNumber: string
-}): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    params.phone,
-    TEMPLATES.orderDelivered,
-    { '1': params.orderNumber },
-    'order_delivered',
-    `${STORE}: Your order ${params.orderNumber} has been delivered.`
-  )
+export async function sendOrderDeliveredWhatsApp(p: { phone?: string | null; orderNumber: string }): Promise<boolean> {
+  const url = (await orderUrlByNumber(p.orderNumber)) || `${await storeBaseUrlAsync()}/account/orders`
+  return sendBySlug(p.phone, 'order/delivered', { '1': p.orderNumber, '2': url })
 }
 
-export async function sendAccessGrantedWhatsApp(params: {
-  phone?: string | null
-  orderNumber: string
-  vaultUrl: string
-}): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    params.phone,
-    TEMPLATES.accessGranted,
-    { '1': params.orderNumber, '2': params.vaultUrl },
-    'order_granted',
-    `${STORE}: Access granted for order ${params.orderNumber}. Open your vault: ${params.vaultUrl}`
-  )
+export async function sendAccessGrantedWhatsApp(p: { phone?: string | null; orderNumber: string; vaultUrl: string }): Promise<boolean> {
+  return sendBySlug(p.phone, 'order/access-granted', { '1': p.orderNumber, '2': p.vaultUrl })
 }
 
-export async function sendOrderCancelledWhatsApp(params: {
-  phone?: string | null
-  orderNumber: string
-}): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    params.phone,
-    TEMPLATES.orderCancelled,
-    { '1': params.orderNumber },
-    'order_cancelled',
-    `${STORE}: Your order ${params.orderNumber} has been cancelled.`
-  )
+export async function sendOrderCancelledWhatsApp(p: { phone?: string | null; orderNumber: string }): Promise<boolean> {
+  return sendBySlug(p.phone, 'order/cancelled', { '1': p.orderNumber, '2': '' })
 }
 
-export async function sendOutForDeliveryWhatsApp(params: {
-  phone?: string | null
-  orderNumber: string
-}): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    params.phone,
-    TEMPLATES.outForDelivery,
-    { '1': params.orderNumber },
-    'out_for_delivery',
-    `${STORE}: Your order ${params.orderNumber} is out for delivery today.`
-  )
+export async function sendOutForDeliveryWhatsApp(p: { phone?: string | null; orderNumber: string }): Promise<boolean> {
+  return sendBySlug(p.phone, 'order/out-for-delivery', { '1': p.orderNumber, '2': '' })
 }
 
-export async function sendPaymentFailedWhatsApp(params: {
-  phone?: string | null
-  orderNumber: string
-}): Promise<boolean> {
-  // No dedicated payment-failed template yet; skip unless configured.
-  if (!TEMPLATES.paymentFailed) return false
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    params.phone,
-    TEMPLATES.paymentFailed,
-    { '1': params.orderNumber },
-    'payment_failed',
-    `${STORE}: Payment for order ${params.orderNumber} failed.`
-  )
+export async function sendPaymentFailedWhatsApp(p: { phone?: string | null; orderNumber: string }): Promise<boolean> {
+  return sendBySlug(p.phone, 'order/payment-failed', { '1': p.orderNumber })
 }
 
-// ── Marketing ──────────────────────────────────────────────────────────────
-
-export async function sendPromoOfferWhatsApp(p: {
-  phone?: string | null
-  headline: string
-  code: string
-  discount: string
-  entity?: { entityType?: string; entityId?: string }
-}): Promise<boolean> {
+export async function sendPromoOfferWhatsApp(p: { phone?: string | null; headline: string; code: string; discount: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
   const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.promoOffer,
-    { '1': p.headline, '2': p.code, '3': p.discount },
-    'promo_offer',
-    `${STORE}: ${p.headline}! Use code ${p.code} for ${p.discount} off.`,
-    p.entity
-  )
+  return sendBySlug(p.phone, 'promo/offer', { '1': STORE, '2': p.discount, '3': p.code, '4': '', '5': p.headline }, p.entity?.entityId)
 }
 export async function sendNewArrivalsWhatsApp(p: { phone?: string | null; items: string }): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.newArrivals,
-    { '1': p.items },
-    'new_arrivals',
-    `${STORE}: New arrivals — ${p.items} now in stock.`
-  )
+  return sendBySlug(p.phone, 'promo/new-arrivals', { '1': p.items })
 }
-export async function sendAbandonedCartWhatsApp(p: {
-  phone?: string | null
-  items: string
-  entity?: { entityType?: string; entityId?: string }
-}): Promise<boolean> {
+export async function sendAbandonedCartWhatsApp(p: { phone?: string | null; items: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
   const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.abandonedCart,
-    { '1': p.items },
-    'abandoned_cart',
-    `${STORE}: You left ${p.items} in your cart.`,
-    p.entity
-  )
+  return sendBySlug(p.phone, 'cart/abandoned', { '1': STORE, '2': p.items, '3': '' }, p.entity?.entityId)
 }
-export async function sendBackInStockWhatsApp(p: {
-  phone?: string | null
-  product: string
-  entity?: { entityType?: string; entityId?: string }
-}): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.backInStock,
-    { '1': p.product },
-    'back_in_stock',
-    `${STORE}: ${p.product} is back in stock.`,
-    p.entity
-  )
+export async function sendBackInStockWhatsApp(p: { phone?: string | null; product: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
+  return sendBySlug(p.phone, 'restock', { '1': p.product }, p.entity?.entityId)
 }
-export async function sendFestiveGreetingWhatsApp(p: {
-  phone?: string | null
-  festival: string
-  discount: string
-}): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.festiveGreeting,
-    { '1': p.festival, '2': p.discount },
-    'festive_greeting',
-    `${STORE}: ${p.festival} wishes! Enjoy ${p.discount} off storewide.`
-  )
+export async function sendFestiveGreetingWhatsApp(p: { phone?: string | null; festival: string; discount: string }): Promise<boolean> {
+  return sendBySlug(p.phone, 'promo/festive', { '1': p.festival, '2': p.discount })
 }
 export async function sendReorderReminderWhatsApp(p: { phone?: string | null; product: string }): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.reorderReminder,
-    { '1': p.product },
-    'reorder_reminder',
-    `${STORE}: Running low on ${p.product}? Reorder now.`
-  )
+  return sendBySlug(p.phone, 'promo/reorder', { '1': p.product })
 }
-
-// ── Support ────────────────────────────────────────────────────────────────
 
 export async function sendSupportAckWhatsApp(p: { phone?: string | null }): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.supportAck,
-    {},
-    'support_ack',
-    `${STORE}: We received your message and an agent will reply shortly.`
-  )
+  return sendBySlug(p.phone, 'support/ack', {})
 }
 export async function sendSupportTicketCreatedWhatsApp(p: { phone?: string | null; ticket: string }): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.supportTicketCreated,
-    { '1': p.ticket },
-    'support_ticket_created',
-    `${STORE}: Your support request #${p.ticket} is registered.`
-  )
+  return sendBySlug(p.phone, 'support/ticket-created', { '1': p.ticket })
 }
 export async function sendSupportReplyWhatsApp(p: { phone?: string | null; message: string }): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.supportReply,
-    { '1': p.message },
-    'support_reply',
-    `${STORE} support: ${p.message}`
-  )
+  return sendBySlug(p.phone, 'support/reply', { '1': p.message })
 }
 export async function sendSupportResolvedWhatsApp(p: { phone?: string | null; ticket: string }): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.supportResolved,
-    { '1': p.ticket },
-    'support_resolved',
-    `${STORE}: Your support request #${p.ticket} is resolved.`
-  )
+  return sendBySlug(p.phone, 'support/resolved', { '1': p.ticket })
 }
 export async function sendReturnInitiatedWhatsApp(p: { phone?: string | null; orderNumber: string }): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.returnInitiated,
-    { '1': p.orderNumber },
-    'return_initiated',
-    `${STORE}: Your return for order ${p.orderNumber} has been initiated.`
-  )
+  return sendBySlug(p.phone, 'return/initiated', { '1': p.orderNumber })
 }
-export async function sendRefundProcessedWhatsApp(p: {
-  phone?: string | null
-  amount: string
-  orderNumber: string
-}): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.refundProcessed,
-    { '1': p.amount, '2': p.orderNumber },
-    'refund_processed',
-    `${STORE}: A refund of ${p.amount} for order ${p.orderNumber} has been processed.`
-  )
+export async function sendRefundProcessedWhatsApp(p: { phone?: string | null; amount: string; orderNumber: string }): Promise<boolean> {
+  return sendBySlug(p.phone, 'refund/processed', { '1': p.amount, '2': p.orderNumber })
 }
-export async function sendFeedbackRequestWhatsApp(p: {
-  phone?: string | null
-  orderNumber: string
-  url: string
-  entity?: { entityType?: string; entityId?: string }
-}): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.feedbackRequest,
-    { '1': p.orderNumber, '2': p.url },
-    'feedback_request',
-    `${STORE}: How was your order ${p.orderNumber}? Share feedback at ${p.url}.`,
-    p.entity
-  )
+export async function sendFeedbackRequestWhatsApp(p: { phone?: string | null; orderNumber: string; url: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
+  return sendBySlug(p.phone, 'feedback/request', { '1': p.orderNumber, '2': p.url }, p.entity?.entityId)
 }
-export async function sendVariantChangeRequestedWhatsApp(p: {
-  phone?: string | null
-  orderNumber: string
-  url: string
-  entity?: { entityType?: string; entityId?: string }
-}): Promise<boolean> {
-  const { name: STORE } = await storeSignature()
-  return sendTemplate(
-    p.phone,
-    TEMPLATES.variantChange,
-    { '1': p.orderNumber, '2': p.url },
-    'variant_change_requested',
-    `${STORE}: Order ${p.orderNumber} needs your approval for a variant change. Review & confirm: ${p.url}`,
-    p.entity
-  )
+export async function sendVariantChangeRequestedWhatsApp(p: { phone?: string | null; orderNumber: string; url: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
+  return sendBySlug(p.phone, 'order/variant-change-requested', { '1': p.orderNumber, '2': p.url }, p.entity?.entityId)
 }
 
-// ── Free-text (only delivers within the 24h customer-service window) ─────────
-// Used for support replies after a customer has messaged first. Outside the
-// window Meta blocks it and this returns false (caller should fall back to a template).
+// Free-text WA (24h customer-service window) — bypasses templates; used for support replies.
 export async function sendFreeTextWhatsApp(params: {
   phone?: string | null
   body: string
@@ -476,36 +169,14 @@ export async function sendFreeTextWhatsApp(params: {
   try {
     const sid = await provider.sendText(normalized, params.body)
     debitMessageEstimate({ channel: 'whatsapp', providerSid: sid }).catch(() => {})
-    logMessage({
-      channel: 'whatsapp',
-      to: normalized,
-      from: provider.from,
-      body: params.body,
-      kind,
-      status: 'sent',
-      providerSid: sid,
-      provider: provider.name,
-      price: estimateFor('whatsapp'),
-      deliveryStatus: 'estimated',
-    })
+    logMessage({ channel: 'whatsapp', to: normalized, from: provider.from, body: params.body, kind, status: 'sent', providerSid: sid, provider: provider.name, price: estimateFor('whatsapp'), deliveryStatus: 'estimated' })
     return true
   } catch (err: any) {
-    logMessage({
-      channel: 'whatsapp',
-      to: normalized,
-      from: provider.from,
-      body: params.body,
-      kind,
-      status: 'failed',
-      error: err?.message,
-      provider: provider.name,
-    })
+    logMessage({ channel: 'whatsapp', to: normalized, from: provider.from, body: params.body, kind, status: 'failed', error: err?.message, provider: provider.name })
     return false
   }
 }
 
-// Registry of send-from-UI templates for the admin WhatsApp Engagement card.
-// Each entry: the label + the variable fields the admin must fill.
 export const WA_TEMPLATE_REGISTRY: Record<
   string,
   { label: string; category: 'marketing' | 'support'; fields: string[] }
@@ -524,38 +195,24 @@ export const WA_TEMPLATE_REGISTRY: Record<
   feedback_request: { label: 'Feedback Request', category: 'support', fields: ['orderNumber', 'url'] },
 }
 
-// Dispatch a registry template by key with a variables object (used by the engagement API).
 export async function sendTemplateByKey(
   phone: string | null | undefined,
   key: string,
   vars: Record<string, string>
 ): Promise<boolean> {
   switch (key) {
-    case 'promo_offer':
-      return sendPromoOfferWhatsApp({ phone, headline: vars.headline, code: vars.code, discount: vars.discount })
-    case 'new_arrivals':
-      return sendNewArrivalsWhatsApp({ phone, items: vars.items })
-    case 'abandoned_cart':
-      return sendAbandonedCartWhatsApp({ phone, items: vars.items })
-    case 'back_in_stock':
-      return sendBackInStockWhatsApp({ phone, product: vars.product })
-    case 'festive_greeting':
-      return sendFestiveGreetingWhatsApp({ phone, festival: vars.festival, discount: vars.discount })
-    case 'reorder_reminder':
-      return sendReorderReminderWhatsApp({ phone, product: vars.product })
-    case 'support_ticket_created':
-      return sendSupportTicketCreatedWhatsApp({ phone, ticket: vars.ticket })
-    case 'support_reply':
-      return sendSupportReplyWhatsApp({ phone, message: vars.message })
-    case 'support_resolved':
-      return sendSupportResolvedWhatsApp({ phone, ticket: vars.ticket })
-    case 'return_initiated':
-      return sendReturnInitiatedWhatsApp({ phone, orderNumber: vars.orderNumber })
-    case 'refund_processed':
-      return sendRefundProcessedWhatsApp({ phone, amount: vars.amount, orderNumber: vars.orderNumber })
-    case 'feedback_request':
-      return sendFeedbackRequestWhatsApp({ phone, orderNumber: vars.orderNumber, url: vars.url })
-    default:
-      return false
+    case 'promo_offer': return sendPromoOfferWhatsApp({ phone, headline: vars.headline, code: vars.code, discount: vars.discount })
+    case 'new_arrivals': return sendNewArrivalsWhatsApp({ phone, items: vars.items })
+    case 'abandoned_cart': return sendAbandonedCartWhatsApp({ phone, items: vars.items })
+    case 'back_in_stock': return sendBackInStockWhatsApp({ phone, product: vars.product })
+    case 'festive_greeting': return sendFestiveGreetingWhatsApp({ phone, festival: vars.festival, discount: vars.discount })
+    case 'reorder_reminder': return sendReorderReminderWhatsApp({ phone, product: vars.product })
+    case 'support_ticket_created': return sendSupportTicketCreatedWhatsApp({ phone, ticket: vars.ticket })
+    case 'support_reply': return sendSupportReplyWhatsApp({ phone, message: vars.message })
+    case 'support_resolved': return sendSupportResolvedWhatsApp({ phone, ticket: vars.ticket })
+    case 'return_initiated': return sendReturnInitiatedWhatsApp({ phone, orderNumber: vars.orderNumber })
+    case 'refund_processed': return sendRefundProcessedWhatsApp({ phone, amount: vars.amount, orderNumber: vars.orderNumber })
+    case 'feedback_request': return sendFeedbackRequestWhatsApp({ phone, orderNumber: vars.orderNumber, url: vars.url })
+    default: return false
   }
 }
