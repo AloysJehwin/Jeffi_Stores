@@ -320,5 +320,7 @@ export async function upgradeTenantToStore(tenantId: string, planSlug: string, b
      WHERE id = $1 AND NOT ('store' = ANY(service_types))`,
     [tenantId, plan.rows[0].id, billingInterval]
   )
+  // API workspaces had their KYC auto-approved; the store needs a real review.
+  await pool.query(`UPDATE tenant_kyc SET status = 'pending', reviewed_at = NULL, reviewed_by = NULL WHERE tenant_id = $1`, [tenantId])
   return { ok: true }
 }

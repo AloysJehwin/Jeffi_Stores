@@ -2109,3 +2109,5 @@ CREATE INDEX IF NOT EXISTS idx_bulk_items_claim ON public.bulk_job_items (status
 CREATE INDEX IF NOT EXISTS idx_bulk_items_job ON public.bulk_job_items (job_id, seq);
 
 CREATE INDEX IF NOT EXISTS idx_platform_invoices_tenant ON public.platform_invoices (tenant_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_tenant_service_approvals_pending ON public.tenant_service_approvals (status, requested_at) WHERE status = 'pending';

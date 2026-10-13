@@ -121,3 +121,4 @@ export {
   deleteCustomDomain,
   type CustomDomain,
 } from './custom-domains'
+export { listServiceApprovals, requestServiceApproval, reviewServiceApproval, blockedServices, type ServiceApproval, type ApprovalService } from './service-approvals'

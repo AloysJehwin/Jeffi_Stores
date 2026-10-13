@@ -10,13 +10,17 @@ const SCOPES: [string, string, 'messaging' | 'documents' | null][] = [
   ['documents:render', 'Render documents', 'documents'], ['documents:read', 'Read documents', 'documents'], ['wallet:read', 'Read wallet balance', null],
 ]
 
-export default function ApiKeysClient({ services, docsUrl }: { services: { messaging: boolean; documents: boolean }; docsUrl: string }) {
+type Review = 'pending' | 'rejected' | null
+const LABEL = { messaging: 'Messaging', documents: 'Documents' } as const
+
+export default function ApiKeysClient({ services, review, docsUrl }: { services: { messaging: boolean; documents: boolean }; review: { messaging: Review; documents: Review }; docsUrl: string }) {
   const [keys, setKeys] = useState<Key[] | null>(null)
   const [name, setName] = useState('')
   const [scopes, setScopes] = useState<string[]>(SCOPES.filter(([, , s]) => !s || services[s]).map(([k]) => k))
   const [created, setCreated] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [enabling, setEnabling] = useState(false)
+  const [confirm, setConfirm] = useState<'messaging' | 'documents' | null>(null)
 
   const load = () => fetch('/api/ecom/api-keys').then(r => r.json()).then(d => setKeys(d.keys ?? [])).catch(() => setKeys([]))
   useEffect(() => { load() }, [])
@@ -31,23 +35,45 @@ export default function ApiKeysClient({ services, docsUrl }: { services: { messa
   async function revoke(id: string) {
     await fetch(`/api/ecom/api-keys/${id}`, { method: 'DELETE' }); load()
   }
-  async function enable(s: 'messaging' | 'documents') {
+  async function request(s: 'messaging' | 'documents') {
     setEnabling(true)
     await fetch('/api/ecom/services/add', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ services: [s] }) })
     location.reload()
   }
+  const other: 'messaging' | 'documents' = services.messaging ? 'documents' : 'messaging'
+  const confirmBox = (s: 'messaging' | 'documents') => (
+    <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-surface-elevated px-4 py-3 text-sm">
+      <span>Request the {LABEL[s]} API? We review requests the same business day and email you when it&apos;s on.</span>
+      <button disabled={enabling} onClick={() => request(s)} className="ecom-accent-bg rounded-full px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40">{enabling ? 'Sending…' : 'Send request'}</button>
+      <button onClick={() => setConfirm(null)} className="text-xs font-semibold text-foreground-secondary hover:text-foreground">Cancel</button>
+    </div>
+  )
 
   const noService = !services.messaging && !services.documents
   return (
     <div className="space-y-6">
+      {(['messaging', 'documents'] as const).filter(s => services[s] && review[s]).map(s => (
+        <div key={s} className={`rounded-2xl px-5 py-3 text-sm ${review[s] === 'rejected' ? 'bg-[#f6d5cc]/60 text-[#8a2e1f]' : 'org-peach'}`}>
+          {review[s] === 'pending'
+            ? <><strong>{LABEL[s]} API — under review.</strong> Create keys and set things up now; sending starts once we approve it (usually the same day).</>
+            : <><strong>{LABEL[s]} API — not approved.</strong> Reply to our email or write to support@jeffistores.in.</>}
+        </div>
+      ))}
       {noService && (
-        <Card title="Enable a service">
-          <p className="text-sm text-foreground-secondary mb-4">Your workspace has no API services yet. Turn one on — it uses the same wallet as your store.</p>
-          <div className="flex gap-3">{(['messaging', 'documents'] as const).map(s => <button key={s} disabled={enabling} onClick={() => enable(s)} className="ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">Enable {s}</button>)}</div>
+        <Card title="Request a service">
+          <p className="text-sm text-foreground-secondary mb-4">Your workspace has no API services yet. Request one — it uses the same wallet as your store and starts after a quick review.</p>
+          <div className="flex gap-3">{(['messaging', 'documents'] as const).map(s => <button key={s} onClick={() => setConfirm(s)} className="ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white">Request {LABEL[s]} API</button>)}</div>
+          {confirm && confirmBox(confirm)}
         </Card>
       )}
       {!noService && (!services.messaging || !services.documents) && (
-        <div className="rounded-2xl org-sand px-5 py-3 text-sm flex items-center justify-between gap-4"><span>Also need the {services.messaging ? 'Documents' : 'Messaging'} API?</span><button disabled={enabling} onClick={() => enable(services.messaging ? 'documents' : 'messaging')} className="org-brown font-semibold hover:underline">Enable it →</button></div>
+        <div className="rounded-2xl org-sand px-5 py-3 text-sm">
+          <div className="flex items-center justify-between gap-4">
+            <span>Also need the {LABEL[other]} API?</span>
+            {confirm !== other && <button onClick={() => setConfirm(other)} className="rounded-full border border-border-default px-4 py-1.5 text-xs font-semibold hover:bg-surface-elevated">Request {LABEL[other]} API</button>}
+          </div>
+          {confirm === other && confirmBox(other)}
+        </div>
       )}
 
       {created && (

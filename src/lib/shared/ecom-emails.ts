@@ -267,3 +267,56 @@ export async function sendPlatformInvoiceEmail(
   )
   await send(to, `Tax invoice ${inv.number} — ${inv.store}`, html, [{ filename: `${inv.number.replace(/\//g, '-')}.pdf`, content: pdf, contentType: 'application/pdf' }])
 }
+
+const serviceLabel = (services: string[]) => services.map(x => (x === 'messaging' ? 'Messaging API' : 'Documents API')).join(' and ')
+const CONSOLE_URL = `https://ecom.${process.env.PLATFORM_DOMAIN || 'jeffistores.in'}/dashboard`
+
+/** Messaging/Documents access requested (sign-up or an extra service): owner + platform admin. */
+export async function sendServicesRequestedEmail(owner: { email: string; name: string | null }, workspace: string, services: string[]) {
+  const what = serviceLabel(services)
+  await send(owner.email, `We're reviewing your ${what} request`, baseHtml(
+    `Your ${what} request is under review.`,
+    'Your request is under review',
+    `
+    <p style="margin:0 0 14px;">Hi ${owner.name ?? 'there'},</p>
+    <p style="margin:0 0 14px;">Thanks for choosing Jeffi. We have received your request for the <strong>${what}</strong> for <strong>${workspace}</strong>.</p>
+    ${notice('Reviews usually finish the <strong>same business day</strong>. Meanwhile you can explore the console, set up templates and create API keys — sending starts as soon as we approve.')}
+    ${button(CONSOLE_URL, 'Open the console')}
+  `))
+  await send(PLATFORM_ADMIN, `Service request: ${what} — ${workspace}`, baseHtml(
+    'A Messaging/Documents request needs review.',
+    'New service request',
+    `
+    ${detailTable([
+      { label: 'Workspace', value: workspace },
+      { label: 'Requested', value: what },
+      { label: 'Owner', value: `${owner.name ?? '—'} · ${owner.email}` },
+      { label: 'Received', value: new Date().toLocaleString('en-IN') },
+    ])}
+    <p style="margin:0;">Approve or reject it from Admin → Ecom → Customers → the workspace → KYC.</p>
+  `))
+}
+
+export async function sendServicesReviewedEmail(owner: { email: string; name: string | null }, workspace: string, services: string[], decision: 'approved' | 'rejected', note?: string | null) {
+  const what = serviceLabel(services)
+  if (decision === 'approved') {
+    await send(owner.email, `Approved: your ${what} is ready`, baseHtml(
+      `Your ${what} is approved — you can start sending.`,
+      'You are approved',
+      `
+      <p style="margin:0 0 14px;">Hi ${owner.name ?? 'there'},</p>
+      <p style="margin:0 0 14px;">The <strong>${what}</strong> for <strong>${workspace}</strong> is approved. Your API keys and the console can now send and render.</p>
+      ${button(CONSOLE_URL, 'Open the console')}
+    `))
+    return
+  }
+  await send(owner.email, `Update on your ${what} request`, baseHtml(
+    `We could not approve your ${what} request.`,
+    'We could not approve your request',
+    `
+    <p style="margin:0 0 14px;">Hi ${owner.name ?? 'there'},</p>
+    <p style="margin:0 0 14px;">We were unable to approve the <strong>${what}</strong> for <strong>${workspace}</strong>.</p>
+    ${note ? notice(`<strong>Reason:</strong> ${note}`, 'warn') : ''}
+    <p style="margin:0;">Reply to this email with any corrections and we will review it again.</p>
+  `))
+}
