@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useIsMobile } from '@/contexts/PortalDeviceContext'
 import type { PortalSurfaceConfig } from '@/lib/tenancy/portal-config'
+import type { GoogleOAuthResult } from '@/lib/client/google-oauth-popup'
 
 // Shared sign-in for the portal surfaces: Google (popup OAuth, then the surface's Google route
 // mints its cookie) and a one-time email code (start -> verify). Copy and endpoints come from the
@@ -27,7 +28,15 @@ export default function PortalSignIn({ config }: { config: PortalSurfaceConfig }
     router.refresh()
   }
 
-  async function google() {
+  useEffect(() => {
+    import('@/lib/client/google-oauth-popup').then(m => {
+      const r = m.consumeGoogleRedirect()
+      if (r) google(r)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function google(returned?: GoogleOAuthResult) {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
     if (!clientId) {
       setError('Google sign-in is not configured in this environment.')
@@ -37,7 +46,7 @@ export default function PortalSignIn({ config }: { config: PortalSurfaceConfig }
     setError('')
     try {
       const { openGoogleOAuthPopup } = await import('@/lib/client/google-oauth-popup')
-      const result = await openGoogleOAuthPopup({ clientId })
+      const result = returned ?? (await openGoogleOAuthPopup({ clientId }))
       if (!result.accessToken) {
         if (result.error && result.error !== 'popup_closed') setError(result.error)
         return
@@ -124,7 +133,7 @@ export default function PortalSignIn({ config }: { config: PortalSurfaceConfig }
 
       {step === 'choose' ? (
         <div className="mt-8 space-y-4">
-          <button type="button" onClick={google} disabled={busy !== null} className={secondary}>
+          <button type="button" onClick={() => google()} disabled={busy !== null} className={secondary}>
             <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden>
               <path
                 fill="#4285F4"
