@@ -35,10 +35,14 @@ export default function EcomFilters({
 
   const STATUS_OPTS = statusOptions ?? [
     { value: '', label: 'All statuses' },
+    { value: 'review', label: 'Needs review' },
+    { value: 'pending_approval', label: 'Pending approval' },
+    { value: 'awaiting_payment', label: 'Awaiting payment' },
     { value: 'active', label: 'Active' },
     { value: 'provisioning', label: 'Provisioning' },
     { value: 'suspended', label: 'Suspended' },
     { value: 'terminated', label: 'Terminated' },
+    { value: 'rejected', label: 'Rejected' },
   ]
   const PLAN_OPTS = [
     { value: '', label: 'All plans' },

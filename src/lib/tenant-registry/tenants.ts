@@ -33,7 +33,11 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
   const pool = controlPlanePool()
   const where: string[] = []
   const args: any[] = []
-  if (filters?.status) {
+  if (filters?.status === 'review') {
+    // Anything waiting on Jeffi: store KYC or a requested Messaging/Documents service.
+    where.push(`(EXISTS (SELECT 1 FROM tenant_kyc k WHERE k.tenant_id = t.id AND k.status = 'pending')
+              OR EXISTS (SELECT 1 FROM tenant_service_approvals a WHERE a.tenant_id = t.id AND a.status = 'pending'))`)
+  } else if (filters?.status) {
     args.push(filters.status)
     where.push(`t.status = $${args.length}`)
   }

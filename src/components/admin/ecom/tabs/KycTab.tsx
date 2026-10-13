@@ -1,4 +1,5 @@
-import type { TenantDetail, TenantKyc } from '@/lib/tenant-registry'
+import type { TenantDetail, TenantKyc, ServiceApproval } from '@/lib/tenant-registry'
+import ServiceApprovals from './ServiceApprovals'
 import { Field, Mono, Section } from '../EcomUI'
 import KycActionButtons from './KycActionButtons'
 
@@ -14,18 +15,23 @@ const BADGE: Record<string, string> = {
   rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 }
 
-export default function KycTab({ tenant: t, kyc }: { tenant: TenantDetail; kyc: TenantKyc | null }) {
+export default function KycTab({ tenant: t, kyc, approvals = [] }: { tenant: TenantDetail; kyc: TenantKyc | null; approvals?: ServiceApproval[] }) {
+  const services = <ServiceApprovals tenantId={t.id} services={t.service_types ?? []} approvals={approvals} />
   if (!kyc) {
     return (
-      <Section title="KYC / GST Verification">
-        <p className="text-sm text-foreground-muted">This store has not submitted KYC details yet.</p>
-      </Section>
+      <div className="space-y-6">
+        <Section title="KYC / GST Verification">
+          <p className="text-sm text-foreground-muted">This workspace has not submitted KYC details yet.</p>
+        </Section>
+        {services}
+      </div>
     )
   }
 
   const pending = kyc.status === 'pending'
 
   return (
+    <div className="space-y-6">
     <section className={`rounded-xl border p-5 bg-surface-elevated min-w-0 ${BORDER[kyc.status] || BORDER.rejected}`}>
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <div className="flex items-center gap-3">
@@ -81,5 +87,7 @@ export default function KycTab({ tenant: t, kyc }: { tenant: TenantDetail; kyc: 
         />
       </dl>
     </section>
+    {services}
+    </div>
   )
 }
