@@ -112,6 +112,15 @@ async function handle(request: NextRequest) {
   const hostname = resolveTrustedHost(request)
   const pathname = request.nextUrl.pathname
 
+  // public.<domain> is served by public-api-service, not this app. In production Traefik routes the
+  // host there; in dev the Next server proxies so public.localhost:3000 just works.
+  if (hostname === 'public.localhost' || hostname.startsWith('public.')) {
+    if (process.env.NODE_ENV !== 'production') {
+      return NextResponse.rewrite(new URL(pathname + request.nextUrl.search, process.env.PUBLIC_API_URL || 'http://localhost:3100'))
+    }
+    return new NextResponse('Not found', { status: 404 })
+  }
+
   const hostApp = appFromHost(hostname)
 
   // Serve public/ assets directly regardless of host, before any tenant/host rewrite runs. Vault pages
