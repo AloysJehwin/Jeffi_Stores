@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Braces, ImageIcon, Link2, MessageCircle } from 'lucide-react'
 import { BUILTIN_TEMPLATE_VARIABLES } from '@/lib/templates/variables-shared'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import type { AiActionScope } from '@/lib/auth/ai-scope'
+import type { EnrichFormat } from '@/lib/ai/enrich-field'
 
 // Every parameter an approved WhatsApp template needs on send: body {{n}} slots, plus the header
 // image and link button of `_action` templates (their {{n}} sit after a Meta-approved prefix).
@@ -80,8 +83,10 @@ export function InsertVariable({ onInsert }: { onInsert: (token: string) => void
   )
 }
 
-/** A text input (or textarea) with an Insert-variable menu that inserts at the cursor. */
-export function VarInput({ value, onChange, placeholder, className, rows }: { value: string; onChange: (v: string) => void; placeholder?: string; className: string; rows?: number }) {
+export interface AiField { label: string; context?: string; scope?: AiActionScope; format?: EnrichFormat; variables?: string[]; endpoint?: string; write?: boolean; maxLength?: number }
+
+/** A text input (or textarea) with an Insert-variable menu (inserts at the cursor) and, with `ai`, Enrich with AI. */
+export function VarInput({ value, onChange, placeholder, className, rows, ai }: { value: string; onChange: (v: string) => void; placeholder?: string; className: string; rows?: number; ai?: AiField }) {
   const ref = useRef<HTMLInputElement & HTMLTextAreaElement>(null)
   const insert = (t: string) => {
     const el = ref.current
@@ -96,6 +101,8 @@ export function VarInput({ value, onChange, placeholder, className, rows }: { va
         ? <textarea ref={ref} rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={`${className} flex-1 min-w-0 resize-none`} />
         : <input ref={ref} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} className={`${className} flex-1 min-w-0`} />}
       <div className={rows ? 'h-9' : ''}><InsertVariable onInsert={insert} /></div>
+      {ai && <AIEnrichButton placement="inline" fieldLabel={ai.label} value={value} onChange={onChange} scope={ai.scope ?? 'mailer:write'} context={ai.context}
+        format={ai.format ?? 'plain'} variables={ai.variables} endpoint={ai.endpoint} write={ai.write ?? true} maxLength={ai.maxLength} broadcast />}
     </div>
   )
 }
@@ -120,7 +127,8 @@ export default function WaParamsForm({ params, vars, setVars, mediaUrl, setMedia
           <label className="block text-sm font-medium text-foreground">Text {i + 1} <code className="ml-1 text-[11px] font-normal text-foreground-muted">{`{{${s.n}}}`}</code></label>
           <p className="mb-1.5 text-[11px] text-foreground-muted">Goes here: “{s.context}”</p>
           <VarInput className={inputClass} value={vars[s.n] ?? ''} onChange={v => setVars(p => ({ ...p, [s.n]: v }))}
-            placeholder={s.sample ? `e.g. ${s.sample}` : 'Fixed text, or insert a variable'} />
+            placeholder={s.sample ? `e.g. ${s.sample}` : 'Fixed text, or insert a variable'}
+            ai={{ label: `WhatsApp slot {{${s.n}}}`, context: `A short value for the slot in this approved WhatsApp message: "${s.context}"${s.sample ? ` (example: ${s.sample})` : ''}. A few words, no line breaks.`, maxLength: 120 }} />
         </div>
       ))}
       {params.media && (

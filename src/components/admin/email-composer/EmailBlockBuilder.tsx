@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext } from 'react'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import {
   DndContext,
   closestCenter,
@@ -59,6 +60,7 @@ function BlockRow({
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
 
   const vars = useContext(VarsCtx)
+  const varNames = (vars ?? []).map(v => v.key)
   return (
     <div
       ref={setNodeRef}
@@ -96,6 +98,7 @@ function BlockRow({
             onChange={e => onPatch({ ...block, text: e.target.value })}
             placeholder="Heading text ({variables} allowed)"
           />
+          <AIEnrichButton placement="inline" fieldLabel="Email heading" value={block.text} onChange={text => onPatch({ ...block, text })} scope="mailer:write" format="plain" maxLength={90} variables={varNames} write context="A heading inside a marketing email block." />
           <div className="w-32 shrink-0">
             <AdminSelect
               value={block.align ?? 'left'}
@@ -143,6 +146,7 @@ function BlockRow({
 
       {block.type === 'cta_button' && (
         <div className="flex gap-2">
+          <AIEnrichButton placement="inline" fieldLabel="Button text" value={block.text} onChange={text => onPatch({ ...block, text })} scope="mailer:write" format="label" maxLength={30} write context="Call-to-action button in a marketing email." />
           <input
             className={inputCls}
             value={block.text}

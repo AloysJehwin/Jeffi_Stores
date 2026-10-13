@@ -15,6 +15,7 @@ import WaParamsForm, { waParams, VarInput, usageContext } from '@/components/adm
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite, useCanUseAi } from '@/contexts/AdminScopesContext'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { useToast } from '@/contexts/ToastContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import EditorToolbar from '@/components/admin/EditorToolbar'
@@ -538,17 +539,22 @@ export default function NewMessagePage() {
             )}
             <div>
               <label className={labelClass}>Title (internal)</label>
-              <input value={title} onChange={e => setTitle(e.target.value)} className={inputClass} placeholder="e.g. May review push" />
+              <AIEnrichButton fieldLabel="Internal title" value={title} onChange={setTitle} scope="mailer:write" write context={`A short internal name for this message (channels: ${active.join(', ')}${channels.email?.slug ? `; email template ${channels.email.slug}` : ''}${subject ? `; subject "${subject}"` : ''}).`}>
+                <input value={title} onChange={e => setTitle(e.target.value)} className={inputClass} placeholder="e.g. May review push" />
+              </AIEnrichButton>
             </div>
             {channels.email && (
               <div>
                 <label className={labelClass}>Email subject</label>
-                <input
-                  value={subject}
-                  onChange={e => setSubject(e.target.value)}
-                  className={inputClass}
-                  placeholder={loaded.email?.subject ? `Template: ${loaded.email.subject}` : 'Subject line customers will see'}
-                />
+                <AIEnrichButton fieldLabel="Email subject" value={subject} onChange={setSubject} scope="mailer:write" format="subject" write broadcast variables={fields}
+                  context={`Subject line for a broadcast email to customers.${loaded.email?.subject ? ` Template's default subject: "${loaded.email.subject}".` : ''}${loaded.email?.body ? ` Email text starts: "${loaded.email.body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 300)}"` : ''}`}>
+                  <input
+                    value={subject}
+                    onChange={e => setSubject(e.target.value)}
+                    className={inputClass}
+                    placeholder={loaded.email?.subject ? `Template: ${loaded.email.subject}` : 'Subject line customers will see'}
+                  />
+                </AIEnrichButton>
               </div>
             )}
 
@@ -577,7 +583,8 @@ export default function NewMessagePage() {
                 <div key={f}>
                   <label className={labelClass}>{humanize(f)}</label>
                   {where.map(w => <p key={w.ch} className="-mt-1 mb-1.5 text-[11px] text-foreground-muted">{w.ch}: “{w.ctx}”</p>)}
-                  <VarInput value={vars[f] ?? ''} onChange={v => setVars(p => ({ ...p, [f]: v }))} className={inputClass} rows={/body|details|message/i.test(f) ? 4 : undefined} />
+                  <VarInput value={vars[f] ?? ''} onChange={v => setVars(p => ({ ...p, [f]: v }))} className={inputClass} rows={/body|details|message/i.test(f) ? 4 : undefined}
+                    ai={{ label: humanize(f), variables: fields, context: `Value for the {${f}} variable of a broadcast message.${where.length ? ` It appears here: ${where.map(w => `${w.ch}: "${w.ctx}"`).join('; ')}` : ''}` }} />
                 </div>
               )
             })}
