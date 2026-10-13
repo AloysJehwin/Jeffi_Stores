@@ -24,7 +24,7 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
 
   const sp = await searchParams
   const [tenants, summary] = await Promise.all([
-    listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q') }),
+    listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q'), product: 'store' }),
     tenantSummary(),
   ])
   const provisioning = tenants.filter(t => t.status === 'provisioning').length

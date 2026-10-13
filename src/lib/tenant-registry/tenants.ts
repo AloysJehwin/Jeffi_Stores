@@ -29,7 +29,7 @@ export interface TenantRow {
 }
 
 /** List tenants (control-plane admin UI). Read-only, optional filters. */
-export async function listTenants(filters?: { status?: string; plan?: string; q?: string }): Promise<TenantRow[]> {
+export async function listTenants(filters?: { status?: string; plan?: string; q?: string; product?: 'store' | 'api' }): Promise<TenantRow[]> {
   const pool = controlPlanePool()
   const where: string[] = []
   const args: any[] = []
@@ -41,6 +41,9 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
     args.push(filters.status)
     where.push(`t.status = $${args.length}`)
   }
+  // 'store' = has a store; 'api' = Messaging/Documents-only workspace (no store infrastructure).
+  if (filters?.product === 'store') where.push(`'store' = ANY(t.service_types)`)
+  if (filters?.product === 'api') where.push(`NOT ('store' = ANY(t.service_types))`)
   if (filters?.plan) {
     args.push(filters.plan)
     where.push(`p.slug = $${args.length}`)
@@ -291,7 +294,7 @@ export async function billingSummary(): Promise<{
   const res = await pool.query(`
     SELECT
       (SELECT COALESCE(SUM(p.monthly_price_inr),0) FROM tenants t JOIN plans p ON p.id=t.plan_id WHERE t.status='active')::numeric AS mrr,
-      (SELECT COUNT(*) FROM tenants WHERE status='active')::int AS paying,
+      (SELECT COUNT(*) FROM tenants WHERE status='active' AND 'store' = ANY(service_types))::int AS paying,
       (SELECT COALESCE(SUM(platform_commission),0) FROM tenant_transactions WHERE occurred_at > now() - interval '30 days')::numeric AS comm,
       (SELECT COALESCE(SUM(gross_amount),0) FROM tenant_transactions WHERE occurred_at > now() - interval '30 days')::numeric AS gmv
   `)

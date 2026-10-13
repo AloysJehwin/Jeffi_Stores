@@ -17,7 +17,7 @@ export default async function EcomInstancesPage({ searchParams }: { searchParams
   if (!isPlatformAdmin(role)) redirect('/admin')
 
   const sp = await searchParams
-  const tenants = await listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q') })
+  const tenants = await listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q'), product: 'store' })
   const provisioned = tenants.filter(t => t.rds_endpoint).length
 
   return (

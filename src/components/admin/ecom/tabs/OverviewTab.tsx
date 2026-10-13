@@ -1,4 +1,5 @@
-import type { TenantDetail, ProvisioningJob, TenantOwner } from '@/lib/tenant-registry'
+import type { TenantDetail, ProvisioningJob, TenantOwner, ServiceApproval } from '@/lib/tenant-registry'
+import { hasService } from '@/lib/tenant-registry'
 import { Field, FieldGrid, Section, Mono, NOT_PROVISIONED } from '../EcomUI'
 
 const DOT: Record<string, string> = {
@@ -23,11 +24,14 @@ export default function OverviewTab({
   tenant: t,
   job,
   owners,
+  approvals = [],
 }: {
   tenant: TenantDetail
   job: ProvisioningJob | null
   owners: TenantOwner[]
+  approvals?: ServiceApproval[]
 }) {
+  if (!hasService(t, 'store')) return <ApiOverview tenant={t} owners={owners} approvals={approvals} />
   const serving = t.status === 'active' && !!t.rds_endpoint
 
   return (
@@ -90,30 +94,7 @@ export default function OverviewTab({
         </Section>
       </div>
 
-      <Section title="Owners">
-        {owners.length === 0 ? (
-          <p className="text-sm text-foreground-muted">
-            No owner linked to this store. It cannot be signed into from ecom.jeffistores.in.
-          </p>
-        ) : (
-          <ul className="space-y-3">
-            {owners.map(o => (
-              <li key={o.id} className="flex items-start justify-between gap-3 min-w-0">
-                <div className="min-w-0">
-                  <div className="text-sm text-foreground break-all">{o.name || o.email}</div>
-                  {o.name && <div className="text-xs text-foreground-muted break-all">{o.email}</div>}
-                </div>
-                <div className="text-right shrink-0">
-                  <div className="text-xs capitalize text-foreground-secondary">{o.role}</div>
-                  <div className="text-xs text-foreground-muted">
-                    since {new Date(o.linked_at).toLocaleDateString('en-IN')}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
+      <Owners owners={owners} />
 
       <Section title="Surfaces">
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -138,6 +119,75 @@ export default function OverviewTab({
           ))}
         </ul>
       </Section>
+    </div>
+  )
+}
+
+function Owners({ owners }: { owners: TenantOwner[] }) {
+  return (
+    <Section title="Owners">
+        {owners.length === 0 ? (
+          <p className="text-sm text-foreground-muted">
+            No owner linked to this workspace. It cannot be signed into from ecom.jeffistores.in.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {owners.map(o => (
+              <li key={o.id} className="flex items-start justify-between gap-3 min-w-0">
+                <div className="min-w-0">
+                  <div className="text-sm text-foreground break-all">{o.name || o.email}</div>
+                  {o.name && <div className="text-xs text-foreground-muted break-all">{o.email}</div>}
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-xs capitalize text-foreground-secondary">{o.role}</div>
+                  <div className="text-xs text-foreground-muted">
+                    since {new Date(o.linked_at).toLocaleDateString('en-IN')}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+  )
+}
+
+const API_TONE: Record<string, string> = { approved: 'bg-green-500', pending: 'bg-amber-500', rejected: 'bg-red-500' }
+
+/** Messaging/Documents-only workspace: no store, database or instance — just its services. */
+function ApiOverview({ tenant: t, owners, approvals }: { tenant: TenantDetail; owners: TenantOwner[]; approvals: ServiceApproval[] }) {
+  const services = (t.service_types ?? []).filter(s => s !== 'store')
+  const statusOf = (s: string) => approvals.find(a => a.service === s)?.status ?? 'approved'
+  return (
+    <div className="space-y-6 min-w-0">
+      <div className="rounded-xl border border-sky-300 dark:border-sky-700 bg-sky-50 dark:bg-sky-900/20 p-5">
+        <span className="font-semibold text-foreground">API workspace</span>
+        <span className="ml-2 text-sm text-foreground-muted">Uses the Messaging / Documents APIs only — there is no store, database or instance to manage. It can add a store later from its console.</span>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Section title="Workspace">
+          <FieldGrid>
+            <Field label="Console slug" value={<Mono>{t.slug}</Mono>} />
+            <Field label="Status" value={<span className="capitalize">{t.status}</span>} />
+            <Field label="Created" value={new Date(t.created_at).toLocaleDateString('en-IN')} />
+            <Field label="Notification email" value={<Mono>{t.noreply_email}</Mono>} />
+          </FieldGrid>
+        </Section>
+        <Section title="Services">
+          {services.length === 0 ? <p className="text-sm text-foreground-muted">No services enabled.</p> : (
+            <ul className="space-y-2">
+              {services.map(s => (
+                <li key={s} className="flex items-center gap-2 text-sm">
+                  <span className={`w-2 h-2 rounded-full ${API_TONE[statusOf(s)]}`} />
+                  <span className="text-foreground">{s === 'messaging' ? 'Messaging API' : 'Documents API'}</span>
+                  <span className="text-xs capitalize text-foreground-muted">{statusOf(s)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
+      </div>
+      <Owners owners={owners} />
     </div>
   )
 }

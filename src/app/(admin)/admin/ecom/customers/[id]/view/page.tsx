@@ -60,6 +60,13 @@ export default async function TenantObjectPage({
 
   const t = await getTenant(id)
   if (!t) notFound()
+  // API workspaces (Messaging/Documents only) have no store infrastructure to show or manage.
+  const isStore = hasService(t, 'store')
+  const hiddenTabs: TenantTab[] = [
+    ...(isStore ? [] : (['provisioning', 'infrastructure', 'commerce', 'shipments', 'access'] as TenantTab[])),
+    ...(hasService(t, 'messaging') ? [] : (['messaging'] as TenantTab[])),
+  ]
+  if (hiddenTabs.includes(tab)) redirect(`/admin/ecom/customers/${id}/view?tab=overview`)
 
   // Cheap single-row reads that feed the header or more than one tab: KYC drives the header
   // badge everywhere, the job feeds Overview's health and Infrastructure's resource ids.
@@ -80,7 +87,7 @@ export default async function TenantObjectPage({
       <TenantTabNav
         tenantId={t.id}
         active={tab}
-        hidden={hasService(t, 'messaging') ? [] : ['messaging']}
+        hidden={hiddenTabs}
         badges={{
           kyc: kycPending ? (
             <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block align-middle" />
@@ -90,7 +97,7 @@ export default async function TenantObjectPage({
 
       <div className="mt-6">
         {tab === 'overview' && (
-          <OverviewTab tenant={t} job={headerJob} owners={await getTenantOwners(id).catch(() => [])} />
+          <OverviewTab tenant={t} job={headerJob} owners={await getTenantOwners(id).catch(() => [])} approvals={approvals} />
         )}
         {tab === 'provisioning' && <ProvisioningTab tenant={t} />}
         {tab === 'infrastructure' && <InfrastructureTab tenant={t} job={headerJob} {...await infraData(id)} />}

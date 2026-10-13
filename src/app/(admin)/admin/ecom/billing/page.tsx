@@ -18,7 +18,7 @@ export default async function EcomBillingPage({ searchParams }: { searchParams: 
 
   const sp = await searchParams
   const [tenants, summary] = await Promise.all([
-    listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q') }),
+    listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q'), product: 'store' }),
     billingSummary(),
   ])
 
