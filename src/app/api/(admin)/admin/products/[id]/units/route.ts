@@ -33,6 +33,30 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   const variantId = request.nextUrl.searchParams.get('variant_id')
+  const subVariantId = request.nextUrl.searchParams.get('sub_variant_id')
+
+  // chain=1 (document line items): every unit the line can be sold in — sub-variant, then variant, then product
+  // — one per unit name with the most specific scope winning; the default (is_base) of the most specific scope
+  // with units comes first.
+  if (request.nextUrl.searchParams.get('chain')) {
+    const rows = await queryMany<any>(
+      `SELECT id, product_id, variant_id, sub_variant_id, unit, factor, dimension, is_base, display_label,
+              min_qty, max_qty, qty_step,
+              CASE WHEN sub_variant_id IS NOT NULL THEN 0 WHEN variant_id IS NOT NULL THEN 1 ELSE 2 END AS depth
+       FROM product_units
+       WHERE product_id = $1
+         AND ((sub_variant_id IS NOT NULL AND sub_variant_id = $3::uuid)
+           OR (sub_variant_id IS NULL AND variant_id IS NOT NULL AND variant_id = $2::uuid)
+           OR (sub_variant_id IS NULL AND variant_id IS NULL))
+       ORDER BY depth, is_base DESC, unit`,
+      [id, variantId || null, subVariantId || null]
+    )
+    const seen = new Set<string>()
+    const units = rows.filter(r => !seen.has(r.unit.toLowerCase()) && seen.add(r.unit.toLowerCase()))
+    const def = units.find(u => u.is_base && u.depth === units[0]?.depth) ?? units.find(u => u.is_base)
+    const ordered = def ? [def, ...units.filter(u => u !== def)] : units
+    return NextResponse.json({ units: ordered.map(u => ({ ...u, is_base: u === def })) })
+  }
 
   const units = await queryMany(
     variantId

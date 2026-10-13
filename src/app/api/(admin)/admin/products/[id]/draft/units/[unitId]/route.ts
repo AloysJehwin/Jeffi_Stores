@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryOne, query } from '@/lib/shared/db'
+import { queryOne, query, queryMany } from '@/lib/shared/db'
 import { assertUnitChangeAllowed, changedUnitFields } from '@/lib/catalog/selling-unit'
 
 export const dynamic = 'force-dynamic'
@@ -59,7 +59,24 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const patch = { ...body, override: undefined, ...(override ? { _reset_stock_on_publish: true } : {}) }
   let updated: any[]
-  if (idx >= 0) {
+  // Making a unit the default: one default per scope. A scope still showing live units is copied into the
+  // draft first so the old default is demoted rather than dropped on publish.
+  if (body.is_base === true) {
+    const vId = (existing?.variant_id ?? req.nextUrl.searchParams.get('variant_id')) || null
+    const svId = (existing?.sub_variant_id ?? req.nextUrl.searchParams.get('sub_variant_id')) || null
+    const inScope = (u: any) => (svId ? u.sub_variant_id === svId : vId ? u.variant_id === vId && !u.sub_variant_id : !u.variant_id && !u.sub_variant_id)
+    let all = units
+    if (!all.some((u: any) => !u._cleared && inScope(u))) {
+      const live = await queryMany<any>(
+        `SELECT * FROM product_units WHERE product_id = $1
+           AND variant_id IS NOT DISTINCT FROM $2::uuid AND sub_variant_id IS NOT DISTINCT FROM $3::uuid`,
+        [id, vId, svId]
+      )
+      all = [...all.filter((u: any) => !inScope(u)), ...live]
+    }
+    updated = all.map((u: any) => (u.id === unitId ? { ...u, ...patch, is_base: true } : inScope(u) ? { ...u, is_base: false } : u))
+    if (!updated.some((u: any) => u.id === unitId)) updated.push({ ...patch, id: unitId, variant_id: vId, sub_variant_id: svId })
+  } else if (idx >= 0) {
     updated = units.map((u: any) => (u.id === unitId ? { ...u, ...patch } : u))
   } else {
     // Unit not in draft yet — add it with this id
