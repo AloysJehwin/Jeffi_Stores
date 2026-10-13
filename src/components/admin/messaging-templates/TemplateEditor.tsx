@@ -1,9 +1,7 @@
 'use client'
 
-import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Link from '@tiptap/extension-link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
 
@@ -27,14 +25,16 @@ export type WaCarouselCard = {
   title?: string
   body?: string
   media_url?: string
-  buttons?: Array<{ type: 'quick_reply' | 'url' | 'phone'; label: string; value?: string }>
+  buttons?: Array<WaButton>
 }
+
+export type WaButton = { type: 'quick_reply' | 'url' | 'phone'; label: string; value?: string }
 
 type Props = {
   value: EditorTemplate
-  apiBase: string // e.g. /api/admin/messaging-templates or /api/ecom/svc/messaging
-  assetsBase?: string // optional override; defaults to `${apiBase}/assets/upload`
-  shortLinksBase?: string // optional override; defaults to `${apiBase}/short-links`
+  apiBase: string
+  assetsBase?: string
+  shortLinksBase?: string
   onChange: (t: EditorTemplate) => void
   onSave: (publish: boolean) => Promise<void>
   saving?: boolean
@@ -46,7 +46,12 @@ const hasEmoji = (s: string) => /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(s
 
 const QUICK_EMOJI = ['🎉','✅','📦','🚚','💰','⚡','🎁','🔥','🏆','⏰','👋','🛒','💬','⭐','🙏']
 
-type WaBlocks = { types?: Record<string, any>; variables?: Record<string, string>; carousel?: { cards: WaCarouselCard[] } }
+type WaBlocks = {
+  types?: Record<string, any>
+  variables?: Record<string, string>
+  buttons?: WaButton[]
+  carousel?: { cards: WaCarouselCard[] }
+}
 
 export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave, saving }: Props) {
   const [preview, setPreview] = useState<{ subject?: string | null; body?: string; missing?: string[] } | null>(null)
@@ -59,25 +64,6 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
 
   const uploadUrl = assetsBase ?? `${apiBase}/assets/upload`
   const shortUrl = shortLinksBase ?? `${apiBase}/short-links`
-
-  const email = useEditor({
-    extensions: [StarterKit, Link.configure({ openOnClick: false })],
-    content: value.channel === 'email' ? (value.blocks as any) ?? value.body : '',
-    editable: value.channel === 'email',
-    immediatelyRender: false,
-    onUpdate: ({ editor }) => {
-      if (value.channel !== 'email') return
-      onChange({ ...value, blocks: editor.getJSON(), blocks_format: 'tiptap', body: editor.getText() })
-    },
-  })
-
-  useEffect(() => {
-    if (value.channel === 'email' && email && value.blocks) {
-      const current = email.getJSON()
-      if (JSON.stringify(current) !== JSON.stringify(value.blocks)) email.commands.setContent(value.blocks as any)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value.id])
 
   const smsStats = useMemo(() => {
     if (value.channel !== 'sms') return null
@@ -114,13 +100,6 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
       const data = await r.json()
       return (data.url as string) || destination
     } catch { return destination }
-  }
-
-  async function onPickImageEmail() {
-    const file = await pickFile()
-    if (!file) return
-    const url = await uploadFile(file)
-    if (url) email?.chain().focus().insertContent(`<img src="${url}" alt="" />`).run()
   }
 
   function pickFile(): Promise<File | null> {
@@ -212,21 +191,17 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                 placeholder="e.g. Order #{{order_number}} confirmed"
               />
             </div>
-            <div className="border rounded">
-              <div className="flex flex-wrap gap-1 border-b p-2 text-sm">
-                <button type="button" className="px-2 py-1 hover:bg-gray-100 rounded" onClick={() => email?.chain().focus().toggleBold().run()}><b>B</b></button>
-                <button type="button" className="px-2 py-1 hover:bg-gray-100 rounded italic" onClick={() => email?.chain().focus().toggleItalic().run()}>I</button>
-                <button type="button" className="px-2 py-1 hover:bg-gray-100 rounded" onClick={() => email?.chain().focus().toggleHeading({ level: 2 }).run()}>H2</button>
-                <button type="button" className="px-2 py-1 hover:bg-gray-100 rounded" onClick={() => email?.chain().focus().toggleBulletList().run()}>• List</button>
-                <button type="button" className="px-2 py-1 hover:bg-gray-100 rounded" onClick={() => {
-                  const url = prompt('Link URL')
-                  if (url) email?.chain().focus().setLink({ href: url }).run()
-                }}>Link</button>
-                <button type="button" disabled={uploading} className="px-2 py-1 hover:bg-gray-100 rounded disabled:opacity-50" onClick={onPickImageEmail}>
-                  {uploading ? '⏳ Uploading…' : '🖼️ Image'}
-                </button>
-              </div>
-              <EditorContent editor={email} className="prose max-w-none p-3 min-h-[320px]" />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+              <EmailComposer
+                value={typeof value.body === 'string' ? value.body : ''}
+                onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })}
+                minHeight={360}
+                ctaHref="{storeUrl}"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Tokens like <code>{'{customer_first_name}'}</code> are replaced with the actual customer details when the email is sent.
+              </p>
             </div>
           </>
         )}
@@ -261,19 +236,24 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
         {value.channel === 'whatsapp' && (() => {
           const waBlocks = (value.blocks as WaBlocks | undefined) ?? {}
           const cards = waBlocks.carousel?.cards ?? []
+          const buttons = waBlocks.buttons ?? []
           const isApproved = value.approval_status === 'approved'
           const mediaLocked = isApproved && !!value.media_type
 
           const setBlocks = (patch: Partial<WaBlocks>) =>
             onChange({ ...value, blocks: { ...waBlocks, ...patch }, blocks_format: 'wa-content' })
 
-          const setCards = (next: WaCarouselCard[]) =>
-            setBlocks({ carousel: { cards: next } })
-
+          const setCards = (next: WaCarouselCard[]) => setBlocks({ carousel: { cards: next } })
           const addCard = () => setCards([...cards, { title: '', body: '', buttons: [] }])
           const removeCard = (i: number) => setCards(cards.filter((_, idx) => idx !== i))
           const updateCard = (i: number, patch: Partial<WaCarouselCard>) =>
             setCards(cards.map((c, idx) => idx === i ? { ...c, ...patch } : c))
+
+          const setButtons = (next: WaButton[]) => setBlocks({ buttons: next })
+          const addButton = () => setButtons([...buttons, { type: 'quick_reply', label: '' }])
+          const removeButton = (i: number) => setButtons(buttons.filter((_, idx) => idx !== i))
+          const updateButton = (i: number, patch: Partial<WaButton>) =>
+            setButtons(buttons.map((b, idx) => idx === i ? { ...b, ...patch } : b))
 
           const onPickCardMedia = async (i: number) => {
             const file = await pickFile()
@@ -381,6 +361,45 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                   </button>
                 </div>
                 {emojiPanel}
+              </div>
+
+              <div className="border rounded p-3 bg-white">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-medium text-gray-700">Action buttons ({buttons.length}/3)</span>
+                  <button type="button" disabled={buttons.length >= 3} className="px-2 py-1 text-xs border rounded hover:bg-gray-100 disabled:opacity-50" onClick={addButton}>+ Add button</button>
+                </div>
+                <p className="text-xs text-gray-400 mb-2">Shown as tappable chips below the WhatsApp message body.</p>
+                <div className="space-y-2">
+                  {buttons.map((btn, i) => (
+                    <div key={i} className="flex flex-wrap items-center gap-2 border rounded p-2 bg-gray-50">
+                      <select
+                        className="border rounded px-2 py-1 text-xs"
+                        value={btn.type}
+                        onChange={e => updateButton(i, { type: e.target.value as WaButton['type'], value: '' })}
+                      >
+                        <option value="quick_reply">Quick reply</option>
+                        <option value="url">Visit URL</option>
+                        <option value="phone">Call phone</option>
+                      </select>
+                      <input
+                        className="border rounded px-2 py-1 text-xs flex-1 min-w-[8rem]"
+                        placeholder="Label (max 25 chars)"
+                        maxLength={25}
+                        value={btn.label}
+                        onChange={e => updateButton(i, { label: e.target.value })}
+                      />
+                      {btn.type !== 'quick_reply' && (
+                        <input
+                          className="border rounded px-2 py-1 text-xs flex-1 min-w-[10rem]"
+                          placeholder={btn.type === 'url' ? 'https://… (or {{1}})' : '+911234567890'}
+                          value={btn.value ?? ''}
+                          onChange={e => updateButton(i, { value: e.target.value })}
+                        />
+                      )}
+                      <button type="button" className="text-xs text-red-600 hover:underline" onClick={() => removeButton(i)}>remove</button>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="border rounded p-3 bg-white">
