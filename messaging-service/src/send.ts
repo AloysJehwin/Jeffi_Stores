@@ -79,14 +79,75 @@ async function resolveTemplate(tenantId: string, channel: string, slug: string, 
     const live = channel === 'whatsapp' && t.variant.provider_ref
       ? (await tpl.liveVersion(pool, t.variant.id, t.variant.provider_ref)) ?? t.version
       : t.version
-    return { subject: live.subject, body: live.body, provider_ref: t.variant.provider_ref ?? undefined }
+    return { subject: live.subject, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any }
   }
   return findTemplate(tenantId, channel, slug)
 }
 
+// WhatsApp templates with a header image `<prefix>{{n}}` and/or a URL button `<host>/{{m}}`: callers may
+// pass media_url / button_url instead of the raw path and link code.
+const PH = /\{\{\s*(\d+)\s*\}\}/
+async function actionVars(ctx: Ctx, blocks: any, vars: Vars, req: SendMessageRequest): Promise<Vars> {
+  const out: Vars = {}
+  const media: string = blocks?.types?.['twilio/media']?.media?.[0] ?? ''
+  const mediaSlot = media.match(PH)?.[1]
+  if (mediaSlot && !vars[mediaSlot]) {
+    const prefix = media.slice(0, media.search(PH))
+    if (!req.media_url) throw new SendError(422, 'missing_variables', `This template has an image header — pass media_url (an image under ${prefix}) or variables.${mediaSlot}`, { missing: [mediaSlot] })
+    if (!req.media_url.startsWith(prefix)) throw new SendError(422, 'invalid_media_url', `media_url must start with ${prefix} (the domain Meta approved for this template)`)
+    out[mediaSlot] = req.media_url.slice(prefix.length)
+  }
+  const button = (blocks?.buttons ?? []).find((b: any) => b.type === 'url' && PH.test(b.value ?? ''))
+  const linkSlot = button?.value.match(PH)?.[1]
+  if (linkSlot && !vars[linkSlot]) {
+    if (!req.button_url) throw new SendError(422, 'missing_variables', `This template has a link button — pass button_url or variables.${linkSlot}`, { missing: [linkSlot] })
+    const code = randomUUID().replace(/-/g, '').slice(0, 10)
+    await db.query(`INSERT INTO short_link (code, tenant_id, destination_url, kind) VALUES ($1,$2,$3,'page')`, [code, ctx.tenantId, req.button_url])
+    out[linkSlot] = code
+  }
+  return out
+}
+
+// The insert variables every template can use without the caller passing them: store details, the
+// store's custom variables, date/year and recipient fallbacks. The caller's own values always win.
+const sysCache = new Map<string, { at: number; vars: Vars }>()
+export async function systemVars(tenantId: string): Promise<Vars> {
+  const hit = sysCache.get(tenantId)
+  if (hit && Date.now() - hit.at < 60_000) return hit.vars
+  const pools = await poolsForTenant(tenantId).then(p => p.pools).catch(() => null)
+  // Missing tables / DB hiccup: fall back to the defaults rather than failing the send.
+  const q = async <T>(sql: string, args: unknown[] = []) => { try { return (await pools!.tenant.query(sql, args)).rows as T[] } catch { return [] as T[] } }
+  const [settings, custom, tenant] = await Promise.all([
+    q<{ key: string; value: string }>(`SELECT key, value FROM site_settings WHERE key IN ('business_name','business_email','business_phone','business_web')`),
+    q<{ key: string; value: string }>(`SELECT key, value FROM template_variables WHERE is_enabled`),
+    db.query<{ display_name: string }>(`SELECT display_name FROM tenants WHERE id=$1`, [tenantId]).then(r => r.rows[0]).catch(() => undefined),
+  ])
+  const set = Object.fromEntries(settings.map(r => [r.key, r.value]))
+  const vars: Vars = {
+    ...Object.fromEntries(custom.map(c => [c.key, c.value ?? ''])),
+    store_name: set.business_name || tenant?.display_name || '',
+    store_email: set.business_email || '',
+    store_phone: set.business_phone || '',
+    store_web: set.business_web || '',
+    current_year: String(new Date().getFullYear()),
+    date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }),
+    customer_first_name: 'there',
+    customer_name: 'there',
+    customer_last_name: '',
+  }
+  sysCache.set(tenantId, { at: Date.now(), vars })
+  return vars
+}
+
 /** Resolve template + variables into the final subject/body. */
 async function compose(ctx: Ctx, req: SendMessageRequest) {
-  const vars: Vars = (req.variables ?? {}) as Vars
+  const given = (req.variables ?? {}) as Vars
+  const vars: Vars = {
+    ...(await systemVars(ctx.tenantId)),
+    ...(req.channel === 'email' ? { customer_email: req.to } : {}),
+    ...(given.customer_first_name && !given.customer_name ? { customer_name: given.customer_first_name } : {}),
+    ...given,
+  }
   let subject = req.subject ?? null
   let body = req.body ?? ''
   let providerRef: string | undefined = req.provider_ref
@@ -98,6 +159,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     subject = subject ?? t.subject
     body = t.body
     providerRef = providerRef ?? t.provider_ref ?? undefined
+    if (req.channel === 'whatsapp') Object.assign(vars, await actionVars(ctx, (t as any).blocks, vars, req))
   }
   const html = req.channel === 'email'
   return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars }
@@ -135,7 +197,8 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     } else if (req.channel === 'sms') {
       ref = await sendSms({ to: req.to, body, messageId: id })
     } else {
-      const variables = Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, String(v ?? '')]))
+      // Twilio content variables are the numbered slots only.
+      const variables = Object.fromEntries(Object.entries(vars).filter(([k]) => /^\d+$/.test(k)).map(([k, v]) => [k, String(v ?? '')]))
       ref = await sendWhatsApp({ to: req.to, body, contentSid: providerRef, variables, messageId: id })
     }
     await db.query(

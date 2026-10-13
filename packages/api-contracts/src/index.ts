@@ -29,6 +29,9 @@ export const SendMessageRequest = z
     brand: z.string().max(120).optional(),
     kicker: z.string().max(120).optional(),
     footer_contact: z.string().max(200).optional(),
+    // WhatsApp templates with an image header / link button: pass full URLs, the service fills their {{n}}.
+    media_url: z.string().url().optional(),
+    button_url: z.string().url().optional(),
   })
   .refine(m => m.template || m.body, { message: 'Provide template or body' })
   .refine(m => (m.channel === 'email' ? Email.safeParse(m.to).success : Phone.safeParse(m.to).success), {
@@ -57,9 +60,14 @@ export type Message = z.infer<typeof Message>
 export const BatchMessageRequest = z.object({
   channel: Channel,
   template: Slug,
-  recipients: z.array(z.object({ to: z.string().min(3), variables: Vars.optional(), reference: z.string().optional() })).min(1).max(500),
+  recipients: z.array(z.object({
+    to: z.string().min(3), variables: Vars.optional(), reference: z.string().optional(),
+    media_url: z.string().url().optional(), button_url: z.string().url().optional(),
+  })).min(1).max(500),
   variables: Vars.optional(),
   subject: z.string().max(200).optional(),
+  media_url: z.string().url().optional(),
+  button_url: z.string().url().optional(),
 })
 export const BatchMessageResponse = z.object({ batch_id: z.string().uuid(), accepted: z.number(), rejected: z.array(z.object({ to: z.string(), reason: z.string() })) })
 
@@ -85,6 +93,54 @@ export const UpsertTemplateRequest = z.object({
   body: z.string().min(1).max(20000),
   provider_ref: z.string().max(80).optional(),
 })
+// Templates library (v2): a template per (slug, channel); every save is a new version.
+const WaButton = z.object({ type: z.enum(['quick_reply', 'url', 'phone']), label: z.string().min(1).max(25), value: z.string().max(2000).optional() })
+export const TemplateBlocks = z.object({
+  variables: z.record(z.string(), z.string()).optional().describe('WhatsApp: sample value per {{n}}, sent to Meta for review'),
+  buttons: z.array(WaButton).max(3).optional(),
+  carousel: z.object({ cards: z.array(z.object({ title: z.string().optional(), body: z.string().optional(), media_url: z.string().optional(), buttons: z.array(WaButton).max(2).optional() })).max(10) }).optional(),
+  types: z.record(z.string(), z.unknown()).optional(),
+}).passthrough()
+export const UpsertLibraryTemplateRequest = z.object({
+  slug: Slug,
+  channel: Channel,
+  name: z.string().min(1).max(120),
+  category: z.string().max(32).optional(),
+  description: z.string().max(500).optional(),
+  locale: z.string().max(10).optional(),
+  subject: z.string().max(200).optional(),
+  body: z.string().min(1).max(20000),
+  blocks: z.union([TemplateBlocks, z.array(z.unknown()), z.string()]).optional(),
+  blocks_format: z.enum(['tiptap', 'tiptap-html', 'email-blocks', 'maily', 'mjml', 'wa-content', 'sms-text']).optional(),
+  meta_category: z.enum(['MARKETING', 'UTILITY', 'AUTHENTICATION']).optional(),
+  media_type: z.enum(['image', 'video', 'document']).optional(),
+  provider_ref: z.string().max(80).optional(),
+  note: z.string().max(500).optional(),
+  publish: z.boolean().default(true),
+})
+export type UpsertLibraryTemplateRequest = z.infer<typeof UpsertLibraryTemplateRequest>
+export const UpdateLibraryTemplateRequest = UpsertLibraryTemplateRequest.omit({ slug: true, channel: true }).partial({ name: true, body: true })
+export const LibraryTemplate = z.object({
+  id: z.string().uuid(),
+  slug: z.string(),
+  name: z.string(),
+  category: z.string().nullable(),
+  channel: Channel,
+  status: z.string(),
+  source: z.enum(['tenant', 'platform']).optional(),
+  provider_ref: z.string().nullable().optional(),
+  approval_status: z.string().nullable().optional(),
+  approval_reason: z.string().nullable().optional(),
+  needs_resubmission: z.boolean().optional(),
+  meta_category: z.string().nullable().optional(),
+  media_type: z.string().nullable().optional(),
+  current_version: z.object({
+    id: z.string().uuid(), version: z.number(), subject: z.string().nullable(), body: z.string(),
+    blocks: z.unknown(), blocks_format: z.string().nullable(), variables: z.array(z.string()), created_at: z.string(),
+  }).nullable().optional(),
+})
+export const TemplatePreviewRequest = z.object({ channel: Channel, slug: Slug, locale: z.string().optional(), variables: Vars.optional() })
+
 export const TemplateQuery = z.object({ channel: Channel.optional(), include_system: z.coerce.boolean().default(true) })
 
 // ── documents ──

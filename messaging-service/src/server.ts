@@ -2,12 +2,12 @@ import Fastify, { type FastifyRequest } from 'fastify'
 import formbody from '@fastify/formbody'
 import { randomUUID } from 'node:crypto'
 import { ZodError } from 'zod'
-import { SendMessageRequest, BatchMessageRequest, UpsertTemplateRequest, TemplateQuery, Channel } from '@jeffi/api-contracts'
+import { SendMessageRequest, BatchMessageRequest, UpsertTemplateRequest, UpsertLibraryTemplateRequest, UpdateLibraryTemplateRequest, TemplateQuery, Channel } from '@jeffi/api-contracts'
 import { verifyServiceToken, bearer, type ServiceClaims } from '@jeffi/service-auth'
 import { usdToInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
-import { sendMessage, getMessage, toApi as msgToApi, SendError, type MessageRow } from './send.js'
+import { sendMessage, getMessage, systemVars, toApi as msgToApi, SendError, type MessageRow } from './send.js'
 import { listTemplates, upsertTemplate, archiveTemplate, toApi as tplToApi } from './templates.js'
 import * as tpl from './templates-v2.js'
 import { CATALOG, WA_APPROVED_SIDS } from '../seed/catalog.js'
@@ -20,6 +20,11 @@ import { wrapEmail } from './mail-shell.js'
 import { randomBytes } from 'node:crypto'
 
 export const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' } })
+
+// Accept an empty JSON body (DELETE / body-less POST with Content-Type: application/json).
+app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+  try { done(null, body ? JSON.parse(body as string) : {}) } catch (e: any) { e.statusCode = 400; done(e, undefined) }
+})
 await app.register(formbody)
 
 declare module 'fastify' {
@@ -69,7 +74,9 @@ app.post('/messages/batch', async req => {
         subject: body.subject,
         variables: { ...(body.variables ?? {}), ...(r.variables ?? {}) },
         reference: r.reference,
-      })
+        media_url: r.media_url ?? body.media_url,
+        button_url: r.button_url ?? body.button_url,
+      } as SendMessageRequest)
       if (m.status === 'sent') accepted++
       else rejected.push({ to: r.to, reason: m.error ?? m.status })
     } catch (e: any) {
@@ -141,9 +148,21 @@ app.get<{ Querystring: { channel?: string } }>('/v2/templates', async req => {
   return { items }
 })
 
+// API-key callers get strict validation; the dashboards post the editor's richer shape.
+const upsertBody = (req: FastifyRequest, partial = false) =>
+  (req.claims.service === 'public-api' ? (partial ? UpdateLibraryTemplateRequest : UpsertLibraryTemplateRequest).parse(req.body) : req.body) as tpl.UpsertInput
+
 app.post('/v2/templates', async req => {
   const { pool } = await poolFor(req)
-  return tpl.toApi(await tpl.upsertTemplate(pool, req.claims.tenantId, req.body as tpl.UpsertInput, spaceOf(req)))
+  return tpl.toApi(await tpl.upsertTemplate(pool, req.claims.tenantId, upsertBody(req), spaceOf(req)))
+})
+
+app.delete<{ Params: { channel: string; slug: string } }>('/v2/templates/:channel/:slug', async (req, reply) => {
+  const { pool } = await poolFor(req)
+  const own = await tpl.findBySlug(pool, req.claims.tenantId, Channel.parse(req.params.channel), req.params.slug, 'en', spaceOf(req))
+  if (!own) return reply.code(404).send({ error: 'not_found', message: 'No template of yours with that slug (standard templates cannot be deleted)' })
+  await tpl.archiveTemplate(pool, req.claims.tenantId, own.template.id, spaceOf(req))
+  return { ok: true }
 })
 
 app.put<{ Params: { id: string } }>('/v2/templates/:id', async (req, reply) => {
@@ -153,7 +172,7 @@ app.put<{ Params: { id: string } }>('/v2/templates/:id', async (req, reply) => {
     ?? (req.claims.tenantId !== tpl.PLATFORM_TENANT_ID ? await tpl.findById(db, tpl.PLATFORM_TENANT_ID, req.params.id) : null)
   if (!existing) return reply.code(404).send({ error: 'not_found' })
   const input: tpl.UpsertInput = {
-    ...(req.body as any),
+    ...(upsertBody(req, true) as any),
     slug: existing.family.slug,
     channel: existing.template.channel as any,
     name: (req.body as any).name ?? existing.family.name,
@@ -189,7 +208,7 @@ app.post<{ Body: { channel: string; slug: string; locale?: string; versionId?: s
     const { pools } = await poolFor(req)
     const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, req.body.channel, req.body.slug, req.body.locale ?? 'en', spaceOf(req))
     if (!t?.version) return reply.code(404).send({ error: 'not_found' })
-    const given = req.body.variables ?? {}
+    const given = { ...(await systemVars(req.claims.tenantId)), ...(req.body.variables ?? {}) }
     // Preview = sample data: anything the caller didn't supply gets a sample value.
     const missing = [...new Set([...missingKeys(t.version.subject ?? '', given), ...missingKeys(t.version.body, given)])]
     const vars = { ...Object.fromEntries(missing.map(k => [k, sampleFor(k)])), ...given }
@@ -223,9 +242,9 @@ app.post<{ Body: { channel: string; subject?: string; body: string; variables?: 
 app.post<{ Body: { destination_url: string; kind?: string; variant_id?: string; expires_at?: string } }>(
   '/short-links',
   async req => {
-    const { pool } = await poolFor(req)
     const code = randomBytes(6).toString('base64url').slice(0, 8)
-    await pool.query(
+    // Always the main DB: the public /s/:code redirect has no tenant context and reads it there.
+    await db.query(
       `INSERT INTO short_link (code, tenant_id, variant_id, destination_url, kind, expires_at)
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [code, req.claims.tenantId, req.body.variant_id ?? null, req.body.destination_url, req.body.kind ?? 'page', req.body.expires_at ?? null]

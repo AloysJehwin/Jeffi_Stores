@@ -11,6 +11,7 @@ import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
 import { Smile, Link2, ImageIcon, Loader2, Upload, RefreshCw } from 'lucide-react'
 import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
 import PhonePreview from './PhonePreview'
+import { sampleVariableMap, TOKEN_RE } from '@/lib/templates/variables-shared'
 import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
@@ -99,7 +100,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
     const human = (k: string) => k.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, c => c.toUpperCase())
     return names.length ? names.map(k => ({ key: k, label: human(k), description: 'Used by this template', sample: '', group: 'order' as const, builtIn: true, section: 'This template' })) : undefined
   }, [kind, variableNames, ownVars])
-  const [preview, setPreview] = useState<{ subject?: string | null; body?: string; missing?: string[] } | null>(null)
+  const [preview, setPreview] = useState<{ subject?: string | null; body?: string; missing?: string[]; renderedFor?: string } | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -209,7 +210,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ channel: value.channel, slug: value.slug, variables: {} }),
       })
-      setPreview(await res.json())
+      setPreview({ ...(await res.json()), renderedFor: value.body })
     } finally {
       setPreviewing(false)
     }
@@ -577,9 +578,24 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
           )
         })() : (
           <>
-            {!preview && <p className="text-sm text-foreground-muted">Save first, then render to see the message as customers get it.</p>}
-            {preview?.subject && <div className="font-semibold mb-2">{preview.subject}</div>}
-            {preview?.body && <iframe title="Email preview" srcDoc={preview.body} sandbox="" className="w-full bg-surface-elevated border border-border-default rounded-lg" style={{ minHeight: 520 }} />}
+            {/* Branded server render while it matches the editor; otherwise a live render of what's being typed. */}
+            {(() => {
+              const server = preview?.body && preview.renderedFor === value.body ? preview : null
+              const samples = sampleVariableMap()
+              const fill = (t: string) => t.replace(TOKEN_RE, (m, a?: string, b?: string) => {
+                const k = (a || b || '').toLowerCase()
+                return samples[k] ?? `<span style="background:#f4e3da;color:#a9552f;border-radius:3px;padding:0 3px">${k}</span>`
+              })
+              const subject = server ? server.subject : fill(value.subject ?? '').replace(/<[^>]+>/g, '')
+              const html = server ? server.body! : `<!doctype html><html><body style="margin:0;padding:24px;background:#f6f6f6;font-family:Arial,Helvetica,sans-serif"><div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;padding:24px">${fill(value.body || '<p style="color:#999">Start writing to see the preview.</p>')}</div></body></html>`
+              return (
+                <>
+                  {subject && <div className="font-semibold mb-2">{subject}</div>}
+                  <iframe title="Email preview" srcDoc={html} sandbox="" className="w-full bg-surface-elevated border border-border-default rounded-lg" style={{ minHeight: 520 }} />
+                  {!server && <p className="mt-2 text-[11px] text-foreground-muted">Live preview with sample values. Save, then “Render with sample data” for the branded email as sent.</p>}
+                </>
+              )
+            })()}
           </>
         )}
         {preview?.missing && preview.missing.length > 0 && (
