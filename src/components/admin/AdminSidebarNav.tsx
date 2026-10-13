@@ -287,7 +287,7 @@ export const NAV_ICONS: Record<string, JSX.Element> = {
       />
     </svg>
   ),
-  Mailer: (
+  Messaging: (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
       <path
         strokeLinecap="round"

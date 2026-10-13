@@ -323,16 +323,16 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
   },
   {
     key: 'mailer:read',
-    label: 'Mailer (Read)',
+    label: 'Messaging (Read)',
     description: 'View email campaigns and audience previews',
-    routes: ['/admin/mailer'],
+    routes: ['/admin/marketing/messaging', '/admin/mailer'],
     group: 'Marketing',
   },
   {
     key: 'mailer:write',
-    label: 'Mailer (Write)',
+    label: 'Messaging (Write)',
     description: 'Create, send and schedule email campaigns to customers',
-    routes: ['/admin/mailer'],
+    routes: ['/admin/marketing/messaging', '/admin/mailer'],
     group: 'Marketing',
   },
   // Messaging templates library (email / SMS / WhatsApp bodies). Sold with Mailer.

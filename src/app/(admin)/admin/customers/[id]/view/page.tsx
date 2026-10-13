@@ -582,11 +582,11 @@ export default async function CustomerDetailPage({
             )}
           </div>
 
-          {/* Send Mailer */}
+          {/* Send message */}
           {canMail && (
             <div id="mailer" className="bg-surface-elevated rounded-xl border border-border-default p-5">
               <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">
-                Send Mailer
+                Send message
               </h2>
               <CustomerMailerPanel
                 customerId={customer.id}

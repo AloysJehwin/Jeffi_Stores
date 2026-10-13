@@ -469,8 +469,8 @@ export default function CustomerMailerPanel({
     }
     setSendError(null)
     const ok = await showConfirm({
-      title: 'Send Mailer',
-      message: `Send mailer to ${customerName} (${customerEmail})?`,
+      title: 'Send message',
+      message: `Send a message to ${customerName} (${customerEmail})?`,
       confirmText: 'Send',
       type: 'info',
     })
@@ -494,7 +494,7 @@ export default function CustomerMailerPanel({
         }),
       })
       if (!createRes.ok) {
-        showToast('Failed to create mailer.', 'error')
+        showToast('Failed to create message.', 'error')
         return
       }
       const { id } = await createRes.json()
@@ -506,7 +506,7 @@ export default function CustomerMailerPanel({
         const result = await sendRes.json()
         setSendResult(result)
       } else {
-        showToast('Failed to send. Check Mailer page.', 'error')
+        showToast('Failed to send. Check the Messaging page.', 'error')
       }
     } finally {
       setSending(false)
@@ -539,7 +539,7 @@ export default function CustomerMailerPanel({
         <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
           <Mail className="w-5 h-5 text-green-600 dark:text-green-400" />
         </div>
-        <p className="text-sm font-semibold text-foreground">Mailer sent!</p>
+        <p className="text-sm font-semibold text-foreground">Message sent!</p>
         <p className="text-xs text-foreground-muted">
           {sendResult.sent} delivered · {sendResult.failed} failed
         </p>

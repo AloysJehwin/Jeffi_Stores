@@ -288,14 +288,21 @@ function renderCampaignEmailRaw(
 interface Recipient {
   user_id: string
   email: string
+  phone?: string | null
   first_name: string | null
   last_name?: string | null
 }
 
+export type MessagingChannels = {
+  email?: { slug: string; vars?: Record<string, string>; subject?: string }
+  sms?: { slug: string; vars?: Record<string, string> }
+  whatsapp?: { slug: string; vars?: Record<string, string> }
+}
+
 async function resolveAudience(audienceType: string, audienceFilter: Record<string, unknown>): Promise<Recipient[]> {
-  const base = `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u`
-  const base_cp = `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
-  const where = `WHERE u.is_active = true AND u.is_guest = false AND u.email IS NOT NULL`
+  const base = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u`
+  const base_cp = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u LEFT JOIN customer_profiles cp ON cp.user_id = u.id`
+  const where = `WHERE u.is_active = true AND u.is_guest = false AND u.email IS NOT NULL AND u.marketing_opt_out = false`
 
   if (audienceType === 'customer_type') {
     const types = audienceFilter.customerTypes as string[]
@@ -312,7 +319,7 @@ async function resolveAudience(audienceType: string, audienceFilter: Record<stri
   if (audienceType === 'specific_user') {
     const userId = audienceFilter.userId as string
     return queryMany<Recipient>(
-      `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u WHERE u.id = $1 AND u.email IS NOT NULL`,
+      `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u WHERE u.id = $1 AND u.email IS NOT NULL AND u.marketing_opt_out = false`,
       [userId]
     )
   }
@@ -332,7 +339,7 @@ async function resolveAudience(audienceType: string, audienceFilter: Record<stri
     }
     const cond = segConditions[seg]
     if (cond) {
-      const from = `SELECT u.id AS user_id, u.email, u.first_name, u.last_name FROM users u LEFT JOIN (SELECT user_id, COUNT(*) AS order_count, SUM(total_amount) AS lifetime_value, MAX(created_at) AS last_order_at, COUNT(*) FILTER (WHERE payment_status='paid') AS paid_orders FROM orders GROUP BY user_id) o ON o.user_id=u.id LEFT JOIN customer_profiles cp ON cp.user_id=u.id`
+      const from = `SELECT u.id AS user_id, u.email, u.phone, u.first_name, u.last_name FROM users u LEFT JOIN (SELECT user_id, COUNT(*) AS order_count, SUM(total_amount) AS lifetime_value, MAX(created_at) AS last_order_at, COUNT(*) FILTER (WHERE payment_status='paid') AS paid_orders FROM orders GROUP BY user_id) o ON o.user_id=u.id LEFT JOIN customer_profiles cp ON cp.user_id=u.id`
       return queryMany<Recipient>(`${from} ${where} AND ${cond}`)
     }
   }
@@ -352,6 +359,7 @@ export async function sendCampaign(
     template_key: string
     subject: string
     template_data: Record<string, string>
+    channels: MessagingChannels | null
     audience_type: string
     audience_filter: Record<string, unknown>
     status: string
@@ -370,9 +378,6 @@ export async function sendCampaign(
   const fromAddr = await campaignMailFromAsync()
   const baseUrl = await storeBaseUrlAsync()
 
-  let sent = 0
-  let failed = 0
-
   // Resolve coupon once
   const sourceCouponId = campaign.audience_filter.couponId as string | undefined
   let sourceCoupon: { id: string; code: string; discount_type: string; discount_value: number } | null = null
@@ -381,6 +386,19 @@ export async function sendCampaign(
       sourceCouponId,
     ])
   }
+
+  if (campaign.template_key === 'library') {
+    const r = await sendLibraryMessaging(campaign.id, campaign.channels ?? {}, campaign.subject, recipients, {
+      resolveVars, fromAddr, baseUrl, sourceCoupon, batchSize, batchDelay,
+    })
+    await query(`UPDATE email_campaigns SET status = 'sent', sent_at = NOW(), recipient_count = $2 WHERE id = $1`, [
+      campaignId, recipients.length,
+    ])
+    return r
+  }
+
+  let sent = 0
+  let failed = 0
 
   // Send in batches to avoid blocking and stay under SES rate limits
   for (let i = 0; i < recipients.length; i += batchSize) {
@@ -459,5 +477,117 @@ export async function sendCampaign(
     sent + failed,
   ])
 
+  return { sent, failed }
+}
+
+type Coupon = { id: string; code: string; discount_type: string; discount_value: number }
+
+async function logSend(campaignId: string, channel: string, to: string, ok: boolean, error?: string) {
+  await query(
+    `INSERT INTO email_campaign_logs (campaign_id, email, channel, to_address, status, error) VALUES ($1, $2, $3, $4, $5, $6)`,
+    [campaignId, channel === 'email' ? to : null, channel, to, ok ? 'sent' : 'failed', error ?? null]
+  )
+}
+
+const alreadySent = (campaignId: string, channel: string, to: string) =>
+  queryOne(`SELECT 1 FROM email_campaign_logs WHERE campaign_id = $1 AND channel = $2 AND to_address = $3 AND status = 'sent'`, [
+    campaignId, channel, to,
+  ])
+
+// Messaging (library templates): each picked channel goes to every recipient that has that address.
+async function sendLibraryMessaging(
+  campaignId: string,
+  channels: MessagingChannels,
+  fallbackSubject: string,
+  recipients: Recipient[],
+  ctx: {
+    resolveVars: Awaited<ReturnType<typeof createTemplateVariableResolver>>
+    fromAddr: string
+    baseUrl: string
+    sourceCoupon: Coupon | null
+    batchSize: number
+    batchDelay: number
+  }
+): Promise<{ sent: number; failed: number }> {
+  const { getLibraryTemplate } = await import('@/lib/messaging/library')
+  const { renderCampaignTemplate } = await import('@/lib/shared/automation-emails')
+  const { sendCampaignSMS } = await import('@/lib/shared/sms')
+  const { sendByTemplate } = await import('@/lib/shared/send-by-template')
+  const { renderBlocks } = await import('@/lib/templates/blocks')
+
+  const [emailT, smsT, waT] = await Promise.all([
+    channels.email ? getLibraryTemplate('email', channels.email.slug) : null,
+    channels.sms ? getLibraryTemplate('sms', channels.sms.slug) : null,
+    channels.whatsapp ? getLibraryTemplate('whatsapp', channels.whatsapp.slug) : null,
+  ])
+  const emailBody = emailT
+    ? (emailT.blocks_format === 'email-blocks' && Array.isArray(emailT.blocks?.blocks) && renderBlocks(emailT.blocks.blocks)) || emailT.body
+    : ''
+  const waSlots = waT ? [...new Set([...waT.body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map(m => m[1]))] : []
+  const waProblem = !channels.whatsapp ? null
+    : !waT ? 'WhatsApp template not found'
+    : waT.approval_status !== 'approved' ? 'WhatsApp template is not approved by Meta'
+    : waSlots.some(n => !channels.whatsapp!.vars?.[n]?.trim()) ? 'WhatsApp template has unfilled slots'
+    : null
+
+  let sent = 0
+  let failed = 0
+  const tally = (ok: boolean) => (ok ? sent++ : failed++)
+
+  async function one(r: Recipient) {
+    const registered = ctx.resolveVars({ recipient: { email: r.email, first_name: r.first_name, last_name: r.last_name } })
+    const coupon = ctx.sourceCoupon
+    if (coupon) {
+      await query(`INSERT INTO coupon_eligible_users (coupon_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [coupon.id, r.user_id])
+    }
+    const scenario = (own?: Record<string, string>): Record<string, string> => ({
+      firstName: r.first_name || 'there',
+      ...(coupon ? { couponCode: coupon.code, discountPercent: coupon.discount_type === 'percentage' ? String(coupon.discount_value) : '' } : {}),
+      ...(own ?? {}),
+    })
+
+    if (channels.email && r.email && !(await alreadySent(campaignId, 'email', r.email))) {
+      try {
+        if (!emailT) throw new Error('Email template not found')
+        const vars = scenario(channels.email.vars)
+        const subject = renderCampaignTemplate(channels.email.subject || emailT.subject || fallbackSubject, vars, registered, false)
+        const body = renderCampaignTemplate(emailBody, vars, registered, true)
+        const html = renderTemplate(baseLayout(subject, body, ctx.baseUrl), registered, { escape: true })
+        await sendAuditedMail({
+          from: ctx.fromAddr, to: r.email, subject, html, kind: 'campaign', templateName: emailT.slug,
+          entityType: 'email_campaigns', entityId: campaignId, userId: r.user_id,
+        })
+        await logSend(campaignId, 'email', r.email, true); tally(true)
+      } catch (e) {
+        await logSend(campaignId, 'email', r.email, false, String(e)); tally(false)
+      }
+    }
+
+    if (channels.sms && r.phone && !(await alreadySent(campaignId, 'sms', r.phone))) {
+      const body = smsT ? renderCampaignTemplate(smsT.body, scenario(channels.sms.vars), registered, false) : ''
+      const ok = !!body && (await sendCampaignSMS({ phone: r.phone, body, kind: 'messaging', userId: r.user_id }))
+      await logSend(campaignId, 'sms', r.phone, ok, ok ? undefined : smsT ? 'SMS not delivered (channel off or provider error)' : 'SMS template not found')
+      tally(ok)
+    }
+
+    if (channels.whatsapp && r.phone && !(await alreadySent(campaignId, 'whatsapp', r.phone))) {
+      if (waProblem) {
+        await logSend(campaignId, 'whatsapp', r.phone, false, waProblem); tally(false)
+      } else {
+        const vars = scenario()
+        const variables = Object.fromEntries(
+          waSlots.map(n => [n, renderCampaignTemplate(channels.whatsapp!.vars![n], vars, registered, false)])
+        )
+        const res = await sendByTemplate({ channel: 'whatsapp', slug: waT!.slug, to: r.phone, variables, reference: `messaging:${campaignId}` })
+        const ok = res.status !== 'failed' && res.status !== 'skipped'
+        await logSend(campaignId, 'whatsapp', r.phone, ok, ok ? undefined : res.error || res.status); tally(ok)
+      }
+    }
+  }
+
+  for (let i = 0; i < recipients.length; i += ctx.batchSize) {
+    await Promise.all(recipients.slice(i, i + ctx.batchSize).map(r => one(r).catch(() => tally(false))))
+    if (i + ctx.batchSize < recipients.length) await new Promise(res => setTimeout(res, ctx.batchDelay))
+  }
   return { sent, failed }
 }

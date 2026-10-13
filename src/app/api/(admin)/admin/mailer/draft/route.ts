@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
     audience_filter,
     scheduled_at,
     wizard_step,
+    channels,
   } = body
 
   const stepClamped =
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
         audience_filter = COALESCE($6, audience_filter),
         scheduled_at    = COALESCE($7, scheduled_at),
         wizard_step     = COALESCE($8, wizard_step),
+        channels        = COALESCE($10, channels),
         updated_at      = now()
        WHERE id = $9 AND status = 'draft'`,
       [
@@ -52,6 +54,7 @@ export async function POST(request: NextRequest) {
         scheduled_at || null,
         stepClamped,
         draft_id,
+        channels ? JSON.stringify(channels) : null,
       ]
     )
     return NextResponse.json({ id: draft_id })
@@ -60,8 +63,8 @@ export async function POST(request: NextRequest) {
   const result = await query(
     `INSERT INTO email_campaigns
        (template_key, title, subject, template_data, audience_type, audience_filter,
-        scheduled_at, wizard_step, status, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'draft', $9)
+        scheduled_at, wizard_step, status, created_by, channels)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'draft', $9, $10)
      RETURNING id`,
     [
       template_key || 'custom',
@@ -73,6 +76,7 @@ export async function POST(request: NextRequest) {
       scheduled_at || null,
       stepClamped ?? 1,
       admin.adminId,
+      JSON.stringify(channels || {}),
     ]
   )
 
