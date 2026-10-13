@@ -4,6 +4,8 @@ import { messagePriceInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
 import { findTemplate } from './templates.js'
+import * as tpl from './templates-v2.js'
+import { poolsForTenant } from './pools.js'
 import { render, missingKeys, type Vars } from './render.js'
 import { sendEmail } from './providers/email.js'
 import { sendSms, sendWhatsApp } from './providers/twilio.js'
@@ -63,6 +65,17 @@ interface Ctx {
   internal?: boolean
 }
 
+// v2 library (tenant copy → platform default) first; legacy message_templates as fallback.
+async function resolveTemplate(tenantId: string, channel: string, slug: string) {
+  const { pools } = await poolsForTenant(tenantId)
+  const t = await tpl.findBySlugWithDefaults(pools, tenantId, channel, slug)
+  if (t?.version) {
+    const { subject, body } = t.version
+    return { subject, body, provider_ref: t.variant.provider_ref ?? t.version.provider_ref }
+  }
+  return findTemplate(tenantId, channel, slug)
+}
+
 /** Resolve template + variables into the final subject/body. */
 async function compose(ctx: Ctx, req: SendMessageRequest) {
   const vars: Vars = (req.variables ?? {}) as Vars
@@ -70,7 +83,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   let body = req.body ?? ''
   let providerRef: string | undefined = req.provider_ref
   if (req.template) {
-    const t = await findTemplate(ctx.tenantId, req.channel, req.template)
+    const t = await resolveTemplate(ctx.tenantId, req.channel, req.template)
     if (!t) throw new SendError(404, 'template_not_found', `No ${req.channel} template '${req.template}'`)
     const missing = missingKeys(t.body + ' ' + (t.subject ?? ''), vars)
     if (missing.length) throw new SendError(422, 'missing_variables', `Template needs: ${missing.join(', ')}`, { missing })

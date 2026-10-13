@@ -13,8 +13,7 @@ import * as tpl from './templates-v2.js'
 import { CATALOG, WA_APPROVED_SIDS } from '../seed/catalog.js'
 import * as twContent from './providers/twilio-content.js'
 import { priceUsd } from './providers/twilio.js'
-import { lookupTenantContextById } from '@jeffi/tenancy'
-import { tenantPool } from '@jeffi/tenancy'
+import { poolsForTenant } from './pools.js'
 import { render as renderVars, missingKeys } from './render.js'
 import { randomBytes } from 'node:crypto'
 
@@ -113,17 +112,13 @@ app.delete<{ Params: { channel: string; slug: string } }>('/templates/:channel/:
 
 // ── templates v2 (three-level: family → template → variant → version) ──
 
-async function poolFor(req: FastifyRequest) {
-  const ctx = await lookupTenantContextById(req.claims.tenantId)
-  if (!ctx) throw Object.assign(new Error('Tenant not found'), { status: 404 })
-  return { ctx, pool: tenantPool(ctx) }
-}
+const poolFor = (req: FastifyRequest) => poolsForTenant(req.claims.tenantId)
 
 app.get<{ Params: { channel: string; slug: string }; Querystring: { locale?: string } }>(
   '/v2/templates/:channel/:slug',
   async (req, reply) => {
-    const { pool } = await poolFor(req)
-    const t = await tpl.findBySlug(pool, req.claims.tenantId, Channel.parse(req.params.channel), req.params.slug, req.query.locale ?? 'en')
+    const { pools } = await poolFor(req)
+    const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, Channel.parse(req.params.channel), req.params.slug, req.query.locale ?? 'en')
     if (!t) return reply.code(404).send({ error: 'not_found' })
     return tpl.toApi(t)
   }
@@ -134,6 +129,12 @@ app.get<{ Params: { id: string } }>('/v2/templates/:id/versions', async req => {
   const t = await tpl.findById(pool, req.claims.tenantId, req.params.id)
   if (!t?.variant) return { items: [] }
   return { items: await tpl.listVersions(pool, t.variant.id) }
+})
+
+app.get<{ Querystring: { channel?: string } }>('/v2/templates', async req => {
+  const { pools } = await poolFor(req)
+  const items = await tpl.listTemplatesWithDefaults(pools, req.claims.tenantId, req.query.channel)
+  return { items }
 })
 
 app.post('/v2/templates', async req => {
@@ -169,8 +170,8 @@ app.post<{ Params: { id: string }; Body: { versionId: string } }>(
 app.post<{ Body: { channel: string; slug: string; locale?: string; versionId?: string; variables?: Record<string, any> } }>(
   '/v2/templates/preview',
   async (req, reply) => {
-    const { pool } = await poolFor(req)
-    const t = await tpl.findBySlug(pool, req.claims.tenantId, req.body.channel, req.body.slug, req.body.locale ?? 'en')
+    const { pools } = await poolFor(req)
+    const t = await tpl.findBySlugWithDefaults(pools, req.claims.tenantId, req.body.channel, req.body.slug, req.body.locale ?? 'en')
     if (!t?.version) return reply.code(404).send({ error: 'not_found' })
     const vars = req.body.variables ?? {}
     const subject = t.version.subject ? renderVars(t.version.subject, vars) : null

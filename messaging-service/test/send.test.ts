@@ -20,6 +20,8 @@ vi.mock('../src/db.js', () => ({
   one: vi.fn(async (sql: string, params: any[]) => (sql.startsWith('SELECT * FROM messages') ? rows.get(params[0]) : undefined)),
 }))
 vi.mock('../src/templates.js', () => ({ findTemplate: vi.fn() }))
+vi.mock('../src/pools.js', () => ({ poolsForTenant: vi.fn().mockResolvedValue({ pools: {} }) }))
+vi.mock('../src/templates-v2.js', () => ({ findBySlugWithDefaults: vi.fn().mockResolvedValue(null) }))
 vi.mock('@jeffi/wallet', () => ({ debit: vi.fn(), trueUp: vi.fn() }))
 vi.mock('../src/providers/email.js', () => ({ sendEmail: vi.fn() }))
 vi.mock('../src/providers/twilio.js', () => ({ sendSms: vi.fn(), sendWhatsApp: vi.fn() }))
