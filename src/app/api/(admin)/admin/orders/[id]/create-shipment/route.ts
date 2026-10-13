@@ -8,7 +8,7 @@ import { sendOrderShippedSMS } from '@/lib/shared/sms'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
-import { listDelhiveryPickupLocations, cancelDelhiveryShipment } from '@/lib/shipping/delhivery'
+import { listDelhiveryPickupLocations, cancelDelhiveryShipment, courierConsignee } from '@/lib/shipping/delhivery'
 import { checkWalletForShipment, chargeDeliveryEstimate } from '@/lib/payments/wallet'
 import { resolveShippingAccount } from '@/lib/shipping/delhivery-account'
 import { applyCourierEdd } from '@/lib/shipping/courier-edd'
@@ -88,10 +88,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Order has invalid or missing delivery pincode' }, { status: 422 })
     }
 
-    const consigneeName = order.full_name || order.customer_name || 'Customer'
-    const rawPhone = (order.consignee_phone || order.customer_phone || '9999999999').replace(/\D/g, '')
-    const consigneePhone = rawPhone.length === 12 && rawPhone.startsWith('91') ? rawPhone.slice(2) : rawPhone.slice(-10)
-    const address = [order.address_line1, order.address_line2, order.landmark].filter(Boolean).join(', ')
+    const consignee = courierConsignee({
+      name: order.full_name || order.customer_name,
+      phones: [order.consignee_phone, order.customer_phone],
+      addressParts: [order.address_line1, order.address_line2, order.landmark],
+      city: order.city,
+      state: order.state,
+    })
+    if (!consignee.ok) return NextResponse.json({ error: consignee.error }, { status: 422 })
+    const { name: consigneeName, phone: consigneePhone, address } = consignee
 
     const productDesc = 'Hardware / Fasteners'
     const totalAmount = String(round2(Number(order.total_amount)))
@@ -181,8 +186,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           name: consigneeName,
           add: address,
           pin,
-          city: order.city || '',
-          state: order.state || '',
+          city: consignee.city,
+          state: consignee.state,
           country: 'India',
           phone: consigneePhone,
           order: invoiceRef,
@@ -241,11 +246,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const pkg = data.packages[0]
 
     if (pkg.status === 'Fail' || pkg.err_code) {
+      const details = pkg.remarks?.join('; ') || 'Unknown error'
+      console.error(`[create-shipment] Delhivery ${pkg.err_code} order=${id} ref=${invoiceRef}: ${details}`)
       return NextResponse.json(
         {
           error: 'Shipment creation failed',
           code: pkg.err_code,
-          details: pkg.remarks?.join('; ') || 'Unknown error',
+          details:
+            pkg.err_code === 'ER0005'
+              ? `Delhivery flagged the consignee as suspicious. Check the customer's name, phone and address on this order (no placeholders, full street address), then retry — a retry uses a fresh reference. (${details})`
+              : details,
         },
         { status: 422 }
       )
