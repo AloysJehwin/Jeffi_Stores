@@ -215,7 +215,8 @@ export async function upsertTemplate(pool: pg.Pool, tenantId: string, i: UpsertI
          -- Not given → keep the current version's layout.
          COALESCE($11, (SELECT layout FROM template_version WHERE id=$12), 'store'))
        RETURNING *`,
-      [variant.id, version, i.subject ?? null, i.body, i.blocks ?? null,
+      // JSON-encode: a raw HTML string (or an array) is not valid jsonb input as-is.
+      [variant.id, version, i.subject ?? null, i.body, i.blocks == null ? null : JSON.stringify(i.blocks),
        i.blocks_format ?? defaultBlocksFormat(i.channel), variables, i.provider_ref ?? null,
        i.note ?? null, i.createdBy ?? null, i.layout ?? null, variant.current_version_id ?? null])).rows[0]
 
