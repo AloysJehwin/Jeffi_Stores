@@ -11,7 +11,7 @@ import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
 import { Smile, Link2, ImageIcon, Loader2, Upload, RefreshCw } from 'lucide-react'
 import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
 import PhonePreview from './PhonePreview'
-import { sampleVariableMap, TOKEN_RE } from '@/lib/templates/variables-shared'
+import { emailPreviewDoc, previewSubject } from '@/lib/templates/email-preview'
 import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
@@ -581,13 +581,9 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
             {/* Branded server render while it matches the editor; otherwise a live render of what's being typed. */}
             {(() => {
               const server = preview?.body && preview.renderedFor === value.body ? preview : null
-              const samples = sampleVariableMap()
-              const fill = (t: string) => t.replace(TOKEN_RE, (m, a?: string, b?: string) => {
-                const k = (a || b || '').toLowerCase()
-                return samples[k] ?? `<span style="background:#f4e3da;color:#a9552f;border-radius:3px;padding:0 3px">${k}</span>`
-              })
-              const subject = server ? server.subject : fill(value.subject ?? '').replace(/<[^>]+>/g, '')
-              const html = server ? server.body! : `<!doctype html><html><body style="margin:0;padding:24px;background:#f6f6f6;font-family:Arial,Helvetica,sans-serif"><div style="max-width:600px;margin:0 auto;background:#fff;border-radius:8px;padding:24px">${fill(value.body || '<p style="color:#999">Start writing to see the preview.</p>')}</div></body></html>`
+              // Same renderer + sample data as the campaign editor's preview, so both pages match.
+              const subject = server ? server.subject : previewSubject(value.subject ?? '')
+              const html = server ? server.body! : emailPreviewDoc(value.body || '<p style="color:#999">Start writing to see the preview.</p>')
               return (
                 <>
                   {subject && <div className="font-semibold mb-2">{subject}</div>}
