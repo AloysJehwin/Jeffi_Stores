@@ -29,15 +29,21 @@ const openapi = buildOpenApi()
 app.get('/openapi.json', async () => openapi)
 await app.register(apiReference, { routePrefix: '/docs', configuration: { content: openapi, theme: 'kepler' } })
 // Scalar's /docs → /docs/ 301 bounces with Next's trailingSlash:false (which 308s /docs/ back
-// to /docs), creating an infinite redirect loop when served through the public.* Next rewrite.
-// Rewrite the redirect in place: serve /docs/'s HTML on /docs with a 200.
+// to /docs), creating an infinite redirect loop behind the public.* Next rewrite. Serve
+// /docs/'s HTML directly on /docs with a 200 AND rewrite the HTML's relative asset paths
+// (`js/scalar.js`, `./openapi.json`) to absolute `/docs/*` so the browser resolves them
+// against the right directory regardless of the URL having no trailing slash.
 app.addHook('onSend', async (req, reply, payload) => {
   if (req.url === '/docs' && reply.statusCode === 301) {
     const r = await app.inject({ method: 'GET', url: '/docs/' })
+    const html = r.payload
+      .replace(/(src|href)="(?!https?:|\/|data:)([^"]+)"/g, '$1="/docs/$2"')
+      .replace(/"\.?\/?openapi\.json"/g, '"/openapi.json"')
     reply.code(200)
     const ct = r.headers['content-type']
     if (ct) reply.header('content-type', ct)
-    return r.payload
+    reply.header('content-length', Buffer.byteLength(html))
+    return html
   }
   return payload
 })
