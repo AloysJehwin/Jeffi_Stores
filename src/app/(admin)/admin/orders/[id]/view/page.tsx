@@ -1145,13 +1145,16 @@ export default async function OrderDetailsPage({
                           })()
                         : p.gateway_response || {}
                     const isVariantChange = resp?.purpose === 'variant_change'
+                    const isAdjustment = resp?.purpose === 'order_adjustment'
+                    const partial: Array<{ id: string; amount: number; purpose?: string; at?: string }> = Array.isArray(resp?.partial_refunds) ? resp.partial_refunds : []
+                    const partialTotal = partial.reduce((s2, r) => s2 + (Number(r.amount) || 0), 0)
                     const refunded = resp?.refund || resp?.variantChangeRefund
                     const returnCharge = resp?.returnCharge
                     return (
                       <div key={p.id || idx} className="rounded-lg border border-border-default p-3 space-y-1.5">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-semibold text-foreground">
-                            {isVariantChange ? 'Variant-change top-up' : idx === 0 ? 'Order payment' : 'Payment'}
+                            {isVariantChange ? 'Variant-change top-up' : isAdjustment ? 'Order-changes top-up' : idx === 0 ? 'Order payment' : 'Payment'}
                           </span>
                           <span
                             className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
@@ -1197,6 +1200,26 @@ export default async function OrderDetailsPage({
                             })}
                           </span>
                         </div>
+                        {partial.map(r => (
+                          <div key={r.id} className="flex justify-between gap-3 text-sm">
+                            <span className="text-foreground-secondary">
+                              Partial refund{r.purpose === 'order_adjustment' ? ' · order changes' : r.purpose === 'variant_change' ? ' · variant change' : ''}
+                              {r.at ? <span className="block text-[11px] text-foreground-muted">{new Date(r.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span> : null}
+                            </span>
+                            <span className="text-right">
+                              <span className="block text-red-600 font-semibold">− Rs. {Number(r.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="block text-foreground-muted font-mono text-[11px]">{r.id}</span>
+                            </span>
+                          </div>
+                        ))}
+                        {partialTotal > 0 && (
+                          <div className="flex justify-between text-sm border-t border-border-default pt-1.5">
+                            <span className="text-foreground-secondary">Net received</span>
+                            <span className="text-foreground font-semibold">
+                              Rs. {(Number(p.amount) - partialTotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        )}
                         {refunded?.id && (
                           <div className="flex justify-between text-sm">
                             <span className="text-foreground-secondary">Refund</span>
