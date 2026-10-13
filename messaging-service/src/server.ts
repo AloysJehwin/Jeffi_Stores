@@ -11,7 +11,7 @@ import { sendMessage, getMessage, toApi as msgToApi, SendError, type MessageRow 
 import { listTemplates, upsertTemplate, archiveTemplate, toApi as tplToApi } from './templates.js'
 import { priceUsd } from './providers/twilio.js'
 
-const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' } })
+export const app = Fastify({ logger: { level: process.env.LOG_LEVEL || 'info' } })
 await app.register(formbody)
 
 declare module 'fastify' {
@@ -127,5 +127,7 @@ app.post<{ Querystring: { m?: string }; Body: Record<string, string> }>('/webhoo
   return { ok: true }
 })
 
-const port = Number(process.env.PORT || 3101)
-await app.listen({ port, host: '0.0.0.0' })
+if (!process.env.VITEST) {
+  const port = Number(process.env.PORT || 3101)
+  await app.listen({ port, host: '0.0.0.0' })
+}
