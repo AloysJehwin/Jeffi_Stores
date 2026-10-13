@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, query } from '@/lib/shared/db'
+import { missingRequired } from '@/lib/campaigns/kind-variables'
+import { getLibraryTemplate } from '@/lib/messaging/library'
+import { renderBlocks } from '@/lib/templates/blocks'
 
 export const dynamic = 'force-dynamic'
 interface Params {
@@ -17,7 +20,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const live = await queryOne<{ kind: string }>(`SELECT kind FROM campaigns WHERE kind = $1`, [kind])
+  const live = await queryOne<{
+    kind: string; scenario_kind: string | null; email_template_slug: string | null
+    subject_template: string; body_template: string; template_mode: string | null; blocks: unknown
+  }>(`SELECT kind, scenario_kind, email_template_slug, subject_template, body_template, template_mode, blocks FROM campaigns WHERE kind = $1`, [kind])
   if (!live) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
 
   const draft = await queryOne<{ fields: Record<string, unknown> | null }>(
@@ -27,6 +33,25 @@ export async function POST(req: NextRequest, { params }: Params) {
   const d = (draft?.fields || {}) as any
   if (!draft || Object.keys(d).length === 0) {
     return NextResponse.json({ error: 'No draft to publish' }, { status: 400 })
+  }
+
+  // The email must use the variables this campaign kind depends on (product gallery, CTA link…).
+  const pick = <K extends keyof typeof live>(k: K) => (k in d ? d[k] : live[k]) as (typeof live)[K]
+  const slug = pick('email_template_slug')
+  let emailText: string | null = null
+  if (slug) {
+    const t = await getLibraryTemplate('email', slug)
+    if (t) emailText = `${t.subject ?? ''}\n${t.blocks_format === 'email-blocks' && Array.isArray(t.blocks?.blocks) ? renderBlocks(t.blocks.blocks) : t.body}`
+  } else {
+    const blocks = pick('blocks') as any
+    emailText = `${pick('subject_template') ?? ''}\n${pick('template_mode') === 'blocks' && Array.isArray(blocks) ? renderBlocks(blocks) : pick('body_template') ?? ''}`
+  }
+  const missing = emailText === null ? [] : missingRequired(pick('scenario_kind') || kind, 'email', emailText)
+  if (missing.length) {
+    return NextResponse.json(
+      { error: `The email must use ${missing.map(k => `{${k}}`).join(', ')} — this campaign relies on ${missing.length === 1 ? 'it' : 'them'}.` },
+      { status: 400 }
+    )
   }
   await query(
     `UPDATE campaigns SET

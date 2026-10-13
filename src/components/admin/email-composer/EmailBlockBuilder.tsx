@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { createContext, useCallback, useContext } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -15,12 +15,16 @@ import { GripVertical, Trash2, Plus, Image as ImageIcon, Type, Heading, MousePoi
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { CAMPAIGN_VARIABLES } from '@/components/admin/email-composer/campaign-variables'
+import type { ComposerVariable } from '@/components/admin/email-composer/variables'
 import type { EmailBlock } from '@/lib/templates/blocks'
 
 interface Props {
   blocks: EmailBlock[]
   onChange: (blocks: EmailBlock[]) => void
+  extraVariables?: ComposerVariable[]
 }
+
+const VarsCtx = createContext<ComposerVariable[]>(CAMPAIGN_VARIABLES)
 
 type BlockType = EmailBlock['type']
 
@@ -53,6 +57,7 @@ function BlockRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 }
 
+  const vars = useContext(VarsCtx)
   return (
     <div
       ref={setNodeRef}
@@ -107,7 +112,7 @@ function BlockRow({
         <EmailComposer
           value={block.html}
           onChange={html => onPatch({ ...block, html })}
-          extraVariables={CAMPAIGN_VARIABLES}
+          extraVariables={vars}
           minHeight={120}
           allowSource={false}
         />
@@ -186,7 +191,7 @@ function BlockRow({
   )
 }
 
-export default function EmailBlockBuilder({ blocks, onChange }: Props) {
+export default function EmailBlockBuilder({ blocks, onChange, extraVariables }: Props) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   // Stable keys by index are fine here — blocks have no ids; we reorder the array directly.
   const ids = blocks.map((_, i) => `block-${i}`)
@@ -212,6 +217,7 @@ export default function EmailBlockBuilder({ blocks, onChange }: Props) {
   }
 
   return (
+    <VarsCtx.Provider value={extraVariables ?? CAMPAIGN_VARIABLES}>
     <div className="space-y-3">
       <div className="flex flex-wrap gap-1.5">
         {PALETTE.map(p => (
@@ -248,5 +254,6 @@ export default function EmailBlockBuilder({ blocks, onChange }: Props) {
         </DndContext>
       )}
     </div>
+    </VarsCtx.Provider>
   )
 }

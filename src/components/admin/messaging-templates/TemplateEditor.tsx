@@ -9,6 +9,8 @@ import EmojiPicker from './EmojiPicker'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
 import { Smile, Link2, ImageIcon, Loader2, Upload, RefreshCw } from 'lucide-react'
+import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
+import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
 
@@ -61,6 +63,8 @@ type Props = {
   saving?: boolean
   /** Inside another editor (campaigns, Messaging): single column, no preview panel, one save action. */
   embedded?: boolean
+  /** Campaign kind whose variables this template must use (else derived from a campaign/<kind> slug). */
+  campaignKind?: string | null
 }
 
 const SMS_GSM_LIMIT = 160
@@ -75,13 +79,29 @@ type WaBlocks = {
   carousel?: { cards: WaCarouselCard[] }
 }
 
-export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave, saving, embedded }: Props) {
+export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksBase, onChange, onSave: rawSave, saving, embedded, campaignKind }: Props) {
+  const derived = campaignKind ?? (value.slug?.startsWith('campaign/') ? value.slug.slice('campaign/'.length) : null)
+  const kind = isCampaignKind(derived) && value.channel !== 'whatsapp' ? derived : null
+  const kindText = `${value.channel === 'email' ? value.subject ?? '' : ''}\n${value.body ?? ''}`
+  const composerVars = useMemo(
+    () => (kind ? campaignVariables(kind, 'email').map(v => ({ key: v.key, label: v.label, description: v.description, sample: v.sample, group: 'order' as const, builtIn: true, section: 'Campaign' })) : undefined),
+    [kind]
+  )
   const [preview, setPreview] = useState<{ subject?: string | null; body?: string; missing?: string[] } | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [showEmoji, setShowEmoji] = useState(false)
   const { showToast } = useToast()
+  // A campaign template can't drop the variables its campaign depends on (e.g. the product gallery).
+  const onSave = async (publish: boolean) => {
+    const miss = missingRequired(kind, value.channel, kindText)
+    if (miss.length) {
+      showToast(`This template must use ${miss.map(k => `{${k}}`).join(', ')} — the campaign relies on ${miss.length === 1 ? 'it' : 'them'}.`, 'error')
+      return null
+    }
+    return rawSave(publish)
+  }
   const askText = usePrompt()
   const confirm = useConfirm()
   const fileRef = useRef<HTMLInputElement | null>(null)
@@ -225,6 +245,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
               {value.blocks_format === 'email-blocks' ? (
                 // Block-built emails (imported from campaigns) stay in the block builder; body keeps the rendered HTML.
                 <EmailBlockBuilder
+                  extraVariables={composerVars}
                   blocks={(value.blocks as any)?.blocks ?? []}
                   onChange={b => onChange({ ...value, blocks: { blocks: b }, body: renderBlocks(b), blocks_format: 'email-blocks' })}
                 />
@@ -233,9 +254,11 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                   value={typeof value.body === 'string' ? value.body : ''}
                   onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })}
                   minHeight={360}
-                  ctaHref="{storeUrl}"
+                  ctaHref={kind ? '{ctaUrl}' : '{storeUrl}'}
+                  extraVariables={composerVars}
                 />
               )}
+              {kind && <div className="mt-2"><CampaignVariables kind={kind} channel="email" text={kindText} /></div>}
               <p className="mt-1 text-xs text-foreground-secondary">
                 Tokens like <code>{'{customer_first_name}'}</code> are replaced with the actual customer details when the email is sent.
               </p>
@@ -261,6 +284,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                 {smsStats.encoding === 'UCS-2' && ' · emoji flips to UCS-2 (DLT may need re-registration)'}
               </p>
             )}
+            {kind && <div className="mt-2"><CampaignVariables kind={kind} channel="sms" text={kindText} /></div>}
           </div>
         )}
 

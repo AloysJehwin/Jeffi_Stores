@@ -21,3 +21,13 @@ describe('recommendScore', () => {
     expect(recommendScore('abandoned_cart', 'email', 'order/confirmed')).toBe(0)
   })
 })
+
+import { missingRequired } from '@/lib/campaigns/kind-variables'
+
+describe('missingRequired', () => {
+  it('flags the variables a campaign kind depends on', () => {
+    expect(missingRequired('abandoned_cart', 'email', 'Hi {firstName} <a href="{ctaUrl}">go</a>')).toEqual(['itemsHtml'])
+    expect(missingRequired('restock', 'email', '{productCard} {{ctaUrl}}')).toEqual([])
+    expect(missingRequired('messaging', 'email', '')).toEqual([])
+  })
+})

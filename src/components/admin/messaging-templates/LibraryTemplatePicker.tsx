@@ -7,6 +7,7 @@ import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
 import { useAdminHost } from '@/contexts/AdminHostContext'
 import { recommendScore } from '@/lib/campaigns/template-hints'
+import { missingRequired } from '@/lib/campaigns/kind-variables'
 
 export type PickerChannel = 'email' | 'sms' | 'whatsapp'
 
@@ -92,6 +93,8 @@ export default function LibraryTemplatePicker({
     return picked.variables.filter(v => !/^\d+$/.test(v) && !ok(v))
   }, [picked, supplied])
 
+  const lacking = picked && channel !== 'whatsapp' ? missingRequired(kind, channel, `${picked.subject ?? ''}\n${picked.body}`) : []
+
   if (items === null) return <div className="h-10 rounded-lg bg-surface-secondary animate-pulse" />
 
   return (
@@ -111,6 +114,11 @@ export default function LibraryTemplatePicker({
           </div>
           {picked.subject && <p className="text-foreground-secondary"><span className="text-foreground-muted">Subject:</span> {picked.subject}</p>}
           <p className="text-foreground-secondary line-clamp-3">{strip(picked.body).slice(0, 320) || '—'}</p>
+          {lacking.length > 0 && (
+            <p className="text-red-600 dark:text-red-400">
+              This template doesn&apos;t use {lacking.map(v => `{${v}}`).join(', ')}, which this campaign needs — add {lacking.length === 1 ? 'it' : 'them'} in the editor below or pick another template.
+            </p>
+          )}
           {unfilled.length > 0 && (
             <p className="text-yellow-700 dark:text-yellow-300">
               This campaign doesn&apos;t provide {unfilled.map(v => `{{${v}}}`).join(', ')} — {unfilled.length === 1 ? 'it' : 'they'} will be left blank.

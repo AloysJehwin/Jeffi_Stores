@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
 import LibraryTemplatePicker, { type PickedTemplate } from '@/components/admin/messaging-templates/LibraryTemplatePicker'
+import { campaignVariables } from '@/lib/campaigns/kind-variables'
 
 // Campaign WhatsApp = an APPROVED template from the templates library (Meta only delivers approved
 // templates to customers who haven't messaged first). The admin fills its numbered {{n}} slots with
@@ -15,7 +16,6 @@ export interface WhatsAppTemplateValue {
 
 const inputCls =
   'w-full field-normal border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500'
-const COMMON_TOKENS = ['{firstName}', '{items}', '{productName}', '{couponCode}', '{discountPercent}', '{orderNumber}', '{ctaUrl}']
 const PH = /\{\{\s*(\d+)\s*\}\}/g
 
 export const waSlots = (body: string) => [...new Set([...(body || '').matchAll(PH)].map(m => m[1]))].sort((a, b) => +a - +b)
@@ -73,7 +73,7 @@ export default function WhatsAppTemplateEditor({
       ))}
       {tpl && slots.length > 0 && (
         <p className="text-[10px] text-foreground-muted">
-          Variables resolve per recipient: {COMMON_TOKENS.map(t => <code key={t} className="px-1 mr-1 bg-surface-secondary rounded">{t}</code>)}
+          This campaign fills: {campaignVariables(kind, 'whatsapp').map(v => <code key={v.key} title={v.label} className="px-1 mr-1 bg-surface-secondary rounded">{`{${v.key}}`}</code>)}
           Links are click-tracked automatically.
         </p>
       )}

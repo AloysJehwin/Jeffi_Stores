@@ -12,12 +12,14 @@ const API = '/api/admin/messaging-templates'
  * so an edit here and an edit on the Templates page are the same edit.
  */
 export default function LinkedTemplateEditor({
-  channel, slug, currentKind, onMirror,
+  channel, slug, currentKind, campaignKind, onMirror,
 }: {
   channel: 'email' | 'sms' | 'whatsapp'
   slug: string
   /** The campaign doing the editing (excluded from the "also used by" count). */
   currentKind?: string
+  /** Campaign kind whose variables the template must keep using. */
+  campaignKind?: string | null
   /** Called with the template on load and on every edit (the host's preview reads it). */
   onMirror?: (t: EditorTemplate) => void
 }) {
@@ -74,6 +76,7 @@ export default function LinkedTemplateEditor({
       )}
       <TemplateEditor
         embedded
+        campaignKind={campaignKind}
         value={value}
         apiBase={API}
         onChange={t => { setValue(t); onMirror?.(t) }}
