@@ -2,6 +2,8 @@
 
 import { useMemo, useRef, useState } from 'react'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
+import EmailBlockBuilder from '@/components/admin/email-composer/EmailBlockBuilder'
+import { renderBlocks } from '@/lib/templates/blocks'
 import AdminSelect from '@/components/admin/AdminSelect'
 import EmojiPicker from './EmojiPicker'
 import { useToast } from '@/contexts/ToastContext'
@@ -218,12 +220,20 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
             </div>
             <div>
               <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Message</label>
-              <EmailComposer
-                value={typeof value.body === 'string' ? value.body : ''}
-                onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })}
-                minHeight={360}
-                ctaHref="{storeUrl}"
-              />
+              {value.blocks_format === 'email-blocks' ? (
+                // Block-built emails (imported from campaigns) stay in the block builder; body keeps the rendered HTML.
+                <EmailBlockBuilder
+                  blocks={(value.blocks as any)?.blocks ?? []}
+                  onChange={b => onChange({ ...value, blocks: { blocks: b }, body: renderBlocks(b), blocks_format: 'email-blocks' })}
+                />
+              ) : (
+                <EmailComposer
+                  value={typeof value.body === 'string' ? value.body : ''}
+                  onChange={html => onChange({ ...value, body: html, blocks: html, blocks_format: 'tiptap-html' })}
+                  minHeight={360}
+                  ctaHref="{storeUrl}"
+                />
+              )}
               <p className="mt-1 text-xs text-foreground-secondary">
                 Tokens like <code>{'{customer_first_name}'}</code> are replaced with the actual customer details when the email is sent.
               </p>

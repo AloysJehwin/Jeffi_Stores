@@ -20,6 +20,7 @@ import {
   stripDoubleBraceTokens,
 } from '@/lib/templates/variables'
 import { cooldownMinutes } from '@/lib/campaigns/duration'
+import { bridgeVars } from '@/lib/templates/var-bridge'
 import { DEFAULT_COUPON_DISCOUNT } from '@/lib/campaigns/default-templates'
 import { queryOne } from '@/lib/shared/db'
 import { sendAuditedMail } from '@/lib/shared/mail-audit'
@@ -79,6 +80,7 @@ export function renderCampaignTemplate(
   registered: Record<string, string>,
   html: boolean
 ): string {
+  scenarioVars = bridgeVars(scenarioVars)
   let t = renderConditionals(template || '', { ...registered, ...scenarioVars })
   if (!isTruthyVar(scenarioVars.couponCode)) t = t.replace(BARE_COUPON_ELEMENT_RE, '')
   const pre = renderVars(renderVars(t, stringVars(scenarioVars)), registered, { escape: html })

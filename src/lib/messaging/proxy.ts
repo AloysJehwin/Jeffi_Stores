@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto'
 import { authenticateAdmin, authenticateAnyUser } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { FLAGSHIP_TENANT_ID } from '@/lib/payments/wallet'
 
 const MESSAGING_URL = (process.env.MESSAGING_URL || 'http://localhost:3101').replace(/\/$/, '')
 
@@ -14,7 +15,7 @@ function token(claims: Record<string, unknown>) {
   return `${Buffer.from(payload).toString('base64url')}.${sig.toString('base64url')}`
 }
 
-const PLATFORM_TENANT = { tenantId: '00000000-0000-0000-0000-000000000000', slug: 'platform' }
+const PLATFORM_TENANT = { tenantId: FLAGSHIP_TENANT_ID, slug: 'platform' }
 
 async function forward(request: NextRequest, path: string, claims: Record<string, unknown>, allowPlatform = false): Promise<NextResponse> {
   // Platform admin host has no tenant: it curates the platform defaults (templates library).
