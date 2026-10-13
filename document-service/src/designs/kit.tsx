@@ -43,8 +43,11 @@ export function Doc({ m, children }: { m: DocModel; children: ReactNode }) {
   return <Document title={`${m.title} ${m.number}`} author={m.seller.name} creator="Jeffi Commerce" producer="Jeffi Commerce">{children}</Document>
 }
 
-export function Logo({ m, height = 34, fallback }: { m: DocModel; height?: number; fallback?: ReactNode }) {
-  if (m.logo) return <Image src={{ data: m.logo, format: 'png' }} style={{ height, objectFit: 'contain', maxWidth: height * 4 }} />
+// `plate`: a light backing so any logo stays legible on a coloured header.
+export function Logo({ m, height = 34, fallback, plate }: { m: DocModel; height?: number; fallback?: ReactNode; plate?: boolean }) {
+  const img = m.logo ? <Image src={{ data: m.logo, format: 'png' }} style={{ height, objectFit: 'contain', maxWidth: height * 4 }} /> : null
+  if (img && plate) return <View style={{ backgroundColor: '#ffffff', borderRadius: 4, padding: 5, alignSelf: 'flex-start' }}>{img}</View>
+  if (img) return img
   return <>{fallback ?? null}</>
 }
 

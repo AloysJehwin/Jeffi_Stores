@@ -15,7 +15,7 @@ export const corporate: Design = {
           <View style={{ marginHorizontal: -40, marginTop: -40 }}>
             <View style={{ backgroundColor: dark, paddingHorizontal: 40, paddingTop: 30, paddingBottom: 34, flexDirection: 'row', justifyContent: 'space-between' }}>
               <View>
-                <Logo m={m} height={28} fallback={<Text style={{ color: '#ffffff', fontFamily: t.head, fontWeight: 700, fontSize: 14 }}>{m.seller.name}</Text>} />
+                <Logo m={m} height={28} plate fallback={<Text style={{ color: '#ffffff', fontFamily: t.head, fontWeight: 700, fontSize: 14 }}>{m.seller.name}</Text>} />
                 <Text style={{ color: '#ffffff', fontFamily: t.head, fontWeight: 700, fontSize: 24, marginTop: 14 }}>{m.title}</Text>
               </View>
             </View>

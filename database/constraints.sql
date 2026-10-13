@@ -3428,3 +3428,9 @@ ALTER TABLE ONLY public.pub_template_asset ADD CONSTRAINT pub_template_asset_kin
 ALTER TABLE ONLY public.pub_template_asset ADD CONSTRAINT pub_template_asset_variant_fkey FOREIGN KEY (variant_id) REFERENCES public.pub_template_variant(id) ON DELETE SET NULL;
 ALTER TABLE ONLY public.pub_short_link ADD CONSTRAINT pub_short_link_pkey PRIMARY KEY (code);
 ALTER TABLE ONLY public.pub_short_link ADD CONSTRAINT pub_short_link_kind_check CHECK (kind IN ('image','page','product'));
+
+ALTER TABLE ONLY public.documents ADD CONSTRAINT documents_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.documents ADD CONSTRAINT documents_view_token_key UNIQUE (view_token);
+ALTER TABLE ONLY public.documents ADD CONSTRAINT documents_type_check CHECK (((type)::text = ANY ((ARRAY['invoice'::character varying, 'quotation'::character varying, 'receipt'::character varying, 'packing_slip'::character varying, 'label'::character varying, 'purchase_order'::character varying])::text[])));
+ALTER TABLE ONLY public.document_sequences ADD CONSTRAINT document_sequences_pkey PRIMARY KEY (tenant_id, type, financial_year);
+ALTER TABLE ONLY public.document_settings ADD CONSTRAINT document_settings_pkey PRIMARY KEY (tenant_id);
