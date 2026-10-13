@@ -10,7 +10,7 @@ import { useToast } from '@/contexts/ToastContext'
 import BulkMessages from './BulkMessages'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 
-interface ListItem { id: string; slug: string; channel: Channel; name: string; category?: string | null; approval_status?: string | null; source?: 'tenant' | 'platform' }
+interface ListItem { id: string; slug: string; channel: Channel; name: string; category?: string | null; approval_status?: string | null; source?: 'tenant' | 'platform'; review_status?: string | null }
 interface Msg { id: string; channel: string; to: string; template: string | null; status: string; price_inr: number; charged_inr: number; error: string | null; created_at: string }
 const TONE: Record<string, string> = { sent: STATUS_PILL.captured, delivered: STATUS_PILL.settled, failed: STATUS_PILL.failed, skipped: STATUS_PILL.split, queued: 'org-sand' }
 const CHANNELS: Array<{ key: Channel; label: string; icon: typeof Mail }> = [
@@ -31,10 +31,14 @@ export default function MessagingClient(props: { prices: Record<string, number>;
   const [selected, setSelected] = useState<EditorTemplate | null>(null)
   const [opening, setOpening] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // Jeffi's controls for this workspace (null = none) and the open template's review state.
+  const [gov, setGov] = useState<{ editing_enabled: boolean; review_required: boolean } | null>(null)
+  const [review, setReview] = useState<{ status: string; note: string | null } | null>(null)
+  const canEdit = gov?.editing_enabled !== false
 
   const loadTpls = useCallback(() => {
     setItems(null)
-    return fetch(`${API}/v2/templates?channel=${channel}`).then(r => r.json()).then(d => setItems(d.items ?? [])).catch(() => setItems([]))
+    return fetch(`${API}/v2/templates?channel=${channel}`).then(r => r.json()).then(d => { setItems(d.items ?? []); setGov(d.settings ?? null) }).catch(() => setItems([]))
   }, [channel])
 
   useEffect(() => { if (tab === 'templates') loadTpls() }, [tab, loadTpls])
@@ -87,8 +91,11 @@ export default function MessagingClient(props: { prices: Record<string, number>;
     setOpening(it.slug)
     try {
       const r = await fetch(`${API}/v2/templates/${it.channel}/${encodeURIComponent(it.slug)}`)
-      if (r.ok) setSelected(toEditorTemplate(await r.json()))
-      else showToast('Could not open that template.', 'error')
+      if (r.ok) {
+        const d = await r.json()
+        setSelected(toEditorTemplate(d))
+        setReview(d.review_status ? { status: d.review_status, note: d.review_note ?? null } : null)
+      } else showToast('Could not open that template.', 'error')
     } finally { setOpening(null) }
   }
 
@@ -107,7 +114,10 @@ export default function MessagingClient(props: { prices: Record<string, number>;
         showToast(`Save failed: ${err?.message || err?.error || r.status}`, 'error')
         return null
       }
-      const saved = toEditorTemplate(await r.json())
+      const raw = await r.json()
+      const saved = toEditorTemplate(raw)
+      setReview(raw.review_status ? { status: raw.review_status, note: raw.review_note ?? null } : null)
+      if (raw.review_status === 'pending') showToast('Saved — Jeffi will review it; sends keep using the approved version until then.', 'success')
       setSelected(saved); await loadTpls(); showToast(publish ? 'Template published.' : 'Draft saved.', 'success')
       return saved
     } finally { setSaving(false) }
@@ -173,7 +183,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
                   <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Filter templates" className="w-full bg-surface pl-9 pr-3 py-2 text-sm text-foreground border border-border-default focus:outline-none focus:ring-2 focus:ring-accent-500" />
                 </div>
-                <button onClick={createNew} title="New template" className="ecom-accent-bg rounded-full p-2 text-white shrink-0"><Plus className="w-4 h-4" /></button>
+                {canEdit && <button onClick={createNew} title="New template" className="ecom-accent-bg rounded-full p-2 text-white shrink-0"><Plus className="w-4 h-4" /></button>}
               </div>
               <div className="max-h-[calc(100vh-320px)] overflow-y-auto overscroll-contain">
                 {items === null && Array.from({ length: 8 }).map((_, i) => (
@@ -208,6 +218,9 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                               </div>
                               <div className="mt-0.5 flex items-center gap-2 text-xs text-foreground-muted">
                                 <code className="truncate">{it.slug}</code>
+                                {it.source === 'tenant' && it.review_status && it.review_status !== 'approved' && (
+                                  <span className={`rounded-full px-1.5 text-[10px] font-medium ${it.review_status === 'rejected' ? 'bg-[#f6d5cc] text-[#8a2e1f]' : 'org-peach org-brown'}`}>{it.review_status === 'pending' ? 'in review' : 'changes rejected'}</span>
+                                )}
                                 {it.channel === 'whatsapp' && it.approval_status && (
                                   <span className={`rounded-full px-1.5 text-[10px] font-medium ${WA_TONE[it.approval_status] ?? 'org-sand'}`}>{it.approval_status}</span>
                                 )}
@@ -232,8 +245,18 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                 </Card>
               )}
               {opening && !selected && <Card><SkeletonRows rows={6} cols={2} /></Card>}
+              {selected && !canEdit && (
+                <p className="mb-4 rounded-xl org-sand px-4 py-3 text-sm">Templates for this workspace are managed by Jeffi. You can preview and send them; to change one, write to support@jeffistores.in.</p>
+              )}
+              {selected && canEdit && review?.status === 'pending' && (
+                <p className="mb-4 rounded-xl org-peach px-4 py-3 text-sm"><strong>In review.</strong> Jeffi is reviewing your latest changes — messages keep using the last approved version until then.</p>
+              )}
+              {selected && canEdit && review?.status === 'rejected' && (
+                <p className="mb-4 rounded-xl bg-[#f6d5cc]/60 px-4 py-3 text-sm text-[#8a2e1f]"><strong>Changes not approved.</strong> {review.note ?? ''} Edit and save again to resubmit.</p>
+              )}
               {selected && (
                 <Card>
+                  <fieldset disabled={!canEdit} className="min-w-0">
                   {!selected.id && (
                     <label className="block mb-4">
                       <span className="text-xs text-foreground-muted">Slug (e.g. order/confirmed)</span>
@@ -249,6 +272,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                     onSave={save}
                     saving={saving}
                   />
+                  </fieldset>
                 </Card>
               )}
             </section>
