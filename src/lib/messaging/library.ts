@@ -36,6 +36,8 @@ export interface LibraryTemplate {
   provider_ref: string | null
   approval_status: string | null
   media_type: string | null
+  /** Email: 'none' = send the HTML as written, without the store layout. */
+  layout: 'store' | 'none'
 }
 
 const cache = new Map<string, { at: number; t: LibraryTemplate | null }>()
@@ -60,7 +62,7 @@ export async function getLibraryTemplate(channel: Channel, slug: string): Promis
         id: a.id, slug: a.slug, name: a.name, channel: a.channel, category: a.category ?? null,
         subject: v.subject ?? null, body: v.body ?? '', blocks: v.blocks ?? null, blocks_format: v.blocks_format ?? null,
         variables: v.variables ?? [], provider_ref: a.provider_ref ?? null, approval_status: a.approval_status ?? null,
-        media_type: a.media_type ?? null,
+        media_type: a.media_type ?? null, layout: v.layout === 'none' ? 'none' : 'store',
       }
     }
   } catch { /* messaging-service down → caller falls back */ }

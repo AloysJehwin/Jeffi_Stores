@@ -553,7 +553,7 @@ async function sendLibraryMessaging(
         const vars = scenario(channels.email.vars)
         const subject = renderCampaignTemplate(channels.email.subject || emailT.subject || fallbackSubject, vars, registered, false)
         const body = renderCampaignTemplate(emailBody, vars, registered, true)
-        const html = renderTemplate(baseLayout(subject, body, ctx.baseUrl), registered, { escape: true })
+        const html = renderTemplate(emailT.layout === 'none' ? body : baseLayout(subject, body, ctx.baseUrl), registered, { escape: true })
         await sendAuditedMail({
           from: ctx.fromAddr, to: r.email, subject, html, kind: 'campaign', templateName: emailT.slug,
           entityType: 'email_campaigns', entityId: campaignId, userId: r.user_id,

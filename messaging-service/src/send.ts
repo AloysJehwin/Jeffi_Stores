@@ -79,7 +79,7 @@ async function resolveTemplate(tenantId: string, channel: string, slug: string, 
     const live = channel === 'whatsapp' && t.variant.provider_ref
       ? (await tpl.liveVersion(pool, t.variant.id, t.variant.provider_ref)) ?? t.version
       : t.version
-    return { subject: live.subject, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any }
+    return { subject: live.subject, body: live.body, provider_ref: t.variant.provider_ref ?? undefined, blocks: live.blocks as any, layout: live.layout }
   }
   return findTemplate(tenantId, channel, slug)
 }
@@ -151,6 +151,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   let subject = req.subject ?? null
   let body = req.body ?? ''
   let providerRef: string | undefined = req.provider_ref
+  let layout: 'store' | 'none' = 'store'
   if (req.template) {
     const t = await resolveTemplate(ctx.tenantId, req.channel, req.template, ctx.space)
     if (!t) throw new SendError(404, 'template_not_found', `No ${req.channel} template '${req.template}'`)
@@ -159,14 +160,15 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     subject = subject ?? t.subject
     body = t.body
     providerRef = providerRef ?? t.provider_ref ?? undefined
+    layout = (t as any).layout === 'none' ? 'none' : 'store'
     if (req.channel === 'whatsapp') Object.assign(vars, await actionVars(ctx, (t as any).blocks, vars, req))
   }
   const html = req.channel === 'email'
-  return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars }
+  return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars, layout }
 }
 
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
-  const { subject, body, providerRef, vars } = await compose(ctx, req)
+  const { subject, body, providerRef, vars, layout } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
 
   const id = randomUUID()
@@ -192,7 +194,8 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
     let ref: string
     if (req.channel === 'email') {
       provider = 'ses'
-      const html = wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact })
+      // layout 'none': the template's HTML exactly as written, no store header/footer.
+      const html = layout === 'none' ? body : wrapEmail(body, { brand: req.brand, kicker: req.kicker, footerContact: req.footer_contact })
       ref = await sendEmail({ to: req.to, from: from!, subject: subject!, html })
     } else if (req.channel === 'sms') {
       ref = await sendSms({ to: req.to, body, messageId: id })

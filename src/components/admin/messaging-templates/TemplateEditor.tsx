@@ -11,7 +11,7 @@ import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
 import { Smile, Link2, ImageIcon, Loader2, Upload, RefreshCw } from 'lucide-react'
 import CampaignVariables from '@/components/admin/campaigns/CampaignVariables'
 import PhonePreview from './PhonePreview'
-import { emailPreviewDoc, previewSubject } from '@/lib/templates/email-preview'
+import { emailPreviewDoc, emailBodyDoc, previewSubject } from '@/lib/templates/email-preview'
 import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
@@ -31,6 +31,8 @@ export type EditorTemplate = {
   approval_status?: string | null
   approval_reason?: string | null
   needs_resubmission?: boolean
+  /** Email: 'none' = no store layout around the body. */
+  layout?: 'store' | 'none'
 }
 
 // messaging-service nests the published snapshot under current_version; the editor edits a flat shape.
@@ -41,7 +43,7 @@ export function toEditorTemplate(api: any): EditorTemplate {
     subject: v.subject ?? api.subject ?? '', body: v.body ?? api.body ?? '', blocks: v.blocks ?? api.blocks,
     blocks_format: v.blocks_format ?? api.blocks_format ?? null, meta_category: api.meta_category ?? null,
     media_type: api.media_type ?? null, approval_status: api.approval_status ?? null, approval_reason: api.approval_reason ?? null,
-    needs_resubmission: !!api.needs_resubmission,
+    needs_resubmission: !!api.needs_resubmission, layout: v.layout === 'none' ? 'none' : 'store',
   }
 }
 
@@ -253,6 +255,19 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                 placeholder="e.g. Order #{{order_number}} confirmed"
               />
             </div>
+            {!kind && (
+              <div>
+                <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Layout</label>
+                <AdminSelect
+                  value={value.layout ?? 'store'}
+                  onChange={v => onChange({ ...value, layout: v as 'store' | 'none' })}
+                  options={[
+                    { value: 'store', label: 'Store layout', hint: 'Your logo header and footer around the message' },
+                    { value: 'none', label: 'No layout', hint: 'Send exactly the HTML below — nothing added' },
+                  ]}
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Message</label>
               {value.blocks_format === 'email-blocks' ? (
@@ -583,7 +598,8 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
               const server = preview?.body && preview.renderedFor === value.body ? preview : null
               // Same renderer + sample data as the campaign editor's preview, so both pages match.
               const subject = server ? server.subject : previewSubject(value.subject ?? '')
-              const html = server ? server.body! : emailPreviewDoc(value.body || '<p style="color:#999">Start writing to see the preview.</p>')
+              const empty = '<p style="color:#999">Start writing to see the preview.</p>'
+              const html = server ? server.body! : value.layout === 'none' ? emailBodyDoc(value.body || empty) : emailPreviewDoc(value.body || empty)
               return (
                 <>
                   {subject && <div className="font-semibold mb-2">{subject}</div>}

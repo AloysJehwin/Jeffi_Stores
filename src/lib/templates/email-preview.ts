@@ -54,3 +54,8 @@ export function emailPreviewDoc(body: string, layout?: string | null, vars: Reco
 
 export const previewSubject = (subject: string, vars: Record<string, string | number> = CAMPAIGN_SAMPLE_VARS) =>
   renderPreviewTemplate(subject, bridgeVars(vars))
+
+/** No layout: just the body with sample values (templates set to send their HTML as written). */
+export function emailBodyDoc(body: string, vars: Record<string, string | number> = CAMPAIGN_SAMPLE_VARS): string {
+  return `<!doctype html><html><body style="margin:0;padding:16px;background:#fff">${renderPreviewTemplate(body, bridgeVars(vars))}</body></html>`
+}

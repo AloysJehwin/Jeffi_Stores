@@ -116,6 +116,7 @@ export const UpsertLibraryTemplateRequest = z.object({
   media_type: z.enum(['image', 'video', 'document']).optional(),
   provider_ref: z.string().max(80).optional(),
   note: z.string().max(500).optional(),
+  layout: z.enum(['store', 'none']).optional().describe("Email: 'store' (default) wraps the body in your branded layout; 'none' sends your HTML as written"),
   publish: z.boolean().default(true),
 })
 export type UpsertLibraryTemplateRequest = z.infer<typeof UpsertLibraryTemplateRequest>
