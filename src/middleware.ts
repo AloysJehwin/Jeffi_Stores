@@ -6,6 +6,7 @@ import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/auth/scopes'
 import { applyRateLimit } from './lib/shared/rate-limit'
 import { extractSessionSignals } from './lib/auth/session-signals-request'
 import { resolveTenantFromHost, appFromHost, slugFromHost, formsHostForSlug } from './lib/tenant-registry'
+import { documentHostForSlug } from './lib/tenancy/forms-host'
 import { runWithTenantContext } from './lib/tenancy/tenant-context'
 import { adminCookieNameForHost } from './lib/auth/admin-cookie'
 import { bindingGate } from './lib/auth/session-binding-gate'
@@ -305,6 +306,17 @@ async function handle(request: NextRequest) {
         request: { headers: stripped },
       })
     )
+  }
+
+  // Legacy same-host links ({slug}.domain/invoice/<token>) — the pages moved to the document hosts.
+  const legacyDoc = pathname.match(/^\/(invoice|quotation|purchaseorder)\/([0-9a-f-]{36})(\/pdf)?$/i)
+  if (legacyDoc && !hostApp) {
+    const slug = slugFromHost(hostname).slug
+    const bare = hostname.split(':')[0]
+    const isLocal = bare === 'localhost' || bare.endsWith('.localhost')
+    const port = isLocal && request.nextUrl.port ? `:${request.nextUrl.port}` : ''
+    const docHost = isLocal ? `${legacyDoc[1]}${slug ? `-${slug}` : ''}.localhost${port}` : documentHostForSlug(legacyDoc[1] as any, slug)
+    return NextResponse.redirect(`${isLocal ? 'http' : 'https'}://${docHost}/${legacyDoc[2]}${legacyDoc[3] ?? ''}`, 308)
   }
 
   // invoice-/quotation-/purchaseorder-{slug} hosts are served by document-service. In production

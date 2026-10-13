@@ -93,3 +93,20 @@ export function businessHostForHost(hostname: string): string {
   const slug = slugFromHostname(hostname)
   return slug ? `${slug}.business.${ROOT_DOMAIN}` : `business.${ROOT_DOMAIN}`
 }
+
+/**
+ * Browser-side URL for a tenant document page (served by document-service). Works on `*.localhost`
+ * dev hosts (keeps the port, http) and on prod hosts; falls back to the platform document host.
+ */
+export function documentUrlForLocation(app: DocumentApp, location: { hostname: string; port?: string; protocol?: string }, token: string): string {
+  const host = location.hostname.toLowerCase()
+  const path = `/${encodeURIComponent(token)}`
+  if (host === 'localhost' || host.endsWith('.localhost')) {
+    const label = host === 'localhost' ? '' : host.slice(0, -'.localhost'.length)
+    const m = label.match(/^(?:(?:admin|invoice|quotation|purchaseorder|forms|vault|www)-)?(.+?)(?:\.business)?$/)
+    const slug = m && !RESERVED_LABELS.has(m[1]) ? m[1] : null
+    const port = location.port ? `:${location.port}` : ''
+    return `http://${slug ? `${app}-${slug}` : app}.localhost${port}${path}`
+  }
+  return `https://${documentHostForHost(app, host)}${path}`
+}
