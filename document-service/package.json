@@ -8,7 +8,8 @@
     "start": "node --import tsx src/server.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "predev": "SM_SECRET_ID=${SM_SECRET_ID:-jeffi/services/local} ENV_OUT_DIR=. node ../deploy/load-secrets.mjs"
+    "predev": "SM_SECRET_ID=${SM_SECRET_ID:-jeffi/services/local} ENV_OUT_DIR=. node ../deploy/load-secrets.mjs && npm run -s build:css",
+    "build:css": "tailwindcss -c tailwind.config.cjs -i src/tenant/views/tailwind.css -o src/tenant/views/styles.css --minify"
   },
   "dependencies": {
     "@jeffi/api-contracts": "*",
@@ -38,6 +39,7 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^3.0.0",
-    "@types/qrcode": "^1.5.5"
+    "@types/qrcode": "^1.5.5",
+    "tailwindcss": "^3.4.1"
   }
 }
