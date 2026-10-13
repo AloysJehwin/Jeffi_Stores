@@ -2,6 +2,11 @@
 
 import { useMemo, useRef, useState } from 'react'
 import EmailComposer from '@/components/admin/email-composer/EmailComposer'
+import AdminSelect from '@/components/admin/AdminSelect'
+import EmojiPicker from './EmojiPicker'
+import { useToast } from '@/contexts/ToastContext'
+import { usePrompt } from '@/contexts/ConfirmContext'
+import { Smile, Link2, ImageIcon, Loader2, Upload, RefreshCw } from 'lucide-react'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
 
@@ -55,7 +60,6 @@ const SMS_GSM_LIMIT = 160
 const SMS_UCS2_LIMIT = 70
 const hasEmoji = (s: string) => /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(s)
 
-const QUICK_EMOJI = ['🎉','✅','📦','🚚','💰','⚡','🎁','🔥','🏆','⏰','👋','🛒','💬','⭐','🙏']
 
 type WaBlocks = {
   types?: Record<string, any>
@@ -70,6 +74,8 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
   const [uploading, setUploading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [showEmoji, setShowEmoji] = useState(false)
+  const { showToast } = useToast()
+  const askText = usePrompt()
   const fileRef = useRef<HTMLInputElement | null>(null)
   const textRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -92,7 +98,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
       const r = await fetch(uploadUrl, { method: 'POST', body: fd })
       if (!r.ok) {
         const err = await r.json().catch(() => ({}))
-        alert(err?.error || `Upload failed (HTTP ${r.status})`)
+        showToast(err?.error || `Upload failed (HTTP ${r.status})`, 'error')
         return null
       }
       const data = await r.json()
@@ -140,7 +146,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
   }
 
   async function onInsertShortLink() {
-    const dest = prompt('Destination URL (where the short link redirects)')
+    const dest = await askText({ title: 'Insert short link', message: 'Where should the short link redirect?', placeholder: 'https://…', confirmLabel: 'Create link' })
     if (!dest) return
     const u = await createShortLink(dest)
     if (u) insertAtCursor(u)
@@ -169,12 +175,16 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
     }
   }
 
-  const emojiPanel = showEmoji && (
-    <div className="absolute z-10 mt-1 p-2 bg-surface-elevated border border-border-default rounded-lg shadow grid grid-cols-5 gap-1">
-      {QUICK_EMOJI.map(e => (
-        <button key={e} type="button" className="px-2 py-1 hover:bg-surface-secondary rounded text-lg"
-          onClick={() => { insertAtCursor(e); setShowEmoji(false) }}>{e}</button>
-      ))}
+  const emojiPanel = showEmoji && <EmojiPicker onPick={insertAtCursor} onClose={() => setShowEmoji(false)} />
+
+  const TOOL = 'inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors disabled:opacity-60'
+  const toolbar = (
+    <div className="flex flex-wrap gap-1.5 mt-2 text-xs">
+      <button type="button" data-emoji-toggle className={TOOL} onClick={() => setShowEmoji(s => !s)}><Smile className="w-3.5 h-3.5" />Emoji</button>
+      <button type="button" className={TOOL} onClick={onInsertShortLink}><Link2 className="w-3.5 h-3.5" />Short link</button>
+      <button type="button" disabled={uploading} className={TOOL} onClick={onPickImageTextual}>
+        {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImageIcon className="w-3.5 h-3.5" />}Image as short link
+      </button>
     </div>
   )
 
@@ -227,13 +237,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
               value={value.body}
               onChange={e => onChange({ ...value, body: e.target.value, blocks_format: 'sms-text' })}
             />
-            <div className="flex flex-wrap gap-1 mt-1 text-xs">
-              <button type="button" className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary" onClick={() => setShowEmoji(s => !s)}>😊 Emoji</button>
-              <button type="button" className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary" onClick={onInsertShortLink}>🔗 Short link</button>
-              <button type="button" disabled={uploading} className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={onPickImageTextual}>
-                {uploading ? '⏳' : '🖼️ Image → short link'}
-              </button>
-            </div>
+                {toolbar}
             {emojiPanel}
             {smsStats && (
               <p className="mt-1 text-xs text-foreground-secondary">
@@ -275,7 +279,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
 
           const onPickHeaderMedia = async () => {
             if (mediaLocked) {
-              alert(`Header media type is locked to '${value.media_type}' after approval. You can swap the URL but not the type.`)
+              showToast(`Header media type is locked to '${value.media_type}' after approval — you can swap the file, not the type.`, 'info')
             }
             const file = await pickFile()
             if (!file) return
@@ -286,8 +290,8 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
           }
 
           async function onSubmitForApproval() {
-            if (!value.id) { alert('Save the template first.'); return }
-            const name = prompt('Template name (snake_case) submitted to Meta', value.slug.replace(/[^a-z0-9_]/gi, '_').toLowerCase())
+            if (!value.id) { showToast('Save the template first.', 'warning'); return }
+            const name = await askText({ title: 'Submit to Meta for approval', message: 'Template name submitted to Meta (lowercase, underscores only).', defaultValue: value.slug.replace(/[^a-z0-9_]/gi, '_').toLowerCase(), confirmLabel: 'Submit' })
             if (!name) return
             setSubmitting(true)
             try {
@@ -296,8 +300,9 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                 body: JSON.stringify({ templateId: value.id, locale: 'en', name, category: value.meta_category ?? 'UTILITY' }),
               })
               const data = await r.json().catch(() => ({}))
-              if (!r.ok) { alert(data?.error || `Submit failed (HTTP ${r.status})`); return }
+              if (!r.ok) { showToast(data?.error || `Submit failed (HTTP ${r.status})`, 'error'); return }
               onChange({ ...value, approval_status: data.status ?? 'pending' })
+              showToast('Submitted to Meta for approval.', 'success')
             } finally { setSubmitting(false) }
           }
 
@@ -307,7 +312,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
               const r = await fetch(`${apiBase}/wa/sync-approval`, {
                 method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}',
               })
-              if (r.ok) alert('Approval status re-synced. Reload to see updates.')
+              showToast(r.ok ? 'Approval status re-synced.' : `Re-sync failed (HTTP ${r.status})`, r.ok ? 'success' : 'error')
             } finally { setSubmitting(false) }
           }
 
@@ -315,15 +320,11 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
             <>
               <div>
                 <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Meta category</label>
-                <select
-                  className="w-full px-4 py-2 border border-border-default border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                <AdminSelect
                   value={value.meta_category ?? 'UTILITY'}
-                  onChange={e => onChange({ ...value, meta_category: e.target.value })}
-                >
-                  <option value="MARKETING">Marketing</option>
-                  <option value="UTILITY">Utility</option>
-                  <option value="AUTHENTICATION">Authentication</option>
-                </select>
+                  onChange={v => onChange({ ...value, meta_category: v })}
+                  options={[{ value: 'MARKETING', label: 'Marketing' }, { value: 'UTILITY', label: 'Utility' }, { value: 'AUTHENTICATION', label: 'Authentication' }]}
+                />
               </div>
 
               <div>
@@ -331,20 +332,16 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                   Header media type {mediaLocked && <span className="text-xs text-foreground-muted">(locked after approval)</span>}
                 </label>
                 <div className="flex gap-2 items-center">
-                  <select
-                    className="border border-border-default rounded-lg px-3 py-2 text-sm"
+                  <AdminSelect
+                    className="w-48"
                     disabled={mediaLocked}
                     value={value.media_type ?? ''}
-                    onChange={e => onChange({ ...value, media_type: e.target.value || null })}
-                  >
-                    <option value="">— none —</option>
-                    <option value="image">Image</option>
-                    <option value="video">Video</option>
-                    <option value="document">Document</option>
-                  </select>
+                    onChange={v => onChange({ ...value, media_type: v || null })}
+                    options={[{ value: '', label: 'None' }, { value: 'image', label: 'Image' }, { value: 'video', label: 'Video' }, { value: 'document', label: 'Document' }]}
+                  />
                   {value.media_type && (
-                    <button type="button" disabled={uploading} className="px-2 py-1 border border-border-default rounded-lg text-xs hover:bg-surface-secondary" onClick={onPickHeaderMedia}>
-                      {uploading ? '⏳' : '🖼️ Upload header media'}
+                    <button type="button" disabled={uploading} className={`${TOOL} text-xs`} onClick={onPickHeaderMedia}>
+                      {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}Upload header media
                     </button>
                   )}
                 </div>
@@ -364,13 +361,7 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                   value={value.body}
                   onChange={e => onChange({ ...value, body: e.target.value, blocks_format: 'wa-content' })}
                 />
-                <div className="flex flex-wrap gap-1 mt-1 text-xs">
-                  <button type="button" className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary" onClick={() => setShowEmoji(s => !s)}>😊 Emoji</button>
-                  <button type="button" className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary" onClick={onInsertShortLink}>🔗 Short link</button>
-                  <button type="button" disabled={uploading} className="px-2 py-1 border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={onPickImageTextual}>
-                    {uploading ? '⏳' : '🖼️ Image → short link'}
-                  </button>
-                </div>
+                {toolbar}
                 {emojiPanel}
               </div>
 
@@ -383,15 +374,13 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                 <div className="space-y-2">
                   {buttons.map((btn, i) => (
                     <div key={i} className="flex flex-wrap items-center gap-2 border border-border-default rounded-lg p-2 bg-surface-secondary">
-                      <select
-                        className="border border-border-default rounded-lg px-2 py-1 text-xs"
+                      <AdminSelect
+                        compact
+                        className="w-36"
                         value={btn.type}
-                        onChange={e => updateButton(i, { type: e.target.value as WaButton['type'], value: '' })}
-                      >
-                        <option value="quick_reply">Quick reply</option>
-                        <option value="url">Visit URL</option>
-                        <option value="phone">Call phone</option>
-                      </select>
+                        onChange={v => updateButton(i, { type: v as WaButton['type'], value: '' })}
+                        options={[{ value: 'quick_reply', label: 'Quick reply' }, { value: 'url', label: 'Visit URL' }, { value: 'phone', label: 'Call phone' }]}
+                      />
                       <input
                         className="border border-border-default rounded-lg px-2 py-1 text-xs flex-1 min-w-[8rem]"
                         placeholder="Label (max 25 chars)"
@@ -427,8 +416,9 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                       <input className="w-full border border-border-default rounded-lg px-2 py-1 text-sm mb-1" placeholder="Title" value={card.title ?? ''} onChange={e => updateCard(i, { title: e.target.value })} />
                       <textarea className="w-full border border-border-default rounded-lg px-2 py-1 text-sm font-mono" rows={2} placeholder="Body — use {{1}}, {{2}} …" value={card.body ?? ''} onChange={e => updateCard(i, { body: e.target.value })} />
                       <div className="flex items-center gap-2 mt-1">
-                        <button type="button" disabled={uploading} className="px-2 py-1 text-xs border border-border-default rounded-lg hover:bg-surface-secondary disabled:opacity-50" onClick={() => onPickCardMedia(i)}>
-                          {uploading ? '⏳' : card.media_url ? '🔄 Replace media' : '🖼️ Add media'}
+                        <button type="button" disabled={uploading} className={`${TOOL} text-xs`} onClick={() => onPickCardMedia(i)}>
+                          {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : card.media_url ? <RefreshCw className="w-3.5 h-3.5" /> : <ImageIcon className="w-3.5 h-3.5" />}
+                          {card.media_url ? 'Replace media' : 'Add media'}
                         </button>
                         {card.media_url && <span className="text-xs text-foreground-secondary truncate flex-1">{card.media_url}</span>}
                       </div>

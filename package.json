@@ -83,6 +83,7 @@
     "sharp": "^0.35.4",
     "tailwind-merge": "^2.2.0",
     "twilio": "^6.0.2",
+    "unicode-emoji-json": "^0.8.0",
     "xlsx": "file:vendor/xlsx-0.20.3.tgz",
     "zod": "^4.4.3"
   },
