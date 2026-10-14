@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
 import { uploadTemplateAsset } from '@jeffi/tenancy'
-import { formFile, readForm } from '@/lib/shared/form-file'
+import { readUpload } from '@/lib/shared/form-file'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,15 +16,12 @@ export async function POST(req: NextRequest) {
   const tenant = await resolveTenant()
   if (!tenant) return NextResponse.json({ error: 'no tenant' }, { status: 400 })
 
-  const form = await readForm(req, 'admin/messaging-templates/assets')
-  const file = formFile(form, 'file', 'admin/messaging-templates/assets')
-  const templateId = (form?.get('templateId') as string) || null
-  if (!file) return NextResponse.json({ error: 'file required' }, { status: 400 })
-  const mime = file.type || 'application/octet-stream'
+  const up = await readUpload(req, 'admin/messaging-templates/assets')
+  if ('error' in up) return NextResponse.json({ error: up.error }, { status: 400 })
+  const mime = up.mime
   if (!ALLOWED.has(mime)) return NextResponse.json({ error: `unsupported type: ${mime}` }, { status: 400 })
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: 'file too large (max 5MB)' }, { status: 413 })
+  if (up.bytes.length > MAX_BYTES) return NextResponse.json({ error: 'file too large (max 5MB)' }, { status: 413 })
 
-  const buf = Buffer.from(await file.arrayBuffer())
-  const result = await uploadTemplateAsset(buf, templateId, mime)
-  return NextResponse.json({ url: result.url, key: result.key, bytes: buf.length, mime })
+  const result = await uploadTemplateAsset(up.bytes, up.field('templateId') || null, mime)
+  return NextResponse.json({ url: result.url, key: result.key, bytes: up.bytes.length, mime })
 }

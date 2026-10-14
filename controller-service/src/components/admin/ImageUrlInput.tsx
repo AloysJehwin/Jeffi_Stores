@@ -5,10 +5,13 @@ import { Loader2, Upload } from 'lucide-react'
 
 // An image-URL field with an Upload button: paste a link or upload a file (→ CDN URL in the field).
 
+// Raw bytes rather than multipart: the server checks it received every byte (lib/shared/form-file).
 export async function uploadImage(file: File, endpoint = '/api/admin/uploads/image'): Promise<string> {
-  const fd = new FormData()
-  fd.append('file', file)
-  const r = await fetch(endpoint, { method: 'POST', body: fd })
+  const r = await fetch(endpoint, {
+    method: 'POST',
+    body: file,
+    headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) },
+  })
   const d = await r.json().catch(() => ({}))
   if (!r.ok || !d.url) throw new Error(d.error || 'Upload failed')
   return d.url as string
