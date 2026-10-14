@@ -24,10 +24,26 @@ preflight() {
   echo "commit $(git -C "$REPO" rev-parse --short HEAD), AWS $(aws sts get-caller-identity --query Arn --output text)"
   [ -f "$SSH_KEY" ] || { echo "Missing $SSH_KEY" >&2; return 1; }
   docker info >/dev/null 2>&1 || { echo "Docker Desktop is not running." >&2; return 1; }
+  ssh_allowed
   k8s_tunnel; kubectl get nodes
   tunnel; psql_app jeffi_stores -Atc "SELECT 'jeffi_stores reachable as ' || current_user"
   echo "EventBridge schedules (none may stop RDS or the core node in the next two hours):"
   aws scheduler list-schedules --query 'Schedules[].[Name,State]' --output text 2>/dev/null || echo "  (could not list)"
+}
+
+# The core's security group allows SSH from listed IPs only; a home IP changes now and then.
+ssh_allowed() {
+  local ip sg cidrs
+  ip=$(curl -s --max-time 10 https://checkip.amazonaws.com)
+  sg=$(aws ec2 describe-instances --filters "Name=ip-address,Values=$CORE_IP" \
+    --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)
+  cidrs=$(aws ec2 describe-security-groups --group-ids "$sg" \
+    --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`].IpRanges[].CidrIp' --output text | tr '\t' ' ')
+  python3 -I -c 'import ipaddress, sys; ip = ipaddress.ip_address(sys.argv[1])
+sys.exit(0 if any(ip in ipaddress.ip_network(c) for c in sys.argv[2:]) else 1)' "$ip" $cidrs && return 0
+  echo "SSH to the core is allowed only from $cidrs, and your IP is $ip. Allow it, then re-run:" >&2
+  echo "  aws ec2 authorize-security-group-ingress --group-id $sg --protocol tcp --port 22 --cidr $ip/32" >&2
+  return 1
 }
 
 resize_core() {
