@@ -15,12 +15,10 @@ aws rds describe-db-snapshots --db-instance-identifier "$RDS_INSTANCE" \
 tunnel
 say "Database sizes"
 psql_app jeffi_stores -Atc "SELECT datname || '  ' || pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE datname IN ('jeffi_stores', 'jeffi_control_plane')"
-say "Objects in public not owned by app_user (the release scripts run as app_user; expect none)"
-for db in $DBS; do
-  psql_app "$db" -Atc "SELECT '$db: ' || c.relname || ' (' || pg_get_userbyid(c.relowner) || ')' FROM pg_class c
-    JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r','p','S','v','m')
-    AND c.relowner <> (SELECT oid FROM pg_roles WHERE rolname = current_user)"
-done
+say "Tables in jeffi_stores app_user can't alter, by owner (05-table-owner.sh hands postgres's to jeffi_owner)"
+psql_app jeffi_stores -Atc "SELECT pg_get_userbyid(c.relowner) || ': ' || count(*) FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r','p','v','m')
+  AND NOT pg_has_role(current_user, c.relowner, 'USAGE') GROUP BY 1"
 
 if $DRY_RUN; then echo "Dry run: would snapshot $SNAP and dump $DBS into $OUT_DIR."; exit 0; fi
 confirm "Writes must be frozen first. Snapshot $RDS_INSTANCE and dump $DBS?"

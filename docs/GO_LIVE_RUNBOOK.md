@@ -32,7 +32,8 @@ command, and logs to `~/Documents/db-backups/go-live-<stamp>/`. `--skip-rehearsa
 | `deploy/k8s/bootstrap/freeze.sh on\|off` | Suspends the CronJobs and scales the app Deployments to 0; `off` restores what it recorded |
 | `deploy/k8s/db/00-backup.sh` | RDS snapshot, plus `pg_dump` of `jeffi_stores` and `jeffi_control_plane` |
 | `deploy/k8s/db/rehearse.sh <dir>` | Restores those dumps locally and runs 10, 20 and `verify.sql` on the copy (no RDS writes) |
-| `deploy/k8s/db/10-platform-schema.sh` | Additive schema diff in one transaction, then `manual.sql` (foreign keys, one column change) |
+| `deploy/k8s/db/10-platform-schema.sh` | First `05-table-owner.sh`, then the additive schema diff in one transaction, then `manual.sql` (foreign keys, one column change) |
+| `deploy/k8s/db/05-table-owner.sh` | As the master user: the older tables owned by `postgres` go to a new role `jeffi_owner` (members `postgres` and `app_user`), so `app_user` can alter them. Writes a rollback file |
 | `deploy/k8s/db/20-merge-control-plane.sh` | Creates the control-plane tables in `jeffi_stores`, copies the rows, validates the foreign keys, seeds plans |
 | `deploy/k8s/db/30-secrets.sh` | Patches only the DB keys, the bucket and `SERVICE_AUTH_SECRET`; creates the bucket; writes a rollback file |
 | `deploy/k8s/bootstrap/release.sh` | Builds and pushes the four images, then `rollout.sh`: platform, tenant schema fan-out (`db/40-tenant-fanout.sh`), every store, smoke test |
@@ -76,7 +77,8 @@ to `~/Documents/db-backups/release-<stamp>/`.
    kubectl get nodes; kubectl get pods -A | grep -vE 'Running|Completed'
    ```
    Go on once the core is `Ready` and the system pods run. The frozen apps stay at 0.
-4. **Schema.** `bash deploy/k8s/db/10-platform-schema.sh`. Review the diff, type `yes`, and expect "0 statement(s) left
+4. **Schema.** `bash deploy/k8s/db/10-platform-schema.sh`. It first hands the ~90 older tables owned by `postgres` to
+   `jeffi_owner` (otherwise `app_user` can't alter them). Review the diff, type `yes`, and expect "0 statement(s) left
    besides the CHECK re-adds".
 5. **Control-plane merge.** `bash deploy/k8s/db/20-merge-control-plane.sh`. It stops if any control-plane table already
    exists in `jeffi_stores`.
@@ -90,7 +92,8 @@ to `~/Documents/db-backups/release-<stamp>/`.
 8. **Seeds.** `bash deploy/k8s/db/50-seeds.sh`.
 9. **Document hosts.** `bash deploy/k8s/bootstrap/doc-hosts-dns.sh --apply`. Once the hosts resolve to 32.196.38.130
    (TTL 300): `curl -s https://invoice.jeffistores.in/healthz`.
-10. **Pool capacity.** Each Basic store is now three pods: `kubectl label node -l jeffi.io/pool=basic jeffi.io/pool-capacity=4 --overwrite`.
+10. **Pool capacity.** Each Basic store is now three pods. Dedicated pool nodes go to 4; the core keeps its own label:
+    `kubectl label node -l 'jeffi.io/pool=basic,!node-role.kubernetes.io/control-plane' jeffi.io/pool-capacity=4 --overwrite`.
 11. **Verify.**
     - `bash -c 'source deploy/k8s/db/lib.sh; tunnel; psql_app jeffi_stores -f deploy/k8s/db/verify.sql'`. Expect no
       missing tables, no unvalidated foreign keys, the platform templates seeded, and a `tenant_migration_runs` row per store.
@@ -103,7 +106,7 @@ to `~/Documents/db-backups/release-<stamp>/`.
 | Failed at | Do |
 |---|---|
 | 1–3 | `freeze.sh off`. For the node, resize back to t4g.large the same way. |
-| 4 schema | The diff is one transaction, so a failure applies nothing. `manual.sql` is idempotent: fix and re-run. |
+| 4 schema | The diff is one transaction, so a failure applies nothing. `manual.sql` is idempotent: fix and re-run. To hand the older tables back: `table-owner-rollback.sql`, run as `postgres`. |
 | 5 merge | The row copy is one transaction. If the tables were created but the copy failed, drop the control-plane tables the script listed from `jeffi_stores` and re-run. |
 | 6 secrets | `bash ~/Documents/db-backups/release-<stamp>/secrets-rollback.sh` |
 | 7 platform not ready | `rollout.sh` stops before deleting `flagship`. Delete the new routes: `kubectl -n jeffi delete ingressroute jeffi-stores-controller-service jeffi-stores-controller-service-admin jeffi-stores-controller-service-cloudfront-origin jeffi-stores-document-service jeffi-stores-public-api-service`. Then `freeze.sh off` brings the old flagship back. It reads the merged control plane, which is fine; or roll the secrets back too. |

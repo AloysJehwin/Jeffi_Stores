@@ -80,10 +80,12 @@ s9() {
   bash "$BOOT/doc-hosts-dns.sh" --apply
   curl -fsS --max-time 15 --resolve "invoice.jeffistores.in:443:$CORE_IP" https://invoice.jeffistores.in/healthz; echo
 }
+# Dedicated pool nodes only: the core keeps its own capacity (it also runs the platform).
+POOL_NODES='jeffi.io/pool=basic,!node-role.kubernetes.io/control-plane'
 s10() {
-  if [ -z "$(kubectl get nodes -l jeffi.io/pool=basic -o name)" ]; then echo "no Basic pool nodes"; return 0; fi
-  if $DRY_RUN; then kubectl get nodes -l jeffi.io/pool=basic -L jeffi.io/pool-capacity; return 0; fi
-  kubectl label node -l jeffi.io/pool=basic jeffi.io/pool-capacity=4 --overwrite
+  if [ -z "$(kubectl get nodes -l "$POOL_NODES" -o name)" ]; then echo "no dedicated Basic pool nodes; nothing to relabel"; return 0; fi
+  if $DRY_RUN; then kubectl get nodes -l "$POOL_NODES" -L jeffi.io/pool-capacity; return 0; fi
+  kubectl label node -l "$POOL_NODES" jeffi.io/pool-capacity=4 --overwrite
 }
 s11() { if $DRY_RUN; then would "verify.sql"; else tunnel; psql_app jeffi_stores -f "$DB/verify.sql"; fi; }
 s12() { if $DRY_RUN; then would "freeze.sh off"; else bash "$BOOT/freeze.sh" off; fi; }

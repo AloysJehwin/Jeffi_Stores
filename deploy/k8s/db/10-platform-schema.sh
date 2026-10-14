@@ -1,12 +1,13 @@
 #!/bin/bash
-# Step 1: bring jeffi_stores' schema to this commit. The additive migra diff of database/*.sql is shown,
-# then applied exactly as shown in one transaction, then manual.sql (foreign keys + the column change the
-# diff never applies), then a re-check of what is left.
+# Step 1: bring jeffi_stores' schema to this commit. First 05-table-owner.sh (so app_user can alter the older
+# tables), then the additive migra diff of database/*.sql, shown and applied exactly as shown in one transaction,
+# then manual.sql (foreign keys + the column change the diff never applies), then a re-check of what is left.
 # Usage: bash deploy/k8s/db/10-platform-schema.sh [--dry-run] [--yes]
 source "$(dirname "$0")/lib.sh"
 mkdir -p "$OUT_DIR"
 PLAN=$OUT_DIR/schema-platform-jeffi_stores.sql
 tunnel
+bash "$REPO/deploy/k8s/db/05-table-owner.sh" "$@"
 
 say "Schema diff for jeffi_stores (nothing applied yet)"
 schema_diff jeffi_stores --set=platform --dry-run

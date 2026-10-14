@@ -33,14 +33,22 @@ tunnel() {
   echo "Could not open the tunnel to $RDS_HOST through $CORE" >&2; exit 1
 }
 
-# libpq env for app_user; a fresh IAM token per call (they expire after 15 minutes).
+# libpq env for app_user (a fresh IAM token per call; they expire after 15 minutes) and for the master user postgres.
 pg_env() {
-  $REHEARSAL && return 0
+  if $REHEARSAL; then export PGUSER=app_user PGPASSWORD=$REHEARSAL_PW; return 0; fi
   export PGHOST=127.0.0.1 PGPORT=$PORT PGUSER=app_user PGSSLMODE=require
   PGPASSWORD=$(aws rds generate-db-auth-token --hostname "$RDS_HOST" --port 5432 --username app_user)
   export PGPASSWORD
 }
+pg_master_env() {
+  if $REHEARSAL; then export PGUSER=postgres PGPASSWORD=$REHEARSAL_PW; return 0; fi
+  export PGHOST=127.0.0.1 PGPORT=$PORT PGUSER=postgres PGSSLMODE=require
+  PGPASSWORD=$(aws secretsmanager get-secret-value --secret-id jeffi/production --query SecretString --output text |
+    python3 -I -c 'import json, sys; print(json.load(sys.stdin)["RDS_MASTER_PASSWORD"])')
+  export PGPASSWORD
+}
 psql_app() { local db=$1; shift; (pg_env; psql -d "$db" -v ON_ERROR_STOP=1 "$@"); }
+psql_master() { local db=$1; shift; (pg_master_env; psql -d "$db" -v ON_ERROR_STOP=1 "$@"); }
 pg_major() { psql_app jeffi_stores -Atc "show server_version_num" | cut -c1-2; }
 # pg_dump/pg_restore matching the server's major version (the local client may be older).
 pg_docker() {
@@ -54,7 +62,7 @@ pg_docker() {
 schema_diff() {
   local db=$1; shift
   if $REHEARSAL; then
-    RDS_DB=$db TARGET_URL="postgresql://$PGUSER:$PGPASSWORD@127.0.0.1:$PGPORT/$db" SCHEMA_DIFF_OUT=$OUT_DIR \
+    RDS_DB=$db TARGET_URL="postgresql://app_user:$REHEARSAL_PW@127.0.0.1:$PGPORT/$db" SCHEMA_DIFF_OUT=$OUT_DIR \
       bash "$REPO/deploy/schema-diff.sh" "$@"
   else
     RDS_HOST=$RDS_HOST RDS_PORT=5432 RDS_CONNECT_HOST=127.0.0.1 RDS_CONNECT_PORT=$PORT RDS_USER=app_user RDS_DB=$db \
