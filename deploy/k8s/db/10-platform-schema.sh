@@ -21,6 +21,15 @@ say "manual.sql"
 psql_app jeffi_stores -q -f "$REPO/deploy/k8s/db/manual.sql"
 say "Re-check"
 schema_diff jeffi_stores --set=platform --dry-run > "$OUT_DIR/schema-recheck.log" 2>&1
-# migra re-emits every CHECK (DROP IF EXISTS + ADD ... NOT VALID) on each run; anything else is a real leftover.
-LEFT=$(grep -viE 'drop constraint if exists|add constraint .* check .* not valid;' "$PLAN" | grep -c ';' || true)
-echo "$LEFT statement(s) left besides the CHECK re-adds (expect 0): $PLAN"
+# Expected leftovers: every CHECK (re-added NOT VALID each run), and indexes/primary keys that already exist under
+# the same name with an older definition (IF NOT EXISTS keeps them). Anything else did not apply.
+IDX=$(grep -oiE '^create (unique )?index if not exists [a-z0-9_]+' "$PLAN" | awk '{print $NF}' | tr '\n' ' ')
+PKS=$(grep -oE "t.relname = '[a-z0-9_]+' AND c.contype = 'p'" "$PLAN" | cut -d"'" -f2 | tr '\n' ' ')
+psql_app jeffi_stores -At -v idx="$IDX" -v pks="$PKS" <<'SQL'
+SELECT 'Kept as they are (exist with an older definition): '
+  || (SELECT count(*) FROM unnest(string_to_array(trim(:'idx'), ' ')) i WHERE to_regclass('public.' || i) IS NOT NULL) || ' index(es), '
+  || (SELECT count(*) FROM unnest(string_to_array(trim(:'pks'), ' ')) t
+       WHERE EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('public.' || t) AND contype = 'p')) || ' primary key(s)';
+SELECT 'Not applied: ' || i FROM unnest(string_to_array(trim(:'idx'), ' ')) i WHERE to_regclass('public.' || i) IS NULL;
+SQL
+grep -iE '^(create table|alter table .* add column|create sequence|create extension)' "$PLAN" | sed 's/^/Not applied: /' || true
