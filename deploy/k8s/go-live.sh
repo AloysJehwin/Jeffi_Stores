@@ -11,7 +11,7 @@ FROM=1; REHEARSE=true
 while [ $# -gt 0 ]; do case $1 in --from) FROM=${2:?step}; shift ;; --skip-rehearsal) REHEARSE=false ;; esac; shift; done
 case $FROM in [1-9]|1[0-2]) ;; *) echo "--from takes 1-12" >&2; exit 1 ;; esac
 export STAMP OUT_DIR
-CORE_TYPE=${CORE_TYPE:-t4g.xlarge}
+CORE_TYPE=${CORE_TYPE:-r7g.medium}
 CORE_IP=${CORE#*@}
 DB=$REPO/deploy/k8s/db; BOOT=$REPO/deploy/k8s/bootstrap
 mkdir -p "$OUT_DIR"; exec > >(tee -a "$OUT_DIR/go-live.log") 2>&1
@@ -46,21 +46,29 @@ sys.exit(0 if any(ip in ipaddress.ip_network(c) for c in sys.argv[2:]) else 1)' 
   return 1
 }
 
+# The account's EC2 limit is 1 vCPU (raised only once the AWS bill is settled); a type over it never starts.
 resize_core() {
-  local id type
+  local id type state need limit
   id=$(aws ec2 describe-addresses --public-ips "$CORE_IP" --query 'Addresses[0].InstanceId' --output text)
-  type=$(aws ec2 describe-instances --instance-ids "$id" --query 'Reservations[0].Instances[0].InstanceType' --output text)
-  echo "core $id is $type"
-  if [ "$type" = "$CORE_TYPE" ]; then return 0; fi
-  if $DRY_RUN; then would "stop, resize to $CORE_TYPE, start"; return 0; fi
-  aws ec2 stop-instances --instance-ids "$id" >/dev/null
-  aws ec2 wait instance-stopped --instance-ids "$id"
-  aws ec2 modify-instance-attribute --instance-id "$id" --instance-type "{\"Value\":\"$CORE_TYPE\"}"
-  aws ec2 start-instances --instance-ids "$id" >/dev/null
-  aws ec2 wait instance-status-ok --instance-ids "$id"
-  pkill -f "ssh .*-L $PORT:" || true
-  for _ in $(seq 1 12); do ssh_forward 16443 127.0.0.1:6443 && break; sleep 10; done
-  for _ in $(seq 1 60); do k8s_up && break; sleep 10; done
+  read -r type state < <(aws ec2 describe-instances --instance-ids "$id" \
+    --query 'Reservations[0].Instances[0].[InstanceType,State.Name]' --output text)
+  echo "core $id is $type ($state)"
+  if [ "$type" != "$CORE_TYPE" ] || [ "$state" != running ]; then
+    need=$(aws ec2 describe-instance-types --instance-types "$CORE_TYPE" --query 'InstanceTypes[0].VCpuInfo.DefaultVCpus' --output text)
+    limit=$(aws service-quotas get-service-quota --service-code ec2 --quota-code L-1216C47A --query Quota.Value --output text)
+    [ "$need" -le "${limit%.*}" ] || { echo "$CORE_TYPE has $need vCPUs, over the account's limit of $limit; the core was not touched." >&2; return 1; }
+    if $DRY_RUN; then would "set the core to $CORE_TYPE and start it"; return 0; fi
+    if [ "$type" != "$CORE_TYPE" ]; then
+      aws ec2 stop-instances --instance-ids "$id" >/dev/null
+      aws ec2 wait instance-stopped --instance-ids "$id"
+      aws ec2 modify-instance-attribute --instance-id "$id" --instance-type "{\"Value\":\"$CORE_TYPE\"}"
+    fi
+    aws ec2 start-instances --instance-ids "$id" >/dev/null
+    aws ec2 wait instance-status-ok --instance-ids "$id"
+    pkill -f "ssh .*-L $PORT:" || true
+  fi
+  if $DRY_RUN; then return 0; fi
+  for _ in $(seq 1 60); do k8s_up && break; ssh_forward 16443 127.0.0.1:6443 || true; sleep 10; done
   kubectl wait --for=condition=Ready node -l node-role.kubernetes.io/control-plane --timeout=600s
   for ns in kube-system cert-manager; do
     for d in $(kubectl -n $ns get deploy -o name); do kubectl -n $ns rollout status "$d" --timeout=600s; done
@@ -95,7 +103,7 @@ TITLES=("" "Freeze writes" "Backup" "Core node → $CORE_TYPE" "Schema" "Control
 HINTS=(""
   "Nothing has changed. bash deploy/k8s/bootstrap/freeze.sh off brings the site back."
   "Nothing has changed in the DB. bash deploy/k8s/bootstrap/freeze.sh off brings the site back."
-  "The DB is untouched. If the core node is stopped, start it (aws ec2 start-instances), then resume or unfreeze."
+  "The DB is untouched. Resuming this step starts a stopped core (within the vCPU limit); or start it and unfreeze."
   "The diff runs in one transaction, so nothing applied if it failed there; manual.sql is idempotent."
   "The row copy is one transaction. If the tables exist but the copy failed, drop them from jeffi_stores first."
   "bash $OUT_DIR/secrets-rollback.sh restores the previous secret versions."
@@ -111,7 +119,7 @@ trap 'rc=$?; if [ $rc -ne 0 ] && $PRE; then
   echo "Stopped before the window: nothing in production changed. Fix it and re-run (pushed images are reused)." >&2
 elif [ $rc -ne 0 ] && [ $CUR -gt 0 ]; then
   echo "Step $CUR (${TITLES[$CUR]}) failed. ${HINTS[$CUR]}" >&2
-  echo "Fix it, then resume: bash deploy/k8s/go-live.sh --from $CUR   (files and log: $OUT_DIR)" >&2; fi' EXIT
+  echo "Fix it, then resume: OUT_DIR=$OUT_DIR bash deploy/k8s/go-live.sh --from $CUR" >&2; fi' EXIT
 
 say "Preflight"
 preflight

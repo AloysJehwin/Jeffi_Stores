@@ -25,7 +25,10 @@ command, and logs to `~/Documents/db-backups/go-live-<stamp>/`. `--skip-rehearsa
   bucket, `jeffi-stores-documents`.
 - **Hosts.** `public.` goes to public-api (`/webhooks/` to messaging). `invoice.`, `quotation.` and `purchaseorder.` go to
   document-service, so their DNS moves from CloudFront to the cluster.
-- **Core node.** t4g.large → t4g.xlarge (about $49/month more).
+- **Core node.** t4g.large → r7g.medium. The account's EC2 limit is 1 vCPU (it can't be raised until the AWS bill is
+  settled) and every T4g size has 2 or more, so none of them starts, t4g.xlarge included. r7g.medium keeps 8 GB and is
+  one full Graviton3 core: more sustained CPU than the t4g.large (30% baseline per vCPU), about $10/month less. The pod
+  CPU requests are trimmed to fit; the controller runs two pods and updates them one at a time.
 
 | Script | Does |
 |---|---|
@@ -66,17 +69,21 @@ to `~/Documents/db-backups/release-<stamp>/`.
 
 1. **Freeze.** `bash deploy/k8s/bootstrap/freeze.sh on`. The site is down from here.
 2. **Back up.** `bash deploy/k8s/db/00-backup.sh` (5–10 min). Note the folder.
-3. **Resize the core node** (about 10 min):
+3. **Core node** (about 10 min). Only a type within the account's vCPU limit starts (`aws service-quotas
+   get-service-quota --service-code ec2 --quota-code L-1216C47A`, 1 today), so r7g.medium. `go-live.sh` checks the
+   limit before it stops anything, and starts a stopped core.
    ```bash
    ID=$(aws ec2 describe-addresses --public-ips 32.196.38.130 --query 'Addresses[0].InstanceId' --output text)
    aws ec2 stop-instances --instance-ids $ID >/dev/null && aws ec2 wait instance-stopped --instance-ids $ID
-   aws ec2 modify-instance-attribute --instance-id $ID --instance-type '{"Value":"t4g.xlarge"}'
+   aws ec2 modify-instance-attribute --instance-id $ID --instance-type '{"Value":"r7g.medium"}'
    aws ec2 start-instances --instance-ids $ID >/dev/null && aws ec2 wait instance-status-ok --instance-ids $ID
    pkill -f 'ssh .*-L 16443:'; pkill -f 'ssh .*-L 15432:'
    ssh -i ~/.ssh/jeffi-stores-key.pem -f -N -L 16443:127.0.0.1:6443 ec2-user@32.196.38.130
    kubectl get nodes; kubectl get pods -A | grep -vE 'Running|Completed'
+   kubectl describe node core | sed -n '/Allocated resources/,/Events/p'
    ```
-   Go on once the core is `Ready` and the system pods run. The frozen apps stay at 0.
+   Go on once the core is `Ready` and the system pods run. The frozen apps stay at 0. CPU requests should be at most
+   about 50%: the release adds about 0.4 vCPU, and rolling updates and CronJob pods need the rest.
 4. **Schema.** `bash deploy/k8s/db/10-platform-schema.sh`. It first hands the ~90 older tables owned by `postgres` to
    `jeffi_owner` (otherwise `app_user` can't alter them). Review the diff, type `yes`, and expect "0 statement(s) left
    besides the CHECK re-adds".
@@ -105,7 +112,7 @@ to `~/Documents/db-backups/release-<stamp>/`.
 
 | Failed at | Do |
 |---|---|
-| 1–3 | `freeze.sh off`. For the node, resize back to t4g.large the same way. |
+| 1–3 | `freeze.sh off`. The core stays r7g.medium: the t4g.large (2 vCPUs) can't start under the limit. |
 | 4 schema | The diff is one transaction, so a failure applies nothing. `manual.sql` is idempotent: fix and re-run. To hand the older tables back: `table-owner-rollback.sql`, run as `postgres`. |
 | 5 merge | The row copy is one transaction. If the tables were created but the copy failed, drop the control-plane tables the script listed from `jeffi_stores` and re-run. |
 | 6 secrets | `bash ~/Documents/db-backups/release-<stamp>/secrets-rollback.sh` |
@@ -124,3 +131,6 @@ longer has those writes.
 - Every later release is just `release.sh`. Run `10-platform-schema.sh` first when `database/*.sql` changed, and
   `manual.sql`-style statements for foreign keys or column changes the diff never applies.
 - `MESSAGING_INLINE` is unchanged: the controller still sends some messages itself.
+- The one-vCPU core holds the platform with little to spare. Check `kubectl describe node core` before onboarding a
+  store (three more pods). Once the bill is settled and the limit raised: t4g.xlarge (step 3 with that type), then the
+  controller back to a 300m request and 2→4 autoscaling, and the other requests as they were.

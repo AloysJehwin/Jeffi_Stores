@@ -34,7 +34,7 @@ spec:
               valueFrom: { secretKeyRef: { name: redis, key: password } }
             - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }
           resources:
-            requests: { cpu: 50m, memory: 128Mi }
+            requests: { cpu: 25m, memory: 128Mi }
             limits: { cpu: 500m, memory: 256Mi }
           startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 24 }
           readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10, timeoutSeconds: 5 }

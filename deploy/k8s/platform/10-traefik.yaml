@@ -25,5 +25,5 @@ spec:
     logs:
       access: { enabled: true }
     resources:
-      requests: { cpu: 100m, memory: 96Mi }
+      requests: { cpu: 50m, memory: 96Mi }
       limits: { memory: 256Mi }

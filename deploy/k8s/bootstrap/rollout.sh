@@ -10,6 +10,12 @@ PLATFORM=($CTRL jeffi-stores-messaging-service jeffi-stores-document-service jef
 k8s_tunnel
 
 say "Platform at $TAG"
+# The freeze suspends the 6-hourly ecr-refresh; renew the pull secret before the release images are pulled.
+if kubectl -n jeffi get cronjob ecr-refresh >/dev/null 2>&1; then
+  job=ecr-refresh-$(date +%s)
+  kubectl -n jeffi create job --from=cronjob/ecr-refresh "$job" >/dev/null
+  kubectl -n jeffi wait --for=condition=complete "job/$job" --timeout=300s
+fi
 kubectl kustomize "$REPO/deploy/k8s/platform" | sed -E "s#(${REG}/jeffi-stores-[a-z-]+):[A-Za-z0-9._-]+#\1:${TAG}#g" | kubectl apply -f -
 for d in "${PLATFORM[@]}"; do kubectl -n jeffi rollout status deploy/$d --timeout=600s; done
 
