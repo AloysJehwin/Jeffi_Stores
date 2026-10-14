@@ -24,6 +24,8 @@ WORKDIR /app
 ENV NODE_ENV=production SPAWN_APP=1 APP_NODE_ARGS="--import tsx"
 RUN addgroup --system --gid 1001 svc && adduser --system --uid 1001 -G svc svc
 COPY deploy/load-secrets.mjs deploy/load-secrets.mjs
+# The services' tsconfigs extend it; without it tsx ignores them (document-service loses react-jsx).
+COPY tsconfig.services.json ./
 
 FROM runtime AS messaging
 COPY --from=messaging-deps /app ./

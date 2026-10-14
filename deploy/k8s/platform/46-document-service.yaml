@@ -41,11 +41,27 @@ spec:
           volumeMounts:
             - { name: certs, mountPath: /app/certs, readOnly: true }
             - { name: tmp, mountPath: /tmp }
+            # Images up to local-0012293f lack the tsconfig base; without it tsx renders JSX as React.createElement.
+            - { name: tsconfig, mountPath: /app/tsconfig.services.json, subPath: tsconfig.services.json, readOnly: true }
       volumes:
         - name: certs
           configMap: { name: rds-ca }
         - name: tmp
           emptyDir: { sizeLimit: 256Mi }
+        - name: tsconfig
+          configMap: { name: services-tsconfig }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: services-tsconfig, namespace: jeffi }
+data:
+  tsconfig.services.json: |
+    {
+      "compilerOptions": {
+        "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler", "strict": true, "esModuleInterop": true,
+        "skipLibCheck": true, "resolveJsonModule": true, "noEmit": true, "types": ["node"]
+      }
+    }
 ---
 apiVersion: v1
 kind: Service
