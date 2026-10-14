@@ -12,7 +12,6 @@ while [ $# -gt 0 ]; do case $1 in --from) FROM=${2:?step}; shift ;; --skip-rehea
 case $FROM in [1-9]|1[0-2]) ;; *) echo "--from takes 1-12" >&2; exit 1 ;; esac
 export STAMP OUT_DIR
 CORE_TYPE=${CORE_TYPE:-r7g.medium}
-CORE_IP=${CORE#*@}
 DB=$REPO/deploy/k8s/db; BOOT=$REPO/deploy/k8s/bootstrap
 mkdir -p "$OUT_DIR"; exec > >(tee -a "$OUT_DIR/go-live.log") 2>&1
 flag() { if $DRY_RUN; then echo --dry-run; else echo --yes; fi; }
@@ -31,21 +30,6 @@ preflight() {
     { echo "RDS rejects the master password stored in jeffi/production; reset it first (docs/GO_LIVE_RUNBOOK.md, The day before)." >&2; return 1; }
   echo "EventBridge schedules (none may stop RDS or the core node in the next two hours):"
   aws scheduler list-schedules --query 'Schedules[].[Name,State]' --output text 2>/dev/null || echo "  (could not list)"
-}
-
-# The core's security group allows SSH from listed IPs only; a home IP changes now and then.
-ssh_allowed() {
-  local ip sg cidrs
-  ip=$(curl -s --max-time 10 https://checkip.amazonaws.com)
-  sg=$(aws ec2 describe-instances --filters "Name=ip-address,Values=$CORE_IP" \
-    --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)
-  cidrs=$(aws ec2 describe-security-groups --group-ids "$sg" \
-    --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`].IpRanges[].CidrIp' --output text | tr '\t' ' ')
-  python3 -I -c 'import ipaddress, sys; ip = ipaddress.ip_address(sys.argv[1])
-sys.exit(0 if any(ip in ipaddress.ip_network(c) for c in sys.argv[2:]) else 1)' "$ip" $cidrs && return 0
-  echo "SSH to the core is allowed only from $cidrs, and your IP is $ip. Allow it, then re-run:" >&2
-  echo "  aws ec2 authorize-security-group-ingress --group-id $sg --protocol tcp --port 22 --cidr $ip/32" >&2
-  return 1
 }
 
 # The account's EC2 limit is 1 vCPU (raised only once the AWS bill is settled); a type over it never starts.

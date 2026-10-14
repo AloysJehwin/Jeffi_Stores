@@ -32,7 +32,24 @@ confirm() {
 }
 
 listening() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+CORE_IP=${CORE#*@}
+# The core's security group allows SSH from listed IPs only; a home IP changes now and then.
+ssh_allowed() {
+  local ip sg cidrs
+  ip=$(curl -s --max-time 10 https://checkip.amazonaws.com)
+  sg=$(aws ec2 describe-instances --filters "Name=ip-address,Values=$CORE_IP" \
+    --query 'Reservations[0].Instances[0].SecurityGroups[0].GroupId' --output text)
+  cidrs=$(aws ec2 describe-security-groups --group-ids "$sg" \
+    --query 'SecurityGroups[0].IpPermissions[?FromPort==`22`].IpRanges[].CidrIp' --output text | tr '\t' ' ')
+  python3 -I -c 'import ipaddress, sys; ip = ipaddress.ip_address(sys.argv[1])
+sys.exit(0 if any(ip in ipaddress.ip_network(c) for c in sys.argv[2:]) else 1)' "$ip" $cidrs && return 0
+  echo "SSH to the core is allowed only from $cidrs, and your IP is $ip. Allow it, then re-run:" >&2
+  echo "  aws ec2 authorize-security-group-ingress --group-id $sg --protocol tcp --port 22 --cidr $ip/32" >&2
+  return 1
+}
+
 ssh_forward() { # <local port> <target>; replaces one of ours that holds the port but stopped forwarding (network change, sleep)
+  ssh_allowed || return 1
   pkill -f "ssh .*-L $1:" 2>/dev/null || true; sleep 1
   ssh -i "$SSH_KEY" -f -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L "$1:$2" "$CORE"
 }
