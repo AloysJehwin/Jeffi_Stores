@@ -64,8 +64,10 @@ ssm_forward() {
   local id
   id=$(aws ec2 describe-addresses --public-ips "$CORE_IP" --query 'Addresses[0].InstanceId' --output text)
   echo "SSH failed; forwarding :$1 over SSM ($id)" >&2
-  nohup aws ssm start-session --target "$id" --document-name AWS-StartPortForwardingSessionToRemoteHost \
-    --parameters "host=${2%:*},portNumber=${2##*:},localPortNumber=$1" >/dev/null 2>&1 &
+  # The remote-host document refuses 127.0.0.1; a port on the core itself has its own document.
+  local doc=AWS-StartPortForwardingSessionToRemoteHost params="host=${2%:*},portNumber=${2##*:},localPortNumber=$1"
+  [ "${2%:*}" = 127.0.0.1 ] && { doc=AWS-StartPortForwardingSession; params="portNumber=${2##*:},localPortNumber=$1"; }
+  nohup aws ssm start-session --target "$id" --document-name "$doc" --parameters "$params" >/dev/null 2>&1 &
   for _ in $(seq 1 20); do listening "$1" && return 0; sleep 1; done
   return 1
 }
