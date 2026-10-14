@@ -64,7 +64,12 @@ pg_docker pg_dump -d jeffi_control_plane --data-only --no-owner --no-privileges 
 } | dst -1 -q
 
 say "3/4 Foreign keys"
-dst -q -f "$OUT_DIR/cp-fkeys.sql" || echo "Some foreign keys did not validate (left NOT VALID) — check the rows they name." >&2
+# Each one on its own: a key whose old rows don't match stays NOT VALID (still enforced for new rows).
+dst -v ON_ERROR_STOP=0 -q -f "$OUT_DIR/cp-fkeys.sql" 2> "$OUT_DIR/cp-fkeys.err" || true
+if grep -q ERROR "$OUT_DIR/cp-fkeys.err"; then
+  echo "Left NOT VALID (rows from before the merge don't match; new rows are checked):"
+  grep -oE 'constraint "[a-z0-9_]+"' "$OUT_DIR/cp-fkeys.err" | sort -u | sed 's/^/  /'
+fi
 
 say "4/4 seed-plans.sql"
 dst -q -f "$REPO/database/control-plane/seed-plans.sql"
