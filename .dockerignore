@@ -1,5 +1,8 @@
 node_modules
+**/node_modules
 .next
+**/.next
+**/.next-build
 .git
 .gitignore
 .env
@@ -33,3 +36,26 @@ supabase/
 scripts/
 check-images.js
 s3-bucket-policy*.json
+
+# Not needed by any image (builds from `git archive` skip untracked files anyway)
+graphify-out/
+coverage/
+tests/
+integration-tests/
+ai-platform/
+document-service/.documents/
+**/.env.local
+**/.env.local.overrides
+controller-service/public/models/onboarding/onnx/
+controller-service/public/models/onboarding/ort/
+controller-service/public/ort/*.wasm
+controller-service/public/ort/*.map
+data/
+store_documents/
+.vault-store/
+.claude/
+.playwright-mcp/
+.mcp.json
+*.csv
+*.pem
+jeffi-stores-*.json
