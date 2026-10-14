@@ -22,7 +22,7 @@ Last updated: 2026-08-17.
 ### Notes
 - All `*.jeffistores.in` subdomains are covered by the wildcard ACM cert — no per-tenant cert needed.
 - Custom domains (Pro/Enterprise) require a separate ACM cert per domain issued via DNS validation.
-- The middleware (`src/middleware.ts`) already routes all `{prefix}-{slug}` patterns via `slugFromHost()`.
+- The middleware (`controller-service/src/middleware.ts`) already routes all `{prefix}-{slug}` patterns via `slugFromHost()`.
 - Subdomain access for Growth+ CNAMEs (`quotation-`, `purchaseorder-`, `forms-`) is gated by plan scope in middleware.
 
 ---
@@ -40,7 +40,7 @@ Last updated: 2026-08-17.
 | Review forms | ❌ | ✅ | ✅ | ✅ |
 
 ### Enforcement
-- `returnAllowed` / `replacementAllowed` on order items are forced to `false` in `src/app/api/orders/[id]/route.ts` when tenant plan lacks `returns:read`.
+- `returnAllowed` / `replacementAllowed` on order items are forced to `false` in `controller-service/src/app/api/orders/[id]/route.ts` when tenant plan lacks `returns:read`.
 - B2B portal (`business.{slug}.jeffistores.in`) is middleware-gated by `business_customers:read`.
 
 ---
@@ -142,10 +142,10 @@ Custom domain add-on: charged on top of subscription (amount TBD).
 ## Enforcement Architecture
 
 ### Current implementation
-- **Middleware** (`src/middleware.ts`): `getScopeForPath()` → `hasScope()` gates all `/api/admin/*` and `/admin/*` routes.
+- **Middleware** (`controller-service/src/middleware.ts`): `getScopeForPath()` → `hasScope()` gates all `/api/admin/*` and `/admin/*` routes.
 - **Route handlers**: redundant `hasScope(admin.role, admin.scopes, 'scope:verb')` check inside each handler.
-- **Storefront API** (`src/app/api/orders/[id]/route.ts`): `getCurrentTenant()` plan check forces `returnAllowed=false` for Basic.
-- **Delhivery route** (`src/app/api/admin/delhivery/pickup-request/route.ts`): now correctly checks `delhivery:read/write` (was wrongly checking `orders:read/write`).
+- **Storefront API** (`controller-service/src/app/api/orders/[id]/route.ts`): `getCurrentTenant()` plan check forces `returnAllowed=false` for Basic.
+- **Delhivery route** (`controller-service/src/app/api/admin/delhivery/pickup-request/route.ts`): now correctly checks `delhivery:read/write` (was wrongly checking `orders:read/write`).
 
 ### Planned: PlanGateService
 A common server-side utility to replace scattered checks:
@@ -169,19 +169,19 @@ Caches plan scope set ~60s from control-plane DB. To be applied at:
 - Basic plan now has 21 scopes — focused on core storefront + orders + delivery
 
 ### Service-Level Changes Applied
-- **Delhivery route** (`src/app/api/admin/delhivery/pickup-request/route.ts`): fixed scope check from `orders:read/write` → `delhivery:read/write`
-- **Order status gate** (`src/app/api/admin/orders/[id]/route.ts`): blocks `returned`/`return_received` for tenants without `returns:read`; inventory restore (`restoreOrderStock`) skipped if no `inventory:read`
-- **Storefront order API** (`src/app/api/orders/[id]/route.ts`): `returnAllowed`/`replacementAllowed` forced to `false` for Basic plan via `currentTenantPlanGate('returns:read')`
-- **Product form** (`src/components/admin/ProductForm.tsx`): `hasInventory` prop hides `inventory_sync`, `perishable`, `serialized` flags for Basic plan
-- **Brand form** (`src/components/admin/BrandForm.tsx`): `hasReturns` prop hides Return & Replacement Policy section for Basic plan
+- **Delhivery route** (`controller-service/src/app/api/admin/delhivery/pickup-request/route.ts`): fixed scope check from `orders:read/write` → `delhivery:read/write`
+- **Order status gate** (`controller-service/src/app/api/admin/orders/[id]/route.ts`): blocks `returned`/`return_received` for tenants without `returns:read`; inventory restore (`restoreOrderStock`) skipped if no `inventory:read`
+- **Storefront order API** (`controller-service/src/app/api/orders/[id]/route.ts`): `returnAllowed`/`replacementAllowed` forced to `false` for Basic plan via `currentTenantPlanGate('returns:read')`
+- **Product form** (`controller-service/src/components/admin/ProductForm.tsx`): `hasInventory` prop hides `inventory_sync`, `perishable`, `serialized` flags for Basic plan
+- **Brand form** (`controller-service/src/components/admin/BrandForm.tsx`): `hasReturns` prop hides Return & Replacement Policy section for Basic plan
 - **Product/brand edit pages**: pass `hasInventory`/`hasReturns` from admin session scopes
-- **Customer detail page** (`src/app/admin/customers/[id]/page.tsx`): WhatsApp/CRM engagement chips hidden for Basic (requires `crm:read` — Growth+)
-- **WhatsApp API** (`src/app/api/admin/customers/[id]/whatsapp/route.ts`): scope changed from `customers:read/write` → `crm:read/write` (Growth+)
-- **Middleware** (`src/middleware.ts`): `/admin/ecom/*` and `/api/admin/ecom/*` blocked on tenant admin subdomains (`admin-{slug}.`); only accessible on `admin.jeffistores.in`
-- **site-controls** (`src/lib/site-controls.ts`): added `inventoryValidationEnabled` feature flag (key: `feature_inventory_validation_enabled`, default: `true`)
+- **Customer detail page** (`controller-service/src/app/admin/customers/[id]/page.tsx`): WhatsApp/CRM engagement chips hidden for Basic (requires `crm:read` — Growth+)
+- **WhatsApp API** (`controller-service/src/app/api/admin/customers/[id]/whatsapp/route.ts`): scope changed from `customers:read/write` → `crm:read/write` (Growth+)
+- **Middleware** (`controller-service/src/middleware.ts`): `/admin/ecom/*` and `/api/admin/ecom/*` blocked on tenant admin subdomains (`admin-{slug}.`); only accessible on `admin.jeffistores.in`
+- **site-controls** (`controller-service/src/lib/site-controls.ts`): added `inventoryValidationEnabled` feature flag (key: `feature_inventory_validation_enabled`, default: `true`)
 
 ### PlanGateService Built
-- `src/lib/plan-gate.ts` — central plan feature gate
+- `controller-service/src/lib/plan-gate.ts` — central plan feature gate
 - `planGate(tenantId, scopeKey)` → `{ allowed, plan, upgradeRequired }`
 - `currentTenantPlanGate(scopeKey)` — for storefront API routes using TenantContext
 - 60s in-process cache, invalidated on plan change
@@ -197,7 +197,7 @@ Caches plan scope set ~60s from control-plane DB. To be applied at:
 ### Group C/D — ALL COMPLETED ✅
 
 #### Razorpay Route (POBO) — LIVE
-- `src/lib/razorpay-route.ts` — linked account creation, payment transfer, reverse
+- `controller-service/src/lib/razorpay-route.ts` — linked account creation, payment transfer, reverse
 - KYC approval creates Route linked account (`acc_xxxx`) on tenant
 - Payment capture fires transfer to linked account (3% platform commission)
 - Bank verification uses Razorpay FAV (Fund Account Validation) — instant, no UTR needed
@@ -208,7 +208,7 @@ Caches plan scope set ~60s from control-plane DB. To be applied at:
 - Generates mTLS client certificate (p12) and emails it to owner
 - Owner can access `admin-{slug}.jeffistores.in` using the cert + OTP/Google login
 
-#### Ecom Onboarding Emails (`src/lib/ecom-emails.ts`)
+#### Ecom Onboarding Emails (`controller-service/src/lib/ecom-emails.ts`)
 | Event | Trigger | Recipient |
 |-------|---------|-----------|
 | KYC submitted | `POST /api/ecom/onboard/submit` | Owner + platform admin |
@@ -221,7 +221,7 @@ Caches plan scope set ~60s from control-plane DB. To be applied at:
 Generated columns on `tenants` table — no per-tenant SES identity needed (domain identity for `jeffistores.in` covers all):
 - `noreply-{slug}@jeffistores.in` — all plans, transactional
 - `campaigns-{slug}@jeffistores.in` — Pro+ only, marketing
-- Use `tenantNoReplyEmail(slug)` / `tenantCampaignEmail(slug)` from `src/lib/ecom-emails.ts`
+- Use `tenantNoReplyEmail(slug)` / `tenantCampaignEmail(slug)` from `controller-service/src/lib/ecom-emails.ts`
 
 ### Still Pending
 - C: DB replication → tenant S3 bucket (replaces Razer system) — deferred
@@ -231,11 +231,11 @@ Generated columns on `tenants` table — no per-tenant SES identity needed (doma
 ### Group E — Remaining SaaS work (2026-08-17) — CODE COMPLETE ✅
 
 #### Storefront Google Auth (tenant subdomains) — FIXED
-- `src/lib/google-oauth-popup.ts` — `stripAppSubdomain` now collapses ANY `*.jeffistores.in` subdomain (including tenant `{slug}.`) to root, so OAuth callback always reaches the registered `jeffistores.in/auth/google/callback` redirect URI. Popup postMessages token cross-subdomain via `'*'` target.
+- `controller-service/src/lib/google-oauth-popup.ts` — `stripAppSubdomain` now collapses ANY `*.jeffistores.in` subdomain (including tenant `{slug}.`) to root, so OAuth callback always reaches the registered `jeffistores.in/auth/google/callback` redirect URI. Popup postMessages token cross-subdomain via `'*'` target.
 
 #### Migration Fan-out — BUILT
-- `src/lib/tenant-migrations.ts` — `runMigrationFanout(gitSha)` enumerates active tenants, connects per-tenant via IAM pool, applies desired-state schema (idempotent), records one `tenant_migration_runs` row per (tenant, gitSha). Skips already-applied. `getMigrationRuns()` for admin visibility.
-- `src/lib/tenant-migrations-schema.ts` — shared `buildTenantSchemaSql()` (apply order: extensions→tables→constraints→indexes→functions→triggers)
+- `controller-service/src/lib/tenant-migrations.ts` — `runMigrationFanout(gitSha)` enumerates active tenants, connects per-tenant via IAM pool, applies desired-state schema (idempotent), records one `tenant_migration_runs` row per (tenant, gitSha). Skips already-applied. `getMigrationRuns()` for admin visibility.
+- `controller-service/src/lib/tenant-migrations-schema.ts` — shared `buildTenantSchemaSql()` (apply order: extensions→tables→constraints→indexes→functions→triggers)
 - `POST /api/admin/ecom/migrations/run` — super-admin trigger; `GET` for run history
 
 #### Custom Domains (BYO CNAME) — BUILT
@@ -243,16 +243,16 @@ Generated columns on `tenants` table — no per-tenant SES identity needed (doma
 - `lookupTenant('custom_domain')` now resolves via verified `tenant_custom_domains` (+ legacy fallback)
 - Registry: `addCustomDomain` (plan-quota enforced), `listCustomDomains`, `setCustomDomainStatus`, `deleteCustomDomain`
 - `POST/GET /api/ecom/domains` + `POST /api/ecom/domains/[id]/verify` (real DNS CNAME check)
-- `src/app/ecom/dashboard/store/CustomDomains.tsx` — owner UI (add domain, show CNAME target, verify button)
+- `controller-service/src/app/ecom/dashboard/store/CustomDomains.tsx` — owner UI (add domain, show CNAME target, verify button)
 - ⚠️ ACM cert issuance + CloudFront attach = separate infra step (verification marks 'verified'; TLS follows)
 
 #### COD Settlement — BUILT
-- `recordCodSettlement()` in `src/lib/razorpay-route.ts` — ledger-based (COD has no Razorpay payment_id)
+- `recordCodSettlement()` in `controller-service/src/lib/razorpay-route.ts` — ledger-based (COD has no Razorpay payment_id)
 - Wired into `POST /api/admin/financial/cod-remittance` — on remittance, records `tenant_transactions` + `settlement_ledger` with gross − commission − ACTUAL Delhivery charge (`delhivery_billed_amount`)
 - Fixes the flat ₹20 buffer → uses reconciled `delhivery_billed_amount` (falls back to estimate)
 
 #### AWS Provisioning Provider — SKELETON (needs live AWS)
-- `src/lib/provisioning/aws-provider.ts` — real @aws-sdk RDS + S3 calls (param group, create instance, poll endpoint, loadSchema via IAM, lock-down bucket, stop/start/delete)
+- `controller-service/src/lib/provisioning/aws-provider.ts` — real @aws-sdk RDS + S3 calls (param group, create instance, poll endpoint, loadSchema via IAM, lock-down bucket, stop/start/delete)
 - Enabled via `PROVISIONING_PROVIDER=aws` in `index.ts` (lazy-loaded)
 - Installed `@aws-sdk/client-rds`
 - ⚠️ Cannot verify locally — needs live AWS + RDS_MASTER_PASSWORD + certs/global-bundle.pem
@@ -268,6 +268,6 @@ Generated columns on `tenants` table — no per-tenant SES identity needed (doma
 
 
 - Plan scope assignments: `jeffi_control_plane.plan_features` table (local port 5432)
-- Scope definitions: `src/lib/scopes.ts`
-- Subdomain routing: `src/middleware.ts` + `src/lib/tenant-registry.ts` (`slugFromHost`, `RESERVED_LABELS`)
+- Scope definitions: `controller-service/src/lib/scopes.ts`
+- Subdomain routing: `controller-service/src/middleware.ts` + `controller-service/src/lib/tenant-registry.ts` (`slugFromHost`, `RESERVED_LABELS`)
 - Plan pricing: `jeffi_control_plane.plans` table

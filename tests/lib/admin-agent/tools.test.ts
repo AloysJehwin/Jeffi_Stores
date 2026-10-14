@@ -1406,7 +1406,7 @@ describe('admin-agent/tools', () => {
     })
 
     it('throws for path containing "secret"', async () => {
-      await expect(tool().handler({ dir: 'src/lib/secret-stuff' })).rejects.toThrow(/forbidden/)
+      await expect(tool().handler({ dir: 'controller-service/src/lib/secret-stuff' })).rejects.toThrow(/forbidden/)
     })
 
     it('returns files from a valid directory', async () => {
@@ -1417,7 +1417,7 @@ describe('admin-agent/tools', () => {
       })
       mockFs.readdir.mockResolvedValueOnce([fakeEnt('queries.ts', false), fakeEnt('utils.ts', false)])
       mockFs.stat.mockResolvedValueOnce({ size: 1024 }).mockResolvedValueOnce({ size: 512 })
-      const result = await tool().handler({ dir: 'src/lib' })
+      const result = await tool().handler({ dir: 'controller-service/src/lib' })
       expect((result as any).files).toBeDefined()
       expect((result as any).count).toBeGreaterThanOrEqual(0)
     })
@@ -1426,7 +1426,7 @@ describe('admin-agent/tools', () => {
       const fakeEnt = (name: string) => ({ name, isDirectory: () => false, isFile: () => true })
       mockFs.readdir.mockResolvedValueOnce([fakeEnt('queries.ts'), fakeEnt('utils.ts')])
       mockFs.stat.mockResolvedValueOnce({ size: 100 })
-      const result = await tool().handler({ dir: 'src/lib', pattern: 'queries' })
+      const result = await tool().handler({ dir: 'controller-service/src/lib', pattern: 'queries' })
       const files = (result as any).files as { path: string }[]
       expect(files.every(f => f.path.includes('queries'))).toBe(true)
     })
@@ -1437,14 +1437,14 @@ describe('admin-agent/tools', () => {
       // First readdir returns node_modules (dir) and a file
       mockFs.readdir.mockResolvedValueOnce([fakeDir('node_modules'), fakeFile('index.ts')])
       mockFs.stat.mockResolvedValueOnce({ size: 200 })
-      const result = await tool().handler({ dir: 'src' })
+      const result = await tool().handler({ dir: 'controller-service/src' })
       // node_modules should not be walked — readdir should only be called once
       expect(mockFs.readdir).toHaveBeenCalledTimes(1)
     })
 
     it('handles readdir throwing (returns empty list)', async () => {
       mockFs.readdir.mockRejectedValueOnce(new Error('ENOENT'))
-      const result = await tool().handler({ dir: 'src/lib/nonexistent' })
+      const result = await tool().handler({ dir: 'controller-service/src/lib/nonexistent' })
       expect((result as any).files).toHaveLength(0)
     })
   })
@@ -1465,19 +1465,19 @@ describe('admin-agent/tools', () => {
     })
 
     it('throws for forbidden path (lib/auth.ts)', async () => {
-      await expect(tool().handler({ path: 'src/lib/auth.ts' })).rejects.toThrow(/forbidden/)
+      await expect(tool().handler({ path: 'controller-service/src/lib/auth.ts' })).rejects.toThrow(/forbidden/)
     })
 
     it('throws for forbidden path (lib/auth/jwt.ts after domain regroup)', async () => {
-      await expect(tool().handler({ path: 'src/lib/auth/jwt.ts' })).rejects.toThrow(/forbidden/)
+      await expect(tool().handler({ path: 'controller-service/src/lib/auth/jwt.ts' })).rejects.toThrow(/forbidden/)
     })
 
     it('throws for forbidden path (lib/shared/db.ts after domain regroup)', async () => {
-      await expect(tool().handler({ path: 'src/lib/shared/db.ts' })).rejects.toThrow(/forbidden/)
+      await expect(tool().handler({ path: 'controller-service/src/lib/shared/db.ts' })).rejects.toThrow(/forbidden/)
     })
 
     it('throws for path with password keyword', async () => {
-      await expect(tool().handler({ path: 'src/lib/password-helper.ts' })).rejects.toThrow(/forbidden/)
+      await expect(tool().handler({ path: 'controller-service/src/lib/password-helper.ts' })).rejects.toThrow(/forbidden/)
     })
 
     it('returns file content for a valid path', async () => {
@@ -1491,7 +1491,7 @@ describe('admin-agent/tools', () => {
         close: vi.fn().mockResolvedValue(undefined),
       }
       mockFs.open.mockResolvedValueOnce(fakeHandle)
-      const result = await tool().handler({ path: 'src/lib/queries.ts' })
+      const result = await tool().handler({ path: 'controller-service/src/lib/queries.ts' })
       expect((result as any).content).toContain('foo')
       expect((result as any).bytesRead).toBe(fakeContent.length)
     })
@@ -1499,12 +1499,12 @@ describe('admin-agent/tools', () => {
     it('throws File not found for ENOENT', async () => {
       const enoentErr = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
       mockFs.open.mockRejectedValueOnce(enoentErr)
-      await expect(tool().handler({ path: 'src/lib/does-not-exist.ts' })).rejects.toThrow(/File not found/)
+      await expect(tool().handler({ path: 'controller-service/src/lib/does-not-exist.ts' })).rejects.toThrow(/File not found/)
     })
 
     it('re-throws non-ENOENT errors', async () => {
       mockFs.open.mockRejectedValueOnce(new Error('EPERM: permission denied'))
-      await expect(tool().handler({ path: 'src/lib/queries.ts' })).rejects.toThrow(/EPERM/)
+      await expect(tool().handler({ path: 'controller-service/src/lib/queries.ts' })).rejects.toThrow(/EPERM/)
     })
   })
 

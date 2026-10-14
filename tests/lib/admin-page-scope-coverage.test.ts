@@ -17,11 +17,11 @@ const SPECIAL_CASED = new Set([
 ])
 
 function adminPages(): string[] {
-  return glob.sync('src/app/\\(admin\\)/admin/**/page.tsx', { cwd: process.cwd() }).map(
+  return glob.sync('controller-service/src/app/\\(admin\\)/admin/**/page.tsx', { cwd: process.cwd() }).map(
     f =>
       '/' +
       f
-        .replace('src/app/', '')
+        .replace('controller-service/src/app/', '')
         .replace(/\/page\.tsx$/, '')
         .replace(/^\([^)]*\)\//, '')
         .replace(/\/\([^)]*\)/g, '')

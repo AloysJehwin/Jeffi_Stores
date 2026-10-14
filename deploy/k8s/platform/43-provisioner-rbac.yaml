@@ -1,4 +1,4 @@
-# The flagship runs the provisioning engine (src/lib/k8s/tenant-compute.ts): it creates tenant
+# The flagship runs the provisioning engine (controller-service/src/lib/k8s/tenant-compute.ts): it creates tenant
 # namespaces and everything inside them, reads Nodes for placement, copies the pull secret / RDS CA
 # out of jeffi, and patches the tenant-admin CA bundle in jeffi-edge.
 apiVersion: rbac.authorization.k8s.io/v1

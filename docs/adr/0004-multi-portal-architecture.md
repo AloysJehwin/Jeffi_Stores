@@ -31,7 +31,7 @@ Routing is enforced in `middleware.ts`: the JWT payload `type` field is read on 
 
 All three portals call the same `/api/*` route handlers. API routes perform their own token validation — they do not trust middleware alone. Business-specific API routes (`/api/admin/*`, `/api/business/*`) extract `type` from the verified JWT and reject mismatches with 403.
 
-Shared components (cart logic, product queries, address forms) live in `src/components/visitor/`, `src/components/business/`, or `src/components/admin/` depending on which portal owns them, with no cross-portal imports.
+Shared components (cart logic, product queries, address forms) live in `controller-service/src/components/visitor/`, `controller-service/src/components/business/`, or `controller-service/src/components/admin/` depending on which portal owns them, with no cross-portal imports.
 
 ## Consequences
 

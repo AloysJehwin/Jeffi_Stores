@@ -19,9 +19,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./controller-service/src/*"]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "next-env.d.ts"],
+  "include": ["**/*.ts", "**/*.tsx", "controller-service/.next/types/**/*.ts", "next-env.d.ts"],
   "exclude": ["node_modules", "ai-platform", "packages", "messaging-service", "document-service", "public-api-service"]
 }

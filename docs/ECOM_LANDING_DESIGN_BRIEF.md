@@ -1,6 +1,6 @@
 # Ecom Landing Page — Design Brief
 
-**Target:** `src/app/(ecom)/ecom/` (served at `ecom.jeffistores.in`).
+**Target:** `controller-service/src/app/(ecom)/ecom/` (served at `ecom.jeffistores.in`).
 
 ## 1. Page composition (render order)
 

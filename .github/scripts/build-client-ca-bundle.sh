@@ -10,7 +10,7 @@
 # send.
 #
 # ssl_verify_client stays optional_no_ca: this bundle exists to ADVERTISE issuers, not to
-# validate. The chain is still verified per-tenant in the app (src/lib/tenant-mtls.ts),
+# validate. The chain is still verified per-tenant in the app (controller-service/src/lib/tenant-mtls.ts),
 # against that tenant's own CA.
 #
 # The platform CA is always included so the file is never empty — nginx refuses to start

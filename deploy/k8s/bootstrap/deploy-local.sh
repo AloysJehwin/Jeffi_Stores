@@ -11,7 +11,7 @@ WORK=${TMPDIR:-/tmp}/jeffi-deploy
 export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/jeffi-k3s.yaml}
 cd "$REPO"
 
-[ -z "$(git status --porcelain -- src deploy database public package.json package-lock.json Dockerfile vendor)" ] ||
+[ -z "$(git status --porcelain -- controller-service messaging-service document-service public-api-service packages deploy database package.json package-lock.json vendor)" ] ||
   { echo "Uncommitted changes — commit first so the deploy is reproducible." >&2; exit 1; }
 SHA=$(git rev-parse --short HEAD)
 IMG=$REG/jeffi-stores:local-$SHA

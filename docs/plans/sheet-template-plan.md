@@ -11,12 +11,12 @@ Plus: a `data_source` product field so sync only touches sheet-sourced products,
 
 ## Today (what exists)
 
-- `src/lib/import/columns.ts` — one flat `ALL_COLUMNS` list; each `ImportColumn` has
+- `controller-service/src/lib/import/columns.ts` — one flat `ALL_COLUMNS` list; each `ImportColumn` has
   `header, coerce, rowTypes[], required?, enumKey?, help?`. 88 product-level, 24 variant,
   11 sub-variant columns.
-- `src/lib/import/template.ts` — `buildTemplateWorkbook()` builds ONE `Products` worksheet,
+- `controller-service/src/lib/import/template.ts` — `buildTemplateWorkbook()` builds ONE `Products` worksheet,
   colour-coded header band, help row, dropdowns from `enums.ts`.
-- `src/lib/import/google-sync.ts` — reads the sheet, coerces rows, upserts. No delete. No
+- `controller-service/src/lib/import/google-sync.ts` — reads the sheet, coerces rows, upserts. No delete. No
   data_source scoping.
 - `products` table has NO `data_source` column yet.
 
@@ -74,9 +74,9 @@ the new sheets carry their level implicitly (no `row_type` column needed).
 ## Files
 | File | Change |
 |---|---|
-| `src/lib/import/columns.ts` | add `level` + `sheet` to each column |
-| `src/lib/import/template.ts` | multi-sheet builder + README sheet + cross-sheet dropdowns |
-| `src/lib/import/google-sync.ts` | read all sheets, stitch by keys, data_source scope, delete-on-sync |
+| `controller-service/src/lib/import/columns.ts` | add `level` + `sheet` to each column |
+| `controller-service/src/lib/import/template.ts` | multi-sheet builder + README sheet + cross-sheet dropdowns |
+| `controller-service/src/lib/import/google-sync.ts` | read all sheets, stitch by keys, data_source scope, delete-on-sync |
 | `database/catalog.sql` (+ constraints) | `products.data_source` |
 | data-source UI | show sync summary (created/updated/deleted/skipped) |
 

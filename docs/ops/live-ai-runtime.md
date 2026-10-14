@@ -26,7 +26,7 @@ on always-on infra and repoint the two URLs.
 ## Retrieval quality
 
 Pure vector search drifts on project-style queries ("wooden shelf" → woodworking
-tools). `findSimilarProductIds` (src/lib/rag.ts) now does **hybrid keyword +
+tools). `findSimilarProductIds` (controller-service/src/lib/rag.ts) now does **hybrid keyword +
 vector** search so literal fastener terms surface. No re-embedding needed.
 
 ## On-device checkout summary (Gemma 3 270M in the browser)

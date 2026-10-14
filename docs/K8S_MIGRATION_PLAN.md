@@ -48,7 +48,7 @@ This supersedes `docs/KUBERNETES_PLAN.md` (Basic tenants on shared pods, Razer a
 | **t-{slug}** | Sized by tier (below) | One Growth, Pro or Enterprise tenant only. The node is labelled and tainted to that tenant. |
 | **razer** (separate k3s, unchanged) | Home GPU box | AI gateway and Ollama. Monitored from EC2 over Tailscale. |
 
-**Per-plan tiers** (a code table, `src/lib/provisioning/tiers.ts`, so no schema change):
+**Per-plan tiers** (a code table, `controller-service/src/lib/provisioning/tiers.ts`, so no schema change):
 
 | Plan | Node | Replicas | Pod request / limit | Autoscaling (HPA) |
 |---|---|---|---|---|
@@ -75,7 +75,7 @@ This supersedes `docs/KUBERNETES_PLAN.md` (Basic tenants on shared pods, Razer a
 - **Certificates**:
   - cert-manager uses DNS-01 against Route53 (zone `Z08094881XKVZ9XSGBKG1`) to issue a wildcard `*.jeffistores.in` plus the apex.
   - Custom domains get a per-host HTTP-01 Certificate created by the provisioning engine. This implements the cert attach that is missing today (`cert_arn` is never set).
-- **Hostnames per tenant**: generated from `tenantHostnames()` in `src/lib/provisioning/steps.ts`. That covers the storefront, `admin-{slug}`, `vault-{slug}` and the rest, plus the custom domains in `custom_domains`. All of them route to the tenant's Service.
+- **Hostnames per tenant**: generated from `tenantHostnames()` in `controller-service/src/lib/provisioning/steps.ts`. That covers the storefront, `admin-{slug}`, `vault-{slug}` and the rest, plus the custom domains in `custom_domains`. All of them route to the tenant's Service.
 
 ### mTLS mapping
 Today nginx handles client certificates. Traefik takes over as follows:
@@ -86,9 +86,9 @@ Today nginx handles client certificates. Traefik takes over as follows:
 | `admin-{slug}` | `TLSOption` set to `RequestClientCert` (same as today's `optional_no_ca`), CA list = `client-ca-bundle` Secret | Full certificate; the app verifies it per tenant in `tenant-mtls.ts` |
 
 - **Passing the certificate on**: the `passTLSClientCert` middleware sends the certificate (PEM) and its info (serial, subject CN).
-- **App change**: `src/middleware.ts` reads Traefik's `X-Forwarded-Tls-Client-Cert` and `-Info` headers, maps them to the existing internal `x-client-cert`, `-serial` and `-cn`, and keeps stripping any client-supplied headers of those names.
+- **App change**: `controller-service/src/middleware.ts` reads Traefik's `X-Forwarded-Tls-Client-Cert` and `-Info` headers, maps them to the existing internal `x-client-cert`, `-serial` and `-cn`, and keeps stripping any client-supplied headers of those names.
   - A Traefik `headers` middleware also blanks the incoming header names on every route, so a forged header cannot reach the app.
-- **CA bundle updates**: `src/lib/tenancy/mtls-fleet.ts` stops pushing through S3 and SSM. It patches the `client-ca-bundle` Secret instead, and Traefik reloads it live.
+- **CA bundle updates**: `controller-service/src/lib/tenancy/mtls-fleet.ts` stops pushing through S3 and SSM. It patches the `client-ca-bundle` Secret instead, and Traefik reloads it live.
 - **Who gets the CA**: the platform CA key is mounted only into flagship pods, never into tenant pods.
 
 ### Observability at `k8s.jeffistores.in` (client certificate required)
@@ -103,8 +103,8 @@ Today nginx handles client certificates. Traefik takes over as follows:
 - **Memory**: Coroot plus ClickHouse is the heaviest component, at about 2.5 GB. If core memory pressure exceeds 85%, the fallback is core → t4g.xlarge (+$49/month).
 
 ### Crons → Kubernetes CronJobs
-- **New gate**: `IN_PROCESS_CRON=false` in `src/instrumentation.ts` turns off the `setInterval` scheduler in pods.
-- **Generated CronJobs**: generate the CronJobs from the `CRON_JOBS` registry in `src/lib/shared/cron-jobs.ts` (script → Helm values).
+- **New gate**: `IN_PROCESS_CRON=false` in `controller-service/src/instrumentation.ts` turns off the `setInterval` scheduler in pods.
+- **Generated CronJobs**: generate the CronJobs from the `CRON_JOBS` registry in `controller-service/src/lib/shared/cron-jobs.ts` (script → Helm values).
   - Each one is a curl to the in-cluster flagship Service with `Authorization: Bearer $CRON_SECRET` and `concurrencyPolicy: Forbid`.
   - 45-second jobs become every 1 minute.
   - The 24-hour jobs (`daily_briefing`, `customer_notes_digest`) run at fixed IST times instead of on every restart.
@@ -128,7 +128,7 @@ Today nginx handles client certificates. Traefik takes over as follows:
   - The rate limiter is in-memory per pod.
 
 ### Provisioning engine → k8s provider
-New file `src/lib/provisioning/k8s-provider.ts` behind the existing seam (`ensureAppInstance` / `deleteAppInstance` / `isInstanceGone` in `provider.ts`), selected with `PROVISIONING_PROVIDER=k8s`. It talks to the API server through a small fetch wrapper using its ServiceAccount token. RBAC is limited to `tenant-*` namespaces, Nodes and Certificates.
+New file `controller-service/src/lib/provisioning/k8s-provider.ts` behind the existing seam (`ensureAppInstance` / `deleteAppInstance` / `isInstanceGone` in `provider.ts`), selected with `PROVISIONING_PROVIDER=k8s`. It talks to the API server through a small fetch wrapper using its ServiceAccount token. RBAC is limited to `tenant-*` namespaces, Nodes and Certificates.
 
 - **`ensure_compute`**:
   - Ensures the namespace, Deployment (tier resources plus `nodeSelector`/toleration), Service, Redis, IngressRoutes for every tenant host, and Certificate(s) for custom domains.

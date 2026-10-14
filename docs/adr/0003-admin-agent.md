@@ -89,7 +89,7 @@ Reuses the same 11 read-only tools as the MCP server, plus 3 mutating tools:
 | **toggle_campaign_enabled** | Yes | Proposes; on approve → PATCH /api/admin/campaigns/[kind] |
 | **mark_order_shipped** | Yes | Proposes; on approve → PATCH /api/admin/orders/[id] |
 
-For V1 we keep these in `src/lib/admin-agent/tools.ts` (in-process). Code duplication with `mcp-server.mjs` is acceptable for now; we can extract a shared registry in V2 once we know what's actually getting used.
+For V1 we keep these in `controller-service/src/lib/admin-agent/tools.ts` (in-process). Code duplication with `mcp-server.mjs` is acceptable for now; we can extract a shared registry in V2 once we know what's actually getting used.
 
 ## Auth model
 

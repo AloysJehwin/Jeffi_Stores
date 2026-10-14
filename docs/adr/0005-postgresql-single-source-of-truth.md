@@ -21,7 +21,7 @@ Next.js ISR (Incremental Static Regeneration) already absorbs the majority of re
 
 Use a single RDS PostgreSQL instance for all reads and writes. No Redis, no ElastiCache, no read replica.
 
-Connection management uses the `pg` pool (`src/lib/db.ts`) with a bounded pool size tuned to the RDS instance class. The pool is shared across all Next.js server processes via the module singleton pattern.
+Connection management uses the `pg` pool (`controller-service/src/lib/db.ts`) with a bounded pool size tuned to the RDS instance class. The pool is shared across all Next.js server processes via the module singleton pattern.
 
 ISR revalidation periods (`revalidate`) are set on static pages to limit how often product/category queries run. Dynamic pages (cart, checkout, order status) query the DB directly and are not ISR-cached.
 

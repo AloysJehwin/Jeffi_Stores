@@ -44,9 +44,9 @@ A standard JSON-RPC protocol where an LLM agent (Claude Desktop, Cursor, our own
     ▼
 [MCP server: scripts/mcp-server.mjs]
     │  reuses existing libs:
-    │    - src/lib/rag.ts        (RAG queries to Razer pgvector)
-    │    - src/lib/db.ts          (Postgres pool to local jeffi_dev)
-    │    - src/lib/ai-assistant.ts (search + LLM helpers)
+    │    - controller-service/src/lib/rag.ts        (RAG queries to Razer pgvector)
+    │    - controller-service/src/lib/db.ts          (Postgres pool to local jeffi_dev)
+    │    - controller-service/src/lib/ai-assistant.ts (search + LLM helpers)
     ▼
 [Razer Postgres + pgvector]   [Razer Ollama]
 ```
