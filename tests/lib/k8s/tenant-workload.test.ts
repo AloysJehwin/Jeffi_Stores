@@ -8,7 +8,8 @@ const hosts = (slug: string) => [
   `admin-${slug}.jeffistores.in`,
   `vault-${slug}.jeffistores.in`,
 ]
-const appDep = (objs: any[]): any => objs.find(o => o.kind === 'Deployment' && o.metadata.name !== 'redis')
+const appDep = (objs: any[]): any => objs.find(o => o.kind === 'Deployment' && o.metadata.name.endsWith('-controller-service'))
+const envOf = (d: any) => Object.fromEntries(d.spec.template.spec.containers[0].env.map((e: any) => [e.name, e.value]))
 const byKind = (objs: any[], kind: string, name?: string) =>
   objs.filter(o => o.kind === kind && (!name || o.metadata.name === name))
 
@@ -18,12 +19,22 @@ describe('renderTenantWorkload', () => {
     expect(objs[0]).toMatchObject({ kind: 'Namespace', metadata: { name: 'tenant-acme' } })
     expect(objs.every(o => o.kind === 'Namespace' || o.metadata.namespace === 'tenant-acme')).toBe(true)
     const app = appDep(objs) as any
-    expect(app.metadata.name).toBe('acme')
+    expect(app.metadata.name).toBe('acme-controller-service')
     expect(app.spec.replicas).toBe(1)
     expect(app.spec.template.spec.nodeSelector).toEqual({ 'jeffi.io/pool': 'basic' })
     expect(app.spec.template.spec.automountServiceAccountToken).toBe(false)
-    const env = Object.fromEntries(app.spec.template.spec.containers[0].env.map((e: any) => [e.name, e.value]))
-    expect(env).toMatchObject({ WEB_CONCURRENCY: '1', IN_PROCESS_CRON: 'false', CLIENT_CERT_PROXY: 'traefik' })
+    expect(envOf(app)).toMatchObject({
+      WEB_CONCURRENCY: '1',
+      IN_PROCESS_CRON: 'false',
+      CLIENT_CERT_PROXY: 'traefik',
+      MESSAGING_URL: 'http://acme-messaging-service:3101',
+      DOCUMENTS_URL: 'http://acme-document-service:3102',
+    })
+    // The store's own messaging + document services, pinned to it.
+    for (const name of ['acme-messaging-service', 'acme-document-service']) {
+      expect(envOf(byKind(objs, 'Deployment', name)[0])).toMatchObject({ SERVICE_TENANT_SLUG: 'acme', DB_IAM_AUTH: 'true' })
+      expect(byKind(objs, 'Service', name)).toHaveLength(1)
+    }
     expect(byKind(objs, 'HorizontalPodAutoscaler')).toHaveLength(0)
     expect(byKind(objs, 'PodDisruptionBudget')).toHaveLength(0)
     expect(byKind(objs, 'NetworkPolicy')).toHaveLength(1)
@@ -51,12 +62,19 @@ describe('renderTenantWorkload', () => {
     expect(spec.nodeSelector).toEqual({ 'jeffi.io/tenant': 'big' })
     expect(spec.tolerations[0]).toMatchObject({ key: 'jeffi.io/tenant', value: 'big', effect: 'NoSchedule' })
     expect((byKind(objs, 'HorizontalPodAutoscaler')[0] as any).spec).toMatchObject({ minReplicas: 2, maxReplicas: 3 })
-    expect(byKind(objs, 'PodDisruptionBudget')).toHaveLength(1)
+    expect(byKind(objs, 'PodDisruptionBudget')).toHaveLength(3)
   })
 
   it('routes admin-{slug} through tenant mTLS and everything else through the default TLS option', () => {
-    const objs = renderTenantWorkload({ slug: 'acme', plan: 'basic', hosts: hosts('acme') }) as any[]
-    const store = byKind(objs, 'IngressRoute', 'storefront')[0] as any
+    const objs = renderTenantWorkload({
+      slug: 'acme',
+      plan: 'basic',
+      hosts: [...hosts('acme'), 'invoice-acme.jeffistores.in'],
+    }) as any[]
+    const store = byKind(objs, 'IngressRoute', 'controller')[0] as any
+    const docs = byKind(objs, 'IngressRoute', 'documents')[0] as any
+    expect(docs.spec.routes[0].match).toBe('Host(`invoice-acme.jeffistores.in`)')
+    expect(docs.spec.routes[0].services).toEqual([{ name: 'acme-document-service', port: 3102 }])
     const admin = byKind(objs, 'IngressRoute', 'admin')[0] as any
     expect(store.spec.routes[0].match).toBe('Host(`acme.jeffistores.in`) || Host(`vault-acme.jeffistores.in`)')
     expect(admin.spec.routes[0].match).toBe('Host(`admin-acme.jeffistores.in`)')
@@ -83,7 +101,7 @@ describe('renderTenantWorkload', () => {
       slug: 'a',
       plan: 'basic',
       hosts: hosts('a'),
-      image: '708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:main-abc',
+      images: { controller: '708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:main-abc' },
     }) as any[]
     expect(appDep(objs).spec.template.spec.containers[0].image).toBe(
       '708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:main-abc'
@@ -133,7 +151,7 @@ describe('tracing env', () => {
         e.value,
       ])
     )
-    expect(env.OTEL_SERVICE_NAME).toBe('tenant-acme')
+    expect(env.OTEL_SERVICE_NAME).toBe('acme-controller-service')
     expect(env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT).toBe('http://coroot-coroot.observability:8080/v1/traces')
   })
 })
