@@ -82,7 +82,7 @@ s2() { bash "$DB/00-backup.sh" "$(flag)"; }
 s3() { resize_core; }
 s4() { bash "$DB/10-platform-schema.sh" "$(flag)"; }
 s5() { bash "$DB/20-merge-control-plane.sh" "$(flag)"; }
-s6() { bash "$DB/30-secrets.sh" "$(flag)"; }
+s6() { bash "$DB/30-secrets.sh" "$(flag)"; bash "$BOOT/service-secrets-iam.sh" "$(flag)"; }
 s7() { if $DRY_RUN; then would "release.sh (platform, tenant fan-out, stores, smoke test)"; else bash "$BOOT/release.sh"; fi; }
 s8() { if $DRY_RUN; then would "50-seeds.sh"; else bash "$DB/50-seeds.sh"; fi; }
 s9() {

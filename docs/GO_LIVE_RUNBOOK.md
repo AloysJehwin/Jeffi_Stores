@@ -96,7 +96,9 @@ to `~/Documents/db-backups/release-<stamp>/`.
    besides the CHECK re-adds".
 5. **Control-plane merge.** `bash deploy/k8s/db/20-merge-control-plane.sh`. It stops if any control-plane table already
    exists in `jeffi_stores`.
-6. **Secrets and bucket.** `bash deploy/k8s/db/30-secrets.sh`. Keep the rollback file it names.
+6. **Secrets and bucket.** `bash deploy/k8s/db/30-secrets.sh`. Keep the rollback file it names. Then
+   `bash deploy/k8s/bootstrap/service-secrets-iam.sh`: the pods read secrets with the core's role, which must list the
+   three service secrets, or those pods crash at start (`not authorized to perform: secretsmanager:GetSecretValue`).
 7. **Release.** `bash deploy/k8s/bootstrap/release.sh`. The images are already in ECR, so it goes straight to the rollout:
    - applies the platform and waits for its four Deployments;
    - deletes the old `flagship` objects;
