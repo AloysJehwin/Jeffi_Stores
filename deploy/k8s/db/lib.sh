@@ -19,6 +19,11 @@ DRY_RUN=false; YES=false
 for a in "$@"; do case $a in --dry-run) DRY_RUN=true ;; --yes) YES=true ;; esac; done
 
 say() { printf '\n== %s\n' "$*"; }
+# Images are tagged by the last commit that changed what goes into them, so script/doc-only commits reuse them.
+image_sha() {
+  git -C "$REPO" log -1 --format=%h -- . ':(exclude)docs' ':(exclude)deploy/k8s' ':(exclude)tests' \
+    ':(exclude)integration-tests' ':(exclude)graphify-out' ':(exclude).github' ':(exclude,glob)*.md'
+}
 confirm() {
   $YES && return 0
   read -r -p "$1 Type yes to continue: " a

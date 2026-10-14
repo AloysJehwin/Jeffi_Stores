@@ -106,14 +106,17 @@ HINTS=(""
   "The site is up."
   "The site is up; the CronJobs are still suspended.")
 
-CUR=0
-trap 'rc=$?; if [ $rc -ne 0 ] && [ $CUR -gt 0 ]; then
+CUR=0; PRE=false
+trap 'rc=$?; if [ $rc -ne 0 ] && $PRE; then
+  echo "Stopped before the window: nothing in production changed. Fix it and re-run (pushed images are reused)." >&2
+elif [ $rc -ne 0 ] && [ $CUR -gt 0 ]; then
   echo "Step $CUR (${TITLES[$CUR]}) failed. ${HINTS[$CUR]}" >&2
   echo "Fix it, then resume: bash deploy/k8s/go-live.sh --from $CUR   (files and log: $OUT_DIR)" >&2; fi' EXIT
 
 say "Preflight"
 preflight
 if [ "$FROM" = 1 ] && ! $DRY_RUN; then
+  PRE=true
   say "Images (site up)"
   bash "$BOOT/release.sh" --build-only
   if $REHEARSE; then
@@ -128,6 +131,7 @@ if ! $DRY_RUN; then
   read -r -p "Ready. This takes the site down (60-90 min) and runs steps $FROM-12. Type go-live to start: " a
   [ "$a" = go-live ] || { echo "Stopped before the window; nothing changed."; exit 1; }
 fi
+PRE=false
 for n in $(seq "$FROM" 12); do
   CUR=$n
   say "Step $n/12: ${TITLES[$n]}"
@@ -135,5 +139,5 @@ for n in $(seq "$FROM" 12); do
 done
 CUR=0
 if $DRY_RUN; then echo "Dry run complete; nothing changed."; exit 0; fi
-say "Live at $(git -C "$REPO" rev-parse --short HEAD)"
+say "Live: images local-$(image_sha), HEAD $(git -C "$REPO" rev-parse --short HEAD)"
 echo "Check by hand: admin sign-in, a checkout, an invoice page, a test email and SMS. Log and files: $OUT_DIR"
