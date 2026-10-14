@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
+import { formFile } from '@/lib/shared/form-file'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -24,8 +25,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 })
   }
 
-  const file = form.get('file')
-  if (!(file instanceof File)) {
+  const file = formFile(form, 'file', 'admin/agent/upload')
+  if (!file) {
     return NextResponse.json({ error: 'file field is required' }, { status: 400 })
   }
   if (file.size === 0) return NextResponse.json({ error: 'Empty file' }, { status: 400 })

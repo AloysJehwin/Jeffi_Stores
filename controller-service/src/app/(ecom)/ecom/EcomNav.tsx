@@ -50,7 +50,7 @@ export default function EcomNav({ owner }: { owner: { email: string; name: strin
             </>
           ) : (
             <>
-              <Link href="/signin" className="text-foreground-secondary hover:text-foreground px-2">
+              <Link href="/signin" className="hidden sm:inline text-foreground-secondary hover:text-foreground px-2">
                 Sign in
               </Link>
               <Link

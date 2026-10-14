@@ -4,6 +4,7 @@ import { logAdminAudit } from '@/lib/shared/admin-audit'
 import { uploadImportFile } from '@/lib/shared/s3'
 import { parseWorkbook } from '@/lib/import/parse'
 import { enqueueImportJob, resolveImportTenantId } from '@/lib/import/jobs'
+import { formFile, readForm } from '@/lib/shared/form-file'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -19,9 +20,8 @@ export async function POST(request: NextRequest) {
 
   const tenantId = await resolveImportTenantId()
 
-  const form = await request.formData().catch(() => null)
-  const file = form?.get('file')
-  if (!(file instanceof File)) {
+  const file = formFile(await readForm(request, 'admin/data-source/import'), 'file', 'admin/data-source/import')
+  if (!file) {
     return NextResponse.json({ error: 'No file uploaded (expected multipart field "file")' }, { status: 400 })
   }
   if (file.size === 0) return NextResponse.json({ error: 'File is empty' }, { status: 400 })

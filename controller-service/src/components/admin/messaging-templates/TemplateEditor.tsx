@@ -250,7 +250,8 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
   return (
     <div className={embedded ? 'space-y-4' : 'grid grid-cols-1 lg:grid-cols-2 gap-6'}>
       <input ref={fileRef} type="file" accept="image/*" className="hidden" />
-      <div className="space-y-4">
+      {!embedded && <p className="md:hidden text-sm text-foreground-secondary">Templates can be edited on a tablet or computer. Here you can preview them.</p>}
+      <div className={embedded ? 'space-y-4' : 'hidden md:block space-y-4'}>
         <div>
           {aiLabel({ label: "Name", field: "Template name", value: value.name, onChange: name => onChange({ ...value, name }), format: "plain", maxLength: 80, context: `A short human name for a ${value.channel} template with slug "${value.slug}". Body starts: "${(value.body ?? '').replace(/<[^>]+>/g, ' ').slice(0, 160)}"` })}
           <input
