@@ -149,12 +149,11 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
   }, [value.body, value.channel])
 
   async function uploadFile(file: File): Promise<string | null> {
-    const fd = new FormData()
-    fd.append('file', file)
-    if (value.id) fd.append('templateId', value.id)
+    const headers: Record<string, string> = { 'Content-Type': file.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(file.name) }
+    if (value.id) headers['X-Upload-TemplateId'] = value.id
     setUploading(true)
     try {
-      const r = await fetch(uploadUrl, { method: 'POST', body: fd })
+      const r = await fetch(uploadUrl, { method: 'POST', body: file, headers })
       if (!r.ok) {
         const err = await r.json().catch(() => ({}))
         showToast(err?.error || `Upload failed (HTTP ${r.status})`, 'error')
