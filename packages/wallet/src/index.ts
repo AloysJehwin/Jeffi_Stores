@@ -1,4 +1,5 @@
-import pg from 'pg'
+import type pg from 'pg'
+import { mainPool } from '@jeffi/tenancy'
 
 // Standalone control-plane wallet client for the services. Same tables + idempotency rules as
 // src/lib/payments/wallet.ts in the monolith (external_ref unique per tenant).
@@ -11,7 +12,7 @@ export function controlPlanePool(): pg.Pool {
   if (pool) return pool
   const url = process.env.CONTROL_PLANE_DATABASE_URL
   if (!url) throw new Error('CONTROL_PLANE_DATABASE_URL is not set')
-  pool = new pg.Pool({ connectionString: url, max: 5 })
+  pool = mainPool(url, 5)
   return pool
 }
 

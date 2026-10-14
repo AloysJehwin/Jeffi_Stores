@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
-import pg from 'pg'
+import type pg from 'pg'
+import { mainPool } from '@jeffi/tenancy'
 import type { ApiScope } from '@jeffi/api-contracts'
 
 // API keys live in the control plane. Plaintext is shown once; only sha256 is stored.
@@ -22,7 +23,7 @@ export function cp(): pg.Pool {
   if (pool) return pool
   const url = process.env.CONTROL_PLANE_DATABASE_URL
   if (!url) throw new Error('CONTROL_PLANE_DATABASE_URL is not set')
-  pool = new pg.Pool({ connectionString: url, max: 5 })
+  pool = mainPool(url, 5)
   return pool
 }
 
