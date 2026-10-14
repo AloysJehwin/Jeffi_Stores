@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+export * from './whatsapp-rules'
+
 // Shared request/response contracts for public.jeffistores.in. Used by the gateway, the services,
 // the dashboard proxies, and OpenAPI generation. Keep every public shape here.
 

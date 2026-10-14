@@ -4,30 +4,20 @@ import { db } from './db.js'
 import { poolsForTenant } from './pools.js'
 import * as tpl from './templates-v2.js'
 import * as twContent from './providers/twilio-content.js'
+import { metaSamples, validateForMeta, type WaBlocks as Blocks, type WaButton as Button } from '@jeffi/api-contracts'
+
+export { extraSlots, samplesFor, validateForMeta } from '@jeffi/api-contracts'
 
 // WhatsApp template → Twilio Content → Meta approval.
 // The variant's provider_ref is always the LIVE (approved) SID that sends use. A submission puts its
 // new SID on the submitted version only; sync promotes it to the variant once Meta approves, so a
 // pending or rejected edit never breaks sending.
 
-type Button = { type: 'quick_reply' | 'url' | 'phone'; label: string; value?: string }
-type Card = { title?: string; body?: string; media_url?: string; buttons?: Button[] }
-type Blocks = { types?: Record<string, any>; variables?: Record<string, string>; buttons?: Button[]; carousel?: { cards?: Card[] } }
-
-const PH = /\{\{\s*(\d+)\s*\}\}/g
-const placeholders = (s: string) => [...new Set([...(s || '').matchAll(PH)].map(m => m[1]))].sort((a, b) => +a - +b)
-
 function actions(buttons: Button[] | undefined) {
   return (buttons ?? []).filter(b => b.label?.trim()).map(b =>
     b.type === 'quick_reply' ? { type: 'QUICK_REPLY', title: b.label.trim(), id: b.label.trim().toLowerCase().replace(/\W+/g, '_') }
     : b.type === 'url' ? { type: 'URL', title: b.label.trim(), url: b.value ?? '' }
     : { type: 'PHONE_NUMBER', title: b.label.trim(), phone: b.value ?? '' })
-}
-
-/** {{n}} used outside the body: header media URL and URL-button suffixes (per-send image / link). */
-export function extraSlots(blocks: Blocks | null | undefined): string[] {
-  const b = blocks ?? {}
-  return placeholders([b.types?.['twilio/media']?.media?.[0] ?? '', ...(b.buttons ?? []).map(x => x.value ?? '')].join(' '))
 }
 
 /** One Twilio Content type built from what the editor stores. Body always comes from the saved body. */
@@ -47,51 +37,6 @@ export function composeTypes(body: string, blocks: Blocks | null | undefined): R
   return { 'twilio/text': { body } }
 }
 
-/** Meta's rejection rules we can check before spending a submission. Empty array = OK. */
-export function validateForMeta(body: string, blocks: Blocks | null | undefined, samples: Record<string, string>): string[] {
-  const errs: string[] = []
-  const text = (body || '').trim()
-  if (!text) errs.push('Body is empty.')
-  if (text.length > 1024) errs.push(`Body is ${text.length} characters; Meta allows 1024.`)
-  if (/^\{\{\s*\d+\s*\}\}/.test(text)) errs.push('Body cannot start with a variable — add text before {{1}}.')
-  if (/\{\{\s*\d+\s*\}\}[\s.!?]*$/.test(text)) errs.push('Body cannot end with a variable — add text after the last {{n}}.')
-  const vars = placeholders(text)
-  vars.forEach((v, i) => { if (+v !== i + 1) errs.push(`Variables must be numbered {{1}}, {{2}}, … in order (found {{${v}}}).`) })
-  const words = text.replace(PH, '').split(/\s+/).filter(Boolean).length
-  if (vars.length && words < vars.length * 3) errs.push('Too many variables for the message length — add more text around them.')
-  for (const v of vars) if (!samples[v]?.trim()) errs.push(`Add a sample value for {{${v}}}.`)
-  const extra = extraSlots(blocks)
-  extra.forEach((v, i) => { if (+v !== vars.length + i + 1) errs.push(`Image/button variables must continue the numbering after the body (expected {{${vars.length + i + 1}}}).`) })
-  for (const v of extra) if (!samples[v]?.trim()) errs.push(`Add a sample value for {{${v}}} (image path or link code).`)
-  const all = [...(blocks?.buttons ?? []), ...(blocks?.carousel?.cards ?? []).flatMap(c => c.buttons ?? [])]
-  if ((blocks?.buttons?.length ?? 0) > 3) errs.push('At most 3 buttons.')
-  for (const btn of all) {
-    if (!btn.label?.trim()) errs.push('Every button needs a label.')
-    else if (btn.label.length > 25) errs.push(`Button "${btn.label}" is over 25 characters.`)
-    if (btn.type === 'url' && !/^https:\/\//.test(btn.value ?? '')) errs.push(`Button "${btn.label}" needs an https:// URL.`)
-    if (btn.type === 'phone' && !/^\+\d{8,15}$/.test(btn.value ?? '')) errs.push(`Button "${btn.label}" needs a phone like +919876543210.`)
-  }
-  return [...new Set(errs)]
-}
-
-const SAMPLE_BY_CONTEXT: Array<[RegExp, string]> = [
-  [/(https?:|link|here|track|view|download|review|open)\W*$/i, 'https://jeffistores.in/account/orders'],
-  [/(order|invoice|quotation|request|ticket)\s*#?\s*$/i, 'JS-10234'],
-  [/(₹|rs\.?|total|amount|refund of)\s*$/i, '₹2,499'],
-  [/code\s*$/i, 'WELCOME20'],
-  [/(hi|hello|dear)\s*,?\s*$/i, 'Priya'],
-]
-/** Samples Meta reviews with. Keeps what the editor set; fills the rest from the text around {{n}}. */
-export function samplesFor(body: string, given?: Record<string, string>): Record<string, string> {
-  const out: Record<string, string> = {}
-  for (const v of placeholders(body)) {
-    if (given?.[v]?.trim()) { out[v] = given[v]; continue }
-    const before = body.slice(0, body.search(new RegExp(`\\{\\{\\s*${v}\\s*\\}\\}`)))
-    out[v] = SAMPLE_BY_CONTEXT.find(([re]) => re.test(before))?.[1] ?? 'Sample text'
-  }
-  return out
-}
-
 /** Meta template names are unique per WhatsApp account, so include tenant + version. */
 export function metaName(tenantSlug: string | undefined, slug: string, version: number) {
   const prefix = !tenantSlug || tenantSlug === 'platform' ? 'jeffi' : tenantSlug
@@ -106,7 +51,7 @@ export async function submit(pool: pg.Pool, tenantId: string, tenantSlug: string
   if (t.version.provider_ref && ['pending', 'received', 'approved'].includes(t.variant.approval_status))
     throw Object.assign(new Error('This version is already submitted. Edit and save to submit a new version.'), { status: 409 })
   const blocks = (t.version.blocks ?? {}) as Blocks
-  const samples = { ...samplesFor(t.version.body, blocks.variables), ...Object.fromEntries(extraSlots(blocks).map(n => [n, blocks.variables?.[n] ?? ''])) }
+  const samples = metaSamples(t.version.body, blocks)
   const errors = validateForMeta(t.version.body, blocks, samples)
   if (errors.length) throw Object.assign(new Error(errors.join(' ')), { status: 422, errors })
   const category = (opts.category ?? t.variant.meta_category ?? 'UTILITY') as 'MARKETING' | 'UTILITY' | 'AUTHENTICATION'

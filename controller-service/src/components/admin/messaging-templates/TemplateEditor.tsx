@@ -15,6 +15,7 @@ import ApiCurlHint from './ApiCurlHint'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { emailPreviewDoc, emailBodyDoc, previewSubject } from '@/lib/templates/email-preview'
 import { campaignVariables, isCampaignKind, missingRequired } from '@/lib/campaigns/kind-variables'
+import { rejectionHints } from '@jeffi/api-contracts'
 
 export type Channel = 'email' | 'sms' | 'whatsapp'
 
@@ -564,9 +565,16 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                 {(value.approval_status === 'pending' || value.approval_status === 'received') && (
                   <p className="text-xs text-foreground-muted">Waiting for Meta — checked automatically every 10 minutes. Customers receive the previously approved version meanwhile.</p>
                 )}
-                {value.approval_status === 'rejected' && (
-                  <p className="text-xs text-red-700 dark:text-red-300"><b>Rejected by Meta:</b> {value.approval_reason || 'no reason given'}. Edit the text and submit again.</p>
-                )}
+                {value.approval_status === 'rejected' && (value.approval_reason && !/unknown/i.test(value.approval_reason) ? (
+                  <p className="text-xs text-red-700 dark:text-red-300"><b>Rejected by Meta:</b> {value.approval_reason}. Edit the text and submit again.</p>
+                ) : (
+                  <div className="text-xs text-red-700 dark:text-red-300">
+                    <p><b>Rejected by Meta</b> without a specific reason. Fix this and submit again:</p>
+                    <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                      {rejectionHints(value.body ?? '', value.blocks as WaBlocks, value.meta_category).map(h => <li key={h}>{h}</li>)}
+                    </ul>
+                  </div>
+                ))}
               </div>
             </>
           )
