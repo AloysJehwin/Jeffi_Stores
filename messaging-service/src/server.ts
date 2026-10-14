@@ -7,6 +7,7 @@ import { SendMessageRequest, BatchMessageRequest, BulkMessagesRequest, UpsertTem
 import { verifyServiceToken, bearer, type ServiceClaims } from '@jeffi/service-auth'
 import { usdToInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
+import { resolveServiceScope, scopeSql, inScope } from '@jeffi/tenancy'
 import { db, one } from './db.js'
 import { sendMessage, getMessage, resolveTemplate, systemVars, toApi as msgToApi, SendError, type MessageRow } from './send.js'
 import { listTemplates, upsertTemplate, archiveTemplate, toApi as tplToApi } from './templates.js'
@@ -37,11 +38,14 @@ declare module 'fastify' {
   }
 }
 
+const scope = await resolveServiceScope()
+
 // Every non-webhook route needs a gateway-issued service token.
 app.addHook('onRequest', async (req, reply) => {
   if (req.url.startsWith('/webhooks') || req.url.startsWith('/s/') || req.url === '/healthz') return
   const claims = verifyServiceToken(bearer(req as FastifyRequest))
   if (!claims) return reply.code(401).send({ error: 'unauthorized', message: 'Missing or invalid service token' })
+  if (!inScope(scope, claims.tenantId)) return reply.code(403).send({ error: 'forbidden', message: 'This service belongs to another tenant' })
   req.claims = claims
 })
 
@@ -422,8 +426,8 @@ app.post<{ Querystring: { m?: string }; Body: Record<string, string> }>('/webhoo
 if (!process.env.VITEST) {
   const port = Number(process.env.PORT || 3101)
   await app.listen({ port, host: '0.0.0.0' })
-  wa.startApprovalSync(m => app.log.info(m))
-  startDeliverySync(m => app.log.warn(m))
+  wa.startApprovalSync(m => app.log.info(m), scope)
+  startDeliverySync(m => app.log.warn(m), scope)
   startWorker(db, 'messages', async (item, job) => {
     const o = job.options as { space?: 'store' | 'api'; tenantSlug?: string }
     try {
@@ -435,5 +439,5 @@ if (!process.env.VITEST) {
       if (e instanceof SendError) throw new BulkItemError(e.message, { stop: e.code === 'insufficient_balance' })
       throw e
     }
-  }, { concurrency: Number(process.env.MESSAGING_BULK_CONCURRENCY || 2), log: (m, e) => app.log.error({ err: e }, m) })
+  }, { concurrency: Number(process.env.MESSAGING_BULK_CONCURRENCY || 2), log: (m, e) => app.log.error({ err: e }, m), where: (c, p) => scopeSql(scope, c, p) })
 }

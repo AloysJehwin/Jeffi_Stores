@@ -1,4 +1,5 @@
 import type pg from 'pg'
+import type { ServiceScope } from '@jeffi/tenancy'
 import { db } from './db.js'
 import { poolsForTenant } from './pools.js'
 import * as tpl from './templates-v2.js'
@@ -154,8 +155,12 @@ export async function syncTenant(pool: pg.Pool, tenantId: string) {
 }
 
 /** Platform + every active tenant. Tenant DBs without the template tables are skipped. */
-export async function syncAll(log: (m: string) => void = () => {}) {
-  const tenants = (await db.query<{ id: string }>(`SELECT id FROM tenants WHERE status='active' OR id=$1`, [tpl.PLATFORM_TENANT_ID])).rows
+export async function syncAll(log: (m: string) => void = () => {}, scope: ServiceScope = { tenantId: null, skipStoreTenants: false }) {
+  const tenants = scope.tenantId
+    ? [{ id: scope.tenantId }]
+    : (await db.query<{ id: string }>(
+        `SELECT id FROM tenants WHERE (status='active' AND NOT ($2 AND 'store' = ANY(service_types))) OR id=$1`,
+        [tpl.PLATFORM_TENANT_ID, scope.skipStoreTenants])).rows
   let checked = 0, changed = 0
   for (const { id } of tenants) {
     try {
@@ -167,10 +172,10 @@ export async function syncAll(log: (m: string) => void = () => {}) {
   return { checked, changed }
 }
 
-export function startApprovalSync(log: (m: string) => void) {
+export function startApprovalSync(log: (m: string) => void, scope: ServiceScope) {
   const every = Number(process.env.WA_APPROVAL_SYNC_MS || 10 * 60_000)
   if (!every || !process.env.TWILIO_ACCOUNT_SID) return
-  const run = () => syncAll(log).then(r => r.checked && log(`wa approval sync: checked=${r.checked} changed=${r.changed}`)).catch(e => log(`wa approval sync failed: ${e?.message}`))
+  const run = () => syncAll(log, scope).then(r => r.checked && log(`wa approval sync: checked=${r.checked} changed=${r.changed}`)).catch(e => log(`wa approval sync failed: ${e?.message}`))
   setTimeout(run, 15_000)
   setInterval(run, every).unref()
 }

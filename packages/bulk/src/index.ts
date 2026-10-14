@@ -126,7 +126,8 @@ export function startWorker(
   db: pg.Pool, kind: BulkKind,
   handle: (item: BulkItemRow, job: BulkJobRow) => Promise<ItemOutcome>,
   // sequential: one item at a time per job (jobs still run in parallel) — keeps document numbers in item order.
-  opts: { concurrency?: number; sequential?: boolean; intervalMs?: number; log?: (msg: string, err?: unknown) => void } = {}
+  // where: limits which tenants' jobs this worker claims (a tenant's own service pod vs the platform's).
+  opts: { concurrency?: number; sequential?: boolean; intervalMs?: number; log?: (msg: string, err?: unknown) => void; where?: (col: string, p: number) => { sql: string; params: unknown[] } } = {}
 ) {
   const concurrency = Math.max(1, opts.concurrency ?? 2)
   let active = 0, stopped = false, ticking = false
@@ -171,19 +172,20 @@ export function startWorker(
     ticking = true
     try {
       const claimable = `(x.status='pending' OR (x.status='running' AND x.locked_at < now() - interval '5 minutes'))`
+      const w = opts.where?.('j.tenant_id', 3) ?? { sql: 'true', params: [] }
       const pick = opts.sequential
         ? `SELECT x.id FROM bulk_jobs j CROSS JOIN LATERAL (
              SELECT x.id FROM bulk_job_items x WHERE x.job_id = j.id AND ${claimable} ORDER BY x.seq LIMIT 1 FOR UPDATE SKIP LOCKED) x
-            WHERE j.kind=$1 AND j.status IN ('queued','running')
+            WHERE j.kind=$1 AND j.status IN ('queued','running') AND ${w.sql}
               AND NOT EXISTS (SELECT 1 FROM bulk_job_items r WHERE r.job_id = j.id AND r.status='running' AND r.locked_at >= now() - interval '5 minutes')
             ORDER BY j.created_at LIMIT $2`
         // Ordered by seq first, so concurrent jobs interleave instead of one big job starving the rest.
         : `SELECT x.id FROM bulk_job_items x JOIN bulk_jobs j ON j.id = x.job_id
-            WHERE j.kind=$1 AND j.status IN ('queued','running') AND ${claimable}
+            WHERE j.kind=$1 AND j.status IN ('queued','running') AND ${claimable} AND ${w.sql}
             ORDER BY x.seq, j.created_at LIMIT $2 FOR UPDATE OF x SKIP LOCKED`
       const r = await db.query<BulkItemRow>(
         `UPDATE bulk_job_items i SET status='running', locked_at=now(), attempts=i.attempts+1, updated_at=now()
-          WHERE i.id IN (${pick}) RETURNING i.*`, [kind, concurrency - active])
+          WHERE i.id IN (${pick}) RETURNING i.*`, [kind, concurrency - active, ...w.params])
       if (!r.rows.length) return
       await db.query(`UPDATE bulk_jobs SET status='running', started_at=COALESCE(started_at, now()) WHERE id = ANY($1) AND status='queued'`,
         [[...new Set(r.rows.map(i => i.job_id))]])

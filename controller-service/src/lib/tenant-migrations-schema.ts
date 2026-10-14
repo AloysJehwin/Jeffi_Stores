@@ -26,6 +26,10 @@ const APPLY_ORDER = [
   'editor-sessions.sql',
   'ai.sql',
   'amazon.sql',
+  // Service tables live in the main DB, but constraints/indexes.sql reference them.
+  'documents.sql',
+  'bulk.sql',
+  'services.sql',
   'constraints.sql',
   'indexes.sql',
   'functions.sql',
@@ -48,7 +52,9 @@ export function buildTenantSchemaSql(): string {
   // template_family is unique per (tenant, space, slug) now; the old per-(tenant, slug) key would stop a
   // store copy and an API copy sharing a slug. The fan-out only adds constraints, so drop it here.
   return `${built}\n\n-- ==== tenant role cleanup (#488) ====\nUPDATE public.admins SET role = 'super_admin' WHERE role = 'administrator';` +
-    `\n\n-- ==== template spaces ====\nALTER TABLE IF EXISTS public.template_family DROP CONSTRAINT IF EXISTS template_family_tenant_slug_key;`
+    `\n\n-- ==== template spaces ====\nALTER TABLE IF EXISTS public.template_family DROP CONSTRAINT IF EXISTS template_family_tenant_slug_key;` +
+    // Phone-channel campaign logs have no email; the fan-out never relaxes NOT NULL by itself.
+    `\n\n-- ==== campaign log channels ====\nALTER TABLE IF EXISTS public.email_campaign_logs ALTER COLUMN email DROP NOT NULL;`
 }
 
 export interface DesiredColumn {

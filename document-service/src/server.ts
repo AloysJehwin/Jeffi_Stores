@@ -15,13 +15,13 @@ import { renderDocument, resolveDesign, DESIGNS, DEFAULT_DESIGN, designList, fon
 import { sampleRequest } from './designs/sample.js'
 import { getSettings, saveSettings, saveLogo, loadLogo, resolveBranding } from './designs/settings.js'
 import { putPdf, getPdf, pdfUrl } from './storage.js'
-import { appFromHost } from '@jeffi/tenancy'
+import { appFromHost, mainPool, resolveServiceScope, scopeSql, inScope } from '@jeffi/tenancy'
 import { publicRoutes } from './tenant/public.js'
 import { adminRoutes } from './admin/index.js'
 
 const url = process.env.DOCUMENTS_DATABASE_URL
 if (!url) throw new Error('DOCUMENTS_DATABASE_URL is not set')
-const db = new pg.Pool({ connectionString: url, max: 10 })
+const db = mainPool(url, 10)
 const PUBLIC_BASE = (process.env.PUBLIC_BASE_URL || 'http://localhost:3100').replace(/\/$/, '')
 const PREFIX: Record<string, string> = { invoice: 'INV', quotation: 'QT', receipt: 'RCT', packing_slip: 'PS', label: 'LBL', purchase_order: 'PO' }
 
@@ -45,6 +45,8 @@ function isPublicDocHost(req: FastifyRequest): boolean {
   return DOC_HOSTS.has(appFromHost(host) ?? '')
 }
 
+const scope = await resolveServiceScope()
+
 app.addHook('onRequest', async (req, reply) => {
   if (req.url.startsWith('/view/') || req.url.startsWith('/t/') || req.url === '/healthz' || /^\/designs\/[a-z0-9-]+\/thumbnail\.png$/.test(req.url)) return
   if (isPublicDocHost(req)) {
@@ -53,6 +55,7 @@ app.addHook('onRequest', async (req, reply) => {
   }
   const claims = verifyServiceToken(bearer(req as FastifyRequest))
   if (!claims) return reply.code(401).send({ error: 'unauthorized', message: 'Missing or invalid service token' })
+  if (!inScope(scope, claims.tenantId)) return reply.code(403).send({ error: 'forbidden', message: 'This service belongs to another tenant' })
   req.claims = claims
 })
 app.setErrorHandler((err: any, _req, reply) => {
@@ -318,4 +321,4 @@ startWorker(db, 'documents', async (item, job) => {
     if (e?.status === 400) throw new BulkItemError(e.message)
     throw e
   }
-}, { concurrency: Number(process.env.DOCUMENT_BULK_CONCURRENCY || 4), sequential: true, log: (m, e) => app.log.error({ err: e }, m) })
+}, { concurrency: Number(process.env.DOCUMENT_BULK_CONCURRENCY || 4), sequential: true, log: (m, e) => app.log.error({ err: e }, m), where: (c, p) => scopeSql(scope, c, p) })

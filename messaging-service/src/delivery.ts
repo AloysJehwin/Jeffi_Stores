@@ -1,3 +1,4 @@
+import { scopeSql, type ServiceScope } from '@jeffi/tenancy'
 import { db, one } from './db.js'
 import { poolsForTenant } from './pools.js'
 import { callbacksEnabled, fetchStatus } from './providers/twilio.js'
@@ -41,14 +42,15 @@ export async function applyStatus(id: string, status: string, o: { code?: string
 }
 
 /** Dev has no public status callback: poll Twilio for recent sends, backing off as they age. */
-export function startDeliverySync(log: (m: string) => void) {
+export function startDeliverySync(log: (m: string) => void, scope: ServiceScope) {
   if (callbacksEnabled()) return
   const sweep = async () => {
+    const w = scopeSql(scope, 'tenant_id', 1)
     const rows = await db.query<{ id: string; provider_ref: string }>(
       `SELECT id, provider_ref FROM messages
        WHERE provider='twilio' AND status='sent' AND provider_ref IS NOT NULL AND created_at > now() - interval '24 hours'
-         AND updated_at < now() - greatest(interval '10 seconds', (now() - created_at) / 4)
-       ORDER BY created_at DESC LIMIT 50`)
+         AND updated_at < now() - greatest(interval '10 seconds', (now() - created_at) / 4) AND ${w.sql}
+       ORDER BY created_at DESC LIMIT 50`, w.params)
     for (const r of rows.rows) {
       try {
         const s = await fetchStatus(r.provider_ref)
