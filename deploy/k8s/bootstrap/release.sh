@@ -1,22 +1,21 @@
 #!/bin/bash
 # Release the committed HEAD (stand-in for CI while GitHub Actions is unavailable): build the four images on
 # this Mac (arm64) from a clean `git archive`, push them to ECR (tags already there are skipped), roll out with
-# rollout.sh, smoke-test. --build-only stops after the push, so images can be ready before a window.
+# rollout.sh, smoke-test. --build-only stops after the push, so images can be ready before a window. Images are
+# tagged local-<image_sha> (lib.sh): commits that only touch docs or deploy/k8s reuse the images already pushed.
 # Usage: bash deploy/k8s/bootstrap/release.sh [--build-only]
-set -euo pipefail
-REPO=$(cd "$(dirname "$0")/../../.." && pwd)
+source "$(dirname "$0")/../db/lib.sh"
 WORK=${TMPDIR:-/tmp}/jeffi-release
-export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/jeffi-k3s.yaml}
 cd "$REPO"
 
 [ -z "$(git status --porcelain -- controller-service messaging-service document-service public-api-service packages deploy database package.json package-lock.json vendor)" ] ||
   { echo "Uncommitted changes — commit first so the release is reproducible." >&2; exit 1; }
-SHA=$(git rev-parse --short HEAD); TAG=local-$SHA
+SHA=$(image_sha); TAG=local-$SHA
 free_gb=$(df -g "$HOME" | awk 'NR==2 {print $4}')
 [ "$free_gb" -ge 15 ] || { echo "Only ${free_gb} GB free; the builds need ~15 GB (Docker corrupts its disk when it runs out)." >&2; exit 1; }
 docker info >/dev/null 2>&1 || { echo "Docker Desktop is not running." >&2; exit 1; }
 
-echo "== 1/3 Images at $TAG (logs in $WORK)"
+echo "== 1/3 Images at $TAG (HEAD $(git rev-parse --short HEAD); logs in $WORK)"
 rm -rf "$WORK" && mkdir -p "$WORK/src"
 git archive HEAD | tar x -C "$WORK/src"
 for s in controller messaging documents public-api; do
