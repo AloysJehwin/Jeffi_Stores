@@ -48,10 +48,26 @@ sys.exit(0 if any(ip in ipaddress.ip_network(c) for c in sys.argv[2:]) else 1)' 
   return 1
 }
 
+# SSH forward to the core; when port 22 is unreachable (a VPN's rotating exit IPs), the same forward over
+# SSM Session Manager, which needs no inbound rule.
 ssh_forward() { # <local port> <target>; replaces one of ours that holds the port but stopped forwarding (network change, sleep)
-  ssh_allowed || return 1
-  pkill -f "ssh .*-L $1:" 2>/dev/null || true; sleep 1
-  ssh -i "$SSH_KEY" -f -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L "$1:$2" "$CORE"
+  pkill -f "ssh .*-L $1:" 2>/dev/null || true
+  pkill -f "localPortNumber[^0-9]{0,6}$1([^0-9]|$)" 2>/dev/null || true; sleep 1
+  ssh -i "$SSH_KEY" -f -N -o ConnectTimeout=8 -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L "$1:$2" "$CORE" && return 0
+  ssm_forward "$1" "$2" && return 0
+  ssh_allowed || true
+  return 1
+}
+ssm_forward() {
+  command -v session-manager-plugin >/dev/null ||
+    { echo "SSH failed. To tunnel over SSM instead (no port 22): brew install --cask session-manager-plugin" >&2; return 1; }
+  local id
+  id=$(aws ec2 describe-addresses --public-ips "$CORE_IP" --query 'Addresses[0].InstanceId' --output text)
+  echo "SSH failed; forwarding :$1 over SSM ($id)" >&2
+  nohup aws ssm start-session --target "$id" --document-name AWS-StartPortForwardingSessionToRemoteHost \
+    --parameters "host=${2%:*},portNumber=${2##*:},localPortNumber=$1" >/dev/null 2>&1 &
+  for _ in $(seq 1 20); do listening "$1" && return 0; sleep 1; done
+  return 1
 }
 pg_up() { pg_isready -h 127.0.0.1 -p "$PORT" -t 10 -q 2>/dev/null; }
 tunnel() {

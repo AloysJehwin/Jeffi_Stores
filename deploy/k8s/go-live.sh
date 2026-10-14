@@ -23,7 +23,6 @@ preflight() {
   echo "commit $(git -C "$REPO" rev-parse --short HEAD), AWS $(aws sts get-caller-identity --query Arn --output text)"
   [ -f "$SSH_KEY" ] || { echo "Missing $SSH_KEY" >&2; return 1; }
   docker info >/dev/null 2>&1 || { echo "Docker Desktop is not running." >&2; return 1; }
-  ssh_allowed
   k8s_tunnel; kubectl get nodes
   tunnel; psql_app jeffi_stores -Atc "SELECT 'jeffi_stores reachable as ' || current_user"
   [ "$FROM" -gt 4 ] || psql_master jeffi_stores -Atc "SELECT 'master login works (' || current_user || ')'" ||
