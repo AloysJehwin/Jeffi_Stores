@@ -37,11 +37,27 @@ export function controlPlanePool(): pg.Pool {
     const user = process.env.CONTROL_PLANE_RDS_USER || 'app_user'
     Object.assign(config, { host, port, user, database: process.env.CONTROL_PLANE_RDS_DB || 'jeffi_control_plane', ssl: rdsSslOption(), password: rdsIamPassword(host, port, user, process.env.AWS_REGION || 'us-east-1') })
   } else {
-    config.connectionString = url
-    if (url.includes('rds.amazonaws.com')) config.ssl = rdsSslOption()
+    cp = mainPool(url, 3)
+    return cp
   }
   cp = createPgPool(config)
   return cp
+}
+
+/**
+ * A pool on the main app DB from a postgres URL. RDS hosts get TLS with the RDS CA; DB_IAM_AUTH=true
+ * signs an IAM token per connection instead of a password. Built from parts so `sslmode` in the URL
+ * can't override the CA.
+ */
+export function mainPool(url: string, max = 10): pg.Pool {
+  const u = new URL(url)
+  const port = Number(u.port || 5432)
+  const user = decodeURIComponent(u.username)
+  const config: any = { ...basePoolConfig(), max, host: u.hostname, port, database: decodeURIComponent(u.pathname.slice(1)), user }
+  if (u.password) config.password = decodeURIComponent(u.password)
+  if (u.hostname.includes('rds.amazonaws.com')) config.ssl = rdsSslOption()
+  if (process.env.DB_IAM_AUTH === 'true') config.password = rdsIamPassword(u.hostname, port, user, process.env.AWS_REGION || 'us-east-1')
+  return createPgPool(config)
 }
 
 export const PLATFORM_TENANT_ID = '00000000-0000-0000-0000-000000000000'
@@ -52,7 +68,7 @@ export function platformPool(): pg.Pool {
   if (platform) return platform
   const url = process.env.DATABASE_URL
   if (!url) throw new Error('DATABASE_URL is not set')
-  platform = createPgPool({ ...basePoolConfig(), connectionString: url, ...(url.includes('rds.amazonaws.com') ? { ssl: rdsSslOption() } : {}) })
+  platform = mainPool(url)
   return platform
 }
 
