@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (!zUuid.safeParse(resourceId).success)
     return NextResponse.json({ error: 'Invalid resource_id' }, { status: 400 })
 
-  const session = await openSession(admin.id, resourceType as ResourceType, resourceId)
+  const session = await openSession(admin.adminId, resourceType as ResourceType, resourceId)
   if (!session) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   return NextResponse.json({

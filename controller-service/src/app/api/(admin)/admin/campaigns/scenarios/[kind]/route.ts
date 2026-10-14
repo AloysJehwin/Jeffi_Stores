@@ -145,7 +145,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ki
 
   await query(
     `INSERT INTO scenario_audit_log (admin_id, scenario_kind, action, result) VALUES ($1, $2, 'patch', $3::jsonb)`,
-    [admin.id, kind, JSON.stringify(body)]
+    [admin.adminId, kind, JSON.stringify(body)]
   ).catch(() => {})
 
   return NextResponse.json({ success: true })
@@ -180,7 +180,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
   await query(`DELETE FROM scenarios WHERE kind = $1`, [kind])
 
   await query(`INSERT INTO scenario_audit_log (admin_id, scenario_kind, action) VALUES ($1, $2, 'delete')`, [
-    admin.id,
+    admin.adminId,
     kind,
   ]).catch(() => {})
 

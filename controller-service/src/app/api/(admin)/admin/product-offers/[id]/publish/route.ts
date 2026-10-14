@@ -30,7 +30,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const offer = await queryOne<{ id: string }>(`SELECT id FROM product_offers WHERE id = $1`, [id])
   if (!offer) return NextResponse.json({ error: 'Offer not found' }, { status: 404 })
 
-  const session = await findOpenSession(admin.id, 'offer', id)
+  const session = await findOpenSession(admin.adminId, 'offer', id)
   if (!session) {
     return NextResponse.json({ error: 'No open edit session' }, { status: 400 })
   }
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await client.query(`DELETE FROM offer_drafts WHERE offer_id = $1`, [id])
   })
 
-  await saveSession(session.id, admin.id)
+  await saveSession(session.id, admin.adminId)
 
   const row = await queryOne(`SELECT * FROM product_offers WHERE id = $1`, [id])
   return NextResponse.json({ offer: row })

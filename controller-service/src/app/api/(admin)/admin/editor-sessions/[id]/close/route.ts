@@ -19,8 +19,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "action must be 'save' or 'cancel'" }, { status: 400 })
 
   const ok = action === 'save'
-    ? await saveSession(id, admin.id)
-    : await cancelSession(id, admin.id)
+    ? await saveSession(id, admin.adminId)
+    : await cancelSession(id, admin.adminId)
 
   if (!ok) return NextResponse.json({ error: 'Session not found or already closed' }, { status: 404 })
   return NextResponse.json({ success: true })

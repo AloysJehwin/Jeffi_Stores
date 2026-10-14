@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!validation.ok) {
     await query(
       `INSERT INTO scenario_audit_log (admin_id, action, generated_sql, validation) VALUES ($1, 'dry_run_rejected', $2, $3::jsonb)`,
-      [admin.id, sql, JSON.stringify(validation)]
+      [admin.adminId, sql, JSON.stringify(validation)]
     ).catch(() => {})
     return NextResponse.json({ error: validation.reason, validation }, { status: 400 })
   }
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     await query(
       `INSERT INTO scenario_audit_log (admin_id, action, generated_sql, validation, result) VALUES ($1, 'dry_run_failed', $2, $3::jsonb, $4::jsonb)`,
       [
-        admin.id,
+        admin.adminId,
         sql,
         JSON.stringify(validation),
         JSON.stringify({ error: String(err?.message || err), code: err?.code }),
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
   await query(
     `INSERT INTO scenario_audit_log (admin_id, action, generated_sql, validation, result) VALUES ($1, 'dry_run', $2, $3::jsonb, $4::jsonb)`,
     [
-      admin.id,
+      admin.adminId,
       sql,
       JSON.stringify({ audience: validation, products: productValidation }),
       JSON.stringify({ count, sample, productCount, productSample, elapsedMs }),

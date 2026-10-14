@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
     const message = err instanceof AiClientError ? err.message : 'AI request failed'
     await query(
       `INSERT INTO scenario_audit_log (admin_id, action, ai_prompt, result) VALUES ($1, 'ai_generate_failed', $2, $3::jsonb)`,
-      [admin.id, userPrompt, JSON.stringify({ error: message })]
+      [admin.adminId, userPrompt, JSON.stringify({ error: message })]
     ).catch(() => {})
     return NextResponse.json({ error: message }, { status: 502 })
   }
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
     console.error('[route]', err)
     await query(
       `INSERT INTO scenario_audit_log (admin_id, action, ai_prompt, ai_response, result) VALUES ($1, 'ai_generate_unparseable', $2, $3, $4::jsonb)`,
-      [admin.id, userPrompt, aiText, JSON.stringify({ error: 'unparseable JSON', provider, model })]
+      [admin.adminId, userPrompt, aiText, JSON.stringify({ error: 'unparseable JSON', provider, model })]
     ).catch(() => {})
     return NextResponse.json({ error: 'AI returned unparseable JSON' }, { status: 502 })
   }
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     `INSERT INTO scenario_audit_log (admin_id, action, ai_prompt, ai_response, generated_sql, validation, result)
      VALUES ($1, 'ai_generate', $2, $3, $4, $5::jsonb, $6::jsonb)`,
     [
-      admin.id,
+      admin.adminId,
       userPrompt,
       aiText,
       parsed.sql,

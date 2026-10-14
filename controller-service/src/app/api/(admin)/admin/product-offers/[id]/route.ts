@@ -49,7 +49,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const touched = Object.entries(COLUMN_MAP).filter(([key]) => key in d)
   if (touched.length === 0) return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
 
-  const session = await findOpenSession(admin.id, 'offer', id)
+  const session = await findOpenSession(admin.adminId, 'offer', id)
 
   if (session) {
     // Draft path — merge the patch into offer_drafts.fields.
