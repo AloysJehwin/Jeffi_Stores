@@ -507,26 +507,60 @@ export interface MessagingSpendRow {
   spent: number
 }
 
-// Messaging spend for the Finance → Messaging tab. Reads control-plane wallet_ledger debits (unlike
-// the tenant-DB finance readers). Returns per-channel+month totals plus overall + this-month totals.
+// The flagship's sends are never debited, so its spend is what they cost: in-process sends from
+// message_logs (Twilio's price once the status callback lands, else the estimate) plus
+// messaging-service sends from messages (their message_logs rows are skipped so none count twice).
+async function flagshipSpendRows(): Promise<{ channel: string; month: string; spent: string }[]> {
+  const { query } = await import('@/lib/shared/db')
+  const { MESSAGING_ESTIMATE_INR } = await import('@/lib/shared/messaging/pricing')
+  const [logs, service] = await Promise.all([
+    query(
+      `SELECT channel, to_char(date_trunc('month', sent_at), 'YYYY-MM') AS month,
+         SUM(COALESCE(price, CASE WHEN delivery_status IN ('failed','undelivered') THEN 0 WHEN channel = 'sms' THEN $1::numeric ELSE $2::numeric END)) AS spent
+       FROM message_logs
+       WHERE direction = 'outbound' AND status = 'sent' AND channel IN ('sms','whatsapp')
+         AND provider IS DISTINCT FROM 'messaging-service'
+       GROUP BY channel, 2`,
+      [MESSAGING_ESTIMATE_INR.sms, MESSAGING_ESTIMATE_INR.whatsapp]
+    ).catch(() => null),
+    controlPlanePool().query(
+      `SELECT channel, to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+         SUM(CASE WHEN charged_inr > 0 THEN charged_inr ELSE price_inr END) AS spent
+       FROM messages
+       WHERE tenant_id = $1 AND status IN ('sent','delivered') AND channel IN ('sms','whatsapp','email')
+       GROUP BY channel, 2`,
+      [FLAGSHIP_TENANT_ID]
+    ).catch(() => null),
+  ])
+  return [...(logs?.rows ?? []), ...(service?.rows ?? [])]
+}
+
+// Messaging spend for the Finance → Messaging tab: control-plane wallet_ledger debits (unlike the
+// tenant-DB finance readers), or the flagship's message costs. Per-channel+month plus totals.
 export async function getMessagingSpend(
   tenantId: string
 ): Promise<{ rows: MessagingSpendRow[]; total: number; thisMonth: number; byChannel: Record<string, number> }> {
-  const pool = controlPlanePool()
-  const r = await pool
-    .query(
-      `SELECT category AS channel, to_char(date_trunc('month', occurred_at), 'YYYY-MM') AS month, SUM(-amount) AS spent
-       FROM wallet_ledger
-       WHERE tenant_id = $1 AND entry_type = 'debit' AND category IN ('sms','whatsapp','email')
-       GROUP BY category, 2 ORDER BY 2 DESC, category`,
-      [tenantId]
-    )
-    .catch(() => null)
-  const rows: MessagingSpendRow[] = (r?.rows ?? []).map(x => ({
-    channel: String(x.channel),
-    month: String(x.month),
-    spent: Number(x.spent),
-  }))
+  const raw = isFlagshipTenant(tenantId)
+    ? await flagshipSpendRows()
+    : ((
+        await controlPlanePool()
+          .query(
+            `SELECT category AS channel, to_char(date_trunc('month', occurred_at), 'YYYY-MM') AS month, SUM(-amount) AS spent
+             FROM wallet_ledger
+             WHERE tenant_id = $1 AND entry_type = 'debit' AND category IN ('sms','whatsapp','email')
+             GROUP BY category, 2`,
+            [tenantId]
+          )
+          .catch(() => null)
+      )?.rows ?? [])
+  const merged = new Map<string, MessagingSpendRow>()
+  for (const x of raw) {
+    const key = `${x.month}|${x.channel}`
+    const row = merged.get(key) ?? { channel: String(x.channel), month: String(x.month), spent: 0 }
+    row.spent = Math.round((row.spent + Number(x.spent)) * 100) / 100
+    merged.set(key, row)
+  }
+  const rows = [...merged.values()].sort((a, b) => b.month.localeCompare(a.month) || a.channel.localeCompare(b.channel))
   const nowMonth = new Date().toISOString().slice(0, 7)
   const byChannel: Record<string, number> = {}
   let total = 0
