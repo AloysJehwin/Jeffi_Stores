@@ -5,14 +5,24 @@ resources:
   - 10-traefik.yaml
   - 20-cert-manager.yaml
   - 30-edge.yaml
-  - 40-flagship.yaml
+  - 40-controller-service.yaml
   - 41-redis.yaml
   - 42-netpol.yaml
   - 43-provisioner-rbac.yaml
   - 44-ecr-pull-secret.yaml
+  - 45-messaging-service.yaml
+  - 46-document-service.yaml
+  - 47-public-api-service.yaml
   - release.yaml
   - cronjobs.yaml
 # CRD-backed resources (issuers, Coroot) are applied after their charts settle: see bootstrap/apply-platform.sh.
+# The tag is a placeholder on purpose: rollout.sh pins every image to the release being rolled.
 images:
-  - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores
-    newTag: local-014e65e4
+  - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service
+    newTag: set-by-rollout
+  - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-messaging-service
+    newTag: set-by-rollout
+  - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-document-service
+    newTag: set-by-rollout
+  - name: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-public-api-service
+    newTag: set-by-rollout

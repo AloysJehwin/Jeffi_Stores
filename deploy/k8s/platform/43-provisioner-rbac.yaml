@@ -1,4 +1,4 @@
-# The flagship runs the provisioning engine (controller-service/src/lib/k8s/tenant-compute.ts): it creates tenant
+# jeffi-stores-controller-service runs the provisioning engine (controller-service/src/lib/k8s/tenant-compute.ts): it creates tenant
 # namespaces and everything inside them, reads Nodes for placement, copies the pull secret / RDS CA
 # out of jeffi, and patches the tenant-admin CA bundle in jeffi-edge.
 apiVersion: rbac.authorization.k8s.io/v1
@@ -37,7 +37,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata: { name: jeffi-provisioner }
 roleRef: { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: jeffi-provisioner }
-subjects: [{ kind: ServiceAccount, name: flagship, namespace: jeffi }]
+subjects: [{ kind: ServiceAccount, name: jeffi-stores-controller-service, namespace: jeffi }]
 ---
 # Filled in by bootstrap/launch-core.sh output (node SG, core private IP, AMI).
 apiVersion: v1
@@ -49,3 +49,5 @@ data:
   K8S_NODE_IAM_PROFILE: jeffi-stores-ec2-profile
   # Applied EC2 On-Demand vCPU quota; blocks Growth+ sign-ups/upgrades with no room for a node. Raise when AWS approves.
   EC2_VCPU_QUOTA: '1'
+  # Basic tenants per shared pool node: each store runs controller + messaging + document pods.
+  POOL_NODE_CAPACITY: '4'

@@ -26,7 +26,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs delhivery_sync POST /api/cron/fanout']
               env:
@@ -63,7 +63,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs cancel_stale_orders POST /api/cron/fanout']
               env:
@@ -100,7 +100,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs sweep_auto_tasks POST /api/cron/fanout']
               env:
@@ -137,7 +137,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs dispatch_mailer POST /api/cron/fanout']
               env:
@@ -174,7 +174,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs run_campaigns POST /api/cron/fanout']
               env:
@@ -211,7 +211,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs compute_health POST /api/cron/fanout']
               env:
@@ -248,7 +248,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs daily_briefing POST /api/cron/fanout']
               env:
@@ -285,7 +285,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs provisioning_worker GET /api/internal/provisioning/worker']
               env:
@@ -322,7 +322,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs import_worker GET /api/internal/import/worker']
               env:
@@ -359,7 +359,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs provisioning_reconcile POST /api/internal/provisioning/reconcile']
               env:
@@ -396,7 +396,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs publish_social_posts POST /api/cron/fanout']
               env:
@@ -433,7 +433,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs customer_notes_digest POST /api/cron/fanout']
               env:
@@ -470,7 +470,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs loyalty_reconcile POST /api/cron/fanout']
               env:
@@ -507,7 +507,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs sweep_idle_sessions POST /api/cron/fanout']
               env:
@@ -544,7 +544,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs embed_sync POST /api/cron/fanout']
               env:
@@ -581,7 +581,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs ai_health GET /api/internal/ai/health']
               env:
@@ -618,7 +618,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs merchant_sync GET /api/admin/merchant/sync']
               env:
@@ -655,7 +655,7 @@ spec:
           imagePullSecrets: [{ name: regcred }]
           containers:
             - name: run
-              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
               # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
               command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs amazon_sync GET /api/admin/merchant/amazon/sync']
               env:

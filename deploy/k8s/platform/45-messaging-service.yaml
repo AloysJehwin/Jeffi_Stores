@@ -1,0 +1,55 @@
+# Platform messaging: the platform tenant and services-only tenants (store tenants run their own).
+# Twilio status callbacks for every tenant land here (public.jeffistores.in/webhooks/*).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-messaging-service
+  namespace: jeffi
+  labels: { app: messaging-service, jeffi.io/service: messaging, jeffi.io/tenant: jeffi-stores }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: messaging-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: messaging-service, jeffi.io/service: messaging, jeffi.io/tenant: jeffi-stores }
+    spec:
+      nodeSelector: { jeffi.io/role: core }
+      imagePullSecrets: [{ name: regcred }]
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-messaging-service:latest
+          ports: [{ name: http, containerPort: 3101 }]
+          env:
+            - { name: SM_SECRET_ID, value: jeffi/messaging/production }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=320 }
+            - { name: SERVICE_SKIP_STORE_TENANTS, value: 'true' }
+            - { name: PUBLIC_BASE_URL, value: 'https://public.jeffistores.in' }
+            - { name: DB_IAM_AUTH, value: 'true' }
+          resources:
+            requests: { cpu: 100m, memory: 192Mi }
+            limits: { cpu: 500m, memory: 384Mi }
+          startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 24 }
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 3 }
+          lifecycle:
+            preStop: { exec: { command: [sleep, '5'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: certs
+          configMap: { name: rds-ca }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-messaging-service, namespace: jeffi }
+spec:
+  selector: { app: messaging-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3101, targetPort: http }]

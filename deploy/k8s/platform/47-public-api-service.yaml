@@ -1,0 +1,76 @@
+# The public API gateway (public.jeffistores.in). Shared by every tenant; never provisioned per tenant.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-public-api-service
+  namespace: jeffi
+  labels: { app: public-api-service, jeffi.io/service: public-api, jeffi.io/tenant: jeffi-stores }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: public-api-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: public-api-service, jeffi.io/service: public-api, jeffi.io/tenant: jeffi-stores }
+    spec:
+      nodeSelector: { jeffi.io/role: core }
+      imagePullSecrets: [{ name: regcred }]
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-public-api-service:latest
+          ports: [{ name: http, containerPort: 3100 }]
+          env:
+            - { name: SM_SECRET_ID, value: jeffi/public-api/production }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=192 }
+            - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
+            - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
+            - { name: DB_IAM_AUTH, value: 'true' }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+            - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 24 }
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 3 }
+          lifecycle:
+            preStop: { exec: { command: [sleep, '5'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: certs
+          configMap: { name: rds-ca }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-public-api-service, namespace: jeffi }
+spec:
+  selector: { app: public-api-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3100, targetPort: http }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: jeffi-stores-public-api-service, namespace: jeffi }
+spec:
+  entryPoints: [websecure]
+  routes:
+    # Provider callbacks (Twilio status) go straight to messaging.
+    - match: Host(`public.jeffistores.in`) && PathPrefix(`/webhooks/`)
+      priority: 110
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: jeffi-stores-messaging-service, port: 3101 }]
+    - match: Host(`public.jeffistores.in`)
+      priority: 100
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: jeffi-stores-public-api-service, port: 3100 }]
+  tls: {}

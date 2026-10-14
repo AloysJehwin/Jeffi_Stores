@@ -1,31 +1,31 @@
-# The flagship store (jeffistores.in + platform subdomains). Same image every tenant runs.
+# jeffi-stores-controller-service: the platform store (jeffistores.in + platform subdomains). Every tenant runs the same image.
 apiVersion: v1
 kind: ServiceAccount
-metadata: { name: flagship, namespace: jeffi }
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: flagship
+  name: jeffi-stores-controller-service
   namespace: jeffi
-  labels: { app: storefront, jeffi.io/tenant: flagship }
+  labels: { app: controller-service, jeffi.io/service: controller, jeffi.io/tenant: jeffi-stores }
 spec:
   # No replicas: the HPA below owns the count (2→4); a fixed value would reset it on every deploy.
   revisionHistoryLimit: 5
   strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
-  selector: { matchLabels: { app: storefront, jeffi.io/tenant: flagship } }
+  selector: { matchLabels: { app: controller-service, jeffi.io/tenant: jeffi-stores } }
   template:
     metadata:
-      labels: { app: storefront, jeffi.io/tenant: flagship }
+      labels: { app: controller-service, jeffi.io/service: controller, jeffi.io/tenant: jeffi-stores }
     spec:
-      serviceAccountName: flagship
+      serviceAccountName: jeffi-stores-controller-service
       nodeSelector: { jeffi.io/role: core }
       imagePullSecrets: [{ name: regcred }]
       terminationGracePeriodSeconds: 60
       securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
       containers:
         - name: app
-          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores:latest
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
           ports: [{ name: http, containerPort: 3000 }]
           envFrom:
             - configMapRef: { name: provisioning, optional: true }
@@ -34,8 +34,10 @@ spec:
             - { name: WEB_CONCURRENCY, value: '1' }
             - { name: IN_PROCESS_CRON, value: 'false' }
             - { name: CLIENT_CERT_PROXY, value: traefik }
+            - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
+            - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
             # Traces → Coroot in-cluster (the public k8s. URL is behind mTLS). Every request is traced (14-day retention).
-            - { name: OTEL_SERVICE_NAME, value: jeffi-flagship }
+            - { name: OTEL_SERVICE_NAME, value: jeffi-stores-controller-service }
             - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: 'http://coroot-coroot.observability:8080/v1/traces' }
             - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
             - { name: OTEL_TRACES_SAMPLER, value: parentbased_traceidratio }
@@ -78,54 +80,53 @@ spec:
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
-metadata: { name: flagship, namespace: jeffi }
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
 spec:
   minAvailable: 1
-  selector: { matchLabels: { app: storefront, jeffi.io/tenant: flagship } }
+  selector: { matchLabels: { app: controller-service, jeffi.io/tenant: jeffi-stores } }
 ---
 apiVersion: v1
 kind: Service
-metadata: { name: flagship, namespace: jeffi }
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
 spec:
-  selector: { app: storefront, jeffi.io/tenant: flagship }
+  selector: { app: controller-service, jeffi.io/tenant: jeffi-stores }
   ports: [{ name: http, port: 3000, targetPort: http }]
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
-metadata: { name: flagship-cloudfront-origin, namespace: jeffi }
+metadata: { name: jeffi-stores-controller-service-cloudfront-origin, namespace: jeffi }
 spec:
   entryPoints: [web]
   routes:
     - match: Host(`jeffistores.in`) || Host(`www.jeffistores.in`)
       kind: Rule
-      services: [{ name: flagship, port: 3000 }]
+      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
-metadata: { name: flagship, namespace: jeffi }
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
 spec:
   entryPoints: [websecure]
   routes:
     - match: >-
         Host(`jeffistores.in`) || Host(`www.jeffistores.in`) || Host(`business.jeffistores.in`) ||
-        Host(`forms.jeffistores.in`) || Host(`quotation.jeffistores.in`) || Host(`invoice.jeffistores.in`) ||
-        Host(`purchaseorder.jeffistores.in`) || Host(`certificate.jeffistores.in`) || Host(`ecom.jeffistores.in`) ||
+        Host(`forms.jeffistores.in`) || Host(`certificate.jeffistores.in`) || Host(`ecom.jeffistores.in`) ||
         Host(`vault.jeffistores.in`)
       kind: Rule
       middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
-      services: [{ name: flagship, port: 3000 }]
-    # Hosts not claimed by a tenant namespace fall through to the flagship, which 404s unknown slugs.
+      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
+    # Hosts not claimed by a tenant namespace or a service route fall through here; unknown slugs 404.
     - match: HostRegexp(`^[a-z0-9-]+\.jeffistores\.in$`) || HostRegexp(`^[a-z0-9-]+\.business\.jeffistores\.in$`)
       priority: 2
       kind: Rule
       middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
-      services: [{ name: flagship, port: 3000 }]
+      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
   # No options: the TLSOption named `default` applies automatically (naming it is an error).
   tls: {}
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
-metadata: { name: flagship-admin, namespace: jeffi }
+metadata: { name: jeffi-stores-controller-service-admin, namespace: jeffi }
 spec:
   entryPoints: [websecure]
   routes:
@@ -134,16 +135,16 @@ spec:
       middlewares:
         - { name: strip-client-cert, namespace: jeffi-edge }
         - { name: pass-client-cert, namespace: jeffi-edge }
-      services: [{ name: flagship, port: 3000 }]
+      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
   tls:
     options: { name: platform-mtls, namespace: jeffi-edge }
 ---
-# Scale the store 2→4 pods on CPU. Capped at 4: all flagship pods share the core node (~550 MB each).
+# Scale the store 2→4 pods on CPU. Capped at 4: they share the core node (~550 MB each).
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
-metadata: { name: flagship, namespace: jeffi }
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
 spec:
-  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: flagship }
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: jeffi-stores-controller-service }
   minReplicas: 2
   maxReplicas: 4
   metrics:

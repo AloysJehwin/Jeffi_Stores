@@ -24,7 +24,8 @@
     "undici": "^7.1.0",
     "zod": "^4.4.3",
     "tsx": "^4.19.2",
-    "@aws-sdk/client-secrets-manager": "^3.1110.0"
+    "@aws-sdk/client-secrets-manager": "^3.1110.0",
+    "@jeffi/tenancy": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
