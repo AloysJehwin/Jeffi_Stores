@@ -26,6 +26,12 @@ describe('wa-approval', () => {
     expect(validateForMeta(ok, {}, samplesFor(ok))).toEqual([])
   })
 
+  it('explains a reason-less rejection of a body with named variables', async () => {
+    const { rejectionHints } = await import('@jeffi/api-contracts')
+    expect(rejectionHints('Hi {firstName}, we are launching a new product please check it out {cta}', {}, 'MARKETING'))
+      .toEqual(['WhatsApp variables are numbered: replace {firstName}, {cta} with {{1}}, {{2}} … in order.'])
+  })
+
   it('derives samples from context and names per tenant/version', () => {
     expect(samplesFor('Hi {{1}}, your order {{2}} ships. Track here: {{3}} today.')).toEqual({ 1: 'Priya', 2: 'JS-10234', 3: 'https://jeffistores.in/account/orders' })
     expect(metaName('testco', 'order/confirmed', 3)).toBe('testco_order_confirmed_v3')
