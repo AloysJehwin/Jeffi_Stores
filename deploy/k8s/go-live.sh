@@ -58,9 +58,9 @@ resize_core() {
   aws ec2 modify-instance-attribute --instance-id "$id" --instance-type "{\"Value\":\"$CORE_TYPE\"}"
   aws ec2 start-instances --instance-ids "$id" >/dev/null
   aws ec2 wait instance-status-ok --instance-ids "$id"
-  pkill -f "ssh .*-L 16443:" || true; pkill -f "ssh .*-L $PORT:" || true
-  ssh -i "$SSH_KEY" -f -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -L 16443:127.0.0.1:6443 "$CORE"
-  for _ in $(seq 1 60); do kubectl get nodes >/dev/null 2>&1 && break; sleep 10; done
+  pkill -f "ssh .*-L $PORT:" || true
+  for _ in $(seq 1 12); do ssh_forward 16443 127.0.0.1:6443 && break; sleep 10; done
+  for _ in $(seq 1 60); do k8s_up && break; sleep 10; done
   kubectl wait --for=condition=Ready node -l node-role.kubernetes.io/control-plane --timeout=600s
   for ns in kube-system cert-manager; do
     for d in $(kubectl -n $ns get deploy -o name); do kubectl -n $ns rollout status "$d" --timeout=600s; done
