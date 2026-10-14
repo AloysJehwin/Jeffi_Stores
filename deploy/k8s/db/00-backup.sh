@@ -18,7 +18,7 @@ psql_app jeffi_stores -Atc "SELECT datname || '  ' || pg_size_pretty(pg_database
 say "Tables in jeffi_stores app_user can't alter, by owner (05-table-owner.sh hands postgres's to jeffi_owner)"
 psql_app jeffi_stores -Atc "SELECT pg_get_userbyid(c.relowner) || ': ' || count(*) FROM pg_class c
   JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r','p','v','m')
-  AND NOT pg_has_role(current_user, c.relowner, 'USAGE') GROUP BY 1"
+  AND NOT pg_has_role(current_user, c.relowner, 'USAGE') GROUP BY c.relowner"
 
 if $DRY_RUN; then echo "Dry run: would snapshot $SNAP and dump $DBS into $OUT_DIR."; exit 0; fi
 confirm "Writes must be frozen first. Snapshot $RDS_INSTANCE and dump $DBS?"
