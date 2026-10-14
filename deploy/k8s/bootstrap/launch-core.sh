@@ -1,5 +1,5 @@
 #!/bin/bash
-# One-time: security groups + the core t4g.large, attached to the spare EIP 32.196.38.130.
+# One-time: security groups + the core (r7g.medium: the account's EC2 limit is 1 vCPU), attached to the spare EIP 32.196.38.130.
 set -euo pipefail
 REGION=us-east-1
 VPC=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text)
@@ -29,7 +29,7 @@ RDS_SG=$(aws rds describe-db-instances --db-instance-identifier jeffi-stores-db 
 rule --group-id $RDS_SG --protocol tcp --port 5432 --source-group $CORE_SG
 rule --group-id $RDS_SG --protocol tcp --port 5432 --source-group $NODE_SG
 
-ID=$(aws ec2 run-instances --image-id $AMI --instance-type t4g.large --subnet-id $SUBNET \
+ID=$(aws ec2 run-instances --image-id $AMI --instance-type r7g.medium --subnet-id $SUBNET \
   --security-group-ids $CORE_SG --key-name jeffi-stores-key \
   --iam-instance-profile Name=jeffi-stores-ec2-profile \
   --metadata-options HttpTokens=required,HttpPutResponseHopLimit=2 \

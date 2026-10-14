@@ -10,9 +10,10 @@ metadata:
   namespace: jeffi
   labels: { app: controller-service, jeffi.io/service: controller, jeffi.io/tenant: jeffi-stores }
 spec:
-  # No replicas: the HPA below owns the count (2→4); a fixed value would reset it on every deploy.
+  # No replicas: the HPA below owns the count; a fixed value would reset it on every deploy.
   revisionHistoryLimit: 5
-  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  # One pod at a time, no surge: the 1-vCPU core has no room for a third pod; the other one keeps serving.
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 1, maxSurge: 0 } }
   selector: { matchLabels: { app: controller-service, jeffi.io/tenant: jeffi-stores } }
   template:
     metadata:
@@ -49,7 +50,7 @@ spec:
             - name: GOOGLE_SERVICE_ACCOUNT_JSON
               valueFrom: { secretKeyRef: { name: google-sa, key: json, optional: true } }
           resources:
-            requests: { cpu: 300m, memory: 512Mi }
+            requests: { cpu: 150m, memory: 512Mi }
             limits: { cpu: 1500m, memory: 900Mi }
           startupProbe:
             httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
@@ -139,14 +140,15 @@ spec:
   tls:
     options: { name: platform-mtls, namespace: jeffi-edge }
 ---
-# Scale the store 2→4 pods on CPU. Capped at 4: they share the core node (~550 MB each).
+# Two pods: the core has one vCPU (the account's EC2 limit), where more pods add no CPU. Back to 2→4 (and a
+# 300m request) on a bigger core.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
 spec:
   scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: jeffi-stores-controller-service }
   minReplicas: 2
-  maxReplicas: 4
+  maxReplicas: 2
   metrics:
     - type: Resource
       resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }

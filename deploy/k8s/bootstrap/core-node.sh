@@ -1,5 +1,5 @@
 #!/bin/bash
-# EC2 user-data for the k3s core node (t4g.large, AL2023 arm64). Idempotent on reboot.
+# EC2 user-data for the k3s core node (r7g.medium, AL2023 arm64). Idempotent on reboot.
 # Needs the instance profile jeffi-stores-ec2-profile (Secrets Manager read, Route53, S3 etcd bucket).
 set -euxo pipefail
 REGION=us-east-1

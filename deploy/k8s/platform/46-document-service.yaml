@@ -31,7 +31,7 @@ spec:
             - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
             - { name: DB_IAM_AUTH, value: 'true' }
           resources:
-            requests: { cpu: 100m, memory: 256Mi }
+            requests: { cpu: 50m, memory: 256Mi }
             limits: { cpu: 1, memory: 512Mi }
           startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 24 }
           readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10, timeoutSeconds: 5 }

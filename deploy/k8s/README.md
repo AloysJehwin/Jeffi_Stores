@@ -5,7 +5,7 @@ up and cut production over to it.
 
 | Path | What |
 |---|---|
-| `bootstrap/launch-core.sh` | One-time: security groups, RDS ingress, the core `t4g.large` (user-data `core-node.sh`), EIP `32.196.38.130` |
+| `bootstrap/launch-core.sh` | One-time: security groups, RDS ingress, the core `r7g.medium`, as the account's EC2 limit is 1 vCPU (user-data `core-node.sh`), EIP `32.196.38.130` |
 | `bootstrap/core-node.sh` | Core user-data: Tailscale + k3s server (embedded etcd, 6-hourly snapshots) |
 | `bootstrap/secrets.sh` | Seeds cluster Secrets from Secrets Manager + local `certs/` (prints no values) |
 | `bootstrap/apply-platform.sh` | Applies `platform/` in dependency order |
