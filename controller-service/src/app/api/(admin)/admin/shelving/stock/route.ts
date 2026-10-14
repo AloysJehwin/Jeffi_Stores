@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         variant_id || null,
         sub_variant_id || null,
         qty,
-        admin.id
+        admin.adminId
       )
       return NextResponse.json({ ok: true })
     }
@@ -169,7 +169,7 @@ export async function POST(request: NextRequest) {
       sub_variant_id || null,
       change,
       reason || 'adjustment',
-      admin.id
+      admin.adminId
     )
     return NextResponse.json({ stock })
   } catch (e: any) {

@@ -73,7 +73,6 @@ export interface AdminJWTPayload {
   sessionId?: string
   deadlineAt?: string
   expiresAt?: string
-  [key: string]: any
 }
 
 export async function verifyToken(

@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   if (!validation.ok) {
     await query(
       `INSERT INTO scenario_audit_log (admin_id, scenario_kind, action, generated_sql, validation) VALUES ($1, $2, 'save_rejected', $3, $4::jsonb)`,
-      [admin.id, kind, sql, JSON.stringify(validation)]
+      [admin.adminId, kind, sql, JSON.stringify(validation)]
     ).catch(() => {})
     return NextResponse.json({ error: validation.reason, validation }, { status: 400 })
   }
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
           validation.normalized,
           productSqlNormalized,
           dryRunCount,
-          admin.id,
+          admin.adminId,
           JSON.stringify(parameters),
         ]
       )
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
   await query(
     `INSERT INTO scenario_audit_log (admin_id, scenario_kind, action, ai_prompt, generated_sql, validation, result) VALUES ($1, $2, 'save', $3, $4, $5::jsonb, $6::jsonb)`,
     [
-      admin.id,
+      admin.adminId,
       kind,
       aiPrompt,
       validation.normalized,

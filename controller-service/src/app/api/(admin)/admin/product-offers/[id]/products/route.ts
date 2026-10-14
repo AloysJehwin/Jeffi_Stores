@@ -39,7 +39,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ items: rows.map(r => ({ id: r.id, label: r.name, sublabel: r.sku })) })
   }
 
-  const session = await findOpenSession(admin.id, 'offer', id)
+  const session = await findOpenSession(admin.adminId, 'offer', id)
   if (session) {
     await ensureOfferDraft(id)
     const ids = (await draftProductIds(id)) ?? []
@@ -81,7 +81,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   if (!parsed.ok) return parsed.response
   const productIds = Array.from(new Set(parsed.data.productIds))
 
-  const session = await findOpenSession(admin.id, 'offer', id)
+  const session = await findOpenSession(admin.adminId, 'offer', id)
   if (session) {
     await ensureOfferDraft(id)
     await query(
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const matched = await queryMany<{ id: string }>(matchIdsSql, [categoryId ?? brandId])
   const matchedIds = matched.map(m => m.id)
 
-  const session = await findOpenSession(admin.id, 'offer', id)
+  const session = await findOpenSession(admin.adminId, 'offer', id)
   if (session) {
     await ensureOfferDraft(id)
     const current = (await draftProductIds(id)) ?? []
