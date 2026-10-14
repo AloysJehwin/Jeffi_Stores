@@ -308,6 +308,12 @@ describe('middleware', () => {
       expect(res.status).not.toBe(401)
       expect(res.status).not.toBe(307)
     })
+
+    it('reads a request body to the end before returning', async () => {
+      const req = new NextRequest('https://business.jeffistores.in/api/products', { method: 'POST', body: 'x'.repeat(50_000) })
+      await middleware(req)
+      expect(req.bodyUsed).toBe(true)
+    })
   })
 
   // -------------------------------------------------------------------------
