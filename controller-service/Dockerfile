@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# Build context: the repo root (the app imports the workspace packages under packages/).
 FROM node:20-alpine AS base
 # Gentler installs: fewer sockets + retries survive flaky links (Docker Desktop NAT drops bursts).
 ENV npm_config_maxsockets=6 npm_config_fetch_retries=5 npm_config_fetch_retry_mintimeout=20000 npm_config_fetch_retry_maxtimeout=120000
@@ -9,6 +10,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 # xlsx is vendored: SheetJS ships it from its own CDN, which some networks can't reach.
 COPY vendor ./vendor
+# npm workspaces: the lockfile links @jeffi/* to packages/*, so every workspace manifest must exist.
+COPY packages ./packages
+COPY messaging-service/package.json messaging-service/
+COPY document-service/package.json document-service/
+COPY public-api-service/package.json public-api-service/
 RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci --omit=dev
 
 # ---- Builder ----
@@ -17,6 +23,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 # xlsx is vendored: SheetJS ships it from its own CDN, which some networks can't reach.
 COPY vendor ./vendor
+# npm workspaces: the lockfile links @jeffi/* to packages/*, so every workspace manifest must exist.
+COPY packages ./packages
+COPY messaging-service/package.json messaging-service/
+COPY document-service/package.json document-service/
+COPY public-api-service/package.json public-api-service/
 RUN --mount=type=cache,target=/root/.npm,sharing=locked npm ci
 COPY . .
 
@@ -72,12 +83,10 @@ RUN apk add --no-cache openssl
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Copy public assets
-COPY --from=builder /app/public ./public
-
-# Copy standalone server + static files
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Standalone output traced from the repo root: controller-service/server.js + root node_modules/packages.
+COPY --from=builder --chown=nextjs:nodejs /app/controller-service/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/controller-service/.next/static ./controller-service/.next/static
+COPY --from=builder /app/controller-service/public ./controller-service/public
 
 # Copy pdfkit + full dependency tree (serverExternalPackages not bundled by Next.js)
 COPY --from=deps /app/node_modules/pdfkit ./node_modules/pdfkit
@@ -106,7 +115,7 @@ COPY --from=deps /app/node_modules/dijkstrajs ./node_modules/dijkstrajs
 COPY --from=deps /app/node_modules/bwip-js ./node_modules/bwip-js
 
 # Copy cluster server wrapper
-COPY --from=builder --chown=nextjs:nodejs /app/cluster-server.js ./cluster-server.js
+COPY --from=builder --chown=nextjs:nodejs /app/controller-service/cluster-server.js ./controller-service/cluster-server.js
 
 # Copy secrets bootstrap script (fetches from AWS Secrets Manager at container start)
 COPY --from=builder --chown=nextjs:nodejs /app/deploy/load-secrets.mjs ./deploy/load-secrets.mjs
@@ -151,4 +160,5 @@ ENV HOSTNAME="0.0.0.0"
 # server separately, so injected secrets never reached the app (JWT_SECRET etc.
 # were undefined and the container failed health checks on deploy).
 ENV SPAWN_APP=1
+ENV APP_ENTRY=controller-service/cluster-server.js
 CMD ["node", "deploy/load-secrets.mjs"]
