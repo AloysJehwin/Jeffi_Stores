@@ -1,7 +1,14 @@
 import 'server-only'
 import crypto from 'node:crypto'
 import { apply, get, list, remove, type K8sObject } from './client'
-import { renderTenantWorkload, tenantAppName, LEGACY_APP_NAME, type TenantWorkloadInput } from './tenant-workload'
+import {
+  renderTenantWorkload,
+  tenantAppName,
+  tenantWorkloadNames,
+  legacyAppNames,
+  type TenantService,
+  type TenantWorkloadInput,
+} from './tenant-workload'
 import { agentNodeUserData } from './node-user-data'
 import {
   computeTierFor,
@@ -154,66 +161,78 @@ async function seedNamespace(ns: string) {
   }
 }
 
-/** The image every tenant should run: platform/release ConfigMap (set by CI), else :latest. */
-export async function releaseImage(): Promise<string | undefined> {
+/** The images tenants run, per service: platform/release ConfigMap (set by rollout.sh). */
+export async function releaseImages(): Promise<Partial<Record<TenantService, string>>> {
   const cm = await get<any>('ConfigMap', 'release', PLATFORM_NS).catch(() => null)
-  return cm?.data?.image || undefined
+  const d = cm?.data ?? {}
+  const pick = (v?: string) => (v && !v.endsWith(':set-by-rollout') ? v : undefined)
+  return { controller: pick(d.controller), messaging: pick(d.messaging), documents: pick(d.documents) }
 }
 
 /** Apply (create or reconcile) the tenant's whole namespace. Safe to call on plan change. */
 export async function applyTenantWorkload(input: TenantWorkloadInput): Promise<void> {
-  const objs = renderTenantWorkload({ ...input, image: input.image || (await releaseImage()) })
+  const objs = renderTenantWorkload({ ...input, images: { ...(await releaseImages()), ...input.images } })
   const [nsObj, ...rest] = objs
   await apply(nsObj)
   await seedNamespace(tenantNamespace(input.slug))
   for (const o of rest) await apply(o)
-  // Downgrades drop the HPA/PDB the new tier no longer renders.
-  const kinds = new Set(rest.map(o => o.kind))
+  // Downgrades drop the HPA/PDBs the new tier no longer renders.
   const ns = tenantNamespace(input.slug)
-  const app = tenantAppName(input.slug)
-  if (!kinds.has('HorizontalPodAutoscaler')) await remove('HorizontalPodAutoscaler', app, ns)
-  if (!kinds.has('PodDisruptionBudget')) await remove('PodDisruptionBudget', app, ns)
+  const rendered = new Set(rest.map(o => `${o.kind}/${o.metadata.name}`))
+  for (const kind of ['HorizontalPodAutoscaler', 'PodDisruptionBudget']) {
+    for (const name of tenantWorkloadNames(input.slug)) {
+      if (!rendered.has(`${kind}/${name}`)) await remove(kind, name, ns)
+    }
+  }
   await retireLegacyApp(input.slug)
 }
 
-/** Drop the pre-rename `storefront` Deployment/HPA/PDB once the slug-named one serves. Idempotent. */
+/** Drop the earlier store Deployments and the `storefront` Service/route once the controller serves. Idempotent. */
 async function retireLegacyApp(slug: string): Promise<void> {
   const ns = tenantNamespace(slug)
-  if (tenantAppName(slug) === LEGACY_APP_NAME) return
-  if (!(await get('Deployment', LEGACY_APP_NAME, ns))) return
   const d = await get<any>('Deployment', tenantAppName(slug), ns)
   if ((d?.status?.readyReplicas ?? 0) < 1) return
-  for (const kind of ['HorizontalPodAutoscaler', 'PodDisruptionBudget', 'Deployment']) {
-    await remove(kind, LEGACY_APP_NAME, ns)
+  for (const name of legacyAppNames(slug)) {
+    if (!(await get('Deployment', name, ns))) continue
+    for (const kind of ['HorizontalPodAutoscaler', 'PodDisruptionBudget', 'Deployment']) await remove(kind, name, ns)
   }
+  await remove('IngressRoute', 'storefront', ns)
+  await remove('Service', 'storefront', ns)
 }
 
-/** The store Deployment (slug-named, or the legacy name until migrated). */
+/** The store's controller Deployment (or an earlier name until migrated). */
 async function appDeployment(slug: string): Promise<any> {
   const ns = tenantNamespace(slug)
-  return (await get<any>('Deployment', tenantAppName(slug), ns)) ?? (await get<any>('Deployment', LEGACY_APP_NAME, ns))
+  for (const name of [tenantAppName(slug), ...legacyAppNames(slug)]) {
+    const d = await get<any>('Deployment', name, ns)
+    if (d) return d
+  }
+  return null
 }
 
-/** True once the store Deployment has at least one ready replica. */
+const workloads = (slug: string) =>
+  Promise.all(tenantWorkloadNames(slug).map(n => get<any>('Deployment', n, tenantNamespace(slug))))
+
+/** True once the store's controller, messaging and document Deployments each have a ready replica. */
 export async function tenantWorkloadReady(slug: string): Promise<boolean> {
-  const d = await get<any>('Deployment', tenantAppName(slug), tenantNamespace(slug))
-  const ready = (d?.status?.readyReplicas ?? 0) > 0
+  const ready = (await workloads(slug)).every(d => (d?.status?.readyReplicas ?? 0) > 0)
   if (ready) await retireLegacyApp(slug).catch(() => {})
   return ready
 }
 
-/** Rolled out: every replica is on the current template and ready (pods have left the old node). */
+/** Rolled out: every replica of every store Deployment is on the current template and ready. */
 export async function tenantRolloutComplete(slug: string): Promise<boolean> {
-  const d = await get<any>('Deployment', tenantAppName(slug), tenantNamespace(slug))
-  if (!d) return false
-  const want = d.spec?.replicas ?? 1
-  const s = d.status ?? {}
-  return (
-    (s.observedGeneration ?? 0) >= (d.metadata?.generation ?? 0) &&
-    (s.updatedReplicas ?? 0) >= want &&
-    (s.readyReplicas ?? 0) >= want &&
-    (s.replicas ?? 0) === (s.updatedReplicas ?? 0)
-  )
+  return (await workloads(slug)).every(d => {
+    if (!d) return false
+    const want = d.spec?.replicas ?? 1
+    const s = d.status ?? {}
+    return (
+      (s.observedGeneration ?? 0) >= (d.metadata?.generation ?? 0) &&
+      (s.updatedReplicas ?? 0) >= want &&
+      (s.readyReplicas ?? 0) >= want &&
+      (s.replicas ?? 0) === (s.updatedReplicas ?? 0)
+    )
+  })
 }
 
 /**
@@ -259,7 +278,7 @@ export async function getTenantWorkloadStatus(slug: string): Promise<TenantWorkl
   const ns = tenantNamespace(slug)
   const d = await appDeployment(slug)
   if (!d) return null
-  const pods = await list<any>('Pod', ns, `app=storefront,jeffi.io/tenant=${slug}`)
+  const pods = await list<any>('Pod', ns, `jeffi.io/tenant=${slug}`)
   return {
     namespace: ns,
     image: d.spec?.template?.spec?.containers?.[0]?.image ?? null,

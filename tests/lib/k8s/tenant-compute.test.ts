@@ -50,8 +50,8 @@ describe('ensureTenantNode – basic pool', () => {
   })
 
   it('defaults to the pool node capacity', () => {
-    expect(poolCapacity(node({ 'jeffi.io/pool': 'basic' }))).toBe(6)
-    expect(poolCapacity(node({ 'jeffi.io/pool-capacity': 'x' }))).toBe(6)
+    expect(poolCapacity(node({ 'jeffi.io/pool': 'basic' }))).toBe(4)
+    expect(poolCapacity(node({ 'jeffi.io/pool-capacity': 'x' }))).toBe(4)
   })
 })
 
@@ -80,25 +80,30 @@ describe('terminateTenantInstance', () => {
   })
 })
 
-describe('legacy storefront Deployment retirement', () => {
+describe('legacy store Deployment retirement', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('removes the old storefront objects only once the slug-named Deployment is ready', async () => {
+  it('waits for all three services, then removes the earlier store objects', async () => {
     const { tenantWorkloadReady } = await import('@/lib/k8s/tenant-compute')
+    const up = { status: { readyReplicas: 1 } }
     const state: Record<string, any> = {
-      'Deployment/acme': { status: { readyReplicas: 0 } },
-      'Deployment/storefront': { status: { readyReplicas: 1 } },
+      'Deployment/acme-controller-service': up,
+      'Deployment/acme-messaging-service': up,
+      'Deployment/acme-document-service': { status: { readyReplicas: 0 } },
+      'Deployment/acme': up,
     }
     k8s.get.mockImplementation(async (kind: string, name: string) => state[`${kind}/${name}`] ?? null)
     expect(await tenantWorkloadReady('acme')).toBe(false)
     expect(k8s.remove).not.toHaveBeenCalled()
 
-    state['Deployment/acme'] = { status: { readyReplicas: 1 } }
+    state['Deployment/acme-document-service'] = up
     expect(await tenantWorkloadReady('acme')).toBe(true)
     expect(k8s.remove.mock.calls.map(c => `${c[0]}/${c[1]}`)).toEqual([
-      'HorizontalPodAutoscaler/storefront',
-      'PodDisruptionBudget/storefront',
-      'Deployment/storefront',
+      'HorizontalPodAutoscaler/acme',
+      'PodDisruptionBudget/acme',
+      'Deployment/acme',
+      'IngressRoute/storefront',
+      'Service/storefront',
     ])
   })
 })
