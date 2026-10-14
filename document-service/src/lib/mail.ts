@@ -1,5 +1,5 @@
 import { signServiceToken } from '@jeffi/service-auth'
-import { requireTenant } from '@jeffi/tenancy'
+import { currentTenant, PLATFORM_TENANT_ID } from '@jeffi/tenancy'
 import { mailShell } from './mail-template'
 import { currentBrandNameAsync, customerMailFromAsync, storeAddressLine, storeContactLine } from './brand'
 
@@ -9,7 +9,7 @@ const inr = (n: number) => n.toLocaleString('en-IN', { minimumFractionDigits: 2,
 type Result = { success: boolean; messageId?: string; error?: unknown }
 
 async function send(to: string, subject: string, html: string, templateName: string, metadata: Record<string, unknown>): Promise<Result> {
-  const t = requireTenant()
+  const t = currentTenant() ?? { tenantId: PLATFORM_TENANT_ID, slug: 'platform' }
   try {
     const res = await fetch(`${MESSAGING_URL}/messages`, {
       method: 'POST',

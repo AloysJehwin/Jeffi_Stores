@@ -1,6 +1,6 @@
 export * from './context'
 export * from './hosts'
-export { controlPlanePool, tenantPool } from './pools'
+export { controlPlanePool, tenantPool, platformPool, PLATFORM_TENANT_ID } from './pools'
 export * from './registry'
 export * from './db'
 export * from './s3'
