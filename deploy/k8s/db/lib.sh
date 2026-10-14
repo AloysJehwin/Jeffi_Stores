@@ -12,6 +12,7 @@ REHEARSAL=${REHEARSAL:-false}
 CTRL=jeffi-stores-controller-service
 export AWS_REGION=${AWS_REGION:-us-east-1}
 export KUBECONFIG=${KUBECONFIG:-$HOME/.kube/jeffi-k3s.yaml}
+export PGGSSENCMODE=disable  # no Kerberos attempt (a corporate krb5 realm only adds noise to auth errors)
 STAMP=${STAMP:-$(date +%Y%m%d-%H%M)}
 OUT_DIR=${OUT_DIR:-$HOME/Documents/db-backups/release-$STAMP}
 

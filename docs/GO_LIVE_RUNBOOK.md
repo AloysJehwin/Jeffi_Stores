@@ -62,6 +62,13 @@ to `~/Documents/db-backups/release-<stamp>/`.
    - No EventBridge schedule stops RDS or the core node during the window: `aws scheduler list-schedules --query 'Schedules[].[Name,State]' --output table`.
    - The `RAZORPAY_PLAN_ID_*` plans in Razorpay match the prices in the rehearsal's plans table.
    - At least 15 GB free disk, Docker Desktop running, `~/.ssh/jeffi-stores-key.pem` present, and `aws sts get-caller-identity` working.
+   - The RDS master login works (step 4 hands the older tables over as `postgres`; `go-live.sh` checks it). If RDS
+     rejects the password stored in `jeffi/production`, reset RDS to it. There's no downtime: the apps sign in as
+     `app_user` with IAM.
+     ```bash
+     aws rds modify-db-instance --db-instance-identifier jeffi-stores-db --apply-immediately --master-user-password "$(aws secretsmanager get-secret-value --secret-id jeffi/production --query SecretString --output text | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["RDS_MASTER_PASSWORD"])')" --query DBInstance.DBInstanceStatus --output text
+     bash -c 'source deploy/k8s/db/lib.sh; tunnel; for i in $(seq 30); do psql_master jeffi_stores -Atc "select 1" >/dev/null 2>&1 && { echo master login ok; exit 0; }; sleep 10; done; echo still rejected; exit 1'
+     ```
 
 ## The window (60–90 min)
 

@@ -27,6 +27,8 @@ preflight() {
   ssh_allowed
   k8s_tunnel; kubectl get nodes
   tunnel; psql_app jeffi_stores -Atc "SELECT 'jeffi_stores reachable as ' || current_user"
+  [ "$FROM" -gt 4 ] || psql_master jeffi_stores -Atc "SELECT 'master login works (' || current_user || ')'" ||
+    { echo "RDS rejects the master password stored in jeffi/production; reset it first (docs/GO_LIVE_RUNBOOK.md, The day before)." >&2; return 1; }
   echo "EventBridge schedules (none may stop RDS or the core node in the next two hours):"
   aws scheduler list-schedules --query 'Schedules[].[Name,State]' --output text 2>/dev/null || echo "  (could not list)"
 }
