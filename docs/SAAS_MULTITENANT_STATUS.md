@@ -1,5 +1,5 @@
 # SaaS Multi-Tenant Foundation — Status Summary
-_Last updated: 2026-08-26_
+_Last updated: 2026-10-14_
 
 Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until instructed)
 
@@ -13,6 +13,19 @@ Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until 
 
 ---
 
+## Service pods and go-live (2026-10-14)
+
+- The Next app is `controller-service/` (was `src/`). Every service runs as its own pod:
+  - platform (`jeffi`): `jeffi-stores-{controller,messaging,document,public-api}-service`;
+  - each store tenant (`tenant-{slug}`): `{slug}-{controller,messaging,document}-service`, sized per plan (`provisioning/tiers.ts`) and pinned with `SERVICE_TENANT_SLUG`;
+  - public-api is shared.
+- A pinned pod serves and runs background loops for its own tenant only; the platform's pods skip store tenants (`SERVICE_SKIP_STORE_TENANTS`, `packages/tenancy/src/service-scope.ts`).
+- Routes: `public.` → public-api (`/webhooks/` → messaging); `invoice.`/`quotation.`/`purchaseorder.` → the platform document-service; `invoice-`/`quotation-`/`purchaseorder-{slug}.` → the store's own document-service.
+- Existing stores move to the new layout through `POST /api/internal/provisioning/reconcile-k8s`, which `rollout.sh` runs.
+- Production DB: the control plane merges into `jeffi_stores` at go-live (`CONTROL_PLANE_RDS_DB=jeffi_stores`); `jeffi_control_plane` stays a week as the fallback.
+- Releases without CI: `deploy/k8s/bootstrap/release.sh`. DB changes are user-run scripts in `deploy/k8s/db/`. Go-live steps: [`GO_LIVE_RUNBOOK.md`](GO_LIVE_RUNBOOK.md).
+- **Live state:** not deployed yet; production runs `5c4ffbf4`.
+
 ## Kubernetes (2026-10-08)
 
 Tenant compute is moving from AMI-built EC2s to k3s. The plan is in [`K8S_MIGRATION_PLAN.md`](K8S_MIGRATION_PLAN.md) and the runbook in [`deploy/k8s/README.md`](../deploy/k8s/README.md).
@@ -23,7 +36,7 @@ Tenant compute is moving from AMI-built EC2s to k3s. The plan is in [`K8S_MIGRAT
 - **DNS:** a single `*.jeffistores.in` wildcard. `configure_dns` no longer writes per-host records in k8s mode.
 - **Plan changes:** go through `reconcileK8sPlan`. A node that is still joining parks the change as `k8sPendingPlan`, which the worker retries.
 - **Tenant-admin CA bundle:** is a Secret (`jeffi-edge/client-ca-bundle`) patched by `mtls-fleet` instead of being pushed over SSM.
-- **Live state:** not live yet. The cluster bring-up is the manual runbook step.
+- **Live state:** live on k3s since 2026-10-09 (`5c4ffbf4`).
 
 ---
 
@@ -243,16 +256,16 @@ Each signed-up tenant gets a dedicated `db.t4g.micro` RDS Postgres instance + an
 - Dashboard gate (`lib/ecom/owner-context.ts`): only store-only tenants are held in `/onboard` while `pending_approval`/`awaiting_payment`.
 - Console nav is filtered by service type (`dashboard/nav.ts` `navFor`). New pages: Wallet (Razorpay top-up via `/api/ecom/wallet/topup/*`), API keys, Messaging (templates + log), Documents, Add a store (`upgradeTenantToStore` — same tenant id and wallet).
 - Public API: `public.jeffistores.in` → `public-api-service/`; keys in control-plane `api_keys` / `api_key_usage_daily`. See `docs/MICROSERVICES_PLAN.md` addendum.
-- Hosts: `public.` is served by the gateway, not the Next app (add the Traefik rule when deploying).
+- Hosts: `public.` is served by the gateway, not the Next app (`deploy/k8s/platform/47-public-api-service.yaml`).
 
 ## Invoices / quotations / purchase orders live in document-service (added 2026-10-13)
 
-- **Tenant document hosts** `invoice-{slug}.`, `quotation-{slug}.`, `purchaseorder-{slug}.jeffistores.in` are served by `document-service/` (`controller-service/src/tenant/public.tsx`: HTML viewer, `/<token>/json`, `/<token>/pdf`; also reachable as `/t/:app/:token`). The Next app no longer has `(business)/{invoice,quotation,purchaseorder}` pages or `api/public/{invoice,quotation,purchaseorder}` routes. Dev: middleware rewrites those hosts to `DOCUMENTS_URL`; **prod: add a Traefik rule** `HostRegexp(^(invoice|quotation|purchaseorder)-[a-z0-9-]+\.jeffistores\.in$)` → document-service (not yet applied).
+- **Tenant document hosts** `invoice-{slug}.`, `quotation-{slug}.`, `purchaseorder-{slug}.jeffistores.in` are served by `document-service/` (`controller-service/src/tenant/public.tsx`: HTML viewer, `/<token>/json`, `/<token>/pdf`; also reachable as `/t/:app/:token`). The Next app no longer has `(business)/{invoice,quotation,purchaseorder}` pages or `api/public/{invoice,quotation,purchaseorder}` routes. Dev: middleware rewrites those hosts to `DOCUMENTS_URL`. Prod: the store's `documents` IngressRoute sends them to `{slug}-document-service`; the platform's own `invoice.`/`quotation.`/`purchaseorder.` hosts go to `jeffi-stores-document-service`.
 - **Admin APIs** keep their URLs. `/api/admin/invoices/**`, `/api/admin/quotations/**`, `/api/admin/inventory/po/**` (incl. receive/GRN), `/api/admin/business/rfqs/[id]/convert-to-quotation`, `/api/admin/orders/[id]/einvoice` and `/api/orders/[id]/invoice` are thin Next routes: `authenticateAdmin` + scope check, then `controller-service/src/lib/documents/proxy.ts` forwards to document-service with an HMAC service token carrying `adminId/role/scopes` (or `userId` for the customer invoice download). Handlers are the lifted monolith code under `document-service/src/admin/**` (Next shim in `controller-service/src/shim.ts`).
 - **Data access**: `packages/tenancy` resolves the tenant from the control plane (`tenant_infra`) and opens a per-tenant pg pool (IAM auth; `localhost` endpoint uses `DATABASE_URL` creds in dev). It exposes the monolith's `query/queryOne/queryMany/getClient/withTransaction` names (audit `admin_id` set from the token) so lifted code is a path rewrite. Tenant S3 upload via `uploadInvoicePDF`.
 - **Numbering / PDF from the monolith** (checkout, Razorpay webhooks, subscription cycles, COD remittance): `controller-service/src/lib/documents/invoice.ts` is now a client → `POST /orders/:id/invoice/{draft,number,generate}` on document-service. `assignInvoiceNumber` runs in the service's own transaction after the order transaction commits (idempotent).
 - **Emails** from the service (invoice/quotation/PO finalized, business invoice) go through messaging-service (`internal: true`, cost price), not the monolith's SMTP; the online-order "status update with PDF attachment" became the invoice-finalized email with the view link (no attachments in messaging-service yet).
 - Also moved: PO receive/GRN (`po/[id]/receive` + receive drafts) and `business/rfqs/[id]/convert-to-quotation`. Still in the monolith: legacy `admin/cash-sale/**`, `receipt-pdf.ts` and `store-logo.ts` (packing-slip/brochure/legacy receipt).
 - E2E verified locally (scratch script, 49 checks): invoice draft→finalize→edit→amend→publish, cash sale, quotation→PDF→convert-to-invoice, PO draft→create→receive (GRN)→public page, e-invoice stub, RFQ→quotation, stock deltas on each step, emails logged in messaging-service.
-- Caveat: the proxy requires a tenant in scope; on the platform's own (non-tenant) host these APIs return 501.
+- On the platform's own host the proxy sends the platform tenant id; document-service serves it from the main DB (`runAsPlatform`, `platformPool`).
 - Env (`jeffi/services/local`): `DATABASE_URL`, `AWS_*`, `S3_BUCKET_NAME`, `RAZORPAY_KEY_*`, `SES_FROM_EMAIL`, `DEV_PUBLIC_PORT`; prod also needs `RDS_USER`, `EINVOICE_*`.

@@ -24,9 +24,9 @@ if (!jobId || !method || !path || !process.env.CRON_SECRET) {
 // A new pod joins the k3s network-policy allow-list a moment after it starts, so the first
 // connection can be dropped; retry connection errors (not HTTP errors) briefly.
 // The fan-out endpoint reads the jobId from the POST body (one CronJob drives all tenants for a job).
-const isFanout = path === '/api/cron/fanout'
-const callHeaders = isFanout ? { ...headers, 'Content-Type': 'application/json' } : headers
-const callBody = isFanout ? JSON.stringify({ jobId }) : undefined
+// CRON_BODY (JSON) is for one-off release calls (deploy/k8s/db/lib.sh in_cluster).
+const callBody = process.env.CRON_BODY || (path === '/api/cron/fanout' ? JSON.stringify({ jobId }) : undefined)
+const callHeaders = callBody ? { ...headers, 'Content-Type': 'application/json' } : headers
 
 async function call() {
   for (let attempt = 1; ; attempt++) {
@@ -46,6 +46,7 @@ try {
     body = await res.json()
   } catch {}
   await record(res.ok, res.ok ? undefined : `HTTP ${res.status}`, body)
+  if (process.env.CRON_VERBOSE) console.log(JSON.stringify(body, null, 2))
   console.log(`${jobId} ${res.status}`)
   process.exit(res.ok ? 0 : 1)
 } catch (err) {

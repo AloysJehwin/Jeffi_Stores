@@ -29,6 +29,7 @@ spec:
             - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
             - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
             - { name: DB_IAM_AUTH, value: 'true' }
+            - { name: PUBLIC_API_URL, value: 'https://public.jeffistores.in' }
             - name: REDIS_PASSWORD
               valueFrom: { secretKeyRef: { name: redis, key: password } }
             - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }

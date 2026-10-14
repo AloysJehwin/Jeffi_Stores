@@ -9,8 +9,10 @@ up and cut production over to it.
 | `bootstrap/core-node.sh` | Core user-data: Tailscale + k3s server (embedded etcd, 6-hourly snapshots) |
 | `bootstrap/secrets.sh` | Seeds cluster Secrets from Secrets Manager + local `certs/` (prints no values) |
 | `bootstrap/apply-platform.sh` | Applies `platform/` in dependency order |
-| `bootstrap/rollout.sh` | CI rollout: platform, then every tenant namespace one at a time |
-| `platform/` | Traefik config, cert-manager + wildcard, mTLS edge, flagship, Redis, CronJobs, Coroot + Headlamp |
+| `bootstrap/release.sh` | Builds the four service images from `HEAD`, pushes them to ECR, runs `rollout.sh`, smoke-tests |
+| `bootstrap/rollout.sh` | Rollout: platform, tenant schema fan-out, then every store namespace one at a time |
+| `db/` | Production DB release scripts (backup, schema, control-plane merge, secrets, fan-out, seeds); see `docs/GO_LIVE_RUNBOOK.md` |
+| `platform/` | Traefik config, cert-manager + wildcard, mTLS edge, the controller/messaging/document/public-api services, Redis, CronJobs, Coroot + Headlamp |
 | `gen-cronjobs.ts` | Regenerates `platform/cronjobs.yaml` from `controller-service/src/lib/shared/cron-jobs.ts` (a test fails on drift) |
 
 Tenant namespaces are **not** in git. The provisioning engine renders them
@@ -27,7 +29,7 @@ Tenant namespaces are **not** in git. The provisioning engine renders them
 4. **Secrets:** `GH_DEPLOY_TOKEN=… bash deploy/k8s/bootstrap/secrets.sh`
 5. **Provisioner config** (from step 2):
    `kubectl -n jeffi patch cm provisioning --type merge -p '{"data":{"K8S_SERVER_URL":"https://<core-private-ip>:6443","K8S_NODE_SECURITY_GROUP":"<node-sg>","K8S_NODE_AMI_ID":"<al2023-arm64-ami>"}}'`
-6. **Apply:** `bash deploy/k8s/bootstrap/apply-platform.sh main-<sha>`
+6. **Apply:** `bash deploy/k8s/bootstrap/apply-platform.sh local-<sha>` (images pushed by `release.sh --build-only`)
    - Basic tenants schedule on any node labelled `jeffi.io/pool=basic`, capped per node by `jeffi.io/pool-capacity`. To host them on core: `kubectl label node <core> jeffi.io/pool=basic jeffi.io/pool-capacity=<n> --overwrite`. Core must have no NoSchedule taint (tenant pods carry no tolerations).
 7. **Verify before any DNS change**, with `curl --resolve`:
    - `curl --resolve jeffistores.in:443:32.196.38.130 https://jeffistores.in/api/ready`
@@ -52,15 +54,15 @@ Tenant namespaces are **not** in git. The provisioning engine renders them
 
 ## Deploying without CI (GitHub unavailable)
 
-Commit your changes, then run `bash deploy/k8s/bootstrap/deploy-local.sh`.
+Commit your changes, then run `bash deploy/k8s/bootstrap/release.sh` (`deploy-local.sh` is an alias).
 
-It builds the committed `HEAD` on this Mac (arm64, from `git archive`, so uncommitted and local files never ship), pushes it to ECR, rolls it out with `rollout.sh`, then smoke-tests that the live `/api/health` reports the new commit.
+It builds the committed `HEAD` on this Mac (arm64, from `git archive`, so uncommitted and local files never ship) into four images (`jeffi-stores-{controller,messaging,document,public-api}-service:local-<sha>`), pushes them to ECR, rolls them out with `rollout.sh`, then smoke-tests that the live `/api/health` reports the new commit. `--build-only` stops after the push. Schema changes are not applied by it: see `deploy/k8s/db/` and `docs/GO_LIVE_RUNBOOK.md`.
 
 - **Preconditions:** a clean working tree, Docker Desktop running, and ≥15 GB free disk (Docker corrupts its disk when it runs out).
-- **Rollback:** `kubectl -n jeffi rollout undo deploy/flagship`.
+- **Rollback:** `kubectl -n jeffi rollout undo deploy/jeffi-stores-controller-service` (likewise the other three services).
 - **Never build on the core node:** the build needs ~4 GB RAM and starves production.
 
 ## Rollback
 
-- **App:** `kubectl -n jeffi rollout undo deploy/flagship`, or `-n tenant-<slug> … storefront`.
+- **App:** `kubectl -n jeffi rollout undo deploy/jeffi-stores-<service>-service`, or `-n tenant-<slug> … deploy/<slug>-<service>-service`.
 - **Cutover:** start `i-0b2466b2a540d6f23`, point the CloudFront origin and DNS back at `52.20.193.62`, and unset `K8S_DEPLOY`.

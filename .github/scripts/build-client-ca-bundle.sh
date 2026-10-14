@@ -27,7 +27,7 @@ cat "$PLATFORM_CA" > "$TMP"
 
 HOST="${CONTROL_PLANE_RDS_HOST:-jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com}"
 USER="${CONTROL_PLANE_RDS_USER:-app_user}"
-DB="${CONTROL_PLANE_RDS_DB:-jeffi_control_plane}"
+DB="${CONTROL_PLANE_RDS_DB:-jeffi_stores}"
 REGION="${AWS_REGION:-us-east-1}"
 
 PGPASSWORD="$(aws rds generate-db-auth-token --hostname "$HOST" --port 5432 --region "$REGION" --username "$USER")" \

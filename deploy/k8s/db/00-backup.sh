@@ -1,0 +1,40 @@
+#!/bin/bash
+# Step 0, inside the write freeze: an RDS snapshot plus pg_dump (custom format) of jeffi_stores and
+# jeffi_control_plane into $OUT_DIR. The dumps also feed rehearse.sh.
+# Usage: bash deploy/k8s/db/00-backup.sh [--dry-run] [--yes]
+source "$(dirname "$0")/lib.sh"
+SNAP=$RDS_INSTANCE-pre-release-$STAMP
+DBS="jeffi_stores jeffi_control_plane"
+
+say "RDS instance (status, class, engine, GB) and latest snapshots"
+aws rds describe-db-instances --db-instance-identifier "$RDS_INSTANCE" \
+  --query 'DBInstances[0].[DBInstanceStatus,DBInstanceClass,EngineVersion,AllocatedStorage]' --output text
+aws rds describe-db-snapshots --db-instance-identifier "$RDS_INSTANCE" \
+  --query 'reverse(sort_by(DBSnapshots,&SnapshotCreateTime))[:3].[DBSnapshotIdentifier,SnapshotCreateTime,Status]' --output text
+tunnel
+say "Database sizes"
+psql_app jeffi_stores -Atc "SELECT datname || '  ' || pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE datname IN ('jeffi_stores', 'jeffi_control_plane')"
+say "Objects in public not owned by app_user (the release scripts run as app_user; expect none)"
+for db in $DBS; do
+  psql_app "$db" -Atc "SELECT '$db: ' || c.relname || ' (' || pg_get_userbyid(c.relowner) || ')' FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r','p','S','v','m')
+    AND c.relowner <> (SELECT oid FROM pg_roles WHERE rolname = current_user)"
+done
+
+if $DRY_RUN; then echo "Dry run: would snapshot $SNAP and dump $DBS into $OUT_DIR."; exit 0; fi
+confirm "Writes must be frozen first. Snapshot $RDS_INSTANCE and dump $DBS?"
+mkdir -p "$OUT_DIR"
+
+say "Snapshot $SNAP (dumps run while it is taken)"
+aws rds create-db-snapshot --db-instance-identifier "$RDS_INSTANCE" --db-snapshot-identifier "$SNAP" \
+  --query DBSnapshot.Status --output text
+pg_major > "$OUT_DIR/pg_major"
+for db in $DBS; do
+  say "pg_dump $db"
+  pg_docker pg_dump -d "$db" -Fc -f "/out/$db.dump"
+  echo "$(pg_docker pg_restore -l "/out/$db.dump" | grep -c ' TABLE DATA ') tables with data, $(du -h "$OUT_DIR/$db.dump" | cut -f1)"
+done
+say "Waiting for the snapshot"
+aws rds wait db-snapshot-available --db-snapshot-identifier "$SNAP"
+echo "Backed up: snapshot $SNAP, dumps in $OUT_DIR"
+echo "Restore the instance from the snapshot: aws rds restore-db-instance-from-db-snapshot --db-snapshot-identifier $SNAP --db-instance-identifier <new-id>"
