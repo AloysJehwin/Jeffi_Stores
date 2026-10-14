@@ -1,4 +1,4 @@
-import { controlPlanePool } from './pools'
+import { controlPlanePool, PLATFORM_TENANT_ID } from './pools'
 
 // A service pod either belongs to one store tenant (SERVICE_TENANT_SLUG) or is the platform's.
 // In k8s every store tenant runs its own services, so the platform's pods skip store tenants
@@ -21,7 +21,11 @@ export async function resolveServiceScope(): Promise<ServiceScope> {
 export function scopeSql(scope: ServiceScope, col: string, p: number): { sql: string; params: unknown[] } {
   if (scope.tenantId) return { sql: `${col} = $${p}`, params: [scope.tenantId] }
   if (scope.skipStoreTenants) {
-    return { sql: `NOT EXISTS (SELECT 1 FROM tenants st WHERE st.id = ${col} AND 'store' = ANY(st.service_types))`, params: [] }
+    // The platform's own rows stay here: its control-plane row reads as a store (service_types defaults to {store}).
+    return {
+      sql: `(${col} = '${PLATFORM_TENANT_ID}' OR NOT EXISTS (SELECT 1 FROM tenants st WHERE st.id = ${col} AND 'store' = ANY(st.service_types)))`,
+      params: [],
+    }
   }
   return { sql: 'true', params: [] }
 }
