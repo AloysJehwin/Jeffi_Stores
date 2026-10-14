@@ -1,9 +1,11 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 const q = vi.hoisted(() => vi.fn())
+const local = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => ({ query: q }) }))
+vi.mock('@/lib/shared/db', () => ({ query: local }))
 
-import { getMessagingSpend } from '@/lib/payments/wallet'
+import { FLAGSHIP_TENANT_ID, getMessagingSpend } from '@/lib/payments/wallet'
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -26,5 +28,13 @@ describe('getMessagingSpend', () => {
     q.mockRejectedValue(new Error('cp down'))
     const r = await getMessagingSpend('t1')
     expect(r).toEqual({ rows: [], total: 0, thisMonth: 0, byChannel: {} })
+  })
+
+  it('totals the flagship from what its messages cost, not its (never debited) wallet', async () => {
+    local.mockResolvedValue({ rows: [{ channel: 'whatsapp', month: '2026-10', spent: '0.88' }] })
+    q.mockResolvedValue({ rows: [{ channel: 'whatsapp', month: '2026-10', spent: '1.4' }, { channel: 'email', month: '2026-10', spent: '0.07' }] })
+    const r = await getMessagingSpend(FLAGSHIP_TENANT_ID)
+    expect(r.byChannel).toEqual({ whatsapp: 2.28, email: 0.07 })
+    expect(q.mock.calls[0][0]).toContain('FROM messages')
   })
 })
