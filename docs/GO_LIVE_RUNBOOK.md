@@ -3,6 +3,18 @@
 _2026-10-14. The release after `5c4ffbf4` (live as of 2026-10-09). Run every command from the repo root on the Mac.
 Every script that writes shows its plan, asks for `yes`, and has `--dry-run`._
 
+## One command
+
+```bash
+bash deploy/k8s/go-live.sh --dry-run    # read-only preview of every step
+bash deploy/k8s/go-live.sh              # everything below, start to finish
+bash deploy/k8s/go-live.sh --from <n>   # resume after fixing a failed step
+```
+
+It runs the day-before work with the site up: preflight, image build, a rehearsal on a fresh dump. Then it asks once
+(type `go-live`) and runs window steps 1–12. It stops at the first failure with that step's rollback and the resume
+command, and logs to `~/Documents/db-backups/go-live-<stamp>/`. `--skip-rehearsal` skips the rehearsal.
+
 ## What changes
 
 - **Pods.** The platform runs `jeffi-stores-{controller,messaging,document,public-api}-service` in `jeffi`. Each store
