@@ -25,11 +25,17 @@ confirm() {
   [ "$a" = yes ] || { echo "Stopped."; exit 1; }
 }
 
+listening() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+ssh_forward() { # <local port> <target>; replaces one of ours that holds the port but stopped forwarding (network change, sleep)
+  pkill -f "ssh .*-L $1:" 2>/dev/null || true; sleep 1
+  ssh -i "$SSH_KEY" -f -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L "$1:$2" "$CORE"
+}
+pg_up() { pg_isready -h 127.0.0.1 -p "$PORT" -t 10 -q 2>/dev/null; }
 tunnel() {
   $REHEARSAL && return 0
-  pg_isready -h 127.0.0.1 -p "$PORT" -q 2>/dev/null && return 0
-  ssh -i "$SSH_KEY" -f -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -L "$PORT:$RDS_HOST:5432" "$CORE"
-  for _ in $(seq 1 15); do pg_isready -h 127.0.0.1 -p "$PORT" -q 2>/dev/null && return 0; sleep 1; done
+  if listening "$PORT"; then for _ in 1 2 3; do pg_up && return 0; sleep 2; done; fi
+  ssh_forward "$PORT" "$RDS_HOST:5432"
+  for _ in $(seq 1 15); do pg_up && return 0; sleep 1; done
   echo "Could not open the tunnel to $RDS_HOST through $CORE" >&2; exit 1
 }
 
@@ -70,10 +76,12 @@ schema_diff() {
   fi
 }
 
+k8s_up() { kubectl get nodes --request-timeout=10s >/dev/null 2>&1; }
 k8s_tunnel() {
-  kubectl get nodes >/dev/null 2>&1 && return 0
-  ssh -i "$SSH_KEY" -f -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -L 16443:127.0.0.1:6443 "$CORE"
-  kubectl get nodes >/dev/null
+  if listening 16443; then for _ in 1 2 3; do k8s_up && return 0; sleep 2; done; fi
+  ssh_forward 16443 127.0.0.1:6443
+  for _ in $(seq 1 10); do k8s_up && return 0; sleep 2; done
+  echo "Could not reach the cluster through $CORE" >&2; exit 1
 }
 # POST an internal route from inside the controller pod; CRON_SECRET goes over stdin, never into argv.
 in_cluster() {
