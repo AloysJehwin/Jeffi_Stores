@@ -5,13 +5,13 @@ picks an approved template per campaign, fills its variable slots, and (for medi
 header image — see the **WhatsApp message** panel in Marketing → Campaigns when WhatsApp is enabled.
 
 ## How it works
-- The catalogue of selectable templates lives in `src/lib/templates/whatsapp-registry.ts`
+- The catalogue of selectable templates lives in `controller-service/src/lib/templates/whatsapp-registry.ts`
   (`WHATSAPP_TEMPLATES`). Each entry has a `key` (stored on the campaign in `campaigns.wa_template_sid`),
   a `sidEnv` (the env var holding the live Twilio Content SID), the `kinds` it's offered for, its numbered
   `slots`, `hasImageHeader`, and a `bodyPreview` used only for the admin chat-bubble preview.
-- At send time `sendCampaignWhatsApp` (`src/lib/campaigns/whatsapp-dispatch.ts`) resolves the campaign's
+- At send time `sendCampaignWhatsApp` (`controller-service/src/lib/campaigns/whatsapp-dispatch.ts`) resolves the campaign's
   chosen key → the SID from `process.env[sidEnv]` and sends via `sendCampaignTemplateWhatsApp`
-  (`src/lib/shared/whatsapp.ts`). If no key is chosen it falls back to the built-in per-kind dispatch; if
+  (`controller-service/src/lib/shared/whatsapp.ts`). If no key is chosen it falls back to the built-in per-kind dispatch; if
   the SID isn't configured the send returns false and the SMS fallback carries the message.
 - Twilio/WhatsApp credentials are **platform-global** (`TWILIO_*` env). Tenants pick from the shared
   approved set; they don't register their own sender.
@@ -22,7 +22,7 @@ header image — see the **WhatsApp message** panel in Marketing → Campaigns w
 2. When approved, copy its **Content SID** (`HX…`).
 3. Add the SID to the environment as a new `TWILIO_WA_<NAME>_SID` (Secrets Manager → regenerated into
    `.env.local` locally; the deploy secret in prod).
-4. Add an entry to `WHATSAPP_TEMPLATES` in `src/lib/templates/whatsapp-registry.ts`: a `key`, `label`,
+4. Add an entry to `WHATSAPP_TEMPLATES` in `controller-service/src/lib/templates/whatsapp-registry.ts`: a `key`, `label`,
    `sidEnv` (the new var), the campaign `kinds` it suits, its `slots` (matching the `{{n}}` order),
    and a `bodyPreview` mirroring the approved copy. **If the template has an image/media header**, set
    `imageSlot` to the `{{n}}` index that the template's media component uses for its URL — the admin's

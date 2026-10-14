@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const testsRoot = path.join(root, 'tests/api')
-const apiRoot = path.join(root, 'src/app/api')
+const apiRoot = path.join(root, 'controller-service/src/app/api')
 
 function walk(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
@@ -41,8 +41,8 @@ const missing = walk(testsRoot)
   .map((f) => path.relative(root, f))
 
 if (missing.length) {
-  console.error('Route tests without a matching src/app/api route:')
+  console.error('Route tests without a matching controller-service/src/app/api route:')
   for (const f of missing) console.error(`  ${f}`)
   process.exit(1)
 }
-console.log('Every tests/api route test mirrors a src/app/api route.')
+console.log('Every tests/api route test mirrors a controller-service/src/app/api route.')

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Bulk-approve every proposed enrichment in product_ai_enrichment_log.
- * Mirrors src/app/api/admin/catalog-enrichment/[id]/approve/route.ts
+ * Mirrors controller-service/src/app/api/admin/catalog-enrichment/[id]/approve/route.ts
  * but runs at the DB layer for smoke tests, without admin auth.
  *
  * Writes ai_description / ai_use_cases to RDS, marks log row promoted,

@@ -1,7 +1,7 @@
 # Microservices plan: surface services + shared services
 
 _Written 2026-10-10. Status: **proposal for review — no code changed yet.**_
-_Based on a full scan of the current app: 182 pages, 561 API routes, 30 `src/lib` modules, 16 tenant schema files._
+_Based on a full scan of the current app: 182 pages, 561 API routes, 30 `controller-service/src/lib` modules, 16 tenant schema files._
 
 ## 1. The model
 
@@ -84,7 +84,7 @@ packages/
   schema/      database/*.sql stays the single source of truth (pipeline unchanged)
 ```
 
-Today's `src/lib` maps almost one-to-one onto these packages; the move is mechanical (path aliases change,
+Today's `controller-service/src/lib` maps almost one-to-one onto these packages; the move is mechanical (path aliases change,
 code does not).
 
 ## 5. Data ownership (one writer per table group)
@@ -177,7 +177,7 @@ current app, which keeps running until phase 6).
 | **3. docs, vault, platform** | The three least-coupled surfaces become their own apps | 2 wk | IngressRoute per host back to the app |
 | **4. business, then admin, then storefront** | Split the big three; admin last-but-one because it has the most routes, storefront last because it carries the revenue | 3 wk | Same, per host |
 | **5. sync-worker + per-plan layout** | Extract syncs; provisioner renders per-plan surfaces and the shared pool; migrate the existing test store | 1.5 wk | Tier map back to "own everything" |
-| **6. Retire the monolith** | Delete `src/app` remnants; enforce Postgres role grants | 0.5 wk | — |
+| **6. Retire the monolith** | Delete `controller-service/src/app` remnants; enforce Postgres role grants | 0.5 wk | — |
 
 **Total: about 11–12 weeks** for one developer, with visible wins from phase 1.
 

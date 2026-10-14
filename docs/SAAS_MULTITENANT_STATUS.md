@@ -17,7 +17,7 @@ Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until 
 
 Tenant compute is moving from AMI-built EC2s to k3s. The plan is in [`K8S_MIGRATION_PLAN.md`](K8S_MIGRATION_PLAN.md) and the runbook in [`deploy/k8s/README.md`](../deploy/k8s/README.md).
 
-- **Selection:** `PROVISIONING_COMPUTE=k8s` switches `ensure_compute` to `src/lib/k8s/tenant-compute.ts`. Each tenant gets the namespace `tenant-{slug}`, with per-plan pod sizing (`src/lib/provisioning/tiers.ts`).
+- **Selection:** `PROVISIONING_COMPUTE=k8s` switches `ensure_compute` to `controller-service/src/lib/k8s/tenant-compute.ts`. Each tenant gets the namespace `tenant-{slug}`, with per-plan pod sizing (`controller-service/src/lib/provisioning/tiers.ts`).
   - Basic tenants run on shared `pool-basic-N` nodes.
   - Growth and above get a dedicated `t-{slug}` node.
 - **DNS:** a single `*.jeffistores.in` wildcard. `configure_dns` no longer writes per-host records in k8s mode.
@@ -53,9 +53,9 @@ All of these were **found by actually running the engine end-to-end** and are no
 
 | Fix | Commit | File(s) |
 |-----|--------|---------|
-| Middleware dropped `x-tenant-slug` on storefront/doc/tenant-admin rewrites → silently fell back to platform DB | `7af2bd1e` | `src/middleware.ts` |
-| `getPool()` ignored resolved tenant ctx (`enterWith` didn't survive the `await` back to caller) | `28c3729d` | `src/lib/db.ts` |
-| `aws-provider.tenantPool()` used IAM token for master user — wrong; master user is password-auth | `28c3729d` | `src/lib/provisioning/aws-provider.ts` |
+| Middleware dropped `x-tenant-slug` on storefront/doc/tenant-admin rewrites → silently fell back to platform DB | `7af2bd1e` | `controller-service/src/middleware.ts` |
+| `getPool()` ignored resolved tenant ctx (`enterWith` didn't survive the `await` back to caller) | `28c3729d` | `controller-service/src/lib/db.ts` |
+| `aws-provider.tenantPool()` used IAM token for master user — wrong; master user is password-auth | `28c3729d` | `controller-service/src/lib/provisioning/aws-provider.ts` |
 
 ### 3. Provisioning Engine Hardening (2026-08-18 session)
 
@@ -152,7 +152,7 @@ It is idempotent (`InvalidPermission.Duplicate` = success) and re-runs on retry,
 change self-heals. With the flag absent, `PubliclyAccessible` is `false` and **no SG call is made at
 all** — prod behavior is unchanged.
 
-Implemented via `authorizeSgIngress` / `revokeSgIngress` / `currentPublicIp` in `src/lib/ec2-client.ts`
+Implemented via `authorizeSgIngress` / `revokeSgIngress` / `currentPublicIp` in `controller-service/src/lib/ec2-client.ts`
 (the existing minimal SigV4 EC2 Query-API client — deliberately avoids adding `@aws-sdk/client-ec2`,
 which would version-skew against the installed 3.477 SDK).
 
@@ -163,7 +163,7 @@ which would version-skew against the installed 3.477 SDK).
 
 ### 7. Key Files
 ```
-src/lib/provisioning/
+controller-service/src/lib/provisioning/
   steps.ts          — 15-step state machine (preflight→activate) + reprovisionDns (DNS-only plan change)
   trigger.ts        — single entry point for all 4 flows (triggerProvisioning + kickAdvance)
   aws-provider.ts   — real @aws-sdk RDS/S3/Route53 impl
@@ -172,16 +172,16 @@ src/lib/provisioning/
   seed.ts           — optional seed_data seam (no-op; extend per profile)
   index.ts          — provider factory (PROVISIONING_PROVIDER=aws|stub)
 
-src/lib/tenant-dns.ts            — Route53 UPSERT/DELETE (value-agnostic teardown)
-src/lib/tenant-registry.ts       — control-plane pool, lookupTenant, reconcileOrphanedTenants
-src/lib/db.ts                    — tenant-aware DB pool, ensureTenantContext
-src/middleware.ts                 — host→tenant resolver, x-tenant-slug forwarding
-src/app/api/ecom/provisioning/route.ts        — canonical owner-portal trigger (owner-session gated)
-src/app/api/internal/provisioning/worker/route.ts    — ACTIVE driver; advances every in-flight job one step per 45s tick
-src/app/api/internal/provisioning/advance/route.ts   — legacy single-tenant self-advance loop (superseded; see below)
-src/app/api/internal/provisioning/reconcile/route.ts — hourly drift sweep (from instrumentation.ts)
-src/instrumentation.ts            — in-app scheduler; 45s provisioning worker + hourly reconcile
-src/lib/ec2-client.ts             — minimal SigV4 EC2 Query-API client (no @aws-sdk/client-ec2 dep)
+controller-service/src/lib/tenant-dns.ts            — Route53 UPSERT/DELETE (value-agnostic teardown)
+controller-service/src/lib/tenant-registry.ts       — control-plane pool, lookupTenant, reconcileOrphanedTenants
+controller-service/src/lib/db.ts                    — tenant-aware DB pool, ensureTenantContext
+controller-service/src/middleware.ts                 — host→tenant resolver, x-tenant-slug forwarding
+controller-service/src/app/api/ecom/provisioning/route.ts        — canonical owner-portal trigger (owner-session gated)
+controller-service/src/app/api/internal/provisioning/worker/route.ts    — ACTIVE driver; advances every in-flight job one step per 45s tick
+controller-service/src/app/api/internal/provisioning/advance/route.ts   — legacy single-tenant self-advance loop (superseded; see below)
+controller-service/src/app/api/internal/provisioning/reconcile/route.ts — hourly drift sweep (from instrumentation.ts)
+controller-service/src/instrumentation.ts            — in-app scheduler; 45s provisioning worker + hourly reconcile
+controller-service/src/lib/ec2-client.ts             — minimal SigV4 EC2 Query-API client (no @aws-sdk/client-ec2 dep)
 deploy/nginx-servers.conf        — nginx including tenant wildcard server_name blocks
 database/control-plane/schema.sql
 ```
@@ -195,7 +195,7 @@ database/control-plane/schema.sql
 | # | Item | Notes |
 |---|------|-------|
 | 🔴 **1** | **Merge PR #425 → main** | Deploys all code fixes + makes prod pick up `RDS_MASTER_PASSWORD`. This is the real gate. Do NOT merge until you've reviewed. |
-| 🔴 **2** | **Provisioning is now EVENT-DRIVEN (no cron)** | **Reworked 2026-08-22.** Provisioning is triggered by exactly four flows, all from the ecom owner portal, each handing a full self-contained payload to `triggerProvisioning()` (`src/lib/provisioning/trigger.ts`): (1) first provision — `subscription.charged` webhook + onboard success page; (2) plan upgrade/downgrade — `change-plan` route → `reprovisionDns` (DNS-only, never recreates infra); (3) deprovision on missed payment — `subscription.cancelled`/`completed` webhook; (4) owner cancel — `POST /api/ecom/provisioning {action:'deprovision'}` cancels the Razorpay sub, and the webhook then deprovisions. The **GitHub Actions driver + `/api/cron/provisioning-worker` are deleted** (the GH workflow was also disabled in the Actions tab).<br><br>**⚠️ Corrected 2026-08-26 — how jobs advance.** This row previously claimed there was "no more cron worker" and that the engine self-advanced via a `setTimeout` re-invoke loop against `/api/internal/provisioning/advance`. **That approach was tried and abandoned** — in the Next server model the request scope is torn down after the response, so the post-response timer may never fire (observed in practice: the loop never started; see the comment in `trigger.ts`). What actually runs today:<br>• `triggerProvisioning()` drives the cheap control-plane steps **inline**, bounded to `MAX_INLINE_STEPS = 6`, then stops as soon as the job parks on a polling step (`wait_db_available` / `verify_serving`) or hits a terminal state.<br>• A **recurring in-app worker** takes it from there: `GET /api/internal/provisioning/worker` (Bearer `CRON_SECRET`), fired every **45s** by `setInterval` in `src/instrumentation.ts`. It advances *every* active job one step per tick — this is what carries a job across the ~10-min RDS create.<br>• `/api/internal/provisioning/advance` still exists but is **not wired to the scheduler**; it is legacy. Both routes fire `provisionTenantOwnerAdmin` on transition to `done`. The `provisionTenantOwnerAdmin` super_admin/cert now fires when the job reaches `done` (after the tenant RDS exists), not at payment time. Admin operator routes (`/api/admin/ecom/customers/[id]/provision`+`/deprovision`) are kept as a manual override and now route through the same shared trigger. |
+| 🔴 **2** | **Provisioning is now EVENT-DRIVEN (no cron)** | **Reworked 2026-08-22.** Provisioning is triggered by exactly four flows, all from the ecom owner portal, each handing a full self-contained payload to `triggerProvisioning()` (`controller-service/src/lib/provisioning/trigger.ts`): (1) first provision — `subscription.charged` webhook + onboard success page; (2) plan upgrade/downgrade — `change-plan` route → `reprovisionDns` (DNS-only, never recreates infra); (3) deprovision on missed payment — `subscription.cancelled`/`completed` webhook; (4) owner cancel — `POST /api/ecom/provisioning {action:'deprovision'}` cancels the Razorpay sub, and the webhook then deprovisions. The **GitHub Actions driver + `/api/cron/provisioning-worker` are deleted** (the GH workflow was also disabled in the Actions tab).<br><br>**⚠️ Corrected 2026-08-26 — how jobs advance.** This row previously claimed there was "no more cron worker" and that the engine self-advanced via a `setTimeout` re-invoke loop against `/api/internal/provisioning/advance`. **That approach was tried and abandoned** — in the Next server model the request scope is torn down after the response, so the post-response timer may never fire (observed in practice: the loop never started; see the comment in `trigger.ts`). What actually runs today:<br>• `triggerProvisioning()` drives the cheap control-plane steps **inline**, bounded to `MAX_INLINE_STEPS = 6`, then stops as soon as the job parks on a polling step (`wait_db_available` / `verify_serving`) or hits a terminal state.<br>• A **recurring in-app worker** takes it from there: `GET /api/internal/provisioning/worker` (Bearer `CRON_SECRET`), fired every **45s** by `setInterval` in `controller-service/src/instrumentation.ts`. It advances *every* active job one step per tick — this is what carries a job across the ~10-min RDS create.<br>• `/api/internal/provisioning/advance` still exists but is **not wired to the scheduler**; it is legacy. Both routes fire `provisionTenantOwnerAdmin` on transition to `done`. The `provisionTenantOwnerAdmin` super_admin/cert now fires when the job reaches `done` (after the tenant RDS exists), not at payment time. Admin operator routes (`/api/admin/ecom/customers/[id]/provision`+`/deprovision`) are kept as a manual override and now route through the same shared trigger. |
 | | *Schedules in `instrumentation.ts`* | Two: the **45s provisioning worker** (above) and `reconcileOrphanedTenants()` (drift sweep) **hourly** against `/api/internal/provisioning/reconcile`. The sweep does not need 60-second resolution. |
 | | *Clarification on "in-VPC"* | The worker/reconcile routes run **on the app**, which is already in-VPC, so their data-plane steps (`load_schema`, `restore_data`, backup) reach the `PubliclyAccessible: false` tenant RDS fine. Self-calls target `APP_URL` (`https://jeffistores.in`) with `Authorization: Bearer $CRON_SECRET`; CloudFront `/api/*` forwards `Authorization` (Managed-AllViewer) + disables caching, so it is a safe self-call host. **Running the engine from a laptop is the exception** — see *Local provisioning testing* below. |
 
@@ -247,10 +247,10 @@ Each signed-up tenant gets a dedicated `db.t4g.micro` RDS Postgres instance + an
 
 ## Invoices / quotations / purchase orders live in document-service (added 2026-10-13)
 
-- **Tenant document hosts** `invoice-{slug}.`, `quotation-{slug}.`, `purchaseorder-{slug}.jeffistores.in` are served by `document-service/` (`src/tenant/public.tsx`: HTML viewer, `/<token>/json`, `/<token>/pdf`; also reachable as `/t/:app/:token`). The Next app no longer has `(business)/{invoice,quotation,purchaseorder}` pages or `api/public/{invoice,quotation,purchaseorder}` routes. Dev: middleware rewrites those hosts to `DOCUMENTS_URL`; **prod: add a Traefik rule** `HostRegexp(^(invoice|quotation|purchaseorder)-[a-z0-9-]+\.jeffistores\.in$)` → document-service (not yet applied).
-- **Admin APIs** keep their URLs. `/api/admin/invoices/**`, `/api/admin/quotations/**`, `/api/admin/inventory/po/**` (incl. receive/GRN), `/api/admin/business/rfqs/[id]/convert-to-quotation`, `/api/admin/orders/[id]/einvoice` and `/api/orders/[id]/invoice` are thin Next routes: `authenticateAdmin` + scope check, then `src/lib/documents/proxy.ts` forwards to document-service with an HMAC service token carrying `adminId/role/scopes` (or `userId` for the customer invoice download). Handlers are the lifted monolith code under `document-service/src/admin/**` (Next shim in `src/shim.ts`).
+- **Tenant document hosts** `invoice-{slug}.`, `quotation-{slug}.`, `purchaseorder-{slug}.jeffistores.in` are served by `document-service/` (`controller-service/src/tenant/public.tsx`: HTML viewer, `/<token>/json`, `/<token>/pdf`; also reachable as `/t/:app/:token`). The Next app no longer has `(business)/{invoice,quotation,purchaseorder}` pages or `api/public/{invoice,quotation,purchaseorder}` routes. Dev: middleware rewrites those hosts to `DOCUMENTS_URL`; **prod: add a Traefik rule** `HostRegexp(^(invoice|quotation|purchaseorder)-[a-z0-9-]+\.jeffistores\.in$)` → document-service (not yet applied).
+- **Admin APIs** keep their URLs. `/api/admin/invoices/**`, `/api/admin/quotations/**`, `/api/admin/inventory/po/**` (incl. receive/GRN), `/api/admin/business/rfqs/[id]/convert-to-quotation`, `/api/admin/orders/[id]/einvoice` and `/api/orders/[id]/invoice` are thin Next routes: `authenticateAdmin` + scope check, then `controller-service/src/lib/documents/proxy.ts` forwards to document-service with an HMAC service token carrying `adminId/role/scopes` (or `userId` for the customer invoice download). Handlers are the lifted monolith code under `document-service/src/admin/**` (Next shim in `controller-service/src/shim.ts`).
 - **Data access**: `packages/tenancy` resolves the tenant from the control plane (`tenant_infra`) and opens a per-tenant pg pool (IAM auth; `localhost` endpoint uses `DATABASE_URL` creds in dev). It exposes the monolith's `query/queryOne/queryMany/getClient/withTransaction` names (audit `admin_id` set from the token) so lifted code is a path rewrite. Tenant S3 upload via `uploadInvoicePDF`.
-- **Numbering / PDF from the monolith** (checkout, Razorpay webhooks, subscription cycles, COD remittance): `src/lib/documents/invoice.ts` is now a client → `POST /orders/:id/invoice/{draft,number,generate}` on document-service. `assignInvoiceNumber` runs in the service's own transaction after the order transaction commits (idempotent).
+- **Numbering / PDF from the monolith** (checkout, Razorpay webhooks, subscription cycles, COD remittance): `controller-service/src/lib/documents/invoice.ts` is now a client → `POST /orders/:id/invoice/{draft,number,generate}` on document-service. `assignInvoiceNumber` runs in the service's own transaction after the order transaction commits (idempotent).
 - **Emails** from the service (invoice/quotation/PO finalized, business invoice) go through messaging-service (`internal: true`, cost price), not the monolith's SMTP; the online-order "status update with PDF attachment" became the invoice-finalized email with the view link (no attachments in messaging-service yet).
 - Also moved: PO receive/GRN (`po/[id]/receive` + receive drafts) and `business/rfqs/[id]/convert-to-quotation`. Still in the monolith: legacy `admin/cash-sale/**`, `receipt-pdf.ts` and `store-logo.ts` (packing-slip/brochure/legacy receipt).
 - E2E verified locally (scratch script, 49 checks): invoice draft→finalize→edit→amend→publish, cash sale, quotation→PDF→convert-to-invoice, PO draft→create→receive (GRN)→public page, e-invoice stub, RFQ→quotation, stock deltas on each step, emails logged in messaging-service.

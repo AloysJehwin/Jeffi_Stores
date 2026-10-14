@@ -11,10 +11,10 @@ up and cut production over to it.
 | `bootstrap/apply-platform.sh` | Applies `platform/` in dependency order |
 | `bootstrap/rollout.sh` | CI rollout: platform, then every tenant namespace one at a time |
 | `platform/` | Traefik config, cert-manager + wildcard, mTLS edge, flagship, Redis, CronJobs, Coroot + Headlamp |
-| `gen-cronjobs.ts` | Regenerates `platform/cronjobs.yaml` from `src/lib/shared/cron-jobs.ts` (a test fails on drift) |
+| `gen-cronjobs.ts` | Regenerates `platform/cronjobs.yaml` from `controller-service/src/lib/shared/cron-jobs.ts` (a test fails on drift) |
 
 Tenant namespaces are **not** in git. The provisioning engine renders them
-(`src/lib/k8s/tenant-workload.ts`) and applies them (`src/lib/k8s/tenant-compute.ts`) when
+(`controller-service/src/lib/k8s/tenant-workload.ts`) and applies them (`controller-service/src/lib/k8s/tenant-compute.ts`) when
 `PROVISIONING_COMPUTE=k8s` (set by the `provisioning` ConfigMap).
 
 ## Bring-up (in order)

@@ -27,7 +27,7 @@
  */
 
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
-import { writeFileSync, existsSync, readFileSync } from 'fs'
+import { writeFileSync, existsSync, readFileSync, lstatSync, symlinkSync, unlinkSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -98,6 +98,16 @@ async function loadSecrets() {
     }
     const envPath = resolve(OUT_DIR, '.env.local')
     writeFileSync(envPath, lines.join('\n') + '\n', 'utf8')
+    // Next loads env files from its project dir (controller-service/); point it at this one.
+    const appEnv = resolve(REPO_ROOT, 'controller-service', '.env.local')
+    if (OUT_DIR === REPO_ROOT && existsSync(resolve(REPO_ROOT, 'controller-service'))) {
+      let stat = null
+      try { stat = lstatSync(appEnv) } catch {}
+      if (!stat || stat.isSymbolicLink()) {
+        if (stat) unlinkSync(appEnv)
+        symlinkSync('../.env.local', appEnv)
+      }
+    }
     process.stdout.write(
       `[load-secrets] Wrote ${Object.keys(secrets).length} secrets from "${SECRET_ID}"` +
         `${overrideCount ? ` + ${overrideCount} local override(s)` : ''} → .env.local\n`
@@ -133,8 +143,14 @@ await loadSecrets()
 // so `predev` (which just writes .env.local) is unaffected.
 if (process.env.SPAWN_APP === '1') {
   const { spawn } = await import('child_process')
-  const entry = resolve(REPO_ROOT, 'cluster-server.js')
-  const child = spawn(process.execPath, [entry], { stdio: 'inherit', env: process.env })
+  // APP_ENTRY picks the process (the controller's cluster-server.js, or a service's src/server.ts with
+  // APP_NODE_ARGS='--import tsx'); paths are relative to the repo/image root.
+  const entry = resolve(
+    REPO_ROOT,
+    process.env.APP_ENTRY || (existsSync(resolve(REPO_ROOT, 'controller-service/cluster-server.js')) ? 'controller-service/cluster-server.js' : 'cluster-server.js')
+  )
+  const nodeArgs = (process.env.APP_NODE_ARGS || '').split(' ').filter(Boolean)
+  const child = spawn(process.execPath, [...nodeArgs, entry], { stdio: 'inherit', env: process.env, cwd: process.env.APP_CWD ? resolve(REPO_ROOT, process.env.APP_CWD) : dirname(entry) })
   child.on('exit', (code, signal) => {
     process.exit(signal ? 1 : (code ?? 0))
   })

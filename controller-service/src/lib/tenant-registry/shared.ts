@@ -1,0 +1,80 @@
+import { Pool } from 'pg'
+import path from 'path'
+import fs from 'fs'
+import { createPgPool, rdsSslOption, rdsIamPassword } from '@/lib/shared/pg-pool'
+import type { TenantContext } from '@/lib/tenancy/tenant-context'
+import { repoPath } from '@/lib/shared/paths'
+
+/**
+ * Control-plane registry client + host->tenant resolver.
+ *
+ * The control plane is a SEPARATE database (jeffi_control_plane) that holds the
+ * tenant registry (tenants, plans, plan_features, tenant_infra). This module owns
+ * its own pool to that DB — it is NOT the per-tenant app pool in db.ts.
+ *
+ * resolveTenantFromHost() maps a request Host header to a TenantContext, cached
+ * in-process (short TTL) to keep the hot path off the DB. Returns null for the
+ * platform's own hosts (jeffistores.in + its app subdomains) and unknown hosts —
+ * a null result means "no tenant", and downstream code falls back to the default
+ * (platform) resources, preserving single-tenant behavior.
+ */
+
+// Hosts/labels that are the PLATFORM's own, never a tenant slug.
+export const RESERVED_LABELS = new Set([
+  'admin',
+  'business',
+  'forms',
+  'vault',
+  'www',
+  'ecom',
+  'invoice',
+  'quotation',
+  'purchaseorder',
+  'api',
+  'app',
+  'mail',
+  'static',
+  'assets',
+  'cdn',
+  'certificate',
+])
+
+export const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
+
+// Cache the control-plane pool on globalThis so Next.js dev / Turbopack hot-reloads
+// (which re-import this module) reuse the SAME pg.Pool instead of spawning a fresh
+// one each reload — otherwise the orphaned pools accumulate open connections and
+// local Postgres hits "sorry, too many clients already".
+const cpGlobal = globalThis as unknown as { __cpPool?: Pool }
+export function controlPlanePool(): Pool {
+  if (cpGlobal.__cpPool) return cpGlobal.__cpPool
+  let url = process.env.CONTROL_PLANE_DATABASE_URL || ''
+  const iam = process.env.CONTROL_PLANE_IAM_AUTH === 'true'
+  // Control-plane tables live in the unified app DB (docs/MICROSERVICES.md); no separate DB.
+  if (!url && !iam && process.env.DATABASE_URL) url = process.env.DATABASE_URL
+  if (!url && !iam) {
+    throw new Error('Control-plane DB not configured: set CONTROL_PLANE_DATABASE_URL (or CONTROL_PLANE_IAM_AUTH=true).')
+  }
+  const config: any = { max: 3, idleTimeoutMillis: 30000, connectionTimeoutMillis: 8000, keepAlive: true }
+  if (iam) {
+    const host = process.env.CONTROL_PLANE_RDS_HOST!
+    const port = parseInt(process.env.CONTROL_PLANE_RDS_PORT || '5432', 10)
+    const user = process.env.CONTROL_PLANE_RDS_USER || 'app_user'
+    const region = process.env.AWS_REGION || 'us-east-1'
+    config.host = host
+    config.port = port
+    config.user = user
+    config.database = process.env.CONTROL_PLANE_RDS_DB || 'jeffi_control_plane'
+    config.ssl = rdsSslOption()
+    config.password = rdsIamPassword(host, port, user, region)
+  } else {
+    config.connectionString = url
+    if (url.includes('rds.amazonaws.com')) {
+      const certPath = repoPath('certs', 'global-bundle.pem')
+      if (fs.existsSync(certPath)) config.ssl = { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
+    }
+  }
+  const p = createPgPool(config)
+  cpGlobal.__cpPool = p
+  return p
+}

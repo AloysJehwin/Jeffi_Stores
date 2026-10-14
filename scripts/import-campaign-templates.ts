@@ -27,7 +27,7 @@ const EMAIL_SKIP = new Set(['review_request'])
 
 type Seed = { slug: string; channel: 'email' | 'sms'; name: string; category: string; subject?: string; body: string; blocks_format: string; blocks?: unknown }
 
-// Token versions of the hard-coded campaign SMS lines (src/lib/campaigns/whatsapp-dispatch.ts campaignSmsBody).
+// Token versions of the hard-coded campaign SMS lines (controller-service/src/lib/campaigns/whatsapp-dispatch.ts campaignSmsBody).
 const SMS: Record<string, string> = {}
 const sms = (kinds: string[], body: string) => kinds.forEach(k => (SMS[k] = body))
 sms(['abandoned_cart', 'abandoned_checkout', 'high_value_cart'], "You left {items} in your cart. Complete your order before it's gone.")
@@ -41,7 +41,7 @@ sms(['winback_90', 'winback_180', 'price_drop', 'first_purchase_nudge', 'second_
   '{headline}{#if couponCode} — use code {couponCode}{/if}.')
 sms(['review_request', 'review_reminder', 'post_purchase'], 'How was order {orderNumber}? Share a quick review: {ctaUrl}')
 
-// Mailer's hard-coded templates (src/lib/shared/email-campaigns.ts) as library content; the layout is applied at send.
+// Mailer's hard-coded templates (controller-service/src/lib/shared/email-campaigns.ts) as library content; the layout is applied at send.
 const greet = '<p style="font-size:16px;color:#333;margin:0 0 12px;">Hi {firstName},</p>'
 const h2 = (t: string) => `<h2 style="font-size:24px;color:#1a3a4a;margin:0 0 16px;">${t}</h2>`
 const para = (t: string) => `<p style="color:#555;line-height:1.6;margin:0 0 20px;">${t}</p>`
@@ -53,7 +53,7 @@ const MAILER: Seed[] = [
   { slug: 'messaging/review-form-share', name: 'Review form share', subject: 'Share your experience — get a reward!', body: greet + h2('{formTitle}') + para("We'd love to hear what you think! Leave us a review and we'll send you a special discount as a thank-you.") + btn('Leave a review & claim reward', '{formUrl}') },
 ].map(s => ({ ...s, channel: 'email' as const, category: 'messaging', blocks_format: 'tiptap-html' }))
 
-  // The 26 built-in scenario kinds (src/lib/campaigns/scenarios/_registry.ts). Custom campaigns are not standards.
+  // The 26 built-in scenario kinds (controller-service/src/lib/campaigns/scenarios/_registry.ts). Custom campaigns are not standards.
 const BUILTIN_KINDS = ['abandoned_cart', 'abandoned_checkout', 'post_purchase', 'review_reminder', 'review_request', 'winback_90',
   'winback_180', 'restock', 'price_drop', 'viewed_product', 'viewed_category', 'high_value_cart', 'cart_price_drop',
   'wishlist_reminder', 'review_photo_followup', 'back_in_stock_wishlist', 'first_purchase_nudge', 'second_purchase_nudge',

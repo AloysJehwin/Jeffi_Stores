@@ -14,7 +14,7 @@ import path from 'path'
  * which every capture path (verify, webhook, subscription cycle) goes through via
  * recordCapturedPayment. This test guards that single resolver.
  */
-const RESOLVER = 'src/lib/payments/route-settlement.ts'
+const RESOLVER = 'controller-service/src/lib/payments/route-settlement.ts'
 
 function resolvePayoutTargetQuery(): string {
   const src = fs.readFileSync(path.join(process.cwd(), RESOLVER), 'utf8')
@@ -47,9 +47,9 @@ describe('Route transfer resolves the linked account with the owner-bank fallbac
 
   it('every capture path goes through recordCapturedPayment, not a hand-rolled transfer', () => {
     for (const f of [
-      'src/app/api/(public)/razorpay/verify/route.ts',
-      'src/app/api/(public)/webhooks/razorpay/route.ts',
-      'src/lib/subscriptions/cycle.ts',
+      'controller-service/src/app/api/(public)/razorpay/verify/route.ts',
+      'controller-service/src/app/api/(public)/webhooks/razorpay/route.ts',
+      'controller-service/src/lib/subscriptions/cycle.ts',
     ]) {
       const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
       expect(src, `${f} uses recordCapturedPayment`).toContain('recordCapturedPayment')

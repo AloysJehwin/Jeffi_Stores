@@ -27,7 +27,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'json-summary', 'json'],
-      include: ['src/**/*.ts', 'src/**/*.tsx'],
+      include: ['controller-service/src/**/*.ts', 'controller-service/src/**/*.tsx'],
       // Baseline after adding .tsx to coverage (#524): lines 39.61 / branches 31.73
       // / functions 23.38 / statements 39. Thresholds floored to the measured numbers
       // so CI does not fail on the one-time drop; raise as .tsx coverage grows.
@@ -41,7 +41,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(__dirname, './controller-service/src'),
       'server-only': path.resolve(__dirname, './node_modules/next/dist/compiled/server-only/empty.js'),
     },
   },

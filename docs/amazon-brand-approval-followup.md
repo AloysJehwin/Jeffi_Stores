@@ -34,7 +34,7 @@ Complete the **"Listing approval for TVS"** application. Everything is fillable 
    `drive_system` (Hex/Allen), `number_of_items` (1), `part_number` (SKU), item height unit.
 
 ## Resume steps (when TVS is approved)
-1. Add the SCREWS attributes above to `src/lib/amazon/mapper.ts`.
+1. Add the SCREWS attributes above to `controller-service/src/lib/amazon/mapper.ts`.
 2. Re-run VALIDATION_PREVIEW (`POST /api/admin/merchant/amazon/sync {mode:'validate', productId:'803ae40b-d59c-4974-88b5-6db6aead76d0'}`) → confirm status VALID, 0 errors.
 3. Flip `AMAZON_PUSH_DISABLED=false`, restart dev.
 4. Push one product (`{productId}`), verify it lands in Seller Central, then flip the flag back to `true`.

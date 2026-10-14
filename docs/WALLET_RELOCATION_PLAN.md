@@ -4,7 +4,7 @@ _Written 2026-10-10. Status: **plan, approved to build.**_
 
 ## Why
 Today a tenant's prepaid shipping wallet is visible only on **one** screen —
-`WalletCard` inside `src/app/(admin)/admin/delhivery/DelhiveryPageClient.tsx`. The balance drives
+`WalletCard` inside `controller-service/src/app/(admin)/admin/delhivery/DelhiveryPageClient.tsx`. The balance drives
 whether an AWB can be created, yet an admin has to go hunting for it. And soon other paid features
 (campaigns, AI) will debit the same wallet, so it needs a home of its own, not a corner of the
 Delhivery page.
@@ -13,15 +13,15 @@ Delhivery page.
 - **Schema** (`database/control-plane/schema.sql`): `tenant_wallets` (balance, min_balance, currency)
   and `wallet_ledger` (`entry_type` recharge|debit|adjustment, signed `amount`, `order_ref`, `awb`,
   `external_ref`, `note`, `occurred_at`; unique on awb-debit and on external_ref-credit).
-- **Lib** (`src/lib/payments/wallet.ts`): `getTenantWallet(tenantId, ledgerLimit)` returns
+- **Lib** (`controller-service/src/lib/payments/wallet.ts`): `getTenantWallet(tenantId, ledgerLimit)` returns
   `{ balance, minBalance, currency, ledger[] }`; `rechargeWallet`, `chargeDeliveryEstimate`,
   `refundEstimateForAwbs`, `correctWalletDebitForAwb`, `settleDelhiveryCostToWallet`,
   `checkWalletForShipment`, `FLAGSHIP_TENANT_ID`, `isFlagshipTenant`.
 - **APIs:** platform-admin view `GET/POST /api/admin/ecom/[tenantId]/wallet`;
   tenant self top-up `POST /api/admin/financial/wallet/{topup,topup/create-order,topup/verify,recharge}`.
-- **Top bar:** `src/components/admin/AdminShell.tsx` renders the right cluster (NotificationBell,
+- **Top bar:** `controller-service/src/components/admin/AdminShell.tsx` renders the right cluster (NotificationBell,
   ThemeToggle, agent, logout). This is where the badge goes.
-- **Nav:** `src/app/(admin)/admin/layout.tsx` `navLinks[]`, filtered by scope.
+- **Nav:** `controller-service/src/app/(admin)/admin/layout.tsx` `navLinks[]`, filtered by scope.
 
 ## Build
 
@@ -42,7 +42,7 @@ movement was, so future features classify cleanly without overloading `entry_typ
   `category` is null.
 
 ### 2. Balance badge in the top nav
-- New client component `src/components/admin/WalletBadge.tsx`: a pill next to `NotificationBell`
+- New client component `controller-service/src/components/admin/WalletBadge.tsx`: a pill next to `NotificationBell`
   showing `₹<balance>`, amber when `balance < minBalance`, linking to `/admin/wallet`. Hidden
   entirely for own-Delhivery tenants and the flagship (no platform wallet), and for admins without
   `delhivery:read`. The shipping wallet applies to EVERY plan (not just Pro+), so it is gated on
@@ -54,7 +54,7 @@ movement was, so future features classify cleanly without overloading `entry_typ
   (new thin read route returning `getTenantWallet(tenantId, 0)` — balance only, no ledger).
 
 ### 3. Dedicated `/admin/wallet` page
-- `src/app/(admin)/admin/wallet/page.tsx` (server) + `WalletClient.tsx` (client).
+- `controller-service/src/app/(admin)/admin/wallet/page.tsx` (server) + `WalletClient.tsx` (client).
 - Header: current balance, min-balance, a **Recharge** button (reuses the existing
   `topup/create-order` → Razorpay → `topup/verify` flow already in the Delhivery page).
 - Ledger table: date, category (badge), direction (in/out, coloured), amount, order/AWB ref, note.

@@ -16,64 +16,64 @@ import glob from 'fast-glob'
  */
 const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Auth / self-service: the member is proving who they are or acting on themselves.
-  'src/app/(admin)/admin/login/page.tsx',
-  'src/components/admin/AdminSessionController.tsx',
-  'src/components/admin/AccessDenied.tsx',
-  'src/components/admin/TwoFactorCard.tsx',
-  'src/components/admin/AdminSupportChat.tsx',
-  'src/components/admin/AdminAgentModal.tsx',
+  'controller-service/src/app/(admin)/admin/login/page.tsx',
+  'controller-service/src/components/admin/AdminSessionController.tsx',
+  'controller-service/src/components/admin/AccessDenied.tsx',
+  'controller-service/src/components/admin/TwoFactorCard.tsx',
+  'controller-service/src/components/admin/AdminSupportChat.tsx',
+  'controller-service/src/components/admin/AdminAgentModal.tsx',
   // Self-service: marks the member's own notification bell read; no scoped record mutation.
-  'src/components/admin/NotificationBell.tsx',
+  'controller-service/src/components/admin/NotificationBell.tsx',
   // Platform control plane: gated by host + isPlatformAdmin, not a tenant scope.
-  'src/components/admin/ecom/tabs/KycActionButtons.tsx',
-  'src/components/admin/ecom/TenantActions.tsx',
-  'src/components/admin/ecom/PurgeCustomerButton.tsx',
-  'src/app/(admin)/admin/ecom/billing/[id]/AccountModeToggle.tsx',
-  'src/app/(admin)/admin/ecom/billing/[id]/DeliveryModeToggle.tsx',
+  'controller-service/src/components/admin/ecom/tabs/KycActionButtons.tsx',
+  'controller-service/src/components/admin/ecom/TenantActions.tsx',
+  'controller-service/src/components/admin/ecom/PurgeCustomerButton.tsx',
+  'controller-service/src/app/(admin)/admin/ecom/billing/[id]/AccountModeToggle.tsx',
+  'controller-service/src/app/(admin)/admin/ecom/billing/[id]/DeliveryModeToggle.tsx',
   // DNS re-sync for a tenant: platform-admin only (isPlatformAdmin), same as the sibling toggles.
-  'src/app/(admin)/admin/ecom/billing/[id]/DnsResyncButton.tsx',
-  'src/app/(admin)/admin/ecom/billing/[id]/ReconcileButton.tsx',
-  'src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
-  'src/components/admin/ecom/tabs/BillingReconcile.tsx',
+  'controller-service/src/app/(admin)/admin/ecom/billing/[id]/DnsResyncButton.tsx',
+  'controller-service/src/app/(admin)/admin/ecom/billing/[id]/ReconcileButton.tsx',
+  'controller-service/src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
+  'controller-service/src/components/admin/ecom/tabs/BillingReconcile.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
-  'src/components/admin/CreateAdminForm.tsx',
-  'src/components/admin/AdminUserActions.tsx',
-  'src/components/admin/ServiceAccountRevokeButton.tsx',
+  'controller-service/src/components/admin/CreateAdminForm.tsx',
+  'controller-service/src/components/admin/AdminUserActions.tsx',
+  'controller-service/src/components/admin/ServiceAccountRevokeButton.tsx',
   // Owner-only revoke rendered only for owners by service-accounts/page.tsx (replaced the button above).
-  'src/components/admin/ServiceAccountRowActions.tsx',
-  'src/app/(admin)/admin/service-accounts/add/page.tsx',
+  'controller-service/src/components/admin/ServiceAccountRowActions.tsx',
+  'controller-service/src/app/(admin)/admin/service-accounts/add/page.tsx',
   // Read-only view; its only POST is an export/filter, not a scoped write.
-  'src/app/(admin)/admin/audit/AdminAuditClient.tsx',
+  'controller-service/src/app/(admin)/admin/audit/AdminAuditClient.tsx',
   // Dashboard shell: its only POST is a fire-and-forget payout reconciliation on mount,
   // not a user action. Each mutating tab (receivables/payables/cod) gates on financial:write.
-  'src/app/(admin)/admin/financial/FinancialClient.tsx',
+  'controller-service/src/app/(admin)/admin/financial/FinancialClient.tsx',
   // Gated on the exact :write scope, but through a server-derived canWrite prop
   // (hasScope(role, scopes, '<area>:write') in the page) rather than the client context.
-  'src/app/(admin)/admin/products/ProductsTableClient.tsx',
-  'src/app/(admin)/admin/products/_components/ProductsMobileList.tsx',
-  'src/app/(admin)/admin/invoices/InvoicesClient.tsx',
-  'src/app/(admin)/admin/quotations/QuotationsClient.tsx',
+  'controller-service/src/app/(admin)/admin/products/ProductsTableClient.tsx',
+  'controller-service/src/app/(admin)/admin/products/_components/ProductsMobileList.tsx',
+  'controller-service/src/app/(admin)/admin/invoices/InvoicesClient.tsx',
+  'controller-service/src/app/(admin)/admin/quotations/QuotationsClient.tsx',
   // Gated by a server-derived `canWrite` prop that wraps the RowActions ({canWrite && <RowActions/>}).
-  'src/components/admin/CouponTableRow.tsx',
+  'controller-service/src/components/admin/CouponTableRow.tsx',
   // Gated on a server-derived canWrite prop (hasScope(role, scopes, 'service_accounts:write')
   // in the page), passed in and used to gate every action — same pattern as the siblings above.
-  'src/app/(admin)/admin/service-accounts/_components/ServiceAccountsMobileList.tsx',
+  'controller-service/src/app/(admin)/admin/service-accounts/_components/ServiceAccountsMobileList.tsx',
   // Read-only document/label exports (GET/PDF); no record mutation to gate.
-  'src/app/(admin)/admin/packing-slips/PackingSlipsClient.tsx',
-  'src/app/(admin)/admin/labels/LabelsClient.tsx',
-  'src/components/admin/BatchSerialLabelPicker.tsx',
-  'src/app/(admin)/admin/products/_components/ProductLabelModal.tsx',
+  'controller-service/src/app/(admin)/admin/packing-slips/PackingSlipsClient.tsx',
+  'controller-service/src/app/(admin)/admin/labels/LabelsClient.tsx',
+  'controller-service/src/components/admin/BatchSerialLabelPicker.tsx',
+  'controller-service/src/app/(admin)/admin/products/_components/ProductLabelModal.tsx',
   // Shared modal committed via a parent-owned onConfirm — the gate sits on each caller's
   // open control (cash-sale, quotations, invoices, order status), not the modal.
-  'src/components/admin/BatchPickerModal.tsx',
+  'controller-service/src/components/admin/BatchPickerModal.tsx',
   // Mutation lives in the parent form; this is a field editor feeding onChange.
-  'src/components/admin/LineItemsSection.tsx',
+  'controller-service/src/components/admin/LineItemsSection.tsx',
   // Gated on the stricter isSuperAdmin, which no tenant :write scope expresses.
-  'src/components/admin/CustomerTagDefinitionsCard.tsx',
+  'controller-service/src/components/admin/CustomerTagDefinitionsCard.tsx',
 ])
 
 function mutatingClientComponents(): string[] {
-  const files = glob.sync(['src/app/\\(admin\\)/admin/**/*.tsx', 'src/components/admin/**/*.tsx'], {
+  const files = glob.sync(['controller-service/src/app/\\(admin\\)/admin/**/*.tsx', 'controller-service/src/components/admin/**/*.tsx'], {
     cwd: process.cwd(),
   })
   const out: string[] = []

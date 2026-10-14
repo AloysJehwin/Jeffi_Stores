@@ -30,14 +30,14 @@ Not a reason: "k3s isn't real Kubernetes". It passes the same conformance tests.
 | `local-path` StorageClass (`41-redis.yaml`, Coroot/ClickHouse PVCs) | Persistent volumes on the node disk | **AWS EBS CSI driver** + `gp3` StorageClass. Volumes then survive node replacement. Update `storageClassName` in `41-redis.yaml` and the Coroot spec. |
 | Bundled metrics-server | HPA (flagship 2→4, Pro/Enterprise tenants), `kubectl top`, admin Infrastructure tab | metrics-server Helm chart. |
 | CoreDNS | Service DNS | kubeadm installs CoreDNS. No change. |
-| `get.k3s.io` join with a static `K3S_TOKEN` (`core-node.sh`, `src/lib/k8s/node-user-data.ts`) | Nodes join on boot | `kubeadm join` with a **bootstrap token (24 h TTL)** + CA hash. See "Node join" below. This is the main code change. |
+| `get.k3s.io` join with a static `K3S_TOKEN` (`core-node.sh`, `controller-service/src/lib/k8s/node-user-data.ts`) | Nodes join on boot | `kubeadm join` with a **bootstrap token (24 h TTL)** + CA hash. See "Node join" below. This is the main code change. |
 
 ## Code and config that change
 
 | File | Change |
 |---|---|
-| `src/lib/k8s/node-user-data.ts` | Replace the k3s install with: install containerd + kubelet/kubeadm (pinned version), then `kubeadm join <api>:6443 --token … --discovery-token-ca-cert-hash …` with a `JoinConfiguration` carrying `nodeRegistration.kubeletExtraArgs.node-labels` and `taints` (same labels and taints as today). Keep Tailscale. |
-| `src/lib/k8s/tenant-compute.ts` | Before `launchNode`, mint a short-lived bootstrap token through the API (a `bootstrap-token-<id>` Secret in `kube-system`, TTL ~1 h) and pass it in user-data. RBAC: allow the flagship SA to create those Secrets in `kube-system` only. |
+| `controller-service/src/lib/k8s/node-user-data.ts` | Replace the k3s install with: install containerd + kubelet/kubeadm (pinned version), then `kubeadm join <api>:6443 --token … --discovery-token-ca-cert-hash …` with a `JoinConfiguration` carrying `nodeRegistration.kubeletExtraArgs.node-labels` and `taints` (same labels and taints as today). Keep Tailscale. |
+| `controller-service/src/lib/k8s/tenant-compute.ts` | Before `launchNode`, mint a short-lived bootstrap token through the API (a `bootstrap-token-<id>` Secret in `kube-system`, TTL ~1 h) and pass it in user-data. RBAC: allow the flagship SA to create those Secrets in `kube-system` only. |
 | `deploy/k8s/bootstrap/core-node.sh`, `launch-core.sh` | Become `control-plane.sh` (kubeadm init/join `--control-plane`, 3 nodes behind an internal NLB or keepalived VIP) and `ingress-node.sh`. |
 | `deploy/k8s/platform/10-traefik.yaml`, `20-cert-manager.yaml`, `50-observability.yaml` | Convert `HelmChart`/`HelmChartConfig` to Helm values files and install with helm. |
 | `deploy/k8s/platform/41-redis.yaml` (+ Coroot storage) | `storageClassName: gp3`. |
