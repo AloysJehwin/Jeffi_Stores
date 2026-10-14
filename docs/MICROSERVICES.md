@@ -5,13 +5,17 @@
 **Only the SERVICES are segregated. The DATABASE is unified.**
 
 Services:
-- Next.js monolith (admin + ecom + storefront)
+- `controller-service` — the Next.js app (admin + ecom + storefront)
 - `messaging-service` (SMS/email/WhatsApp send + templates library)
 - `document-service` (invoice/quotation/PO rendering + storage)
+- `public-api-service` (the public API gateway, `public.jeffistores.in`)
+
+Each runs as its own k8s pod. The platform's are `jeffi-stores-<service>-service` (namespace `jeffi`); each store
+tenant runs `{slug}-{controller,messaging,document}-service` in `tenant-{slug}`, and public-api is shared.
 
 Every service connects to **the same database**:
 - **Local**: `jeffi_production_ready` (port 5432)
-- **Prod**: the single Jeffi DB
+- **Prod**: `jeffi_stores` (the control plane merges into it at go-live, see `GO_LIVE_RUNBOOK.md`)
 
 That one DB holds every entity:
 - **control-plane entity** — `tenants`, `plans`, `plan_features`, `owners`, `api_keys`, `tenant_infra`, `wallet_*`, `auth_sessions`

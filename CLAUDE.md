@@ -21,9 +21,10 @@ Rules:
 
 ## Microservices — services split, DB unified
 
-**Today only the services are segregated (monolith + messaging-service + document-service). They ALL connect to the same DB** — `jeffi_production_ready` locally, the single Jeffi DB in prod. Every entity (control-plane, messaging, documents, templates library, business tables) lives in that one DB. See `docs/MICROSERVICES.md`.
+**Today only the services are segregated (controller-service — the Next app — plus messaging-service, document-service and public-api-service). They ALL connect to the same DB** — `jeffi_production_ready` locally, `jeffi_stores` in prod (the control plane merges into it at go-live). Every entity (control-plane, messaging, documents, templates library, business tables) lives in that one DB. See `docs/MICROSERVICES.md`.
 
 - Do NOT create new DBs. `jeffi_control_plane`, `jeffi_messaging`, `jeffi_documents` are legacy from an earlier design and are deprecated.
 - New tables for any service go in the main `database/*.sql` pipeline (topic file + `constraints.sql` + `indexes.sql`), applied to `jeffi_production_ready` locally.
 - `.env` DB URLs across every service all point at the same main DB.
 - Per-service DB split and per-tenant DBs come later with multi-tenancy; resolved via `packages/tenancy` using the service-auth `tenant_id` claim.
+- Each service is its own k8s pod: `jeffi-stores-<service>-service` for the platform, `{slug}-{controller,messaging,document}-service` per store tenant (public-api is shared). Releases: `deploy/k8s/bootstrap/release.sh`; production DB changes are user-run scripts in `deploy/k8s/db/` (`docs/GO_LIVE_RUNBOOK.md`).

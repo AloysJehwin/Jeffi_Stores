@@ -111,7 +111,7 @@ describe('tenant-registry (database layer)', () => {
       const { controlPlanePool } = await importRegistry()
       controlPlanePool()
       expect(capturedConfigs[0].host).toBe('cp.rds.amazonaws.com')
-      expect(capturedConfigs[0].database).toBe('jeffi_control_plane')
+      expect(capturedConfigs[0].database).toBe('jeffi_stores')
       // password is a callback so a fresh IAM token is signed per connection
       expect(typeof capturedConfigs[0].password).toBe('function')
       delete process.env.CONTROL_PLANE_RDS_HOST

@@ -35,7 +35,7 @@ export function controlPlanePool(): pg.Pool {
     const host = process.env.CONTROL_PLANE_RDS_HOST!
     const port = parseInt(process.env.CONTROL_PLANE_RDS_PORT || '5432', 10)
     const user = process.env.CONTROL_PLANE_RDS_USER || 'app_user'
-    Object.assign(config, { host, port, user, database: process.env.CONTROL_PLANE_RDS_DB || 'jeffi_control_plane', ssl: rdsSslOption(), password: rdsIamPassword(host, port, user, process.env.AWS_REGION || 'us-east-1') })
+    Object.assign(config, { host, port, user, database: process.env.CONTROL_PLANE_RDS_DB || 'jeffi_stores', ssl: rdsSslOption(), password: rdsIamPassword(host, port, user, process.env.AWS_REGION || 'us-east-1') })
   } else {
     cp = mainPool(url, 3)
     return cp

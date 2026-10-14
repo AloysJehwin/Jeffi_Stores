@@ -8,9 +8,9 @@ import { repoPath } from '@/lib/shared/paths'
 /**
  * Control-plane registry client + host->tenant resolver.
  *
- * The control plane is a SEPARATE database (jeffi_control_plane) that holds the
- * tenant registry (tenants, plans, plan_features, tenant_infra). This module owns
- * its own pool to that DB — it is NOT the per-tenant app pool in db.ts.
+ * The control plane (tenants, plans, plan_features, tenant_infra) lives in the main app DB
+ * (jeffi_stores in production). This module owns its own pool to it — it is NOT the
+ * per-tenant app pool in db.ts.
  *
  * resolveTenantFromHost() maps a request Host header to a TenantContext, cached
  * in-process (short TTL) to keep the hot path off the DB. Returns null for the
@@ -64,7 +64,7 @@ export function controlPlanePool(): Pool {
     config.host = host
     config.port = port
     config.user = user
-    config.database = process.env.CONTROL_PLANE_RDS_DB || 'jeffi_control_plane'
+    config.database = process.env.CONTROL_PLANE_RDS_DB || 'jeffi_stores'
     config.ssl = rdsSslOption()
     config.password = rdsIamPassword(host, port, user, region)
   } else {

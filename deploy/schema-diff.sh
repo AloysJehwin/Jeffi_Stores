@@ -3,48 +3,51 @@
 # and applies only the delta using migra.
 #
 # Usage:
-#   bash deploy/schema-diff.sh             # diff + apply
-#   bash deploy/schema-diff.sh --dry-run   # diff only, print SQL, do not apply
+#   bash deploy/schema-diff.sh [--set=platform|control-plane]          # diff + apply
+#   bash deploy/schema-diff.sh [--set=...] --dry-run                   # diff only; nothing is written (no seed)
 #
 # Requirements (set in environment):
-#   RDS_HOST, RDS_PORT, RDS_USER, RDS_DB, AWS_REGION (RDS_CONNECT_HOST overrides the address, e.g. a port-forward)
+#   RDS_HOST, RDS_PORT, RDS_USER, RDS_DB, AWS_REGION (RDS_CONNECT_HOST/RDS_CONNECT_PORT: where to connect,
+#   e.g. a tunnel; the IAM token stays signed for RDS_HOST:RDS_PORT). --no-seed skips seed-plans.sql.
+#   or TARGET_URL=postgresql://user:pass@host:port/db for a non-IAM target (local rehearsal).
+# The planned SQL is also written to $SCHEMA_DIFF_OUT (default /tmp)/schema-<set>-<db>.sql.
+# Needs docker, python3 (migra goes into a venv under ~/.cache) and psql.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-DRY_RUN=false
-for arg in "$@"; do [[ "$arg" == "--dry-run" ]] && DRY_RUN=true; done
+DRY_RUN=false; NO_SEED=false
+for arg in "$@"; do
+  [[ "$arg" == "--dry-run" ]] && DRY_RUN=true
+  [[ "$arg" == "--no-seed" ]] && NO_SEED=true
+done
 
 TEMP_DB="schema_diff_$$"
 
-cleanup() { docker rm -fv "$TEMP_DB" 2>/dev/null || true; }
+cleanup() { docker rm -fv "$TEMP_DB" >/dev/null 2>&1 || true; }
 trap cleanup EXIT
+
+# psql against the target (IAM token, or TARGET_URL).
+target_psql() {
+  if [ -n "${TARGET_URL:-}" ]; then psql "$TARGET_URL" "$@"; return; fi
+  PGPASSWORD="$(aws rds generate-db-auth-token --hostname "$RDS_HOST" --port "${RDS_PORT:-5432}" \
+    --region "${AWS_REGION:-us-east-1}" --username "$RDS_USER")" PGSSLMODE=require \
+    psql -h "${RDS_CONNECT_HOST:-$RDS_HOST}" -p "${RDS_CONNECT_PORT:-${RDS_PORT:-5432}}" -U "$RDS_USER" -d "$RDS_DB" "$@"
+}
 
 # seed-plans.sql is row data (plans + plan_features), not structure, so migra never sees it.
 # It is transactional and authoritative (upsert + prune), so re-running on every deploy keeps
-# plan entitlements in step with the seed — without it an over-grant like Basic carrying
-# merchant_sync/crm survives forever and leaks over-plan nav. Only meaningful for the control
-# plane; the platform DB has no plans table. Called on both the no-diff and applied paths so it
-# runs on every control-plane deploy regardless of whether structure changed.
+# plan entitlements in step with the seed. Only meaningful for the control-plane set. Never in a dry run.
 seed_control_plane() {
   [ "${SCHEMA_SET:-}" = "control-plane" ] || return 0
   [ -f database/control-plane/seed-plans.sql ] || return 0
+  if [ "$DRY_RUN" = "true" ]; then echo "(dry run: control-plane seed not applied)"; return 0; fi
+  if [ "$NO_SEED" = "true" ]; then echo "(--no-seed: control-plane seed skipped)"; return 0; fi
   echo ""
   echo "── Seeding control-plane plans/entitlements ──"
-  local SEED_TOKEN SEED_LOG
-  SEED_TOKEN=$(aws rds generate-db-auth-token \
-    --hostname "$RDS_HOST" \
-    --port "${RDS_PORT:-5432}" \
-    --region "${AWS_REGION:-us-east-1}" \
-    --username "$RDS_USER")
+  local SEED_LOG
   SEED_LOG=$(mktemp /tmp/schema_seed_XXXXXX.log)
-  PGPASSWORD="$SEED_TOKEN" PGSSLMODE=require psql \
-    -h "${RDS_CONNECT_HOST:-$RDS_HOST}" \
-    -p "${RDS_PORT:-5432}" \
-    -U "$RDS_USER" \
-    -d "$RDS_DB" \
-    -v ON_ERROR_STOP=1 \
-    -f database/control-plane/seed-plans.sql 2>&1 | tee "$SEED_LOG"
+  target_psql -v ON_ERROR_STOP=1 -f database/control-plane/seed-plans.sql 2>&1 | tee "$SEED_LOG"
   if grep -q '^ERROR:' "$SEED_LOG"; then
     echo ""
     echo "seed-plans.sql FAILED — plan entitlements not updated."
@@ -56,36 +59,41 @@ seed_control_plane() {
   echo "Control-plane seed applied."
 }
 
-# ── 1. Install migra (idempotent) ─────────────────────────────────────────────
+# ── 1. Install migra (idempotent, in a venv so a managed system Python is left alone) ──
 echo "── Installing migra ──"
-pip3 install --quiet --break-system-packages migra psycopg2-binary 2>/dev/null || \
-  pip3 install --quiet migra psycopg2-binary
+VENV=${MIGRA_VENV:-$HOME/.cache/jeffi-migra}
+[ -x "$VENV/bin/migra" ] || { python3 -m venv "$VENV" && "$VENV/bin/pip" install --quiet migra psycopg2-binary "psycopg[binary]" "setuptools<81"; }
+MIGRA="$VENV/bin/migra"
 
 # ── 2. Start temp Postgres ────────────────────────────────────────────────────
+# pgvector image: ai.sql's vector tables must exist in the desired state too. A published localhost
+# port (not the bridge IP) so this works from Docker Desktop on a Mac as well as on Linux.
 echo "── Starting temp Postgres ──"
-docker run -d --name "$TEMP_DB" \
+# Same major version as the target, so index/CHECK text normalizes the same way on both sides.
+PG_MAJOR=$(target_psql -Atc "show server_version_num" | cut -c1-2)
+docker run -d --name "$TEMP_DB" -p 127.0.0.1::5432 \
   -e POSTGRES_PASSWORD=temp \
   -e POSTGRES_DB=desired \
-  postgres:15-alpine
+  "pgvector/pgvector:pg${PG_MAJOR:-16}" >/dev/null
 
 echo "Waiting for temp DB to be ready..."
 for i in $(seq 1 15); do
   docker exec "$TEMP_DB" pg_isready -U postgres -q 2>/dev/null && break || true
   sleep 2
 done
-
-CONTAINER_IP=$(docker inspect "$TEMP_DB" --format '{{.NetworkSettings.IPAddress}}')
-echo "Container IP: $CONTAINER_IP"
+TEMP_PORT=$(docker port "$TEMP_DB" 5432/tcp | head -1 | sed 's/.*://')
+TEMP_URL="postgresql://postgres:temp@127.0.0.1:${TEMP_PORT}/desired"
+for i in $(seq 1 15); do psql "$TEMP_URL" -qc 'select 1' >/dev/null 2>&1 && break || sleep 1; done
 
 # ── 3. Load entity SQL files into temp DB ─────────────────────────────────────
 echo "── Loading desired schema into temp DB ──"
 
-PGPASSWORD=temp psql -h "$CONTAINER_IP" -p 5432 -U postgres -d desired \
-  -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent;' \
-  > /dev/null 2>&1 || true
+psql "$TEMP_URL" -q \
+  -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent; CREATE EXTENSION IF NOT EXISTS vector;' \
+  > /dev/null
 
-# Which schema set to diff. `platform` = the main store DB (default, unchanged);
-# `control-plane` = the SaaS control plane, which was previously never diffed at all.
+# Which schema set to diff. `platform` = the main store DB (default);
+# `control-plane` = the SaaS control-plane tables (database/control-plane/schema.sql).
 SCHEMA_SET="${SCHEMA_SET:-platform}"
 for arg in "$@"; do
   case "$arg" in --set=*) SCHEMA_SET="${arg#--set=}" ;; esac
@@ -95,9 +103,7 @@ echo "Schema set: $SCHEMA_SET"
 if [ "$SCHEMA_SET" = "control-plane" ]; then
   SCHEMA_FILES="database/control-plane/schema.sql"
 else
-  # Load EVERY database/*.sql, discovered at runtime. A hardcoded list silently skipped
-  # auth.sql and amazon.sql, so migra saw those tables as absent from the desired state
-  # and never diffed them - auth_sessions among them. Ordering still matters: extensions
+  # Load EVERY database/*.sql, discovered at runtime. Ordering still matters: extensions
   # first, then topic/table files, then the files that reference tables.
   TAIL_FILES="indexes.sql functions.sql triggers.sql constraints.sql"
   SCHEMA_FILES=""
@@ -114,32 +120,50 @@ database/$b"
   done
 fi
 
+LOAD_LOG=$(mktemp /tmp/schema_load_XXXXXX.log)
 for f in $SCHEMA_FILES; do
   [ -f "$f" ] || continue
-  PGPASSWORD=temp psql -h "$CONTAINER_IP" -p 5432 -U postgres -d desired \
-    -v ON_ERROR_STOP=0 -f "$f" > /dev/null 2>&1 || true
+  psql "$TEMP_URL" -v ON_ERROR_STOP=0 -f "$f" 2>&1 | grep -E '(^|: )ERROR:' >> "$LOAD_LOG" || true
 done
-
-
+if [ -s "$LOAD_LOG" ]; then
+  echo "$(wc -l < "$LOAD_LOG" | tr -d ' ') error(s) loading the desired schema. Foreign keys in topic files load before the keys"
+  echo "they reference and the diff never applies FKs, so those are expected; anything else needs a look:"
+  head -20 "$LOAD_LOG" | sed 's/^/  /'
+fi
+rm -f "$LOAD_LOG"
 echo "Desired schema loaded."
 
 # ── 4. Generate diff: desired (temp) vs live (RDS) ───────────────────────────
 echo "── Generating schema diff ──"
 
-RDS_TOKEN=$(aws rds generate-db-auth-token \
-  --hostname "$RDS_HOST" \
-  --port "${RDS_PORT:-5432}" \
-  --region "${AWS_REGION:-us-east-1}" \
-  --username "$RDS_USER")
+if [ -n "${TARGET_URL:-}" ]; then
+  LIVE_URL="$TARGET_URL"
+else
+  RDS_TOKEN=$(aws rds generate-db-auth-token \
+    --hostname "$RDS_HOST" \
+    --port "${RDS_PORT:-5432}" \
+    --region "${AWS_REGION:-us-east-1}" \
+    --username "$RDS_USER")
+  # URL-encode the IAM token — it contains ?, &, = which break connection string parsing
+  RDS_TOKEN_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))" <<< "$RDS_TOKEN")
+  LIVE_URL="postgresql://$RDS_USER:${RDS_TOKEN_ENC}@${RDS_CONNECT_HOST:-$RDS_HOST}:${RDS_CONNECT_PORT:-${RDS_PORT:-5432}}/$RDS_DB?sslmode=require"
+fi
+DESIRED_URL="$TEMP_URL"
 
-# URL-encode the IAM token — it contains ?, &, = which break connection string parsing
-RDS_TOKEN_ENC=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))" <<< "$RDS_TOKEN")
-
-DESIRED_URL="postgresql://postgres:temp@${CONTAINER_IP}:5432/desired"
-LIVE_URL="postgresql://$RDS_USER:${RDS_TOKEN_ENC}@${RDS_CONNECT_HOST:-$RDS_HOST}:${RDS_PORT:-5432}/$RDS_DB?sslmode=require"
-
-# migra <from=live> <to=desired> — generates SQL to transform live into desired
-RAW_DIFF=$(migra --unsafe --ignore-extension-versions "$LIVE_URL" "$DESIRED_URL" 2>/dev/null || true)
+# migra <from=live> <to=desired> — SQL that turns live into desired.
+# Exit 0 = no differences, 2 = differences; anything else is a failure, never "no diff".
+MIGRA_ERR=$(mktemp /tmp/migra_err_XXXXXX.log)
+set +e
+RAW_DIFF=$("$MIGRA" --unsafe --ignore-extension-versions "$LIVE_URL" "$DESIRED_URL" 2>"$MIGRA_ERR")
+MIGRA_RC=$?
+set -e
+if [ "$MIGRA_RC" -ne 0 ] && [ "$MIGRA_RC" -ne 2 ]; then
+  echo "migra failed (exit $MIGRA_RC):"
+  sed 's/^/  /' "$MIGRA_ERR"
+  rm -f "$MIGRA_ERR"
+  exit 1
+fi
+rm -f "$MIGRA_ERR"
 
 # Filter to only safe additive statements — never apply drops automatically.
 # Destructive changes (DROP COLUMN, DROP TABLE) go through database/migrations/.
@@ -254,17 +278,21 @@ result = _re.sub(r'(?i)\bcreate(\s+unique)?\s+index\s+(?!if\s+not\s+exists)',
 print(result)
 PYEOF
 
+
 DIFF=$(echo "$RAW_DIFF" | python3 "$FILTER_SCRIPT")
 rm -f "$FILTER_SCRIPT"
 
+OUT="${SCHEMA_DIFF_OUT:-/tmp}/schema-${SCHEMA_SET}-${RDS_DB:-target}.sql"
+printf '%s\n' "$DIFF" > "$OUT"
+
 if [ -z "$DIFF" ]; then
-  echo "No schema differences — live RDS matches entity files."
+  echo "No schema differences — live matches the entity files."
   seed_control_plane
   exit 0
 fi
 
 echo ""
-echo "Schema diff:"
+echo "Schema diff (also in $OUT):"
 echo "────────────────────────────────────────"
 echo "$DIFF"
 echo "────────────────────────────────────────"
@@ -275,32 +303,19 @@ if [[ "$DRY_RUN" == "true" ]]; then
   exit 0
 fi
 
-# ── 5. Apply diff to live RDS ─────────────────────────────────────────────────
+# ── 5. Apply diff ─────────────────────────────────────────────────────────────
 echo ""
-echo "── Applying diff to live RDS ──"
-# Refresh token (tokens last 15 min)
-RDS_TOKEN=$(aws rds generate-db-auth-token \
-  --hostname "$RDS_HOST" \
-  --port "${RDS_PORT:-5432}" \
-  --region "${AWS_REGION:-us-east-1}" \
-  --username "$RDS_USER")
-
-# psql without ON_ERROR_STOP continues past failures and still exits 0, so a broken
-# statement used to be reported as a successful apply. Capture the output, surface any
-# ERROR lines, and fail the step. This job runs AFTER deploy, so a failure here flags the
-# drift loudly without rolling back a good release.
+echo "── Applying diff ──"
+# psql without ON_ERROR_STOP continues past failures and still exits 0, so capture the output,
+# surface any ERROR lines, and fail.
 APPLY_LOG=$(mktemp /tmp/schema_apply_XXXXXX.log)
-echo "$DIFF" | PGPASSWORD="$RDS_TOKEN" PGSSLMODE=require psql \
-  -h "${RDS_CONNECT_HOST:-$RDS_HOST}" \
-  -p "${RDS_PORT:-5432}" \
-  -U "$RDS_USER" \
-  -d "$RDS_DB" 2>&1 | tee "$APPLY_LOG"
+echo "$DIFF" | target_psql 2>&1 | tee "$APPLY_LOG"
 
 ERRORS=$(grep -c '^ERROR:' "$APPLY_LOG" || true)
 if [ "${ERRORS:-0}" -gt 0 ]; then
   echo ""
   echo "──────────────────────────────────────────────"
-  echo "$ERRORS statement(s) FAILED while applying to $RDS_DB ($SCHEMA_SET):"
+  echo "$ERRORS statement(s) FAILED while applying to ${RDS_DB:-target} ($SCHEMA_SET):"
   grep '^ERROR:' "$APPLY_LOG" | sed 's/^/  /'
   echo "──────────────────────────────────────────────"
   echo "The schema files and the live database disagree in a way the diff cannot"
@@ -311,5 +326,5 @@ fi
 rm -f "$APPLY_LOG"
 
 # ── 6. Seed control-plane reference data ──────────────────────────────────────
-echo "Schema diff applied successfully ($SCHEMA_SET -> $RDS_DB)."
+echo "Schema diff applied successfully ($SCHEMA_SET -> ${RDS_DB:-target})."
 seed_control_plane

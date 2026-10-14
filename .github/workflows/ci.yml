@@ -540,8 +540,8 @@ jobs:
 
             # SaaS control plane - previously never diffed, which is how it ended up
             # missing tenant_ca/tenant_admin_certs and provisioning_jobs.next_attempt_at.
-            echo "::group::Control-plane DB diff (jeffi_control_plane)"
-            RDS_DB=jeffi_control_plane bash deploy/schema-diff.sh --set=control-plane
+            echo "::group::Control-plane diff (merged into jeffi_stores)"
+            RDS_DB=jeffi_stores bash deploy/schema-diff.sh --set=control-plane
             echo "::endgroup::"
 
             # Every tenant's own database. The two diffs above only ever touched the flagship
@@ -1020,7 +1020,7 @@ jobs:
         if: needs.detect-changes.outputs.schema_changed == 'true'
         run: |
           RDS_DB=jeffi_stores bash deploy/schema-diff.sh --set=platform
-          RDS_DB=jeffi_control_plane bash deploy/schema-diff.sh --set=control-plane
+          RDS_DB=jeffi_stores bash deploy/schema-diff.sh --set=control-plane
       - name: File migrations
         if: needs.detect-changes.outputs.migrations_changed == 'true'
         run: |
