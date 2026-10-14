@@ -106,6 +106,9 @@ const VAULT_BLOCKED_STATIC_RE = /\.(?:mp4|webm|pdf)$/i
 // Every response carries the request's trace id: quote it to find the request's logs/trace in Coroot.
 export async function middleware(request: NextRequest) {
   const response = await handle(request)
+  // Next hands the route its copy of the body before the upload ends (finalize() not awaited), so bytes arriving
+  // in between are lost. Reading our copy to the end makes the route's copy complete before we return.
+  if (request.body && !request.bodyUsed) await request.arrayBuffer().catch(() => {})
   const traceId = currentTraceId()
   if (traceId && response) response.headers.set('x-trace-id', traceId)
   return response
