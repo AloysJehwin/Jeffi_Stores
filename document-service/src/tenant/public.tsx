@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { readFileSync } from 'node:fs'
-import { resolveTenantFromHost, runWithTenant, appFromHost, type TenantContext } from '@jeffi/tenancy'
+import { resolveTenantFromHost, runWithTenant, runAsPlatform, appFromHost, slugFromHost, type TenantContext } from '@jeffi/tenancy'
 import { loadInvoice, invoicePdf, loadQuotation, quotationPdf, loadPurchaseOrder, purchaseOrderPdf } from './loaders'
 import InvoiceView from './views/InvoiceView'
 import QuotationView from './views/QuotationView'
@@ -19,11 +19,14 @@ function page(title: string, body: string) {
 }
 
 // Host: invoice-{slug}.<root> (Traefik in prod) or x-forwarded-host (Next dev rewrite).
-async function tenantFor(req: FastifyRequest): Promise<{ tenant: TenantContext; app: App } | null> {
+// invoice.<root> (no slug) is the platform store's own document host.
+async function tenantFor(req: FastifyRequest): Promise<{ tenant: TenantContext | null; app: App } | null> {
   const fwd = req.headers['x-forwarded-host']
   const host = String((Array.isArray(fwd) ? fwd[0] : fwd) || req.headers.host || '')
   const app = appFromHost(host)
   if (!app || !APPS.includes(app as App)) return null
+  const parsed = slugFromHost(host)
+  if (!parsed.slug && !parsed.isCustomDomain) return { tenant: null, app: app as App }
   const tenant = await resolveTenantFromHost(host)
   return tenant ? { tenant, app: app as App } : null
 }
@@ -44,7 +47,8 @@ export async function publicRoutes(app: FastifyInstance) {
     const t = await tenantFor(req)
     const docApp = (req.params.app as App | undefined) ?? t?.app
     if (!t || !docApp || !APPS.includes(docApp)) return notFound(reply)
-    return runWithTenant(t.tenant, async () => {
+    const scoped = <T,>(fn: () => Promise<T>) => (t.tenant ? runWithTenant(t.tenant, fn) : runAsPlatform(fn))
+    return scoped(async () => {
       const data: any = await load(docApp, req.params.token)
       if (!data) return notFound(reply)
       if (kind === 'json') return data

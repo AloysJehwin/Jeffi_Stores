@@ -19,7 +19,8 @@ export interface TenantContext {
 }
 
 export interface RequestScope {
-  tenant: TenantContext
+  /** null = the platform's own store (flagship), whose rows live in the main app DB. */
+  tenant: TenantContext | null
   adminId?: string | null
 }
 
@@ -27,6 +28,15 @@ const als = new AsyncLocalStorage<RequestScope>()
 
 export function runWithTenant<T>(tenant: TenantContext, fn: () => Promise<T>, adminId?: string | null): Promise<T> {
   return als.run({ tenant, adminId: adminId ?? null }, fn)
+}
+
+export function runAsPlatform<T>(fn: () => Promise<T>, adminId?: string | null): Promise<T> {
+  return als.run({ tenant: null, adminId: adminId ?? null }, fn)
+}
+
+export function isPlatformScope(): boolean {
+  const s = als.getStore()
+  return !!s && !s.tenant
 }
 
 export function currentScope(): RequestScope | null {

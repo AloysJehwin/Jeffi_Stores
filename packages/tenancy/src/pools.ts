@@ -44,6 +44,18 @@ export function controlPlanePool(): pg.Pool {
   return cp
 }
 
+export const PLATFORM_TENANT_ID = '00000000-0000-0000-0000-000000000000'
+
+let platform: pg.Pool | null = null
+/** The platform store has no tenant_infra: its rows live in the main app DB (docs/MICROSERVICES.md). */
+export function platformPool(): pg.Pool {
+  if (platform) return platform
+  const url = process.env.DATABASE_URL
+  if (!url) throw new Error('DATABASE_URL is not set')
+  platform = createPgPool({ ...basePoolConfig(), connectionString: url, ...(url.includes('rds.amazonaws.com') ? { ssl: rdsSslOption() } : {}) })
+  return platform
+}
+
 function basePoolConfig(): any {
   const workers = parseInt(process.env.WEB_CONCURRENCY || '1', 10)
   return {

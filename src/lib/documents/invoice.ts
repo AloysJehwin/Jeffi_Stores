@@ -1,13 +1,13 @@
 import { createHmac } from 'node:crypto'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { FLAGSHIP_TENANT_ID } from '@/lib/payments/wallet'
 
 // Invoice numbering + PDF rendering live in document-service; these are the monolith's
 // system-level entry points (checkout, webhooks, subscription cycles). No admin session.
 const DOCUMENTS_URL = (process.env.DOCUMENTS_URL || 'http://localhost:3102').replace(/\/$/, '')
 
 async function call(path: string): Promise<Response> {
-  const t = await resolveTenant()
-  if (!t) throw new Error('document-service calls require a tenant in scope')
+  const t = (await resolveTenant()) ?? { tenantId: FLAGSHIP_TENANT_ID, slug: 'platform' }
   const secret = process.env.SERVICE_AUTH_SECRET
   if (!secret) throw new Error('SERVICE_AUTH_SECRET is not set')
   const payload = JSON.stringify({ service: 'platform', internal: true, tenantId: t.tenantId, tenantSlug: t.slug, exp: Math.floor(Date.now() / 1000) + 60 })

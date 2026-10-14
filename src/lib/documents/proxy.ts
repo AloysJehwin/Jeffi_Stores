@@ -3,6 +3,7 @@ import { createHmac } from 'node:crypto'
 import { authenticateAdmin, authenticateAnyUser } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { FLAGSHIP_TENANT_ID } from '@/lib/payments/wallet'
 
 // Invoice / quotation / purchase-order APIs live in document-service. These Next routes keep their
 // URLs (same-origin cookie auth), authenticate here, then forward with the admin's identity in the
@@ -18,8 +19,8 @@ function token(claims: Record<string, unknown>) {
 }
 
 async function forward(request: NextRequest, path: string, claims: Record<string, unknown>): Promise<NextResponse> {
-  const tenant = await resolveTenant()
-  if (!tenant) return NextResponse.json({ error: 'Documents service is only available on a tenant host' }, { status: 501 })
+  // The platform's own store has no tenant; document-service serves it from the main DB.
+  const tenant = (await resolveTenant()) ?? { tenantId: FLAGSHIP_TENANT_ID, slug: 'platform' }
   const url = new URL(request.url)
   const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.text()
   const res = await fetch(`${DOCUMENTS_URL}${path}${url.search}`, {

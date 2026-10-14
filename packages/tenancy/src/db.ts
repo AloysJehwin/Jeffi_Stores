@@ -1,10 +1,10 @@
 import type pg from 'pg'
-import { currentAdminId, requireTenant } from './context'
-import { tenantPool } from './pools'
+import { currentAdminId, isPlatformScope, requireTenant } from './context'
+import { platformPool, tenantPool } from './pools'
 
 type Row = pg.QueryResultRow
 
-const pool = () => tenantPool(requireTenant())
+const pool = () => (isPlatformScope() ? platformPool() : tenantPool(requireTenant()))
 const isMutation = (t: string) => /^(INSERT|UPDATE|DELETE)/i.test(t.trimStart())
 
 export async function query<T extends Row = any>(text: string, params?: any[]): Promise<pg.QueryResult<T>> {
