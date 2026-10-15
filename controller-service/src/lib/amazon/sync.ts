@@ -1,4 +1,4 @@
-import { queryOne, query } from '@/lib/shared/db'
+import { queryOne, query, getClient } from '@/lib/shared/db'
 import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
 import { productToAmazonListings, productToAmazonOfferListing, type AmazonListing } from './mapper'
 import {
@@ -12,6 +12,8 @@ import {
   getMarketplaceId,
 } from './client'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
+import { countSyncErrorItems } from '@/lib/merchant/sync-errors'
+import { AMAZON_SYNC_IN_PROGRESS_MESSAGE, amazonErrorReason, groupAmazonSyncErrors } from './sync-errors'
 
 // Amazon catalog push — analog of src/lib/merchant/sync.ts (Google).
 // Unlike GMC (which has a /products/batch), SP-API Listings Items is one PUT per SKU, so we
@@ -20,6 +22,13 @@ const ADMIN_EMAIL = 'jeffistoress@jeffistores.in'
 const CONCURRENCY = 5
 const SYNC_LOCK_KEY = 84219575
 const MAX_RETRIES = 3
+
+export class AmazonSyncInProgressError extends Error {
+  constructor() {
+    super(AMAZON_SYNC_IN_PROGRESS_MESSAGE)
+    this.name = 'AmazonSyncInProgressError'
+  }
+}
 
 interface SyncResult {
   synced: number
@@ -126,22 +135,41 @@ export async function syncAllProductsToAmazon(): Promise<SyncResult> {
       finishedAt: now,
     }
   }
-  const lockRes = await queryOne<{ acquired: boolean }>(`SELECT pg_try_advisory_lock($1) AS acquired`, [SYNC_LOCK_KEY])
-  if (!lockRes?.acquired) {
-    const startedAt = new Date().toISOString()
-    return {
-      synced: 0,
-      deleted: 0,
-      errors: [{ sku: '__lock__', error: 'Another sync is already running' }],
-      startedAt,
-      finishedAt: startedAt,
-    }
-  }
-
+  // Session-level lock held on one dedicated connection for the whole run (pooled query() calls
+  // would take and release it on different connections). A dropped connection releases it.
+  const client = await getClient()
+  let locked = false
+  let unlockFailed = false
   try {
+    const lockRes = await client.query<{ acquired: boolean }>(`SELECT pg_try_advisory_lock($1) AS acquired`, [
+      SYNC_LOCK_KEY,
+    ])
+    locked = !!lockRes.rows[0]?.acquired
+    if (!locked) throw new AmazonSyncInProgressError()
     return await runFullSync()
   } finally {
-    await query(`SELECT pg_advisory_unlock($1)`, [SYNC_LOCK_KEY]).catch(() => {})
+    if (locked) {
+      await client.query(`SELECT pg_advisory_unlock($1)`, [SYNC_LOCK_KEY]).catch(() => {
+        unlockFailed = true
+      })
+    }
+    client.release(unlockFailed || undefined)
+  }
+}
+
+export async function isAmazonSyncRunning(): Promise<boolean> {
+  try {
+    const row = await queryOne<{ running: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM pg_locks
+         WHERE locktype = 'advisory' AND granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+           AND classid = 0 AND objid = $1 AND objsubid = 1
+       ) AS running`,
+      [SYNC_LOCK_KEY]
+    )
+    return !!row?.running
+  } catch {
+    return false
   }
 }
 
@@ -224,7 +252,7 @@ async function runFullSync(): Promise<SyncResult> {
         listings.push({ sku: l.sku, listing: l })
       }
     } catch (err: any) {
-      errors.push({ sku: product.sku, error: err.message })
+      errors.push({ sku: product.sku, error: amazonErrorReason(err.message) })
     }
   }
 
@@ -233,7 +261,7 @@ async function runFullSync(): Promise<SyncResult> {
       await putWithBackoff(sku, listing)
       synced++
     } catch (err: any) {
-      errors.push({ sku, error: err.message })
+      errors.push({ sku, error: amazonErrorReason(err.message) })
     }
   })
 
@@ -406,8 +434,11 @@ export async function sendAmazonSyncFailureEmail(result: SyncResult): Promise<vo
       title: 'Amazon Marketplace Sync',
       startedAt: result.startedAt,
       finishedAt: result.finishedAt,
-      stats: { Synced: result.synced, Errors: result.errors.length },
-      errors: result.errors,
+      stats: { Synced: result.synced, Errors: countSyncErrorItems(result.errors) },
+      errors: groupAmazonSyncErrors(result.errors, 10).map(g => ({
+        sku: `${g.count} item(s): ${g.skus.join(', ')}`,
+        error: g.reason,
+      })),
       kind: 'amazon_sync_report',
     })
   } catch (_) {}

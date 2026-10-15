@@ -7,6 +7,7 @@ import {
   sendAmazonSyncFailureEmail,
   validateProductForAmazon,
   dryRunAmazonSync,
+  AmazonSyncInProgressError,
 } from '@/lib/amazon/sync'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
@@ -75,6 +76,9 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ success: true, mode: 'full', ...result })
   } catch (err: any) {
+    if (err instanceof AmazonSyncInProgressError) {
+      return NextResponse.json({ error: err.message, inProgress: true }, { status: 409 })
+    }
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
@@ -96,6 +100,9 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({ success: true, ...result })
   } catch (err: any) {
+    if (err instanceof AmazonSyncInProgressError) {
+      return NextResponse.json({ error: err.message, inProgress: true }, { status: 409 })
+    }
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

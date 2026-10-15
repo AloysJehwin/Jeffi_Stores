@@ -1,8 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+const { lockClient } = vi.hoisted(() => ({
+  lockClient: { query: vi.fn(), release: vi.fn() },
+}))
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
+  getClient: vi.fn(async () => lockClient),
 }))
 vi.mock('nodemailer', () => ({
   default: {
@@ -39,6 +43,8 @@ import {
   dryRunAmazonSync,
   getLastAmazonSyncStatus,
   sendAmazonSyncFailureEmail,
+  isAmazonSyncRunning,
+  AmazonSyncInProgressError,
 } from '@/lib/amazon/sync'
 import * as db from '@/lib/shared/db'
 import * as fetchMod from '@/lib/merchant/product-fetch'
@@ -77,7 +83,9 @@ describe('amazon/sync', () => {
     mockGetMarketplaceId.mockResolvedValue('A21TJRUUN4KGV')
     mockAmazonConfigured.mockResolvedValue(true)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
-    mockQueryOne.mockResolvedValue({ acquired: true } as any)
+    mockQueryOne.mockResolvedValue(null as any)
+    lockClient.query.mockResolvedValue({ rows: [{ acquired: true }] })
+    vi.mocked(db.getClient).mockImplementation(async () => lockClient as any)
     mockFetchAll.mockResolvedValue([] as any)
     mockToListings.mockReturnValue([])
     mockToOffer.mockImplementation((_p: any, asin: string) =>
@@ -87,11 +95,40 @@ describe('amazon/sync', () => {
   })
 
   describe('syncAllProductsToAmazon', () => {
-    it('returns lock-held result when advisory lock not acquired', async () => {
-      mockQueryOne.mockResolvedValueOnce({ acquired: false })
+    it('throws AmazonSyncInProgressError when the lock is held, without running or unlocking', async () => {
+      lockClient.query.mockResolvedValueOnce({ rows: [{ acquired: false }] })
+      await expect(syncAllProductsToAmazon()).rejects.toBeInstanceOf(AmazonSyncInProgressError)
+      expect(mockFetchAll).not.toHaveBeenCalled()
+      expect(lockClient.query).toHaveBeenCalledTimes(1)
+      expect(lockClient.release).toHaveBeenCalledWith(undefined)
+    })
+
+    it('takes and releases the lock on the same dedicated connection', async () => {
+      await syncAllProductsToAmazon()
+      expect(lockClient.query.mock.calls[0][0]).toMatch(/pg_try_advisory_lock/)
+      expect(lockClient.query.mock.calls[1][0]).toMatch(/pg_advisory_unlock/)
+      expect(lockClient.release).toHaveBeenCalledWith(undefined)
+    })
+
+    it('destroys the connection when the unlock fails', async () => {
+      lockClient.query.mockResolvedValueOnce({ rows: [{ acquired: true }] }).mockRejectedValueOnce(new Error('gone'))
+      await syncAllProductsToAmazon()
+      expect(lockClient.release).toHaveBeenCalledWith(true)
+    })
+
+    it('records SP-API failures by reason, without the SKU-bearing path', async () => {
+      mockFetchAll.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-1', name: 'Widget', has_variants: false }] as any)
+      mockMatchAsin.mockResolvedValueOnce(null)
+      mockToListings.mockReturnValueOnce([createListing({ sku: 'SKU-1' })])
+      mockPut.mockRejectedValueOnce(
+        new Error(
+          'Amazon PUT /listings/2021-08-01/items/SELLER/SKU-1 failed (400): {"errors":[{"code":"InvalidInput","message":"Brand not approved"}]}'
+        )
+      )
       const result = await syncAllProductsToAmazon()
-      expect(result.errors[0].sku).toBe('__lock__')
-      expect(result.synced).toBe(0)
+      expect(result.errors).toEqual([
+        { sku: 'SKU-1', error: 'Amazon rejected the request (400): InvalidInput: Brand not approved' },
+      ])
     })
 
     it('runs full sync with a full-create product (no variants, no asin)', async () => {
@@ -454,6 +491,19 @@ describe('amazon/sync', () => {
       mockQueryOne.mockRejectedValueOnce(new Error('db down'))
       const r = await getLastAmazonSyncStatus()
       expect(r).toBeNull()
+    })
+  })
+
+  describe('isAmazonSyncRunning', () => {
+    it('reports the advisory lock from pg_locks', async () => {
+      mockQueryOne.mockResolvedValueOnce({ running: true } as any)
+      expect(await isAmazonSyncRunning()).toBe(true)
+      expect(String(mockQueryOne.mock.calls[0][0])).toMatch(/pg_locks/)
+    })
+
+    it('is false when the check fails', async () => {
+      mockQueryOne.mockRejectedValueOnce(new Error('db down'))
+      expect(await isAmazonSyncRunning()).toBe(false)
     })
   })
 
