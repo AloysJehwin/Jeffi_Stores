@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: 'Unknown provider' }, { status: 400 })
   const { provider } = parsed.data
 
-  const admin = await requireAdminScope(request, provider === 'meta' ? 'campaigns:read' : 'merchant_sync:read')
+  const admin = await requireAdminScope(request, provider === 'meta' ? 'campaigns:write' : 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
   const tenant = await resolveTenant()
   if (!tenant) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
