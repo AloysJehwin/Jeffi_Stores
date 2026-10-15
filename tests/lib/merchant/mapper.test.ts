@@ -8,7 +8,7 @@ vi.mock('@/lib/shared/google-merchant-helpers', () => ({
   buildCustomLabels: vi.fn(),
 }))
 
-import { productToGmcItems } from '@/lib/merchant/mapper'
+import { productToGmcItems, gmcItemProblem } from '@/lib/merchant/mapper'
 import * as helpers from '@/lib/shared/google-merchant-helpers'
 
 const mockGetGoogleProductCategory = vi.mocked(helpers.getGoogleProductCategory)
@@ -105,6 +105,16 @@ describe('merchant/mapper', () => {
     it('omits salePrice when mrp < base_price (invalid)', () => {
       const items = productToGmcItems(makeProduct({ base_price: 300, mrp: 200 }))
       expect(items[0].salePrice).toBeUndefined()
+    })
+
+    it('advertises the selling price, not a lower mrp', () => {
+      const items = productToGmcItems(makeProduct({ base_price: 300, mrp: 200 }))
+      expect(items[0].price.value).toBe('300.00')
+    })
+
+    it('caps the title at 150 characters', () => {
+      const items = productToGmcItems(makeProduct({ name: 'x'.repeat(200) }))
+      expect(items[0].title.length).toBe(150)
     })
 
     it('sets availability to in stock for In Stock status', () => {
@@ -244,12 +254,17 @@ describe('merchant/mapper', () => {
       expect(items[0].isBundle).toBe(false)
     })
 
-    it('sets taxCategory from hsn_code', () => {
+    it('does not send the HSN code as taxCategory', () => {
       const items = productToGmcItems(makeProduct({ hsn_code: '8204' }))
-      expect(items[0].taxCategory).toBe('8204')
+      expect(items[0].taxCategory).toBeUndefined()
     })
 
-    it('sets identifierExists true when mpn present', () => {
+    it('sets identifierExists false for an mpn without a brand', () => {
+      const items = productToGmcItems(makeProduct({ mpn: 'MPN-123', brands: { name: '' } }))
+      expect(items[0].identifierExists).toBe(false)
+    })
+
+    it('sets identifierExists true when mpn present with a brand', () => {
       const items = productToGmcItems(makeProduct({ mpn: 'MPN-123' }))
       expect(items[0].identifierExists).toBe(true)
     })
@@ -259,9 +274,9 @@ describe('merchant/mapper', () => {
       expect(items[0].identifierExists).toBe(true)
     })
 
-    it('sets identifierExists true when brand present', () => {
+    it('sets identifierExists false when only a brand is present', () => {
       const items = productToGmcItems(makeProduct({ brands: { name: 'Acme' } }))
-      expect(items[0].identifierExists).toBe(true)
+      expect(items[0].identifierExists).toBe(false)
     })
 
     it('sets identifierExists false when no identifiers', () => {
@@ -348,6 +363,14 @@ describe('merchant/mapper', () => {
       expect(items[0].salePrice).toBeDefined()
     })
 
+    it('uses the variant selling price when the mrp is lower (ex-GST mrp)', () => {
+      const items = productToGmcItems(
+        makeVariantProduct([{ sku: 'VAR-1', variant_name: 'M', price: 127.16, mrp: 107.76, stock_status: 'In Stock' }])
+      )
+      expect(items[0].price.value).toBe('127.16')
+      expect(items[0].salePrice).toBeUndefined()
+    })
+
     it('sets sizes from variant_name', () => {
       // Content API v2.1: sizes is an array of strings.
       const items = productToGmcItems(
@@ -394,6 +417,25 @@ describe('merchant/mapper', () => {
     it('replaces special chars with underscore', () => {
       const items = productToGmcItems(makeProduct({ sku: 'TW#001@store' }))
       expect(items[0].offerId).toBe('TW_001_store')
+    })
+  })
+
+  describe('gmcItemProblem', () => {
+    const ok = { offerId: 'A', title: 'T', imageLink: 'https://cdn/x.png', price: { value: '10.00' } }
+
+    it('accepts a complete item', () => {
+      expect(gmcItemProblem(ok)).toBeNull()
+    })
+
+    it.each([
+      [{ title: '' }, 'Missing product name'],
+      [{ imageLink: '' }, 'Missing product image'],
+      [{ imageLink: '/uploads/x.png' }, 'Product image is not a full http(s) URL'],
+      [{ price: { value: '0.00' } }, 'Missing or zero price'],
+      [{ price: { value: 'NaN' } }, 'Missing or zero price'],
+      [{ offerId: 'x'.repeat(51) }, 'SKU is longer than 50 characters'],
+    ])('flags %o', (patch, reason) => {
+      expect(gmcItemProblem({ ...ok, ...patch })).toBe(reason)
     })
   })
 })

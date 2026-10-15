@@ -159,6 +159,37 @@ describe('merchant/client', () => {
     })
   })
 
+  describe('customBatchUpsert errors', () => {
+    const entries = [{ batchId: 0, merchantId: '12345', method: 'insert', product: { offerId: 'A' } }]
+    const token = { ok: true, json: async () => ({ access_token: 'tok', expires_in: 3600 }) }
+    const fail = (status: number, body: unknown) => ({ ok: false, status, text: async () => JSON.stringify(body) })
+
+    it('retries a transient 410 and returns the later success', async () => {
+      mockFetch
+        .mockResolvedValueOnce(token)
+        .mockResolvedValueOnce(fail(410, { error: { code: 410, message: 'gone' } }))
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ entries: [{ batchId: 0 }] }) })
+      const { customBatchUpsert } = await import('@/lib/merchant/client')
+      const res = await customBatchUpsert(entries, [0])
+      expect(res.entries).toHaveLength(1)
+    })
+
+    it('throws a readable sunset message once 410 retries run out', async () => {
+      mockFetch.mockResolvedValueOnce(token).mockResolvedValue(fail(410, { error: { code: 410, message: 'gone' } }))
+      const { customBatchUpsert } = await import('@/lib/merchant/client')
+      await expect(customBatchUpsert(entries, [0])).rejects.toThrow(/Content API for Shopping .*Merchant API\. gone$/)
+    })
+
+    it('does not retry a 400 and keeps only the Google message', async () => {
+      mockFetch
+        .mockResolvedValueOnce(token)
+        .mockResolvedValueOnce(fail(400, { error: { message: 'Invalid  value\n[price]' } }))
+      const { customBatchUpsert } = await import('@/lib/merchant/client')
+      await expect(customBatchUpsert(entries, [0])).rejects.toThrow('HTTP 400: Invalid value [price]')
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+  })
+
   describe('deleteProductByOfferId', () => {
     it('calls delete endpoint', async () => {
       mockFetch

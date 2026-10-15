@@ -1,5 +1,5 @@
-import { queryOne, query } from '@/lib/shared/db'
-import { productToGmcItems } from './mapper'
+import { queryOne, query, getClient } from '@/lib/shared/db'
+import { productToGmcItems, gmcItemProblem } from './mapper'
 import { fetchAllActiveProducts, fetchProduct } from './product-fetch'
 import {
   upsertProduct,
@@ -10,15 +10,25 @@ import {
   merchantConfigured,
   GMC_PUSH_DISABLED,
 } from './client'
+import { SYNC_IN_PROGRESS_MESSAGE, groupSyncErrors, countSyncErrorItems, type MerchantSyncError } from './sync-errors'
 
 const ADMIN_EMAIL = 'jeffistoress@jeffistores.in'
 const BATCH_SIZE = 100
 const SYNC_LOCK_KEY = 84219573
+// Consecutive whole-batch failures with the same message before the rest of the run is skipped.
+const MAX_REPEATED_BATCH_FAILURES = 3
+
+export class MerchantSyncInProgressError extends Error {
+  constructor() {
+    super(SYNC_IN_PROGRESS_MESSAGE)
+    this.name = 'MerchantSyncInProgressError'
+  }
+}
 
 interface SyncResult {
   synced: number
   deleted: number
-  errors: Array<{ sku: string; error: string }>
+  errors: MerchantSyncError[]
   startedAt: string
   finishedAt: string
 }
@@ -79,28 +89,48 @@ export async function syncAllProductsToMerchant(): Promise<SyncResult> {
       finishedAt: now,
     }
   }
-  const lockRes = await queryOne<{ acquired: boolean }>(`SELECT pg_try_advisory_lock($1) AS acquired`, [SYNC_LOCK_KEY])
-  if (!lockRes?.acquired) {
-    const startedAt = new Date().toISOString()
-    return {
-      synced: 0,
-      deleted: 0,
-      errors: [{ sku: '__lock__', error: 'Another sync is already running' }],
-      startedAt,
-      finishedAt: startedAt,
-    }
-  }
-
+  // Session-level advisory lock held on one dedicated connection for the whole run: a second
+  // request is refused, and a crashed pod drops the connection, which releases the lock.
+  const client = await getClient()
+  let locked = false
+  let unlockFailed = false
   try {
+    const lockRes = await client.query<{ acquired: boolean }>(`SELECT pg_try_advisory_lock($1) AS acquired`, [
+      SYNC_LOCK_KEY,
+    ])
+    locked = !!lockRes.rows[0]?.acquired
+    if (!locked) throw new MerchantSyncInProgressError()
     return await runFullSync()
   } finally {
-    await query(`SELECT pg_advisory_unlock($1)`, [SYNC_LOCK_KEY]).catch(() => {})
+    if (locked) {
+      await client.query(`SELECT pg_advisory_unlock($1)`, [SYNC_LOCK_KEY]).catch(() => {
+        unlockFailed = true
+      })
+    }
+    // Destroy rather than pool a connection that may still hold the lock.
+    client.release(unlockFailed || undefined)
+  }
+}
+
+export async function isMerchantSyncRunning(): Promise<boolean> {
+  try {
+    const row = await queryOne<{ running: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM pg_locks
+         WHERE locktype = 'advisory' AND granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+           AND classid = 0 AND objid = $1 AND objsubid = 1
+       ) AS running`,
+      [SYNC_LOCK_KEY]
+    )
+    return !!row?.running
+  } catch {
+    return false
   }
 }
 
 async function runFullSync(): Promise<SyncResult> {
   const startedAt = new Date().toISOString()
-  const errors: Array<{ sku: string; error: string }> = []
+  const errors: MerchantSyncError[] = []
   let synced = 0
   let deleted = 0
 
@@ -113,16 +143,28 @@ async function runFullSync(): Promise<SyncResult> {
     try {
       const items = productToGmcItems(product)
       for (const item of items) {
-        allItems.push(item)
         activeOfferIds.add(item.offerId)
+        const problem = gmcItemProblem(item)
+        if (problem) errors.push({ sku: item.offerId || product.sku, error: problem })
+        else allItems.push(item)
       }
     } catch (err: any) {
       errors.push({ sku: product.sku, error: err.message })
     }
   }
 
+  let lastBatchError = ''
+  let repeatedFailures = 0
   for (let i = 0; i < allItems.length; i += BATCH_SIZE) {
     const batch = allItems.slice(i, i + BATCH_SIZE)
+    if (repeatedFailures >= MAX_REPEATED_BATCH_FAILURES) {
+      errors.push({
+        sku: `batch-${i}`,
+        error: `Skipped after ${MAX_REPEATED_BATCH_FAILURES} batches failed in a row: ${lastBatchError}`,
+        items: allItems.length - i,
+      })
+      break
+    }
     const entries = batch.map((item, idx) => ({
       batchId: i + idx,
       merchantId,
@@ -131,16 +173,24 @@ async function runFullSync(): Promise<SyncResult> {
     }))
     try {
       const res = await customBatchUpsert(entries)
+      repeatedFailures = 0
       for (const entry of res.entries || []) {
         if (entry.errors?.errors?.length) {
           const item = batch[entry.batchId - i]
-          errors.push({ sku: item?.offerId || String(entry.batchId), error: entry.errors.errors[0].message })
+          const messages = [...new Set(entry.errors.errors.map((e: any) => e.message).filter(Boolean))]
+          errors.push({
+            sku: item?.offerId || String(entry.batchId),
+            error: messages.join('; ') || 'Rejected by Google',
+          })
         } else {
           synced++
         }
       }
     } catch (err: any) {
-      errors.push({ sku: `batch-${i}`, error: err.message })
+      const message = err?.message || 'Batch request failed'
+      repeatedFailures = message === lastBatchError ? repeatedFailures + 1 : 1
+      lastBatchError = message
+      errors.push({ sku: `batch-${i}`, error: message, items: batch.length })
     }
   }
 
@@ -176,6 +226,7 @@ export async function syncProductToMerchant(productId: string): Promise<void> {
   // so we upsert them rather than delete.
   const items = productToGmcItems(product)
   for (const item of items) {
+    if (gmcItemProblem(item)) continue
     await upsertProduct(item)
   }
 }
@@ -196,8 +247,11 @@ export async function sendSyncFailureEmail(result: SyncResult): Promise<void> {
       title: 'Google Merchant Sync',
       startedAt: result.startedAt,
       finishedAt: result.finishedAt,
-      stats: { Synced: result.synced, Deleted: result.deleted, Errors: result.errors.length },
-      errors: result.errors,
+      stats: { Synced: result.synced, Deleted: result.deleted, Errors: countSyncErrorItems(result.errors) },
+      errors: groupSyncErrors(result.errors, 10).map(g => ({
+        sku: `${g.count} item(s): ${g.skus.join(', ')}`,
+        error: g.reason,
+      })),
       kind: 'merchant_sync_report',
     })
   } catch (err) {
