@@ -1,6 +1,7 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import type { DateRange } from './queries'
 import { googleAdsOrderStats, computeReturnMetrics, type AdsOrderStats, type ReturnMetrics } from './attribution'
+import { loadConversionsSummary } from './conversions/console'
 
 // Read-side loaders for the Google Ads console. Everything reads the local ads_* mirror; money is
 // returned in account currency units (micros / 1e6).
@@ -14,6 +15,7 @@ export type AdsTab =
   | 'locations'
   | 'recommendations'
   | 'changes'
+  | 'conversions'
   | 'sync'
 
 export const ADS_TABS: AdsTab[] = [
@@ -25,6 +27,7 @@ export const ADS_TABS: AdsTab[] = [
   'locations',
   'recommendations',
   'changes',
+  'conversions',
   'sync',
 ]
 
@@ -250,6 +253,7 @@ export async function loadAdGroups(range: DateRange) {
     })),
     ads: ads.map((r: any) => ({
       adId: String(r.ad_id),
+      adGroupId: String(r.ad_group_id),
       name: r.name || (Array.isArray(r.headlines) ? r.headlines[0] : null),
       type: r.type,
       status: r.status,
@@ -273,7 +277,9 @@ export async function loadKeywords(range: DateRange) {
     ),
     queryMany(
       `WITH t AS (
-         SELECT search_term, MAX(keyword_text) AS keyword_text, MAX(status) AS status, ${SUM_METRICS}
+         SELECT search_term, MAX(keyword_text) AS keyword_text, MAX(status) AS status,
+           (array_agg(campaign_id ORDER BY cost_micros DESC, clicks DESC))[1] AS campaign_id,
+           (array_agg(ad_group_id ORDER BY cost_micros DESC, clicks DESC))[1] AS ad_group_id, ${SUM_METRICS}
          FROM ads_search_terms WHERE date BETWEEN $1 AND $2
          GROUP BY search_term ORDER BY SUM(cost_micros) DESC, SUM(clicks) DESC LIMIT 300
        ), tok AS (
@@ -290,7 +296,8 @@ export async function loadKeywords(range: DateRange) {
            OR (cardinality(tok.words) > 0 AND EXISTS (
                 SELECT 1 FROM products p WHERE p.is_active IS NOT FALSE
                   AND NOT EXISTS (SELECT 1 FROM unnest(tok.words) w WHERE p.name NOT ILIKE '%' || w || '%')))
-         ) AS in_catalogue
+         ) AS in_catalogue,
+         (SELECT ac.channel_type FROM ads_campaigns ac WHERE ac.campaign_id = t.campaign_id) AS campaign_channel
        FROM t JOIN tok ON tok.search_term = t.search_term
        ORDER BY t.cost_micros DESC, t.clicks DESC`,
       [range.from, range.to]
@@ -299,6 +306,7 @@ export async function loadKeywords(range: DateRange) {
   return {
     keywords: keywords.map((r: any) => ({
       criterionId: String(r.criterion_id),
+      adGroupId: String(r.ad_group_id),
       text: r.text,
       matchType: r.match_type,
       status: r.status,
@@ -312,6 +320,9 @@ export async function loadKeywords(range: DateRange) {
       keyword: r.keyword_text,
       status: r.status,
       inCatalogue: !!r.in_catalogue,
+      campaignId: r.campaign_id == null ? null : String(r.campaign_id),
+      adGroupId: r.ad_group_id == null ? null : String(r.ad_group_id),
+      campaignChannel: r.campaign_channel ?? null,
       ...kpisFrom(r),
     })),
   }
@@ -483,6 +494,8 @@ export async function loadTab(tab: AdsTab, range: DateRange): Promise<unknown> {
       return { recommendations: await loadRecommendations() }
     case 'changes':
       return { changes: await loadChanges() }
+    case 'conversions':
+      return loadConversionsSummary(range)
     case 'sync':
       return { log: await loadSyncLog() }
   }

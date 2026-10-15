@@ -925,10 +925,52 @@ CREATE INDEX idx_ads_change_events_time ON public.ads_change_events USING btree 
 
 
 --
+-- Name: idx_ads_change_log_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_change_log_created_at ON public.ads_change_log USING btree (created_at DESC);
+
+
+--
 -- Name: idx_ads_sync_log_started_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_ads_sync_log_started_at ON public.ads_sync_log USING btree (started_at DESC);
+
+
+--
+-- Name: idx_ads_conversion_uploads_due; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_conversion_uploads_due ON public.ads_conversion_uploads USING btree (next_attempt_at) WHERE ((status)::text = 'pending'::text);
+
+
+--
+-- Name: idx_ads_conversion_uploads_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_conversion_uploads_created_at ON public.ads_conversion_uploads USING btree (created_at DESC);
+
+
+--
+-- Name: idx_ads_conversion_uploads_request_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_conversion_uploads_request_id ON public.ads_conversion_uploads USING btree (request_id) WHERE (request_id IS NOT NULL);
+
+
+--
+-- Name: idx_ads_conversion_requests_due; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_conversion_requests_due ON public.ads_conversion_requests USING btree (next_check_at) WHERE (finished_at IS NULL);
+
+
+--
+-- Name: idx_ads_conversion_requests_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_conversion_requests_created_at ON public.ads_conversion_requests USING btree (created_at DESC);
 
 
 --

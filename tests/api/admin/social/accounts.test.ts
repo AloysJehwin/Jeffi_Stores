@@ -29,7 +29,7 @@ beforeEach(() => {
 
 describe('manual Meta Page token', () => {
   it('verifies the token against the Page and stores FB + the linked IG account', async () => {
-    const res = await POST(req('POST', { page_id: '1234567', access_token: TOKEN }))
+    const res = (await POST(req('POST', { page_id: '1234567', access_token: TOKEN })))!
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ ok: true, page_name: 'Acme', instagram: true })
     expect(getPageInfo).toHaveBeenCalledWith('1234567', TOKEN)
@@ -58,7 +58,7 @@ describe('manual Meta Page token', () => {
 
   it('rejects a token Meta refuses, without storing it', async () => {
     vi.mocked(getPageInfo).mockRejectedValue(new Error('Meta GET 1234567 failed (400): Invalid OAuth access token'))
-    const res = await POST(req('POST', { page_id: '1234567', access_token: TOKEN }))
+    const res = (await POST(req('POST', { page_id: '1234567', access_token: TOKEN })))!
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(/Invalid OAuth access token/)
     expect(saveTenantSocialAccount).not.toHaveBeenCalled()
@@ -69,14 +69,14 @@ describe('manual Meta Page token', () => {
     [{ page_id: '1234567', access_token: 'short' }, /Page access token/],
     [{ page_id: '1234567', access_token: TOKEN, ig_user_id: 'ig' }, /numeric/],
   ])('validates input %#', async (body, msg) => {
-    const res = await POST(req('POST', body))
+    const res = (await POST(req('POST', body)))!
     expect(res.status).toBe(400)
     expect((await res.json()).error).toMatch(msg)
     expect(getPageInfo).not.toHaveBeenCalled()
   })
 
   it('disconnect removes both rows for the current tenant', async () => {
-    expect((await DELETE(req('DELETE'))).status).toBe(200)
+    expect((await DELETE(req('DELETE')))!.status).toBe(200)
     expect(deleteTenantSocialAccount).toHaveBeenCalledWith('t-acme')
   })
 })

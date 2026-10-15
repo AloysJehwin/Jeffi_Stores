@@ -53,6 +53,7 @@ vi.mock('@/lib/shared/marketing', () => ({
 vi.mock('@/lib/catalog/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({ inventoryValidationEnabled: true }),
 }))
+vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn(async () => ({ action: 'none', reason: 'test' })) }))
 vi.mock('@/lib/shared/validate', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/shared/validate')>()
   return { ...actual }
@@ -62,6 +63,7 @@ import { GET, PATCH, DELETE } from '@/app/api/(public)/orders/[id]/route'
 import * as db from '@/lib/shared/db'
 import * as jwt from '@/lib/auth/jwt'
 import * as inventoryDeduct from '@/lib/orders/inventory-deduct'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 const PARAMS = { params: Promise.resolve({ id: 'order-1' }) }
 const USER = { userId: 'user-1', isBusiness: false }
@@ -496,5 +498,26 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
     // outer notify().catch(() => {}) swallows the rejection; response still 200
     expect(res.status).toBe(200)
     await flush()
+  })
+})
+
+describe('PATCH /api/orders/[id] Google Ads conversion', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('re-checks the conversion when an order is cancelled or its payment changes', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    const current = { ...BASE_ORDER, status: 'confirmed', payment_status: 'paid', gclid: 'Cj0KCQ', gbraid: null, wbraid: null, users: null }
+    vi.mocked(db.queryOne).mockResolvedValueOnce(current).mockResolvedValueOnce(null)
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+    expect((await PATCH(makeReq('PATCH', { status: 'cancelled' }) as any, PARAMS)).status).toBe(200)
+    expect(queueAdsConversion).toHaveBeenCalledWith('order-1', expect.objectContaining({ gclid: 'Cj0KCQ' }))
+  })
+
+  it('does not run when nothing about the status changed', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ ...BASE_ORDER, status: 'confirmed', payment_status: 'paid', users: null })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+    await PATCH(makeReq('PATCH', { status: 'confirmed' }) as any, PARAMS)
+    expect(queueAdsConversion).not.toHaveBeenCalled()
   })
 })

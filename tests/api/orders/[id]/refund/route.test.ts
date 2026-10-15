@@ -40,6 +40,7 @@ vi.mock('@/lib/tenant-registry', () => ({
 vi.mock('@/lib/shared/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
+vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn(async () => ({ action: 'none', reason: 'test' })) }))
 
 import { POST } from '@/app/api/(public)/orders/[id]/refund/route'
 import * as jwt from '@/lib/auth/jwt'
@@ -47,6 +48,7 @@ import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'
 import * as routeSettlement from '@/lib/payments/route-settlement'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['orders:write'] }
 const PARAMS = { params: Promise.resolve({ id: 'order-123' }) }
@@ -161,6 +163,17 @@ describe('POST /api/orders/[id]/refund', () => {
     expect(body.refundIds).toEqual(['rfnd_123'])
     expect(body.totalRefunded).toBe(500)
     expect(mockRefund).toHaveBeenCalledWith('pay_rzp_123', { amount: 50000 })
+  })
+
+  it('re-checks the Google Ads conversion once the refund is recorded', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ ...MOCK_ORDER, gclid: 'Cj0KCQ', gbraid: null, wbraid: null })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([MOCK_PAYMENT] as any)
+    vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({
+      instance: { payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_9' }) } },
+    } as any)
+    expect((await POST(makeRequest() as any, PARAMS)).status).toBe(200)
+    expect(queueAdsConversion).toHaveBeenCalledWith('order-123', expect.objectContaining({ gclid: 'Cj0KCQ' }))
   })
 
   it('revokes every digital line on a full (cancelled-order) refund', async () => {

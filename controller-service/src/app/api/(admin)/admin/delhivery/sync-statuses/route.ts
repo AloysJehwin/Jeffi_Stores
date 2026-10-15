@@ -12,6 +12,7 @@ import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { settleDelhiveryCostToWallet, isFlagshipTenant } from '@/lib/payments/wallet'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 import { applyCourierEdd, extractCourierEdd } from '@/lib/shipping/courier-edd'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,10 +84,13 @@ export async function POST(request: NextRequest) {
     delhivery_quoted_weight_kg: number | null
     delhivery_charged_weight_kg: number | null
     delhivery_billed_at: string | null
+    gclid: string | null
+    gbraid: string | null
+    wbraid: string | null
   }>(
     `SELECT o.id, o.awb_number, o.status, o.shipment_status, o.order_number, o.user_id,
             o.payment_mode, o.shipping_amount, o.delhivery_quoted_weight_kg,
-            o.delhivery_charged_weight_kg, o.delhivery_billed_at,
+            o.delhivery_charged_weight_kg, o.delhivery_billed_at, o.gclid, o.gbraid, o.wbraid,
             o.shipping_address_snapshot->>'postal_code' AS dest_pin,
             COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
             COALESCE(u.email, o.customer_email) AS customer_email,
@@ -304,6 +308,8 @@ export async function POST(request: NextRequest) {
             [order.id]
           ).catch(() => {})
         }
+        // A delivered COD order is a sale; a return to origin undoes a prepaid one.
+        if (syncRule.orderStatus === 'delivered' || syncRule.orderStatus === 'returned') await queueAdsConversion(order.id, order)
 
         if (order.customer_email && order.customer_name) {
           sendOrderStatusUpdate(

@@ -54,6 +54,8 @@ vi.mock('@/lib/shared/ai-feedback', () => ({
   recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn(async () => ({ action: 'none', reason: 'test' })) }))
+
 // getFeatureFlags() runs a real queryMany (site-controls) unless mocked, which
 // would consume a queued db mock and desync the sequence. Stub it out.
 vi.mock('@/lib/catalog/site-controls', () => ({
@@ -72,6 +74,7 @@ import * as invoice from '@/lib/documents/invoice'
 import * as activity from '@/lib/shared/activity'
 import * as aiFeedback from '@/lib/shared/ai-feedback'
 import * as marketing from '@/lib/shared/marketing'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 const queryOne = db.queryOne as unknown as ReturnType<typeof vi.fn>
 const queryMany = db.queryMany as unknown as ReturnType<typeof vi.fn>
@@ -418,5 +421,36 @@ describe('payment_link.expired', () => {
     const res = await POST(signedRequest(paymentLinkExpired({ id: 'plink_exp' })))
     expect(res.status).toBe(200)
     expect(queryOne).toHaveBeenCalledWith(expect.stringContaining("payment_link_status = 'expired'"), ['plink_exp'])
+  })
+})
+
+// ===========================================================================
+// Google Ads server-side conversions
+// ===========================================================================
+
+describe('Google Ads conversion queue', () => {
+  it('queues the purchase once payment.captured marks an order paid, with its click ids', async () => {
+    const record = { order_id: 'o1', payment_status: 'unpaid', user_id: null, gclid: 'Cj0KCQ', gbraid: null, wbraid: null }
+    queryOne.mockResolvedValueOnce(record)
+    await POST(signedRequest(paymentCaptured({ id: 'pay_9', order_id: 'order_9', amount: 10000 })))
+    expect(queueAdsConversion).toHaveBeenCalledWith('o1', expect.objectContaining({ gclid: 'Cj0KCQ' }))
+  })
+
+  it('skips an order that was already paid', async () => {
+    vi.mocked(queueAdsConversion).mockClear()
+    queryOne.mockResolvedValueOnce({ order_id: 'o1', payment_status: 'paid', user_id: null })
+    await POST(signedRequest(paymentCaptured({ id: 'pay_10', order_id: 'order_10', amount: 10000 })))
+    expect(queueAdsConversion).not.toHaveBeenCalled()
+  })
+
+  it('queues payment-link and QR payments', async () => {
+    vi.mocked(queueAdsConversion).mockClear()
+    queryOne.mockResolvedValueOnce({ id: 'o5', payment_status: 'unpaid', user_id: null, total_amount: '100', gclid: 'g5' })
+    await POST(signedRequest(paymentLinkPaid({ id: 'plink_5', payments: [{ payment_id: 'pay_5' }] })))
+    expect(queueAdsConversion).toHaveBeenCalledWith('o5', expect.objectContaining({ gclid: 'g5' }))
+    query.mockResolvedValueOnce({ rows: [], rowCount: 1 })
+    queryOne.mockResolvedValueOnce({ id: 'o6', payment_status: 'unpaid', total_amount: '100', gclid: 'g6' })
+    await POST(signedRequest(qrCredited({ id: 'qr_6', payments: [{ razorpay_payment_id: 'qrp6' }] })))
+    expect(queueAdsConversion).toHaveBeenCalledWith('o6', expect.objectContaining({ gclid: 'g6' }))
   })
 })

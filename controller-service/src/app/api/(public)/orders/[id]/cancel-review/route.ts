@@ -5,6 +5,7 @@ import { sendOrderStatusUpdate } from '@/lib/email'
 import { cancelDelhiveryShipment } from '@/lib/shipping/delhivery'
 import { restoreOrderStock } from '@/lib/orders/order-stock'
 import { logActivity } from '@/lib/shared/activity'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const order = await queryOne(
       `
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
-        o.customer_name, o.customer_email, o.user_id, o.awb_number,
+        o.customer_name, o.customer_email, o.user_id, o.awb_number, o.gclid, o.gbraid, o.wbraid,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const wasStockDeducted = !!saleRecord
 
       await query(`UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`, [orderId])
+      await queueAdsConversion(orderId, order)
 
       // Restore inventory via the shared helper: resets serials to in_stock,
       // reverses product_batches quantity_remaining, and syncs shelf_stock — the

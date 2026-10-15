@@ -755,6 +755,9 @@ ALTER TABLE ONLY public.ads_account
 ALTER TABLE ONLY public.ads_account
     ADD CONSTRAINT ads_account_singleton CHECK (id = 1);
 
+ALTER TABLE ONLY public.ads_account
+    ADD CONSTRAINT ads_account_conversion_upload_api_check CHECK (((conversion_upload_api)::text = ANY ((ARRAY['data_manager'::character varying, 'ads_api'::character varying])::text[])));
+
 --
 -- Name: ads_campaigns ads_campaigns_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -826,11 +829,50 @@ ALTER TABLE ONLY public.ads_change_events
     ADD CONSTRAINT ads_change_events_pkey PRIMARY KEY (resource_name);
 
 --
+-- Name: ads_change_log ads_change_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_change_log
+    ADD CONSTRAINT ads_change_log_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ads_change_log
+    ADD CONSTRAINT ads_change_log_status_check CHECK (((status)::text = ANY ((ARRAY['applied'::character varying, 'rejected'::character varying, 'failed'::character varying])::text[])));
+
+--
 -- Name: ads_sync_log ads_sync_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.ads_sync_log
     ADD CONSTRAINT ads_sync_log_pkey PRIMARY KEY (id);
+
+--
+-- Name: ads_conversion_uploads ads_conversion_uploads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_conversion_uploads
+    ADD CONSTRAINT ads_conversion_uploads_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ads_conversion_uploads
+    ADD CONSTRAINT ads_conversion_uploads_order_kind_version_key UNIQUE (order_id, kind, version);
+
+ALTER TABLE ONLY public.ads_conversion_uploads
+    ADD CONSTRAINT ads_conversion_uploads_kind_check CHECK (((kind)::text = ANY ((ARRAY['purchase'::character varying, 'retraction'::character varying, 'restatement'::character varying])::text[])));
+
+ALTER TABLE ONLY public.ads_conversion_uploads
+    ADD CONSTRAINT ads_conversion_uploads_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'uploaded'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])));
+
+--
+-- Name: ads_conversion_requests ads_conversion_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_conversion_requests
+    ADD CONSTRAINT ads_conversion_requests_pkey PRIMARY KEY (request_id);
+
+ALTER TABLE ONLY public.ads_conversion_requests
+    ADD CONSTRAINT ads_conversion_requests_kind_check CHECK (((kind)::text = ANY ((ARRAY['purchase'::character varying, 'adjustment'::character varying])::text[])));
+
+ALTER TABLE ONLY public.ads_conversion_requests
+    ADD CONSTRAINT ads_conversion_requests_status_check CHECK (((status)::text = ANY ((ARRAY['PROCESSING'::character varying, 'SUCCESS'::character varying, 'PARTIAL_SUCCESS'::character varying, 'FAILED'::character varying, 'UNKNOWN'::character varying, 'TIMED_OUT'::character varying])::text[])));
 
 
 --

@@ -10,6 +10,7 @@ import { grantOrderEntitlements } from '@/lib/orders/entitlements'
 import { digitalUnitError } from '@/lib/catalog/digital-units'
 import { sellingUnitsFor } from '@/lib/catalog/unit-factor'
 import { attachOrderAttribution } from '@/lib/orders/attribution'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 import type { Attribution } from '@/lib/shared/attribution'
 
 export interface CartLine {
@@ -446,6 +447,8 @@ export interface CommitInput {
   paymentRecord: { gatewayOrderId: string; paymentId: string; signature: string; amountPaise: number } | null
   /** Buyer's click / UTM attribution (from the browser cookie; absent on webhook commits). */
   attribution?: Attribution | null
+  /** Buyer's advertising-cookie choice (consent cookie); null when none was made. */
+  adsConsent?: boolean | null
 }
 
 export interface CartCommitInput extends CommitInput {
@@ -498,7 +501,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     input.subtotal - input.appliedDiscount - input.businessDiscountAmount + input.shippingAmount + input.codFeeAmount
   )
 
-  return withTransaction(async client => {
+  const order = await withTransaction(async client => {
     const address = await ensureAddressOnOrder(client, input.userId, input.addressId)
     if (!address) throw new Error('Address not found')
 
@@ -731,7 +734,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
       ]
     )
     const created = orderResult.rows[0]
-    await attachOrderAttribution(client, created.id, input.attribution ?? null)
+    await attachOrderAttribution(client, created.id, input.attribution ?? null, input.adsConsent ?? null)
 
     // Selling-unit snapshot (unit, pieces per unit, total pieces) for packing, shipping, stock and adjustments.
     const soldUnits = await sellingUnitsFor(
@@ -822,4 +825,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
 
     return created
   })
+  // Paid: an order that came from a Google Ads click goes into the server-side conversion queue.
+  if (input.paymentRecord) await queueAdsConversion(order.id, input.attribution ?? {})
+  return order
 }

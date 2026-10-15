@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
         customer_id: cid,
         login_customer_id: body.loginCustomerId ? normalizeCustomerId(body.loginCustomerId) : undefined,
         connected_via: body.action === 'manual' ? 'manual' : 'oauth',
+        // The sign-in's granted scopes stay with its token (conversion uploads check them).
+        ...(body.action === 'select' && existing?.scopes ? { scopes: existing.scopes } : {}),
       }
       client = new GoogleAdsClient({ refreshToken, customerId: cid, loginCustomerId: cfg.login_customer_id, retryDelays: [] })
       const info = await verifyAccount(client)

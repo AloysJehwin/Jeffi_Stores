@@ -8,6 +8,7 @@ import { logActivity } from '@/lib/shared/activity'
 import { getReturnRequest } from '@/lib/queries'
 import { computeRefundableAmount, refundCapacity } from '@/lib/payments/refund'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const order = await queryOne(
       `
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
-        o.customer_name, o.customer_email, o.user_id, o.original_order_id,
+        o.customer_name, o.customer_email, o.user_id, o.original_order_id, o.gclid, o.gbraid, o.wbraid,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -132,6 +133,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       await client.query(`UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`, [orderId])
       if (order.status === 'cancelled') await revokeOrderEntitlements(client, { orderId, reason: 'refund' })
     })
+    await queueAdsConversion(orderId, order)
 
     const user = order.users
     const userEmail = user?.email || order.customer_email

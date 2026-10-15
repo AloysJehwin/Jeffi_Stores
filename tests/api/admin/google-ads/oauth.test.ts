@@ -25,7 +25,7 @@ import { GET as googleCallback } from '@/app/api/(admin)/admin/integrations/goog
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
-import { saveIntegrationCredential } from '@/lib/tenant-registry'
+import { saveIntegrationCredential, getIntegrationCredential } from '@/lib/tenant-registry'
 import { signAdminState, verifyAdminState } from '@/lib/shared/oauth-state'
 import { oauthProviderInfo, OAUTH_CALLBACK_PATHS } from '@/lib/integrations/oauth'
 
@@ -46,7 +46,9 @@ async function landing(res: Response): Promise<URL> {
   const m = html.match(/location\.replace\((".*?")\)/)
   return new URL(JSON.parse(m![1]))
 }
-const tokenOk = (scope = 'https://www.googleapis.com/auth/adwords') =>
+const ADWORDS = 'https://www.googleapis.com/auth/adwords'
+const DATAMANAGER = 'https://www.googleapis.com/auth/datamanager'
+const tokenOk = (scope = ADWORDS) =>
   new Response(JSON.stringify({ access_token: 'at', refresh_token: 'rt-ads', scope }), { status: 200 })
 
 beforeEach(() => {
@@ -68,16 +70,24 @@ describe('Google Ads connect', () => {
     expect(requireAdminScope).toHaveBeenCalledWith(expect.anything(), 'google_ads:write')
   })
 
-  it('asks Google for the adwords scope offline with a signed tenant state', async () => {
+  it('asks Google for the adwords and datamanager scopes, incrementally and offline, with a signed tenant state', async () => {
     const res = await adsConnect(get('https://admin-acme.jeffistores.in/api/admin/integrations/google-ads/connect'))
     const url = new URL(res.headers.get('location')!)
     expect(url.origin + url.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth')
-    expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/adwords')
+    expect(url.searchParams.get('scope')).toBe(`${ADWORDS} ${DATAMANAGER}`)
+    expect(url.searchParams.get('include_granted_scopes')).toBe('true')
     expect(url.searchParams.get('access_type')).toBe('offline')
     expect(url.searchParams.get('prompt')).toBe('consent')
     expect(url.searchParams.get('redirect_uri')).toBe('https://admin.jeffistores.in/api/admin/integrations/google/callback')
     const state = verifyAdminState(url.searchParams.get('state')!)
     expect(state).toMatchObject({ tenantId: 't-acme', provider: 'google_ads' })
+    expect(state?.keepAccount).toBeUndefined()
+  })
+
+  it('marks a reconnect so the chosen account is kept', async () => {
+    const res = await adsConnect(get('https://admin-acme.jeffistores.in/api/admin/integrations/google-ads/connect?reconnect=1'))
+    const state = verifyAdminState(new URL(res.headers.get('location')!).searchParams.get('state')!)
+    expect(state).toMatchObject({ tenantId: 't-acme', provider: 'google_ads', keepAccount: true })
   })
 
   it('keys the flagship to the platform sentinel', async () => {
@@ -109,8 +119,68 @@ describe('shared Google callback, Google Ads leg', () => {
     expect(body.get('redirect_uri')).toBe('https://admin.jeffistores.in/api/admin/integrations/google/callback')
     const saved = vi.mocked(saveIntegrationCredential).mock.calls[0][0]
     expect(saved).toMatchObject({ tenantId: 't-acme', provider: 'google_ads' })
-    expect(JSON.parse(saved.configEnc.replace(/^enc:/, ''))).toEqual({ connected_via: 'oauth', oauth_refresh_token: 'rt-ads' })
-    expect(saved.meta).toMatchObject({ needs_customer: true, connected_via: 'oauth' })
+    expect(JSON.parse(saved.configEnc.replace(/^enc:/, ''))).toEqual({ connected_via: 'oauth', oauth_refresh_token: 'rt-ads', scopes: [ADWORDS] })
+    expect(saved.meta).toMatchObject({ needs_customer: true, connected_via: 'oauth', data_manager: false })
+  })
+
+  it('records the Data Manager grant for conversion uploads', async () => {
+    fetchMock.mockResolvedValueOnce(tokenOk(`${ADWORDS} ${DATAMANAGER}`))
+    await googleCallback(get(`https://admin.jeffistores.in/api/admin/integrations/google/callback?code=c1&state=${state()}`))
+    const saved = vi.mocked(saveIntegrationCredential).mock.calls[0][0]
+    expect(JSON.parse(saved.configEnc.replace(/^enc:/, '')).scopes).toEqual([ADWORDS, DATAMANAGER])
+    expect(saved.meta).toMatchObject({ data_manager: true, data_manager_at: expect.any(String) })
+  })
+
+  describe('reconnect', () => {
+    const reconnect = () => signAdminState({ tenantId: 't-acme', provider: 'google_ads', nonce: 'n', keepAccount: true })
+    const stored = (cfg: Record<string, unknown>) =>
+      vi.mocked(getIntegrationCredential).mockResolvedValueOnce({ status: 'connected', config_enc: `enc:${JSON.stringify(cfg)}`, meta: {} } as any)
+    const customerRow = new Response(
+      JSON.stringify([{ results: [{ customer: { id: '1234567890', descriptiveName: 'Acme', manager: false, currencyCode: 'INR' } }] }]),
+      { status: 200 }
+    )
+
+    it('keeps the account when the new sign-in can still read it and returns to Conversions', async () => {
+      stored({ connected_via: 'oauth', oauth_refresh_token: 'old', customer_id: '1234567890', login_customer_id: '5556667778' })
+      fetchMock
+        .mockResolvedValueOnce(tokenOk(`${ADWORDS} ${DATAMANAGER}`))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'at2', expires_in: 3600 }), { status: 200 }))
+        .mockResolvedValueOnce(customerRow)
+      const res = await googleCallback(get(`https://admin.jeffistores.in/api/admin/integrations/google/callback?code=c1&state=${reconnect()}`))
+      expect((await landing(res)).toString()).toBe('https://admin-acme.jeffistores.in/admin/google-ads?connected=google_ads&tab=conversions')
+      const search = fetchMock.mock.calls[2]
+      expect(String(search[0])).toContain('/customers/1234567890/googleAds:searchStream')
+      expect(search[1].headers['login-customer-id']).toBe('5556667778')
+      const saved = vi.mocked(saveIntegrationCredential).mock.calls[0][0]
+      expect(JSON.parse(saved.configEnc.replace(/^enc:/, ''))).toEqual({
+        connected_via: 'oauth',
+        oauth_refresh_token: 'rt-ads',
+        customer_id: '1234567890',
+        login_customer_id: '5556667778',
+        scopes: [ADWORDS, DATAMANAGER],
+      })
+      expect(saved.meta).toMatchObject({ account_name: 'Acme', data_manager: true, needs_customer: false })
+    })
+
+    it('falls back to picking an account when the new sign-in cannot read the old one', async () => {
+      stored({ connected_via: 'oauth', oauth_refresh_token: 'old', customer_id: '1234567890' })
+      fetchMock
+        .mockResolvedValueOnce(tokenOk(`${ADWORDS} ${DATAMANAGER}`))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'at2', expires_in: 3600 }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 403, status: 'PERMISSION_DENIED', message: 'denied' } }), { status: 403 }))
+      const res = await googleCallback(get(`https://admin.jeffistores.in/api/admin/integrations/google/callback?code=c1&state=${reconnect()}`))
+      expect((await landing(res)).searchParams.get('pick')).toBe('1')
+      const saved = vi.mocked(saveIntegrationCredential).mock.calls[0][0]
+      expect(JSON.parse(saved.configEnc.replace(/^enc:/, ''))).toEqual({ connected_via: 'oauth', oauth_refresh_token: 'rt-ads', scopes: [ADWORDS, DATAMANAGER] })
+    })
+
+    it('does not touch a manager-managed connection', async () => {
+      stored({ connected_via: 'manager', customer_id: '1234567890' })
+      fetchMock.mockResolvedValueOnce(tokenOk(`${ADWORDS} ${DATAMANAGER}`))
+      const res = await googleCallback(get(`https://admin.jeffistores.in/api/admin/integrations/google/callback?code=c1&state=${reconnect()}`))
+      expect((await landing(res)).searchParams.get('pick')).toBe('1')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('never touches the Merchant credential', async () => {

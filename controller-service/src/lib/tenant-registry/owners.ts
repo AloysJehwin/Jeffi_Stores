@@ -248,6 +248,7 @@ export const COMPARISON_ROWS: { group: string; label: string; scopeKey: string |
   { group: 'Marketing', label: 'Email mailer & campaigns', scopeKey: 'mailer:read' },
   { group: 'Marketing', label: 'Traffic analytics', scopeKey: 'traffic:read' },
   { group: 'Marketing', label: 'Google Ads reporting', scopeKey: 'google_ads:read' },
+  { group: 'Marketing', label: 'Google Ads campaign management', scopeKey: 'google_ads_campaigns:write' },
   { group: 'AI & B2B', label: 'AI admin assistant', scopeKey: 'agent:read' },
   { group: 'AI & B2B', label: 'B2B partner portal & RFQs', scopeKey: 'business_customers:read' },
   { group: 'Platform', label: 'Audit log & service accounts', scopeKey: 'audit:read' },

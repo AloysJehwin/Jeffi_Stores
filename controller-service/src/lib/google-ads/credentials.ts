@@ -5,6 +5,7 @@ import { IntegrationNotConnectedError } from '@/lib/integrations/resolve'
 import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
 import { loadGoogleServiceAccount } from '@/lib/shared/google-credentials'
 import { GoogleAdsClient, normalizeCustomerId, GOOGLE_ADS_SCOPE, type GoogleAdsClientOptions, type ServiceAccountKey } from './client'
+import { DATA_MANAGER_SCOPE } from './conversions/data-manager'
 
 // Google Ads credentials live in their own tenant_integration_credentials row (provider
 // 'google_ads', adwords scope) so connecting Ads never replaces the Merchant Center token. The
@@ -29,6 +30,8 @@ export interface GoogleAdsConfig {
   customer_id?: string
   login_customer_id?: string
   connected_via: AdsConnectedVia
+  /** Scopes Google granted with the refresh token (Google sign-in only); conversion uploads need datamanager. */
+  scopes?: string[]
 }
 
 export interface GoogleAdsCreds {
@@ -95,6 +98,7 @@ export async function saveAdsConfig(
     ...(cfg.oauth_refresh_token ? { oauth_refresh_token: cfg.oauth_refresh_token } : {}),
     ...(customerId ? { customer_id: customerId } : {}),
     ...(loginCustomerId && loginCustomerId !== customerId ? { login_customer_id: loginCustomerId } : {}),
+    ...(cfg.scopes?.length ? { scopes: cfg.scopes } : {}),
   }
   await saveIntegrationCredential({
     tenantId: tenantKey,
@@ -106,6 +110,9 @@ export async function saveAdsConfig(
       customer_id: clean.customer_id ?? null,
       login_customer_id: clean.login_customer_id ?? null,
       needs_customer: !clean.customer_id,
+      // Conversion uploads (Data Manager API) need this scope; null when the token's scopes are unknown.
+      data_manager: clean.scopes ? clean.scopes.includes(DATA_MANAGER_SCOPE) : null,
+      data_manager_at: clean.scopes ? new Date().toISOString() : null,
       ...meta,
     },
   })
@@ -155,11 +162,7 @@ export async function resolveGoogleAdsCreds(tenantId?: string | null): Promise<G
   return credsFromConfig(cfg, key)
 }
 
-export async function googleAdsClientFor(
-  tenantId?: string | null,
-  extra: Partial<GoogleAdsClientOptions> = {}
-): Promise<GoogleAdsClient> {
-  const c = await resolveGoogleAdsCreds(tenantId)
+export function googleAdsClientFromCreds(c: GoogleAdsCreds, extra: Partial<GoogleAdsClientOptions> = {}): GoogleAdsClient {
   return new GoogleAdsClient({
     refreshToken: c.refreshToken,
     serviceAccount: c.serviceAccount,
@@ -167,6 +170,13 @@ export async function googleAdsClientFor(
     loginCustomerId: c.loginCustomerId,
     ...extra,
   })
+}
+
+export async function googleAdsClientFor(
+  tenantId?: string | null,
+  extra: Partial<GoogleAdsClientOptions> = {}
+): Promise<GoogleAdsClient> {
+  return googleAdsClientFromCreds(await resolveGoogleAdsCreds(tenantId), extra)
 }
 
 /** Platform manager client (for the "managed by the platform" mode); null when not configured. */

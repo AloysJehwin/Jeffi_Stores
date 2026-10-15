@@ -214,6 +214,17 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'google_ads:read',
   },
   {
+    id: 'google_ads_conversions',
+    name: 'Google Ads conversion uploads',
+    path: '/api/cron/google-ads-conversions',
+    method: 'GET',
+    intervalMs: 30 * MIN,
+    intervalLabel: 'every 30 min',
+    startDelayMs: 330 * SEC,
+    lockTtlMs: 30 * MIN - 30 * SEC,
+    tenantScope: 'google_ads:read',
+  },
+  {
     id: 'ai_health',
     name: 'AI platform health',
     path: '/api/internal/ai/health',

@@ -191,7 +191,7 @@ describe('POST /api/orders/create — click / UTM attribution', () => {
     const res = await POST(requestWithCookie({ paymentMethod: 'cod' }, `user_sid=x; jeffi_attr=${attr}`) as any)
     expect(res.status).toBe(200)
 
-    const update = client.query.mock.calls.find(([sql]: [string]) => sql.includes('SET gclid'))
+    const update = client.query.mock.calls.find(([sql]: any[]) => String(sql).includes('SET gclid'))
     expect(update).toBeTruthy()
     const params = update![1]
     expect(params[0]).toBe(CREATED_ORDER.id)
@@ -209,17 +209,30 @@ describe('POST /api/orders/create — click / UTM attribution', () => {
     expect(params[10]).toBe(new Date(ts).toISOString())
   })
 
+  it('stamps the ads consent choice with the attribution, or on its own', async () => {
+    let client = codOrderSetup()
+    const attr = encodeURIComponent(JSON.stringify({ gclid: 'Cj0KCQ-abc', landing_path: '/', ts: Date.now() - 86400000 }))
+    await POST(requestWithCookie({ paymentMethod: 'cod' }, `jeffi_attr=${attr}; jeffi_consent=v1.1.1`) as any)
+    const update = client.query.mock.calls.find(([sql]: any[]) => String(sql).includes('SET gclid'))!
+    expect(update[1][11]).toBe(true)
+
+    client = codOrderSetup()
+    await POST(requestWithCookie({ paymentMethod: 'cod' }, 'jeffi_consent=v1.1.0') as any)
+    const consent = client.query.mock.calls.find(([sql]: any[]) => String(sql).includes('SET ads_consent'))!
+    expect(consent[1]).toEqual([CREATED_ORDER.id, false])
+  })
+
   it('leaves the order untouched without an attribution cookie', async () => {
     const client = codOrderSetup()
     const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(200)
-    expect(client.query.mock.calls.some(([sql]: [string]) => sql.includes('SET gclid'))).toBe(false)
+    expect(client.query.mock.calls.some(([sql]: any[]) => String(sql).includes('SET gclid'))).toBe(false)
   })
 
   it('ignores an expired attribution cookie', async () => {
     const client = codOrderSetup()
     const attr = encodeURIComponent(JSON.stringify({ gclid: 'old', landing_path: '/', ts: Date.now() - 91 * 86400000 }))
     await POST(requestWithCookie({ paymentMethod: 'cod' }, `jeffi_attr=${attr}`) as any)
-    expect(client.query.mock.calls.some(([sql]: [string]) => sql.includes('SET gclid'))).toBe(false)
+    expect(client.query.mock.calls.some(([sql]: any[]) => String(sql).includes('SET gclid'))).toBe(false)
   })
 })

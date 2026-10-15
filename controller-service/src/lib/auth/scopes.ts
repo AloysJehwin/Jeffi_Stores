@@ -418,6 +418,13 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/google-ads'],
     group: 'Marketing',
   },
+  {
+    key: 'google_ads_campaigns:write',
+    label: 'Google Ads Campaigns (Write)',
+    description: 'Create Google Ads campaigns and change budgets, bids, keywords, ads, assets and recommendations',
+    routes: ['/admin/google-ads'],
+    group: 'Marketing',
+  },
 
   // Finance
   {

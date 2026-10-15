@@ -26,6 +26,7 @@ import { controlPlanePool } from '@/lib/tenant-registry'
 import { resolveSubscriptionTenant, runInTenant, type WebhookTenant } from '@/lib/payments/webhook-tenant'
 import { processSubscriptionEvent } from '@/lib/subscriptions/cycle'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 // Customer-subscription events we route to handleSubscriptionEvent. Kept as a Set so the POST
 // dispatch stays a single membership test and new states only touch this list.
@@ -244,7 +245,7 @@ async function handlePaymentCaptured(payment: any) {
   const paymentRecord = await queryOne(
     `SELECT p.id as payment_id, p.order_id, p.status as payment_record_status,
             o.id as db_order_id, o.payment_status, o.order_number, o.total_amount, o.shipping_amount,
-            o.customer_email, o.customer_name, o.user_id
+            o.customer_email, o.customer_name, o.user_id, o.gclid, o.gbraid, o.wbraid
      FROM payments p
      JOIN orders o ON p.order_id = o.id
      WHERE p.gateway_response->>'razorpay_order_id' = $1
@@ -321,6 +322,7 @@ async function handlePaymentCaptured(payment: any) {
       ])
     }
   })
+  await queueAdsConversion(orderId, paymentRecord)
 
   if (paymentRecord.user_id) {
     const user = await queryOne('SELECT * FROM users WHERE id = $1', [paymentRecord.user_id])
@@ -403,7 +405,8 @@ async function handlePaymentLinkPaid(paymentLink: any) {
   const linkId = paymentLink.id
 
   const order = await queryOne(
-    `SELECT id, payment_status, user_id, order_number, total_amount, shipping_amount, customer_email, customer_name
+    `SELECT id, payment_status, user_id, order_number, total_amount, shipping_amount, customer_email, customer_name,
+            gclid, gbraid, wbraid
      FROM orders WHERE payment_link_id = $1`,
     [linkId]
   )
@@ -441,6 +444,7 @@ async function handlePaymentLinkPaid(paymentLink: any) {
       ])
     }
   })
+  await queueAdsConversion(order.id, order)
 
   if (order.user_id) {
     const user = await queryOne('SELECT * FROM users WHERE id = $1', [order.user_id])
@@ -484,9 +488,14 @@ async function handleQrCodeCredited(qrCode: any) {
     total_amount: string
     shipping_amount: string
     order_number: string
-  }>(`SELECT id, payment_status, total_amount, shipping_amount, order_number FROM orders WHERE razorpay_qr_id = $1`, [
-    qrId,
-  ])
+    gclid: string | null
+    gbraid: string | null
+    wbraid: string | null
+  }>(
+    `SELECT id, payment_status, total_amount, shipping_amount, order_number, gclid, gbraid, wbraid
+     FROM orders WHERE razorpay_qr_id = $1`,
+    [qrId]
+  )
   if (!order || order.payment_status === 'paid') return
 
   const upd = await query(
@@ -502,6 +511,7 @@ async function handleQrCodeCredited(qrCode: any) {
      ON CONFLICT DO NOTHING`,
     [order.id, qrPaymentId || qrId, parseFloat(order.total_amount), JSON.stringify(qrCode)]
   )
+  if (flippedToPaid) await queueAdsConversion(order.id, order)
 
   if (flippedToPaid && qrPaymentId) {
     fireRouteTransfer({
@@ -585,7 +595,7 @@ async function handleRefund(refund: any) {
     // A refund covering the whole order total revokes every digital line's vault access. A partial
     // dashboard refund carries no line information, so it revokes nothing (an admin can revoke
     // specific lines from the order page).
-    return withTransaction(async client => {
+    const row = await withTransaction(async client => {
       const o = await client.query<{ order_number: string; total_amount: string }>(
         `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1
          RETURNING order_number, total_amount`,
@@ -605,6 +615,8 @@ async function handleRefund(refund: any) {
         [orderId]
       ).catch(() => null)
     )
+    await queueAdsConversion(orderId)
+    return row
   })
   if (!order?.order_number || !tenant?.tenantId) return
 

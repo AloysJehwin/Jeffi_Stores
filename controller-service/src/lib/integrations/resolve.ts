@@ -92,11 +92,12 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
   }
 }
 
-/** Exchange a refresh token issued to the platform's Google OAuth client for an access token. */
+/** Exchange a refresh token issued to the platform's Google OAuth client for an access token.
+ * `scope` is what Google reports as granted to the token (space-separated), when it says. */
 export async function googleOAuthAccessToken(
   refreshToken: string,
   what = 'Google'
-): Promise<{ token: string; expiresInSec: number }> {
+): Promise<{ token: string; expiresInSec: number; scope?: string }> {
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
   if (!clientId || !clientSecret) throw new Error('Google OAuth not configured')
@@ -115,7 +116,11 @@ export async function googleOAuthAccessToken(
     const reason = data?.error_description || data?.error || 'token_refresh_failed'
     throw new Error(`${what} token refresh failed: ${reason}`)
   }
-  return { token: String(data.access_token), expiresInSec: Number(data.expires_in) || 3600 }
+  return {
+    token: String(data.access_token),
+    expiresInSec: Number(data.expires_in) || 3600,
+    ...(typeof data.scope === 'string' ? { scope: data.scope } : {}),
+  }
 }
 
 const saTokenCache = new Map<string, { token: string; expiresAt: number }>()
