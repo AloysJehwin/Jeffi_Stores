@@ -7,7 +7,7 @@ import { SendMessageRequest, BatchMessageRequest, BulkMessagesRequest, UpsertTem
 import { verifyServiceToken, bearer, type ServiceClaims } from '@jeffi/service-auth'
 import { mediaPriceInr, usdToInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
-import { resolveServiceScope, scopeSql, inScope } from '@jeffi/tenancy'
+import { resolveServiceScope, scopeSql, inScope, verifyLink } from '@jeffi/tenancy'
 import { db, one } from './db.js'
 import { sendMessage, getMessage, resolveTemplate, systemVars, toApi as msgToApi, SendError, type MessageRow } from './send.js'
 import { listTemplates, upsertTemplate, archiveTemplate, toApi as tplToApi } from './templates.js'
@@ -369,6 +369,8 @@ app.post<{ Body: { destination_url: string; kind?: string; variant_id?: string; 
 )
 
 app.get<{ Params: { code: string } }>('/s/:code', { config: { skipAuth: true } }, async (req, reply) => {
+  const signed = verifyLink(req.params.code)
+  if (signed) return reply.redirect(signed.destination, 302)
   // Public, no auth. onRequest hook skips /s/* via url prefix check — see below.
   const row = (await db.query<{ destination_url: string; tenant_id: string }>(
     `SELECT destination_url, tenant_id FROM short_link WHERE code=$1 AND (expires_at IS NULL OR expires_at > now())`,
