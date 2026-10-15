@@ -45,7 +45,15 @@ export interface GoogleAdsClientOptions {
 export interface AdsErrorDetail {
   code: string
   message: string
+  /** Request field the error points at, e.g. "mutate_operations[3].ad_group_ad_operation.create.ad". */
+  field?: string
 }
+
+const fieldPath = (loc: any): string | undefined =>
+  (loc?.fieldPathElements ?? [])
+    .map((p: any) => (p?.index != null ? `${p.fieldName}[${p.index}]` : p?.fieldName))
+    .filter(Boolean)
+    .join('.') || undefined
 
 export class GoogleAdsApiError extends Error {
   constructor(
@@ -108,7 +116,7 @@ export function parseAdsError(body: any, httpStatus: number): GoogleAdsApiError 
     for (const e of d.errors ?? []) {
       const codeObj = e?.errorCode ?? {}
       const code = String(Object.values(codeObj)[0] ?? 'UNKNOWN')
-      details.push({ code, message: String(e?.message ?? '') })
+      details.push({ code, message: String(e?.message ?? ''), field: fieldPath(e?.location) })
     }
   }
   const codes = details.map(d => d.code)
@@ -167,6 +175,21 @@ export class GoogleAdsClient {
       developerToken: this.developerToken,
       fetchImpl: this.fetchImpl,
       retryDelays: this.retryDelays,
+      getAccessToken: this.getAccessToken,
+    })
+    c.token = this.token
+    return c
+  }
+
+  /** Same credentials and token with other retry delays (none for non-idempotent mutates). */
+  withRetryDelays(retryDelays: number[]): GoogleAdsClient {
+    const c = new GoogleAdsClient({
+      ...this.auth,
+      customerId: this.customerId,
+      loginCustomerId: this.loginCustomerId,
+      developerToken: this.developerToken,
+      fetchImpl: this.fetchImpl,
+      retryDelays,
       getAccessToken: this.getAccessToken,
     })
     c.token = this.token

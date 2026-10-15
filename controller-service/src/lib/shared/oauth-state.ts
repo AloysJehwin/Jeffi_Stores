@@ -18,6 +18,8 @@ export interface AdminOAuthState {
   returnBase?: string
   // Google Merchant connect: the account id the token is for.
   merchantId?: string
+  // Google Ads reconnect (to add a scope): keep the chosen account if the new sign-in can reach it.
+  keepAccount?: boolean
   // Issued-at (unix seconds); stamped by signAdminState and checked by verifyAdminState.
   iat?: number
 }

@@ -1,5 +1,6 @@
 import { buildProductHighlights, buildProductDetails } from '@/lib/shared/google-merchant-helpers'
 import { clipTitle, hasIdentifiers, listedPrices } from './item-rules'
+import { itemLabels, type SalesVelocity } from './custom-labels'
 
 // Merchant API v1 ProductInput (products_v1). Attributes live under productAttributes; prices are
 // {amountMicros, currencyCode}; the Content API channel/targetCountry become contentLanguage + feedLabel.
@@ -8,7 +9,7 @@ export const FEED_LABEL = 'IN'
 const COUNTRY = 'IN'
 const CURRENCY = 'INR'
 
-function buildOfferId(sku: string): string {
+export function buildOfferId(sku: string): string {
   return sku.replace(/[^a-zA-Z0-9_:.-]/g, '_')
 }
 
@@ -62,9 +63,11 @@ const availability = (active: boolean, stockStatus: unknown) =>
 
 const gtins = (gtin: unknown) => (gtin ? [String(gtin)] : undefined)
 
+const positive = (v: unknown) => (Number(v) > 0 ? v : null)
+
 // baseUrl is the store's public origin (see catalogBaseUrl); links must match the site verified
-// in Merchant Center.
-export function productToGmcItems(product: any, baseUrl: string): any[] {
+// in Merchant Center. `velocity` (recent sales per SKU) adds the best seller / slow mover label.
+export function productToGmcItems(product: any, baseUrl: string, opts: { velocity?: SalesVelocity } = {}): any[] {
   if (product.is_digital) return []
   const base = baseUrl.replace(/\/+$/, '')
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
@@ -122,6 +125,18 @@ export function productToGmcItems(product: any, baseUrl: string): any[] {
           mpn: v.mpn || product.mpn || undefined,
           identifierExists: hasIdentifiers(v.gtin || product.gtin, v.mpn || product.mpn, brandName),
           costOfGoodsSold: cogs(v.cost_price ?? product.cost_price),
+          ...itemLabels(
+            {
+              sku: v.sku,
+              priceExTax: v.price_ex_gst ?? v.price,
+              cost: positive(v.cost_price) ?? product.cost_price,
+              stockStatus: productActive ? v.stock_status : 'Out of Stock',
+              quantity: v.inventory_quantity,
+              lowThreshold: product.low_stock_threshold,
+              createdAt: product.created_at,
+            },
+            opts.velocity
+          ),
         })
       })
   }
@@ -135,6 +150,18 @@ export function productToGmcItems(product: any, baseUrl: string): any[] {
       availability: availability(productActive, product.stock_status),
       size: product.size || undefined,
       costOfGoodsSold: cogs(product.cost_price),
+      ...itemLabels(
+        {
+          sku: product.sku,
+          priceExTax: product.price_ex_gst ?? product.base_price,
+          cost: product.cost_price,
+          stockStatus: productActive ? product.stock_status : 'Out of Stock',
+          quantity: product.inventory_quantity,
+          lowThreshold: product.low_stock_threshold,
+          createdAt: product.created_at,
+        },
+        opts.velocity
+      ),
     }),
   ]
 }

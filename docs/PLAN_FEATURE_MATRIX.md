@@ -84,6 +84,7 @@ Last updated: 2026-08-17.
 | Review Forms | `review_forms:read` | ❌ | ✅ | ✅ | ✅ |
 | Traffic Analytics | `traffic:read` | ❌ | ✅ | ✅ | ✅ |
 | Google Ads (reporting, connect/disconnect) | `google_ads:read` / `google_ads:write` | ❌ | ✅ | ✅ | ✅ |
+| Google Ads campaign management (create Search / Shopping / Performance Max, edit budgets, bids, keywords, ads, assets, recommendations) | `google_ads_campaigns:write` | ❌ | ❌ | ✅ | ✅ |
 | Email Mailer | `mailer:read` | ❌ | ❌ | ✅ | ✅ |
 | Campaigns & Automation | `campaigns:read` | ❌ | ❌ | ✅ | ✅ |
 | **— AI —** | | | | | |

@@ -116,8 +116,8 @@ export default function ConnectPanel({
       <div>
         <h2 className="text-lg font-semibold text-foreground">Connect Google Ads</h2>
         <p className="text-sm text-foreground-secondary mt-1">
-          Read-only reporting: spend, clicks and conversions next to the orders and margins in your store. Nothing is
-          changed in your Google Ads account.
+          Reporting: spend, clicks and conversions next to the orders and margins in your store. Connecting changes
+          nothing in your Google Ads account; on Pro and up you can also create and edit campaigns from here.
         </p>
       </div>
 

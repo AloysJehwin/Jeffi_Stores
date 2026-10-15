@@ -9,6 +9,7 @@ vi.mock('@/lib/shared/google-merchant-helpers', () => ({
 }))
 
 import { productToGmcItems, gmcItemProblem } from '@/lib/merchant/mapper'
+import { buildVelocity } from '@/lib/merchant/custom-labels'
 
 const BASE = 'https://shop.example.com'
 import * as helpers from '@/lib/shared/google-merchant-helpers'
@@ -215,10 +216,38 @@ describe('merchant/mapper', () => {
       expect(items[0].productAttributes.productDetails).toBeUndefined()
     })
 
-    it('does not set customLabels (not in mapper output)', () => {
-      const items = productToGmcItems(makeProduct(), BASE)
-      expect(items[0].productAttributes.customLabel0).toBeUndefined()
+    it('sets the bidding labels: margin band (0) and stock state (2), not the helper labels', () => {
+      const items = productToGmcItems(makeProduct({ price_ex_gst: 200, cost_price: 100, inventory_quantity: 4 }), BASE)
+      expect(items[0].productAttributes.customLabel0).toBe('margin-high')
+      expect(items[0].productAttributes.customLabel2).toBe('in-stock')
+      expect(items[0].productAttributes.customLabel3).toBeUndefined()
       expect(items[0].productAttributes.customLabel4).toBeUndefined()
+      expect(mockBuildCustomLabels).not.toHaveBeenCalled()
+    })
+
+    it('marks an unknown margin when there is no cost price', () => {
+      expect(productToGmcItems(makeProduct({ cost_price: null }), BASE)[0].productAttributes.customLabel0).toBe('margin-unknown')
+      expect(productToGmcItems(makeProduct({ base_price: 100, price_ex_gst: null, cost_price: 120 }), BASE)[0].productAttributes.customLabel0).toBe(
+        'margin-negative'
+      )
+    })
+
+    it('sets the sales label (1) only when recent sales are passed in', () => {
+      expect(productToGmcItems(makeProduct(), BASE)[0].productAttributes.customLabel1).toBeUndefined()
+      const velocity = buildVelocity([
+        { sku: 'tw-001', units: 9 },
+        { sku: 'other', units: 1 },
+      ])
+      expect(productToGmcItems(makeProduct(), BASE, { velocity })[0].productAttributes.customLabel1).toBe('bestseller')
+      expect(productToGmcItems(makeProduct({ sku: 'TW-404', created_at: '2020-01-01' }), BASE, { velocity })[0].productAttributes.customLabel1).toBe(
+        'slow-mover'
+      )
+    })
+
+    it('labels an inactive product out of stock, like its availability', () => {
+      const [item] = productToGmcItems(makeProduct({ is_active: false, stock_status: 'In Stock' }), BASE)
+      expect(item.productAttributes.availability).toBe('OUT_OF_STOCK')
+      expect(item.productAttributes.customLabel2).toBe('out-of-stock')
     })
 
     it('sets primary image link', () => {
@@ -381,6 +410,25 @@ describe('merchant/mapper', () => {
         ]), BASE)
       expect(items[0].productAttributes.availability).toBe('IN_STOCK')
       expect(items[1].productAttributes.availability).toBe('OUT_OF_STOCK')
+    })
+
+    it('labels each variant from its own price, cost, stock and sales', () => {
+      const velocity = buildVelocity([{ sku: 'VAR-B', units: 5 }])
+      const items = productToGmcItems(
+        makeProduct({
+          has_variants: true,
+          cost_price: 10,
+          product_variants: [
+            { sku: 'VAR-A', variant_name: 'A', price: 118, price_ex_gst: 100, cost_price: 90, stock_status: 'Low Stock' },
+            { sku: 'VAR-B', variant_name: 'B', price: 118, price_ex_gst: 100, cost_price: 0, stock_status: 'Out of Stock' },
+          ],
+        }),
+        BASE,
+        { velocity }
+      )
+      expect(items.map(i => i.productAttributes.customLabel0)).toEqual(['margin-low', 'margin-high'])
+      expect(items.map(i => i.productAttributes.customLabel1)).toEqual(['slow-mover', 'bestseller'])
+      expect(items.map(i => i.productAttributes.customLabel2)).toEqual(['low-stock', 'out-of-stock'])
     })
 
     it('prefers variant gtin over product gtin', () => {

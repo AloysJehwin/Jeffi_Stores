@@ -144,7 +144,7 @@ describe('Amazon SP-API callback', () => {
     fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ refresh_token: 'Atzr|new' }) })
     const state = signAdminState({ tenantId: 't-acme', provider: 'amazon_seller', nonce: 'n' })
     await amazonCallback(cb(`state=${state}&spapi_oauth_code=c&selling_partner_id=A1`))
-    expect(vi.mocked(saveIntegrationCredential).mock.calls[0][0].meta.marketplace_id).toBe('A1PA6795UKMFR9')
+    expect(vi.mocked(saveIntegrationCredential).mock.calls[0]![0].meta?.marketplace_id).toBe('A1PA6795UKMFR9')
   })
 
   it('rejects a forged state without exchanging anything', async () => {

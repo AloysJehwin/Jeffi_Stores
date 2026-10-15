@@ -1,6 +1,7 @@
 import { queryOne, query, getClient } from '@/lib/shared/db'
 import { productToGmcItems, gmcItemProblem } from './mapper'
 import { fetchAllActiveProducts, fetchProduct } from './product-fetch'
+import { loadSalesVelocity } from './sales-velocity'
 import {
   insertProductInput,
   deleteProductByOfferId,
@@ -167,12 +168,13 @@ async function runFullSync(): Promise<SyncResult> {
 
   const baseUrl = await catalogBaseUrl()
   const products = await fetchAllActiveProducts()
+  const velocity = await loadSalesVelocity()
   const allItems: any[] = []
   const activeOfferIds = new Set<string>()
 
   for (const product of products) {
     try {
-      const items = productToGmcItems(product, baseUrl)
+      const items = productToGmcItems(product, baseUrl, { velocity })
       for (const item of items) {
         activeOfferIds.add(item.offerId)
         const problem = gmcItemProblem(item)
@@ -246,7 +248,7 @@ export async function syncProductToMerchant(productId: string): Promise<void> {
 
   // Inactive products stay in the feed as out_of_stock (handled by productToGmcItems),
   // so we upsert them rather than delete.
-  const items = productToGmcItems(product, await catalogBaseUrl())
+  const items = productToGmcItems(product, await catalogBaseUrl(), { velocity: await loadSalesVelocity() })
   for (const item of items) {
     if (gmcItemProblem(item)) continue
     await insertProductInput(item)

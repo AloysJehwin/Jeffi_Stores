@@ -79,6 +79,9 @@ export async function refundAcrossPayments(opts: {
     refunds.push({ id: refund.id, amount: take, paymentId: p.transaction_id! })
     remaining = Math.round((remaining - take) * 100) / 100
   }
+  // The order's total already reflects the change; keep the Google Ads conversion value in step.
+  const { queueAdsConversion } = await import('@/lib/google-ads/conversions/queue')
+  await queueAdsConversion(opts.orderId)
   if (remaining > 0.01) throw Object.assign(new Error(`Only ₹${(opts.amount - remaining).toFixed(2)} of ₹${opts.amount.toFixed(2)} could be refunded — no payment has enough left`), { refunds })
   return { refunded: Math.round((opts.amount - remaining) * 100) / 100, refunds }
 }

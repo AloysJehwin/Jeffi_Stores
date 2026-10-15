@@ -16,7 +16,7 @@ import { createDraftInvoice } from '@/lib/documents/invoice'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 import { sendOrderConfirmedSMS } from '@/lib/shared/sms'
 import { checkPincodeServiceability } from '@/lib/shipping/delhivery'
-import { attributionFromRequest, attachOrderAttribution } from '@/lib/orders/attribution'
+import { attributionFromRequest, attachOrderAttribution, adsConsentFromRequest } from '@/lib/orders/attribution'
 
 const CreateOrderSchema = z.object({
   // 'manual' is accepted only from the business (B2B) portal — a server check below
@@ -266,6 +266,7 @@ export async function POST(request: NextRequest) {
     })
 
     const attribution = attributionFromRequest(request)
+    const adsConsent = adsConsentFromRequest(request)
     const order = await withTransaction(async client => {
       let shippingAddressId = null
       let billingAddressId = null
@@ -515,7 +516,7 @@ export async function POST(request: NextRequest) {
         await client.query(`UPDATE coupons SET times_used = times_used + 1 WHERE id = $1`, [couponId])
       }
 
-      await attachOrderAttribution(client, createdOrder.id, attribution)
+      await attachOrderAttribution(client, createdOrder.id, attribution, adsConsent)
 
       return createdOrder
     })

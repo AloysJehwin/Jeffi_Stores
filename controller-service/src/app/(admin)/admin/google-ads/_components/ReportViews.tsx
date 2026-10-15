@@ -5,6 +5,17 @@ import { AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react'
 import { TrendChart, DonutSplit, RankedBars, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { money, count, decimal, pct, ratio, change, humanize } from '@/lib/google-ads/format'
 import type { OverviewData, Kpis, ProductRow } from '@/lib/google-ads/report'
+import { useAdsManage } from './ManageContext'
+import {
+  actionsCol,
+  AdGroupRowActions,
+  AdRowActions,
+  CampaignRowActions,
+  ChangeLogPanel,
+  KeywordRowActions,
+  RecommendationRowActions,
+  SearchTermRowActions,
+} from './ManageActions'
 
 // One component per console tab. Data shapes come from lib/google-ads/report.ts loaders.
 
@@ -293,6 +304,7 @@ export function OverviewView({ d, currency }: { d: OverviewData; currency: strin
 }
 
 export function CampaignsView({ rows, currency }: { rows: any[]; currency: string }) {
+  const manage = !!useAdsManage()
   return (
     <Section title={`Campaigns (${rows.length})`}>
       <Table
@@ -305,6 +317,7 @@ export function CampaignsView({ rows, currency }: { rows: any[]; currency: strin
           { key: 'budget', label: 'Budget', num: true, render: r => (r.budget == null ? '-' : `${money(r.budget, currency)}/${r.budgetPeriod === 'DAILY' ? 'day' : humanize(r.budgetPeriod)}`), sort: r => r.budget ?? 0 },
           { key: 'bid', label: 'Bid strategy', render: r => humanize(r.biddingStrategy) },
           ...metricCols<any>(currency),
+          ...actionsCol<any>(manage, r => <CampaignRowActions row={r} />),
         ]}
       />
     </Section>
@@ -313,6 +326,7 @@ export function CampaignsView({ rows, currency }: { rows: any[]; currency: strin
 
 export function AdGroupsView({ d, currency }: { d: { adGroups: any[]; ads: any[] }; currency: string }) {
   const disapproved = d.ads.filter(a => a.approvalStatus === 'DISAPPROVED')
+  const manage = !!useAdsManage()
   return (
     <div className="space-y-5">
       {disapproved.length > 0 && (
@@ -331,6 +345,7 @@ export function AdGroupsView({ d, currency }: { d: { adGroups: any[]; ads: any[]
             { key: 'status', label: 'Status', render: r => <Badge tone={statusTone(r.status)}>{humanize(r.status)}</Badge> },
             { key: 'bid', label: 'Max CPC', num: true, render: r => money(r.cpcBid, currency, 2) },
             ...metricCols<any>(currency),
+            ...actionsCol<any>(manage, r => <AdGroupRowActions row={r} />),
           ]}
         />
       </Section>
@@ -363,6 +378,7 @@ export function AdGroupsView({ d, currency }: { d: { adGroups: any[]; ads: any[]
               ),
             },
             ...metricCols<any>(currency, { value: false }),
+            ...actionsCol<any>(manage, r => <AdRowActions row={r} />),
           ]}
         />
         <p className="text-xs text-foreground-muted mt-2">Ad metrics cover the last 30 days as of the last full sync.</p>
@@ -375,6 +391,7 @@ export function KeywordsView({ d, currency }: { d: { keywords: any[]; searchTerm
   const [onlyMissing, setOnlyMissing] = useState(false)
   const terms = onlyMissing ? d.searchTerms.filter(t => !t.inCatalogue) : d.searchTerms
   const missingSpend = d.searchTerms.filter(t => !t.inCatalogue).reduce((s, t) => s + t.cost, 0)
+  const manage = !!useAdsManage()
   return (
     <div className="space-y-5">
       <Section
@@ -403,6 +420,7 @@ export function KeywordsView({ d, currency }: { d: { keywords: any[]; searchTerm
             },
             { key: 'kw', label: 'Matched keyword', render: r => r.keyword || '-' },
             ...metricCols<any>(currency),
+            ...actionsCol<any>(manage, r => <SearchTermRowActions row={r} />),
           ]}
         />
         <p className="text-xs text-foreground-muted mt-2">
@@ -420,6 +438,7 @@ export function KeywordsView({ d, currency }: { d: { keywords: any[]; searchTerm
             { key: 'group', label: 'Ad group', render: r => r.adGroupName || '-' },
             { key: 'qs', label: 'QS', num: true, render: r => r.qualityScore ?? '-', sort: r => r.qualityScore ?? 0 },
             ...metricCols<any>(currency),
+            ...actionsCol<any>(manage, r => <KeywordRowActions row={r} />),
           ]}
         />
         <p className="text-xs text-foreground-muted mt-2">Keyword metrics cover the last 30 days as of the last full sync.</p>
@@ -499,6 +518,7 @@ export function LocationsView({ rows, currency }: { rows: any[]; currency: strin
 }
 
 export function RecommendationsView({ rows, currency }: { rows: any[]; currency: string }) {
+  const manage = !!useAdsManage()
   return (
     <Section title={`Recommendations (${rows.length})`}>
       <Table
@@ -511,29 +531,35 @@ export function RecommendationsView({ rows, currency }: { rows: any[]; currency:
           { key: 'clicks', label: 'Extra clicks', num: true, render: r => (r.extraClicks == null ? '-' : count(r.extraClicks)) },
           { key: 'conv', label: 'Extra conv.', num: true, render: r => (r.extraConversions == null ? '-' : decimal(r.extraConversions)) },
           { key: 'cost', label: 'Extra cost', num: true, render: r => (r.extraCost == null ? '-' : money(r.extraCost, currency)) },
+          ...actionsCol<any>(manage, r => <RecommendationRowActions row={r} />),
         ]}
       />
-      <p className="text-xs text-foreground-muted mt-2">Read-only. Apply or dismiss them in Google Ads.</p>
+      <p className="text-xs text-foreground-muted mt-2">
+        {manage ? 'Apply or dismiss with the buttons on each row.' : 'Read-only. Apply or dismiss them in Google Ads.'}
+      </p>
     </Section>
   )
 }
 
 export function ChangesView({ rows }: { rows: any[] }) {
   return (
-    <Section title="Change history (last 14 days)">
-      <Table
-        rows={rows}
-        rowKey={r => `${r.change_date_time}${r.resource_type}${r.changed_fields}`}
-        empty="No changes recorded."
-        cols={[
-          { key: 'when', label: 'When', render: r => r.change_date_time || '-' },
-          { key: 'what', label: 'What', render: r => `${humanize(r.operation)} ${humanize(r.resource_type).toLowerCase()}` },
-          { key: 'campaign', label: 'Campaign', render: r => r.campaign_name || '-' },
-          { key: 'fields', label: 'Fields', render: r => <span className="text-xs text-foreground-muted break-all">{r.changed_fields || '-'}</span> },
-          { key: 'who', label: 'By', render: r => r.user_email || humanize(r.client_type) },
-        ]}
-      />
-    </Section>
+    <div className="space-y-5">
+      <ChangeLogPanel />
+      <Section title="Change history (last 14 days)">
+        <Table
+          rows={rows}
+          rowKey={r => `${r.change_date_time}${r.resource_type}${r.changed_fields}`}
+          empty="No changes recorded."
+          cols={[
+            { key: 'when', label: 'When', render: r => r.change_date_time || '-' },
+            { key: 'what', label: 'What', render: r => `${humanize(r.operation)} ${humanize(r.resource_type).toLowerCase()}` },
+            { key: 'campaign', label: 'Campaign', render: r => r.campaign_name || '-' },
+            { key: 'fields', label: 'Fields', render: r => <span className="text-xs text-foreground-muted break-all">{r.changed_fields || '-'}</span> },
+            { key: 'who', label: 'By', render: r => r.user_email || humanize(r.client_type) },
+          ]}
+        />
+      </Section>
+    </div>
   )
 }
 

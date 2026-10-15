@@ -17,12 +17,15 @@ vi.mock('@/lib/shared/auto-tasks', () => ({
   completeAutoTask: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn(async () => ({ action: 'none', reason: 'test' })) }))
+
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/(admin)/admin/delhivery/sync-statuses/route'
 import { query, queryMany } from '@/lib/shared/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 import { createAutoTask, completeAutoTask } from '@/lib/shared/auto-tasks'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -150,6 +153,26 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
     const res = await POST(makeReq())
     const body = await res.json()
     expect(body.results[0].syncedTo).toBe('delivered')
+  })
+
+  it('queues the Google Ads conversion when a COD order is delivered, not on transit scans', async () => {
+    const order = { ...sampleOrder, status: 'out_for_delivery', payment_mode: 'cod', gclid: 'Cj0KCQ', gbraid: null, wbraid: null }
+    mockQueryMany.mockResolvedValueOnce([order]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => makeShipmentResponse('AWB111', 'DL', 'Delivered') } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+    await POST(makeReq())
+    expect(queueAdsConversion).toHaveBeenCalledWith('order-1', expect.objectContaining({ gclid: 'Cj0KCQ' }))
+
+    vi.mocked(queueAdsConversion).mockClear()
+    mockQueryMany.mockResolvedValueOnce([{ ...order, status: 'shipped' }]).mockResolvedValueOnce([])
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => makeShipmentResponse('AWB111', 'OD', 'Out for Delivery') } as any)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ShipmentData: [] }) } as any)
+    await POST(makeReq())
+    expect(queueAdsConversion).not.toHaveBeenCalled()
   })
 
   it('syncs processing → shipped status (PU)', async () => {

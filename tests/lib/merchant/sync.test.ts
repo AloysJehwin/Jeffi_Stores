@@ -191,7 +191,9 @@ describe('merchant/sync', () => {
       mockQueryMany.mockResolvedValueOnce([{ id: 'p1', sku: 'P' }])
       mockProductToGmcItems.mockReturnValueOnce([])
       await syncAllProductsToMerchant()
-      expect(mockProductToGmcItems).toHaveBeenCalledWith({ id: 'p1', sku: 'P' }, BASE)
+      expect(mockProductToGmcItems).toHaveBeenCalledWith({ id: 'p1', sku: 'P' }, BASE, { velocity: expect.objectContaining({ windowDays: 60 }) })
+      // recent sales for the best seller / slow mover label: one aggregate per run
+      expect(mockQueryMany.mock.calls.filter(c => String(c[0]).includes('FROM order_items'))).toHaveLength(1)
     })
 
     it('stops before pushing when the data source cannot be resolved', async () => {
@@ -276,7 +278,7 @@ describe('merchant/sync', () => {
       mockQueryOne.mockResolvedValueOnce({ id: 'p1', sku: 'SKU-001', product_variants: [] })
       mockProductToGmcItems.mockReturnValueOnce([good('SKU-001')])
       await syncProductToMerchant('p1')
-      expect(mockProductToGmcItems).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }), BASE)
+      expect(mockProductToGmcItems).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }), BASE, { velocity: expect.anything() })
       expect(mockInsert).toHaveBeenCalledWith(good('SKU-001'))
     })
 

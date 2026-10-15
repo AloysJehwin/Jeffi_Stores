@@ -10,7 +10,10 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { formatCid } from '@/lib/google-ads/format'
 import type { AdsConnectionStatus } from '@/lib/google-ads/connection'
 import type { AdsTab } from '@/lib/google-ads/report'
+import { AdsManageProvider } from './_components/ManageContext'
+import { NewCampaignButton } from './_components/CampaignWizard'
 import ConnectPanel, { NotConfigured } from './_components/ConnectPanel'
+import ConversionsView from './_components/ConversionsView'
 import {
   OverviewView,
   CampaignsView,
@@ -32,6 +35,7 @@ const TABS: { id: AdsTab; label: string }[] = [
   { id: 'locations', label: 'Locations' },
   { id: 'recommendations', label: 'Recommendations' },
   { id: 'changes', label: 'Change history' },
+  { id: 'conversions', label: 'Conversions' },
   { id: 'sync', label: 'Sync status' },
 ]
 
@@ -83,6 +87,7 @@ export default function GoogleAdsClient({
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const reload = useCallback(() => setReloadKey(k => k + 1), [])
 
   // OAuth return (?connected=...) shows once, then the URL is cleaned.
   useEffect(() => {
@@ -177,11 +182,12 @@ export default function GoogleAdsClient({
               ? `${status.accountName || 'Account'} ${formatCid(status.customerId)}${
                   status.loginCustomerId ? ` · via manager ${formatCid(status.loginCustomerId)}` : ''
                 } · ${VIA_LABEL[status.connectedVia ?? 'oauth']}`
-              : 'Read-only reporting for your Google Ads account'}
+              : 'Reporting and campaigns for your Google Ads account'}
           </p>
         </div>
         {connected && (
           <div className="flex items-center gap-1">
+            <NewCampaignButton onCreated={reload} />
             {canWrite && (
               <IconButton icon={RefreshCw} label="Sync now (last 30 days)" busy={busy === 'sync'} onClick={() => action('sync')} />
             )}
@@ -295,7 +301,9 @@ export default function GoogleAdsClient({
           ) : loading && !data ? (
             <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
           ) : data ? (
-            <TabBody tab={tab} data={data} currency={currency} />
+            <AdsManageProvider currency={currency} onChanged={reload}>
+              <TabBody tab={tab} data={data} currency={currency} />
+            </AdsManageProvider>
           ) : null}
         </>
       )}
@@ -321,6 +329,8 @@ function TabBody({ tab, data, currency }: { tab: AdsTab; data: any; currency: st
       return <RecommendationsView rows={data.recommendations ?? []} currency={currency} />
     case 'changes':
       return <ChangesView rows={data.changes ?? []} />
+    case 'conversions':
+      return <ConversionsView d={data} currency={currency} />
     case 'sync':
       return <SyncView rows={data.log ?? []} />
   }

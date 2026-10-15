@@ -18,7 +18,8 @@ import { logActivity } from '@/lib/shared/activity'
 import { createAutoTask } from '@/lib/shared/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
 import { parseBody, zNonEmpty, zUuid } from '@/lib/shared/validate'
-import { attributionFromRequest } from '@/lib/orders/attribution'
+import { attributionFromRequest, adsConsentFromRequest } from '@/lib/orders/attribution'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 import type { Attribution } from '@/lib/shared/attribution'
 import { sendOrderConfirmedSMS } from '@/lib/shared/sms'
 import { notifyAccessGranted } from '@/lib/shared/notify'
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
         razorpay_payment_id,
         razorpay_signature,
         attribution: attributionFromRequest(request),
+        adsConsent: adsConsentFromRequest(request),
       })
     }
 
@@ -214,6 +216,7 @@ async function commitDraft(args: {
   razorpay_payment_id: string
   razorpay_signature: string
   attribution: Attribution | null
+  adsConsent: boolean | null
 }) {
   const draft = await verifyDraftToken(args.token)
   if (!draft) return NextResponse.json({ error: 'Invalid or expired checkout session' }, { status: 400 })
@@ -324,6 +327,7 @@ async function commitDraft(args: {
             amountPaise: expectedAmountPaise,
           },
           attribution: args.attribution,
+          adsConsent: args.adsConsent,
         })
       : await commitOrder({
           mode: 'buyNow',
@@ -349,6 +353,7 @@ async function commitDraft(args: {
             amountPaise: expectedAmountPaise,
           },
           attribution: args.attribution,
+          adsConsent: args.adsConsent,
         })
 
   const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
@@ -508,6 +513,7 @@ async function markLegacyOrderPaid(args: {
       args.userId,
     ])
   })
+  await queueAdsConversion(args.orderId, order)
 
   const [user, orderItems] = await Promise.all([
     queryOne('SELECT * FROM users WHERE id = $1', [args.userId]),
