@@ -37,14 +37,6 @@ echo "== 2/3 Roll out"
 bash deploy/k8s/bootstrap/rollout.sh "$TAG"
 
 echo "== 3/3 Smoke test"
-health=$(curl -s --max-time 15 https://jeffistores.in/api/health)
-echo "   $health"
-echo "$health" | grep -q "\"commit\":\"$SHA\"" || { echo "   live commit is not $SHA" >&2; exit 1; }
-URLS="https://jeffistores.in/ https://business.jeffistores.in/ https://ecom.jeffistores.in/ https://public.jeffistores.in/healthz"
-for ns in $(kubectl get ns -l jeffi.io/tier=tenant -o jsonpath='{.items[*].metadata.name}'); do
-  host=$(kubectl -n "$ns" get ingressroute controller -o jsonpath='{.spec.routes[0].match}' 2>/dev/null | sed -E 's/^Host\(`([^`]+)`.*/\1/')
-  [ -n "$host" ] && URLS="$URLS https://$host/api/health"
-done
-for u in $URLS; do printf '   %s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$u")" "$u"; done
+bash deploy/k8s/bootstrap/smoke.sh "$SHA"
 echo "== Released $SHA. Roll back the platform: kubectl -n jeffi rollout undo deploy/<jeffi-stores-*-service>;"
 echo "   a store: kubectl -n tenant-<slug> rollout undo deploy/<slug>-{controller,messaging,document}-service"

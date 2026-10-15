@@ -25,8 +25,8 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1792075382.7233236,
-    "ast_hash": "c245c6ff9aeb22f8b3c6a0962cd0c176",
+    "mtime": 1792077227.476089,
+    "ast_hash": "28820af32a8b2e19e13675d670a57398",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -4260,8 +4260,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/rollout.sh": {
-    "mtime": 1791952972.4389877,
-    "ast_hash": "5ea93459202a9f29010d6e3be3f6b62f",
+    "mtime": 1792077109.7034159,
+    "ast_hash": "a997bed9c1742cbe0c9843ab9d856343",
     "semantic_hash": ""
   },
   "deploy/k8s/gen-cronjobs.ts": {
@@ -4280,8 +4280,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/README.md": {
-    "mtime": 1792075404.669097,
-    "ast_hash": "a88aeaa8bdb249352590a77289b15ffc",
+    "mtime": 1792077297.8806968,
+    "ast_hash": "29a671a865eeae4f93a5d5b11760a2de",
     "semantic_hash": ""
   },
   "deploy/k8s/platform/00-namespaces.yaml": {
@@ -16190,8 +16190,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/release.sh": {
-    "mtime": 1792058181.0489545,
-    "ast_hash": "fa547a118222436277f82c78f80538e3",
+    "mtime": 1792077119.6926343,
+    "ast_hash": "5e741e5666782efbcf993f505a2f2a6d",
     "semantic_hash": ""
   },
   "deploy/k8s/db/00-backup.sh": {
@@ -16295,8 +16295,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/github-oidc.sh": {
-    "mtime": 1792075369.01287,
-    "ast_hash": "0e1ab3ddadb67cb1759a31d133d8c227",
+    "mtime": 1792077239.9556012,
+    "ast_hash": "b706dde78b5323d3acc46ecfe0c18113",
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/image-tag.sh": {
@@ -16307,6 +16307,16 @@
   "deploy/k8s/db/release-db.sh": {
     "mtime": 1792075123.3883877,
     "ast_hash": "6d9e6816c665d0474fcf1e74b26eb830",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/bootstrap/smoke.sh": {
+    "mtime": 1792077119.6641285,
+    "ast_hash": "174567ccff873664a0a85690c6d411fa",
+    "semantic_hash": ""
+  },
+  ".github/actions/release-setup/action.yml": {
+    "mtime": 1792077180.633014,
+    "ast_hash": "2a88aca8ca1dbbb67a1c0a83baff6b9e",
     "semantic_hash": ""
   }
 }
