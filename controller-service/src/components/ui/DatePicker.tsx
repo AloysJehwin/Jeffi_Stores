@@ -12,6 +12,10 @@ interface DatePickerProps {
   max?: string
   className?: string
   placeholder?: string
+  /** Replaces the trigger's default border/padding/background classes, to match the surrounding form. */
+  triggerClassName?: string
+  /** Shows Clear (sets '') and Today under the month grid. */
+  clearable?: boolean
 }
 
 const MONTHS = [
@@ -63,6 +67,8 @@ export default function DatePicker({
   max,
   className = '',
   placeholder = 'Select date',
+  triggerClassName,
+  clearable,
 }: DatePickerProps) {
   const parsed = parseDateVal(value)
   const today = new Date()
@@ -99,7 +105,7 @@ export default function DatePicker({
       if (!containerRef.current) return
       const rect = containerRef.current.getBoundingClientRect()
       const popupW = 256
-      const popupH = 320
+      const popupH = clearable ? 360 : 320
       const margin = 8
       const vw = window.innerWidth
       const vh = window.innerHeight
@@ -122,7 +128,7 @@ export default function DatePicker({
       window.removeEventListener('resize', reposition)
       window.removeEventListener('scroll', reposition, true)
     }
-  }, [open])
+  }, [open, clearable])
 
   const openPicker = useCallback(() => {
     if (disabled) return
@@ -187,16 +193,20 @@ export default function DatePicker({
   const displayVal = formatDisplay(value)
 
   return (
-    <div ref={containerRef} className={`relative inline-block ${className}`}>
+    <div ref={containerRef} className={`relative ${className.includes('w-full') ? 'block' : 'inline-block'} ${className}`}>
       <button
         type="button"
         disabled={disabled}
         onClick={openPicker}
-        className={`w-full flex items-center justify-between px-4 py-1.5 rounded-lg border bg-surface text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400 ${
-          open
-            ? 'border-accent-500 ring-2 ring-accent-500 dark:ring-accent-400'
-            : 'border-border-secondary hover:border-border-default'
-        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} text-${displayVal ? 'foreground' : 'foreground-muted'}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        data-datepicker-trigger
+        className={`w-full flex items-center justify-between text-left text-sm transition-colors ${
+          triggerClassName ? `${triggerClassName} ${open ? 'ring-2 ring-accent-400' : ''}` :
+          `px-4 py-1.5 rounded-lg border bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400 ${
+            open ? 'border-accent-500 ring-2 ring-accent-500 dark:ring-accent-400' : 'border-border-secondary hover:border-border-default'
+          }`
+        } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       >
         <span className={`whitespace-nowrap ${displayVal ? 'text-foreground' : 'text-foreground-muted'}`}>
           {displayVal || placeholder}
@@ -277,6 +287,9 @@ export default function DatePicker({
                         type="button"
                         disabled={dis}
                         onClick={() => selectDay(d)}
+                        aria-pressed={isSelected}
+                        data-selected={isSelected || undefined}
+                        data-today={isToday || undefined}
                         className={`w-8 h-8 mx-auto rounded-lg text-xs font-medium transition-colors ${
                           isSelected
                             ? 'bg-accent-500 text-white'
@@ -292,6 +305,21 @@ export default function DatePicker({
                     )
                   })}
                 </div>
+                {clearable && (
+                  <div className="mt-2 flex items-center justify-between border-t border-border-default pt-2">
+                    <button type="button" disabled={!value} onClick={() => { onChange(''); setOpen(false) }}
+                      className="px-2 py-1 rounded-lg text-xs font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40">
+                      Clear
+                    </button>
+                    <button type="button" onClick={() => {
+                      const t = toDateStr(today.getFullYear(), today.getMonth(), today.getDate())
+                      if ((min && t < min) || (max && t > max)) return
+                      onChange(t); setOpen(false)
+                    }} className="px-2 py-1 rounded-lg text-xs font-semibold text-foreground hover:bg-surface-secondary">
+                      Today
+                    </button>
+                  </div>
+                )}
               </>
             )}
 
