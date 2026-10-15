@@ -89,6 +89,7 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
                   <td colSpan={3} className="px-4 py-3">
                     <span className="rounded-full bg-sky-100 dark:bg-sky-900/30 px-2 py-0.5 text-xs font-medium text-sky-700 dark:text-sky-300">API workspace</span>
                     <span className="ml-2 text-xs text-foreground-muted">{(t.service_types ?? []).filter(x => x !== 'store').map(x => (x === 'messaging' ? 'Messaging' : 'Documents')).join(' + ')} · pay as you go</span>
+                    {t.store_request && <span className="ml-2 rounded-full bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">Store upgrade</span>}
                   </td>
                 )}
                 <td className="px-4 py-3">

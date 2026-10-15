@@ -516,7 +516,7 @@ describe('tenant-registry — extended coverage', () => {
       await mod.approveKyc('t-1', 'admin@x.com')
       expect(String(poolQuery.mock.calls[0][0])).toMatch(/tenant_kyc SET status='approved'/)
       expect(poolQuery.mock.calls[0][1]).toEqual(['t-1', 'admin@x.com'])
-      expect(String(poolQuery.mock.calls[1][0])).toMatch(/tenants SET status='awaiting_payment'/)
+      expect(String(poolQuery.mock.calls[1][0])).toMatch(/THEN 'awaiting_payment'/)
     })
 
     it('rejectKyc records the note and rejects the tenant', async () => {
@@ -525,7 +525,7 @@ describe('tenant-registry — extended coverage', () => {
       await mod.rejectKyc('t-1', 'admin@x.com', 'blurry doc')
       expect(String(poolQuery.mock.calls[0][0])).toMatch(/status='rejected'/)
       expect(poolQuery.mock.calls[0][1]).toEqual(['t-1', 'admin@x.com', 'blurry doc'])
-      expect(String(poolQuery.mock.calls[1][0])).toMatch(/tenants SET status='rejected'/)
+      expect(String(poolQuery.mock.calls[1][0])).toMatch(/THEN 'rejected'/)
     })
   })
 

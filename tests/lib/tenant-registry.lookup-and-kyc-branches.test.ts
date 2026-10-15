@@ -581,7 +581,7 @@ describe('tenant-registry (data layer, extended)', () => {
     queueRows({ rows: [] }, { rows: [] })
     await mod.approveKyc('t-1', 'admin@x.com')
     expect(String(poolQuery.mock.calls[0][0])).toMatch(/status='approved'/)
-    expect(String(poolQuery.mock.calls[1][0])).toMatch(/status='awaiting_payment'/)
+    expect(String(poolQuery.mock.calls[1][0])).toMatch(/THEN 'awaiting_payment'/)
   })
 
   it('rejectKyc records the note and rejects the tenant', async () => {
@@ -589,7 +589,7 @@ describe('tenant-registry (data layer, extended)', () => {
     queueRows({ rows: [] }, { rows: [] })
     await mod.rejectKyc('t-1', 'admin@x.com', 'bad docs')
     expect(poolQuery.mock.calls[0][1]).toEqual(['t-1', 'admin@x.com', 'bad docs'])
-    expect(String(poolQuery.mock.calls[1][0])).toMatch(/status='rejected'/)
+    expect(String(poolQuery.mock.calls[1][0])).toMatch(/THEN 'rejected'/)
   })
 
   // ── social accounts + posts ──

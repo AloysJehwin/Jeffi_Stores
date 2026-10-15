@@ -27,7 +27,7 @@ export default function DocumentsClient(props: { seller: Seller | null; prices: 
           </button>
         ))}
       </div>
-      {tab === 'documents' ? <DocumentList /> : tab === 'designs' ? <DesignsPanel /> : <BulkDocuments {...props} />}
+      {tab === 'documents' ? <DocumentList /> : tab === 'designs' ? <DesignsPanel seller={props.seller} prices={props.prices} /> : <BulkDocuments {...props} />}
     </div>
   )
 }

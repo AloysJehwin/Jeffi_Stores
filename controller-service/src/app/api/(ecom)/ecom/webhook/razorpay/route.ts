@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyWebhookSignature } from '@/lib/payments/razorpay-subscriptions'
 import { getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
-import { sendStoreLiveEmail } from '@/lib/shared/ecom-emails'
 import { issuePlatformInvoiceLater } from '@/lib/billing/platform-invoice'
-import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
+import { triggerProvisioning } from '@/lib/provisioning/trigger'
+import { startStore } from '@/lib/provisioning/start-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,40 +71,9 @@ export async function POST(request: NextRequest) {
       // (tenant still awaiting_payment / not yet live), flip to 'provisioning' and kick the
       // engine — this is the ONLY place real provisioning starts. Do NOT set 'active' here;
       // only the engine's activate step does that, after infra exists + the host verifies.
-      if (tenant.status !== 'active' && tenant.status !== 'provisioning') {
-        await setSubscriptionStatus(tenant.id, 'active', 'provisioning')
-        const pool = controlPlanePool()
-        const ownerRow = await pool
-          .query(
-            `SELECT o.id, o.email, o.name, t.display_name, t.slug, t.billing_interval,
-                  p.slug AS plan
-           FROM owner_tenants ot
-           JOIN owners o ON o.id = ot.owner_id
-           JOIN tenants t ON t.id = ot.tenant_id
-           LEFT JOIN plans p ON p.id = t.plan_id
-           WHERE ot.tenant_id=$1 LIMIT 1`,
-            [tenant.id]
-          )
-          .catch(() => null)
-        const row = ownerRow?.rows[0]
-        if (row) {
-          sendStoreLiveEmail(
-            { email: row.email, name: row.name },
-            { display_name: row.display_name, slug: row.slug, plan: row.plan }
-          ).catch(() => {})
-          const restoreFromKey = await resolveRestoreKey(tenant.id, row.slug)
-          // Fire-and-forget so Razorpay gets a fast 200; the engine self-advances (AWS) or
-          // runs inline (stub).
-          triggerProvisioning({
-            action: 'provision',
-            tenantId: tenant.id,
-            slug: row.slug,
-            plan: row.plan,
-            ownerId: row.id,
-            restoreFromKey,
-            reason: 'first_payment',
-          }).catch(() => {})
-        }
+      // A services workspace whose store application is approved is not live as a store yet either.
+      if (tenant.store_request === 'awaiting_payment' || (!tenant.store_request && tenant.status !== 'active' && tenant.status !== 'provisioning')) {
+        await startStore(tenant)
       } else {
         // Recurring charge on an already-live tenant — just keep the subscription active.
         await setSubscriptionStatus(tenant.id, 'active')

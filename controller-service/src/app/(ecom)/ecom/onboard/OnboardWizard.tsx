@@ -149,8 +149,11 @@ export default function OnboardWizard({
   reusingPreviousDetails,
   ownerName,
   extraServices = [],
+  upgrade,
 }: {
   plans: Plan[]
+  /** A services workspace adding a store: the tenant (and its subdomain) already exists. */
+  upgrade?: { tenantId: string; slug: string; displayName: string }
   /** Messaging / documents picked alongside the store on the service picker. */
   extraServices?: ('messaging' | 'documents')[]
   /** Name on the owner's sign-in account, used only to prefill the editable name field. */
@@ -217,6 +220,7 @@ export default function OnboardWizard({
   // merely accepted. Keeps the UI from claiming a verification that did not happen.
   const [bankNameConfirmed, setBankNameConfirmed] = useState(false)
   const [bankMsg, setBankMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [bankOnFile, setBankOnFile] = useState(!!upgrade && !!init.bankVerified)
 
   // Step 6 — Branding & Legals
   const [ownerFullName, setOwnerFullName] = useState<string>(init.ownerName ?? ownerName ?? '')
@@ -246,7 +250,7 @@ export default function OnboardWizard({
     }
   }, [])
 
-  const effectiveSlug = slugEdited ? slug : slugify(displayName)
+  const effectiveSlug = upgrade ? upgrade.slug : slugEdited ? slug : slugify(displayName)
   const selectedPlan = plans.find(p => p.slug === planSlug)
   const monthly = Number(selectedPlan?.monthly_price_inr ?? 0)
   const price = interval === 'yearly' ? monthly * 10 : monthly
@@ -455,7 +459,7 @@ export default function OnboardWizard({
       }
       // Application submitted → tenant is pending_approval (NOT paid/live). Stay in the onboard
       // flow, which shows the 'under review' → payment states. Only a live store goes to /dashboard.
-      router.push('/onboard')
+      router.push(upgrade ? '/dashboard/add-store' : '/onboard')
       router.refresh()
     } catch {
       showToast('Network error', 'error')
@@ -696,8 +700,9 @@ export default function OnboardWizard({
                   <label className={lbl}>Subdomain</label>
                   <div className="flex items-center gap-2">
                     <input
-                      className={inp}
+                      className={`${inp} ${upgrade ? 'opacity-70 cursor-not-allowed' : ''}`}
                       value={effectiveSlug}
+                      readOnly={!!upgrade}
                       onChange={e => {
                         setSlugEdited(true)
                         setSlug(slugify(e.target.value))
@@ -706,6 +711,9 @@ export default function OnboardWizard({
                     />
                     <span className="text-sm text-foreground-muted whitespace-nowrap font-mono">.jeffistores.in</span>
                   </div>
+                  {upgrade && (
+                    <p className="text-xs text-foreground-muted mt-1">Your workspace&apos;s subdomain — already reserved for your store.</p>
+                  )}
                 </div>
                 <div>
                   <label className={lbl}>
@@ -1003,6 +1011,33 @@ export default function OnboardWizard({
                 Where your sales will be settled. We verify instantly via a ₹1 bank check.
               </p>
               <div className="space-y-4">
+                {bankOnFile ? (
+                  <div className="rounded-xl border border-[var(--org-sage-deep)]/40 org-sage p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold org-sage-text">
+                      <CheckMark className="w-4 h-4" /> Verified account on file
+                    </div>
+                    <div className="mt-2 text-sm text-foreground space-y-0.5">
+                      <div>{bank.holderName}</div>
+                      <div className="font-mono text-xs">
+                        •••• {String(bank.accountNumber).slice(-4)} · {bank.ifsc}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBankOnFile(false)
+                        setBankVerified(false)
+                        setBankNameConfirmed(false)
+                        setBankMsg(null)
+                        setBank({ accountNumber: '', ifsc: '', holderName: '' })
+                      }}
+                      className="mt-3 text-xs font-semibold text-foreground-secondary hover:text-foreground underline"
+                    >
+                      Use a different account
+                    </button>
+                  </div>
+                ) : (
+                <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="col-span-full sm:col-span-2">
                     <label className={lbl}>Account holder name</label>
@@ -1079,6 +1114,8 @@ export default function OnboardWizard({
                   >
                     {bankMsg.text}
                   </p>
+                )}
+                </>
                 )}
 
                 <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-border-default bg-surface-elevated hover:bg-surface-secondary transition-colors">

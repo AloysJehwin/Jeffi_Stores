@@ -10,10 +10,10 @@ const SCOPES: [string, string, 'messaging' | 'documents' | null][] = [
   ['documents:render', 'Render documents', 'documents'], ['documents:read', 'Read documents', 'documents'], ['wallet:read', 'Read wallet balance', null],
 ]
 
-type Review = 'pending' | 'rejected' | null
 const LABEL = { messaging: 'Messaging', documents: 'Documents' } as const
 
-export default function ApiKeysClient({ services, review, docsUrl }: { services: { messaging: boolean; documents: boolean }; review: { messaging: Review; documents: Review }; docsUrl: string }) {
+// A service still under review is announced by the dashboard layout's banner, on every page.
+export default function ApiKeysClient({ services, docsUrl }: { services: { messaging: boolean; documents: boolean }; docsUrl: string }) {
   const [keys, setKeys] = useState<Key[] | null>(null)
   const [name, setName] = useState('')
   const [scopes, setScopes] = useState<string[]>(SCOPES.filter(([, , s]) => !s || services[s]).map(([k]) => k))
@@ -52,13 +52,6 @@ export default function ApiKeysClient({ services, review, docsUrl }: { services:
   const noService = !services.messaging && !services.documents
   return (
     <div className="space-y-6">
-      {(['messaging', 'documents'] as const).filter(s => services[s] && review[s]).map(s => (
-        <div key={s} className={`rounded-2xl px-5 py-3 text-sm ${review[s] === 'rejected' ? 'bg-[#f6d5cc]/60 text-[#8a2e1f]' : 'org-peach'}`}>
-          {review[s] === 'pending'
-            ? <><strong>{LABEL[s]} API — under review.</strong> Create keys and set things up now; sending starts once we approve it (usually the same day).</>
-            : <><strong>{LABEL[s]} API — not approved.</strong> Reply to our email or write to support@jeffistores.in.</>}
-        </div>
-      ))}
       {noService && (
         <Card title="Request a service">
           <p className="text-sm text-foreground-secondary mb-4">Your workspace has no API services yet. Request one — it uses the same wallet as your store and starts after a quick review.</p>

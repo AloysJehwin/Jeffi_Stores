@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     daily_payout             boolean NOT NULL DEFAULT false, -- +5% upgrade flag
     own_delhivery            boolean NOT NULL DEFAULT false, -- ships on the tenant's own Delhivery account; skip wallet debit
     own_razorpay             boolean NOT NULL DEFAULT false, -- collects payments on the tenant's own Razorpay; skip Route split
+    store_request            text,                           -- store application on a services tenant: pending_approval|awaiting_payment|provisioning
     created_at     timestamp with time zone NOT NULL DEFAULT now(),
     updated_at     timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -99,6 +100,8 @@ ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_subscription_statu
     CHECK (subscription_status IN ('created','authenticated','active','halted','cancelled','completed','expired'));
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_billing_interval_check
     CHECK (billing_interval IN ('monthly','yearly'));
+ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_store_request_check
+    CHECK (store_request IN ('pending_approval','awaiting_payment','provisioning'));
 ALTER TABLE ONLY public.plans          ADD CONSTRAINT plans_tier_check CHECK (tier BETWEEN 0 AND 4); -- 0 = services-only plan
 
 -- FKs are safe here: all four tables live in the SAME control-plane DB.

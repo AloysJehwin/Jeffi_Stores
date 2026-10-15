@@ -41,6 +41,11 @@ export default function KycTab({ tenant: t, kyc, approvals = [] }: { tenant: Ten
           >
             {kyc.status}
           </span>
+          {t.store_request && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+              Store upgrade
+            </span>
+          )}
         </div>
 
         {pending && <KycActionButtons tenantId={t.id} mode="pending" />}

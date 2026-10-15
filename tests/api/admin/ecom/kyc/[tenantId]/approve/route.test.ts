@@ -61,7 +61,10 @@ vi.mock('@/lib/payments/razorpay-route', () => ({
 
 vi.mock('@/lib/shared/ecom-emails', () => ({
   sendKycApprovedEmail: vi.fn().mockResolvedValue(undefined),
+  sendServicesReviewedEmail: vi.fn().mockResolvedValue(undefined),
 }))
+
+vi.mock('@/lib/provisioning/start-store', () => ({ startStore: vi.fn() }))
 
 // ---------------------------------------------------------------------------
 // Imports after mocks
@@ -81,6 +84,7 @@ import {
   getOwnerBankAccount,
   getOwnerBankWithRoute,
   persistLinkedAccountToOwnerBank,
+  reviewServiceApproval,
 } from '@/lib/tenant-registry'
 import { createRazorpaySubscription } from '@/lib/payments/razorpay-subscriptions'
 import {
@@ -473,5 +477,22 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     expect(res.status).toBe(200)
     expect(json.ok).toBe(true)
     expect(sendKycApprovedEmail).toHaveBeenCalled()
+  })
+
+  // --- Store upgrade on a services workspace ---
+
+  it('takes the store path for a services workspace applying for a store', async () => {
+    vi.mocked(getTenant).mockResolvedValue({
+      ...TENANT,
+      service_types: ['messaging'],
+      store_request: 'pending_approval',
+    } as any)
+    const res = await POST(postReq(), params)
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.checkoutUrl).toBe('https://rzp.io/i/checkout')
+    expect(approveKyc).toHaveBeenCalledWith(TENANT_ID, ADMIN.email)
+    expect(createLinkedAccount).toHaveBeenCalled()
+    expect(reviewServiceApproval).not.toHaveBeenCalled()
   })
 })

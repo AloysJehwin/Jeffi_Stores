@@ -5,6 +5,8 @@ import { Check, Copy, ImagePlus, Loader2, Terminal, Trash2 } from 'lucide-react'
 import { Card } from '../_components/Card'
 import PdfPreview from './PdfPreview'
 import { useToast } from '@/contexts/ToastContext'
+import PlayDialog, { PlayButton } from '../_components/PlayDialog'
+import type { Seller } from './BulkDocuments'
 
 interface Design { key: string; name: string; description: string; accent: string; font: string; thumbnail_url: string }
 interface Settings { design: string | null; accent: string | null; font: string | null; has_logo: boolean }
@@ -20,8 +22,9 @@ const HEX = /^#[0-9a-fA-F]{6}$/
 const pill = (on: boolean) =>
   `rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${on ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`
 
-export default function DesignsPanel() {
+export default function DesignsPanel({ seller, prices }: { seller: Seller | null; prices: Record<string, number> }) {
   const { showToast } = useToast()
+  const [play, setPlay] = useState<{ kind: 'document'; design: string; name: string } | null>(null)
   const [designs, setDesigns] = useState<Design[] | null>(null)
   const [fonts, setFonts] = useState<Array<{ key: string; label: string }>>([])
   const [saved, setSaved] = useState<Settings | null>(null)
@@ -123,6 +126,7 @@ export default function DesignsPanel() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={`${API}/designs/${d.key}/thumbnail.png`} alt="" loading="lazy" className="h-full w-full object-cover object-top" />
                     {on && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full ecom-accent-bg text-white"><Check className="w-3 h-3" /></span>}
+                    <PlayButton className="absolute left-1.5 top-1.5 bg-surface-elevated/90 shadow-sm" onClick={() => setPlay({ kind: 'document', design: d.key, name: d.name })} />
                   </div>
                   <div className="px-2.5 py-2">
                     <div className="text-xs font-semibold text-foreground">{d.name}{saved?.design === d.key && <span className="ml-1.5 text-[10px] font-medium text-foreground-muted">· current</span>}</div>
@@ -217,6 +221,7 @@ export default function DesignsPanel() {
         </div>
         <p className="text-xs text-foreground-muted">Sample data · your logo and the colour/font above. Previews are free.</p>
       </div>
+      {play && <PlayDialog target={play} prices={prices} seller={seller} onClose={() => setPlay(null)} />}
     </div>
   )
 }
