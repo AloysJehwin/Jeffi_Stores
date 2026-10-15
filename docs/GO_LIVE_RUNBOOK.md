@@ -137,10 +137,10 @@ longer has those writes.
 
 - Keep `jeffi_control_plane` for a week, then drop it.
 - The old `jeffi-stores` ECR repository (single image) and the stopped EC2 `i-0b2466b2a540d6f23` can go too.
-- Every later release is `release.sh`, normally run by GitHub Actions: merging to `main` builds the images and
-  pauses on the `production` environment; the run summary lists the commits going out and warns when
-  `database/*.sql` changed. Run `10-platform-schema.sh` (and `manual.sql`-style statements for foreign keys or
-  column changes the diff never applies) before approving. Setup and the Mac fallback: `deploy/k8s/README.md`, Releasing.
+- Every later release runs in GitHub Actions: merging to `main` builds the images and pauses on the `production`
+  environment; approved, it applies the `jeffi_stores` schema (when `database/` changed) and pending migration
+  files, rolls out, and fans both out to every store's database. Foreign keys and column changes the diff never
+  applies go in `deploy/k8s/db/manual.sql`. Setup, dry runs and the Mac fallback: `deploy/k8s/README.md`, Releasing.
 - `MESSAGING_INLINE` is unchanged: the controller still sends some messages itself.
 - The one-vCPU core holds the platform with little to spare. Check `kubectl describe node core` before onboarding a
   store (three more pods). Once the bill is settled and the limit raised: t4g.xlarge (step 3 with that type), then the

@@ -2,11 +2,18 @@ name: Jeffi Stores Pipeline
 
 # PR: lint, typecheck, tests, build (pr-gate). Push to main: the same, then the four service images are built
 # and pushed to ECR (tag local-<image_sha>, shared with a Mac release), and the deploy job waits on the
-# `production` environment for approval before running the same rollout a Mac runs
-# (deploy/k8s/bootstrap/release.sh --rollout-only) over an SSM tunnel. The database is never changed here:
-# release-notes flags database/*.sql changes so they can be applied by hand (deploy/k8s/db) before approving.
-# workflow_dispatch with deploy=true exercises the release path from a branch (a re-release of tags that
-# already exist is a no-op rollout).
+# `production` environment for approval. Approved, it opens an SSM tunnel to the core and, in order:
+#   1. jeffi_stores schema (deploy/k8s/db/release-db.sh --schema: the additive database/*.sql diff, manual.sql,
+#      the control-plane diff and plan seed) when the schema changed since the live commit;
+#   2. pending database/migrations files (release-db.sh --migrations), every deploy: only files not yet in
+#      schema_migrations run, so it is a no-op when nothing is pending;
+#   3. the rollout (release.sh --rollout-only), which also fans the schema and migration files out to every
+#      store tenant's own database (40-tenant-fanout.sh) once the new controller is up;
+#   4. a CloudFront invalidation.
+# A database step that fails stops the run before anything is rolled out.
+# workflow_dispatch with deploy=true runs the release path from any branch; dry_run (on by default) builds the
+# images, prints the SQL every database step would apply, checks the cluster and the tenant fan-out, and
+# changes nothing in production.
 
 on:
   pull_request:
@@ -17,7 +24,15 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: Build images and roll out this ref (pauses for approval)
+        description: Run the release path for this ref (pauses for approval)
+        type: boolean
+        default: false
+      dry_run:
+        description: Dry run — build images and show the database SQL, change nothing in production
+        type: boolean
+        default: true
+      schema:
+        description: Run the jeffi_stores schema step even if database/ is unchanged since the live commit
         type: boolean
         default: false
 
@@ -169,7 +184,7 @@ jobs:
           fetch-depth: 0 # image_sha is the last commit that changed the image contents
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_BUILD_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - uses: docker/setup-buildx-action@v3
       - uses: crazy-max/ghaction-github-runtime@v3 # exposes the cache endpoint buildx's gha cache needs
@@ -187,35 +202,39 @@ jobs:
     runs-on: ubuntu-latest
     needs: [verify-scripts, lint, typecheck, test, build]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy)
+    outputs:
+      schema: ${{ steps.notes.outputs.schema }}
+      migrations: ${{ steps.notes.outputs.migrations }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: What this release changes, and whether the database must be updated first
+      - id: notes
+        name: What this release changes
         run: |
           set -euo pipefail
           tag=$(bash deploy/k8s/bootstrap/image-tag.sh)
-          live=$(curl -fsS --max-time 15 https://jeffistores.in/api/health | sed -nE 's/.*"commit":"([0-9a-f]+)".*/\1/p')
+          live=$(curl -fsS --max-time 15 https://jeffistores.in/api/health | sed -nE 's/.*"commit":"([0-9a-f]+)".*/\1/p' || true)
           {
-            echo "## Release $tag (HEAD ${GITHUB_SHA::8})"
-            echo
+            echo "## Release $tag (HEAD ${GITHUB_SHA::8})"; echo
             if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null; then
+              schema=$(git diff --name-only "$live..HEAD" -- database deploy/schema-diff.sh deploy/k8s/db/manual.sql ':(exclude)database/migrations')
+              migrations=$(git diff --name-only "$live..HEAD" -- database/migrations)
               echo "Live: \`$live\`. Commits since:"; echo
               git log --format='- %h %s' "$live..HEAD" | head -60
-              db=$(git diff --name-only "$live..HEAD" -- database/ ':(exclude)database/migrations' || true)
-              echo
-              if [ -n "$db" ]; then
-                echo "> ### Database changes in this release — apply them BEFORE approving the deploy"
-                echo "> \`bash deploy/k8s/db/10-platform-schema.sh --dry-run\`, review, then without \`--dry-run\` (docs/GO_LIVE_RUNBOOK.md)."
-                echo ">"; echo "$db" | sed 's/^/> - /'
-              else
-                echo "No \`database/\` changes since the live commit."
-              fi
             else
-              echo "Live commit \`${live:-unknown}\` is not in this clone; cannot list the changes. Check \`database/\` by hand before approving."
+              # Unknown live commit: run both steps (each is idempotent and applies only what is missing).
+              schema="(live commit ${live:-unknown} not in this clone)"; migrations=$schema
+              echo "Live commit \`${live:-unknown}\` is not in this clone; the database steps will run in full."
             fi
-            echo; echo "Approve the \`production\` environment to roll out; a Mac release of the same commit uses the same tag."
+            echo
+            if [ -n "$schema" ]; then echo "**Schema:** the deploy job applies the \`database/\` diff to jeffi_stores first:"; echo "$schema" | sed 's/^/- /'; else echo "**Schema:** unchanged."; fi
+            echo
+            if [ -n "$migrations" ]; then echo "**Migrations:** new \`database/migrations\` files:"; echo "$migrations" | sed 's/^/- /'; else echo "**Migrations:** no new files; the deploy job still runs any not yet recorded."; fi
+            echo; echo "Store tenant databases are updated during the rollout. Approve the \`production\` environment to proceed."
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "schema=$([ -n "$schema" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "migrations=$([ -n "$migrations" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
   deploy:
     name: Deploy to production
@@ -230,6 +249,11 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+      TUNNEL: ssm
+      OUT_DIR: ${{ runner.temp }}/db
+      RELEASE_WORK_DIR: ${{ runner.temp }}/release
     steps:
       - uses: actions/checkout@v4
         with:
@@ -238,8 +262,11 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-      - name: Session Manager plugin (the tunnel to the core)
+          role-duration-seconds: 7200
+      - name: Tools (Session Manager plugin, psql)
         run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client python3-venv >/dev/null
           command -v session-manager-plugin >/dev/null && exit 0
           curl -fsSL -o /tmp/smp.deb https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb
           sudo dpkg -i /tmp/smp.deb
@@ -250,12 +277,24 @@ jobs:
           mkdir -p ~/.kube
           echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/jeffi-k3s.yaml
           chmod 600 ~/.kube/jeffi-k3s.yaml
-      - name: Roll out ${{ needs.images.outputs.tag }}
-        env:
-          TUNNEL: ssm
-          RELEASE_WORK_DIR: ${{ runner.temp }}/release
+      - name: Database — jeffi_stores schema
+        if: needs.release-notes.outputs.schema == 'true' || env.DRY == 'true' || (github.event_name == 'workflow_dispatch' && inputs.schema)
+        run: bash deploy/k8s/db/release-db.sh --schema --yes $([ "$DRY" = true ] && echo --dry-run)
+      - name: Database — migration files
+        run: bash deploy/k8s/db/release-db.sh --migrations --yes $([ "$DRY" = true ] && echo --dry-run)
+      - name: Roll out ${{ needs.images.outputs.tag }} (platform, tenant databases, stores)
+        if: env.DRY != 'true'
         run: bash deploy/k8s/bootstrap/release.sh --rollout-only
+      - name: Dry run — cluster and tenant fan-out
+        if: env.DRY == 'true'
+        run: |
+          set -euo pipefail
+          tag=${{ needs.images.outputs.tag }}
+          bash deploy/k8s/db/40-tenant-fanout.sh "${tag#local-}" --dry-run
+          bash -c 'source deploy/k8s/db/lib.sh; k8s_tunnel; kubectl -n jeffi get deploy -o wide; kubectl get ns -l jeffi.io/tier=tenant'
+          echo "Dry run: would roll out $tag; nothing was changed."
       - name: Invalidate CloudFront
+        if: env.DRY != 'true'
         env:
           DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
@@ -263,11 +302,21 @@ jobs:
           id=$(aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/*' --query 'Invalidation.Id' --output text)
           aws cloudfront wait invalidation-completed --distribution-id "$DIST_ID" --id "$id"
           echo "Invalidation $id complete"
+      - name: SQL applied (summary)
+        if: always()
+        run: |
+          shopt -s nullglob
+          for f in "$OUT_DIR"/applied-schema-platform.sql "$OUT_DIR"/schema-*.sql; do
+            [ -s "$f" ] || continue
+            { echo "<details><summary>$(basename "$f") ($(grep -c ';' "$f") statements)</summary>"; echo; echo '```sql'; head -c 60000 "$f"; echo '```'; echo '</details>'; } >> "$GITHUB_STEP_SUMMARY"
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: release-logs
-          path: ${{ runner.temp }}/release
+          path: |
+            ${{ runner.temp }}/db
+            ${{ runner.temp }}/release
           if-no-files-found: ignore
 
   summary:
