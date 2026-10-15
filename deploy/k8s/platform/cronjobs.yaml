@@ -557,6 +557,80 @@ spec:
 apiVersion: batch/v1
 kind: CronJob
 metadata:
+  name: cron-google-ads-sync
+  namespace: jeffi
+  labels: { app.kubernetes.io/part-of: jeffi-cron }
+spec:
+  schedule: '30 4 * * *'
+  timeZone: Asia/Kolkata
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 3000
+      ttlSecondsAfterFinished: 600
+      template:
+        metadata:
+          labels: { app.kubernetes.io/part-of: jeffi-cron }
+        spec:
+          restartPolicy: Never
+          nodeSelector: { jeffi.io/role: core }
+          imagePullSecrets: [{ name: regcred }]
+          containers:
+            - name: run
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
+              # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs google_ads_sync POST /api/cron/fanout']
+              env:
+                - name: CRON_SECRET
+                  valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
+              resources:
+                requests: { cpu: 10m, memory: 48Mi }
+                limits: { memory: 128Mi }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-google-ads-refresh
+  namespace: jeffi
+  labels: { app.kubernetes.io/part-of: jeffi-cron }
+spec:
+  schedule: '5 */3 * * *'
+  timeZone: Asia/Kolkata
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 3000
+      ttlSecondsAfterFinished: 600
+      template:
+        metadata:
+          labels: { app.kubernetes.io/part-of: jeffi-cron }
+        spec:
+          restartPolicy: Never
+          nodeSelector: { jeffi.io/role: core }
+          imagePullSecrets: [{ name: regcred }]
+          containers:
+            - name: run
+              image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
+              # sleep: images before the retry in k8s-cron.mjs drop the first connection (netpol race)
+              command: [sh, -c, 'sleep 3 && exec node deploy/k8s-cron.mjs google_ads_refresh POST /api/cron/fanout']
+              env:
+                - name: CRON_SECRET
+                  valueFrom: { secretKeyRef: { name: cron-secret, key: CRON_SECRET } }
+              resources:
+                requests: { cpu: 10m, memory: 48Mi }
+                limits: { memory: 128Mi }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
   name: cron-ai-health
   namespace: jeffi
   labels: { app.kubernetes.io/part-of: jeffi-cron }

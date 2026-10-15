@@ -43,10 +43,11 @@ describe('control-plane scopes belong to the platform operator alone', () => {
 // makes it the ceiling a tenant can hold (grew from 71 with the notifications:read bell scope,
 // then +4 with vault:read/write + subscriptions:read/write, which ship on every plan.
 // (Was 76 before the Replication feature was removed, which dropped replication:read → 75;
-// +2 with templates:read/write, the messaging-templates library sold with Mailer → 77.)
+// +2 with templates:read/write, the messaging-templates library sold with Mailer → 77;
+// +2 with google_ads:read/write, Google Ads reporting sold on Growth and up → 79.)
 describe('the plan ladder never exceeds what a tenant may hold', () => {
   it('caps the top tier at the full tenant scope set', () => {
-    expect(TENANT_SCOPE_KEYS.length).toBe(77)
+    expect(TENANT_SCOPE_KEYS.length).toBe(79)
   })
 
   it('keeps every control-plane scope out of the tenant set', () => {

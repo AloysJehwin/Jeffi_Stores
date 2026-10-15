@@ -3,15 +3,19 @@ import { saveIntegrationCredential } from '@/lib/tenant-registry'
 import { encryptToken } from '@/lib/crypto/token-cipher'
 import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
+import { completeGoogleAdsOAuth } from '@/lib/google-ads/oauth-callback'
 
 export const dynamic = 'force-dynamic'
 
-// Google Merchant OAuth callback. Cross-site return to the platform OAuth host (no admin cookie):
-// trust comes from the signed state. Stores the refresh token + merchant id on the state's tenant.
+// Google OAuth callback (Merchant Center; Google Ads is dispatched on the state's provider).
+// Cross-site return to the platform OAuth host (no admin cookie): trust comes from the signed
+// state. Stores the refresh token + merchant id on the state's tenant.
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
   const rawState = params.get('state')
   const state = rawState ? verifyAdminState(rawState) : null
+  // One Google redirect URI serves Merchant Center and Google Ads; the signed state says which.
+  if (state?.provider === 'google_ads') return completeGoogleAdsOAuth(params, state)
   const backTo = `${await tenantAdminBase(state)}/admin/merchant-sync`
   const fail = (reason: string) => returnToAdmin(`${backTo}?connected=0&provider=google&error=${reason}`)
 
