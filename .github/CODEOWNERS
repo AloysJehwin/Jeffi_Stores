@@ -1,11 +1,19 @@
 # Default owner for everything
 * @AloysJehwin
 
-# Database schema and migrations
+# Database schema
 /database/ @AloysJehwin
 
-# API routes
-/src/app/api/ @AloysJehwin
+# Controller (Next app) API routes and shared library code
+/controller-service/src/app/api/ @AloysJehwin
+/controller-service/src/lib/ @AloysJehwin
 
-# Shared library code
-/src/lib/ @AloysJehwin
+# Services and shared packages
+/messaging-service/ @AloysJehwin
+/document-service/ @AloysJehwin
+/public-api-service/ @AloysJehwin
+/packages/ @AloysJehwin
+
+# Deploy scripts, manifests and workflows
+/deploy/ @AloysJehwin
+/.github/ @AloysJehwin

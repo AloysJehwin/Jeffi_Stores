@@ -50,17 +50,18 @@ Tenant namespaces are **not** in git. The provisioning engine renders them
 - `jeffi-stores-ec2-role`: add `s3:PutObject/GetObject/DeleteObject` on `jeffi-stores-bucket/*` and `jeffi-stores-vault/*`.
   Then remove the `AllowUploadFromApplication` (Principal `*` write) statement from the `jeffi-stores-bucket` policy. Today that bucket is publicly writable and deletable.
 - `jeffi-stores-ec2-role`: `s3:PutObject/GetObject/ListBucket` on `jeffi-stores-mtls-truststore/k3s-etcd/*`. After that, add `--etcd-s3 --etcd-s3-bucket jeffi-stores-mtls-truststore --etcd-s3-folder k3s-etcd` to `core-node.sh` so etcd snapshots leave the box.
-- Replace the root access keys used locally and in GitHub `AWS_ACCESS_KEY_ID` with a scoped IAM user.
+- Replace the root access keys used locally with a scoped IAM user (GitHub now assumes `jeffi-github-deploy` over OIDC; see Releasing).
 
-## Deploying without CI (GitHub unavailable)
+## Releasing
 
-Commit your changes, then run `bash deploy/k8s/bootstrap/release.sh` (`deploy-local.sh` is an alias).
+Every release is `deploy/k8s/bootstrap/release.sh`: it builds the committed `HEAD` (arm64, from `git archive`, so uncommitted and local files never ship) into four images (`jeffi-stores-{controller,messaging,document,public-api}-service:local-<sha>`), pushes them to ECR (tags already there are skipped), rolls them out with `rollout.sh`, then smoke-tests that the live `/api/health` reports the new commit. The tag is the last commit that changed the image contents (`lib.sh image_sha`), so a Mac and GitHub build of the same commit share images. Schema changes are never applied by it: see `deploy/k8s/db/` and `docs/GO_LIVE_RUNBOOK.md`.
 
-It builds the committed `HEAD` on this Mac (arm64, from `git archive`, so uncommitted and local files never ship) into four images (`jeffi-stores-{controller,messaging,document,public-api}-service:local-<sha>`), pushes them to ECR, rolls them out with `rollout.sh`, then smoke-tests that the live `/api/health` reports the new commit. `--build-only` stops after the push. Schema changes are not applied by it: see `deploy/k8s/db/` and `docs/GO_LIVE_RUNBOOK.md`.
+**From GitHub (the normal path).** A push to `main` (a squash-merged PR) runs `.github/workflows/ci.yml`: checks, then the four images in parallel on arm runners, then `Release notes` writes the run summary (commits since the live commit, and a warning listing `database/*.sql` changes that must be applied by hand first), then `Deploy to production` waits on the `production` environment. Approve it there; it opens an SSM tunnel to the core, runs `release.sh --rollout-only`, invalidates CloudFront, and attaches the rollout logs as the `release-logs` artifact. To exercise the path from a branch without merging: `gh workflow run ci.yml --ref <branch> -f deploy=true` (the environment's deployment-branch policy must allow that branch).
 
-- **Preconditions:** a clean working tree, Docker Desktop running, and ≥15 GB free disk (Docker corrupts its disk when it runs out).
-- **Rollback:** `kubectl -n jeffi rollout undo deploy/jeffi-stores-controller-service` (likewise the other three services).
-- **Never build on the core node:** the build needs ~4 GB RAM and starves production.
+- **One-time setup:** `bash deploy/k8s/bootstrap/github-oidc.sh` (IAM role the repo's workflows assume; `--dry-run` prints the policies), then `gh secret set AWS_ROLE_ARN` and `base64 < ~/.kube/jeffi-k3s.yaml | gh secret set KUBECONFIG_B64`; in GitHub → Settings → Environments → `production`, add yourself as required reviewer; branch protection on `main` requires `PR Gate`. The k3s admin cert in that kubeconfig lasts about a year: when the deploy job's `kubectl` starts failing, re-set `KUBECONFIG_B64` from the core.
+- **Secrets no workflow reads any more** (delete them): `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `EC2_HOST`, `EC2_INSTANCE_ID`, `EC2_SSH_KEY`, `EC2_USER`, `GH_DEPLOY_TOKEN`, `RDS_MASTER_PASSWORD`, `DATABASE_URL`, `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `APP_URL`.
+
+**From a Mac** (GitHub unavailable, or a hotfix): commit, then `bash deploy/k8s/bootstrap/release.sh` (`deploy-local.sh` is an alias). `--build-only` stops after the push; `--rollout-only` skips the builds. Preconditions: a clean working tree, Docker running, ≥15 GB free disk (Docker corrupts its disk when it runs out). From a network that cannot reach port 22 (a VPN with rotating exit IPs) the tunnel falls back to SSM (`brew install --cask session-manager-plugin`); `TUNNEL=ssm` skips the SSH attempt. Never build on the core node: the build needs ~4 GB RAM and starves production.
 
 ## Rollback
 

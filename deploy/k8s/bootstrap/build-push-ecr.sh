@@ -27,16 +27,21 @@ fi
 
 ARGS=()
 if [ "$SERVICE" = controller ]; then
-  while IFS= read -r line; do ARGS+=(--build-arg "$line"); done < <(
-    aws secretsmanager get-secret-value --region $REGION --secret-id jeffi/production --query SecretString --output text |
-      python3 -c 'import json,sys
+  PUBLIC=$(aws secretsmanager get-secret-value --region $REGION --secret-id jeffi/production --query SecretString --output text |
+    python3 -c 'import json,sys
 for k,v in json.load(sys.stdin).items():
-    if k.startswith("NEXT_PUBLIC_") and isinstance(v,str): print(f"{k}={v}")'
-  )
+    if k.startswith("NEXT_PUBLIC_") and isinstance(v,str): print(f"{k}={v}")')
+  while IFS= read -r line; do ARGS+=(--build-arg "$line"); done <<<"$PUBLIC"
+  # The on-device summary pair may live in the environment (CI repo vars) rather than the secret.
+  for k in NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY NEXT_PUBLIC_ONDEVICE_MODEL_BASE; do
+    grep -q "^$k=" <<<"$PUBLIC" || [ -z "${!k:-}" ] || ARGS+=(--build-arg "$k=${!k}")
+  done
   ARGS+=(--build-arg "NEXT_PUBLIC_APP_VERSION=$(node -p "require('$CTX/package.json').version")" --build-arg "NEXT_PUBLIC_GIT_SHA=${TAG#local-}")
   ARGS+=(--build-arg "DATABASE_URL=postgresql://build:build@localhost:5432/build" --build-arg "JWT_SECRET=build-only" --build-arg "SKIP_DB_CHECK=true")
 fi
 
 aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin "$REGISTRY" >/dev/null
-(cd "$CTX" && docker buildx build --platform linux/arm64 "${BUILD[@]}" "${ARGS[@]}" -t "$IMAGE" --push .)
+# BUILDX_CACHE_ARGS: e.g. "--cache-from type=gha,scope=$SERVICE --cache-to type=gha,mode=max,scope=$SERVICE" in CI.
+# shellcheck disable=SC2086
+(cd "$CTX" && docker buildx build --platform linux/arm64 "${BUILD[@]}" "${ARGS[@]}" ${BUILDX_CACHE_ARGS:-} -t "$IMAGE" --push .)
 echo "$IMAGE"

@@ -1,185 +1,121 @@
 name: Jeffi Stores Pipeline
 
+# PR: lint, typecheck, tests, build (pr-gate). Push to main: the same, then the four service images are built
+# and pushed to ECR (tag local-<image_sha>, shared with a Mac release), and the deploy job waits on the
+# `production` environment for approval before running the same rollout a Mac runs
+# (deploy/k8s/bootstrap/release.sh --rollout-only) over an SSM tunnel. The database is never changed here:
+# release-notes flags database/*.sql changes so they can be applied by hand (deploy/k8s/db) before approving.
+# workflow_dispatch with deploy=true exercises the release path from a branch (a re-release of tags that
+# already exist is a no-op rollout).
+
 on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened]
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Build images and roll out this ref (pauses for approval)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: pipeline-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  AWS_REGION: us-east-1
+
 jobs:
-  # ────────────────────────────────────────────────────────
-  # Stage 0 — Detect entity schema changes  (main push only)
-  # Watches database/*.sql (not migrations/) — triggers schema-diff job
-  # ────────────────────────────────────────────────────────
-  detect-changes:
-    name: Detect changed paths
+  verify-scripts:
+    name: Referenced scripts exist
     runs-on: ubuntu-latest
-    # One checkout answers both questions. They always ran in parallel and finished in ~8s, so
-    # splitting them bought no wall-clock time and cost a second runner allocation per run.
-    outputs:
-      schema_changed: ${{ steps.detect.outputs.schema_changed }}
-      migrations_changed: ${{ steps.detect.outputs.migrations_changed }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      # A script this workflow runs but which is not committed fails only at deploy time —
-      # after test, build and the image push. That is exactly what happened: .gitignore has a
-      # blanket *.sh, so two new scripts were silently dropped by `git add -A` and the deploy
-      # died on "No such file or directory". Catch it here, at t=0, for the price of a grep.
-      - name: Verify referenced scripts are committed
+      - name: Every script a workflow runs is committed
         run: |
           set -euo pipefail
-          MISSING=""
-          for f in $(grep -ohE '(\.github/scripts|deploy)/[A-Za-z0-9_.-]+\.sh' .github/workflows/*.yml | sort -u); do
-            [ -f "$f" ] || MISSING="$MISSING $f"
+          missing=0
+          for f in $(grep -ohE '(\.github/scripts|deploy)/[A-Za-z0-9_./-]+\.sh' .github/workflows/*.yml | sort -u); do
+            [ -f "$f" ] || { echo "::error::$f is referenced by a workflow but not committed"; missing=1; }
           done
-          if [ -n "$MISSING" ]; then
-            echo "::error::workflow references scripts that are not in the repo (check .gitignore):$MISSING"
-            exit 1
-          fi
-          echo "all referenced scripts are committed"
+          exit $missing
 
-      - name: Detect schema and migration file changes
-        id: detect
-        run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD)
-
-          # NOTE: the previous pattern was [^/]+ which matched only files DIRECTLY under
-          # database/, so database/control-plane/schema.sql never triggered a diff and the
-          # control plane silently drifted. .+ covers subdirectories.
-          # schema-diff.sh itself counts too: a fix to the differ must actually run, or it
-          # sits dormant until the next unrelated schema edit while the drift it repairs
-          # stays live. The same holds for the tenant fan-out builder and runner: the 2026-09-24
-          # fan-out failure was fixed in src/lib/tenant-migrations-schema.ts, and without this the
-          # repaired fan-out would not have run until an unrelated .sql edit. A commit message
-          # containing [schema] forces the job as well.
-          if echo "$CHANGED" | grep -qP '^(database/(?!migrations/).+\.sql|deploy/schema-diff\.sh|src/lib/tenant-migrations(-schema)?\.ts|src/app/api/internal/migrations/)' \
-             || echo "${{ github.event.head_commit.message }}" | grep -q '\[schema\]'; then
-            echo "schema_changed=true" >> $GITHUB_OUTPUT
-            echo "Entity SQL files changed — will schema-diff against live RDS"
-          else
-            echo "schema_changed=false" >> $GITHUB_OUTPUT
-            echo "No entity SQL changes — skipping schema-diff job"
-          fi
-
-          if echo "$CHANGED" | grep -q '^database/migrations/.*\.sql'; then
-            echo "migrations_changed=true" >> $GITHUB_OUTPUT
-            echo "Migration files changed — will apply to RDS after deploy"
-          else
-            echo "migrations_changed=false" >> $GITHUB_OUTPUT
-            echo "No migration files changed — skipping migrate job"
-          fi
-
-  # ────────────────────────────────────────────────────────
-  # Stage 1 — Lint  (PR + main)
-  # ────────────────────────────────────────────────────────
   lint:
     name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - run: npm ci
+      - run: npm run lint
 
-      - name: ESLint
-        run: npm run lint
-
-  # ────────────────────────────────────────────────────────
-  # Stage 1 — Type Check  (PR + main, parallel with lint)
-  # ────────────────────────────────────────────────────────
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - run: npm ci
-
-      - name: TypeScript
+      - name: Controller
         run: npx tsc --noEmit
+      - name: Services and packages
+        run: npm run typecheck:services
 
-  # ────────────────────────────────────────────────────────
-  # Stage 2 — Test + Coverage  (PR + main, gate: lint + typecheck)
-  # ────────────────────────────────────────────────────────
   test:
     name: Test & Coverage
     runs-on: ubuntu-latest
     needs: [lint, typecheck]
+    env:
+      JWT_SECRET: test-jwt-secret-at-least-32-bytes!!
+      CRON_SECRET: test-cron-secret
+      SERVICE_AUTH_SECRET: test-service-auth-secret
+      RAZORPAY_WEBHOOK_SECRET: test-webhook-secret
+      RAZORPAYX_WEBHOOK_SECRET: test-razorpayx-secret
+      DELHIVERY_API_KEY: test-delhivery-key
+      GOOGLE_CLIENT_ID: test-google-client-id
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - run: npm ci
-
       - name: Security audit
         run: npm audit --audit-level=high
         continue-on-error: true
-
-      - name: Run tests with coverage
+      - name: Controller tests with coverage
         run: npx vitest run --coverage --pool=forks
-        env:
-          JWT_SECRET: test-jwt-secret-at-least-32-bytes!!
-          CRON_SECRET: test-cron-secret
-          RAZORPAY_WEBHOOK_SECRET: test-webhook-secret
-          RAZORPAYX_WEBHOOK_SECRET: test-razorpayx-secret
-          DELHIVERY_API_KEY: test-delhivery-key
-          GOOGLE_CLIENT_ID: test-google-client-id
-
-      - name: Run integration / UI tests
+      - name: Integration / UI tests
         run: npm run test:integration
-        env:
-          JWT_SECRET: test-jwt-secret-at-least-32-bytes!!
-          CRON_SECRET: test-cron-secret
-          RAZORPAY_WEBHOOK_SECRET: test-webhook-secret
-          RAZORPAYX_WEBHOOK_SECRET: test-razorpayx-secret
-          DELHIVERY_API_KEY: test-delhivery-key
-          GOOGLE_CLIENT_ID: test-google-client-id
+      - name: Service tests
+        run: |
+          npm --prefix messaging-service test
+          npm --prefix document-service test
+          npm --prefix public-api-service test -- --passWithNoTests
 
-  # ────────────────────────────────────────────────────────
-  # Stage 3 — Build  (PR + main, gate: test)
-  # ────────────────────────────────────────────────────────
   build:
     name: Build
     runs-on: ubuntu-latest
-    # Not [test]: build consumes nothing the test job produces, so this was a gate rather than
-    # a data flow — and it put two ~5m30s jobs end to end. They now run side by side and docker
-    # gates on both, which keeps "never ship failing tests" while taking ~5m30s off every run.
     needs: [lint, typecheck]
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - run: npm ci
-
       - name: Next.js build
         run: npm run build
         env:
@@ -195,1025 +131,162 @@ jobs:
           NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
           NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
 
-  # ────────────────────────────────────────────────────────
-  # Stage 3 — Docker build & push  (main only, gate: build)
-  # ────────────────────────────────────────────────────────
-  docker:
-    name: Build & Push Docker Image
-    runs-on: ubuntu-24.04-arm
-    # Gates on test as well as build: with those two now running in parallel, this is the point
-    # that enforces a failing test never reaching an image.
-    needs: [build, test]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    outputs:
-      image-tag: ${{ steps.meta.outputs.version }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Read app version
-        id: appver
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-
-      - name: Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=sha,prefix=main-,format=short
-            type=raw,value=latest
-            type=raw,value=v${{ steps.appver.outputs.version }}
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Fetch NEXT_PUBLIC vars from Secrets Manager
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          SECRET=$(aws secretsmanager get-secret-value \
-            --secret-id jeffi/production \
-            --query SecretString --output text)
-          # Write every NEXT_PUBLIC_ key from the secret into $GITHUB_ENV so
-          # subsequent steps see them as environment variables and they can be
-          # passed as docker --build-arg values.
-          echo "$SECRET" | node -e "
-            const s = require('fs').readFileSync('/dev/stdin','utf8');
-            const obj = JSON.parse(s);
-            const lines = Object.entries(obj)
-              .filter(([k]) => k.startsWith('NEXT_PUBLIC_'))
-              .map(([k,v]) => k + '=' + v)
-              .join('\n');
-            require('fs').appendFileSync(process.env.GITHUB_ENV, lines + '\n');
-          "
-
-      # NEXT_PUBLIC_* values are inlined at build time, so an empty one ships a broken
-      # image that only fails in the browser. 5b8c0ffa moved these to Secrets Manager but
-      # seeded it from GitHub *secrets*, missing NEXT_PUBLIC_ONDEVICE_MODEL_BASE, which was
-      # a repo *variable* — the on-device flag stayed on while its model URL went empty, so
-      # every visitor 404'd on a 437MB model fetched from the wrong origin.
-      - name: Assert required NEXT_PUBLIC build args are non-empty
-        env:
-          VAR_ENABLE_ONDEVICE_SUMMARY: ${{ vars.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
-          VAR_ONDEVICE_MODEL_BASE: ${{ vars.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
-        run: |
-          # Mirror the build-arg fallback below: these two live in repo variables, not the
-          # Secrets Manager blob, so check the same resolved value the build will use.
-          : "${NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY:=${VAR_ENABLE_ONDEVICE_SUMMARY}}"
-          : "${NEXT_PUBLIC_ONDEVICE_MODEL_BASE:=${VAR_ONDEVICE_MODEL_BASE}}"
-          fail=0
-          require() {
-            if [ -z "${!1}" ]; then echo "::error::$1 is empty — $2"; fail=1; fi
-          }
-          require NEXT_PUBLIC_BASE_URL "site links and canonical URLs break"
-          require NEXT_PUBLIC_APP_URL "OAuth redirects break"
-          if [ "$NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY" = "true" ] || [ "$NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY" = "1" ]; then
-            require NEXT_PUBLIC_ONDEVICE_MODEL_BASE "on-device summary is enabled but the model would be fetched from this origin, which does not host it"
-          fi
-          [ "$fail" = "0" ] || { echo "Refusing to build an image with missing public config."; exit 1; }
-
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          platforms: linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            DATABASE_URL=postgresql://localhost:5432/dummy
-            JWT_SECRET=ci-build-secret
-            NEXT_PUBLIC_APP_URL=${{ env.NEXT_PUBLIC_APP_URL }}
-            SKIP_DB_CHECK=true
-            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ env.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
-            NEXT_PUBLIC_RAZORPAY_KEY_ID=${{ env.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
-            NEXT_PUBLIC_ENABLE_RAZORPAY=${{ env.NEXT_PUBLIC_ENABLE_RAZORPAY }}
-            NEXT_PUBLIC_ENABLE_GST=${{ env.NEXT_PUBLIC_ENABLE_GST }}
-            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
-            NEXT_PUBLIC_BASE_URL=${{ env.NEXT_PUBLIC_BASE_URL }}
-            NEXT_PUBLIC_APP_VERSION=${{ steps.appver.outputs.version }}
-            NEXT_PUBLIC_GIT_SHA=${{ github.sha }}
-            NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY=${{ env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY || vars.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
-            NEXT_PUBLIC_ONDEVICE_MODEL_BASE=${{ env.NEXT_PUBLIC_ONDEVICE_MODEL_BASE || vars.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
-
-  # ────────────────────────────────────────────────────────
-  # Stage 4 — Deploy to EC2  (main only, gate: docker)
-  # ────────────────────────────────────────────────────────
-  deploy:
-    name: Deploy to EC2
-    runs-on: ubuntu-latest
-    needs: [docker]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      deployments: write
-    outputs:
-      deployment_id: ${{ steps.create_deployment.outputs.result }}
-    steps:
-      - name: Create deployment
-        id: create_deployment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const dep = await github.rest.repos.createDeployment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: context.sha,
-              environment: 'production',
-              description: 'EC2 rolling deploy to jeffistores.in',
-              auto_merge: false,
-              required_contexts: [],
-              transient_environment: false,
-              production_environment: true,
-            });
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: dep.data.id,
-              state: 'in_progress',
-              environment_url: 'https://jeffistores.in',
-              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-            });
-            return dep.data.id;
-
-      # ── k3s (vars.K8S_DEPLOY == 'true'): CI joins the tailnet and talks to the API privately ──
-      - uses: actions/checkout@v4
-        if: vars.K8S_DEPLOY == 'true'
-
-      - name: Join tailnet
-        if: vars.K8S_DEPLOY == 'true'
-        uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-
-      - name: Roll out to k3s (flagship, CronJobs, tenants)
-        if: vars.K8S_DEPLOY == 'true'
-        env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-        run: |
-          set -euo pipefail
-          IMAGE="ghcr.io/aloysjehwin/jeffi_stores:main-${GITHUB_SHA::7}"
-          mkdir -p ~/.kube && echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config && chmod 600 ~/.kube/config
-          bash deploy/k8s/bootstrap/rollout.sh "$IMAGE"
-
-      - name: Get EC2 public IP
-        id: ec2
-        if: vars.K8S_DEPLOY != 'true'
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --query 'Reservations[0].Instances[0].PublicIpAddress' \
-            --output text)
-          echo "host=$IP" >> $GITHUB_OUTPUT
-
-      - name: Blue-green deploy (zero downtime)
-        if: vars.K8S_DEPLOY != 'true'
-        uses: appleboy/ssh-action@v1
-        env:
-          GH_DEPLOY_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
-          GH_REPOSITORY: ${{ github.repository }}
-          GH_ACTOR: ${{ github.actor }}
-        with:
-          host: ${{ steps.ec2.outputs.host }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 15m
-          envs: GH_DEPLOY_TOKEN,GH_REPOSITORY,GH_ACTOR
-          script: |
-            set -e
-            cd /opt/jeffi-stores
-
-            echo "── Pulling latest code ──"
-            git config credential.helper '!f(){ echo "username=x-token"; echo "password=$GH_DEPLOY_TOKEN"; };f'
-            git fetch origin
-            git checkout main
-            git reset --hard origin/main
-
-            echo "── Logging in to GHCR ──"
-            echo "$GH_DEPLOY_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
-
-            # Reclaim disk BEFORE pulling the new image. The 20G host sits at 100%
-            # because every deploy re-pulls the :latest tag, orphaning the previous
-            # version; those old layers are held by STOPPED blue-green containers, so
-            # a plain `image prune -f` reclaims 0B and the next pull dies with
-            # "no space left on device" (broke #507 and the #529 merge deploy).
-            # Blue-green keeps no tagged rollback image (single :latest), so removing
-            # every image not used by a RUNNING container is safe and reclaims the
-            # orphaned versions. Order matters: drop stopped containers first so their
-            # images become unreferenced, then prune images (-a) and build cache.
-            echo "── Reclaiming disk before pull ──"
-            docker system df || true
-            df -h / | tail -1 || true
-            docker container prune -f || true
-            docker image prune -a -f || true
-            docker builder prune -a -f || true
-            df -h / | tail -1 || true
-
-            # nginx's config is bind-mounted as a single FILE, which Docker resolves once, by
-            # inode. `git reset --hard` above writes a NEW inode, so the running container keeps
-            # serving the old content indefinitely — a config change appears deployed but never
-            # takes effect. That silently disabled tenant mTLS for 11 days: the admin-{slug}
-            # block's ssl_verify_client never reached nginx, so browsers were never asked for a
-            # client certificate. Only recreating the container re-resolves the mount.
-            # The tenant admin block advertises this bundle so browsers can offer the right
-            # client certificate. Rebuilt before the freshness check below, because adding a
-            # tenant changes the bundle without changing nginx-servers.conf.
-            echo "── client CA bundle ──"
-            BUNDLE=/opt/jeffi-stores/certs/client-ca-bundle.pem
-            BUNDLE_BEFORE=$(md5sum "$BUNDLE" 2>/dev/null | awk '{print $1}' || true)
-            sudo -E bash .github/scripts/build-client-ca-bundle.sh "$BUNDLE"
-            BUNDLE_AFTER=$(md5sum "$BUNDLE" 2>/dev/null | awk '{print $1}' || true)
-
-            echo "── nginx config ──"
-            HOST_MD5=$(md5sum deploy/nginx-servers.conf | awk '{print $1}')
-            CONT_MD5=$(docker exec jeffi-nginx md5sum /etc/nginx/conf.d/servers.conf 2>/dev/null | awk '{print $1}' || true)
-            if [ "$HOST_MD5" != "$CONT_MD5" ] || [ "$BUNDLE_BEFORE" != "$BUNDLE_AFTER" ]; then
-              echo "nginx config or CA bundle changed — validating before restart"
-              NET=$(docker inspect jeffi-nginx --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | awk '{print $1}')
-              # Validate in a throwaway container first: restarting into a bad config would take
-              # every site on this box down.
-              docker run --rm --network "$NET" \
-                -v /etc/letsencrypt:/etc/letsencrypt:ro \
-                -v /opt/jeffi-stores/certbot-webroot:/var/www/certbot:ro \
-                -v /opt/jeffi-stores/certs:/etc/nginx/certs:ro \
-                -v /opt/jeffi-stores/deploy/active-upstream.conf:/etc/nginx/conf.d/upstream.conf:ro \
-                -v /opt/jeffi-stores/deploy/nginx-servers.conf:/etc/nginx/conf.d/servers.conf:ro \
-                nginx:alpine nginx -t
-              docker restart jeffi-nginx
-              echo "nginx restarted on the new config"
-            else
-              echo "nginx config unchanged"
-            fi
-
-
-            echo "── Blue-green deploy ──"
-            bash deploy/blue-green-deploy.sh
-
-            echo "── Pruning old images ──"
-            docker image prune -f
-
-      - name: Mark deployment failure
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: ${{ steps.create_deployment.outputs.result }},
-              state: 'failure',
-              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: 'EC2 deploy failed — check logs',
-            });
-
-  # ────────────────────────────────────────────────────────
-  # Stage 5 — Schema Diff + Apply  (main only, gate: deploy + schema changed)
-  # Loads database/*.sql into temp Postgres, diffs vs live RDS via migra,
-  # applies only the delta. You edit the entity file — pipeline handles the rest.
-  # ────────────────────────────────────────────────────────
-  schema-diff:
-    name: Schema Diff & Apply
-    runs-on: ubuntu-latest
-    needs: [deploy, detect-changes]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.schema_changed == 'true' && vars.K8S_DEPLOY != 'true'
-    steps:
-      - name: Get EC2 public IP
-        id: ec2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --query 'Reservations[0].Instances[0].PublicIpAddress' \
-            --output text)
-          echo "host=$IP" >> $GITHUB_OUTPUT
-
-      - name: Run schema diff and apply via EC2
-        uses: appleboy/ssh-action@v1
-        env:
-          DEPLOY_SHA: ${{ github.sha }}
-          # Authoritative source for the fan-out call. Passing it here decouples the fan-out from
-          # container/slot state on the box — the prior run failed because the container lookup
-          # (docker exec printenv) came back empty when no active-slot container was up.
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        with:
-          host: ${{ steps.ec2.outputs.host }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 15m
-          # ssh-action only forwards variables named here; the fan-out records this SHA per
-          # tenant so a re-run can skip stores that already have it.
-          envs: DEPLOY_SHA,CRON_SECRET
-          script: |
-            set -e
-            cd /opt/jeffi-stores
-
-            export RDS_HOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
-            export RDS_PORT=5432
-            export RDS_USER=app_user
-            export AWS_REGION=us-east-1
-            echo "Applying schema at SHA $DEPLOY_SHA against host $RDS_HOST"
-
-            # Platform store DB
-            echo "::group::Platform DB diff (jeffi_stores)"
-            RDS_DB=jeffi_stores bash deploy/schema-diff.sh --set=platform
-            echo "::endgroup::"
-
-            # SaaS control plane - previously never diffed, which is how it ended up
-            # missing tenant_ca/tenant_admin_certs and provisioning_jobs.next_attempt_at.
-            echo "::group::Control-plane diff (merged into jeffi_stores)"
-            RDS_DB=jeffi_stores bash deploy/schema-diff.sh --set=control-plane
-            echo "::endgroup::"
-
-            # Every tenant's own database. The two diffs above only ever touched the flagship
-            # and the control plane, so a schema change on main never reached a customer store
-            # — their databases silently fell behind the code deployed to serve them.
-            #
-            # Not migra: each tenant gets the same desired-state schema applied idempotently,
-            # which is far cheaper than diffing N databases and is what the provisioning path
-            # already uses. runMigrationFanout skips tenants already recorded at this SHA and
-            # isolates failures per tenant, so one bad store cannot block the rest.
-            echo "::group::Tenant schema fan-out"
-            # Prefer the secret forwarded from GitHub; fall back to the running container's env only
-            # if it was not configured. The old code read solely from the container, so a missing or
-            # down active-slot container surfaced as "CRON_SECRET unavailable" even when the secret existed.
-            if [ -z "$CRON_SECRET" ]; then
-              SLOT=$(cat active_slot 2>/dev/null || echo blue)
-              if ! docker inspect jeffi-app-$SLOT >/dev/null 2>&1; then
-                echo "::error::app container jeffi-app-$SLOT not found — cannot source CRON_SECRET for the fan-out"
-                exit 1
-              fi
-              CRON_SECRET=$(docker exec jeffi-app-$SLOT printenv CRON_SECRET 2>/dev/null || true)
-            fi
-            if [ -z "$CRON_SECRET" ]; then
-              echo "::error::CRON_SECRET unavailable (not forwarded from GitHub and absent from the app container) — cannot run the tenant fan-out"
-              exit 1
-            fi
-            # The fan-out is idempotent (tenants already recorded at this SHA are skipped, the
-            # batch per tenant is one transaction), so retrying is always safe. Attempts 1-2 go
-            # through nginx on localhost; if that is unreachable (nginx mid-reload right after the
-            # blue-green swap, or an active slot still warming up) attempt 3 calls the app container
-            # directly. A 5xx with a parsable body is a per-tenant failure and gets one more try
-            # after a pause, which clears a transient RDS connection blip without masking a real
-            # schema error.
-            SLOT=$(cat active_slot 2>/dev/null || echo blue)
-            BODY="{\"gitSha\":\"$DEPLOY_SHA\"}"
-            CODE=000
-            for ATTEMPT in 1 2 3; do
-              echo "POST /api/internal/migrations/fanout  (gitSha=$DEPLOY_SHA, attempt $ATTEMPT, 300s timeout)"
-              if [ "$ATTEMPT" -lt 3 ]; then
-                CODE=$(curl -s -o /tmp/fanout.json -w '%{http_code}' --max-time 300 \
-                  -X POST http://localhost/api/internal/migrations/fanout \
-                  -H "Authorization: Bearer $CRON_SECRET" \
-                  -H 'Content-Type: application/json' \
-                  -H 'Host: jeffistores.in' \
-                  -d "$BODY" || echo 000)
-              else
-                echo "(nginx path unavailable, calling the $SLOT app container directly)"
-                if docker exec jeffi-app-$SLOT wget -q -O /tmp/fanout-inner.json --timeout=300 \
-                     --header="Authorization: Bearer $CRON_SECRET" --header='Content-Type: application/json' \
-                     --header='Host: jeffistores.in' --post-data="$BODY" \
-                     http://localhost:3000/api/internal/migrations/fanout 2>/dev/null; then
-                  CODE=200
-                else
-                  CODE=500
-                fi
-                docker exec jeffi-app-$SLOT cat /tmp/fanout-inner.json > /tmp/fanout.json 2>/dev/null || echo '{}' > /tmp/fanout.json
-              fi
-              case "$CODE" in
-                200) break ;;
-                000|502|503|504) echo "app not reachable yet (HTTP $CODE), retrying in 15s"; sleep 15 ;;
-                500)
-                  if [ "$ATTEMPT" -lt 3 ] && jq -e '.result' /tmp/fanout.json >/dev/null 2>&1; then
-                    echo "fan-out reported failures (HTTP 500), retrying failed tenants in 20s"
-                    jq -r '.result.failures[]? | "  first attempt: \(.slug): \(.error)"' /tmp/fanout.json 2>/dev/null || true
-                    sleep 20
-                  else
-                    break
-                  fi ;;
-                *) break ;;
-              esac
-            done
-
-            # The endpoint returns aggregate counts plus a slug+error per failing tenant. The old
-            # code just cat'd the raw JSON, so a failed run meant eyeballing an unformatted blob to
-            # find which store broke. Parse it into a readable summary and enumerate the failures by
-            # name. jq is present on the flagship; if it somehow is not, fall back to the raw body so
-            # this never becomes the reason a deploy fails.
-            if command -v jq >/dev/null 2>&1 && jq -e . /tmp/fanout.json >/dev/null 2>&1; then
-              TOTAL=$(jq -r '.result.total   // 0' /tmp/fanout.json)
-              APPLIED=$(jq -r '.result.applied // 0' /tmp/fanout.json)
-              SKIPPED=$(jq -r '.result.skipped // 0' /tmp/fanout.json)
-              FAILEDN=$(jq -r '.result.failed  // 0' /tmp/fanout.json)
-              echo "Tenants: $TOTAL total — $APPLIED applied, $SKIPPED already current, $FAILEDN failed"
-              if [ "$FAILEDN" != "0" ]; then
-                echo "Failed tenants:"
-                jq -r '.result.failures[]? | "  ✗ \(.slug): \(.error)"' /tmp/fanout.json
-              fi
-            else
-              echo "(could not parse fan-out response as JSON — raw body follows)"
-              cat /tmp/fanout.json; echo
-            fi
-            rm -f /tmp/fanout.json
-            echo "::endgroup::"
-            [ "$CODE" = "200" ] || { echo "::error::tenant schema fan-out failed (HTTP $CODE)"; exit 1; }
-
-  # ────────────────────────────────────────────────────────
-  # Stage 4a — Publish the config the tenant fleet fetches
-  # ────────────────────────────────────────────────────────
-  # Split out of the flagship deploy so that deploy and deploy-fleet can run in PARALLEL. While
-  # the publish lived inside the flagship job, the fleet had to wait for the flagship purely to
-  # get its config — and running them side by side without this split would have had pool boxes
-  # fetch the PREVIOUS revision's files.
-  #
-  # The two static files go straight from the runner's checkout. Only the CA bundle needs the
-  # flagship, because just that box can reach the control plane to enumerate tenant_ca — and it
-  # builds it from a script fetched out of S3 rather than from the box's checkout, which the
-  # flagship deploy is concurrently rewriting with `git reset --hard`.
-  fleet-config:
-    name: Publish fleet config
-    runs-on: ubuntu-latest
-    needs: [docker]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.K8S_DEPLOY != 'true'
-    env:
-      FLEET: s3://jeffi-stores-mtls-truststore/fleet
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Upload nginx config and fleet scripts
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          set -euo pipefail
-          aws s3 cp deploy/nginx-servers.conf        "$FLEET/nginx-servers.conf"        --only-show-errors
-          aws s3 cp .github/scripts/fleet-apply.sh            "$FLEET/fleet-apply.sh"            --only-show-errors
-          aws s3 cp .github/scripts/build-client-ca-bundle.sh "$FLEET/build-client-ca-bundle.sh" --only-show-errors
-          echo "published nginx config + fleet scripts"
-
-      - name: Get EC2 public IP
-        id: ec2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
-          echo "host=$IP" >> $GITHUB_OUTPUT
-
-      - name: Build and publish the client-CA bundle
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ steps.ec2.outputs.host }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 5m
-          script: |
-            set -e
-            FLEET=s3://jeffi-stores-mtls-truststore/fleet
-            aws s3 cp "$FLEET/build-client-ca-bundle.sh" /tmp/build-ca.sh --only-show-errors
-            sudo bash /tmp/build-ca.sh /tmp/client-ca-bundle.pem
-            aws s3 cp /tmp/client-ca-bundle.pem "$FLEET/client-ca-bundle.pem" --only-show-errors
-            # sudo wrote it, so it is root-owned — a plain rm fails and `set -e` would take
-            # the whole step down after the work already succeeded.
-            sudo rm -f /tmp/build-ca.sh /tmp/client-ca-bundle.pem
-            echo "client-CA bundle published"
-
-  # ────────────────────────────────────────────────────────
-  # Stage 4b — Roll the same image onto every tenant-serving box
-  # ────────────────────────────────────────────────────────
-  # The flagship deploy above targets one pinned instance. Tenant stores are served by pool
-  # boxes, which only ever pulled :latest at BOOT — so a change on main reached jeffistores.in
-  # and never reached a customer storefront. They ran whatever image existed the day they
-  # launched.
-  #
-  # Driven over SSM rather than SSH: the pool security group opens 22 to a single fixed IP,
-  # and GitHub runners have rotating addresses, so there is no SSH path from CI that does not
-  # mean opening the box to the internet. SSM needs no inbound port at all.
-  #
-  # Each box runs .github/scripts/fleet-apply.sh, fetched from S3 because a pool box has no deploy token
-  # and cannot pull the repo. That script syncs the nginx config and client-CA bundle the
-  # flagship published, then runs the SAME deploy/blue-green-deploy.sh the flagship uses — so a
-  # box that comes up unhealthy keeps serving its current version instead of going dark.
-  deploy-fleet:
-    name: Deploy to tenant fleet
-    runs-on: ubuntu-latest
-    # Not [deploy]: the flagship and the fleet serve different hosts and share nothing but the
-    # image, so they roll in parallel. Only the published config is a real prerequisite.
-    needs: [docker, fleet-config]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.K8S_DEPLOY != 'true'
-    steps:
-      - name: Roll every pool instance
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          set -euo pipefail
-
-          echo "::group::Enumerate tenant fleet"
-          echo "Image SHA to roll: ${GITHUB_SHA:0:7}  (full: $GITHUB_SHA)"
-
-          # Tag-selected, not a hardcoded list: the pool scales with tenant count, so any
-          # fixed set would silently miss boxes added since it was written. Pull the Name tag
-          # alongside the id so the logs read as store boxes, not opaque i-0abc… strings.
-          INSTANCE_JSON=$(aws ec2 describe-instances \
-            --filters "Name=tag:app,Values=jeffi-tenant" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[].Instances[].{Id:InstanceId,Name:Tags[?Key==`Name`]|[0].Value}' \
-            --output json)
-          IDS=$(echo "$INSTANCE_JSON" | jq -r '.[].Id')
-          name_of() { echo "$INSTANCE_JSON" | jq -r --arg id "$1" '.[]|select(.Id==$id)|.Name // "unnamed"'; }
-
-          if [ -z "$IDS" ]; then
-            echo "No running tenant instances — nothing to roll."
-            echo "::endgroup::"
-            echo "### Tenant fleet deploy" >> "$GITHUB_STEP_SUMMARY"
-            echo "_No running tenant instances — nothing to roll._" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          COUNT=$(echo "$IDS" | wc -w | tr -d ' ')
-          echo "Found $COUNT running tenant box(es):"
-          for id in $IDS; do echo "  • $id  ($(name_of "$id"))"; done
-          echo "::endgroup::"
-
-          # An instance whose SSM agent is not registered cannot be reached, and skipping it
-          # silently would leave that box's tenants on stale code with a green pipeline.
-          # --output text separates ids with TABS, so a space-delimited match never fires and
-          # every instance reads as missing. tr normalises before comparing.
-          MANAGED=$(aws ssm describe-instance-information \
-            --query 'InstanceInformationList[?PingStatus==`Online`].InstanceId' --output text | tr '\t' ' ')
-
-          # An empty list is ambiguous, and that ambiguity cost real debugging time: the first
-          # run called the box unreachable while it was in fact Online — CI simply lacked
-          # ssm:DescribeInstanceInformation and saw nothing. Name that case on its own.
-          if [ -z "$MANAGED" ]; then
-            echo "::error::SSM listed no managed instances. Either no agent is registered, or this CI principal lacks ssm:DescribeInstanceInformation — check the permission first."
-            exit 1
-          fi
-
-          MISSING=""
-          for id in $IDS; do
-            case " $MANAGED " in *" $id "*) : ;; *) MISSING="$MISSING $id" ;; esac
-          done
-          if [ -n "$MISSING" ]; then
-            echo "::error::agent not Online on:$MISSING (SSM sees: $MANAGED)"
-            exit 1
-          fi
-          echo "SSM agent Online on all $COUNT target(s)."
-
-          # Accumulate a per-box row for the run summary table so the whole fleet's outcome is
-          # visible on the Actions summary page without expanding every log group.
-          SUMMARY_ROWS=""
-          FAILED=""
-          for id in $IDS; do
-            NAME=$(name_of "$id")
-            echo "::group::Roll $id ($NAME)"
-            START=$(date +%s)
-            CMD=$(aws ssm send-command --instance-ids "$id" \
-              --document-name AWS-RunShellScript \
-              --comment "deploy ${GITHUB_SHA:0:7}" \
-              --parameters 'commands=["set -e","aws s3 cp s3://jeffi-stores-mtls-truststore/fleet/fleet-apply.sh /tmp/fleet-apply.sh --only-show-errors","bash /tmp/fleet-apply.sh","rm -f /tmp/fleet-apply.sh"]' \
-              --query 'Command.CommandId' --output text)
-            echo "SSM CommandId: $CMD"
-
-            # Poll rather than `aws ssm wait`: the blue-green health check alone allows five
-            # minutes, and the wait command gives up sooner than that.
-            STATUS=InProgress
-            for _ in $(seq 1 60); do
-              sleep 10
-              STATUS=$(aws ssm get-command-invocation --command-id "$CMD" --instance-id "$id" \
-                --query 'Status' --output text 2>/dev/null || echo Pending)
-              case "$STATUS" in Success|Failed|Cancelled|TimedOut) break ;; esac
-            done
-            ELAPSED=$(( $(date +%s) - START ))
-
-            echo "── stdout (last 20 lines) ──"
-            aws ssm get-command-invocation --command-id "$CMD" --instance-id "$id" \
-              --query 'StandardOutputContent' --output text 2>/dev/null | tail -20
-            if [ "$STATUS" != "Success" ]; then
-              echo "── stderr (last 20 lines) ──"
-              aws ssm get-command-invocation --command-id "$CMD" --instance-id "$id" \
-                --query 'StandardErrorContent' --output text 2>/dev/null | tail -20
-              echo "::error::$id ($NAME) finished $STATUS after ${ELAPSED}s — full log: aws ssm get-command-invocation --command-id $CMD --instance-id $id"
-              FAILED="$FAILED $id"
-              SUMMARY_ROWS="$SUMMARY_ROWS| \`$id\` | $NAME | ❌ $STATUS | ${ELAPSED}s |"$'\n'
-            else
-              echo "✓ $id ($NAME) updated in ${ELAPSED}s"
-              SUMMARY_ROWS="$SUMMARY_ROWS| \`$id\` | $NAME | ✅ Success | ${ELAPSED}s |"$'\n'
-            fi
-            echo "::endgroup::"
-          done
-
-          {
-            echo "### Tenant fleet deploy — image \`${GITHUB_SHA:0:7}\`"
-            echo ""
-            echo "| Instance | Name | Result | Time |"
-            echo "|---|---|---|---|"
-            printf '%s' "$SUMMARY_ROWS"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          # Boxes that succeeded are already serving the new image and must not be rolled back
-          # to match the ones that did not — each tenant is pinned to a box by DNS, so a mixed
-          # fleet is safe. Fail loudly and name the stragglers instead.
-          if [ -n "$FAILED" ]; then
-            echo "::error::tenant fleet deploy failed on:$FAILED"
-            exit 1
-          fi
-          echo "Tenant fleet up to date — all $COUNT box(es) on ${GITHUB_SHA:0:7}."
-
-  # ────────────────────────────────────────────────────────
-  # Stage 5 — Run DB Migrations  (main only, gate: deploy + migrations changed)
-  # Applies only unapplied files from database/migrations/ via run-migrations.sh.
-  # Tracks applied migrations in schema_migrations table on RDS.
-  # ────────────────────────────────────────────────────────
-  migrate:
-    name: Run DB Migrations
-    runs-on: ubuntu-latest
-    needs: [deploy, detect-changes]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.migrations_changed == 'true' && vars.K8S_DEPLOY != 'true'
-    steps:
-      - name: Get EC2 public IP
-        id: ec2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --query 'Reservations[0].Instances[0].PublicIpAddress' \
-            --output text)
-          echo "host=$IP" >> $GITHUB_OUTPUT
-
-      - name: Apply pending migrations via EC2
-        uses: appleboy/ssh-action@v1
-        env:
-          DEPLOY_SHA: ${{ github.sha }}
-          # Forwarded for the tenant fan-out, same rationale as the schema-diff job: decouple the
-          # fan-out from container/slot state on the box.
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-        with:
-          host: ${{ steps.ec2.outputs.host }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 10m
-          envs: DEPLOY_SHA,CRON_SECRET
-          script: |
-            set -e
-            cd /opt/jeffi-stores
-
-            export RDS_HOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
-            export RDS_PORT=5432
-            export RDS_USER=app_user
-            export RDS_DB=jeffi_stores
-            export AWS_REGION=us-east-1
-            echo "Applying flagship migrations to $RDS_DB on $RDS_HOST"
-
-            # run-migrations.sh already logs each pending/applied file; it also has a --dry-run that
-            # lists the pending set without touching the DB, using the same IAM auth as the real run.
-            # Use it to capture what is about to apply (for the count + step summary) before running
-            # the apply for real — no separate psql connection, so the box's IAM/SSL path is the only
-            # one in play. The dry run is read-only and guarded so it can never fail the step.
-            echo "::group::Pending migrations (dry run)"
-            DRY=$(bash deploy/run-migrations.sh --dry-run 2>&1 || true)
-            echo "$DRY"
-            PENDING=$(printf '%s\n' "$DRY" | sed -n 's/^  + //p')
-            echo "::endgroup::"
-
-            echo "::group::Apply migrations"
-            bash deploy/run-migrations.sh
-            echo "::endgroup::"
-
-            {
-              echo "### Flagship DB migrations"
-              echo ""
-              if [ -z "$PENDING" ]; then
-                echo "_No pending migrations — schema already current._"
-              else
-                COUNT=$(printf '%s\n' "$PENDING" | wc -l | tr -d ' ')
-                echo "Applied **$COUNT** migration(s):"
-                echo ""
-                printf '%s\n' "$PENDING" | sed 's/^/- `/;s/$/`/'
-              fi
-            } >> "$GITHUB_STEP_SUMMARY"
-
-            # The flagship apply above never touched customer databases, so a migration file on
-            # main reached only jeffi_stores — every tenant RDS silently fell behind. Fan the same
-            # pending files out to each active tenant, tracked in that DB's own schema_migrations
-            # ledger. Mirrors the schema-diff job's fan-out: prefer the forwarded secret, fall back
-            # to the running container's env, isolate per-tenant failures, fail the job on non-200.
-            echo "::group::Tenant migration-files fan-out"
-            if [ -z "$CRON_SECRET" ]; then
-              SLOT=$(cat active_slot 2>/dev/null || echo blue)
-              if ! docker inspect jeffi-app-$SLOT >/dev/null 2>&1; then
-                echo "::error::app container jeffi-app-$SLOT not found — cannot source CRON_SECRET for the fan-out"
-                exit 1
-              fi
-              CRON_SECRET=$(docker exec jeffi-app-$SLOT printenv CRON_SECRET 2>/dev/null || true)
-            fi
-            if [ -z "$CRON_SECRET" ]; then
-              echo "::error::CRON_SECRET unavailable (not forwarded from GitHub and absent from the app container) — cannot run the tenant fan-out"
-              exit 1
-            fi
-            echo "POST /api/internal/migrations/files-fanout  (gitSha=$DEPLOY_SHA, 300s timeout)"
-            CODE=$(curl -s -o /tmp/files-fanout.json -w '%{http_code}' --max-time 300 \
-              -X POST http://localhost/api/internal/migrations/files-fanout \
-              -H "Authorization: Bearer $CRON_SECRET" \
-              -H 'Content-Type: application/json' \
-              -H 'Host: jeffistores.in' \
-              -d "{\"gitSha\":\"$DEPLOY_SHA\"}")
-
-            if command -v jq >/dev/null 2>&1 && jq -e . /tmp/files-fanout.json >/dev/null 2>&1; then
-              TOTAL=$(jq -r '.result.total   // 0' /tmp/files-fanout.json)
-              APPLIED=$(jq -r '.result.applied // 0' /tmp/files-fanout.json)
-              SKIPPED=$(jq -r '.result.skipped // 0' /tmp/files-fanout.json)
-              FAILEDN=$(jq -r '.result.failed  // 0' /tmp/files-fanout.json)
-              echo "Tenants: $TOTAL total — $APPLIED applied, $SKIPPED already current, $FAILEDN failed"
-              if [ "$FAILEDN" != "0" ]; then
-                echo "Failed tenants:"
-                jq -r '.result.failures[]? | "  x \(.slug): \(.error)"' /tmp/files-fanout.json
-              fi
-              {
-                echo ""
-                echo "### Tenant DB migrations"
-                echo ""
-                echo "$TOTAL tenant(s) — $APPLIED applied, $SKIPPED already current, $FAILEDN failed"
-              } >> "$GITHUB_STEP_SUMMARY"
-            else
-              echo "(could not parse fan-out response as JSON — raw body follows)"
-              cat /tmp/files-fanout.json; echo
-            fi
-            rm -f /tmp/files-fanout.json
-            echo "::endgroup::"
-            [ "$CODE" = "200" ] || { echo "::error::tenant migration-files fan-out failed (HTTP $CODE)"; exit 1; }
-
-  # ────────────────────────────────────────────────────────
-  # Stage 6 — Smoke test  (main only, gate: deploy + CDN invalidation)
-  # Hits the real domain health endpoint THROUGH CloudFront→nginx (nginx routes by
-  # server_name jeffistores.in, so a bare EC2-IP request never matched — that was
-  # the post-blue-green failure). Runs after invalidate-cdn so the edge cache is
-  # already cleared, and asserts 200 + {"status":"ok"} from /api/health.
-  # ────────────────────────────────────────────────────────
-  # ────────────────────────────────────────────────────────
-  # k3s: schema diff + file migrations from the runner, reaching RDS through an in-cluster
-  # socat pod over the tailnet; fan-out to tenant DBs runs inside the flagship pod.
-  # ────────────────────────────────────────────────────────
-  db-k8s:
-    name: Schema + migrations (k3s)
-    runs-on: ubuntu-latest
-    needs: [deploy, detect-changes]
-    if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.K8S_DEPLOY == 'true' &&
-      (needs.detect-changes.outputs.schema_changed == 'true' || needs.detect-changes.outputs.migrations_changed == 'true')
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_REGION: us-east-1
-      AWS_DEFAULT_REGION: us-east-1
-      RDS_HOST: jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
-      RDS_CONNECT_HOST: 127.0.0.1
-      RDS_PORT: '15432'
-      RDS_USER: app_user
-    steps:
-      - uses: actions/checkout@v4
-      - uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-      - name: Tunnel to RDS
-        env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-        run: |
-          mkdir -p ~/.kube && echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/config && chmod 600 ~/.kube/config
-          sudo apt-get install -y -qq postgresql-client >/dev/null
-          kubectl -n jeffi delete pod rds-tunnel --ignore-not-found
-          kubectl -n jeffi run rds-tunnel --image=alpine/socat:1.8.0.0 --restart=Never \
-            --overrides='{"spec":{"nodeSelector":{"jeffi.io/role":"core"}}}' \
-            -- tcp-listen:5432,fork,reuseaddr tcp-connect:$RDS_HOST:5432
-          kubectl -n jeffi wait --for=condition=Ready pod/rds-tunnel --timeout=120s
-          nohup kubectl -n jeffi port-forward pod/rds-tunnel 15432:5432 >/tmp/pf.log 2>&1 &
-          sleep 5
-      - name: Schema diff (platform + control plane)
-        if: needs.detect-changes.outputs.schema_changed == 'true'
-        run: |
-          RDS_DB=jeffi_stores bash deploy/schema-diff.sh --set=platform
-          RDS_DB=jeffi_stores bash deploy/schema-diff.sh --set=control-plane
-      - name: File migrations
-        if: needs.detect-changes.outputs.migrations_changed == 'true'
-        run: |
-          RDS_DB=jeffi_stores bash deploy/run-migrations.sh --dry-run
-          RDS_DB=jeffi_stores bash deploy/run-migrations.sh
-      - name: Fan out to tenant databases
-        run: |
-          CRON_SECRET=$(kubectl -n jeffi get secret cron-secret -o jsonpath='{.data.CRON_SECRET}' | base64 -d)
-          echo "::add-mask::$CRON_SECRET"
-          kubectl -n jeffi exec deploy/flagship -- env CRON_SECRET="$CRON_SECRET" sh -c '
-            for p in /api/internal/migrations/fanout /api/internal/migrations/files-fanout; do
-              wget -qO- -T 300 --header "Host: jeffistores.in" --header "Authorization: Bearer $CRON_SECRET" \
-                --header "Content-Type: application/json" --post-data "{\"gitSha\":\"'"$GITHUB_SHA"'\"}" \
-                "http://localhost:3000$p" || exit 1
-              echo
-            done'
-      - name: Cleanup
-        if: always()
-        run: kubectl -n jeffi delete pod rds-tunnel --ignore-not-found || true
-
-  smoke-test:
-    name: Smoke Test
-    runs-on: ubuntu-latest
-    needs: [deploy, invalidate-cdn]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Health check (domain /api/health via CDN)
-        run: |
-          URL="https://jeffistores.in/api/health"
-          echo "Smoke-testing $URL ..."
-          LAST_STATUS="000"; LAST_BODY=""
-          for i in $(seq 1 12); do
-            LAST_STATUS=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 10 "$URL" || echo "000")
-            LAST_BODY=$(cat /tmp/health.json 2>/dev/null || echo "")
-            echo "Attempt $i: HTTP $LAST_STATUS  body=$LAST_BODY"
-            if [[ "$LAST_STATUS" == "200" ]] && echo "$LAST_BODY" | grep -q '"status":"ok"'; then
-              echo "Smoke test passed — app is healthy at the edge."
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Smoke test FAILED after 2 minutes. Last HTTP $LAST_STATUS, body: $LAST_BODY"
-          exit 1
-
-  # ────────────────────────────────────────────────────────
-  # Stage 7 — Invalidate CDN  (main only, gate: deploy)
-  # Runs as soon as the new image is live so cached 30x/HTML at the edge
-  # gets cleared before the smoke test, not after. Also waits for the
-  # invalidation to complete so the next stage sees a clean cache.
-  # ────────────────────────────────────────────────────────
-  invalidate-cdn:
-    name: Invalidate CloudFront
-    runs-on: ubuntu-latest
-    needs: [deploy]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-      - name: Create invalidation and wait
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-        run: |
-          set -euo pipefail
-          INV_ID=$(aws cloudfront create-invalidation \
-            --distribution-id "$DIST_ID" \
-            --paths '/*' \
-            --query 'Invalidation.Id' --output text)
-          echo "Invalidation $INV_ID created — waiting for completion..."
-          aws cloudfront wait invalidation-completed \
-            --distribution-id "$DIST_ID" \
-            --id "$INV_ID"
-          echo "Invalidation $INV_ID complete."
-
-  # ────────────────────────────────────────────────────────
-  # Stage 8 — Finalize deployment  (main only)
-  # Marks the GitHub deployment success ONLY when deploy AND smoke both passed,
-  # else failure. This moves the success signal after the smoke gate so a bad
-  # deploy that serves an unhealthy app is never marked successful.
-  # ────────────────────────────────────────────────────────
-  finalize-deploy:
-    name: Finalize Deployment
-    runs-on: ubuntu-latest
-    needs: [deploy, smoke-test]
-    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      deployments: write
-    steps:
-      - name: Mark deployment status from smoke result
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const depId = ${{ needs.deploy.outputs.deployment_id }};
-            const ok = '${{ needs.deploy.result }}' === 'success' && '${{ needs.smoke-test.result }}' === 'success';
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: depId,
-              state: ok ? 'success' : 'failure',
-              environment_url: 'https://jeffistores.in',
-              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: ok ? 'Deployed and smoke-tested successfully' : 'Deploy or smoke test failed',
-            });
-            if (!ok) core.setFailed('Deployment not healthy (deploy or smoke failed)');
-
-  # ────────────────────────────────────────────────────────
-  # PR Gate  (pull_request only) — single required status check
-  # Set this ("PR Gate") as the required check in branch protection so the Test
-  # stage (and lint/typecheck/build) hard-block merges to main.
-  # ────────────────────────────────────────────────────────
   pr-gate:
     name: PR Gate
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, build]
+    needs: [verify-scripts, lint, typecheck, test, build]
     if: github.event_name == 'pull_request'
     steps:
-      - name: Assert all PR checks passed
-        run: |
+      - run: |
+          echo "Scripts:    ${{ needs.verify-scripts.result }}"
           echo "Lint:       ${{ needs.lint.result }}"
           echo "Type Check: ${{ needs.typecheck.result }}"
           echo "Test:       ${{ needs.test.result }}"
           echo "Build:      ${{ needs.build.result }}"
-          if [[ "${{ needs.lint.result }}"      != "success" ||
-                "${{ needs.typecheck.result }}" != "success" ||
-                "${{ needs.test.result }}"      != "success" ||
-                "${{ needs.build.result }}"     != "success" ]]; then
-            echo "PR Gate FAILED — lint, type check, test, and build must all pass."
-            exit 1
-          fi
-          echo "PR Gate PASSED — all required checks green."
+          [[ "${{ needs.verify-scripts.result }}${{ needs.lint.result }}${{ needs.typecheck.result }}${{ needs.test.result }}${{ needs.build.result }}" == "successsuccesssuccesssuccesssuccess" ]] ||
+            { echo "PR Gate FAILED"; exit 1; }
+          echo "PR Gate PASSED"
 
-  # ────────────────────────────────────────────────────────
-  # Final — Summary  (always runs)
-  # ────────────────────────────────────────────────────────
+  # ── Release (push to main, or workflow_dispatch with deploy=true) ─────────────────────────────────────
+
+  images:
+    name: Image ${{ matrix.service }}
+    runs-on: ubuntu-24.04-arm
+    needs: [verify-scripts, lint, typecheck, test, build]
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy)
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        service: [controller, messaging, documents, public-api]
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # image_sha is the last commit that changed the image contents
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: docker/setup-buildx-action@v3
+      - uses: crazy-max/ghaction-github-runtime@v3 # exposes the cache endpoint buildx's gha cache needs
+      - id: tag
+        run: echo "tag=$(bash deploy/k8s/bootstrap/image-tag.sh)" >> "$GITHUB_OUTPUT"
+      - name: Build and push (skipped when the tag already exists)
+        env:
+          BUILDX_CACHE_ARGS: --cache-from type=gha,scope=${{ matrix.service }} --cache-to type=gha,mode=max,scope=${{ matrix.service }}
+          NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY: ${{ vars.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
+          NEXT_PUBLIC_ONDEVICE_MODEL_BASE: ${{ vars.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
+        run: bash deploy/k8s/bootstrap/build-push-ecr.sh "${{ matrix.service }}" "${{ steps.tag.outputs.tag }}"
+
+  release-notes:
+    name: Release notes
+    runs-on: ubuntu-latest
+    needs: [verify-scripts, lint, typecheck, test, build]
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: What this release changes, and whether the database must be updated first
+        run: |
+          set -euo pipefail
+          tag=$(bash deploy/k8s/bootstrap/image-tag.sh)
+          live=$(curl -fsS --max-time 15 https://jeffistores.in/api/health | sed -nE 's/.*"commit":"([0-9a-f]+)".*/\1/p')
+          {
+            echo "## Release $tag (HEAD ${GITHUB_SHA::8})"
+            echo
+            if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null; then
+              echo "Live: \`$live\`. Commits since:"; echo
+              git log --format='- %h %s' "$live..HEAD" | head -60
+              db=$(git diff --name-only "$live..HEAD" -- database/ ':(exclude)database/migrations' || true)
+              echo
+              if [ -n "$db" ]; then
+                echo "> ### Database changes in this release — apply them BEFORE approving the deploy"
+                echo "> \`bash deploy/k8s/db/10-platform-schema.sh --dry-run\`, review, then without \`--dry-run\` (docs/GO_LIVE_RUNBOOK.md)."
+                echo ">"; echo "$db" | sed 's/^/> - /'
+              else
+                echo "No \`database/\` changes since the live commit."
+              fi
+            else
+              echo "Live commit \`${live:-unknown}\` is not in this clone; cannot list the changes. Check \`database/\` by hand before approving."
+            fi
+            echo; echo "Approve the \`production\` environment to roll out; a Mac release of the same commit uses the same tag."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    needs: [images, release-notes]
+    environment:
+      name: production
+      url: https://jeffistores.in
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Session Manager plugin (the tunnel to the core)
+        run: |
+          command -v session-manager-plugin >/dev/null && exit 0
+          curl -fsSL -o /tmp/smp.deb https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb
+          sudo dpkg -i /tmp/smp.deb
+      - name: Kubeconfig (k3s admin, server 127.0.0.1:16443 through the tunnel)
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+        run: |
+          mkdir -p ~/.kube
+          echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/jeffi-k3s.yaml
+          chmod 600 ~/.kube/jeffi-k3s.yaml
+      - name: Roll out ${{ needs.images.outputs.tag }}
+        env:
+          TUNNEL: ssm
+          RELEASE_WORK_DIR: ${{ runner.temp }}/release
+        run: bash deploy/k8s/bootstrap/release.sh --rollout-only
+      - name: Invalidate CloudFront
+        env:
+          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          set -euo pipefail
+          id=$(aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/*' --query 'Invalidation.Id' --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "$DIST_ID" --id "$id"
+          echo "Invalidation $id complete"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-logs
+          path: ${{ runner.temp }}/release
+          if-no-files-found: ignore
+
   summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, build, docker, deploy, fleet-config, deploy-fleet, schema-diff, migrate, smoke-test, invalidate-cdn, finalize-deploy, pr-gate]
+    needs: [verify-scripts, lint, typecheck, test, build, pr-gate, images, release-notes, deploy]
     if: always()
     steps:
-      - name: Result
-        run: |
-          IS_MAIN="${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}"
-
-          echo "╔══════════════════════════════════════════╗"
-          echo "║          PIPELINE SUMMARY                ║"
-          echo "╠══════════════════════════════════════════╣"
-          echo "║  Lint:               ${{ needs.lint.result }}"
-          echo "║  Type Check:         ${{ needs.typecheck.result }}"
-          echo "║  Test & Coverage:    ${{ needs.test.result }}"
-          echo "║  Build:              ${{ needs.build.result }}"
-          if [[ "$IS_MAIN" == "true" ]]; then
-          echo "║  Docker Push:        ${{ needs.docker.result }}"
-          echo "║  Deploy to EC2:      ${{ needs.deploy.result }}"
-          echo "║  Deploy tenant fleet:${{ needs.deploy-fleet.result }}"
-          echo "║  Schema Diff:        ${{ needs.schema-diff.result }}"
-          echo "║  Run DB Migrations:  ${{ needs.migrate.result }}"
-          echo "║  Smoke Test:         ${{ needs.smoke-test.result }}"
-          echo "║  Invalidate CDN:     ${{ needs.invalidate-cdn.result }}"
-          echo "║  Finalize Deploy:    ${{ needs.finalize-deploy.result }}"
-          fi
-          echo "╠══════════════════════════════════════════╣"
-          echo "║  Trigger: ${{ github.event_name }} → ${{ github.ref_name }}"
-          echo "║  Commit:  ${{ github.sha }}"
-          echo "║  Author:  ${{ github.actor }}"
-          echo "╚══════════════════════════════════════════╝"
-
-          if [[ "${{ needs.lint.result }}"      == "failure" ||
-                "${{ needs.typecheck.result }}" == "failure" ||
-                "${{ needs.test.result }}"      == "failure" ||
-                "${{ needs.build.result }}"     == "failure" ]]; then
-            echo "PIPELINE FAILED at checks stage."
-            exit 1
-          fi
-
-          if [[ "$IS_MAIN" == "true" ]]; then
-            if [[ "${{ needs.docker.result }}"         == "failure" ||
-                  "${{ needs.deploy.result }}"         == "failure" ||
-                  "${{ needs.deploy-fleet.result }}"   == "failure" ||
-                  "${{ needs.schema-diff.result }}"    == "failure" ||
-                  "${{ needs.migrate.result }}"        == "failure" ||
-                  "${{ needs.smoke-test.result }}"     == "failure" ||
-                  "${{ needs.invalidate-cdn.result }}" == "failure" ||
-                  "${{ needs.finalize-deploy.result }}" == "failure" ]]; then
-              echo "PIPELINE FAILED at deployment stage."
-              exit 1
-            fi
-            echo "DEPLOYMENT SUCCESSFUL"
-          else
-            if [[ "${{ needs.pr-gate.result }}" != "success" ]]; then
-              echo "PR GATE FAILED — not ready to merge."
-              exit 1
-            fi
-            echo "PR CHECKS PASSED — ready to merge"
-          fi
+      - run: |
+          echo "Scripts:        ${{ needs.verify-scripts.result }}"
+          echo "Lint:           ${{ needs.lint.result }}"
+          echo "Type Check:     ${{ needs.typecheck.result }}"
+          echo "Test:           ${{ needs.test.result }}"
+          echo "Build:          ${{ needs.build.result }}"
+          echo "PR Gate:        ${{ needs.pr-gate.result }}"
+          echo "Images:         ${{ needs.images.result }}"
+          echo "Release notes:  ${{ needs.release-notes.result }}"
+          echo "Deploy:         ${{ needs.deploy.result }}"
+          case "${{ needs.verify-scripts.result }} ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.test.result }} ${{ needs.build.result }} ${{ needs.pr-gate.result }} ${{ needs.images.result }} ${{ needs.release-notes.result }} ${{ needs.deploy.result }}" in
+            *failure*|*cancelled*) echo "Pipeline FAILED"; exit 1 ;;
+          esac
+          echo "Pipeline OK"
