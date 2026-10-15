@@ -3,6 +3,7 @@ import type { SendMessageRequest, Channel } from '@jeffi/api-contracts'
 import { mediaPriceInr, messagePriceInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
+import { signLink } from '@jeffi/tenancy'
 import { findTemplate } from './templates.js'
 import * as tpl from './templates-v2.js'
 import { poolsForTenant } from './pools.js'
@@ -127,9 +128,11 @@ async function actionVars(ctx: Ctx, blocks: any, vars: Vars, req: SendMessageReq
   const linkSlot = button?.value.match(PH)?.[1]
   if (linkSlot && !vars[linkSlot]) {
     if (!req.button_url) throw new SendError(422, 'missing_variables', `This template has a link button — pass button_url or variables.${linkSlot}`, { missing: [linkSlot] })
-    const code = randomUUID().replace(/-/g, '').slice(0, 10)
-    await db.query(`INSERT INTO short_link (code, tenant_id, destination_url, kind) VALUES ($1,$2,$3,'page')`, [code, ctx.tenantId, req.button_url])
-    out[linkSlot] = code
+    // Signed links resolve on any environment's redirect host; the row only counts clicks.
+    const signed = signLink(req.button_url)
+    const code = signed?.id ?? randomUUID().replace(/-/g, '').slice(0, 10)
+    await db.query(`INSERT INTO short_link (code, tenant_id, destination_url, kind) VALUES ($1,$2,$3,'page') ON CONFLICT (code) DO NOTHING`, [code, ctx.tenantId, req.button_url])
+    out[linkSlot] = signed?.token ?? code
   }
   return { vars: out, mediaHosted }
 }

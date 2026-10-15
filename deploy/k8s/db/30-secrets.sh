@@ -14,7 +14,7 @@ sm() { aws secretsmanager get-secret-value --secret-id "$1" --query "$2" --outpu
 # <secret id> <KEY=value ...>; =@prod copies the value from jeffi/production.
 PATCHES=(
   "jeffi/production CONTROL_PLANE_RDS_DB=jeffi_stores"
-  "jeffi/messaging/production CONTROL_PLANE_RDS_DB=jeffi_stores MESSAGING_DATABASE_URL=$DB_URL DATABASE_URL=$DB_URL SERVICE_AUTH_SECRET=@prod"
+  "jeffi/messaging/production CONTROL_PLANE_RDS_DB=jeffi_stores MESSAGING_DATABASE_URL=$DB_URL DATABASE_URL=$DB_URL SERVICE_AUTH_SECRET=@prod SHORT_LINK_SECRET=@prod"
   "jeffi/documents/production CONTROL_PLANE_RDS_DB=jeffi_stores DOCUMENTS_DATABASE_URL=$DB_URL DATABASE_URL=$DB_URL DOCUMENTS_BUCKET=$BUCKET SERVICE_AUTH_SECRET=@prod"
   "jeffi/public-api/production CONTROL_PLANE_RDS_DB=jeffi_stores CONTROL_PLANE_DATABASE_URL=$DB_URL DATABASE_URL=$DB_URL SERVICE_AUTH_SECRET=@prod"
 )

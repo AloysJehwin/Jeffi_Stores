@@ -130,7 +130,7 @@ async function handle(request: NextRequest) {
   // img.<domain>: first-party short links (WhatsApp buttons, SMS) — /<code> redirects to its destination.
   if (hostname === 'img.localhost' || hostname.startsWith('img.')) {
     const code = pathname.slice(1)
-    if (/^[A-Za-z0-9_-]{4,32}$/.test(code)) return NextResponse.rewrite(new URL(`/api/s/${code}`, request.url))
+    if (/^[A-Za-z0-9_-]{4,32}$/.test(code) || /^[A-Za-z0-9_-]{8,1500}\.[A-Za-z0-9_-]{16}$/.test(code)) return NextResponse.rewrite(new URL(`/api/s/${code}`, request.url))
     return new NextResponse('Not found', { status: 404 })
   }
 
