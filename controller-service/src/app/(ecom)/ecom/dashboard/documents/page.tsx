@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { priceList } from '@jeffi/pricing'
 import { loadOwnerContext } from '@/lib/ecom/owner-context'
 import { hasService, getKyc } from '@/lib/tenant-registry'
@@ -23,7 +24,7 @@ export default async function DocumentsPage() {
       <PageHeader eyebrow="Developers" title="Documents" description="Every PDF rendered through your API keys, and the design they use." />
       {enabled
         ? <DocumentsClient seller={seller} prices={priceList().documents} balance={Number(wallet?.balance ?? 0)} />
-        : <p className="text-sm text-foreground-secondary">Documents is not enabled. Turn it on from API keys.</p>}
+        : <p className="text-sm text-foreground-secondary">Documents is not added to this workspace yet. <Link href="/dashboard/services" className="font-semibold ecom-accent-text hover:underline">Add it from Services</Link>.</p>}
     </>
   )
 }

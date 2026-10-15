@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { LayoutDashboard, Globe, Truck, Receipt, BookOpen, Landmark, CreditCard, Building2, Wallet, KeyRound, MessageSquare, FileText, Store } from 'lucide-react'
+import { LayoutDashboard, Globe, Truck, Receipt, BookOpen, Landmark, CreditCard, Building2, Wallet, KeyRound, MessageSquare, FileText, Store, LayoutGrid } from 'lucide-react'
 import type { ServiceType } from '@/lib/tenant-registry'
 
 export interface NavItem {
@@ -29,6 +29,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Developers',
     items: [
+      { href: '/dashboard/services', label: 'Services', icon: LayoutGrid },
       { href: '/dashboard/api-keys', label: 'API keys', icon: KeyRound },
       { href: '/dashboard/messaging', label: 'Messaging', icon: MessageSquare, requires: 'messaging' },
       { href: '/dashboard/documents', label: 'Documents', icon: FileText, requires: 'documents' },
