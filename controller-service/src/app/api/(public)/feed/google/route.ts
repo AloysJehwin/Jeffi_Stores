@@ -4,6 +4,7 @@ import { queryMany } from '@/lib/shared/db'
 import { currentBrandNameAsync } from '@/lib/catalog/brand'
 import { getStorefrontContent } from '@/lib/catalog/site-controls'
 import { buildProductHighlights, buildProductDetails } from '@/lib/shared/google-merchant-helpers'
+import { clipTitle, hasIdentifiers, listedPrices } from '@/lib/merchant/item-rules'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,14 @@ function escapeXml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
+}
+
+function priceXml(selling: number, mrp: number | null): string {
+  const { price, salePrice } = listedPrices(selling, mrp)
+  return (
+    `\n      <g:price>${price.toFixed(2)} INR</g:price>` +
+    (salePrice != null ? `\n      <g:sale_price>${salePrice.toFixed(2)} INR</g:sale_price>` : '')
+  )
 }
 
 export async function GET(request: NextRequest) {
@@ -95,7 +104,6 @@ export async function GET(request: NextRequest) {
         const sellingPrice = variant.price
         if (sellingPrice == null) continue
         const variantMrp = variant.mrp ? Number(variant.mrp) : product.mrp ? Number(product.mrp) : null
-        const hasSalePrice = variantMrp && variantMrp > Number(sellingPrice)
         const variantMpn = variant.mpn || product.mpn || ''
         const variantGtin = variant.gtin || product.gtin || ''
         const availability = !productActive
@@ -107,19 +115,13 @@ export async function GET(request: NextRequest) {
         items.push(`    <item>
       <g:id>${escapeXml(variant.sku)}</g:id>
       <g:item_group_id>${escapeXml(product.sku)}</g:item_group_id>
-      <title>${escapeXml(product.name)} - ${escapeXml(variant.variant_name)}</title>
+      <title>${escapeXml(clipTitle(`${product.name} - ${variant.variant_name}`))}</title>
       <description>${escapeXml(description)}</description>
       <link>${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(variant.sku)}</link>
-      <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}
-      <g:price>${Number(variantMrp || sellingPrice).toFixed(2)} INR</g:price>${
-        hasSalePrice
-          ? `
-      <g:sale_price>${Number(sellingPrice).toFixed(2)} INR</g:sale_price>`
-          : ''
-      }
+      <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}${priceXml(Number(sellingPrice), variantMrp)}
       <g:availability>${availability}</g:availability>
       <g:condition>new</g:condition>
-      <g:identifier_exists>${variantMpn || variantGtin || brandName ? 'yes' : 'no'}</g:identifier_exists>${
+      <g:identifier_exists>${hasIdentifiers(variantGtin, variantMpn, brandName) ? 'yes' : 'no'}</g:identifier_exists>${
         brandName
           ? `
       <g:brand>${escapeXml(brandName)}</g:brand>`
@@ -141,7 +143,6 @@ export async function GET(request: NextRequest) {
     } else {
       const sellingPrice = product.base_price
       const productMrp = product.mrp ? Number(product.mrp) : null
-      const hasSalePrice = productMrp && productMrp > Number(sellingPrice)
       const availability = !productActive
         ? 'out_of_stock'
         : product.stock_status === 'Out of Stock'
@@ -150,19 +151,13 @@ export async function GET(request: NextRequest) {
 
       items.push(`    <item>
       <g:id>${escapeXml(product.sku)}</g:id>
-      <title>${escapeXml(product.name)}</title>
+      <title>${escapeXml(clipTitle(product.name || ''))}</title>
       <description>${escapeXml(description)}</description>
       <link>${baseUrl}/products/${product.slug}</link>
-      <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}
-      <g:price>${Number(productMrp || sellingPrice).toFixed(2)} INR</g:price>${
-        hasSalePrice
-          ? `
-      <g:sale_price>${Number(sellingPrice).toFixed(2)} INR</g:sale_price>`
-          : ''
-      }
+      <g:image_link>${escapeXml(imageUrl)}</g:image_link>${additionalImagesXml}${priceXml(Number(sellingPrice), productMrp)}
       <g:availability>${availability}</g:availability>
       <g:condition>new</g:condition>
-      <g:identifier_exists>${product.mpn || product.gtin || brandName ? 'yes' : 'no'}</g:identifier_exists>${
+      <g:identifier_exists>${hasIdentifiers(product.gtin, product.mpn, brandName) ? 'yes' : 'no'}</g:identifier_exists>${
         brandName
           ? `
       <g:brand>${escapeXml(brandName)}</g:brand>`
