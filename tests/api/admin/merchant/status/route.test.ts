@@ -11,6 +11,7 @@ vi.mock('@/lib/auth/scopes', () => ({
 
 vi.mock('@/lib/merchant/sync', () => ({
   getLastSyncStatus: vi.fn(),
+  isMerchantSyncRunning: vi.fn(),
   syncAllProductsToMerchant: vi.fn(),
   syncProductToMerchant: vi.fn(),
   sendSyncFailureEmail: vi.fn(),
@@ -19,11 +20,12 @@ vi.mock('@/lib/merchant/sync', () => ({
 import { GET } from '@/app/api/(admin)/admin/merchant/status/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { getLastSyncStatus } from '@/lib/merchant/sync'
+import { getLastSyncStatus, isMerchantSyncRunning } from '@/lib/merchant/sync'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
 const mockGetStatus = vi.mocked(getLastSyncStatus)
+const mockRunning = vi.mocked(isMerchantSyncRunning)
 
 const admin = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['products'] }
 
@@ -68,5 +70,14 @@ describe('GET /api/admin/merchant/status', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.status).toBeNull()
+  })
+
+  it('reports whether a sync is running', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockReturnValue(true)
+    mockGetStatus.mockResolvedValue(null)
+    mockRunning.mockResolvedValue(true)
+    const body = await (await GET(makeReq())).json()
+    expect(body.running).toBe(true)
   })
 })

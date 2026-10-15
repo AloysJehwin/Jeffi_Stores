@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
         : await (await import('@/lib/amazon/sync')).syncAllProductsToAmazon()
     return NextResponse.json({ ok: true, provider: parsed.data.provider, result })
   } catch (e: any) {
+    if (e?.name === 'MerchantSyncInProgressError') {
+      return NextResponse.json({ ok: false, error: e.message, inProgress: true }, { status: 409 })
+    }
     return NextResponse.json({ ok: false, error: e?.message || 'sync failed' }, { status: 500 })
   }
 }

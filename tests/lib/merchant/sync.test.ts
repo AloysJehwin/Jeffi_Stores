@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
+const lockClient = { query: vi.fn(), release: vi.fn() }
 vi.mock('@/lib/shared/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
+  getClient: vi.fn(),
 }))
 vi.mock('nodemailer', () => ({
   default: {
@@ -14,6 +16,7 @@ vi.mock('nodemailer', () => ({
 }))
 vi.mock('@/lib/merchant/mapper', () => ({
   productToGmcItems: vi.fn(),
+  gmcItemProblem: vi.fn(),
 }))
 vi.mock('@/lib/merchant/client', () => ({
   upsertProduct: vi.fn(),
@@ -31,6 +34,8 @@ import {
   syncProductToMerchant,
   getLastSyncStatus,
   sendSyncFailureEmail,
+  isMerchantSyncRunning,
+  MerchantSyncInProgressError,
 } from '@/lib/merchant/sync'
 import * as db from '@/lib/shared/db'
 import * as mapper from '@/lib/merchant/mapper'
@@ -59,6 +64,10 @@ describe('merchant/sync', () => {
     // resetAllMocks wipes the factory's getMerchantId implementation — re-stub it.
     vi.mocked(client.getMerchantId).mockResolvedValue('test-merchant-123')
     vi.mocked(client.merchantConfigured).mockResolvedValue(true)
+    vi.mocked(db.getClient).mockResolvedValue(lockClient as any)
+    lockClient.query.mockImplementation(async (sql: string) =>
+      /pg_try_advisory_lock/.test(sql) ? { rows: [{ acquired: true }] } : { rows: [{}] }
+    )
   })
 
   describe('getLastSyncStatus', () => {
@@ -84,18 +93,85 @@ describe('merchant/sync', () => {
   })
 
   describe('syncAllProductsToMerchant', () => {
-    it('returns lock-held result when advisory lock not acquired', async () => {
-      mockQueryOne.mockResolvedValueOnce({ acquired: false })
+    it('refuses a second sync while the advisory lock is held', async () => {
+      lockClient.query.mockImplementation(async (sql: string) =>
+        /pg_try_advisory_lock/.test(sql) ? { rows: [{ acquired: false }] } : { rows: [{}] }
+      )
 
+      await expect(syncAllProductsToMerchant()).rejects.toBeInstanceOf(MerchantSyncInProgressError)
+      await expect(syncAllProductsToMerchant()).rejects.toThrow(/already running/)
+      expect(mockQueryMany).not.toHaveBeenCalled()
+      expect(lockClient.query).not.toHaveBeenCalledWith(expect.stringMatching(/advisory_unlock/), expect.anything())
+      expect(lockClient.release).toHaveBeenCalledTimes(2)
+    })
+
+    it('takes and releases the lock on the same dedicated connection', async () => {
+      await syncAllProductsToMerchant()
+      const sqls = lockClient.query.mock.calls.map(c => c[0])
+      expect(sqls[0]).toMatch(/pg_try_advisory_lock/)
+      expect(sqls[sqls.length - 1]).toMatch(/pg_advisory_unlock/)
+      expect(lockClient.release).toHaveBeenCalledWith(undefined)
+    })
+
+    it('releases the lock even when the run throws', async () => {
+      mockQueryMany.mockRejectedValueOnce(new Error('db down'))
+      await expect(syncAllProductsToMerchant()).rejects.toThrow('db down')
+      expect(lockClient.query).toHaveBeenCalledWith(expect.stringMatching(/pg_advisory_unlock/), expect.anything())
+      expect(lockClient.release).toHaveBeenCalledTimes(1)
+    })
+
+    it('destroys the connection when the unlock fails so a stale lock is not pooled', async () => {
+      lockClient.query.mockImplementation(async (sql: string) => {
+        if (/pg_advisory_unlock/.test(sql)) throw new Error('connection lost')
+        return /pg_try_advisory_lock/.test(sql) ? { rows: [{ acquired: true }] } : { rows: [{}] }
+      })
+      await syncAllProductsToMerchant()
+      expect(lockClient.release).toHaveBeenCalledWith(true)
+    })
+
+    it('records a whole-batch failure once with the items it covers', async () => {
+      mockQueryMany.mockResolvedValueOnce([{ id: 'p1', sku: 'A' }])
+      mockProductToGmcItems.mockReturnValueOnce([
+        { offerId: 'A1', title: 'a', imageLink: 'https://x/a.png', price: { value: '10.00' } },
+        { offerId: 'A2', title: 'a', imageLink: 'https://x/a.png', price: { value: '10.00' } },
+      ])
+      mockCustomBatchUpsert.mockRejectedValueOnce(new Error('HTTP 403: forbidden'))
       const result = await syncAllProductsToMerchant()
-      expect(result.synced).toBe(0)
-      expect(result.errors[0].sku).toBe('__lock__')
-      expect(result.errors[0].error).toMatch(/running|lock/i)
+      expect(result.errors).toContainEqual({ sku: 'batch-0', error: 'HTTP 403: forbidden', items: 2 })
+    })
+
+    it('skips the rest of the run after repeated identical batch failures', async () => {
+      const items = Array.from({ length: 600 }, (_, i) => ({
+        offerId: `S${i}`,
+        title: 't',
+        imageLink: 'https://x/a.png',
+        price: { value: '1.00' },
+      }))
+      mockQueryMany.mockResolvedValueOnce([{ id: 'p1', sku: 'P' }])
+      mockProductToGmcItems.mockReturnValueOnce(items)
+      mockCustomBatchUpsert.mockRejectedValue(new Error('gone (410)'))
+      const result = await syncAllProductsToMerchant()
+      expect(mockCustomBatchUpsert).toHaveBeenCalledTimes(3)
+      const skipped = result.errors.find(e => /Skipped after 3/.test(e.error))
+      expect(skipped?.items).toBe(300)
+    })
+
+    it('does not push items with missing images or prices and says why', async () => {
+      const actual = await vi.importActual<typeof import('@/lib/merchant/mapper')>('@/lib/merchant/mapper')
+      vi.mocked(mapper.gmcItemProblem).mockImplementation(actual.gmcItemProblem)
+      mockQueryMany.mockResolvedValueOnce([{ id: 'p1', sku: 'P' }])
+      mockProductToGmcItems.mockReturnValueOnce([
+        { offerId: 'NOIMG', title: 't', imageLink: '', price: { value: '5.00' } },
+        { offerId: 'OK', title: 't', imageLink: 'https://x/a.png', price: { value: '5.00' } },
+      ])
+      mockCustomBatchUpsert.mockResolvedValueOnce({ entries: [{ batchId: 0 }] } as any)
+      const result = await syncAllProductsToMerchant()
+      expect(result.errors).toContainEqual({ sku: 'NOIMG', error: 'Missing product image' })
+      expect(mockCustomBatchUpsert.mock.calls[0][0]).toHaveLength(1)
+      expect(result.synced).toBe(1)
     })
 
     it('syncs products successfully when lock acquired', async () => {
-      mockQueryOne.mockResolvedValueOnce({ acquired: true })
-
       const fakeProducts = [
         { id: 'p1', sku: 'SKU-001', name: 'Widget A' },
         { id: 'p2', sku: 'SKU-002', name: 'Widget B' },
@@ -120,8 +196,6 @@ describe('merchant/sync', () => {
     })
 
     it('deletes GMC offers not in active product set', async () => {
-      mockQueryOne.mockResolvedValueOnce({ acquired: true })
-
       mockListProducts.mockResolvedValueOnce({
         resources: [{ offerId: 'OLD-SKU' }],
         nextPageToken: undefined,
@@ -133,8 +207,6 @@ describe('merchant/sync', () => {
     })
 
     it('handles batch upsert errors gracefully', async () => {
-      mockQueryOne.mockResolvedValueOnce({ acquired: true })
-
       mockQueryMany.mockResolvedValueOnce([{ id: 'p1', sku: 'SKU-001', name: 'Widget' }])
       mockProductToGmcItems.mockReturnValueOnce([{ offerId: 'SKU-001' }])
 
@@ -152,8 +224,6 @@ describe('merchant/sync', () => {
     })
 
     it('handles productToGmcItems exception per product', async () => {
-      mockQueryOne.mockResolvedValueOnce({ acquired: true })
-
       mockQueryMany.mockResolvedValueOnce([{ id: 'p1', sku: 'BAD-SKU', name: 'Bad' }])
       mockProductToGmcItems.mockImplementationOnce(() => {
         throw new Error('mapping failed')
@@ -164,8 +234,6 @@ describe('merchant/sync', () => {
     })
 
     it('paginates through GMC product list', async () => {
-      mockQueryOne.mockResolvedValueOnce({ acquired: true })
-
       mockListProducts
         .mockResolvedValueOnce({
           resources: [{ offerId: 'PAGE1-SKU' }],
@@ -178,6 +246,19 @@ describe('merchant/sync', () => {
 
       const result = await syncAllProductsToMerchant()
       expect(result.deleted).toBe(2)
+    })
+  })
+
+  describe('isMerchantSyncRunning', () => {
+    it('reports the advisory lock state from pg_locks', async () => {
+      mockQueryOne.mockResolvedValueOnce({ running: true })
+      expect(await isMerchantSyncRunning()).toBe(true)
+      expect(mockQueryOne.mock.calls[0][0]).toMatch(/pg_locks/)
+    })
+
+    it('returns false on db error', async () => {
+      mockQueryOne.mockRejectedValueOnce(new Error('x'))
+      expect(await isMerchantSyncRunning()).toBe(false)
     })
   })
 

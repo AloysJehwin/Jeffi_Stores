@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
+import { groupSyncErrors, countSyncErrorItems, type MerchantSyncError } from '@/lib/merchant/sync-errors'
 
 interface Summary {
   last_refreshed_at: string | null
@@ -22,8 +23,36 @@ interface Row {
 interface SyncStatus {
   status: 'success' | 'error' | 'running' | null
   synced?: number
-  errors?: Array<{ sku: string; error: string }>
+  errors?: MerchantSyncError[] | null
   finished_at?: string
+}
+
+const STATUS_POLL_MS = 5000
+
+function SyncErrors({ errors }: { errors: MerchantSyncError[] }) {
+  const groups = groupSyncErrors(errors)
+  return (
+    <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-3 space-y-2">
+      <p className="text-xs font-semibold text-red-700 dark:text-red-300">
+        Last push had {countSyncErrorItems(errors).toLocaleString()} error(s) across {groups.length} reason(s).
+      </p>
+      <ul className="space-y-1.5">
+        {groups.map(g => (
+          <li key={g.reason} className="text-xs text-red-700 dark:text-red-300">
+            <details>
+              <summary className="cursor-pointer">
+                <span className="font-semibold">{g.count.toLocaleString()}</span> {g.reason}
+              </summary>
+              <p className="mt-1 font-mono text-[11px] text-foreground-secondary break-words">
+                {g.skus.join(', ')}
+                {g.skus.length < g.count ? ' …' : ''}
+              </p>
+            </details>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }
 
 const PAGE_SIZE = 50
@@ -61,6 +90,7 @@ export default function GoogleMerchantPanel() {
   const [refreshing, setRefreshing] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
+  const [syncRunning, setSyncRunning] = useState(false)
   const { showToast } = useToast()
 
   const load = useCallback(
@@ -93,13 +123,26 @@ export default function GoogleMerchantPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Load the DB->GMC sync status banner.
-  useEffect(() => {
-    fetch('/api/admin/merchant/status')
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => d && setSyncStatus(d.status))
-      .catch(() => {})
+  // DB->GMC sync status banner; `running` reflects the server-side sync lock (any tab or the cron).
+  const loadSyncStatus = useCallback(async () => {
+    try {
+      const r = await fetch('/api/admin/merchant/status')
+      if (!r.ok) return
+      const d = await r.json()
+      setSyncStatus(d.status)
+      setSyncRunning(!!d.running)
+    } catch {}
   }, [])
+
+  useEffect(() => {
+    loadSyncStatus()
+  }, [loadSyncStatus])
+
+  useEffect(() => {
+    if (!syncRunning || syncing) return
+    const t = setInterval(loadSyncStatus, STATUS_POLL_MS)
+    return () => clearInterval(t)
+  }, [syncRunning, syncing, loadSyncStatus])
 
   const refresh = async () => {
     setRefreshing(true)
@@ -133,15 +176,25 @@ export default function GoogleMerchantPanel() {
         headers: { 'Content-Type': 'application/json', 'x-requested-with': 'jeffi-admin' },
         body: '{}',
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 409) {
+        setSyncRunning(true)
+        showToast(data.error || 'A sync is already running.', 'warning')
+        return
+      }
+      if (!res.ok) {
+        showToast(data.error || 'Sync failed.', 'error')
+        return
+      }
       setSyncStatus({
         status: data.errors?.length ? 'error' : 'success',
         synced: data.synced,
         errors: data.errors,
         finished_at: data.finishedAt,
       })
+      setSyncRunning(false)
       if (data.errors?.length) {
-        showToast(`Sync finished with ${data.errors.length} error(s).`, 'warning')
+        showToast(`Sync finished with ${countSyncErrorItems(data.errors).toLocaleString()} error(s).`, 'warning')
       } else {
         showToast(`Pushed ${data.synced ?? 0} items to Google.`, 'success')
       }
@@ -186,10 +239,10 @@ export default function GoogleMerchantPanel() {
           <RequireWrite scope="merchant_sync:write">
             <button
               onClick={syncNow}
-              disabled={syncing}
+              disabled={syncing || syncRunning}
               className="px-3 h-control-sm text-sm border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50 transition-colors"
             >
-              {syncing ? 'Pushing…' : 'Sync now (push to Google)'}
+              {syncing || syncRunning ? 'Syncing…' : 'Sync now (push to Google)'}
             </button>
             <button
               onClick={refresh}
@@ -203,9 +256,10 @@ export default function GoogleMerchantPanel() {
       </div>
 
       <div className="p-4 space-y-4">
-        {syncStatus?.status === 'error' && syncStatus.errors?.length ? (
-          <p className="text-xs text-red-600">Last push had {syncStatus.errors.length} error(s).</p>
+        {syncRunning && !syncing ? (
+          <p className="text-xs text-foreground-muted">A sync is running. This updates when it finishes.</p>
         ) : null}
+        {syncStatus?.status === 'error' && syncStatus.errors?.length ? <SyncErrors errors={syncStatus.errors} /> : null}
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

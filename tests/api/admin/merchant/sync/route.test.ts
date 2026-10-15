@@ -20,12 +20,22 @@ vi.mock('@/lib/merchant/sync', () => ({
   syncAllProductsToMerchant: vi.fn(),
   syncProductToMerchant: vi.fn(),
   sendSyncFailureEmail: vi.fn(),
+  MerchantSyncInProgressError: class MerchantSyncInProgressError extends Error {
+    constructor() {
+      super('A Google Merchant sync is already running. Wait for it to finish.')
+    }
+  },
 }))
 
 import { POST, GET } from '@/app/api/(admin)/admin/merchant/sync/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { syncAllProductsToMerchant, syncProductToMerchant, sendSyncFailureEmail } from '@/lib/merchant/sync'
+import {
+  syncAllProductsToMerchant,
+  syncProductToMerchant,
+  sendSyncFailureEmail,
+  MerchantSyncInProgressError,
+} from '@/lib/merchant/sync'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -155,6 +165,18 @@ describe('POST /api/admin/merchant/sync', () => {
     const body = await res.json()
     expect(body.error).toBe('sync failed')
   })
+
+  it('returns 409 without emailing when a sync is already running', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockReturnValue(true)
+    mockSyncAll.mockRejectedValue(new MerchantSyncInProgressError())
+    const res = await POST(makePostReq())
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toMatch(/already running/)
+    expect(body.inProgress).toBe(true)
+    expect(mockSyncFailEmail).not.toHaveBeenCalled()
+  })
 })
 
 describe('GET /api/admin/merchant/sync', () => {
@@ -208,5 +230,11 @@ describe('GET /api/admin/merchant/sync', () => {
     mockSyncAll.mockRejectedValue(new Error('network error'))
     const res = await GET(makeGetReq())
     expect(res.status).toBe(500)
+  })
+
+  it('returns 409 when the cron fires during a running sync', async () => {
+    mockSyncAll.mockRejectedValue(new MerchantSyncInProgressError())
+    const res = await GET(makeGetReq({ authorization: 'Bearer cron-secret-123' }))
+    expect(res.status).toBe(409)
   })
 })

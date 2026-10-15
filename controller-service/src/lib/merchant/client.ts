@@ -94,7 +94,7 @@ export async function gmcRequest(method: string, path: string, body?: unknown): 
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`GMC ${method} ${path} failed (${res.status}): ${err}`)
+    throw new Error(`GMC ${method} ${path.split('?')[0]} failed: ${gmcErrorMessage(res.status, err)}`)
   }
 
   return res.json()
@@ -113,7 +113,7 @@ export async function deleteProduct(productId: string): Promise<void> {
   })
   if (!res.ok && res.status !== 404) {
     const err = await res.text()
-    throw new Error(`GMC DELETE failed (${res.status}): ${err}`)
+    throw new Error(`GMC DELETE failed: ${gmcErrorMessage(res.status, err)}`)
   }
 }
 
@@ -132,21 +132,43 @@ export async function listProductStatuses(pageToken?: string): Promise<{ resourc
   return gmcRequest('GET', `/productstatuses?${params.toString()}`)
 }
 
-export async function customBatchUpsert(entries: unknown[]): Promise<any> {
-  const token = await getAccessToken()
-  const res = await fetch(`${BATCH_URL}/products/batch`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ entries }),
-  })
-
-  if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`GMC POST /products/batch failed (${res.status}): ${err}`)
+// Google's error bodies are JSON ({error:{code,message}}); keep just the message so logs stay readable.
+export function gmcErrorMessage(status: number, body: string): string {
+  let msg = body
+  try {
+    const parsed = JSON.parse(body)
+    msg = parsed?.error?.message || parsed?.message || body
+  } catch {}
+  msg = String(msg).replace(/\s+/g, ' ').trim().slice(0, 300)
+  if (status === 410) {
+    return `Google has shut down the Content API for Shopping (HTTP 410); the sync must move to the Merchant API. ${msg}`.trim()
   }
+  return `HTTP ${status}: ${msg}`
+}
 
-  return res.json()
+const RETRY_STATUSES = new Set([410, 429, 500, 502, 503, 504])
+const RETRY_DELAYS_MS = [2000, 5000]
+
+export async function customBatchUpsert(entries: unknown[], delays: number[] = RETRY_DELAYS_MS): Promise<any> {
+  for (let attempt = 0; ; attempt++) {
+    const token = await getAccessToken()
+    const res = await fetch(`${BATCH_URL}/products/batch`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ entries }),
+    })
+
+    if (res.ok) return res.json()
+
+    const err = await res.text()
+    // Post-sunset Content API calls fail intermittently (410), so transient statuses are retried.
+    if (RETRY_STATUSES.has(res.status) && attempt < delays.length) {
+      await new Promise(r => setTimeout(r, delays[attempt]))
+      continue
+    }
+    throw new Error(gmcErrorMessage(res.status, err))
+  }
 }
