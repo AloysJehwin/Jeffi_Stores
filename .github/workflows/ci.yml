@@ -1,19 +1,18 @@
 name: Jeffi Stores Pipeline
 
-# PR: lint, typecheck, tests, build (pr-gate). Push to main: the same, then the four service images are built
-# and pushed to ECR (tag local-<image_sha>, shared with a Mac release), and the deploy job waits on the
-# `production` environment for approval. Approved, it opens an SSM tunnel to the core and, in order:
-#   1. jeffi_stores schema (deploy/k8s/db/release-db.sh --schema: the additive database/*.sql diff, manual.sql,
-#      the control-plane diff and plan seed) when the schema changed since the live commit;
-#   2. pending database/migrations files (release-db.sh --migrations), every deploy: only files not yet in
-#      schema_migrations run, so it is a no-op when nothing is pending;
-#   3. the rollout (release.sh --rollout-only), which also fans the schema and migration files out to every
-#      store tenant's own database (40-tenant-fanout.sh) once the new controller is up;
-#   4. a CloudFront invalidation.
-# A database step that fails stops the run before anything is rolled out.
-# workflow_dispatch with deploy=true runs the release path from any branch; dry_run (on by default) builds the
-# images, prints the SQL every database step would apply, checks the cluster and the tenant fan-out, and
-# changes nothing in production.
+# PR: verify-scripts, lint, typecheck, test and build in parallel → pr-gate.
+# Push to main (or workflow_dispatch with deploy=true), everything that can overlap does:
+#   checks ─┐
+#   release notes ─┴→ Approve release (production) → Database · schema → Database · migrations ─┐
+#   images (4, arm, tag local-<image_sha>; built while the checks run and you approve) ────────────┴→
+#   Roll out · platform → Database · tenants → Roll out · stores ─┬→ Verify (smoke test)
+#                       └→ CloudFront ─────────────────────────────┘
+# The checks gate the approval, so a failing commit never deploys (its images may still be pushed). The schema
+# is additive, so applying it while the old code runs is safe. Schema and migrations stay in order (both alter
+# jeffi_stores); tenants need the new controller, stores need their databases first. After the one approval the
+# stages run in `production-release` (no reviewer, same branches), each over an SSM tunnel; a failure stops the rest.
+# dry_run (default on for workflow_dispatch) builds the images and shows each stage's SQL, kubectl diff and
+# targets without changing production; schema=true runs the schema stage without a database/ change.
 
 on:
   pull_request:
@@ -92,7 +91,6 @@ jobs:
   test:
     name: Test & Coverage
     runs-on: ubuntu-latest
-    needs: [lint, typecheck]
     env:
       JWT_SECRET: test-jwt-secret-at-least-32-bytes!!
       CRON_SECRET: test-cron-secret
@@ -124,7 +122,6 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -168,7 +165,6 @@ jobs:
   images:
     name: Image ${{ matrix.service }}
     runs-on: ubuntu-24.04-arm
-    needs: [verify-scripts, lint, typecheck, test, build]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy)
     permissions:
       id-token: write
@@ -201,9 +197,9 @@ jobs:
   release-notes:
     name: Release notes
     runs-on: ubuntu-latest
-    needs: [verify-scripts, lint, typecheck, test, build]
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy)
     outputs:
+      tag: ${{ steps.notes.outputs.tag }}
       schema: ${{ steps.notes.outputs.schema }}
       migrations: ${{ steps.notes.outputs.migrations }}
     steps:
@@ -234,6 +230,7 @@ jobs:
             if [ -n "$migrations" ]; then echo "**Migrations:** new \`database/migrations\` files:"; echo "$migrations" | sed 's/^/- /'; else echo "**Migrations:** no new files; the deploy job still runs any not yet recorded."; fi
             echo; echo "Store tenant databases are updated during the rollout. Approve the \`production\` environment to proceed."
           } >> "$GITHUB_STEP_SUMMARY"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "schema=$([ -n "$schema" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "migrations=$([ -n "$migrations" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
@@ -242,17 +239,17 @@ jobs:
   approve:
     name: Approve release
     runs-on: ubuntu-latest
-    needs: [images, release-notes]
+    needs: [verify-scripts, lint, typecheck, test, build, release-notes]
     environment:
       name: production
       url: https://jeffistores.in
     steps:
-      - run: echo "Approved ${{ needs.images.outputs.tag }}, dry_run=${{ env.DRY }}"
+      - run: echo "Approved ${{ needs.release-notes.outputs.tag }}, dry_run=${{ env.DRY }}"
 
   db-schema:
     name: Database · schema
     runs-on: ubuntu-latest
-    needs: [images, release-notes, approve]
+    needs: [release-notes, approve]
     if: ${{ !failure() && !cancelled() && needs.approve.result == 'success' && (needs.release-notes.outputs.schema == 'true' || (github.event_name == 'workflow_dispatch' && (inputs.dry_run || inputs.schema))) }}
     environment: production-release
     concurrency:
@@ -287,7 +284,7 @@ jobs:
   db-migrations:
     name: Database · migrations
     runs-on: ubuntu-latest
-    needs: [images, approve, db-schema]
+    needs: [approve, db-schema]
     if: ${{ !failure() && !cancelled() && needs.approve.result == 'success' }}
     environment: production-release
     concurrency:
@@ -382,11 +379,11 @@ jobs:
       - name: Every store's controller, messaging and document pods at ${{ needs.images.outputs.tag }}
         run: bash deploy/k8s/bootstrap/rollout.sh ${{ needs.images.outputs.tag }} stores ${{ env.DRY == 'true' && '--dry-run' || '' }}
 
-  verify:
-    name: Verify
+  cdn:
+    name: CloudFront
     runs-on: ubuntu-latest
-    needs: [images, rollout-stores]
-    if: success()
+    needs: [rollout-platform]
+    if: success() && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
     environment: production-release
     concurrency:
       group: deploy-production
@@ -401,7 +398,6 @@ jobs:
           role-arn: ${{ secrets.AWS_ROLE_ARN }}
           kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
       - name: Invalidate CloudFront
-        if: env.DRY != 'true'
         env:
           DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
         run: |
@@ -409,6 +405,25 @@ jobs:
           id=$(aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/*' --query 'Invalidation.Id' --output text)
           aws cloudfront wait invalidation-completed --distribution-id "$DIST_ID" --id "$id"
           echo "Invalidation $id complete"
+
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    needs: [images, rollout-stores, cdn]
+    if: ${{ !failure() && !cancelled() && needs.rollout-stores.result == 'success' }}
+    environment: production-release
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/release-setup
+        with:
+          role-arn: ${{ secrets.AWS_ROLE_ARN }}
+          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
       - name: Smoke test (live commit and every host)
         run: |
           tag=${{ needs.images.outputs.tag }}
@@ -417,7 +432,7 @@ jobs:
   summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [verify-scripts, lint, typecheck, test, build, pr-gate, images, release-notes, approve, db-schema, db-migrations, rollout-platform, db-tenants, rollout-stores, verify]
+    needs: [verify-scripts, lint, typecheck, test, build, pr-gate, images, release-notes, approve, db-schema, db-migrations, rollout-platform, db-tenants, rollout-stores, cdn, verify]
     if: always()
     steps:
       - run: |
@@ -435,8 +450,9 @@ jobs:
           echo "Platform:       ${{ needs.rollout-platform.result }}"
           echo "DB tenants:     ${{ needs.db-tenants.result }}"
           echo "Stores:         ${{ needs.rollout-stores.result }}"
+          echo "CloudFront:     ${{ needs.cdn.result }}"
           echo "Verify:         ${{ needs.verify.result }}"
-          case "${{ needs.verify-scripts.result }} ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.test.result }} ${{ needs.build.result }} ${{ needs.pr-gate.result }} ${{ needs.images.result }} ${{ needs.release-notes.result }} ${{ needs.approve.result }} ${{ needs.db-schema.result }} ${{ needs.db-migrations.result }} ${{ needs.rollout-platform.result }} ${{ needs.db-tenants.result }} ${{ needs.rollout-stores.result }} ${{ needs.verify.result }}" in
+          case "${{ needs.verify-scripts.result }} ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.test.result }} ${{ needs.build.result }} ${{ needs.pr-gate.result }} ${{ needs.images.result }} ${{ needs.release-notes.result }} ${{ needs.approve.result }} ${{ needs.db-schema.result }} ${{ needs.db-migrations.result }} ${{ needs.rollout-platform.result }} ${{ needs.db-tenants.result }} ${{ needs.rollout-stores.result }} ${{ needs.cdn.result }} ${{ needs.verify.result }}" in
             *failure*|*cancelled*) echo "Pipeline FAILED"; exit 1 ;;
           esac
           echo "Pipeline OK"
