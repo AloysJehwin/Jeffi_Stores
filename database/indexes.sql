@@ -635,6 +635,14 @@ CREATE INDEX idx_message_logs_kind ON public.message_logs USING btree (kind);
 
 
 --
+-- Name: idx_message_logs_provider_sid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_logs_provider_sid ON public.message_logs USING btree (provider_sid);
+
+
+
+--
 -- Name: idx_email_logs_status_sent_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -647,6 +655,14 @@ CREATE INDEX idx_email_logs_status_sent_at ON public.email_logs USING btree (sta
 --
 
 CREATE INDEX idx_email_sent_campaign_user ON public.email_campaigns_sent USING btree (campaign_kind, user_id, sent_at DESC);
+
+
+
+--
+-- Name: idx_email_sent_channel; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_email_sent_channel ON public.email_campaigns_sent USING btree (campaign_kind, user_id, channel, sent_at DESC);
 
 
 
@@ -1360,20 +1376,6 @@ CREATE INDEX idx_quotations_status ON public.quotations USING btree (status);
 
 
 
---
--- Name: idx_replication_runs_recorded_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_replication_runs_recorded_at ON public.replication_runs USING btree (recorded_at DESC);
-
-
-
---
--- Name: idx_replication_runs_status; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_replication_runs_status ON public.replication_runs USING btree (status);
-
 
 
 --
@@ -1399,6 +1401,31 @@ CREATE INDEX idx_return_requests_status ON public.return_requests USING btree (s
 CREATE INDEX idx_return_requests_user_id ON public.return_requests USING btree (user_id);
 
 
+
+--
+-- Name: idx_order_adjustments_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_order_adjustments_order_id ON public.order_adjustments USING btree (order_id);
+
+--
+-- Name: idx_order_adjustments_rzp_order; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_order_adjustments_rzp_order ON public.order_adjustments USING btree (razorpay_order_id) WHERE (razorpay_order_id IS NOT NULL);
+
+--
+-- Name: idx_order_adjustments_one_open; Type: INDEX; Schema: public; Owner: -
+-- At most one open (pending / awaiting payment) adjustment per order.
+--
+
+CREATE UNIQUE INDEX idx_order_adjustments_one_open ON public.order_adjustments USING btree (order_id) WHERE ((status)::text = ANY (ARRAY['pending_customer'::text, 'awaiting_payment'::text]));
+
+--
+-- Name: idx_order_adjustment_lines_adjustment; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_order_adjustment_lines_adjustment ON public.order_adjustment_lines USING btree (adjustment_id);
 
 --
 -- Name: idx_variant_change_requests_order_id; Type: INDEX; Schema: public; Owner: -
@@ -2051,3 +2078,61 @@ CREATE INDEX idx_vault_tickets_expires ON public.vault_tickets USING btree (expi
 
 CREATE INDEX idx_vault_access_log_user ON public.vault_access_log USING btree (user_id, created_at);
 CREATE INDEX idx_upload_sessions_product ON public.upload_sessions USING btree (product_id, status);
+
+-- One live session per admin + resource. closed_at IS NULL rows cover the "open" state;
+-- closed sessions are historical and can repeat without conflict.
+CREATE UNIQUE INDEX idx_editor_sessions_open
+  ON public.editor_sessions (admin_id, resource_type, resource_id)
+  WHERE closed_at IS NULL;
+
+CREATE INDEX idx_editor_sessions_resource
+  ON public.editor_sessions (resource_type, resource_id, started_at DESC);
+
+-- One open po_drafts row per admin — once promoted_po_id is set, the draft is
+-- "spent" and a new draft can be opened.
+CREATE UNIQUE INDEX idx_po_drafts_open
+  ON public.po_drafts (admin_id)
+  WHERE promoted_po_id IS NULL;
+
+CREATE INDEX idx_po_drafts_admin ON public.po_drafts (admin_id, updated_at DESC);
+CREATE INDEX idx_po_receive_drafts_admin ON public.po_receive_drafts (admin_id, updated_at DESC);
+CREATE INDEX idx_offer_drafts_updated ON public.offer_drafts (updated_at DESC);
+
+CREATE UNIQUE INDEX idx_campaign_drafts_kind ON public.campaign_drafts (kind);
+CREATE INDEX idx_campaign_drafts_updated ON public.campaign_drafts (updated_at DESC);
+
+-- Messaging templates library (per-tenant). See database/messaging.sql.
+CREATE INDEX IF NOT EXISTS idx_family_tenant_cat ON public.template_family (tenant_id, category);
+CREATE INDEX IF NOT EXISTS idx_template_tenant_channel ON public.template (tenant_id, channel, status);
+CREATE INDEX IF NOT EXISTS idx_variant_template ON public.template_variant (template_id);
+CREATE INDEX IF NOT EXISTS idx_variant_approval ON public.template_variant (tenant_id, approval_status) WHERE provider_ref IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_version_variant ON public.template_version (variant_id, version DESC);
+CREATE INDEX IF NOT EXISTS idx_asset_tenant_kind ON public.template_asset (tenant_id, kind);
+CREATE INDEX IF NOT EXISTS idx_short_link_tenant ON public.short_link (tenant_id, created_at DESC);
+
+-- Platform catalog + public-API customer copies. See database/messaging.sql.
+CREATE INDEX IF NOT EXISTS idx_platform_family_cat ON public.platform_template_family (category);
+CREATE INDEX IF NOT EXISTS idx_platform_template_channel ON public.platform_template (channel, status);
+CREATE INDEX IF NOT EXISTS idx_platform_version_variant ON public.platform_template_version (variant_id, version DESC);
+CREATE INDEX IF NOT EXISTS idx_pub_family_user_cat ON public.pub_template_family (public_user_id, category);
+CREATE INDEX IF NOT EXISTS idx_pub_template_user_channel ON public.pub_template (public_user_id, channel, status);
+CREATE INDEX IF NOT EXISTS idx_pub_variant_template ON public.pub_template_variant (template_id);
+CREATE INDEX IF NOT EXISTS idx_pub_version_variant ON public.pub_template_version (variant_id, version DESC);
+CREATE INDEX IF NOT EXISTS idx_pub_asset_user_kind ON public.pub_template_asset (public_user_id, kind);
+CREATE INDEX IF NOT EXISTS idx_pub_short_link_user ON public.pub_short_link (public_user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_email_campaign_logs_campaign_channel ON public.email_campaign_logs (campaign_id, channel);
+
+CREATE INDEX IF NOT EXISTS idx_documents_tenant_created ON public.documents (tenant_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_messages_tenant_created ON public.messages (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_provider_ref ON public.messages (provider_ref);
+CREATE INDEX IF NOT EXISTS idx_messages_batch ON public.messages (batch_id);
+CREATE INDEX IF NOT EXISTS idx_message_events_message ON public.message_events (message_id);
+CREATE INDEX IF NOT EXISTS idx_bulk_jobs_tenant_kind ON public.bulk_jobs (tenant_id, kind, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_bulk_items_claim ON public.bulk_job_items (status, job_id, seq);
+CREATE INDEX IF NOT EXISTS idx_bulk_items_job ON public.bulk_job_items (job_id, seq);
+
+CREATE INDEX IF NOT EXISTS idx_platform_invoices_tenant ON public.platform_invoices (tenant_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_tenant_service_approvals_pending ON public.tenant_service_approvals (status, requested_at) WHERE status = 'pending';

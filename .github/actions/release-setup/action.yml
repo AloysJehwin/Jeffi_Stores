@@ -1,0 +1,32 @@
+name: Release setup
+description: AWS (deploy role), Session Manager plugin, psql and the k3s kubeconfig for a release job.
+inputs:
+  role-arn:
+    description: The deploy role (jeffi-github-deploy)
+    required: true
+  kubeconfig-b64:
+    description: k3s admin kubeconfig, base64 (server 127.0.0.1:16443, reached over the SSM tunnel)
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ inputs.role-arn }}
+        aws-region: us-east-1
+        role-duration-seconds: 7200
+    - name: Tools and kubeconfig
+      shell: bash
+      env:
+        KUBECONFIG_B64: ${{ inputs.kubeconfig-b64 }}
+      run: |
+        set -euo pipefail
+        { echo "OUT_DIR=$RUNNER_TEMP/db"; echo "TUNNEL=ssm"; } >> "$GITHUB_ENV"
+        sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client python3-venv >/dev/null
+        if ! command -v session-manager-plugin >/dev/null; then
+          curl -fsSL -o /tmp/smp.deb https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb
+          sudo dpkg -i /tmp/smp.deb >/dev/null
+        fi
+        mkdir -p ~/.kube
+        echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/jeffi-k3s.yaml
+        chmod 600 ~/.kube/jeffi-k3s.yaml

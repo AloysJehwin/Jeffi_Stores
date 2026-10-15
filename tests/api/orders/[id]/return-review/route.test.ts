@@ -35,9 +35,8 @@ vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstanceFor: vi.fn(),
   isRazorpayEnabled: vi.fn().mockReturnValue(false),
 }))
-vi.mock('@/lib/payments/razorpay-route', () => ({
-  reverseTransfersForRefund: vi.fn().mockResolvedValue({ reversedPaise: 0, unrecoveredPaise: 0, perTransfer: [] }),
-  recordRefundSettlement: vi.fn().mockResolvedValue(undefined),
+vi.mock('@/lib/payments/route-settlement', () => ({
+  applyRouteRefund: vi.fn().mockResolvedValue({ status: 'recorded', reversedPaise: 0, unrecoveredPaise: 0 }),
 }))
 vi.mock('@/lib/tenant-registry', () => ({
   controlPlanePool: () => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
@@ -57,7 +56,7 @@ import { POST } from '@/app/api/(public)/orders/[id]/return-review/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'
-import * as razorpayRoute from '@/lib/payments/razorpay-route'
+import * as routeSettlement from '@/lib/payments/route-settlement'
 import * as inventory from '@/lib/orders/inventory'
 import * as email from '@/lib/email'
 import * as activity from '@/lib/shared/activity'
@@ -436,7 +435,7 @@ describe('POST /api/orders/[id]/return-review', () => {
     )
 
     await POST(makeRequest({ action: 'process' }) as any, PARAMS)
-    expect(razorpayRoute.reverseTransfersForRefund).toHaveBeenCalled()
+    expect(routeSettlement.applyRouteRefund).toHaveBeenCalled()
   })
 
   // Regression: a full return must refund across EVERY completed payment (initial charge + a

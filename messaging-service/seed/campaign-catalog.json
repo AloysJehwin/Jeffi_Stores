@@ -1,0 +1,517 @@
+[
+  {
+    "slug": "campaign/abandoned_cart",
+    "channel": "email",
+    "name": "Abandoned Cart",
+    "category": "campaign",
+    "subject": "You left something in your cart, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Still thinking it over?</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">You left {itemCount} item(s) in your cart. We held onto them for you.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Resume your order</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/abandoned_cart",
+    "channel": "sms",
+    "name": "Abandoned Cart",
+    "category": "campaign",
+    "body": "You left {items} in your cart. Complete your order before it's gone.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/abandoned_checkout",
+    "channel": "email",
+    "name": "Abandoned Checkout",
+    "category": "campaign",
+    "subject": "Complete your purchase, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Your cart is waiting</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">Order #{orderNumber} couldn't be completed because payment didn't go through in time. No worries — your items are still available.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Try again</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/abandoned_checkout",
+    "channel": "sms",
+    "name": "Abandoned Checkout",
+    "category": "campaign",
+    "body": "You left {items} in your cart. Complete your order before it's gone.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/post_purchase",
+    "channel": "email",
+    "name": "Post-Purchase Thank-You",
+    "category": "campaign",
+    "subject": "Hope you're enjoying your purchase, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Thanks for shopping with us</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">Just checking in on your recent order #{orderNumber}. We hope everything arrived in great shape!</p>{itemsHtml}<p style=\"color:#555;line-height:1.6;margin:0 0 20px;\">If anything's not right, just reply to this email and we'll sort it out.</p><p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">View your order</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/post_purchase",
+    "channel": "sms",
+    "name": "Post-Purchase Thank-You",
+    "category": "campaign",
+    "body": "How was order {orderNumber}? Share a quick review: {ctaUrl}",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/review_reminder",
+    "channel": "email",
+    "name": "Review Reminder",
+    "category": "campaign",
+    "subject": "How was your purchase, {firstName}?",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Mind sharing a quick review?</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">Your feedback on order #{orderNumber} would mean a lot. Tap any item below to leave a review (takes less than a minute).</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Leave a review</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/review_reminder",
+    "channel": "sms",
+    "name": "Review Reminder",
+    "category": "campaign",
+    "body": "How was order {orderNumber}? Share a quick review: {ctaUrl}",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/review_request",
+    "channel": "sms",
+    "name": "Review Request (Email Form)",
+    "category": "campaign",
+    "body": "How was order {orderNumber}? Share a quick review: {ctaUrl}",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/winback_90",
+    "channel": "email",
+    "name": "Win-Back (90 days)",
+    "category": "campaign",
+    "subject": "We miss you, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">It's been a while</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Here's {discountPercent}% off your next order to welcome you back.</p><p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">Some of your past favorites:</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Browse products</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/winback_90",
+    "channel": "sms",
+    "name": "Win-Back (90 days)",
+    "category": "campaign",
+    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/winback_180",
+    "channel": "email",
+    "name": "Win-Back (180 days, dormant)",
+    "category": "campaign",
+    "subject": "Come back, {firstName} — {discountPercent}% off",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">We'd love to have you back</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Here's {discountPercent}% off, just for you. Code expires in 14 days.</p><p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\">Some of your past favorites:</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Shop now</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/winback_180",
+    "channel": "sms",
+    "name": "Win-Back (180 days, dormant)",
+    "category": "campaign",
+    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/restock",
+    "channel": "email",
+    "name": "Back in Stock",
+    "category": "campaign",
+    "subject": "{productName} is back in stock!",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Good news!</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\"><strong>{productName}</strong> from your wishlist is back in stock. Grab it before it's gone again.</p>{productCard}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Buy now</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/restock",
+    "channel": "sms",
+    "name": "Back in Stock",
+    "category": "campaign",
+    "body": "{productName} is back in stock. Grab it before it sells out.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/price_drop",
+    "channel": "email",
+    "name": "Price Drop",
+    "category": "campaign",
+    "subject": "Price drop on {productName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Price just dropped</h2><p style=\"color:#555;line-height:1.6;margin:0 0 4px;\"><strong>{productName}</strong> from your wishlist:</p>{productCard}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">View product</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/price_drop",
+    "channel": "sms",
+    "name": "Price Drop",
+    "category": "campaign",
+    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/viewed_product",
+    "channel": "email",
+    "name": "Viewed Product",
+    "category": "campaign",
+    "subject": "Still thinking about it, {firstName}?",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Still thinking it over?</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">You were looking at this recently. Here it is again.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Take another look</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/viewed_product",
+    "channel": "sms",
+    "name": "Viewed Product",
+    "category": "campaign",
+    "body": "Still thinking about {items}? Take another look before it's gone.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/viewed_category",
+    "channel": "email",
+    "name": "Viewed Category",
+    "category": "campaign",
+    "subject": "Picks from what you were browsing, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">More from what caught your eye</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">You browsed a few of these. A closer look might help you decide.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Keep browsing</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/viewed_category",
+    "channel": "sms",
+    "name": "Viewed Category",
+    "category": "campaign",
+    "body": "Still thinking about {items}? Take another look before it's gone.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/high_value_cart",
+    "channel": "email",
+    "name": "High-Value Cart",
+    "category": "campaign",
+    "subject": "Your cart is waiting, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">You left {itemCount} item(s) behind</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">We saved your cart for you — complete your order before anything sells out.</p>{itemsHtml}{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Complete your order</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/high_value_cart",
+    "channel": "sms",
+    "name": "High-Value Cart",
+    "category": "campaign",
+    "body": "You left {items} in your cart. Complete your order before it's gone.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/cart_price_drop",
+    "channel": "email",
+    "name": "Cart Price Drop",
+    "category": "campaign",
+    "subject": "Good news — a price drop in your cart",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">The price just dropped</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Something in your cart is now cheaper than when you added it.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Check out now</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/cart_price_drop",
+    "channel": "sms",
+    "name": "Cart Price Drop",
+    "category": "campaign",
+    "body": "Good news — {items} in your cart just dropped in price.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/wishlist_reminder",
+    "channel": "email",
+    "name": "Wishlist Reminder",
+    "category": "campaign",
+    "subject": "Still on your wishlist, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Your wishlist is waiting</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">These are still available. Grab them before they go.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">View your wishlist</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/wishlist_reminder",
+    "channel": "sms",
+    "name": "Wishlist Reminder",
+    "category": "campaign",
+    "body": "Still thinking about {items}? Take another look before it's gone.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/review_photo_followup",
+    "channel": "email",
+    "name": "Review Photo Follow-up",
+    "category": "campaign",
+    "subject": "Add a photo to your review, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Help other shoppers</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Thanks for reviewing {productName}. A quick photo makes your review far more helpful.</p>{productCard}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Add a photo</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/review_photo_followup",
+    "channel": "sms",
+    "name": "Review Photo Follow-up",
+    "category": "campaign",
+    "body": "Add a photo to your {productName} review and help other shoppers.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/back_in_stock_wishlist",
+    "channel": "email",
+    "name": "Back in Stock (Wishlist)",
+    "category": "campaign",
+    "subject": "{productName} is back in stock!",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Back in stock</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">{productName} from your wishlist is available again. It may not last long.</p>{productCard}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Shop it now</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/back_in_stock_wishlist",
+    "channel": "sms",
+    "name": "Back in Stock (Wishlist)",
+    "category": "campaign",
+    "body": "{productName} is back in stock. Grab it before it sells out.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/first_purchase_nudge",
+    "channel": "email",
+    "name": "First Purchase Nudge",
+    "category": "campaign",
+    "subject": "A little something to get you started, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Welcome — here is a treat</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">You signed up but have not placed your first order yet.{#if discountPercent} Here is {discountPercent}% off to get you going.{/if}</p>{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Start shopping</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/first_purchase_nudge",
+    "channel": "sms",
+    "name": "First Purchase Nudge",
+    "category": "campaign",
+    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/second_purchase_nudge",
+    "channel": "email",
+    "name": "Second Purchase Nudge",
+    "category": "campaign",
+    "subject": "Come back for more, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">We hope you loved your first order</h2>{#if couponCode}<p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Here is a little something for your next one.</p>{/if}{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Shop again</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/second_purchase_nudge",
+    "channel": "sms",
+    "name": "Second Purchase Nudge",
+    "category": "campaign",
+    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/signup_anniversary",
+    "channel": "email",
+    "name": "Signup Anniversary",
+    "category": "campaign",
+    "subject": "Happy anniversary with us, {firstName}!",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">It has been a year (or more)</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Thanks for being with us.{#if couponCode} Here is a token of our appreciation.{/if}</p>{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Treat yourself</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/signup_anniversary",
+    "channel": "sms",
+    "name": "Signup Anniversary",
+    "category": "campaign",
+    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/replenishment",
+    "channel": "email",
+    "name": "Replenishment Reminder",
+    "category": "campaign",
+    "subject": "Time to reorder, {firstName}?",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Running low?</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">If you are getting close to the end, now is a good time to restock.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Reorder now</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/replenishment",
+    "channel": "sms",
+    "name": "Replenishment Reminder",
+    "category": "campaign",
+    "body": "Running low on {items}? Reorder in a tap.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/subscription_renewal",
+    "channel": "email",
+    "name": "Subscription Renewal Reminder",
+    "category": "campaign",
+    "subject": "Your subscription renews soon, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">A heads-up on your subscription</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Your subscription is coming up for renewal. No action needed unless you want to make a change.</p>{itemsHtml}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Manage subscription</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/subscription_renewal",
+    "channel": "sms",
+    "name": "Subscription Renewal Reminder",
+    "category": "campaign",
+    "body": "Running low on {items}? Reorder in a tap.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/loyalty_tier_upgrade",
+    "channel": "email",
+    "name": "Loyalty Tier Upgrade",
+    "category": "campaign",
+    "subject": "You reached {tier}, {firstName}!",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Welcome to {tier}</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">You now have {points} points. Enjoy your new perks{#if couponCode} — starting with this{/if}.</p>{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">See your perks</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/loyalty_tier_upgrade",
+    "channel": "sms",
+    "name": "Loyalty Tier Upgrade",
+    "category": "campaign",
+    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/loyalty_points_reminder",
+    "channel": "email",
+    "name": "Loyalty Points Reminder",
+    "category": "campaign",
+    "subject": "You have {points} points waiting, {firstName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Your points are ready to spend</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">You have {points} points — turn them into a coupon worth up to ₹{pointsWorth} off your next order.</p><p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Redeem your points</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/loyalty_points_reminder",
+    "channel": "sms",
+    "name": "Loyalty Points Reminder",
+    "category": "campaign",
+    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/referral_invite",
+    "channel": "email",
+    "name": "Referral Invite",
+    "category": "campaign",
+    "subject": "Refer a friend, earn {rewardPoints} points",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Know someone who would love us?</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Share your personal link. When a friend signs up with it and their first order is delivered, you get {rewardPoints} points.</p><p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:15px;color:#1a3a4a;font-weight:700;word-break:break-all;\">{shareUrl}</p><p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Share your link</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/referral_invite",
+    "channel": "sms",
+    "name": "Referral Invite",
+    "category": "campaign",
+    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/birthday",
+    "channel": "email",
+    "name": "Birthday",
+    "category": "campaign",
+    "subject": "Happy birthday, {firstName}!",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Happy birthday from all of us</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">We hope your day is a great one.{#if discountPercent} Celebrate with a little gift from us — {discountPercent}% off your next order.{/if}</p>{#if couponCode}<p style=\"background:#fff7ed;border:1px dashed #e07b3f;border-radius:6px;padding:14px 20px;text-align:center;margin:0 0 16px;font-family:ui-monospace,monospace;font-size:18px;color:#1a3a4a;font-weight:700;letter-spacing:1px;\">{couponCode}</p>{/if}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Claim your gift</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "campaign/birthday",
+    "channel": "sms",
+    "name": "Birthday",
+    "category": "campaign",
+    "body": "{headline}{#if couponCode} — use code {couponCode}{/if}.",
+    "blocks_format": "sms-text"
+  },
+  {
+    "slug": "campaign/birthday_collect",
+    "channel": "email",
+    "name": "Birthday Collection",
+    "category": "campaign",
+    "subject": "When's your birthday, {firstName}?",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:22px;color:#1a3a4a;margin:0 0 12px;\">Let us celebrate with you</h2><p style=\"color:#555;line-height:1.6;margin:0 0 12px;\">Tell us your birthday and we will send you a treat every year. It takes one tap, and no sign-in is needed.</p><p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Add my birthday</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "starter/classic",
+    "channel": "email",
+    "name": "Classic starter",
+    "category": "starter",
+    "subject": "{store_name}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 14px;\">Hi {firstName},</p>\n<p style=\"font-size:15px;color:#333;line-height:1.6;margin:0 0 16px;\">We thought you'd want to see this. Take a look and let us know what you think.</p>\n{itemsHtml}\n<div style=\"text-align:center;margin:24px 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;\">Visit the store</a></div>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "starter/bold",
+    "channel": "email",
+    "name": "Bold starter",
+    "category": "starter",
+    "subject": "{store_name}",
+    "body": "<h2 style=\"margin:0 0 12px;\">Hey {firstName} — don't miss this.</h2>\n<p style=\"font-size:15px;color:#333;line-height:1.6;margin:0 0 16px;\">Big things are happening. Here's what's new for you.</p>\n{itemsHtml}\n<div style=\"margin:24px 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#111827;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:700;\">Check it out</a></div>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "starter/minimal",
+    "channel": "email",
+    "name": "Minimal starter",
+    "category": "starter",
+    "subject": "{store_name}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 14px;\">Hi {firstName},</p>\n<p style=\"font-size:15px;color:#333;line-height:1.7;margin:0 0 20px;\">A quick note from us. We'd love for you to take a look.</p>\n{itemsHtml}\n<p style=\"margin:20px 0;\"><a href=\"{ctaUrl}\" style=\"color:#374151;font-weight:600;\">Visit the store →</a></p>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "starter/promo",
+    "channel": "email",
+    "name": "Promo / Sale starter",
+    "category": "starter",
+    "subject": "{store_name}",
+    "body": "<h2 style=\"margin:0 0 10px;text-align:center;\">A special offer for you, {firstName} 🎉</h2>\n<p style=\"font-size:15px;color:#333;line-height:1.6;margin:0 0 16px;text-align:center;\">Use code <strong>{couponCode}</strong> for <strong>{discountPercent}% off</strong> — for a limited time.</p>\n{itemsHtml}\n<div style=\"text-align:center;margin:24px 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#fff;text-decoration:none;padding:12px 30px;border-radius:6px;font-weight:700;\">Shop the sale</a></div>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "starter/festive",
+    "channel": "email",
+    "name": "Festive starter",
+    "category": "starter",
+    "subject": "{store_name}",
+    "body": "<h2 style=\"margin:0 0 10px;text-align:center;\">Season's greetings, {firstName}! ✨</h2>\n<p style=\"font-size:15px;color:#333;line-height:1.6;margin:0 0 16px;text-align:center;\">Celebrate with something special, picked just for you.</p>\n{itemsHtml}\n<div style=\"text-align:center;margin:24px 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#b91c1c;color:#fff;text-decoration:none;padding:12px 30px;border-radius:6px;font-weight:700;\">Explore the collection</a></div>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "starter/fresh",
+    "channel": "email",
+    "name": "Fresh starter",
+    "category": "starter",
+    "subject": "{store_name}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 14px;\">Good news, {firstName}!</p>\n<p style=\"font-size:15px;color:#333;line-height:1.6;margin:0 0 16px;\">It's back — and we saved you a look. Grab it before it's gone again.</p>\n{itemsHtml}\n<div style=\"text-align:center;margin:24px 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#059669;color:#fff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;\">See what's back</a></div>",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "messaging/promotion",
+    "name": "Promotion",
+    "subject": "{headline}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:24px;color:#1a3a4a;margin:0 0 16px;\">{headline}</h2><p style=\"color:#555;line-height:1.6;margin:0 0 20px;\">{body}</p>{#if ctaUrl}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">{ctaText}</a></p>{/if}",
+    "channel": "email",
+    "category": "messaging",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "messaging/announcement",
+    "name": "Announcement",
+    "subject": "{headline}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:24px;color:#1a3a4a;margin:0 0 16px;\">{headline}</h2><p style=\"color:#555;line-height:1.6;margin:0 0 20px;\">{body}</p><p style=\"margin:20px 0 0;\"><a href=\"{store_web}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Visit our store</a></p>",
+    "channel": "email",
+    "category": "messaging",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "messaging/event",
+    "name": "Event invitation",
+    "subject": "You're invited: {eventName}",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:24px;color:#1a3a4a;margin:0 0 16px;\">{eventName}</h2>{#if eventDate}<p style=\"color:#e07b3f;font-weight:600;margin:0 0 16px;\">{eventDate}</p>{/if}<p style=\"color:#555;line-height:1.6;margin:0 0 20px;\">{eventDetails}</p>{#if ctaUrl}<p style=\"margin:20px 0 0;\"><a href=\"{ctaUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Learn more</a></p>{/if}",
+    "channel": "email",
+    "category": "messaging",
+    "blocks_format": "tiptap-html"
+  },
+  {
+    "slug": "messaging/review-form-share",
+    "name": "Review form share",
+    "subject": "Share your experience — get a reward!",
+    "body": "<p style=\"font-size:16px;color:#333;margin:0 0 12px;\">Hi {firstName},</p><h2 style=\"font-size:24px;color:#1a3a4a;margin:0 0 16px;\">{formTitle}</h2><p style=\"color:#555;line-height:1.6;margin:0 0 20px;\">We'd love to hear what you think! Leave us a review and we'll send you a special discount as a thank-you.</p><p style=\"margin:20px 0 0;\"><a href=\"{formUrl}\" style=\"display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;\">Leave a review & claim reward</a></p>",
+    "channel": "email",
+    "category": "messaging",
+    "blocks_format": "tiptap-html"
+  }
+]

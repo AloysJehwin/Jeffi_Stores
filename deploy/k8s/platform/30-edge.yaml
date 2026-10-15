@@ -1,0 +1,70 @@
+# mTLS: admin. and k8s. require a cert from the platform CA; admin-{slug} requests one from any
+# tenant CA in client-ca-bundle and the app verifies the chain per tenant (tenant-mtls.ts).
+# Secrets platform-ca (ca.crt) and client-ca-bundle (ca.crt) are created by bootstrap/secrets.sh
+# and client-ca-bundle is patched by the app (mtls-fleet) when a tenant CA is issued.
+apiVersion: traefik.io/v1alpha1
+kind: TLSOption
+metadata: { name: default, namespace: jeffi-edge }
+spec:
+  minVersion: VersionTLS12
+---
+apiVersion: traefik.io/v1alpha1
+kind: TLSOption
+metadata: { name: platform-mtls, namespace: jeffi-edge }
+spec:
+  minVersion: VersionTLS12
+  clientAuth:
+    secretNames: [platform-ca]
+    clientAuthType: RequireAndVerifyClientCert
+---
+apiVersion: traefik.io/v1alpha1
+kind: TLSOption
+metadata: { name: tenant-mtls, namespace: jeffi-edge }
+spec:
+  minVersion: VersionTLS12
+  clientAuth:
+    secretNames: [client-ca-bundle]
+    clientAuthType: RequestClientCert
+---
+# Blank any client-supplied cert headers first so only Traefik's own values reach the app.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: strip-client-cert, namespace: jeffi-edge }
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Tls-Client-Cert: ''
+      X-Forwarded-Tls-Client-Cert-Info: ''
+      X-Client-Cert: ''
+      X-Client-Cert-Serial: ''
+      X-Client-Cert-Cn: ''
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: pass-client-cert, namespace: jeffi-edge }
+spec:
+  passTLSClientCert:
+    pem: true
+    info:
+      serialNumber: true
+      subject: { commonName: true }
+      issuer: { commonName: true }
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata: { name: https-redirect, namespace: jeffi-edge }
+spec:
+  redirectScheme: { scheme: https, permanent: true }
+---
+# Any other host on :80 → https (CloudFront's apex/www HTTP origin route has higher priority).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: http-to-https, namespace: jeffi-edge }
+spec:
+  entryPoints: [web]
+  routes:
+    - match: HostRegexp(`.+`)
+      priority: 1
+      kind: Rule
+      middlewares: [{ name: https-redirect }]
+      services: [{ name: noop@internal, kind: TraefikService }]

@@ -8,9 +8,13 @@ vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/shared/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }),
+  resolveRequestTenant: vi.fn().mockResolvedValue(null),
 }))
 vi.mock('@/lib/orders/order-stock', () => ({
   restoreOrderStock: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/payments/razorpay', () => ({
+  cancelInvoicePaymentArtifacts: vi.fn().mockResolvedValue({ paymentLink: 'none', qr: 'none' }),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -20,6 +24,7 @@ import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne } from '@/lib/shared/db'
 import { restoreOrderStock } from '@/lib/orders/order-stock'
+import { cancelInvoicePaymentArtifacts } from '@/lib/payments/razorpay'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -123,5 +128,33 @@ describe('POST /api/admin/orders/[id]/cancel', () => {
     const res = await POST(makePost(), PARAMS)
     expect(res.status).toBe(500)
     expect(await res.json()).toMatchObject({ error: 'unexpected db failure' })
+  })
+
+  it('cancels the Razorpay payment link + QR when the invoice has them', async () => {
+    vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(true)
+    vi.mocked(queryOne).mockResolvedValue({
+      ...OFFLINE_ORDER,
+      payment_link_id: 'plink_1',
+      payment_link_status: 'created',
+      razorpay_qr_id: 'qr_1',
+    } as any)
+    vi.mocked(cancelInvoicePaymentArtifacts).mockResolvedValue({ paymentLink: 'cancelled', qr: 'closed' })
+
+    const res = await POST(makePost(), PARAMS)
+    expect(res.status).toBe(200)
+    expect(cancelInvoicePaymentArtifacts).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentLinkId: 'plink_1', paymentLinkStatus: 'created', qrId: 'qr_1' })
+    )
+  })
+
+  it('does not touch Razorpay when the invoice has no link/QR', async () => {
+    vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(true)
+    vi.mocked(queryOne).mockResolvedValue(OFFLINE_ORDER as any)
+
+    const res = await POST(makePost(), PARAMS)
+    expect(res.status).toBe(200)
+    expect(cancelInvoicePaymentArtifacts).not.toHaveBeenCalled()
   })
 })

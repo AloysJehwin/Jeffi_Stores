@@ -217,6 +217,40 @@ describe('canSendMarketing', () => {
     expect(r.reason).toBe('frequency_cap')
   })
 
+  it('windows the frequency cap by the campaign cooldown when one is set (minute-exact)', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ email: 'u@e.com', is_active: true, marketing_opt_out: false })
+      .mockResolvedValueOnce({ kind: 'winback_90', enabled: true, parameters: { sendCooldown: 1 } })
+      .mockResolvedValueOnce({ cnt: '0' })
+    const r = await canSendMarketing('user-1', 'winback_90')
+    expect(r.ok).toBe(true)
+    // The recent-send query (3rd queryOne call) uses the campaign's 1-minute window, not 72h.
+    const recentSql = String(mockQueryOne.mock.calls[2][0])
+    expect(recentSql).toContain('minutes')
+    expect(recentSql).toContain('1::text')
+  })
+
+  it('falls back to the 72h floor when the campaign sets no cooldown', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ email: 'u@e.com', is_active: true, marketing_opt_out: false })
+      .mockResolvedValueOnce({ kind: 'winback_90', enabled: true }) // no parameters
+      .mockResolvedValueOnce({ cnt: '0' })
+    await canSendMarketing('user-1', 'winback_90')
+    const recentSql = String(mockQueryOne.mock.calls[2][0])
+    expect(recentSql).toContain('4320::text') // hours(72) in minutes
+    expect(recentSql).toContain('minutes')
+  })
+
+  it('counts only channel=email rows in the frequency cap (ignores whatsapp/sms markers)', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ email: 'u@e.com', is_active: true, marketing_opt_out: false })
+      .mockResolvedValueOnce({ kind: 'winback_90', enabled: true })
+      .mockResolvedValueOnce({ cnt: '0' })
+    await canSendMarketing('user-1', 'winback_90')
+    const recentSql = String(mockQueryOne.mock.calls[2][0])
+    expect(recentSql).toContain("channel = 'email'")
+  })
+
   it('returns ok:true when all checks pass', async () => {
     mockQueryOne
       .mockResolvedValueOnce({ email: 'u@e.com', is_active: true, marketing_opt_out: false })
@@ -267,13 +301,14 @@ describe('alreadySentForReference', () => {
     expect(sql).not.toContain('sent_at > NOW()')
   })
 
-  // #campaign: a recurring campaign passes its cooldown so the SAME reference re-qualifies after the
-  // window — fixing abandoned_cart day-2 never sending.
-  it('windows a non-null reference by cooldownDays when provided (recurring resend)', async () => {
+  // #campaign: a recurring campaign passes its cooldown (MINUTES) so the SAME reference re-qualifies
+  // after the window — fixing abandoned_cart never resending, and honoring sub-day cooldowns exactly.
+  it('windows a non-null reference by cooldown MINUTES when provided (recurring resend)', async () => {
     mockQueryOne.mockResolvedValue(null)
-    await alreadySentForReference('abandoned_cart', 'user-2', 'seq1', 1)
+    await alreadySentForReference('abandoned_cart', 'user-2', 'seq1', 90)
     const [sql] = mockQueryOne.mock.calls[0]
-    expect(sql).toContain('days')
+    expect(sql).toContain('minutes')
+    expect(sql).not.toContain(' days')
     expect(sql).toContain('sent_at > NOW()')
   })
 })
@@ -285,6 +320,11 @@ describe('recordSent', () => {
     mockQuery.mockResolvedValue({ rows: [{ id: 'sent-abc' }], rowCount: 1 } as any)
     const id = await recordSent({ campaignKind: 'winback_90', userId: 'user-1' })
     expect(id).toBe('sent-abc')
+    // Upserts (refresh sent_at) instead of failing on the permanent dedup index — a recurring
+    // reference must re-record after its cooldown, else the send is blocked forever ("Sent 0").
+    const sql = String(mockQuery.mock.calls[0][0])
+    expect(sql).toContain('ON CONFLICT')
+    expect(sql).toContain('DO UPDATE SET sent_at = now()')
   })
 
   it('calls send_count upsert when sentId is non-null', async () => {

@@ -3,10 +3,14 @@
 // in cloud, the same keys point at managed endpoints. The app never sees any of this.
 
 export const CONFIG = {
-  ollamaBaseUrl: (process.env.OLLAMA_BASE_URL || 'http://ollama:11434').replace(/\/$/, ''),
+  // Tried in order; the first healthy one is used (see providers/ollama-pool.ts).
+  ollamaBaseUrls: parseUrls(process.env.OLLAMA_BASE_URLS || process.env.OLLAMA_BASE_URL || 'http://ollama:11434'),
+  ollamaProbeIntervalMs: Number(process.env.OLLAMA_PROBE_INTERVAL_MS) || 15_000,
   paddleOcrUrl: (process.env.PADDLE_OCR_URL || 'http://paddleocr:8866').replace(/\/$/, ''),
   ollamaHealthTimeoutMs: Number(process.env.OLLAMA_HEALTH_TIMEOUT_MS) || 2_000,
   ollamaRequestTimeoutMs: Number(process.env.OLLAMA_REQUEST_TIMEOUT_MS) || 120_000,
+  // How long an HTTP handler waits for its queued job before giving up (the app times out at 130s).
+  jobWaitTimeoutMs: Number(process.env.AI_JOB_WAIT_TIMEOUT_MS) || 135_000,
 
   redisUrl: process.env.REDIS_URL || 'redis://redis:6379',
 
@@ -20,6 +24,11 @@ export const CONFIG = {
   // OpenAI escape hatch (only when a request forces it) — parity with the old client.
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+}
+
+export function parseUrls(raw: string): string[] {
+  const urls = raw.split(',').map(u => u.trim().replace(/\/$/, '')).filter(Boolean)
+  return [...new Set(urls)]
 }
 
 import type { ModelHint } from '../../sdk/types'

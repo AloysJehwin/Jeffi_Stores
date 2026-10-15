@@ -95,12 +95,12 @@ describe('uploadProductImage', () => {
 
   it('throws on invalid file type', async () => {
     const file = makeFile('application/pdf')
-    await expect(uploadProductImage(file, 'prod-1')).rejects.toThrow('Invalid file type')
+    await expect(uploadProductImage(file, 'prod-1')).rejects.toThrow('Unsupported image type')
   })
 
   it('throws when file exceeds 5MB', async () => {
     const file = makeFile('image/jpeg', 6 * 1024 * 1024)
-    await expect(uploadProductImage(file, 'prod-1')).rejects.toThrow('File size exceeds 5MB')
+    await expect(uploadProductImage(file, 'prod-1')).rejects.toThrow('the limit is 5 MB')
   })
 
   it('uploads successfully for valid jpeg', async () => {

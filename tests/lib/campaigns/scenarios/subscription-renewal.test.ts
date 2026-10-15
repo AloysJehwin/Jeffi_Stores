@@ -119,7 +119,7 @@ describe('subscriptionRenewal scenario', () => {
       expect(kind).toBe('subscription_renewal')
       expect(userId).toBe('u1')
       expect(vars.items).toBe('Monthly Box')
-      expect(cd).toBe(14)
+      expect(cd).toBe(days(14))
     })
 
     it('returns no_user when the user is gone', async () => {

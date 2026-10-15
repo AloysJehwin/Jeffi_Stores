@@ -27,7 +27,15 @@ const mockSendWa = sendCampaignWhatsApp as ReturnType<typeof vi.fn>
 const mockCode = getOrCreateReferralCode as ReturnType<typeof vi.fn>
 const mockLive = isReferralLive as ReturnType<typeof vi.fn>
 
-const campaign = { kind: 'referral_invite', enabled: true, name: 'Referral', coupon_id: null, discount_percent: 0, delay_hours: 0, parameters: {} } as any
+const campaign = {
+  kind: 'referral_invite',
+  enabled: true,
+  name: 'Referral',
+  coupon_id: null,
+  discount_percent: 0,
+  delay_hours: 0,
+  parameters: {},
+} as any
 const defaultParams = referralInvite.defaultParams
 
 describe('referralInvite scenario', () => {
@@ -36,7 +44,12 @@ describe('referralInvite scenario', () => {
     mockLive.mockResolvedValue(true)
     mockQueryMany.mockResolvedValue([])
     mockCode.mockResolvedValue('SAM7K2QX')
-    vi.mocked(getReferralSettings).mockResolvedValue({ enabled: true, rewardPoints: 100, yearlyCap: 10, qualifyDays: 90 })
+    vi.mocked(getReferralSettings).mockResolvedValue({
+      enabled: true,
+      rewardPoints: 100,
+      yearlyCap: 10,
+      qualifyDays: 90,
+    })
   })
 
   it('has kind referral_invite', () => {
@@ -120,7 +133,7 @@ describe('referralInvite scenario', () => {
         code: '',
         discount: '',
       })
-      expect(cooldown).toBe(1)
+      expect(cooldown).toBe(days(1))
     })
   })
 })

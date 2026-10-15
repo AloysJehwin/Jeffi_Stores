@@ -1,5 +1,9 @@
 # Self-Managed Kubernetes Plan
 
+> **SUPERSEDED (2026-10-08)** by [`K8S_MIGRATION_PLAN.md`](K8S_MIGRATION_PLAN.md): every tenant now gets its own pods
+> (Basic on a shared pool node), observability (Coroot + Headlamp) runs on EC2, and the AI platform stays on
+> the Razer with only its monitoring on EC2. Keep this file for design rationale only.
+
 _Last updated: 2026-09-24_
 
 > **Status: plan only. Nothing here is provisioned or implemented.** This document records the
@@ -20,7 +24,7 @@ _Last updated: 2026-09-24_
 | Data | RDS Postgres 16 (`jeffi-stores-db`, `db.t4g.small`) holds the platform DB and `jeffi_control_plane`. The provisioning engine creates a private `db.t4g.micro` per tenant, an S3 bucket per tenant and explicit Route53 records per tenant host. |
 | Secrets | Loaded at container boot from Secrets Manager `jeffi/production` through the instance profile. Platform CA, RDS bundle and the Google service account live on local disk under `certs/`. |
 | Tenant compute | Basic plans share one pool EC2 that scales vertically by instance type (`pool-autoscale.ts`). Growth and above get a dedicated EC2 launched from a flagship AMI (`ensure_compute`). The client-CA bundle reaches the fleet through S3 plus SSM shell commands (`mtls-fleet.ts`). |
-| Scheduling | In-process cron (`src/instrumentation.ts`) with Redis locks. An EventBridge schedule still stops the flagship EC2 and RDS nightly. |
+| Scheduling | In-process cron (`controller-service/src/instrumentation.ts`) with Redis locks. An EventBridge schedule still stops the flagship EC2 and RDS nightly. |
 | Observability | `/api/health` (liveness) and `/api/ready` (DB + Redis). No metrics, logs or traffic visibility. |
 
 Gaps the cluster must fix rather than inherit:
@@ -70,7 +74,7 @@ unchanged.
 - External Secrets Operator syncs `jeffi/production` into a Secret consumed as env. Platform CA,
   RDS bundle and the Google service account are Secrets mounted at the paths the code reads.
 - Cron: keep the in-process scheduler at first (locks are now global); migrate the registry in
-  `src/lib/cron-jobs.ts` to CronJobs later.
+  `controller-service/src/lib/cron-jobs.ts` to CronJobs later.
 
 **Egress.** Nodes in private subnets behind one NAT gateway give a fixed outbound IP for Razorpay,
 Delhivery, Google and Amazon. Public nodes are the cheaper alternative with a changing outbound IP.

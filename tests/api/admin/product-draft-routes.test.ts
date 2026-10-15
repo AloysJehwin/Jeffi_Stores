@@ -11,7 +11,17 @@ vi.mock('@/lib/shared/db', () => ({
   query: (...a: any[]) => mockQuery(...a),
   queryOne: (...a: any[]) => mockQueryOne(...a),
   queryMany: (...a: any[]) => mockQueryMany(...a),
-  withTransaction: vi.fn(),
+  // Locked reads come from queryOne/queryMany mocks, writes from query — same as the pool helpers.
+  withTransaction: vi.fn(async (fn: any) =>
+    fn({
+      query: async (sql: string, p?: unknown[]) =>
+        /FOR UPDATE/.test(sql)
+          ? { rows: [await mockQueryOne(sql, p)].filter(Boolean) }
+          : /^SELECT/.test(sql.trim())
+            ? { rows: (await mockQueryMany(sql, p)) ?? [] }
+            : ((await mockQuery(sql, p)) ?? { rows: [] }),
+    })
+  ),
 }))
 
 import { authenticateAdmin } from '@/lib/auth/jwt'
@@ -153,7 +163,8 @@ describe('products draft sub-variants route', () => {
   })
 
   it('POST adds sub-variant to draft', async () => {
-    mockQueryOne.mockResolvedValueOnce({ sub_variants: [] })
+    mockQueryOne.mockResolvedValueOnce({ is_digital: false }) // digital guard
+    mockQueryOne.mockResolvedValueOnce({ sub_variants: [] }) // locked draft read
     // Variant is untouched → ensureVariantSeeded reads the live sub-variant set
     // (complete-snapshot seeding). No live rows here, so nothing is seeded.
     mockQueryMany.mockResolvedValueOnce([])
@@ -162,6 +173,40 @@ describe('products draft sub-variants route', () => {
     const res = await svPost(r, { params: idParams })
     const data = await res.json()
     expect(data.sub_variant).toBeDefined()
+  })
+
+  it('POST rejects a sub-variant without a name', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_digital: false })
+    const r = reqWithParams('POST', { variant_id: 'v-1' }, { price: 100 })
+    const res = await svPost(r, { params: idParams })
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/sub_variant_name/)
+  })
+
+  it('POST rejects a price above MRP', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_digital: false })
+    const r = reqWithParams('POST', { variant_id: 'v-1' }, { sub_variant_name: 'Red', price: 200, mrp: 100 })
+    const res = await svPost(r, { params: idParams })
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/cannot be higher than MRP/)
+  })
+
+  it('POST rejects a duplicate sub-variant name for the variant', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_digital: false })
+    mockQueryOne.mockResolvedValueOnce({ sub_variants: [{ id: 'sv-1', variant_id: 'v-1', sub_variant_name: 'Red' }] })
+    const r = reqWithParams('POST', { variant_id: 'v-1' }, { sub_variant_name: ' red ' })
+    const res = await svPost(r, { params: idParams })
+    expect(res.status).toBe(409)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('POST returns 404 when the draft row is missing', async () => {
+    mockQueryOne.mockResolvedValueOnce({ is_digital: false })
+    mockQueryOne.mockResolvedValueOnce(null)
+    mockQueryMany.mockResolvedValueOnce([])
+    const r = reqWithParams('POST', { variant_id: 'v-1' }, { sub_variant_name: 'Red' })
+    const res = await svPost(r, { params: idParams })
+    expect(res.status).toBe(404)
   })
 
   it('DELETE removes sub-variant from draft', async () => {

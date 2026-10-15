@@ -1,0 +1,304 @@
+'use client'
+
+import { useState } from 'react'
+import { useHasScope } from '@/contexts/AdminScopesContext'
+import Link from 'next/link'
+import HoverCard from '@/components/ui/HoverCard'
+import OrderDetailModal from '@/components/admin/OrderDetailModal'
+import RowActions from '@/components/admin/RowActions'
+import { ap } from '@/lib/shared/admin-path'
+import SubscriptionOrderBadge from '@/components/admin/SubscriptionOrderBadge'
+
+function statusBadgeClass(status: string) {
+  if (status === 'delivered' || status === 'granted')
+    return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+  if (status === 'processing' || status === 'shipped')
+    return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+  if (status === 'out_for_delivery') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
+  if (status === 'cancelled') return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+  if (status === 'cancel_requested') return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
+  return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+}
+
+function paymentBadgeClass(status: string) {
+  if (status === 'paid') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+  if (status === 'pending') return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+  return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+}
+
+function statusLabel(status: string) {
+  if (status === 'granted') return 'Access granted'
+  if (status === 'cancel_requested') return 'Cancel Requested'
+  if (status === 'out_for_delivery') return 'Out for Delivery'
+  return status.replace(/_/g, ' ')
+}
+
+function CustomerPopover({ order }: { order: any }) {
+  const name = order.users
+    ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest'
+    : order.customer_name || 'Guest'
+  const email = order.users?.email || order.billing_email
+  const phone = order.users?.phone || order.billing_address?.phone
+
+  return (
+    <HoverCard
+      trigger={
+        <span
+          className="cursor-default underline decoration-dotted underline-offset-2 text-foreground hover:text-accent-500 transition-colors"
+          onClick={e => e.stopPropagation()}
+        >
+          {name}
+        </span>
+      }
+      align="left"
+      side="bottom"
+      width="260px"
+    >
+      <div className="p-3 space-y-2">
+        <p className="font-semibold text-foreground text-sm">{name}</p>
+        {email && (
+          <div className="flex items-center gap-2 text-xs text-foreground-secondary">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+            <a href={`mailto:${email}`} className="hover:text-accent-500 truncate">
+              {email}
+            </a>
+          </div>
+        )}
+        {phone && (
+          <div className="flex items-center gap-2 text-xs text-foreground-secondary">
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.948V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+              />
+            </svg>
+            <span>{phone}</span>
+          </div>
+        )}
+        {order.users?.id && (
+          <div className="pt-1 border-t border-border-default">
+            <Link
+              href={ap(`/admin/customers/${order.users.id}/view`)}
+              className="text-xs text-accent-500 hover:text-accent-600 font-medium"
+            >
+              View customer profile →
+            </Link>
+          </div>
+        )}
+      </div>
+    </HoverCard>
+  )
+}
+
+export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: { orders: any[]; backUrl?: string }) {
+  const canPackingSlips = useHasScope('packing_slips:read')
+  const [selected, setSelected] = useState<any>(null)
+
+  if (!orders.length) {
+    return (
+      <tr>
+        <td colSpan={9} className="px-6 py-12 text-center text-foreground-muted">
+          No orders found.
+        </td>
+      </tr>
+    )
+  }
+
+  return (
+    <>
+      <OrderDetailModal order={selected} onClose={() => setSelected(null)} />
+      {orders.map((order: any) => (
+        <tr key={order.id} className="hover:bg-surface-secondary cursor-pointer" onClick={() => setSelected(order)}>
+          <td className="px-6 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+            <HoverCard
+              trigger={
+                <a
+                  href={ap(`/admin/orders/${order.id}/view?back=${encodeURIComponent(backUrl)}`)}
+                  className="font-mono font-semibold text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                  onClick={e => e.stopPropagation()}
+                >
+                  #{order.order_number || order.id.slice(0, 8)}
+                </a>
+              }
+              align="left"
+              side="bottom"
+              width="260px"
+            >
+              <div className="p-3 space-y-2">
+                <p className="font-mono font-semibold text-foreground text-sm">
+                  #{order.order_number || order.id.slice(0, 8)}
+                </p>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                  <span className="text-foreground-muted">Customer</span>
+                  <span className="text-foreground font-medium truncate">
+                    {order.users
+                      ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() ||
+                        order.customer_name ||
+                        'Guest'
+                      : order.customer_name || 'Guest'}
+                  </span>
+                  <span className="text-foreground-muted">Date</span>
+                  <span className="text-foreground">
+                    {new Date(order.created_at).toLocaleDateString('en-IN', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })}
+                  </span>
+                  <span className="text-foreground-muted">Total</span>
+                  <span className="text-foreground font-semibold">
+                    ₹
+                    {Number(order.total_amount).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
+                  </span>
+                  <span className="text-foreground-muted">Payment</span>
+                  <span
+                    className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : order.payment_status === 'pending' ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}
+                  >
+                    {order.payment_status}
+                  </span>
+                  <span className="text-foreground-muted">Source</span>
+                  <span className="text-foreground">
+                    {order.source === 'online'
+                      ? 'Online'
+                      : order.source === 'business'
+                        ? 'Business'
+                        : order.source === 'cash_sale'
+                          ? 'Cash Sale'
+                          : 'Offline'}
+                  </span>
+                </div>
+              </div>
+            </HoverCard>
+            <SubscriptionOrderBadge
+              subscriptionId={order.subscription_id}
+              cycle={order.subscription_cycle}
+              className="ml-2"
+            />
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <span
+              className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                order.source === 'online'
+                  ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                  : order.source === 'business'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                    : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+              }`}
+            >
+              {order.source === 'online'
+                ? 'Online'
+                : order.source === 'business'
+                  ? 'Business'
+                  : order.source === 'cash_sale'
+                    ? 'Cash Sale'
+                    : 'Offline'}
+            </span>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <div>
+              <CustomerPopover order={order} />
+              <div className="text-xs text-foreground-muted mt-0.5">{order.users?.email || order.billing_email}</div>
+            </div>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <div>
+              <div className="text-sm text-foreground">{new Date(order.created_at).toLocaleDateString('en-IN')}</div>
+              <div className="text-xs text-foreground-muted">
+                {new Date(order.created_at).toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  timeZone: 'Asia/Kolkata',
+                })}
+              </div>
+            </div>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            {order.estimated_delivery_date ? (
+              <span className="text-sm text-foreground">
+                {new Date(order.estimated_delivery_date).toLocaleDateString('en-IN', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric',
+                })}
+              </span>
+            ) : (
+              <span className="text-sm text-foreground-muted">--</span>
+            )}
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <span className="text-sm font-medium text-foreground">
+              Rs.{' '}
+              {Number(order.total_amount).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
+            </span>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <span
+              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${paymentBadgeClass(order.payment_status)}`}
+            >
+              {order.payment_status}
+            </span>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <span
+              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusBadgeClass(order.status)}`}
+            >
+              {statusLabel(order.status)}
+            </span>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
+            <RowActions
+              size="sm"
+              actions={[
+                {
+                  key: 'packing-slip',
+                  kind: 'print',
+                  label: 'Packing Slip',
+                  href: `/api/admin/packing-slips/${order.id}`,
+                  target: '_blank',
+                  hidden: !canPackingSlips,
+                },
+                {
+                  key: 'shipping-label',
+                  kind: 'print',
+                  label: 'Shipping Label',
+                  href: `/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`,
+                  target: '_blank',
+                  hidden: !order.awb_number,
+                },
+                {
+                  key: 'invoice',
+                  kind: 'document',
+                  label: 'Invoice PDF',
+                  href: `/api/orders/${order.id}/invoice`,
+                  target: '_blank',
+                  hidden: !order.invoice_number,
+                },
+                {
+                  key: 'view',
+                  kind: 'view',
+                  label: 'View Details',
+                  href: ap(`/admin/orders/${order.id}/view?back=${encodeURIComponent(backUrl)}`),
+                },
+              ]}
+            />
+          </td>
+        </tr>
+      ))}
+    </>
+  )
+}

@@ -1,0 +1,9 @@
+# The images every tenant namespace runs, per service. rollout.sh sets them before rolling tenants
+# (tenant-compute.releaseImage reads them for newly provisioned stores).
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: release, namespace: jeffi }
+data:
+  controller: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:set-by-rollout
+  messaging: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-messaging-service:set-by-rollout
+  documents: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-document-service:set-by-rollout

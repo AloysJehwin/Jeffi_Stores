@@ -27,7 +27,7 @@ function makePost(body: object, headers: Record<string, string> = {}) {
   })
 }
 
-const VALID_BODY = { sessionId: 'sess-1', page: 'Home', path: '/' }
+const VALID_BODY = { sessionId: 'sess-1', page: 'home', path: '/' }
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -36,7 +36,7 @@ beforeEach(() => {
 
 describe('POST /api/track', () => {
   it('returns 400 when sessionId is missing', async () => {
-    const res = await POST(makePost({ page: 'Home', path: '/' }) as any)
+    const res = await POST(makePost({ page: 'home', path: '/' }) as any)
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.ok).toBe(false)
@@ -48,7 +48,7 @@ describe('POST /api/track', () => {
   })
 
   it('returns 400 when path is missing', async () => {
-    const res = await POST(makePost({ sessionId: 'sess-1', page: 'Home' }) as any)
+    const res = await POST(makePost({ sessionId: 'sess-1', page: 'home' }) as any)
     expect(res.status).toBe(400)
   })
 
@@ -61,7 +61,7 @@ describe('POST /api/track', () => {
     expect(body.ok).toBe(true)
     expect(db.query).toHaveBeenCalledWith(
       expect.stringContaining('INSERT INTO page_events'),
-      expect.arrayContaining(['sess-1', null, 'Home', '/'])
+      expect.arrayContaining(['sess-1', null, 'home', '/'])
     )
   })
 
@@ -92,5 +92,9 @@ describe('POST /api/track', () => {
     expect(res.status).toBe(500)
     const body = await res.json()
     expect(body.ok).toBe(false)
+  })
+  it('rejects a URL sent as the page type with 400 instead of a db error', async () => {
+    const res = await POST(makePost({ sessionId: 'sess-1', page: '/products/unbrako-hex-bolt-metric-10-9-m20', path: '/products/x' }) as any)
+    expect(res.status).toBe(400)
   })
 })

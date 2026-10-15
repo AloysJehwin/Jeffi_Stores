@@ -651,6 +651,19 @@ CREATE TABLE public.product_offer_items (
 
 
 --
+-- Name: offer_drafts; Type: TABLE; Schema: public; Owner: -
+-- Draft layer for admin offers editor. Autosave writes here; Publish promotes
+-- to product_offers + product_offer_items in one transaction.
+
+CREATE TABLE public.offer_drafts (
+    offer_id uuid NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    products jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: homepage_sections; Type: TABLE; Schema: public; Owner: -
 --
 

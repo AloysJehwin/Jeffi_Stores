@@ -3,17 +3,25 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
-vi.mock('@/lib/shared/marketing', () => ({
+vi.mock('@/lib/shared/marketing', async orig => ({
+  ...(await orig<any>()),
   canSendMarketing: vi.fn(),
   alreadySentForReference: vi.fn().mockResolvedValue(false),
   recordSent: vi.fn().mockResolvedValue('sent-1'),
+  buildClickTrackingUrl: (sentId: string, url: string, base: string) =>
+    `${base}/api/email-events/click?id=${sentId}&url=${encodeURIComponent(url)}`,
 }))
+vi.mock('@/lib/shared/customer-links', () => ({ apiBaseUrl: vi.fn().mockResolvedValue('https://api.test') }))
 vi.mock('@/lib/shared/whatsapp', () => ({
   sendAbandonedCartWhatsApp: vi.fn(),
   sendBackInStockWhatsApp: vi.fn(),
   sendPromoOfferWhatsApp: vi.fn(),
   sendFeedbackRequestWhatsApp: vi.fn(),
 }))
+vi.mock('@/lib/messaging/library', () => ({ getLibraryTemplate: vi.fn() }))
+vi.mock('@/lib/shared/send-by-template', () => ({ sendByTemplate: vi.fn().mockResolvedValue({ id: 'm1', status: 'sent' }) }))
+vi.mock('@/lib/shared/message-log', () => ({ logMessage: vi.fn() }))
+vi.mock('@/lib/templates/variables', async orig => ({ ...(await orig<any>()), resolveTemplateVariables: vi.fn().mockResolvedValue({}) }))
 vi.mock('@/lib/shared/sms', () => ({ sendCampaignSMS: vi.fn().mockResolvedValue(true) }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -27,6 +35,8 @@ import {
   sendPromoOfferWhatsApp,
   sendFeedbackRequestWhatsApp,
 } from '@/lib/shared/whatsapp'
+import { getLibraryTemplate } from '@/lib/messaging/library'
+import { sendByTemplate } from '@/lib/shared/send-by-template'
 import { sendCampaignSMS } from '@/lib/shared/sms'
 
 const mockQueryOne = vi.mocked(queryOne)
@@ -40,8 +50,9 @@ const mockRecordSent = vi.mocked(recordSent)
 const mockSendSMS = vi.mocked(sendCampaignSMS)
 
 // Default happy-path setup: phone on file + marketing allowed + not in cooldown + sender succeeds.
+// Campaign row carries smsEnabled:true so the opt-in SMS leg fires (mirrors whatsappEnabled).
 function allowAndSend() {
-  mockQueryOne.mockResolvedValue({ phone: '+919876543210' } as any)
+  mockQueryOne.mockResolvedValue({ phone: '+919876543210', parameters: { whatsappEnabled: true, smsEnabled: true } } as any)
   mockCanSend.mockResolvedValue({ ok: true } as any)
   mockAlreadySent.mockResolvedValue(false)
   mockRecordSent.mockResolvedValue('sent-1')
@@ -236,16 +247,21 @@ describe('sendCampaignWhatsApp missing vars', () => {
       allowAndSend()
       await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt' }, 1)
       expect(mockRecordSent).toHaveBeenCalledWith(
-        expect.objectContaining({ campaignKind: 'abandoned_cart', userId: 'user-1', referenceId: 'wa:abandoned_cart' })
+        expect.objectContaining({
+          campaignKind: 'abandoned_cart',
+          userId: 'user-1',
+          referenceId: 'wa:abandoned_cart',
+          channel: 'whatsapp',
+        })
       )
     })
 
-    it('defaults to a 1-day window when no cooldown is passed (never unbounded)', async () => {
+    it('defaults to a 1-day window (in minutes) when no cooldown is passed (never unbounded)', async () => {
       allowAndSend()
       await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt' })
-      // alreadySentForReference called with a positive window, not undefined/0.
+      // alreadySentForReference called with a positive MINUTES window, not undefined/0.
       const call = mockAlreadySent.mock.calls.at(-1)!
-      expect(call[3]).toBe(1)
+      expect(call[3]).toBe(1440) // days(1) in minutes
     })
   })
 
@@ -258,12 +274,28 @@ describe('sendCampaignWhatsApp missing vars', () => {
       expect.objectContaining({ phone: '+919876543210', kind: 'abandoned_cart', userId: 'user-1' })
     )
   })
+
+  it('does NOT send SMS when the campaign has smsEnabled off (default)', async () => {
+    allowAndSend()
+    mockQueryOne.mockResolvedValue({ phone: '+919876543210', parameters: { whatsappEnabled: true } } as any)
+    await sendCampaignWhatsApp('abandoned_cart', 'user-1', { items: 'Bolt, Nut' }, 1)
+    expect(mockAbandonedCart).toHaveBeenCalled()
+    expect(mockSendSMS).not.toHaveBeenCalled()
+  })
 })
 
 // Every kind advertised as WhatsApp-capable must actually dispatch (loyalty_points_reminder used to
 // fall through to `default` and always fail).
 describe('every supported kind dispatches', () => {
-  const VARS = { items: 'Bolt', product: 'Bolt', headline: 'Hi', code: 'C1', discount: '5', orderNumber: 'O1', url: 'https://x' }
+  const VARS = {
+    items: 'Bolt',
+    product: 'Bolt',
+    headline: 'Hi',
+    code: 'C1',
+    discount: '5',
+    orderNumber: 'O1',
+    url: 'https://x',
+  }
   for (const kind of CAMPAIGN_WA_KINDS) {
     it(`${kind} sends`, async () => {
       allowAndSend()
@@ -277,7 +309,10 @@ describe('every supported kind dispatches', () => {
     allowAndSend()
     await sendCampaignWhatsApp('loyalty_points_reminder', 'user-1', { headline: 'You have 500 points', code: '' })
     expect(mockPromoOffer).toHaveBeenCalledWith(
-      expect.objectContaining({ headline: 'You have 500 points', entity: { entityType: 'campaign', entityId: 'loyalty_points_reminder' } })
+      expect.objectContaining({
+        headline: 'You have 500 points',
+        entity: { entityType: 'campaign', entityId: 'loyalty_points_reminder' },
+      })
     )
   })
 })
@@ -286,7 +321,9 @@ describe('campaign SMS copy', () => {
   it('formats a bare percent discount as "N% off"', async () => {
     allowAndSend()
     await sendCampaignWhatsApp('winback_90', 'user-1', { headline: 'We miss you!', code: 'BACK-1', discount: '10' })
-    expect(mockSendSMS).toHaveBeenCalledWith(expect.objectContaining({ body: 'We miss you! — use code BACK-1 for 10% off.' }))
+    expect(mockSendSMS).toHaveBeenCalledWith(
+      expect.objectContaining({ body: 'We miss you! — use code BACK-1 for 10% off.' })
+    )
   })
 
   it('keeps a discount that is already worded', async () => {
@@ -301,6 +338,31 @@ describe('var cleanup', () => {
     allowAndSend()
     await sendCampaignWhatsApp('replenishment', 'user-1', { items: 'Earthing Rod ' })
     expect(mockAbandonedCart).toHaveBeenCalledWith(expect.objectContaining({ items: 'Earthing Rod' }))
-    expect(mockSendSMS).toHaveBeenCalledWith(expect.objectContaining({ body: 'Running low on Earthing Rod? Reorder in a tap.' }))
+    expect(mockSendSMS).toHaveBeenCalledWith(
+      expect.objectContaining({ body: 'Running low on Earthing Rod? Reorder in a tap.' })
+    )
+  })
+})
+
+describe('linked library WhatsApp template', () => {
+  it('fills {{n}} slots with resolved campaign vars and click-tracks URL slots', async () => {
+    mockCanSend.mockResolvedValue({ ok: true } as any)
+    mockAlreadySent.mockResolvedValue(false)
+    mockRecordSent.mockResolvedValue('wa-sent-9')
+    vi.mocked(getLibraryTemplate).mockResolvedValue({
+      slug: 'restock', body: '{{1}} is back. Shop: {{2}}', approval_status: 'approved',
+    } as any)
+    mockQueryOne.mockResolvedValueOnce({ phone: '+919876543210' } as any).mockResolvedValueOnce({
+      wa_template_slug: 'restock',
+      wa_variables: { '1': '{product}', '2': '{productUrl}' },
+      parameters: { whatsappEnabled: true },
+    } as any)
+
+    await sendCampaignWhatsApp('restock', 'u1', { product: 'Widget', productUrl: 'https://shop/p/widget' } as any)
+
+    const arg = vi.mocked(sendByTemplate).mock.calls[0][0]
+    expect(arg.slug).toBe('restock')
+    expect(arg.variables!['1']).toBe('Widget')
+    expect(arg.variables!['2']).toContain('/api/email-events/click?id=wa-sent-9')
   })
 })

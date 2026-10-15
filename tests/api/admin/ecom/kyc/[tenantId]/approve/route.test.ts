@@ -21,6 +21,10 @@ vi.mock('@/lib/tenant-registry', () => ({
   getOwnerBankAccount: vi.fn(),
   getOwnerBankWithRoute: vi.fn(),
   persistLinkedAccountToOwnerBank: vi.fn(),
+  hasService: vi.fn((t: { service_types?: string[] | null }, s: string) => (t?.service_types ?? ['store']).includes(s)),
+  reviewServiceApproval: vi.fn(),
+  controlPlanePool: vi.fn(),
+  setSubscriptionStatus: vi.fn(),
 }))
 
 vi.mock('@/lib/payments/razorpay-subscriptions', () => ({

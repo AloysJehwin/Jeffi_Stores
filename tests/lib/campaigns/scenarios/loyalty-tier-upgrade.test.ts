@@ -136,7 +136,7 @@ describe('loyaltyTierUpgrade scenario', () => {
       expect(kind).toBe('loyalty_tier_upgrade')
       expect(userId).toBe('u1')
       expect(vars.headline).toBe('You reached Gold!')
-      expect(cooldown).toBe(1)
+      expect(cooldown).toBe(days(1))
     })
 
     it('returns no_user when the user is gone', async () => {

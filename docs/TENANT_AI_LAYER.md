@@ -14,7 +14,7 @@ per-tenant. (#489)
 ## Components and how isolation is enforced
 
 ### 1. Server AI (admin agent, storefront helpers) → the ai-platform gateway
-- `src/lib/shared/ai-client.ts` calls the gateway (`AI_GATEWAY_URL`, the Razer box) for chat,
+- `controller-service/src/lib/shared/ai-client.ts` calls the gateway (`AI_GATEWAY_URL`, the Razer box) for chat,
   embed, vision. The gateway is a shared service; it holds no per-tenant catalog.
 - **Cache isolation**: `aiChat` sets `cacheNamespace = resolveTenantId() ?? 'platform'`, so the
   gateway's semantic response cache (`ai_cache.namespace`) is partitioned per tenant — a cached
@@ -38,7 +38,7 @@ Backfill: `scripts/embed-everything.mjs --tenant <uuid>` (and `promote-enrichmen
 
 ### 3. On-device model (storefront, in-browser Gemma via WebGPU)
 - Base weights: shared cache (identical for all stores).
-- **LoRA adapter is per-tenant**: `src/lib/on-device/keys.ts#onDeviceKeys(slug)` namespaces the
+- **LoRA adapter is per-tenant**: `controller-service/src/lib/on-device/keys.ts#onDeviceKeys(slug)` namespaces the
   adapter's IndexedDB key by store slug, so on a shared browser one store's fine-tune never loads
   into another's inference.
 - **Fine-tuning now applies**: `summary.worker.ts` loads the saved LoRA (same tenant-namespaced

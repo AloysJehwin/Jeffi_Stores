@@ -47,13 +47,14 @@ patches:
       - op: replace
         path: /spec/template/spec/volumes/0
         value: { name: models, hostPath: { path: /usr/share/ollama/.ollama, type: Directory } }
-  # Ollama currently runs as the host's systemd service (managed alongside other GPU work), so
-  # the gateway targets whatever serves the node's :11434 rather than the in-cluster pod.
+  # Ollama runs as the host's systemd service, so the gateway targets the node's :11434. Never a
+  # hostname (it once resolved to a stale address and took every AI feature down): first the k3s
+  # cni0 bridge (the host as seen from pods; no DNS/DHCP/Tailscale), then the Tailscale IP.
   - target: { kind: ConfigMap, name: ai-gateway-config }
     patch: |
       - op: replace
-        path: /data/OLLAMA_BASE_URL
-        value: "http://aloysjehwin-blade-18-rz09-0484:11434"
+        path: /data/OLLAMA_BASE_URLS
+        value: "http://10.42.0.1:11434,http://100.82.208.8:11434"
   - patch: |
       apiVersion: v1
       kind: PersistentVolumeClaim

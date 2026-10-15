@@ -56,16 +56,38 @@ the `ollama` user over `/usr/share/ollama/.ollama`, so models are reused and `<h
 keep working. There is no registry: images are built on the box straight into k3s containerd and
 run with `imagePullPolicy: Never`.
 
-Build and deploy (from a copy of this repo on the box):
+Build and roll out (from `ai-platform/` in an up-to-date checkout on the box). The tag never
+changes (`:latest`, `imagePullPolicy: Never`), so a `rollout restart` is what picks up a new build:
 
 ```
-sudo /opt/buildkit/bin/buildkitd --oci-worker=false --containerd-worker=true \
+pgrep buildkitd || sudo /opt/buildkit/bin/buildkitd --oci-worker=false --containerd-worker=true \
   --containerd-worker-addr=/run/k3s/containerd/containerd.sock --containerd-worker-namespace=k8s.io &
 sudo /opt/buildkit/bin/buildctl build --frontend dockerfile.v0 --local context=. --local dockerfile=gateway \
   --output type=image,name=docker.io/jeffi/ai-gateway:latest,unpack=true
-kubectl apply -k deploy/overlays/razer
-kubectl -n ai-platform rollout restart deploy/ai-gateway   # after rebuilding the image
+kubectl apply -k deploy/overlays/razer                     # ConfigMap + manifests
+kubectl -n ai-platform rollout restart deploy/ai-gateway   # new image + new ConfigMap values
+kubectl -n ai-platform rollout status deploy/ai-gateway
+kubectl -n ai-platform logs -l app=ai-gateway --tail=50 | grep -E 'listening|ollama'
+curl -s localhost:8080/readyz                              # 200 {"ok":true,...,"ollama":{"active":...}}
 ```
+
+### Ollama addresses and health
+
+`OLLAMA_BASE_URLS` is a comma-separated list (the old single `OLLAMA_BASE_URL` still works). The
+gateway probes them in order (`GET /api/tags`), uses the first healthy one, re-probes every
+`OLLAMA_PROBE_INTERVAL_MS` (and returns to an earlier URL once it recovers), and fails a request
+over to the next URL on a connection error. It logs `ollama active: <url>` on every change and
+`ollama UNREACHABLE: <reason>` when none answer. On the Razer the list is the k3s `cni0` bridge
+(`10.42.0.1`, the host as seen from pods) then the Tailscale IP; never use the hostname, which once
+resolved to a stale address and took every AI feature down while `/healthz` stayed green.
+
+- `GET /healthz`: liveness only (process up); used by both k8s probes.
+- `GET /readyz` (or `/healthz?deep=1`): truthful dependency check, 503 + `reason` when Redis or
+  every Ollama URL is unreachable. Cached for one probe interval so it never hammers Ollama.
+- While Ollama is known down, `/v1/chat` (cache misses), `/v1/embed` and failed `/v1/vision` answer
+  503 immediately instead of queueing, so the app falls back to direct Ollama without waiting.
+- The app's `ai_health` cron (every 5 min) runs a real chat through the gateway plus a direct Ollama
+  check and mails the platform admin once per incident, then once on recovery.
 
 The gateway is published on `<host>:8080` (ServiceLB).
 

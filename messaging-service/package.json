@@ -1,0 +1,38 @@
+{
+  "name": "messaging-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env.local --import tsx --watch src/server.ts",
+    "start": "node --import tsx src/server.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "predev": "SM_SECRET_ID=${SM_SECRET_ID:-jeffi/messaging/local} ENV_OUT_DIR=. node ../deploy/load-secrets.mjs",
+    "seed:catalog": "node --env-file=.env.local --import tsx scripts/seed-catalog.ts",
+    "wa:sync": "node --env-file=.env.local --import tsx scripts/wa-approval-sync.ts"
+  },
+  "dependencies": {
+    "@jeffi/api-contracts": "*",
+    "@jeffi/pricing": "*",
+    "@jeffi/service-auth": "*",
+    "@jeffi/tenancy": "*",
+    "@jeffi/bulk": "*",
+    "@jeffi/wallet": "*",
+    "fastify": "^5.2.1",
+    "@fastify/formbody": "^8.0.2",
+    "pg": "^8.13.0",
+    "nodemailer": "^6.9.16",
+    "twilio": "^5.4.0",
+    "zod": "^4.4.3",
+    "tsx": "^4.19.2",
+    "@aws-sdk/client-secrets-manager": "^3.1110.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/nodemailer": "^6.4.17",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  }
+}

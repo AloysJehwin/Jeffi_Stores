@@ -50,9 +50,22 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'ecom/[tenantId]/dns/resync',
   // Settle a tenant's captured-but-unsettled payments — platform-admin only (isPlatformAdmin).
   'ecom/[tenantId]/reconcile-settlements',
+  // Platform-admin shipping-wallet controls (admin.jeffistores.in): manual credit + Delhivery
+  // billing reconcile — gated on isPlatformAdmin, stronger than any tenant :write scope.
+  'ecom/[tenantId]/wallet',
+  'ecom/[tenantId]/wallet/reconcile-billing',
+  // Tenant self-recharge GET returns the wallet; its POST is a 403 stub (manual credits are a
+  // platform op) — it writes nothing. The real top-up is financial/wallet/topup (delhivery:write).
+  'financial/wallet/recharge',
   // Hard-delete of a deprovisioned tenant — gated on isPlatformAdmin (platform super-admin),
   // which is strictly stronger than any :write scope, so a read-only member can never reach it.
   'ecom/customers/[id]/purge',
+  // Approve/reject a tenant's Messaging/Documents service — /api/admin/ecom/* is isPlatformAdmin-only
+  // in middleware, same as the kyc + purge controls above.
+  'ecom/customers/[id]/services',
+  // Closes the caller's OWN editor session (admin_id must match); opening one is gated on the
+  // resource's :write scope, so a read-only member never holds a session to close.
+  'editor-sessions/[id]/close',
   // Signature-verified webhook, not an admin action.
   'financial/payables/webhook',
   // Renders a preview; writes nothing.
@@ -63,20 +76,29 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'auth/google',
   // Mints a token whose scopes are filtered to a subset of the caller's own — cannot escalate.
   'token/generate',
+  // Cron Jobs self-service (Audit > Cron Jobs tab): a store toggling its OWN scheduled job on/off,
+  // gated on audit:read — the read-tier sibling of cron/trigger (which is CRON_SECRET-exempt above).
+  // It writes only this store's own cron_enabled_* flag; no cross-tenant or privileged effect.
+  'cron/config',
 ])
 
 function mutatingRoutesWithoutWriteScope(): string[] {
-  const files = glob.sync('src/app/api/\\(admin\\)/admin/**/route.ts', { cwd: process.cwd() })
+  const files = glob.sync('controller-service/src/app/api/\\(admin\\)/admin/**/route.ts', { cwd: process.cwd() })
   const offenders: string[] = []
   for (const f of files) {
     const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
     if (!/export async function (POST|PATCH|PUT|DELETE)\b/.test(src)) continue
-    // Gates: hasScope(...), requireAdminScope(req, '...:write'), and aiDenial(role, scopes, '...:write'),
+    // Gates: hasScope(...), requireAdminScope(req, '...:write'), aiDenial(role, scopes, '...:write'),
+    // proxyAdminDocs(req, path, '...:write') (document-service proxy; checks hasScope before forwarding),
     // or aiDenial on a resolveAiScope() result, which only yields AI_ACTION_SCOPES (all :write).
-    if (/hasScope\([^)]*:write'\)|requireAdminScope\([^)]*:write'\)|aiDenial\([^)]*:write'\)/.test(src)) continue
+    if (/hasScope\([^)]*:write'\)|requireAdminScope\([^)]*:write'\)|aiDenial\([^)]*:write'\)|proxyAdminDocs\([^)]*:write'\)/.test(src)) continue
+    // hasScope over a const list/map whose scope literals are all :write (uploads/image EDIT_SCOPES.some(...),
+    // editor-sessions WRITE_SCOPE[resourceType]).
+    const lits = src.match(/'[a-z_]+:(?:read|write)'/g) ?? []
+    if (/hasScope\(/.test(src) && lits.length > 0 && lits.every(l => l.endsWith(":write'"))) continue
     if (/aiDenial\(/.test(src) && /resolveAiScope\(/.test(src)) continue
     if (/CRON_SECRET|verifyCronRequest|authenticateServiceAccount/.test(src)) continue
-    const route = f.replace('src/app/api/(admin)/admin/', '').replace('/route.ts', '')
+    const route = f.replace('controller-service/src/app/api/(admin)/admin/', '').replace('/route.ts', '')
     if (ALLOWED_WITHOUT_WRITE_SCOPE.has(route)) continue
     offenders.push(route)
   }
@@ -88,24 +110,24 @@ function mutatingRoutesWithoutWriteScope(): string[] {
 // with a valid admin session could reach the write unless it also gates on a :write scope.
 // Each glob is a mutating handler that must carry the same :write check the /api/admin tree uses.
 const ADMIN_ONLY_OUTSIDE_ADMIN = [
-  'src/app/api/(public)/brands/route.ts',
-  'src/app/api/(public)/brands/[id]/route.ts',
-  'src/app/api/(public)/categories/[id]/route.ts',
-  'src/app/api/(public)/categories/reorder/route.ts',
-  'src/app/api/(public)/upload/route.ts',
-  'src/app/api/(public)/gallery/upload/route.ts',
-  'src/app/api/(public)/generate-image/route.ts',
-  'src/app/api/(public)/orders/[id]/refund/route.ts',
-  'src/app/api/(public)/orders/[id]/cancel-review/route.ts',
-  'src/app/api/(public)/orders/[id]/return-review/route.ts',
-  'src/app/api/(public)/orders/[id]/route.ts',
-  'src/app/api/(public)/razorpay/payment-link/route.ts',
-  'src/app/api/(public)/products/[id]/route.ts',
+  'controller-service/src/app/api/(public)/brands/route.ts',
+  'controller-service/src/app/api/(public)/brands/[id]/route.ts',
+  'controller-service/src/app/api/(public)/categories/[id]/route.ts',
+  'controller-service/src/app/api/(public)/categories/reorder/route.ts',
+  'controller-service/src/app/api/(public)/upload/route.ts',
+  'controller-service/src/app/api/(public)/gallery/upload/route.ts',
+  'controller-service/src/app/api/(public)/generate-image/route.ts',
+  'controller-service/src/app/api/(public)/orders/[id]/refund/route.ts',
+  'controller-service/src/app/api/(public)/orders/[id]/cancel-review/route.ts',
+  'controller-service/src/app/api/(public)/orders/[id]/return-review/route.ts',
+  'controller-service/src/app/api/(public)/orders/[id]/route.ts',
+  'controller-service/src/app/api/(public)/razorpay/payment-link/route.ts',
+  'controller-service/src/app/api/(public)/products/[id]/route.ts',
 ]
 
 // products/[id] DELETE is a hard 405 that mutates nothing, so it needs no scope; the file's
 // PATCH is what carries products:write.
-const MUTATING_WITHOUT_SCOPE_OK = new Set(['src/app/api/(public)/products/[id]/route.ts'])
+const MUTATING_WITHOUT_SCOPE_OK = new Set(['controller-service/src/app/api/(public)/products/[id]/route.ts'])
 
 function adminOnlyRoutesWithoutWriteScope(): string[] {
   const offenders: string[] = []
@@ -138,6 +160,6 @@ describe('an admin action is never reachable with read-only access', () => {
   })
 
   it('reads a meaningful number of routes (guards the glob)', () => {
-    expect(glob.sync('src/app/api/\\(admin\\)/admin/**/route.ts', { cwd: process.cwd() }).length).toBeGreaterThanOrEqual(339)
+    expect(glob.sync('controller-service/src/app/api/\\(admin\\)/admin/**/route.ts', { cwd: process.cwd() }).length).toBeGreaterThanOrEqual(339)
   })
 })

@@ -19,7 +19,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'
 import { GET, PUT, POST } from '@/app/api/(admin)/admin/product-offers/[id]/products/route'
 
-const admin = { id: 'a1', role: 'super_admin', scopes: [] }
+const admin = { adminId: 'a1', role: 'super_admin', scopes: [] }
 const params = Promise.resolve({ id: '11111111-1111-1111-1111-111111111111' })
 const P1 = '22222222-2222-4222-8222-222222222222'
 const P2 = '33333333-3333-4333-9333-333333333333'
@@ -122,8 +122,11 @@ describe('POST /api/admin/product-offers/[id]/products (bulk by category or bran
     vi.clearAllMocks()
     vi.mocked(authenticateAdmin).mockResolvedValue(admin as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    mockQueryOne.mockImplementation(async (sql: string) => (sql.includes('count(*)') ? { n: 12 } : { id: 'o1' }))
-    vi.mocked(query).mockResolvedValue({ rowCount: 5 } as any)
+    mockQueryOne.mockImplementation(async (sql: string) =>
+      sql.includes('count(*)') ? { n: 12 } : sql.includes('editor_sessions') ? null : { id: 'o1' }
+    )
+    mockQueryMany.mockResolvedValue([{ id: P1 }, { id: P2 }])
+    mockClientQuery.mockResolvedValue({})
   })
 
   it('401 unauthenticated', async () => {
@@ -154,23 +157,27 @@ describe('POST /api/admin/product-offers/[id]/products (bulk by category or bran
   it('adds a category with its active subcategories, skipping inactive products and existing members', async () => {
     const res = await POST(req('POST', { action: 'add', categoryId: CATEGORY }), { params })
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ changed: 5, total: 12 })
-    const [sql, args] = vi.mocked(query).mock.calls[0]
-    expect(sql).toContain('WITH RECURSIVE tree')
-    expect(sql).toContain('c.is_active = true')
+    expect(await res.json()).toEqual({ changed: 2, total: 12 })
+    const [matchSql, matchArgs] = mockQueryMany.mock.calls[0]
+    expect(matchSql).toContain('WITH RECURSIVE tree')
+    expect(matchSql).toContain('c.is_active = true')
+    expect(matchSql).toContain('p.is_active = true')
+    expect(matchArgs).toEqual([CATEGORY])
+    const [sql, args] = mockClientQuery.mock.calls[0]
     expect(sql).toContain('INSERT INTO product_offer_items')
-    expect(sql).toContain('p.is_active = true')
     expect(sql).toContain('ON CONFLICT DO NOTHING')
-    expect(args).toEqual([(await params).id, CATEGORY])
+    expect(args).toEqual([(await params).id, [P1, P2]])
   })
 
   it('removes a brand, accepting seeded non-RFC brand ids', async () => {
     const res = await POST(req('POST', { action: 'remove', brandId: SEEDED_BRAND }), { params })
     expect(res.status).toBe(200)
-    const [sql, args] = vi.mocked(query).mock.calls[0]
+    const [matchSql, matchArgs] = mockQueryMany.mock.calls[0]
+    expect(matchSql).toContain('p.brand_id = $1')
+    expect(matchSql).not.toContain('RECURSIVE')
+    expect(matchArgs).toEqual([SEEDED_BRAND])
+    const [sql, args] = mockClientQuery.mock.calls[0]
     expect(sql).toContain('DELETE FROM product_offer_items')
-    expect(sql).toContain('p.brand_id = $2')
-    expect(sql).not.toContain('RECURSIVE')
-    expect(args).toEqual([(await params).id, SEEDED_BRAND])
+    expect(args).toEqual([(await params).id, [P1, P2]])
   })
 })

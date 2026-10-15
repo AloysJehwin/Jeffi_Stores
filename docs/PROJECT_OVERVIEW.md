@@ -22,14 +22,14 @@ E-commerce platform powering [jeffistores.in](https://jeffistores.in), an indust
 ## Project Structure
 
 ```
-src/app/             Next.js App Router (storefront, /admin, /api routes)
-src/components/      Reusable React components (admin/, visitor/, shared/)
-src/lib/             Server-side helpers (db, auth, jwt, s3, email, gst,
+controller-service/src/app/             Next.js App Router (storefront, /admin, /api routes)
+controller-service/src/components/      Reusable React components (admin/, visitor/, shared/)
+controller-service/src/lib/             Server-side helpers (db, auth, jwt, s3, email, gst,
                      invoice-pdf, razorpay, delhivery, google-sheets,
                      google-merchant-helpers, redis, etc.)
-src/contexts/        React contexts (cart, auth)
-src/middleware.ts    Auth + rate-limit middleware
-src/instrumentation.ts  Next.js instrumentation hook
+controller-service/src/contexts/        React contexts (cart, auth)
+controller-service/src/middleware.ts    Auth + rate-limit middleware
+controller-service/src/instrumentation.ts  Next.js instrumentation hook
 database/            schema.sql + migrations/*.sql
 deploy/              blue-green-deploy.sh, maintenance.sh, nginx*.conf,
                      scheduler-setup.sh, load-secrets.mjs
@@ -96,13 +96,13 @@ certs/               mTLS certs for nginx <-> app (NOT in repo)
 
 ### Admin Panel — `/admin`
 
-Routes under `src/app/admin/`: `products`, `orders`, `quotations`, `invoices`, `customers`, `coupons`, `inventory`, `suppliers`, `categories`, `brands`, `cash-sale`, `purchaseorder` (via storefront), `packing-slips`, `labels`, `gst`, `financial`, `inflation`, `mailer`, `reviews`, `review-forms`, `traffic`, `team`, `settings`, `delhivery`, `scan`.
+Routes under `controller-service/src/app/admin/`: `products`, `orders`, `quotations`, `invoices`, `customers`, `coupons`, `inventory`, `suppliers`, `categories`, `brands`, `cash-sale`, `purchaseorder` (via storefront), `packing-slips`, `labels`, `gst`, `financial`, `inflation`, `mailer`, `reviews`, `review-forms`, `traffic`, `team`, `settings`, `delhivery`, `scan`.
 
 ### Storefront — `/`
 
-Routes under `src/app/`: catalog (`products`, `categories`, `brands`), `cart`, `checkout`, `account`, `wishlist`, `quotation`, `purchaseorder`, `invoice`, `support`, `forms`, `contact`, `about`, `legal`, `return-policy`, plus `auth` / `login` / `signup`.
+Routes under `controller-service/src/app/`: catalog (`products`, `categories`, `brands`), `cart`, `checkout`, `account`, `wishlist`, `quotation`, `purchaseorder`, `invoice`, `support`, `forms`, `contact`, `about`, `legal`, `return-policy`, plus `auth` / `login` / `signup`.
 
-### Server-side libraries — `src/lib/`
+### Server-side libraries — `controller-service/src/lib/`
 
 Authentication (`auth.ts`, `jwt.ts`, `otp.ts`, `scopes.ts`), DB (`db.ts`, `queries.ts`), payments (`razorpay.ts`), email (`email.ts`, `email-campaigns.ts`), shipping (`shipping.ts`, `delhivery.ts`), GST + invoicing (`gst.ts`, `invoice.ts`, `invoice-pdf.ts`, `quotation-pdf.ts`, `po-pdf.ts`, `receipt-pdf.ts`, `packing-slip-pdf.ts`, `label-pdf.ts`), GST integrations (`einvoice.ts`, `ewaybill.ts` — currently disabled), Google integrations (`google-sheets.ts`, `google-merchant-helpers.ts`), inventory (`inventory.ts`, `sku.ts`), realtime (`redis.ts`), rate limiting (`rate-limit.ts`), S3 (`s3.ts`), search (`search.ts`).
 
@@ -113,10 +113,12 @@ Authentication (`auth.ts`, `jwt.ts`, `otp.ts`, `scopes.ts`), DB (`db.ts`, `queri
 - **Google Merchant Center** — nightly product feed for Google Shopping ads (merchant ID `5762156822`); same service account.
 - **AWS SES** — order/auth/notification emails. Env: `SES_SMTP_USER`, `SES_SMTP_PASSWORD`, `SES_FROM_EMAIL`, `SES_ADMIN_FROM_EMAIL`.
 - **Delhivery** — shipping label + tracking. Env: `DELHIVERY_API_KEY`, `DELHIVERY_ORIGIN_PINCODE`, `DELHIVERY_PICKUP_LOCATION`, `DELHIVERY_SELLER_NAME`, `DELHIVERY_SELLER_PHONE`, `DELHIVERY_SELLER_ADDRESS`.
-- **OpenAI** — used by admin tooling (`scripts/fix-dimensions-ai.mjs`, `src/lib/iconSuggest.ts`). Env: `OPENAI_API_KEY`.
+- **OpenAI** — used by admin tooling (`scripts/fix-dimensions-ai.mjs`, `controller-service/src/lib/iconSuggest.ts`). Env: `OPENAI_API_KEY`.
 - **Google OAuth + Maps** — sign-in and address autocomplete. Env: `GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`, `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`.
 
 ## Deployment
+
+> Planned split into surface and shared services: [`MICROSERVICES_PLAN.md`](MICROSERVICES_PLAN.md).
 
 Production runs on a single EC2 `t4g.micro` (ARM64) running Docker Compose with three services: `app` (two replicas of the Next standalone image from GHCR), `nginx` (TLS + reverse proxy), and `redis`. The image is pulled from `ghcr.io/aloysjehwin/jeffi_stores:latest`.
 
@@ -135,7 +137,7 @@ The repo is cloned from `git@github.com:AloysJehwin/Jeffi_Stores.git` (configure
 - `30 2 * * *` — Nightly Google Merchant Center sync via `GET /api/admin/merchant/sync` with `Authorization: Bearer $CRON_SECRET`
 - `30 1 * * *` — Daily ops briefing via `GET /api/cron/daily-briefing` (02:30 UTC = 08:00 IST). Sends an HTML summary email to all active admins. Idempotent (skips if already sent today). See [docs/DAILY_BRIEFING.md](docs/DAILY_BRIEFING.md).
 
-### In-app Schedules (run inside the Next.js process via `src/instrumentation.ts`)
+### In-app Schedules (run inside the Next.js process via `controller-service/src/instrumentation.ts`)
 
 - Every 10 min — Delhivery shipment status sync (`POST /api/admin/delhivery/sync-statuses`)
 - Every 1 min — Cancel stale unpaid orders past the 10-minute payment window (`GET /api/cron/cancel-stale-orders`). Sends auto-cancel emails to the customer and to all active admins.

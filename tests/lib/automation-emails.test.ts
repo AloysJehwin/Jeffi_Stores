@@ -458,7 +458,8 @@ describe('sendCampaignEmail', () => {
     expect(mockBaseLayout).toHaveBeenCalledWith(
       expect.any(String),
       '<tracked>rendered</tracked>',
-      'https://shop.example.in'
+      'https://shop.example.in',
+      undefined
     )
     const html = mockSendAuditedMail.mock.calls[0][0].html as string
     expect(html).not.toContain('{store_name}')

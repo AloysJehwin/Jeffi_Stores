@@ -14,7 +14,7 @@ import { join, relative, sep } from 'node:path'
 // Adding a tenant-facing file here instead of fixing the leak defeats the guard — don't.
 
 const ROOT = join(__dirname, '..', '..')
-const SRC = join(ROOT, 'src')
+const SRC = join(ROOT, 'controller-service/src')
 
 // Matches the platform brand as a literal word, not substrings like "jeffistores.in" domains
 // (those are covered by host/env config, not brand strings) — we match "Jeffi" followed by a
@@ -28,46 +28,49 @@ const LOCATION_RE = /\b(Chhattisgarh|Raipur)\b/
 // Only enforced on prompt + ops surfaces where a tenant store acts; platform-entity references
 // (legal docs, Amazon LMPC contact, pincode reference tables, GST-code hints) live elsewhere.
 const LOCATION_SCOPE_PREFIXES = [
-  'src/lib/admin-agent/',
-  'src/app/api/(admin)/',
-  'src/app/api/(public)/',
+  'controller-service/src/lib/admin-agent/',
+  'controller-service/src/app/api/(admin)/',
+  'controller-service/src/app/api/(public)/',
 ]
 const LOCATION_ALLOW_FILES = new Set<string>([
-  'src/lib/admin-agent/tools/sales.ts', // description now neutral + default via storeOrigin(); keeps the word only in a comment
-  'src/app/api/(public)/orders/[id]/invoice/route.ts', // reads business_state (tenant), no literal
+  'controller-service/src/lib/admin-agent/tools/sales.ts', // description now neutral + default via storeOrigin(); keeps the word only in a comment
+  'controller-service/src/app/api/(public)/orders/[id]/invoice/route.ts', // reads business_state (tenant), no literal
 ])
 
 // Platform-only surfaces: Jeffi branding here is correct.
 const ALLOW_PREFIXES = [
-  'src/app/(ecom)/',
-  'src/app/(marketing)/',
-  'src/app/(portal)/',
-  'src/lib/provisioning/',
-  'src/lib/legals/',
-  'src/lib/amazon/',
-  'src/lib/merchant/',
-  'src/lib/social/',
-  'src/lib/payments/',
-  'src/lib/tenancy/certificates.ts',
-  'src/lib/tenancy/tenant-ca.ts',
-  'src/lib/tenant-registry/social.ts',
-  'src/lib/integrations/resolve.ts',
-  'src/lib/shared/ecom-emails.ts',
+  'controller-service/src/app/(ecom)/',
+  'controller-service/src/app/api/(ecom)/', // the ecom portal's own API (portal prompts, service gates, platform billing)
+  'controller-service/src/components/admin/ecom/', // platform control plane (admin.jeffistores.in /admin/ecom, isPlatformAdmin)
+  'controller-service/src/lib/billing/', // Jeffi's own invoices/top-ups billed to tenants
+  'controller-service/src/app/(marketing)/',
+  'controller-service/src/app/(portal)/',
+  'controller-service/src/lib/provisioning/',
+  'controller-service/src/lib/legals/',
+  'controller-service/src/lib/amazon/',
+  'controller-service/src/lib/merchant/',
+  'controller-service/src/lib/social/',
+  'controller-service/src/lib/payments/',
+  'controller-service/src/lib/tenancy/certificates.ts',
+  'controller-service/src/lib/tenancy/tenant-ca.ts',
+  'controller-service/src/lib/tenant-registry/social.ts',
+  'controller-service/src/lib/integrations/resolve.ts',
+  'controller-service/src/lib/shared/ecom-emails.ts',
 ]
 
 // Specific files allowed to name the platform entity.
 const ALLOW_FILES = new Set<string>([
-  'src/lib/catalog/brand.ts', // defines platformBrandName() — the platform default lives here
-  'src/lib/catalog/site-controls.ts', // DEFAULTS block (tenant-overridable platform defaults)
-  'src/lib/auth/mfa.ts', // PLATFORM_ISSUER fallback (used only when no tenant brand resolves)
-  'src/lib/shared/daily-briefing.ts', // operator ops briefing (platform admin)
-  'src/lib/shared/mail-audit.ts', // literal only appears in a comment (default now tenant-resolved)
-  'src/lib/email/certificates.ts', // ecom/platform-admin cert mail; tenant branch already uses tenant.storeName
-  'src/app/api/(admin)/admin/access-request/route.ts', // operator alert to the platform admin
-  'src/app/api/(admin)/admin/users/route.ts', // last-resort fallback for a null tenant (platform)
-  'src/components/admin/AdminSupportChat.tsx', // operator-side chat label, not customer-facing
-  'src/components/admin/ExtensionTokenCard.tsx', // "Jeffi Gallery Uploader" — product proper noun
-  'src/components/visitor/SupportChat.tsx', // widget mounts on platform (marketing/business) hosts
+  'controller-service/src/lib/catalog/brand.ts', // defines platformBrandName() — the platform default lives here
+  'controller-service/src/lib/catalog/site-controls.ts', // DEFAULTS block (tenant-overridable platform defaults)
+  'controller-service/src/lib/auth/mfa.ts', // PLATFORM_ISSUER fallback (used only when no tenant brand resolves)
+  'controller-service/src/lib/shared/daily-briefing.ts', // operator ops briefing (platform admin)
+  'controller-service/src/lib/shared/mail-audit.ts', // literal only appears in a comment (default now tenant-resolved)
+  'controller-service/src/lib/email/certificates.ts', // ecom/platform-admin cert mail; tenant branch already uses tenant.storeName
+  'controller-service/src/app/api/(admin)/admin/access-request/route.ts', // operator alert to the platform admin
+  'controller-service/src/app/api/(admin)/admin/users/route.ts', // last-resort fallback for a null tenant (platform)
+  'controller-service/src/components/admin/AdminSupportChat.tsx', // operator-side chat label, not customer-facing
+  'controller-service/src/components/admin/ExtensionTokenCard.tsx', // "Jeffi Gallery Uploader" — product proper noun
+  'controller-service/src/components/visitor/SupportChat.tsx', // widget mounts on platform (marketing/business) hosts
 ])
 
 function isAllowed(rel: string): boolean {

@@ -5,7 +5,7 @@ const pool = { query: vi.fn(), connect: vi.fn().mockResolvedValue(client) }
 
 vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => pool }))
 
-import { rechargeWallet, correctWalletDebitForAwb } from '@/lib/payments/wallet'
+import { rechargeWallet, correctWalletDebitForAwb, debitMessaging } from '@/lib/payments/wallet'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -17,9 +17,10 @@ describe('rechargeWallet — top-up idempotency', () => {
   it('credits once and returns the new balance', async () => {
     client.query
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // ensure wallet
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // lockWallet: ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '0', min_balance: '0' }] }) // lockWallet: SELECT FOR UPDATE
       .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // ledger insert (won)
-      .mockResolvedValueOnce({ rows: [{ balance: '500.00' }] }) // balance update
+      .mockResolvedValueOnce({ rows: [{ balance: '500.00' }] }) // moveBalance
       .mockResolvedValueOnce({ rows: [] }) // COMMIT
     const res = await rechargeWallet({ tenantId: 't1', amountInr: 500, externalRef: 'pay_1' })
     expect(res).toEqual({ ok: true, balance: 500 })
@@ -28,9 +29,9 @@ describe('rechargeWallet — top-up idempotency', () => {
   it('does NOT move the balance when the reference was already credited', async () => {
     client.query
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // BEGIN
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // ensure wallet
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // lockWallet: ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '500', min_balance: '0' }] }) // lockWallet: SELECT FOR UPDATE
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // ledger insert -> CONFLICT
-      .mockResolvedValueOnce({ rows: [{ balance: '500.00' }] }) // read current balance
       .mockResolvedValueOnce({ rows: [] }) // COMMIT
     const res = await rechargeWallet({ tenantId: 't1', amountInr: 500, externalRef: 'pay_1' })
     expect(res).toEqual({ ok: true, balance: 500, alreadyCredited: true })
@@ -48,13 +49,17 @@ describe('rechargeWallet — top-up idempotency', () => {
 })
 
 describe('correctWalletDebitForAwb — post-pickup reprice', () => {
-  function seedNet(netInr: number) {
+  // Sequence: BEGIN, lockWallet ensure+SELECT, awbNet SELECT, adjustment insert, moveBalance, COMMIT.
+  // awbNet reads SUM(amount) AS net and COUNT(*) AS n — n>0 means the AWB already has a debit row,
+  // so the correction posts an 'adjustment' delta rather than a first 'debit'.
+  function seedNet(netInr: number, n = 1) {
     client.query
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // ensure wallet
-      .mockResolvedValueOnce({ rows: [{ net: String(netInr) }] }) // current net for AWB
+      .mockResolvedValueOnce({ rows: [] }) // lockWallet: ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '1000', min_balance: '0' }] }) // lockWallet: SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [{ net: String(netInr), n }] }) // awbNet
       .mockResolvedValueOnce({ rows: [] }) // adjustment insert
-      .mockResolvedValueOnce({ rows: [] }) // balance update
+      .mockResolvedValueOnce({ rows: [{ balance: '1000' }] }) // moveBalance
       .mockResolvedValueOnce({ rows: [] }) // COMMIT
   }
 
@@ -84,8 +89,9 @@ describe('correctWalletDebitForAwb — post-pickup reprice', () => {
     pool.query.mockResolvedValueOnce({ rows: [{ own_delhivery: false }] })
     client.query
       .mockResolvedValueOnce({ rows: [] }) // BEGIN
-      .mockResolvedValueOnce({ rows: [] }) // ensure wallet
-      .mockResolvedValueOnce({ rows: [{ net: '-100' }] }) // already at target
+      .mockResolvedValueOnce({ rows: [] }) // lockWallet: ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '1000', min_balance: '0' }] }) // lockWallet: SELECT FOR UPDATE
+      .mockResolvedValueOnce({ rows: [{ net: '-100', n: 1 }] }) // awbNet: already at target
       .mockResolvedValueOnce({ rows: [] }) // COMMIT
     const res = await correctWalletDebitForAwb({
       tenantId: 't1',
@@ -103,5 +109,94 @@ describe('correctWalletDebitForAwb — post-pickup reprice', () => {
       newAmountInr: 100,
     })
     expect(res).toEqual({ ok: true, outcome: 'exempt', delta: 0 })
+  })
+})
+
+describe('debitWallet — generic categorised debit (campaigns/AI)', () => {
+  it('debits, is idempotent on externalRef, and blocks on insufficient balance', async () => {
+    // first call: not a duplicate, balance 1000 covers 200 + floor 500
+    client.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // lockWallet: ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '1000', min_balance: '0' }] }) // lockWallet SELECT
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // dup check — none
+      .mockResolvedValueOnce({ rows: [] }) // ledger insert
+      .mockResolvedValueOnce({ rows: [{ balance: '800' }] }) // moveBalance
+      .mockResolvedValueOnce({ rows: [] }) // COMMIT
+    const { debitWallet } = await import('@/lib/payments/wallet')
+    const r1 = await debitWallet({ tenantId: 't1', amountInr: 200, category: 'campaign', externalRef: 'c1', note: 'Campaign' })
+    expect(r1).toEqual({ ok: true, charged: true, balance: 800 })
+
+    // second call with same externalRef: dup found -> no charge, no balance move
+    client.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '800', min_balance: '0' }] }) // lockWallet
+      .mockResolvedValueOnce({ rows: [{ '?column?': 1 }], rowCount: 1 }) // dup check — hit
+      .mockResolvedValueOnce({ rows: [] }) // COMMIT
+    const r2 = await debitWallet({ tenantId: 't1', amountInr: 200, category: 'campaign', externalRef: 'c1', note: 'Campaign' })
+    expect(r2).toEqual({ ok: true, charged: false, balance: 800 })
+
+    // third call would drop below floor -> blocked
+    client.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // ensure wallet
+      .mockResolvedValueOnce({ rows: [{ balance: '600', min_balance: '500' }] }) // lockWallet, floor 500
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // dup check — none
+      .mockResolvedValueOnce({ rows: [] }) // ROLLBACK
+    const { debitWallet: dw } = await import('@/lib/payments/wallet')
+    const r3 = await dw({ tenantId: 't1', amountInr: 200, category: 'ai', externalRef: 'a1', note: 'AI' })
+    expect(r3.ok).toBe(false)
+  })
+
+  it('exempts the flagship', async () => {
+    const { debitWallet, FLAGSHIP_TENANT_ID } = await import('@/lib/payments/wallet')
+    const r = await debitWallet({ tenantId: FLAGSHIP_TENANT_ID, amountInr: 200, category: 'ai', externalRef: 'x', note: 'n' })
+    expect(r).toEqual({ ok: true, charged: false, balance: 0 })
+  })
+})
+
+describe('debitMessaging — estimate at send, true-up on callback', () => {
+  // tx steps: BEGIN, lockWallet ensure+SELECT, SELECT existing msg: row, [INSERT|UPDATE], moveBalance, COMMIT.
+  it('inserts the estimate when no prior row exists', async () => {
+    client.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // lockWallet ensure
+      .mockResolvedValueOnce({ rows: [{ balance: '100', min_balance: '0' }] }) // lockWallet SELECT
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // SELECT existing -> none
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // INSERT ledger
+      .mockResolvedValueOnce({ rows: [{ balance: '93' }] }) // moveBalance
+      .mockResolvedValueOnce({ rows: [] }) // COMMIT
+    await debitMessaging({ tenantId: 't1', category: 'sms', amountInr: 7, externalRef: 'msg:SM1', note: 'sms est' })
+    const inserts = client.query.mock.calls.filter(c => /INSERT INTO wallet_ledger/.test(c[0]))
+    expect(inserts).toHaveLength(1)
+    expect(inserts[0][1]).toContain(-7) // debit the estimate
+  })
+
+  it('trues up by the delta vs the estimate (exact > estimate)', async () => {
+    client.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // lockWallet ensure
+      .mockResolvedValueOnce({ rows: [{ balance: '93', min_balance: '0' }] }) // lockWallet SELECT
+      .mockResolvedValueOnce({ rows: [{ amount: '-7' }], rowCount: 1 }) // existing estimate = ₹7
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // UPDATE ledger -> exact
+      .mockResolvedValueOnce({ rows: [{ balance: '85.68' }] }) // moveBalance(-delta)
+      .mockResolvedValueOnce({ rows: [] }) // COMMIT
+    await debitMessaging({ tenantId: 't1', category: 'sms', amountInr: 7.32, externalRef: 'msg:SM1', note: 'sms', trueUp: true })
+    const moves = client.query.mock.calls.filter(c => /UPDATE tenant_wallets SET balance/.test(c[0]))
+    expect(moves).toHaveLength(1)
+    expect(Number(moves[0][1][1])).toBeCloseTo(-0.32, 2) // only the delta moves
+  })
+
+  it('is a no-op on a duplicate send-time call (existing row, no trueUp)', async () => {
+    client.query
+      .mockResolvedValueOnce({ rows: [] }) // BEGIN
+      .mockResolvedValueOnce({ rows: [] }) // lockWallet ensure
+      .mockResolvedValueOnce({ rows: [{ balance: '93', min_balance: '0' }] }) // lockWallet SELECT
+      .mockResolvedValueOnce({ rows: [{ amount: '-7' }], rowCount: 1 }) // existing
+      .mockResolvedValueOnce({ rows: [] }) // COMMIT
+    await debitMessaging({ tenantId: 't1', category: 'sms', amountInr: 7, externalRef: 'msg:SM1', note: 'sms' })
+    const moves = client.query.mock.calls.filter(c => /UPDATE tenant_wallets SET balance/.test(c[0]))
+    expect(moves).toHaveLength(0)
   })
 })

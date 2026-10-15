@@ -256,6 +256,18 @@ describe('ec2-client', () => {
       await expect(isInstanceGone('i-1')).resolves.toBe(true)
     })
 
+    it('describeInstanceName reads the Name tag, and null for a missing instance', async () => {
+      const xml = `<r><instanceId>i-1</instanceId><tagSet><item><key>app</key><value>jeffi-k8s</value></item>
+        <item><key>Name</key><value>jeffi-k8s-t-acme</value></item></tagSet></r>`
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, xml)))
+      const { describeInstanceName } = await import('@/lib/shared/ec2-client')
+      await expect(describeInstanceName('i-1')).resolves.toBe('jeffi-k8s-t-acme')
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(400, 'InvalidInstanceID.NotFound')))
+      await expect(describeInstanceName('i-1')).resolves.toBeNull()
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(200, '<r></r>')))
+      await expect(describeInstanceName('i-1')).resolves.toBeNull()
+    })
+
     it('re-classifies an unrelated API error as NOT gone (do not delete siblings)', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(res(500, 'InternalError: try later')))
       const { isInstanceGone } = await import('@/lib/shared/ec2-client')

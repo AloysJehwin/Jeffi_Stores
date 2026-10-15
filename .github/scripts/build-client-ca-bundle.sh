@@ -10,7 +10,7 @@
 # send.
 #
 # ssl_verify_client stays optional_no_ca: this bundle exists to ADVERTISE issuers, not to
-# validate. The chain is still verified per-tenant in the app (src/lib/tenant-mtls.ts),
+# validate. The chain is still verified per-tenant in the app (controller-service/src/lib/tenant-mtls.ts),
 # against that tenant's own CA.
 #
 # The platform CA is always included so the file is never empty — nginx refuses to start
@@ -27,7 +27,7 @@ cat "$PLATFORM_CA" > "$TMP"
 
 HOST="${CONTROL_PLANE_RDS_HOST:-jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com}"
 USER="${CONTROL_PLANE_RDS_USER:-app_user}"
-DB="${CONTROL_PLANE_RDS_DB:-jeffi_control_plane}"
+DB="${CONTROL_PLANE_RDS_DB:-jeffi_stores}"
 REGION="${AWS_REGION:-us-east-1}"
 
 PGPASSWORD="$(aws rds generate-db-auth-token --hostname "$HOST" --port 5432 --region "$REGION" --username "$USER")" \

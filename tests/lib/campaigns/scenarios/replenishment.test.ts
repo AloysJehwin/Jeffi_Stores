@@ -170,7 +170,7 @@ describe('replenishment scenario', () => {
       expect(kind).toBe('replenishment')
       expect(userId).toBe('u1')
       expect(vars.items).toBe('Coffee')
-      expect(cd).toBe(14)
+      expect(cd).toBe(days(14))
     })
 
     it('returns no_items when the product is gone', async () => {

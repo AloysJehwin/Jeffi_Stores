@@ -1,0 +1,108 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateAdmin } from '@/lib/auth/jwt'
+import { hasScope } from '@/lib/auth/scopes'
+import { queryOne, query } from '@/lib/shared/db'
+import { missingRequired } from '@/lib/campaigns/kind-variables'
+import { getLibraryTemplate } from '@/lib/messaging/library'
+import { renderBlocks } from '@/lib/templates/blocks'
+
+export const dynamic = 'force-dynamic'
+interface Params {
+  params: Promise<{ kind: string }>
+}
+
+// POST — apply draft_fields to live campaign and clear draft
+export async function POST(req: NextRequest, { params }: Params) {
+  const { kind } = await params
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'campaigns:write')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  const live = await queryOne<{
+    kind: string; scenario_kind: string | null; email_template_slug: string | null
+    subject_template: string; body_template: string; template_mode: string | null; blocks: unknown
+  }>(`SELECT kind, scenario_kind, email_template_slug, subject_template, body_template, template_mode, blocks FROM campaigns WHERE kind = $1`, [kind])
+  if (!live) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+
+  const draft = await queryOne<{ fields: Record<string, unknown> | null }>(
+    `SELECT fields FROM campaign_drafts WHERE kind = $1`,
+    [kind]
+  )
+  const d = (draft?.fields || {}) as any
+  if (!draft || Object.keys(d).length === 0) {
+    return NextResponse.json({ error: 'No draft to publish' }, { status: 400 })
+  }
+
+  // The email must use the variables this campaign kind depends on (product gallery, CTA link…).
+  const pick = <K extends keyof typeof live>(k: K) => (k in d ? d[k] : live[k]) as (typeof live)[K]
+  const slug = pick('email_template_slug')
+  let emailText: string | null = null
+  if (slug) {
+    const t = await getLibraryTemplate('email', slug)
+    if (t) emailText = `${t.subject ?? ''}\n${t.blocks_format === 'email-blocks' && Array.isArray(t.blocks?.blocks) ? renderBlocks(t.blocks.blocks) : t.body}`
+  } else {
+    const blocks = pick('blocks') as any
+    emailText = `${pick('subject_template') ?? ''}\n${pick('template_mode') === 'blocks' && Array.isArray(blocks) ? renderBlocks(blocks) : pick('body_template') ?? ''}`
+  }
+  const missing = emailText === null ? [] : missingRequired(pick('scenario_kind') || kind, 'email', emailText)
+  if (missing.length) {
+    return NextResponse.json(
+      { error: `The email must use ${missing.map(k => `{${k}}`).join(', ')} — this campaign relies on ${missing.length === 1 ? 'it' : 'them'}.` },
+      { status: 400 }
+    )
+  }
+  await query(
+    `UPDATE campaigns SET
+       enabled = COALESCE($2::boolean, enabled),
+       delay_hours = COALESCE($3::integer, delay_hours),
+       discount_percent = COALESCE($4::integer, discount_percent),
+       coupon_id = $5::uuid,
+       scenario_kind = $6,
+       subject_template = COALESCE($7, subject_template),
+       body_template = COALESCE($8, body_template),
+       parameters = COALESCE($9::jsonb, parameters),
+       template_layout = COALESCE($10, template_layout),
+       template_mode = COALESCE($11, template_mode),
+       blocks = COALESCE($12::jsonb, blocks),
+       sms_template = COALESCE($13, sms_template),
+       wa_template_sid = CASE WHEN $17::boolean THEN $14 ELSE wa_template_sid END,
+       wa_variables = COALESCE($15::jsonb, wa_variables),
+       wa_header_image_url = COALESCE($16, wa_header_image_url),
+       email_template_slug = CASE WHEN $18::boolean THEN $19 ELSE email_template_slug END,
+       sms_template_slug = CASE WHEN $20::boolean THEN $21 ELSE sms_template_slug END,
+       wa_template_slug = CASE WHEN $22::boolean THEN $23 ELSE wa_template_slug END,
+       updated_at = NOW()
+     WHERE kind = $1`,
+    [
+      kind,
+      d.enabled != null ? d.enabled : null,
+      d.delay_hours != null ? d.delay_hours : null,
+      d.discount_percent != null ? d.discount_percent : null,
+      d.coupon_id || null,
+      d.scenario_kind || null,
+      d.subject_template || null,
+      d.body_template || null,
+      d.parameters ? JSON.stringify(d.parameters) : null,
+      d.template_layout || null,
+      d.template_mode || null,
+      d.blocks != null ? JSON.stringify(d.blocks) : null,
+      d.sms_template != null ? d.sms_template : null,
+      d.wa_template_sid ?? null,
+      d.wa_variables != null ? JSON.stringify(d.wa_variables) : null,
+      d.wa_header_image_url != null ? d.wa_header_image_url : null,
+      // Present-in-draft (even null) sets the column, so a template choice can be cleared.
+      'wa_template_sid' in d,
+      'email_template_slug' in d, d.email_template_slug ?? null,
+      'sms_template_slug' in d, d.sms_template_slug ?? null,
+      'wa_template_slug' in d, d.wa_template_slug ?? null,
+    ]
+  )
+  // Clear the draft (keep the row so campaign_id stays stable).
+  await query(
+    `UPDATE campaign_drafts SET fields = '{}'::jsonb, updated_at = now() WHERE kind = $1`,
+    [kind]
+  )
+  return NextResponse.json({ success: true })
+}

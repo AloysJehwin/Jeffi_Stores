@@ -80,7 +80,14 @@ describe('wishlistReminder scenario', () => {
     beforeEach(() => {
       mockFetchUser.mockResolvedValue({ first_name: 'Sam', baseUrl: 'https://shop.test', unsubscribe_token: 't' })
       mockQueryMany.mockResolvedValue([
-        { product_id: 'p1', product_slug: 'widget', name: 'Widget', source: 'wishlist', price: 100, image_url: 'img.jpg' },
+        {
+          product_id: 'p1',
+          product_slug: 'widget',
+          name: 'Widget',
+          source: 'wishlist',
+          price: 100,
+          image_url: 'img.jpg',
+        },
       ])
     })
 
@@ -111,7 +118,7 @@ describe('wishlistReminder scenario', () => {
       expect(kind).toBe('wishlist_reminder')
       expect(userId).toBe('u1')
       expect(vars.items).toContain('Widget')
-      expect(cd).toBe(1)
+      expect(cd).toBe(days(1))
     })
 
     it('returns no_items when the wishlist is empty', async () => {

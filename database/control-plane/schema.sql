@@ -99,7 +99,7 @@ ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_subscription_statu
     CHECK (subscription_status IN ('created','authenticated','active','halted','cancelled','completed','expired'));
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_billing_interval_check
     CHECK (billing_interval IN ('monthly','yearly'));
-ALTER TABLE ONLY public.plans          ADD CONSTRAINT plans_tier_check CHECK (tier BETWEEN 1 AND 4);
+ALTER TABLE ONLY public.plans          ADD CONSTRAINT plans_tier_check CHECK (tier BETWEEN 0 AND 4); -- 0 = services-only plan
 
 -- FKs are safe here: all four tables live in the SAME control-plane DB.
 ALTER TABLE ONLY public.plan_features  ADD CONSTRAINT plan_features_plan_id_fkey
@@ -133,7 +133,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_transactions (
     is_cod              boolean NOT NULL DEFAULT false,
     gateway             character varying(32) NOT NULL DEFAULT 'razorpay_route',
     gateway_txn_id      character varying(128),
-    status              character varying(24) NOT NULL DEFAULT 'captured', -- captured|split|settled|refunded|failed
+    status              character varying(24) NOT NULL DEFAULT 'captured', -- captured|split|settled|partially_refunded|refunded|failed
     occurred_at         timestamp with time zone NOT NULL DEFAULT now(),
     created_at          timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -180,6 +180,31 @@ ALTER TABLE ONLY public.settlement_ledger ADD CONSTRAINT settlement_ledger_tenan
 CREATE INDEX IF NOT EXISTS idx_tenant_transactions_tenant ON public.tenant_transactions USING btree (tenant_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_settlement_ledger_tenant ON public.settlement_ledger USING btree (tenant_id, occurred_at DESC);
 
+-- Route lifecycle: captured -> split (transferred, on hold) -> settled (linked account paid out),
+-- or partially_refunded / refunded / failed. gateway = razorpay_route | razorpay_own | cod_remittance.
+-- refund_ids makes each Razorpay refund count exactly once across app path + webhook redeliveries.
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS payment_id              character varying(128);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS transfer_id             character varying(128);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS recipient_settlement_id character varying(64);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS refunded_amount         numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS reversed_amount         numeric(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS refund_ids              text[] NOT NULL DEFAULT '{}';
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS failure_reason          character varying(255);
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS transferred_at          timestamp with time zone;
+ALTER TABLE public.tenant_transactions ADD COLUMN IF NOT EXISTS settled_at              timestamp with time zone;
+-- Idempotency key per money movement (cap:<pay>, trf:<trf>, refund id, reversal id, cod:<order>).
+ALTER TABLE public.settlement_ledger   ADD COLUMN IF NOT EXISTS external_ref            character varying(128);
+
+-- One row per payment: verify + webhook + reconcile racing can never record (or transfer) twice.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tenant_transactions_tenant_payment
+    ON public.tenant_transactions USING btree (tenant_id, payment_id) WHERE payment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tenant_transactions_payment ON public.tenant_transactions USING btree (payment_id) WHERE payment_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tenant_transactions_transfer ON public.tenant_transactions USING btree (transfer_id) WHERE transfer_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tenant_transactions_open
+    ON public.tenant_transactions USING btree (occurred_at) WHERE status IN ('captured', 'split');
+CREATE UNIQUE INDEX IF NOT EXISTS uq_settlement_ledger_external_ref
+    ON public.settlement_ledger USING btree (tenant_id, entry_type, external_ref) WHERE external_ref IS NOT NULL;
+
 --
 -- tenant_wallets: per-tenant prepaid balance the platform debits for the real Delhivery
 -- cost once an AWB's invoice is known. Enforces a minimum balance before a shipment may be
@@ -215,6 +240,12 @@ CREATE TABLE IF NOT EXISTS public.wallet_ledger (
     note          text,
     occurred_at   timestamp with time zone NOT NULL DEFAULT now()
 );
+
+-- What the movement was, for the Wallet page's filters/export, independent of entry_type's money
+-- direction. Nullable: existing rows read as their entry_type. Future paid features (campaign, ai)
+-- debit with their own category via debitWallet().
+ALTER TABLE public.wallet_ledger ADD COLUMN IF NOT EXISTS category character varying(32);
+CREATE INDEX IF NOT EXISTS idx_wallet_ledger_tenant_time ON public.wallet_ledger USING btree (tenant_id, occurred_at DESC);
 
 ALTER TABLE ONLY public.tenant_wallets ADD CONSTRAINT tenant_wallets_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_wallets ADD CONSTRAINT tenant_wallets_tenant_id_key UNIQUE (tenant_id);
@@ -753,3 +784,47 @@ CREATE TABLE IF NOT EXISTS public.razorpay_subscription_index (
 );
 
 CREATE INDEX IF NOT EXISTS idx_rzp_sub_index_tenant ON public.razorpay_subscription_index USING btree (tenant_id);
+
+--
+-- Service types + public API keys (public.jeffistores.in). A tenant may subscribe to any mix of
+-- store | messaging | documents. Services-only tenants are never provisioned (no RDS/S3/compute)
+-- and are created 'active' straight from onboarding; they keep the same tenants.id (and so the
+-- same tenant_wallets row) if they later add a store.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS service_types text[] NOT NULL DEFAULT '{store}';
+ALTER TABLE public.plans   ADD COLUMN IF NOT EXISTS product character varying(16) NOT NULL DEFAULT 'store'; -- store|services
+
+CREATE TABLE IF NOT EXISTS public.api_keys (
+    id                 uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    owner_id           uuid NOT NULL,
+    tenant_id          uuid NOT NULL,
+    name               character varying(80) NOT NULL,
+    key_prefix         character varying(16) NOT NULL,  -- 'jk_live_' + 8 chars, shown in UI
+    key_hash           character(64) NOT NULL,          -- sha256 hex of the full key; plaintext never stored
+    scopes             text[] NOT NULL DEFAULT '{}',    -- messages:send | templates:read | templates:write | documents:render | documents:read | wallet:read
+    rate_limit_per_min integer NOT NULL DEFAULT 120,
+    status             character varying(16) NOT NULL DEFAULT 'active', -- active|revoked
+    last_used_at       timestamp with time zone,
+    revoked_at         timestamp with time zone,
+    created_at         timestamp with time zone NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.api_key_usage_daily (
+    api_key_id   uuid NOT NULL,
+    day          date NOT NULL,
+    requests     integer NOT NULL DEFAULT 0,
+    messages     integer NOT NULL DEFAULT 0,
+    documents    integer NOT NULL DEFAULT 0,
+    spend_paise  bigint  NOT NULL DEFAULT 0
+);
+
+ALTER TABLE ONLY public.api_keys ADD CONSTRAINT api_keys_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.api_keys ADD CONSTRAINT api_keys_key_hash_key UNIQUE (key_hash);
+ALTER TABLE ONLY public.api_keys ADD CONSTRAINT api_keys_status_check CHECK (status IN ('active','revoked'));
+ALTER TABLE ONLY public.api_keys ADD CONSTRAINT api_keys_owner_id_fkey  FOREIGN KEY (owner_id)  REFERENCES public.owners(id)  ON DELETE CASCADE;
+ALTER TABLE ONLY public.api_keys ADD CONSTRAINT api_keys_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.api_key_usage_daily ADD CONSTRAINT api_key_usage_daily_pkey PRIMARY KEY (api_key_id, day);
+ALTER TABLE ONLY public.api_key_usage_daily ADD CONSTRAINT api_key_usage_daily_api_key_id_fkey FOREIGN KEY (api_key_id) REFERENCES public.api_keys(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON public.api_keys USING btree (tenant_id, status);
+
+-- ─────────────────────────────────────────────────────────────────────────────

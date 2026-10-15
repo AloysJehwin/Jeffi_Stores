@@ -43,8 +43,20 @@ describe('slugFromHost', () => {
       '127.0.0.1:3000',
       'jeffi.local',
     ]) {
-      expect(slugFromHost(host)).toEqual({ slug: null, isCustomDomain: false })
+      expect(slugFromHost(host).isCustomDomain).toBe(false)
     }
+  })
+
+  // Local tenants: *.localhost is an alternate platform root so a tenant store can be reached
+  // locally exactly like its prod subdomain (scripts/local-tenant.ts). Reserved/apex stay platform.
+  it('resolves {slug}.localhost (and its app subdomains) to the tenant slug', () => {
+    expect(slugFromHost('testco.localhost:3000')).toEqual({ slug: 'testco', isCustomDomain: false })
+    expect(slugFromHost('admin-testco.localhost')).toEqual({ slug: 'testco', isCustomDomain: false })
+    expect(slugFromHost('testco.business.localhost')).toEqual({ slug: 'testco', isCustomDomain: false })
+    // apex + reserved single-label app hosts remain platform (no tenant)
+    expect(slugFromHost('localhost').slug).toBeNull()
+    expect(slugFromHost('admin.localhost').slug).toBeNull()
+    expect(slugFromHost('ecom.localhost').slug).toBeNull()
   })
 
   it('still flags real off-platform hosts as custom domains', () => {

@@ -98,7 +98,7 @@ describe('reviewPhotoFollowup scenario', () => {
       expect(kind).toBe('review_photo_followup')
       expect(userId).toBe('u1')
       expect(vars.product).toBe('Widget')
-      expect(cd).toBe(1)
+      expect(cd).toBe(days(1))
     })
 
     it('returns no_user when the user is gone', async () => {

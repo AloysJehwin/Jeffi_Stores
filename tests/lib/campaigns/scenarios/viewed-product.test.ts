@@ -106,12 +106,12 @@ describe('viewedProduct scenario', () => {
         { campaign, params: { ...defaultParams, whatsappEnabled: true } }
       )
       expect(mockSendWa).toHaveBeenCalledOnce()
-      const [kind, userId, vars, cooldownDays] = mockSendWa.mock.calls[0]
+      const [kind, userId, vars, cooldownMin] = mockSendWa.mock.calls[0]
       expect(kind).toBe('viewed_product')
       expect(userId).toBe('u1')
       expect(vars.items).toBe('Widget')
-      // sendCooldown default = 7 days -> cooldownDays === 7
-      expect(cooldownDays).toBe(7)
+      // sendCooldown default = 7 days -> cooldownMin === days(7) = 10080 min
+      expect(cooldownMin).toBe(10080) // 7 days in minutes
     })
 
     it('returns no_items when the product is gone', async () => {

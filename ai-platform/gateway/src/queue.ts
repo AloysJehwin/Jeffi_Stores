@@ -1,6 +1,8 @@
-import { Queue, Worker, QueueEvents, type JobsOptions } from 'bullmq'
+import { randomUUID } from 'node:crypto'
+import { Queue, Worker, QueueEvents, Job, type JobsOptions } from 'bullmq'
 import IORedis from 'ioredis'
 import { CONFIG } from './config'
+import { JobWaiters } from './job-waiters'
 
 // Durable job queue so an admin request is never lost: every chat/embed/vision call is
 // enqueued to Redis (AOF-persisted) before any model work. A job survives an Ollama pod
@@ -15,6 +17,14 @@ const connection = new IORedis(CONFIG.redisUrl, { maxRetriesPerRequest: null })
 
 export const queue = new Queue(QUEUE_NAME, { connection })
 const events = new QueueEvents(QUEUE_NAME, { connection })
+const waiters = new JobWaiters(events, async (jobId) => {
+  const job = await Job.fromId(queue, jobId)
+  if (!job) return null
+  const state = await job.getState()
+  if (state === 'completed') return { state, value: job.returnvalue }
+  if (state === 'failed') return { state, reason: job.failedReason }
+  return null
+})
 
 const DEFAULT_OPTS: JobsOptions = {
   attempts: Number(process.env.AI_JOB_ATTEMPTS) || 3,
@@ -28,12 +38,22 @@ export interface JobData { kind: JobKind; payload: unknown }
 
 /**
  * Enqueue a job and resolve with its result when the worker finishes. Rejects if the job
- * exhausts its retries (moved to failed) — never hangs past the job's own lifecycle.
+ * exhausts its retries, or after jobWaitTimeoutMs (the job itself keeps running).
  */
 export async function runJob<T>(data: JobData): Promise<T> {
-  const job = await queue.add(data.kind, data, DEFAULT_OPTS)
-  const result = await job.waitUntilFinished(events)
-  return result as T
+  await events.waitUntilReady()
+  const jobId = randomUUID()
+  const result = waiters.wait<T>(jobId, CONFIG.jobWaitTimeoutMs)
+  try {
+    await queue.add(data.kind, data, { ...DEFAULT_OPTS, jobId })
+  } catch (err) {
+    waiters.cancel(jobId, err as Error)
+  }
+  return result
+}
+
+export function pendingWaiters(): number {
+  return waiters.size
 }
 
 /** Register the processor. The gateway starts one Worker per replica; scale via replicas. */

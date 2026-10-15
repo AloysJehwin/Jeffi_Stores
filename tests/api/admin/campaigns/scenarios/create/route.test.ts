@@ -25,7 +25,7 @@ const mockValidateSql = vi.mocked(validateScenarioSql)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const admin = { adminId: 'admin-1', username: 'testadmin', id: 'admin-uuid-1', role: 'super_admin', scopes: ['mailer'] }
+const admin = { adminId: 'admin-1', username: 'testadmin', role: 'super_admin', scopes: ['mailer'] }
 
 function makeRequest(body: unknown) {
   return new NextRequest('http://localhost/api/admin/campaigns/scenarios/create', {
@@ -116,7 +116,7 @@ describe('POST /api/admin/campaigns/scenarios/create', () => {
     // should have inserted audit log — action is hardcoded in SQL, params are [adminId, kind, sql, jsonb]
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('scenario_audit_log'),
-      expect.arrayContaining([admin.id])
+      expect.arrayContaining([admin.adminId])
     )
   })
 
