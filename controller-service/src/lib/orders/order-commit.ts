@@ -9,6 +9,8 @@ import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
 import { grantOrderEntitlements } from '@/lib/orders/entitlements'
 import { digitalUnitError } from '@/lib/catalog/digital-units'
 import { sellingUnitsFor } from '@/lib/catalog/unit-factor'
+import { attachOrderAttribution } from '@/lib/orders/attribution'
+import type { Attribution } from '@/lib/shared/attribution'
 
 export interface CartLine {
   product_id: string
@@ -442,6 +444,8 @@ export interface CommitInput {
   shippingAmount: number
   codFeeAmount: number
   paymentRecord: { gatewayOrderId: string; paymentId: string; signature: string; amountPaise: number } | null
+  /** Buyer's click / UTM attribution (from the browser cookie; absent on webhook commits). */
+  attribution?: Attribution | null
 }
 
 export interface CartCommitInput extends CommitInput {
@@ -727,9 +731,17 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
       ]
     )
     const created = orderResult.rows[0]
+    await attachOrderAttribution(client, created.id, input.attribution ?? null)
 
     // Selling-unit snapshot (unit, pieces per unit, total pieces) for packing, shipping, stock and adjustments.
-    const soldUnits = await sellingUnitsFor(itemRows.map(r => ({ productId: r.productId, variantId: r.variantId, subVariantId: r.subVariantId, unit: r.buyUnit })))
+    const soldUnits = await sellingUnitsFor(
+      itemRows.map(r => ({
+        productId: r.productId,
+        variantId: r.variantId,
+        subVariantId: r.subVariantId,
+        unit: r.buyUnit,
+      }))
+    )
     for (const [k, r] of itemRows.entries()) {
       const su = soldUnits[k]
       // When GST is off we charge the ex-GST price, so there is NO embedded tax

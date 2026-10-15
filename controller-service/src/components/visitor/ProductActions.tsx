@@ -11,6 +11,7 @@ import QuantityInput from '@/components/shared/QuantityInput'
 import InCartQtyHint from '@/components/shared/InCartQtyHint'
 import { inCartQuantity, pickerQtyCap, unitCapError } from '@/lib/catalog/cart-unit-cap'
 import { round2 } from '@/lib/catalog/gst'
+import { trackAddToCart, trackViewItem } from '@/lib/client/analytics'
 import { resolveEdd } from '@/lib/shipping/edd-cache'
 import StickyAddToCartBar from './pdp/StickyAddToCartBar'
 import { PDP_BUY_BUTTONS_ID, PDP_OPTIONS_ID, stickyBarAction } from './pdp/pdp'
@@ -535,6 +536,14 @@ export default function ProductActions({
     })
   }, [effectiveUnitKey, effectiveUnitLabel, qtyMin, qtyMax, qtyStep, unitFactor, sellUnit?.dimension])
 
+  const selectedOptionName = selectedSubVariant?.sub_variant_name || selectedVariant?.variant_name || null
+  const viewedSku = useRef<string | null>(null)
+  useEffect(() => {
+    if (!displaySku || viewedSku.current === displaySku) return
+    viewedSku.current = displaySku
+    trackViewItem({ sku: displaySku, name: productName, price: effectivePrice, variant: selectedOptionName })
+  }, [displaySku, productName, effectivePrice, selectedOptionName])
+
   const handleAddToCart = async () => {
     if (addBlocked) {
       showToast(unitCapError(qtyMax, cartCap.inCart, quantity) ?? 'Max quantity already in cart', 'error')
@@ -554,6 +563,13 @@ export default function ProductActions({
         effectiveUnitKey,
         selectedSubVariantId || undefined
       )
+      trackAddToCart({
+        sku: displaySku,
+        name: productName,
+        price: effectivePrice,
+        quantity,
+        variant: selectedOptionName,
+      })
       showToast('Item added to cart!', 'success')
     } catch (error: any) {
       showToast(error.message || 'Failed to add to cart', 'error')

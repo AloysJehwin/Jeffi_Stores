@@ -6,6 +6,7 @@ import Link from 'next/link'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 import OrderAffirmation from '@/components/on-device/OrderAffirmation'
 import OrderCelebration from './OrderCelebration'
+import { trackPurchase } from '@/lib/client/analytics'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -24,6 +25,9 @@ interface OrderDetails {
   id: string
   orderNumber: string
   totalAmount: number
+  taxAmount?: number
+  shippingAmount?: number
+  couponCode?: string | null
   status: string
   createdAt: string
   shippingAddress: {
@@ -37,6 +41,9 @@ interface OrderDetails {
   items: Array<{
     id: string
     productName: string
+    productSku?: string | null
+    subVariantSku?: string | null
+    variantName?: string | null
     quantity: number
     unitPrice: number
     totalPrice: number
@@ -76,6 +83,23 @@ function OrderConfirmationPage() {
         }
         const data = await response.json()
         setOrder(data.order)
+        const o: OrderDetails | undefined = data.order
+        if (o && o.status !== 'cancelled') {
+          trackPurchase({
+            orderNumber: o.orderNumber,
+            totalAmount: o.totalAmount,
+            taxAmount: o.taxAmount,
+            shippingAmount: o.shippingAmount,
+            couponCode: o.couponCode,
+            items: o.items.map(i => ({
+              sku: i.subVariantSku || i.productSku,
+              name: i.productName,
+              price: i.unitPrice,
+              quantity: Number(i.quantity),
+              variant: i.variantName,
+            })),
+          })
+        }
       } catch (err: any) {
         setError(err.message)
       } finally {

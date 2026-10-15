@@ -9,6 +9,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { round2 } from '@/lib/catalog/gst'
+import { trackAddToCart } from '@/lib/client/analytics'
 import QuantityInput from '@/components/shared/QuantityInput'
 import InCartQtyHint from '@/components/shared/InCartQtyHint'
 import { inCartQuantity, pickerQtyCap } from '@/lib/catalog/cart-unit-cap'
@@ -398,6 +399,13 @@ export default function QuickAddPicker({
         effectiveUnitKey,
         selectedSubVariantId || undefined
       )
+      trackAddToCart({
+        sku: selectedSubVariant?.sku || selectedVariant?.sku,
+        name: productName,
+        price: effectivePrice,
+        quantity,
+        variant: selectedSubVariant?.sub_variant_name || selectedVariant?.variant_name || null,
+      })
       showToast('Item added to cart!', 'success')
       onClose()
     } catch (err) {
@@ -408,6 +416,9 @@ export default function QuickAddPicker({
   }, [
     adding,
     addToCart,
+    effectivePrice,
+    productName,
+    selectedSubVariant,
     effectiveUnitKey,
     isDigital,
     portal,

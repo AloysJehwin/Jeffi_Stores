@@ -19,6 +19,7 @@ import {
   ShoppingCart,
   Eye,
   Package,
+  Target,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
@@ -142,6 +143,207 @@ interface NoResultSearchRow {
   searches: number
 }
 
+interface SourceOrdersRow {
+  channel: string
+  medium: string | null
+  campaign: string | null
+  orders: number
+  revenue: number
+}
+
+interface SourceSessionsRow {
+  channel: string
+  medium: string | null
+  campaign: string | null
+  sessions: number
+}
+
+interface TrafficSources {
+  orders: SourceOrdersRow[]
+  sessions: SourceSessionsRow[]
+  summary: {
+    totalOrders: number
+    totalRevenue: number
+    attributedOrders: number
+    googleAdsOrders: number
+    googleAdsRevenue: number
+    googleAdsSessions: number
+  }
+}
+
+const GOOGLE_ADS_CHANNEL = 'Google Ads'
+const inr = (n: number) => `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+
+function SourceLabel({
+  channel,
+  medium,
+  campaign,
+}: {
+  channel: string
+  medium: string | null
+  campaign: string | null
+}) {
+  const isAds = channel === GOOGLE_ADS_CHANNEL
+  const isDirect = channel.startsWith('Direct')
+  return (
+    <div className="min-w-0">
+      <p
+        className={`text-xs font-medium truncate ${isAds ? 'text-accent-600 dark:text-accent-400' : isDirect ? 'text-foreground-muted italic' : 'text-foreground'}`}
+      >
+        {channel}
+        {medium ? <span className="text-foreground-muted font-normal"> / {medium}</span> : null}
+      </p>
+      {campaign && <p className="text-[11px] text-foreground-muted truncate">{campaign}</p>}
+    </div>
+  )
+}
+
+function SourcesTab({ sources }: { sources: TrafficSources | undefined }) {
+  const [orderPage, setOrderPage] = useState(1)
+  const [sessionPage, setSessionPage] = useState(1)
+  if (!sources) return <Empty />
+  const { summary } = sources
+  const maxRevenue = Math.max(...sources.orders.map(r => r.revenue), 1)
+  const maxSessions = Math.max(...sources.sessions.map(r => r.sessions), 1)
+  const totalSessions = sources.sessions.reduce((s, r) => s + r.sessions, 0)
+  const pagedOrders = sources.orders.slice((orderPage - 1) * PAGE_SIZE, orderPage * PAGE_SIZE)
+  const pagedSessions = sources.sessions.slice((sessionPage - 1) * PAGE_SIZE, sessionPage * PAGE_SIZE)
+  const th = 'py-2 px-2 font-semibold'
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          label="Orders"
+          value={summary.totalOrders.toLocaleString()}
+          sub={inr(summary.totalRevenue)}
+          icon={ShoppingCart}
+        />
+        <KpiCard
+          label="Attributed"
+          value={summary.attributedOrders.toLocaleString()}
+          sub={
+            summary.totalOrders > 0
+              ? `${Math.round((summary.attributedOrders / summary.totalOrders) * 100)}% of orders`
+              : 'No orders yet'
+          }
+          icon={Target}
+        />
+        <KpiCard
+          label="Google Ads orders"
+          value={summary.googleAdsOrders.toLocaleString()}
+          sub={inr(summary.googleAdsRevenue)}
+          highlight={summary.googleAdsOrders > 0}
+          icon={TrendingUp}
+        />
+        <KpiCard label="Google Ads sessions" value={summary.googleAdsSessions.toLocaleString()} icon={Eye} />
+      </div>
+
+      <CollapsibleSection title="Orders & revenue by source" badge={sources.orders.length}>
+        {sources.orders.length === 0 ? (
+          <Empty msg="No orders in this period" />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border-default text-xs uppercase tracking-wide text-foreground-muted">
+                    <th className={`text-left ${th}`}>Source / medium · campaign</th>
+                    <th className={`text-right ${th}`}>Orders</th>
+                    <th className={`text-right ${th}`}>Revenue</th>
+                    <th className={`text-right ${th}`}>Share</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {pagedOrders.map(r => (
+                    <tr key={`${r.channel}|${r.medium}|${r.campaign}`} className="hover:bg-surface-secondary/50">
+                      <td className="py-2 px-2 max-w-[260px]">
+                        <SourceLabel channel={r.channel} medium={r.medium} campaign={r.campaign} />
+                        <div className="mt-1 h-1 bg-surface-secondary rounded-full">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${Math.round((r.revenue / maxRevenue) * 100)}%`,
+                              backgroundColor: r.channel === GOOGLE_ADS_CHANNEL ? '#f97316' : 'rgba(148,163,184,0.7)',
+                            }}
+                          />
+                        </div>
+                      </td>
+                      <td className="py-2 px-2 text-right text-xs font-semibold text-foreground tabular-nums">
+                        {r.orders.toLocaleString()}
+                      </td>
+                      <td className="py-2 px-2 text-right text-xs font-semibold text-foreground tabular-nums">
+                        {inr(r.revenue)}
+                      </td>
+                      <td className="py-2 px-2 text-right text-xs text-foreground-secondary tabular-nums">
+                        {summary.totalRevenue > 0 ? Math.round((r.revenue / summary.totalRevenue) * 100) : 0}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination page={orderPage} total={sources.orders.length} pageSize={PAGE_SIZE} onChange={setOrderPage} />
+          </>
+        )}
+      </CollapsibleSection>
+
+      <CollapsibleSection title="Sessions by source" badge={sources.sessions.length}>
+        {sources.sessions.length === 0 ? (
+          <Empty />
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border-default text-xs uppercase tracking-wide text-foreground-muted">
+                    <th className={`text-left ${th}`}>Source / medium · campaign</th>
+                    <th className={`text-right ${th}`}>Sessions</th>
+                    <th className={`text-right ${th}`}>Share</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {pagedSessions.map(r => (
+                    <tr key={`${r.channel}|${r.medium}|${r.campaign}`} className="hover:bg-surface-secondary/50">
+                      <td className="py-2 px-2 max-w-[260px]">
+                        <SourceLabel channel={r.channel} medium={r.medium} campaign={r.campaign} />
+                        <div className="mt-1 h-1 bg-surface-secondary rounded-full">
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${Math.round((r.sessions / maxSessions) * 100)}%`,
+                              backgroundColor: r.channel === GOOGLE_ADS_CHANNEL ? '#f97316' : 'rgba(148,163,184,0.7)',
+                            }}
+                          />
+                        </div>
+                      </td>
+                      <td className="py-2 px-2 text-right text-xs font-semibold text-foreground tabular-nums">
+                        {r.sessions.toLocaleString()}
+                      </td>
+                      <td className="py-2 px-2 text-right text-xs text-foreground-secondary tabular-nums">
+                        {totalSessions > 0 ? Math.round((r.sessions / totalSessions) * 100) : 0}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <Pagination
+              page={sessionPage}
+              total={sources.sessions.length}
+              pageSize={PAGE_SIZE}
+              onChange={setSessionPage}
+            />
+          </>
+        )}
+      </CollapsibleSection>
+      <p className="text-xs text-foreground-muted">
+        Attribution is the visitor&apos;s last ad click or UTM-tagged visit within 90 days. A Google Ads click id
+        (gclid, gbraid, wbraid) counts as Google Ads whatever the UTM tags say.
+      </p>
+    </div>
+  )
+}
+
 interface TrafficData {
   funnel: FunnelStep[]
   topPages: PageRow[]
@@ -154,6 +356,7 @@ interface TrafficData {
   conversionLaggards: ConversionLaggardRow[]
   topSearchTerms: SearchTermRow[]
   noResultSearches: NoResultSearchRow[]
+  sources?: TrafficSources
   totals: Totals
 }
 
@@ -421,8 +624,8 @@ function CollapsibleSection({
   )
 }
 
-type TrafficTab = 'overview' | 'funnel' | 'pages' | 'audience' | 'products'
-const TRAFFIC_TABS: TrafficTab[] = ['overview', 'funnel', 'products', 'pages', 'audience']
+type TrafficTab = 'overview' | 'funnel' | 'pages' | 'audience' | 'products' | 'sources'
+const TRAFFIC_TABS: TrafficTab[] = ['overview', 'funnel', 'products', 'sources', 'pages', 'audience']
 
 export default function TrafficClient() {
   const router = useRouter()
@@ -479,6 +682,7 @@ export default function TrafficClient() {
     { id: 'overview' as const, label: 'Overview', icon: BarChart2 },
     { id: 'funnel' as const, label: 'Funnel', icon: TrendingUp },
     { id: 'products' as const, label: 'Products', icon: Package },
+    { id: 'sources' as const, label: 'Sources', icon: Target },
     { id: 'pages' as const, label: 'Pages & Sources', icon: Eye },
     { id: 'audience' as const, label: 'Audience', icon: Smartphone },
   ]
@@ -1183,6 +1387,8 @@ export default function TrafficClient() {
           )}
 
           {/* ── PAGES & SOURCES ── */}
+          {tab === 'sources' && <SourcesTab key={days} sources={data.sources} />}
+
           {tab === 'pages' && (
             <div className="space-y-5">
               <CollapsibleSection title="Top Pages" defaultOpen={true} badge={data.topPages.length}>
