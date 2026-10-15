@@ -1,5 +1,5 @@
 import { query, queryMany, queryOne } from '@/lib/shared/db'
-import { listProductStatuses } from './client'
+import { listProducts } from './client'
 
 // Advisory lock so two refreshes can't run concurrently (distinct from the sync lock).
 const GMC_STATUS_LOCK_KEY = 84219574
@@ -23,19 +23,32 @@ export interface GmcSummary {
   disapproved: number
 }
 
-// Derive a single overall status for a GMC productstatus resource from its
-// destinationStatuses (an item is approved only if no destination disapproves it).
-function deriveStatus(ps: any): string {
-  const dests: any[] = ps.destinationStatuses || []
-  const vals = dests.map(d => (d.status || d.approvalStatus || '').toLowerCase())
-  if (vals.some(v => v === 'disapproved')) return 'disapproved'
-  if (vals.some(v => v === 'pending')) return 'pending'
-  if (vals.length && vals.every(v => v === 'approved')) return 'approved'
-  return vals[0] || 'unknown'
+// One overall status from a Merchant API productStatus: disapproved if any reporting context
+// disapproves it in any country, else pending if any is pending, else approved.
+function deriveStatus(status: any): string {
+  const dests: any[] = status?.destinationStatuses || []
+  const any = (key: string) => dests.some(d => (d[key] || []).length > 0)
+  if (any('disapprovedCountries')) return 'disapproved'
+  if (any('pendingCountries')) return 'pending'
+  if (any('approvedCountries')) return 'approved'
+  return 'unknown'
 }
 
-// Pull ALL GMC product statuses (paginated) and upsert into merchant_gmc_status,
-// then recompute the aggregate meta row. Returns the fresh summary.
+const SERVABILITY: Record<string, string> = {
+  DISAPPROVED: 'disapproved',
+  DEMOTED: 'demoted',
+  NOT_IMPACTED: 'unaffected',
+}
+
+function formatPrice(p: any): string | null {
+  const micros = Number(p?.amountMicros)
+  return Number.isFinite(micros) && p?.amountMicros != null
+    ? `${(micros / 1_000_000).toFixed(2)} ${p.currencyCode || ''}`.trim()
+    : null
+}
+
+// Pull ALL processed products with their status (Merchant API products.list, paginated), upsert
+// them into merchant_gmc_status, then recompute the aggregate meta row. Returns the fresh summary.
 export async function refreshGmcStatusSnapshot(): Promise<GmcSummary | { locked: true }> {
   const lock = await queryOne<{ acquired: boolean }>(`SELECT pg_try_advisory_lock($1) AS acquired`, [
     GMC_STATUS_LOCK_KEY,
@@ -46,35 +59,41 @@ export async function refreshGmcStatusSnapshot(): Promise<GmcSummary | { locked:
     const seen: string[] = []
     let pageToken: string | undefined
     do {
-      const res = await listProductStatuses(pageToken)
-      const rows = res.resources || []
-      for (const ps of rows) {
-        // productId format: "online:en:IN:<offerId>"
-        const offerId =
-          String(ps.productId || '')
-            .split(':')
-            .slice(3)
-            .join(':') ||
-          ps.productId ||
-          ''
+      const res = await listProducts(pageToken)
+      for (const product of res.products || []) {
+        const offerId = product.offerId || ''
         if (!offerId) continue
-        const status = deriveStatus(ps)
+        const attrs = product.productAttributes || {}
+        const ps = product.productStatus || {}
         const issues = (ps.itemLevelIssues || []).map((i: any) => ({
           code: i.code,
-          servability: i.servability,
+          severity: i.severity,
+          servability: SERVABILITY[i.severity] || String(i.severity || '').toLowerCase(),
           description: i.description,
           detail: i.detail,
-          attribute: i.attributeName,
+          attribute: i.attribute,
+          resolution: i.resolution,
+          documentation: i.documentation,
         }))
         await query(
           `INSERT INTO merchant_gmc_status
-             (offer_id, title, status, destination_statuses, item_issues, synced_at)
-           VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, now())
+             (offer_id, title, status, item_group_id, link, price, destination_statuses, item_issues, synced_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, now())
            ON CONFLICT (offer_id) DO UPDATE SET
-             title = EXCLUDED.title, status = EXCLUDED.status,
+             title = EXCLUDED.title, status = EXCLUDED.status, item_group_id = EXCLUDED.item_group_id,
+             link = EXCLUDED.link, price = EXCLUDED.price,
              destination_statuses = EXCLUDED.destination_statuses,
              item_issues = EXCLUDED.item_issues, synced_at = now()`,
-          [offerId, ps.title || null, status, JSON.stringify(ps.destinationStatuses || []), JSON.stringify(issues)]
+          [
+            offerId,
+            attrs.title || null,
+            deriveStatus(ps),
+            attrs.itemGroupId || null,
+            attrs.link || null,
+            formatPrice(attrs.salePrice || attrs.price),
+            JSON.stringify(ps.destinationStatuses || []),
+            JSON.stringify(issues),
+          ]
         )
         seen.push(offerId)
       }

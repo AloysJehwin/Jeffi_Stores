@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
-const { mockQuery, mockQueryOne, mockQueryMany, mockListProductStatuses } = vi.hoisted(() => ({
+const { mockQuery, mockQueryOne, mockQueryMany, mockListProducts } = vi.hoisted(() => ({
   mockQuery: vi.fn(),
   mockQueryOne: vi.fn(),
   mockQueryMany: vi.fn(),
-  mockListProductStatuses: vi.fn(),
+  mockListProducts: vi.fn(),
 }))
 
 vi.mock('@/lib/shared/db', () => ({
@@ -17,8 +17,16 @@ vi.mock('@/lib/shared/db', () => ({
 }))
 
 vi.mock('@/lib/merchant/client', () => ({
-  listProductStatuses: mockListProductStatuses,
+  listProducts: mockListProducts,
 }))
+
+// Merchant API v1 processed product with a productStatus.
+const product = (offerId: string, dest: Record<string, string[]>[] = [], extra: Record<string, unknown> = {}) => ({
+  offerId,
+  productAttributes: { title: `Product ${offerId}` },
+  productStatus: { destinationStatuses: dest.map(d => ({ reportingContext: 'SHOPPING_ADS', ...d })) },
+  ...extra,
+})
 
 import { refreshGmcStatusSnapshot, getGmcSummary, getGmcStatusPage } from '@/lib/merchant/gmc-status'
 
@@ -32,7 +40,7 @@ describe('refreshGmcStatusSnapshot', () => {
     mockQueryOne.mockResolvedValueOnce({ acquired: false }) // pg_try_advisory_lock
     const res = await refreshGmcStatusSnapshot()
     expect(res).toEqual({ locked: true })
-    expect(mockListProductStatuses).not.toHaveBeenCalled()
+    expect(mockListProducts).not.toHaveBeenCalled()
   })
 
   it('returns { locked: true } when lock row is null', async () => {
@@ -42,36 +50,30 @@ describe('refreshGmcStatusSnapshot', () => {
   })
 
   it('paginates, upserts, deletes stale, recomputes and returns summary', async () => {
-    // lock
     mockQueryOne.mockResolvedValueOnce({ acquired: true })
-    // two pages
-    mockListProductStatuses
+    mockListProducts
       .mockResolvedValueOnce({
-        resources: [
-          {
-            productId: 'online:en:IN:SKU-1',
-            title: 'Product 1',
-            destinationStatuses: [{ status: 'approved' }],
-            itemLevelIssues: [
-              { code: 'c1', servability: 'disapproved', description: 'd', detail: 'dt', attributeName: 'attr' },
-            ],
-          },
+        products: [
+          product('SKU-1', [{ approvedCountries: ['IN'] }], {
+            productAttributes: {
+              title: 'Product 1',
+              link: 'https://store.example.com/products/p1',
+              itemGroupId: 'G1',
+              price: { amountMicros: '249000000', currencyCode: 'INR' },
+              salePrice: { amountMicros: '199000000', currencyCode: 'INR' },
+            },
+            productStatus: {
+              destinationStatuses: [{ reportingContext: 'SHOPPING_ADS', approvedCountries: ['IN'] }],
+              itemLevelIssues: [
+                { code: 'c1', severity: 'DEMOTED', description: 'd', detail: 'dt', attribute: 'attr', resolution: 'r' },
+              ],
+            },
+          }),
         ],
         nextPageToken: 'page2',
       })
-      .mockResolvedValueOnce({
-        resources: [
-          {
-            productId: 'online:en:IN:SKU-2',
-            title: 'Product 2',
-            destinationStatuses: [{ status: 'pending' }],
-          },
-        ],
-        nextPageToken: undefined,
-      })
-    // counts (queryOne)
+      .mockResolvedValueOnce({ products: [product('SKU-2', [{ pendingCountries: ['IN'] }])], nextPageToken: undefined })
     mockQueryOne.mockResolvedValueOnce({ total: 2, approved: 1, pending: 1, disapproved: 0 })
-    // getGmcSummary (queryOne)
     mockQueryOne.mockResolvedValueOnce({
       last_refreshed_at: '2026-01-01T00:00:00Z',
       total: 2,
@@ -88,63 +90,49 @@ describe('refreshGmcStatusSnapshot', () => {
       pending: 1,
       disapproved: 0,
     })
-    expect(mockListProductStatuses).toHaveBeenCalledTimes(2)
-    // upsert per offer + delete stale + meta insert + unlock
+    expect(mockListProducts).toHaveBeenCalledTimes(2)
+    expect(mockListProducts).toHaveBeenLastCalledWith('page2')
     const upsertCalls = mockQuery.mock.calls.filter(c => String(c[0]).includes('INSERT INTO merchant_gmc_status'))
     expect(upsertCalls).toHaveLength(2)
-    const deleteCall = mockQuery.mock.calls.find(c => String(c[0]).includes('DELETE FROM merchant_gmc_status'))
-    expect(deleteCall).toBeTruthy()
-    const unlockCall = mockQuery.mock.calls.find(c => String(c[0]).includes('pg_advisory_unlock'))
-    expect(unlockCall).toBeTruthy()
+    const [offerId, title, status, group, link, price, , issues] = upsertCalls[0][1]
+    expect([offerId, title, status, group, link, price]).toEqual([
+      'SKU-1',
+      'Product 1',
+      'approved',
+      'G1',
+      'https://store.example.com/products/p1',
+      '199.00 INR',
+    ])
+    expect(JSON.parse(issues)[0]).toMatchObject({ code: 'c1', servability: 'demoted', attribute: 'attr' })
+    expect(upsertCalls[1][1][2]).toBe('pending')
+    expect(mockQuery.mock.calls.find(c => String(c[0]).includes('DELETE FROM merchant_gmc_status'))).toBeTruthy()
+    expect(mockQuery.mock.calls.find(c => String(c[0]).includes('pg_advisory_unlock'))).toBeTruthy()
   })
 
-  it('skips rows with empty offerId and does not delete when nothing seen', async () => {
+  it('skips products without an offerId and does not delete when nothing seen', async () => {
     mockQueryOne.mockResolvedValueOnce({ acquired: true })
-    mockListProductStatuses.mockResolvedValueOnce({
-      resources: [{ productId: '', destinationStatuses: [] }],
-      nextPageToken: undefined,
-    })
+    mockListProducts.mockResolvedValueOnce({ products: [product('')], nextPageToken: undefined })
     mockQueryOne.mockResolvedValueOnce({ total: 0, approved: 0, pending: 0, disapproved: 0 })
-    mockQueryOne.mockResolvedValueOnce(null) // getGmcSummary -> default
+    mockQueryOne.mockResolvedValueOnce(null)
 
     const res = await refreshGmcStatusSnapshot()
     expect(res).toEqual({ last_refreshed_at: null, total: 0, approved: 0, pending: 0, disapproved: 0 })
-    // no upsert (empty offerId skipped) and no DELETE (seen empty)
     expect(mockQuery.mock.calls.some(c => String(c[0]).includes('INSERT INTO merchant_gmc_status'))).toBe(false)
     expect(mockQuery.mock.calls.some(c => String(c[0]).includes('DELETE FROM merchant_gmc_status'))).toBe(false)
   })
 
-  it('falls back to raw productId when it has no colon segments', async () => {
+  it('handles a page with no products key', async () => {
     mockQueryOne.mockResolvedValueOnce({ acquired: true })
-    mockListProductStatuses.mockResolvedValueOnce({
-      resources: [{ productId: 'RAWOFFER', destinationStatuses: [{ status: 'disapproved' }] }],
-      nextPageToken: undefined,
-    })
-    mockQueryOne.mockResolvedValueOnce({ total: 1, approved: 0, pending: 0, disapproved: 1 })
-    mockQueryOne.mockResolvedValueOnce({ last_refreshed_at: 't', total: 1, approved: 0, pending: 0, disapproved: 1 })
-
-    await refreshGmcStatusSnapshot()
-    const upsert = mockQuery.mock.calls.find(c => String(c[0]).includes('INSERT INTO merchant_gmc_status'))
-    expect(upsert![1][0]).toBe('RAWOFFER')
-    expect(upsert![1][2]).toBe('disapproved')
-  })
-
-  it('handles empty resources (defaults to [])', async () => {
-    mockQueryOne.mockResolvedValueOnce({ acquired: true })
-    mockListProductStatuses.mockResolvedValueOnce({ nextPageToken: undefined }) // no resources key
+    mockListProducts.mockResolvedValueOnce({ nextPageToken: undefined })
     mockQueryOne.mockResolvedValueOnce({ total: 0, approved: 0, pending: 0, disapproved: 0 })
     mockQueryOne.mockResolvedValueOnce({ last_refreshed_at: null, total: 0, approved: 0, pending: 0, disapproved: 0 })
-    const res = await refreshGmcStatusSnapshot()
-    expect(res).toBeTruthy()
+    expect(await refreshGmcStatusSnapshot()).toBeTruthy()
   })
 
   it('defaults meta counts to 0 when counts row is null', async () => {
     mockQueryOne.mockResolvedValueOnce({ acquired: true })
-    mockListProductStatuses.mockResolvedValueOnce({
-      resources: [{ productId: 'online:en:IN:X', destinationStatuses: [{ status: 'approved' }] }],
-      nextPageToken: undefined,
-    })
-    mockQueryOne.mockResolvedValueOnce(null) // counts null
+    mockListProducts.mockResolvedValueOnce({ products: [product('X', [{ approvedCountries: ['IN'] }])] })
+    mockQueryOne.mockResolvedValueOnce(null)
     mockQueryOne.mockResolvedValueOnce({ last_refreshed_at: 't', total: 0, approved: 0, pending: 0, disapproved: 0 })
 
     await refreshGmcStatusSnapshot()
@@ -152,33 +140,29 @@ describe('refreshGmcStatusSnapshot', () => {
     expect(metaCall![1]).toEqual([0, 0, 0, 0])
   })
 
-  it('derives status variants: mixed uses approvalStatus, empty -> unknown', async () => {
+  it('derives the overall status across reporting contexts', async () => {
     mockQueryOne.mockResolvedValueOnce({ acquired: true })
-    mockListProductStatuses.mockResolvedValueOnce({
-      resources: [
-        // uses approvalStatus fallback, all approved -> approved
-        { productId: 'online:en:IN:A', destinationStatuses: [{ approvalStatus: 'approved' }] },
-        // no destinationStatuses at all -> vals empty -> 'unknown'
-        { productId: 'online:en:IN:B' },
-        // first value used when not approved/pending/disapproved and not all approved
-        { productId: 'online:en:IN:C', destinationStatuses: [{ status: 'weird' }, { status: 'approved' }] },
+    mockListProducts.mockResolvedValueOnce({
+      products: [
+        product('A', [{ approvedCountries: ['IN'] }, { approvedCountries: ['IN'] }]),
+        product('B', [{ approvedCountries: ['IN'] }, { disapprovedCountries: ['IN'] }]),
+        product('C', [{ approvedCountries: ['IN'] }, { pendingCountries: ['IN'] }]),
+        product('D'),
+        { offerId: 'E' },
       ],
-      nextPageToken: undefined,
     })
-    mockQueryOne.mockResolvedValueOnce({ total: 3, approved: 1, pending: 0, disapproved: 0 })
-    mockQueryOne.mockResolvedValueOnce({ last_refreshed_at: 't', total: 3, approved: 1, pending: 0, disapproved: 0 })
+    mockQueryOne.mockResolvedValueOnce({ total: 5, approved: 1, pending: 1, disapproved: 1 })
+    mockQueryOne.mockResolvedValueOnce({ last_refreshed_at: 't', total: 5, approved: 1, pending: 1, disapproved: 1 })
 
     await refreshGmcStatusSnapshot()
     const upserts = mockQuery.mock.calls.filter(c => String(c[0]).includes('INSERT INTO merchant_gmc_status'))
     const byOffer = Object.fromEntries(upserts.map(c => [c[1][0], c[1][2]]))
-    expect(byOffer['A']).toBe('approved')
-    expect(byOffer['B']).toBe('unknown')
-    expect(byOffer['C']).toBe('weird') // vals[0]
+    expect(byOffer).toEqual({ A: 'approved', B: 'disapproved', C: 'pending', D: 'unknown', E: 'unknown' })
   })
 
   it('unlocks even when a query inside the try throws', async () => {
     mockQueryOne.mockResolvedValueOnce({ acquired: true })
-    mockListProductStatuses.mockRejectedValueOnce(new Error('boom'))
+    mockListProducts.mockRejectedValueOnce(new Error('boom'))
     await expect(refreshGmcStatusSnapshot()).rejects.toThrow('boom')
     const unlockCall = mockQuery.mock.calls.find(c => String(c[0]).includes('pg_advisory_unlock'))
     expect(unlockCall).toBeTruthy()
