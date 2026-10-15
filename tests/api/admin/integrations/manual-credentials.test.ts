@@ -138,7 +138,7 @@ describe('POST /api/admin/integrations/test', () => {
   it('checks Meta for the current tenant with the campaigns scope', async () => {
     await TEST(req('POST', { provider: 'meta' }, '/api/admin/integrations/test'))
     expect(testMeta).toHaveBeenCalledWith('t-acme')
-    expect(vi.mocked(requireAdminScope).mock.calls[0][1]).toBe('campaigns:read')
+    expect(vi.mocked(requireAdminScope).mock.calls[0][1]).toBe('campaigns:write')
   })
 
   it('400s an unknown provider and off-tenant requests', async () => {
