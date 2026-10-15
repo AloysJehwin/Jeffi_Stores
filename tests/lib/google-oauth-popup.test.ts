@@ -1,5 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest'
 import { openGoogleOAuthPopup } from '@/lib/client/google-oauth-popup'
+
+// Own hosts (jeffistores.in, localhost) sign in same-tab; the popup flow only runs on a custom tenant domain.
+beforeAll(() => (window as any).happyDOM.setURL('https://shop.example.com/admin/login'))
 
 describe('openGoogleOAuthPopup — server-side (window undefined)', () => {
   it('resolves with window unavailable error when window is not defined', async () => {

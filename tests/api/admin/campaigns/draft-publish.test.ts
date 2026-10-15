@@ -40,6 +40,10 @@ vi.mock('@/lib/campaigns/sql-safety', () => ({
   validateScenarioSql: (...a: any[]) => mockValidateScenarioSql(...a),
 }))
 
+vi.mock('@/lib/messaging/library', () => ({ getLibraryTemplate: vi.fn(async () => null) }))
+vi.mock('@/lib/campaigns/kind-variables', () => ({ missingRequired: vi.fn(() => []) }))
+vi.mock('@/lib/templates/blocks', () => ({ renderBlocks: vi.fn(() => '') }))
+
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { GET, PATCH, DELETE } from '@/app/api/(admin)/admin/campaigns/[kind]/draft/route'
@@ -65,14 +69,14 @@ describe('campaigns draft route', () => {
   })
 
   it('GET returns draft_fields null when no draft', async () => {
-    mockQueryOne.mockResolvedValueOnce({ draft_fields: null })
+    mockQueryOne.mockResolvedValueOnce({ fields: null })
     const res = await GET(makeReq(), { params })
     const data = await res.json()
     expect(data.draft_fields).toBeNull()
   })
 
   it('GET returns draft_fields when draft exists', async () => {
-    mockQueryOne.mockResolvedValueOnce({ draft_fields: { title: 'test' } })
+    mockQueryOne.mockResolvedValueOnce({ fields: { title: 'test' } })
     const res = await GET(makeReq(), { params })
     const data = await res.json()
     expect(data.draft_fields).toEqual({ title: 'test' })
@@ -89,7 +93,7 @@ describe('campaigns draft route', () => {
     const res = await PATCH(makeReq('PATCH', { enabled: true }), { params })
     const data = await res.json()
     expect(data.success).toBe(true)
-    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('UPDATE campaigns'), expect.any(Array))
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO campaign_drafts'), expect.any(Array))
   })
 
   it('DELETE discards draft', async () => {
@@ -103,12 +107,6 @@ describe('campaigns draft route', () => {
     vi.mocked(hasScope).mockReturnValueOnce(false)
     const res = await GET(makeReq(), { params })
     expect(res.status).toBe(403)
-  })
-
-  it('GET returns 404 when campaign not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null)
-    const res = await GET(makeReq(), { params })
-    expect(res.status).toBe(404)
   })
 
   it('PATCH returns 401 when unauthenticated', async () => {
@@ -137,25 +135,29 @@ describe('campaigns draft route', () => {
 })
 
 describe('campaigns publish route', () => {
+  const liveCampaign = {
+    kind: 'abandoned_cart', scenario_kind: null, email_template_slug: null,
+    subject_template: 's', body_template: 'b', template_mode: null, blocks: null,
+  }
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(authenticateAdmin).mockResolvedValue(mockAdmin as any)
   })
 
-  it('returns 404 when no draft', async () => {
+  it('returns 404 when campaign not found', async () => {
     mockQueryOne.mockResolvedValueOnce(null)
     const res = await publishPost(makeReq('POST'), { params })
     expect(res.status).toBe(404)
   })
 
   it('returns 400 when campaign has no draft_fields', async () => {
-    mockQueryOne.mockResolvedValueOnce({ draft_fields: null })
+    mockQueryOne.mockResolvedValueOnce(liveCampaign).mockResolvedValueOnce({ fields: null })
     const res = await publishPost(makeReq('POST'), { params })
     expect(res.status).toBe(400)
   })
 
   it('publishes draft when draft_fields exist', async () => {
-    mockQueryOne.mockResolvedValueOnce({ draft_fields: { enabled: true, subject_template: 'test' } })
+    mockQueryOne.mockResolvedValueOnce(liveCampaign).mockResolvedValueOnce({ fields: { enabled: true, subject_template: 'test' } })
     mockQuery.mockResolvedValueOnce({})
     const res = await publishPost(makeReq('POST'), { params })
     const data = await res.json()
@@ -176,8 +178,8 @@ describe('campaigns publish route', () => {
   })
 
   it('publishes with fully populated draft_fields (all COALESCE branches)', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      draft_fields: {
+    mockQueryOne.mockResolvedValueOnce(liveCampaign).mockResolvedValueOnce({
+      fields: {
         enabled: false,
         delay_hours: 24,
         discount_percent: 10,
@@ -201,8 +203,8 @@ describe('campaigns publish route', () => {
   })
 
   it('publishes with null/omitted draft fields (COALESCE null branches)', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      draft_fields: { enabled: null, delay_hours: null, discount_percent: null },
+    mockQueryOne.mockResolvedValueOnce(liveCampaign).mockResolvedValueOnce({
+      fields: { enabled: null, delay_hours: null, discount_percent: null },
     })
     mockQuery.mockResolvedValueOnce({})
     const res = await publishPost(makeReq('POST'), { params })

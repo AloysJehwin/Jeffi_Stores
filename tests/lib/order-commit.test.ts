@@ -684,7 +684,10 @@ describe('findExistingUnpaidRazorpayOrder', () => {
 // ---------------------------------------------------------------------------
 
 describe('commitOrder — cart mode', () => {
-  beforeEach(() => vi.resetAllMocks())
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockQueryMany.mockResolvedValue([])
+  })
 
   function makeCartCommitInput(overrides: Record<string, any> = {}) {
     return {
@@ -893,7 +896,10 @@ describe('commitOrder — cart mode', () => {
 // ---------------------------------------------------------------------------
 
 describe('commitOrder — digital lines', () => {
-  beforeEach(() => vi.resetAllMocks())
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockQueryMany.mockResolvedValue([])
+  })
 
   const PAID = { gatewayOrderId: 'g1', paymentId: 'p1', signature: 's1', amountPaise: 20000 }
 
@@ -943,7 +949,7 @@ describe('commitOrder — digital lines', () => {
     expect(orderInsert[1][26]).toBe(true) // stamp flag
 
     const [itemInsert] = sqlOf(client, 'INSERT INTO order_items')
-    expect(itemInsert[1].slice(-2)).toEqual([true, false]) // is_digital, is_returnable
+    expect(itemInsert[1].slice(20, 22)).toEqual([true, false]) // is_digital, is_returnable
     expect(sqlOf(client, 'INSERT INTO vault_entitlements')).toHaveLength(1)
   })
 
@@ -958,8 +964,8 @@ describe('commitOrder — digital lines', () => {
     expect(orderInsert[1][5]).toBe('confirmed')
     expect(orderInsert[1][26]).toBe(false)
     const items = sqlOf(client, 'INSERT INTO order_items')
-    expect(items[0][1].slice(-2)).toEqual([true, false])
-    expect(items[1][1].slice(-2)).toEqual([false, true])
+    expect(items[0][1].slice(20, 22)).toEqual([true, false])
+    expect(items[1][1].slice(20, 22)).toEqual([false, true])
     expect(sqlOf(client, 'INSERT INTO vault_entitlements')).toHaveLength(1)
   })
 
@@ -970,7 +976,7 @@ describe('commitOrder — digital lines', () => {
     await commitOrder(makeInput([makeCartLine()]))
 
     expect(sqlOf(client, 'INSERT INTO orders')[0][1][5]).toBe('confirmed')
-    expect(sqlOf(client, 'INSERT INTO order_items')[0][1].slice(-2)).toEqual([false, true])
+    expect(sqlOf(client, 'INSERT INTO order_items')[0][1].slice(20, 22)).toEqual([false, true])
     expect(sqlOf(client, 'INSERT INTO vault_entitlements')).toHaveLength(0)
   })
 
@@ -988,7 +994,10 @@ describe('commitOrder — digital lines', () => {
 // ---------------------------------------------------------------------------
 
 describe('commitOrder — buyNow mode', () => {
-  beforeEach(() => vi.resetAllMocks())
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockQueryMany.mockResolvedValue([])
+  })
 
   function makeBuyNowInput(overrides: Record<string, any> = {}) {
     return {

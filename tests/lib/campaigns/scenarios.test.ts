@@ -575,7 +575,8 @@ describe('priceDrop scenario', () => {
     expect(vi.mocked(sendCampaignWhatsApp)).toHaveBeenCalledWith(
       'price_drop',
       'u1',
-      expect.objectContaining({ headline: expect.stringContaining('Drill') })
+      expect.objectContaining({ headline: expect.stringContaining('Drill') }),
+      expect.any(Number)
     )
   })
 

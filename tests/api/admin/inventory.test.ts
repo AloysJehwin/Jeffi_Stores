@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type MockInstance } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // ---------------------------------------------------------------------------
@@ -11,6 +11,10 @@ vi.mock('@/lib/auth/jwt', () => ({
 
 vi.mock('@/lib/auth/scopes', () => ({
   hasScope: vi.fn(),
+}))
+
+vi.mock('@/lib/tenancy/tenant-context', () => ({
+  resolveTenant: vi.fn(async () => null),
 }))
 
 vi.mock('@/lib/shared/db', () => ({
@@ -75,9 +79,8 @@ import { GET as stockGET, PATCH as stockPATCH } from '@/app/api/(admin)/admin/in
 import { GET as poGET, POST as poPOST } from '@/app/api/(admin)/admin/inventory/po/route'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { queryMany, queryOne, query, getClient, withTransaction } from '@/lib/shared/db'
+import { queryMany, queryOne, getClient, withTransaction } from '@/lib/shared/db'
 import { getStockLedger, getStockValuation } from '@/lib/orders/inventory'
-import { buildSearchClause } from '@/lib/catalog/search'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -247,119 +250,58 @@ describe('PATCH /api/admin/inventory/stock', () => {
 })
 
 // ---------------------------------------------------------------------------
-// inventory/po — GET
+// inventory/po — forwarded to document-service (handler tests live there)
 // ---------------------------------------------------------------------------
 
-describe('GET /api/admin/inventory/po', () => {
-  beforeEach(() => {
-    vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(buildSearchClause).mockReturnValue({ clause: 'TRUE', params: [], nextIdx: 1 })
-    vi.mocked(queryOne).mockResolvedValue({ total: 2 } as any)
-    vi.mocked(queryMany).mockResolvedValue([{ id: 'po-1' }, { id: 'po-2' }] as any)
-  })
-
-  it('returns purchase orders list with pagination', async () => {
-    const res = await poGET(makeReq('http://localhost/api/admin/inventory/po'))
-    const json = await res.json()
-
-    expect(res.status).toBe(200)
-    expect(json).toMatchObject({ purchase_orders: expect.any(Array), total: 2, page: 1, limit: 20 })
-  })
-
-  it('returns 401 when unauthenticated', async () => {
-    vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-
-    const res = await poGET(makeReq('http://localhost/api/admin/inventory/po'))
-    expect(res.status).toBe(401)
-  })
-
-  it('returns 403 when scope missing', async () => {
-    vi.mocked(hasScope).mockReturnValue(false)
-
-    const res = await poGET(makeReq('http://localhost/api/admin/inventory/po'))
-    expect(res.status).toBe(403)
-  })
-
-  it('forwards status and supplier_id filters', async () => {
-    await poGET(
-      makeReq('http://localhost/api/admin/inventory/po?status=draft&supplier_id=123e4567-e89b-12d3-a456-426614174001')
-    )
-
-    // queryOne is called for count — params array will include 'draft' and the supplier UUID
-    expect(queryOne).toHaveBeenCalled()
-  })
-})
-
-// ---------------------------------------------------------------------------
-// inventory/po — POST
-// ---------------------------------------------------------------------------
-
-describe('POST /api/admin/inventory/po', () => {
+describe('/api/admin/inventory/po forwards to document-service', () => {
   const supplierId = '123e4567-e89b-12d3-a456-426614174001'
-  const productId = '123e4567-e89b-12d3-a456-426614174002'
+  const body = { supplier_id: supplierId, items: [{ product_id: '123e4567-e89b-12d3-a456-426614174002', quantity: 10, unit_cost: 25.5 }] }
+  let fetchMock: MockInstance<typeof fetch>
 
   beforeEach(() => {
+    process.env.SERVICE_AUTH_SECRET = 'test-secret'
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    vi.mocked(queryOne)
-      .mockResolvedValueOnce({ cnt: 0 } as any) // po count for numbering
-      .mockResolvedValueOnce({ id: 'new-po-id' } as any) // INSERT returning id
-    vi.mocked(query).mockResolvedValue(undefined as any)
+    fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } }))
   })
 
-  it('creates a new PO with valid supplier and items and returns 200 with id', async () => {
-    const res = await poPOST(
-      jsonReq('http://localhost/api/admin/inventory/po', {
-        supplier_id: supplierId,
-        items: [{ product_id: productId, quantity: 10, unit_cost: 25.5, tax_rate: 18 }],
-      })
-    )
-    const json = await res.json()
-
+  it('GET needs inventory:read and forwards the filters', async () => {
+    const res = await poGET(makeReq(`http://localhost/api/admin/inventory/po?status=draft&supplier_id=${supplierId}`))
     expect(res.status).toBe(200)
-    expect(json).toMatchObject({ success: true, id: 'new-po-id' })
-    expect(json.po_number).toMatch(/^PO-/)
+    expect(hasScope).toHaveBeenCalledWith(ADMIN.role, ADMIN.scopes, 'inventory:read')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(new RegExp(`/admin/inventory/po\\?status=draft&supplier_id=${supplierId}$`))
+    expect(init?.method).toBe('GET')
   })
 
-  it('returns 400 when items array is empty', async () => {
-    const res = await poPOST(
-      jsonReq('http://localhost/api/admin/inventory/po', {
-        supplier_id: supplierId,
-        items: [],
-      })
-    )
+  it('POST needs inventory:write and forwards the body', async () => {
+    const res = await poPOST(jsonReq('http://localhost/api/admin/inventory/po', body))
+    expect(res.status).toBe(200)
+    expect(hasScope).toHaveBeenCalledWith(ADMIN.role, ADMIN.scopes, 'inventory:write')
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(String(url)).toMatch(/\/admin\/inventory\/po$/)
+    expect(init?.method).toBe('POST')
+    expect(init?.body).toBe(JSON.stringify(body))
+  })
+
+  it('passes document-service status and body through', async () => {
+    fetchMock.mockResolvedValue(new Response('{"error":"supplier_id required"}', { status: 400, headers: { 'content-type': 'application/json' } }))
+    const res = await poPOST(jsonReq('http://localhost/api/admin/inventory/po', { items: [] }))
     expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'supplier_id required' })
   })
 
-  it('returns 400 when supplier_id is missing', async () => {
-    const res = await poPOST(
-      jsonReq('http://localhost/api/admin/inventory/po', {
-        items: [{ product_id: productId, quantity: 5, unit_cost: 10 }],
-      })
-    )
-    expect(res.status).toBe(400)
-  })
-
-  it('returns 400 when item quantity is zero or negative', async () => {
-    const res = await poPOST(
-      jsonReq('http://localhost/api/admin/inventory/po', {
-        supplier_id: supplierId,
-        items: [{ product_id: productId, quantity: 0, unit_cost: 10 }],
-      })
-    )
-    expect(res.status).toBe(400)
-  })
-
-  it('returns 401 when unauthenticated', async () => {
+  it.each([
+    ['GET', () => poGET(makeReq('http://localhost/api/admin/inventory/po'))],
+    ['POST', () => poPOST(jsonReq('http://localhost/api/admin/inventory/po', body))],
+  ])('%s returns 401 when unauthenticated and 403 when scope missing', async (_m, call) => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-
-    const res = await poPOST(
-      jsonReq('http://localhost/api/admin/inventory/po', {
-        supplier_id: supplierId,
-        items: [{ product_id: productId, quantity: 1, unit_cost: 5 }],
-      })
-    )
-    expect(res.status).toBe(401)
+    expect((await call()).status).toBe(401)
+    vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(false)
+    expect((await call()).status).toBe(403)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

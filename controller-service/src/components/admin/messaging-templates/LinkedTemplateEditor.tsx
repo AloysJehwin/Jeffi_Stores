@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import TemplateEditor, { toEditorTemplate, type EditorTemplate } from './TemplateEditor'
 import { useToast } from '@/contexts/ToastContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 const API = '/api/admin/messaging-templates'
 
@@ -26,6 +27,7 @@ export default function LinkedTemplateEditor({
   onMirror?: (t: EditorTemplate) => void
 }) {
   const { showToast } = useToast()
+  const canWrite = useCanWrite('templates:write')
   const [value, setValue] = useState<EditorTemplate | null>(null)
   const [missing, setMissing] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -68,6 +70,7 @@ export default function LinkedTemplateEditor({
 
   if (missing) return <p className="text-xs text-red-600">This template no longer exists in the library — pick another one.</p>
   if (!value) return <div className="h-40 rounded-lg bg-surface-secondary animate-pulse" />
+  if (!canWrite) return <p className="text-xs text-foreground-muted">You have read-only access to templates; the library version is used as-is.</p>
 
   return (
     <div className="space-y-2">

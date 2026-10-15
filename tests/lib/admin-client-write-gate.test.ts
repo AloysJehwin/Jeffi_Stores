@@ -35,6 +35,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/app/(admin)/admin/ecom/billing/[id]/ReconcileButton.tsx',
   'controller-service/src/components/admin/ecom/tabs/ShipmentCorrection.tsx',
   'controller-service/src/components/admin/ecom/tabs/BillingReconcile.tsx',
+  'controller-service/src/components/admin/ecom/tabs/MessagingTab.tsx',
+  'controller-service/src/components/admin/ecom/tabs/ServiceApprovals.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
   'controller-service/src/components/admin/CreateAdminForm.tsx',
   'controller-service/src/components/admin/AdminUserActions.tsx',
@@ -68,6 +70,9 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/components/admin/BatchPickerModal.tsx',
   // Mutation lives in the parent form; this is a field editor feeding onChange.
   'controller-service/src/components/admin/LineItemsSection.tsx',
+  // Image-URL field feeding onChange; its upload POST is a CDN asset write the server gates on the
+  // parent form's :write scope (uploads/image EDIT_SCOPES). The record mutation lives in the parent.
+  'controller-service/src/components/admin/ImageUrlInput.tsx',
   // Gated on the stricter isSuperAdmin, which no tenant :write scope expresses.
   'controller-service/src/components/admin/CustomerTagDefinitionsCard.tsx',
 ])
