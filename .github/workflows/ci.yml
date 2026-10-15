@@ -252,8 +252,6 @@ jobs:
     env:
       DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
       TUNNEL: ssm
-      OUT_DIR: ${{ runner.temp }}/db
-      RELEASE_WORK_DIR: ${{ runner.temp }}/release
     steps:
       - uses: actions/checkout@v4
         with:
@@ -266,6 +264,7 @@ jobs:
       - name: Tools (Session Manager plugin, psql)
         run: |
           set -euo pipefail
+          { echo "OUT_DIR=$RUNNER_TEMP/db"; echo "RELEASE_WORK_DIR=$RUNNER_TEMP/release"; } >> "$GITHUB_ENV"
           sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client python3-venv >/dev/null
           command -v session-manager-plugin >/dev/null && exit 0
           curl -fsSL -o /tmp/smp.deb https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb
@@ -279,9 +278,9 @@ jobs:
           chmod 600 ~/.kube/jeffi-k3s.yaml
       - name: Database — jeffi_stores schema
         if: needs.release-notes.outputs.schema == 'true' || env.DRY == 'true' || (github.event_name == 'workflow_dispatch' && inputs.schema)
-        run: bash deploy/k8s/db/release-db.sh --schema --yes $([ "$DRY" = true ] && echo --dry-run)
+        run: bash deploy/k8s/db/release-db.sh --schema --yes ${{ env.DRY == 'true' && '--dry-run' || '' }}
       - name: Database — migration files
-        run: bash deploy/k8s/db/release-db.sh --migrations --yes $([ "$DRY" = true ] && echo --dry-run)
+        run: bash deploy/k8s/db/release-db.sh --migrations --yes ${{ env.DRY == 'true' && '--dry-run' || '' }}
       - name: Roll out ${{ needs.images.outputs.tag }} (platform, tenant databases, stores)
         if: env.DRY != 'true'
         run: bash deploy/k8s/bootstrap/release.sh --rollout-only
