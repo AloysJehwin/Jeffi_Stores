@@ -29,13 +29,26 @@ describe('signAdminState / verifyAdminState', () => {
   })
 })
 
+describe('state expiry', () => {
+  it('rejects a state older than 30 minutes and accepts a fresh one', () => {
+    const now = Date.now()
+    const fresh = signAdminState({ tenantId: 't', provider: 'amazon_seller', nonce: 'n' })
+    expect(verifyAdminState(fresh)?.iat).toBeTypeOf('number')
+    const old = signAdminState({
+      tenantId: 't',
+      provider: 'amazon_seller',
+      nonce: 'n',
+      iat: Math.floor(now / 1000) - 31 * 60,
+    })
+    expect(verifyAdminState(old)).toBeNull()
+  })
+})
+
 describe('safeReturnBase', () => {
   const tenantAdmin = 'https://admin-acme.jeffistores.in'
 
   it('returns the origin when returnBase matches the tenant admin host', () => {
-    expect(safeReturnBase('https://admin-acme.jeffistores.in', tenantAdmin)).toBe(
-      'https://admin-acme.jeffistores.in'
-    )
+    expect(safeReturnBase('https://admin-acme.jeffistores.in', tenantAdmin)).toBe('https://admin-acme.jeffistores.in')
   })
 
   it('rejects a different tenant admin host (no cross-tenant redirect)', () => {

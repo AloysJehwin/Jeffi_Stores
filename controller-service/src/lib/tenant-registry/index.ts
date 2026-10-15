@@ -99,6 +99,7 @@ export {
 } from './kyc'
 export {
   saveTenantSocialAccount,
+  deleteTenantSocialAccount,
   getTenantSocialAccounts,
   enqueueSocialPost,
   dueSocialPosts,

@@ -23,8 +23,10 @@ export class IntegrationNotConnectedError extends Error {
 }
 
 export interface GoogleMerchantCreds {
+  // Service-account creds; empty when the tenant connected with Google sign-in (refreshToken).
   clientEmail: string
   privateKey: string
+  refreshToken?: string
   merchantId: string
   // Merchant API primary API data source (`accounts/{id}/dataSources/{id}` or the bare id); found or created when unset.
   dataSource?: string
@@ -69,6 +71,15 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
       dataSource: cfg.data_source ? String(cfg.data_source) : undefined,
     }
   }
+  if (cfg?.oauth_refresh_token && cfg?.merchant_id) {
+    return {
+      clientEmail: '',
+      privateKey: '',
+      refreshToken: String(cfg.oauth_refresh_token),
+      merchantId: String(cfg.merchant_id),
+      dataSource: cfg.data_source ? String(cfg.data_source) : undefined,
+    }
+  }
   if (tenant) throw new IntegrationNotConnectedError('google_merchant', tenant.tenantId)
   // Off-tenant only (Jeffi's own): env service-account + GMC_MERCHANT_ID.
   const sa = loadGoogleServiceAccount()
@@ -78,6 +89,32 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
     merchantId: process.env.GMC_MERCHANT_ID || '5762156822',
     dataSource: process.env.GMC_DATA_SOURCE || undefined,
   }
+}
+
+/** Exchange a refresh token issued to the platform's Google OAuth client for an access token. */
+export async function googleOAuthAccessToken(
+  refreshToken: string,
+  what = 'Google'
+): Promise<{ token: string; expiresInSec: number }> {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
+  if (!clientId || !clientSecret) throw new Error('Google OAuth not configured')
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok || !data?.access_token) {
+    const reason = data?.error_description || data?.error || 'token_refresh_failed'
+    throw new Error(`${what} token refresh failed: ${reason}`)
+  }
+  return { token: String(data.access_token), expiresInSec: Number(data.expires_in) || 3600 }
 }
 
 export interface GoogleSheetsCreds {
@@ -96,28 +133,8 @@ export async function resolveGoogleSheetsCreds(tenantId?: string): Promise<Googl
   const cfg = id ? await tenantConfigFor(id, 'google_sheets') : null
   const refreshToken = cfg?.oauth_refresh_token
   if (refreshToken) {
-    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
-    const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
-    if (!clientId || !clientSecret) throw new Error('Google OAuth not configured')
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: String(refreshToken),
-        grant_type: 'refresh_token',
-      }),
-    })
-    const data = await res.json().catch(() => null)
-    if (!res.ok || !data?.access_token) {
-      const reason = data?.error_description || data?.error || 'token_refresh_failed'
-      throw new Error(`Google Sheets token refresh failed: ${reason}`)
-    }
-    return {
-      accessToken: String(data.access_token),
-      spreadsheetId: cfg?.spreadsheet_id ? String(cfg.spreadsheet_id) : null,
-    }
+    const { token } = await googleOAuthAccessToken(String(refreshToken), 'Google Sheets')
+    return { accessToken: token, spreadsheetId: cfg?.spreadsheet_id ? String(cfg.spreadsheet_id) : null }
   }
   throw new IntegrationNotConnectedError('google_sheets', id ?? 'platform')
 }

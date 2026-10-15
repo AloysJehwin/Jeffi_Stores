@@ -21,8 +21,10 @@ vi.mock('crypto', async importOriginal => {
 // Credential resolution is now the sole seam for account creds (tenant-or-env). Mock it so the
 // auth/url tests exercise the JWT + request plumbing without touching fs/env service accounts.
 const mockResolveGoogleMerchantCreds = vi.fn()
+const mockGoogleOAuthAccessToken = vi.fn()
 vi.mock('@/lib/integrations/resolve', () => ({
   resolveGoogleMerchantCreds: mockResolveGoogleMerchantCreds,
+  googleOAuthAccessToken: mockGoogleOAuthAccessToken,
 }))
 
 const mockFetch = vi.fn()
@@ -73,6 +75,22 @@ describe('merchant/client', () => {
       const { getAccessToken } = await import('@/lib/merchant/client')
       expect(await getAccessToken()).toBe(await getAccessToken())
       expect(mockFetch).toHaveBeenCalledTimes(1)
+    })
+
+    it('refreshes a Google sign-in token instead of signing a JWT, cached per token', async () => {
+      mockResolveGoogleMerchantCreds.mockResolvedValue({
+        clientEmail: '',
+        privateKey: '',
+        refreshToken: 'rt',
+        merchantId: '12345',
+      })
+      mockGoogleOAuthAccessToken.mockResolvedValue({ token: 'oauth-tok', expiresInSec: 3600 })
+      const { getAccessToken } = await import('@/lib/merchant/client')
+      expect(await getAccessToken()).toBe('oauth-tok')
+      expect(await getAccessToken()).toBe('oauth-tok')
+      expect(mockGoogleOAuthAccessToken).toHaveBeenCalledTimes(1)
+      expect(mockGoogleOAuthAccessToken).toHaveBeenCalledWith('rt', 'Google Merchant')
+      expect(mockFetch).not.toHaveBeenCalled()
     })
 
     it('throws when the auth response has no access_token', async () => {

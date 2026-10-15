@@ -15,8 +15,8 @@ export const dynamic = 'force-dynamic'
 // Store-admin integration credentials management. Admin-scope gated; the tenant is taken from the
 // request's ALS context (the admin host resolves it), never from the client — a tenant admin can
 // only manage their OWN tenant's creds. Secrets are only ever written here (encrypted); GET never
-// returns them, only non-secret display fields + status. Providers: google_merchant, amazon_seller
-// (Meta lives in tenant_social_accounts, managed by the /api/admin/social routes).
+// returns them, only non-secret display fields + status. Providers: google_merchant, amazon_seller,
+// razorpay (Meta lives in tenant_social_accounts, managed by the /api/admin/social routes).
 
 const PROVIDERS = ['google_merchant', 'amazon_seller', 'delhivery', 'razorpay'] as const
 
@@ -66,7 +66,10 @@ export async function POST(request: NextRequest) {
   let normalized: Record<string, any>
   let meta: Record<string, any>
   if (provider === 'google_merchant') {
-    if (!config.merchant_id) return NextResponse.json({ error: 'merchant_id is required' }, { status: 400 })
+    const merchantId = String(config.merchant_id ?? '').trim()
+    if (!/^\d{5,20}$/.test(merchantId)) {
+      return NextResponse.json({ error: 'Merchant ID must be the numeric Merchant Center account id' }, { status: 400 })
+    }
     let sa: any
     try {
       sa =
@@ -76,11 +79,16 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json({ error: 'Invalid service account JSON' }, { status: 400 })
     }
-    if (!sa.client_email || !sa.private_key) {
+    if (!sa?.client_email || !sa?.private_key) {
       return NextResponse.json({ error: 'Service account must include client_email and private_key' }, { status: 400 })
     }
-    normalized = { client_email: sa.client_email, private_key: sa.private_key, merchant_id: String(config.merchant_id) }
-    meta = { merchant_id: String(config.merchant_id), client_email: sa.client_email }
+    if (!/gserviceaccount\.com$/.test(String(sa.client_email)) || !String(sa.private_key).includes('PRIVATE KEY')) {
+      return NextResponse.json({ error: 'That is not a Google service account key' }, { status: 400 })
+    }
+    const dataSource = String(config.data_source ?? '').trim()
+    normalized = { client_email: sa.client_email, private_key: sa.private_key, merchant_id: merchantId }
+    if (dataSource) normalized.data_source = dataSource
+    meta = { merchant_id: merchantId, client_email: sa.client_email, connected_via: 'manual' }
   } else if (provider === 'delhivery') {
     return NextResponse.json({ error: DELHIVERY_OWNER_MANAGED }, { status: 403 })
   } else if (provider === 'razorpay') {
@@ -94,18 +102,16 @@ export async function POST(request: NextRequest) {
     }
     meta = { key_id: String(config.key_id) }
   } else {
-    const required = ['client_id', 'client_secret', 'refresh_token', 'seller_id']
-    for (const k of required) {
-      if (!config[k]) return NextResponse.json({ error: `${k} is required` }, { status: 400 })
-    }
-    normalized = {
-      client_id: config.client_id,
-      client_secret: config.client_secret,
-      refresh_token: config.refresh_token,
-      seller_id: config.seller_id,
-      marketplace_id: config.marketplace_id || 'A21TJRUUN4KGV',
-    }
-    meta = { seller_id: config.seller_id, marketplace_id: normalized.marketplace_id }
+    const f = Object.fromEntries(
+      ['client_id', 'client_secret', 'refresh_token', 'seller_id', 'marketplace_id'].map(k => [
+        k,
+        String(config[k] ?? '').trim(),
+      ])
+    )
+    const problem = amazonConfigProblem(f)
+    if (problem) return NextResponse.json({ error: problem }, { status: 400 })
+    normalized = { ...f, marketplace_id: f.marketplace_id || 'A21TJRUUN4KGV' }
+    meta = { seller_id: f.seller_id, marketplace_id: normalized.marketplace_id, connected_via: 'manual' }
   }
 
   await saveIntegrationCredential({
@@ -116,6 +122,19 @@ export async function POST(request: NextRequest) {
     meta,
   })
   return NextResponse.json({ ok: true, provider, meta })
+}
+
+function amazonConfigProblem(f: Record<string, string>): string | null {
+  for (const k of ['client_id', 'client_secret', 'refresh_token', 'seller_id']) {
+    if (!f[k]) return `${k} is required`
+  }
+  if (!/^amzn1\.application-oa2-client\.[A-Za-z0-9]+$/.test(f.client_id)) {
+    return 'Client ID should look like amzn1.application-oa2-client.… (the LWA client id of your SP-API app)'
+  }
+  if (!f.refresh_token.startsWith('Atzr|')) return 'Refresh token should start with Atzr|'
+  if (!/^[A-Z0-9]{8,20}$/.test(f.seller_id)) return 'Seller ID should be your Merchant Token (e.g. A1B2C3D4E5F6G7)'
+  if (f.marketplace_id && !/^[A-Z0-9]{8,20}$/.test(f.marketplace_id)) return 'Marketplace ID is not valid'
+  return null
 }
 
 const DeleteSchema = z.object({ provider: z.enum(PROVIDERS) })

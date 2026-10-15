@@ -1,5 +1,5 @@
-import { createSign } from 'crypto'
-import { resolveGoogleMerchantCreds } from '@/lib/integrations/resolve'
+import { createHash, createSign } from 'crypto'
+import { resolveGoogleMerchantCreds, googleOAuthAccessToken } from '@/lib/integrations/resolve'
 import { CONTENT_LANGUAGE, FEED_LABEL } from './mapper'
 
 // When true (set on local dev), pushes to Google Merchant Center are refused so
@@ -35,10 +35,19 @@ const tokenCache = new Map<string, { token: string; expiresAt: number }>()
 
 export async function getAccessToken(): Promise<string> {
   const creds = await resolveGoogleMerchantCreds()
-  const cacheKey = `${creds.clientEmail}|${creds.merchantId}`
+  const cacheKey = creds.refreshToken
+    ? `oauth|${createHash('sha256').update(creds.refreshToken).digest('hex')}|${creds.merchantId}`
+    : `${creds.clientEmail}|${creds.merchantId}`
   const cached = tokenCache.get(cacheKey)
   if (cached && Date.now() < cached.expiresAt - 60000) {
     return cached.token
+  }
+
+  // Connected with Google sign-in: refresh the stored token instead of signing a JWT.
+  if (creds.refreshToken) {
+    const { token, expiresInSec } = await googleOAuthAccessToken(creds.refreshToken, 'Google Merchant')
+    tokenCache.set(cacheKey, { token, expiresAt: Date.now() + expiresInSec * 1000 })
+    return token
   }
 
   const now = Math.floor(Date.now() / 1000)

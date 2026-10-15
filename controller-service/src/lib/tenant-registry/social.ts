@@ -43,6 +43,16 @@ export async function saveTenantSocialAccount(a: {
   )
 }
 
+/** Remove a tenant's Meta account rows (one provider, or both when omitted). */
+export async function deleteTenantSocialAccount(tenantId: string, provider?: 'facebook' | 'instagram'): Promise<void> {
+  const pool = controlPlanePool()
+  if (provider) {
+    await pool.query(`DELETE FROM tenant_social_accounts WHERE tenant_id=$1 AND provider=$2`, [tenantId, provider])
+  } else {
+    await pool.query(`DELETE FROM tenant_social_accounts WHERE tenant_id=$1`, [tenantId])
+  }
+}
+
 export async function getTenantSocialAccounts(tenantId: string): Promise<TenantSocialAccount[]> {
   const pool = controlPlanePool()
   const r = await pool.query(`SELECT * FROM tenant_social_accounts WHERE tenant_id=$1`, [tenantId])
