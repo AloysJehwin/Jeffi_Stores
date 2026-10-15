@@ -25,6 +25,8 @@ export interface LineView {
   unit: string | null
   rate: number
   gstRate: number
+  discount: number
+  discountPct: number
   taxable: number
   total: number
 }
@@ -114,7 +116,7 @@ export async function buildModel(
     labels: { from: po ? 'Buyer' : 'From', to: po ? 'Supplier' : type === 'label' ? 'Deliver to' : 'Bill to', ship: 'Ship to' },
     lines: totals.lines.map(l => ({
       description: l.description, hsn: l.hsn, quantity: l.quantity, unit: l.unit,
-      rate: l.unit_price, gstRate: l.gst_rate, taxable: l.taxable, total: l.total,
+      rate: l.unit_price, gstRate: l.gst_rate, discount: l.discount, discountPct: l.discount_pct, taxable: l.taxable, total: l.total,
     })),
     showPrices: type !== 'packing_slip' && type !== 'label',
     showTax: type === 'invoice' || type === 'quotation' || type === 'receipt' || type === 'purchase_order',
