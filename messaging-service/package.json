@@ -13,20 +13,21 @@
     "wa:sync": "node --env-file=.env.local --import tsx scripts/wa-approval-sync.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-secrets-manager": "^3.1110.0",
+    "@fastify/formbody": "^8.0.2",
     "@jeffi/api-contracts": "*",
+    "@jeffi/bulk": "*",
     "@jeffi/pricing": "*",
     "@jeffi/service-auth": "*",
     "@jeffi/tenancy": "*",
-    "@jeffi/bulk": "*",
     "@jeffi/wallet": "*",
     "fastify": "^5.2.1",
-    "@fastify/formbody": "^8.0.2",
-    "pg": "^8.13.0",
     "nodemailer": "^6.9.16",
-    "twilio": "^5.4.0",
-    "zod": "^4.4.3",
+    "pg": "^8.13.0",
+    "sharp": "^0.35.4",
     "tsx": "^4.19.2",
-    "@aws-sdk/client-secrets-manager": "^3.1110.0"
+    "twilio": "^5.4.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

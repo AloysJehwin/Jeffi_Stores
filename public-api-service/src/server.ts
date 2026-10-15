@@ -172,6 +172,7 @@ app.register(async v1 => {
   v1.addHook('preHandler', idempotent)
 
   v1.post('/messages', { preHandler: need('messages:send', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/messages', 'messages'))
+  v1.post('/media', { preHandler: need('messages:send', 'messaging'), bodyLimit: 22_000_000 }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/media', null))
   v1.post('/messages/batch', { preHandler: need('messages:send', 'messaging') }, (req, reply) => proxy(req, reply, MESSAGING_URL, '/messages/batch', 'messages'))
   // Bulk = async jobs: POST returns 202 + the job; poll GET …/bulk/:id, then page through …/items.
   const msgBulk = { preHandler: need('messages:send', 'messaging') }

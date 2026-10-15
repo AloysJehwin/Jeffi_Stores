@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { SendMessageRequest, Channel } from '@jeffi/api-contracts'
-import { messagePriceInr } from '@jeffi/pricing'
+import { mediaPriceInr, messagePriceInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
 import { findTemplate } from './templates.js'
@@ -11,6 +11,7 @@ import { render, missingKeys, type Vars } from './render.js'
 import { sendEmail } from './providers/email.js'
 import { sendSms, sendWhatsApp } from './providers/twilio.js'
 import { wrapEmail } from './mail-shell.js'
+import { hostUrl, MediaError } from './media.js'
 
 export class SendError extends Error {
   constructor(public status: number, public code: string, message: string, public details?: unknown) {
@@ -98,17 +99,26 @@ export async function resolveTemplate(tenantId: string, channel: string, slug: s
 }
 
 // WhatsApp templates with a header image `<prefix>{{n}}` and/or a URL button `<host>/{{m}}`: callers may
-// pass media_url / button_url instead of the raw path and link code.
+// pass media_url / button_url instead of the raw path and link code. A media_url outside the approved prefix
+// (any host, any image format) is re-hosted on our CDN first, which is charged as media.
 const PH = /\{\{\s*(\d+)\s*\}\}/
-async function actionVars(ctx: Ctx, blocks: any, vars: Vars, req: SendMessageRequest): Promise<Vars> {
+const mediaErr = (e: unknown): never => { throw e instanceof MediaError ? new SendError(e.status, e.code, e.message) : e }
+async function actionVars(ctx: Ctx, blocks: any, vars: Vars, req: SendMessageRequest): Promise<{ vars: Vars; mediaHosted: boolean }> {
   const out: Vars = {}
+  let mediaHosted = false
   const media: string = blocks?.types?.['twilio/media']?.media?.[0] ?? ''
   const mediaSlot = media.match(PH)?.[1]
   if (mediaSlot && !vars[mediaSlot]) {
     const prefix = media.slice(0, media.search(PH))
     if (!req.media_url) throw new SendError(422, 'missing_variables', `This template has an image header — pass media_url (an image under ${prefix}) or variables.${mediaSlot}`, { missing: [mediaSlot] })
-    if (!req.media_url.startsWith(prefix)) throw new SendError(422, 'invalid_media_url', `media_url must start with ${prefix} (the domain Meta approved for this template)`)
-    out[mediaSlot] = req.media_url.slice(prefix.length)
+    let url = req.media_url
+    if (!url.startsWith(prefix)) {
+      const h = await hostUrl(url).catch(mediaErr)
+      url = h.url
+      mediaHosted = h.fresh
+      if (!url.startsWith(prefix)) throw new SendError(500, 'media_host_mismatch', `Re-hosted media is not under ${prefix}`)
+    }
+    out[mediaSlot] = url.slice(prefix.length)
   }
   const button = (blocks?.buttons ?? []).find((b: any) => b.type === 'url' && PH.test(b.value ?? ''))
   const linkSlot = button?.value.match(PH)?.[1]
@@ -118,7 +128,7 @@ async function actionVars(ctx: Ctx, blocks: any, vars: Vars, req: SendMessageReq
     await db.query(`INSERT INTO short_link (code, tenant_id, destination_url, kind) VALUES ($1,$2,$3,'page')`, [code, ctx.tenantId, req.button_url])
     out[linkSlot] = code
   }
-  return out
+  return { vars: out, mediaHosted }
 }
 
 // The insert variables every template can use without the caller passing them: store details, the
@@ -165,6 +175,7 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
   let body = req.body ?? ''
   let providerRef: string | undefined = req.provider_ref
   let layout: 'store' | 'none' = 'store'
+  let mediaHosted = false
   if (req.template) {
     const t = await resolveTemplate(ctx.tenantId, req.channel, req.template, ctx.space)
     if (!t) throw new SendError(404, 'template_not_found', `No ${req.channel} template '${req.template}'`)
@@ -174,14 +185,18 @@ async function compose(ctx: Ctx, req: SendMessageRequest) {
     body = t.body
     providerRef = providerRef ?? t.provider_ref ?? undefined
     layout = (t as any).layout === 'none' ? 'none' : 'store'
-    if (req.channel === 'whatsapp') Object.assign(vars, await actionVars(ctx, (t as any).blocks, vars, req))
+    if (req.channel === 'whatsapp') {
+      const action = await actionVars(ctx, (t as any).blocks, vars, req)
+      Object.assign(vars, action.vars)
+      mediaHosted = action.mediaHosted
+    }
   }
   const html = req.channel === 'email'
-  return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars, layout }
+  return { subject: subject ? render(subject, vars) : null, body: render(body, vars, html), providerRef, vars, layout, mediaHosted }
 }
 
 export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<MessageRow> {
-  const { subject, body, providerRef, vars, layout } = await compose(ctx, req)
+  const { subject, body, providerRef, vars, layout, mediaHosted } = await compose(ctx, req)
   if (req.channel === 'email' && !subject) throw new SendError(422, 'subject_required', 'Email needs a subject')
 
   const id = randomUUID()
@@ -200,6 +215,15 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
   if (!debit.ok) {
     await db.query(`UPDATE messages SET status='skipped', error=$2, updated_at=now() WHERE id=$1`, [id, 'insufficient_balance'])
     throw new SendError(402, 'insufficient_balance', `Wallet balance ₹${debit.balance.toFixed(2)} is below the ₹${priceInr.toFixed(2)} needed. Top up ₹${debit.needed.toFixed(2)}.`)
+  }
+  if (mediaHosted) {
+    const mediaInr = mediaPriceInr(ctx.internal)
+    const m = await wallet.debit({ tenantId: ctx.tenantId, amountInr: mediaInr, category: 'media', externalRef: `media:${id}`, note: `media re-hosted for ${req.to}` })
+    if (!m.ok) {
+      await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: 0, externalRef: `pub:${id}`, note: 'refund: media not covered' })
+      await db.query(`UPDATE messages SET status='skipped', error=$2, updated_at=now() WHERE id=$1`, [id, 'insufficient_balance'])
+      throw new SendError(402, 'insufficient_balance', `Wallet balance ₹${m.balance.toFixed(2)} is below the ₹${mediaInr.toFixed(2)} needed for the image. Top up ₹${m.needed.toFixed(2)}.`)
+    }
   }
 
   try {
@@ -225,6 +249,7 @@ export async function sendMessage(ctx: Ctx, req: SendMessageRequest): Promise<Me
   } catch (e: any) {
     // Provider failed: refund by truing the debit up to zero.
     await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: 0, externalRef: `pub:${id}`, note: `refund: ${req.channel} failed` })
+    if (mediaHosted) await wallet.trueUp({ tenantId: ctx.tenantId, amountInr: 0, externalRef: `media:${id}`, note: 'refund: media for a failed send' })
     await db.query(`UPDATE messages SET status='failed', error=$2, charged_inr=0, updated_at=now() WHERE id=$1`, [id, String(e?.message ?? e).slice(0, 500)])
     await db.query(`INSERT INTO message_events (message_id, event, payload) VALUES ($1,'failed',$2)`, [id, { error: String(e?.message ?? e) }])
   }

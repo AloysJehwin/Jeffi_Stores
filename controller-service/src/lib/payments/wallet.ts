@@ -43,6 +43,7 @@ export type WalletCategory =
   | 'sms'
   | 'whatsapp'
   | 'email'
+  | 'media'
   | 'adjustment'
 
 export interface TenantWallet {
