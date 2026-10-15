@@ -68,10 +68,12 @@ export function openGoogleOAuthPopup({
     // State carries the FULL return URL (origin included) so the callback, which always runs on the root
     // domain, sends the tab back to the exact page it came from (admin./business./ecom./tenant hosts).
     const nonce = Math.random().toString(36).slice(2)
+    // Same-tab on our own hosts; a popup elsewhere ("p." tells the callback to post back to the opener).
+    const sameTab = isOwnHost(window.location.hostname)
     const path = returnTo || window.location.pathname
     // Keep the query (e.g. ?redirect=) — every caller is the sign-in page itself.
     const destination = `${window.location.origin}${path}${window.location.search}`
-    const state = `${nonce}|${encodeURIComponent(destination)}`
+    const state = `${sameTab ? '' : 'p.'}${nonce}|${encodeURIComponent(destination)}`
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -87,7 +89,15 @@ export function openGoogleOAuthPopup({
     // Same-tab flow on our own hosts: popups/new tabs could get stuck and need a manual reload. The page
     // unloads, so this promise never settles; the page completes sign-in on return (consumeGoogleRedirect).
     // Custom tenant domains keep the popup: the callback can only safely send a tab back to our hosts.
-    if (isOwnHost(window.location.hostname)) {
+    if (sameTab) {
+      // Back from Google restores this page from the back/forward cache with the button still loading:
+      // settle as a quiet cancel so the caller resets it.
+      const onShow = (e: PageTransitionEvent) => {
+        if (!e.persisted) return
+        window.removeEventListener('pageshow', onShow)
+        resolve({ accessToken: null, error: 'popup_closed' })
+      }
+      window.addEventListener('pageshow', onShow)
       window.location.assign(url)
       return
     }
