@@ -5,6 +5,7 @@ import HowItWorks from './_sections/HowItWorks'
 import Faq from './_sections/Faq'
 import AppsGrid from './_sections/AppsGrid'
 import FeatureGrid from './_sections/FeatureGrid'
+import ApiServices from './_sections/ApiServices'
 import { Eyebrow, Display, Pill, SandCard } from './_ui'
 
 export const dynamic = 'force-dynamic'
@@ -39,6 +40,7 @@ export default function EcomLandingPage() {
       <HowItWorks />
       <AppsGrid />
       <FeatureGrid />
+      <ApiServices />
 
       {/* ── The whole loop ── */}
       <section className="w-full px-6 lg:px-12 py-20">
