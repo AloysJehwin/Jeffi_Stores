@@ -2,20 +2,23 @@ import { queryOne, query, getClient } from '@/lib/shared/db'
 import { productToGmcItems, gmcItemProblem } from './mapper'
 import { fetchAllActiveProducts, fetchProduct } from './product-fetch'
 import {
-  upsertProduct,
+  insertProductInput,
   deleteProductByOfferId,
   listProducts,
-  customBatchUpsert,
-  getMerchantId,
+  resolveDataSource,
   merchantConfigured,
   GMC_PUSH_DISABLED,
 } from './client'
+import { catalogBaseUrl } from '@/lib/shared/customer-links'
 import { SYNC_IN_PROGRESS_MESSAGE, groupSyncErrors, countSyncErrorItems, type MerchantSyncError } from './sync-errors'
 
 const ADMIN_EMAIL = 'jeffistoress@jeffistores.in'
+// The Merchant API has no custombatch: items go as single inserts, CONCURRENCY at a time, in
+// chunks of BATCH_SIZE so a chunk that fails as a whole is reported (and can stop the run) as one.
 const BATCH_SIZE = 100
+const CONCURRENCY = 5
 const SYNC_LOCK_KEY = 84219573
-// Consecutive whole-batch failures with the same message before the rest of the run is skipped.
+// Consecutive whole-chunk failures with the same message before the rest of the run is skipped.
 const MAX_REPEATED_BATCH_FAILURES = 3
 
 export class MerchantSyncInProgressError extends Error {
@@ -33,19 +36,33 @@ interface SyncResult {
   finishedAt: string
 }
 
-async function getExistingGmcOfferIds(): Promise<Set<string>> {
+// Offer ids Google holds from our API data source (products from other sources are left alone).
+async function getExistingGmcOfferIds(dataSource: string): Promise<Set<string>> {
   const offerIds = new Set<string>()
   let pageToken: string | undefined
 
   do {
     const res = await listProducts(pageToken)
-    for (const item of res.resources || []) {
-      if (item.offerId) offerIds.add(item.offerId)
+    for (const item of res.products || []) {
+      if (item.offerId && (!item.dataSource || item.dataSource === dataSource)) offerIds.add(item.offerId)
     }
     pageToken = res.nextPageToken
   } while (pageToken)
 
   return offerIds
+}
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++
+      out[i] = await fn(items[i])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return out
 }
 
 async function saveSyncStatus(
@@ -134,14 +151,28 @@ async function runFullSync(): Promise<SyncResult> {
   let synced = 0
   let deleted = 0
 
-  const merchantId = await getMerchantId()
+  const finish = async () => {
+    const result: SyncResult = { synced, deleted, errors, startedAt, finishedAt: new Date().toISOString() }
+    await saveSyncStatus({ ...result, status: errors.length ? 'error' : 'success' })
+    return result
+  }
+
+  let dataSource: string
+  try {
+    dataSource = await resolveDataSource()
+  } catch (err: any) {
+    errors.push({ sku: '__datasource__', error: err?.message || 'Merchant API data source unavailable' })
+    return finish()
+  }
+
+  const baseUrl = await catalogBaseUrl()
   const products = await fetchAllActiveProducts()
   const allItems: any[] = []
   const activeOfferIds = new Set<string>()
 
   for (const product of products) {
     try {
-      const items = productToGmcItems(product)
+      const items = productToGmcItems(product, baseUrl)
       for (const item of items) {
         activeOfferIds.add(item.offerId)
         const problem = gmcItemProblem(item)
@@ -165,41 +196,35 @@ async function runFullSync(): Promise<SyncResult> {
       })
       break
     }
-    const entries = batch.map((item, idx) => ({
-      batchId: i + idx,
-      merchantId,
-      method: 'insert',
-      product: item,
-    }))
-    try {
-      const res = await customBatchUpsert(entries)
-      repeatedFailures = 0
-      for (const entry of res.entries || []) {
-        if (entry.errors?.errors?.length) {
-          const item = batch[entry.batchId - i]
-          const messages = [...new Set(entry.errors.errors.map((e: any) => e.message).filter(Boolean))]
-          errors.push({
-            sku: item?.offerId || String(entry.batchId),
-            error: messages.join('; ') || 'Rejected by Google',
-          })
-        } else {
-          synced++
-        }
+    const outcomes = await mapLimit(batch, CONCURRENCY, async item => {
+      try {
+        await insertProductInput(item, { dataSource })
+        return null
+      } catch (err: any) {
+        return String(err?.message || 'Rejected by Google')
       }
-    } catch (err: any) {
-      const message = err?.message || 'Batch request failed'
-      repeatedFailures = message === lastBatchError ? repeatedFailures + 1 : 1
-      lastBatchError = message
-      errors.push({ sku: `batch-${i}`, error: message, items: batch.length })
+    })
+    const failed = outcomes.filter((o): o is string => o !== null)
+    synced += batch.length - failed.length
+    // A chunk where every insert failed for the same reason (auth, quota, outage) is one entry.
+    if (failed.length === batch.length && new Set(failed).size === 1) {
+      repeatedFailures = failed[0] === lastBatchError ? repeatedFailures + 1 : 1
+      lastBatchError = failed[0]
+      errors.push({ sku: `batch-${i}`, error: failed[0], items: batch.length })
+      continue
     }
+    repeatedFailures = 0
+    outcomes.forEach((o, idx) => {
+      if (o !== null) errors.push({ sku: batch[idx].offerId, error: o })
+    })
   }
 
   try {
-    const existingIds = await getExistingGmcOfferIds()
+    const existingIds = await getExistingGmcOfferIds(dataSource)
     for (const offerId of existingIds) {
       if (!activeOfferIds.has(offerId)) {
         try {
-          await deleteProductByOfferId(offerId)
+          await deleteProductByOfferId(offerId, dataSource)
           deleted++
         } catch (err: any) {
           errors.push({ sku: offerId, error: err.message })
@@ -210,10 +235,7 @@ async function runFullSync(): Promise<SyncResult> {
     errors.push({ sku: '__list__', error: err.message })
   }
 
-  const finishedAt = new Date().toISOString()
-  const result: SyncResult = { synced, deleted, errors, startedAt, finishedAt }
-  await saveSyncStatus({ ...result, status: errors.length ? 'error' : 'success' })
-  return result
+  return finish()
 }
 
 export async function syncProductToMerchant(productId: string): Promise<void> {
@@ -224,10 +246,10 @@ export async function syncProductToMerchant(productId: string): Promise<void> {
 
   // Inactive products stay in the feed as out_of_stock (handled by productToGmcItems),
   // so we upsert them rather than delete.
-  const items = productToGmcItems(product)
+  const items = productToGmcItems(product, await catalogBaseUrl())
   for (const item of items) {
     if (gmcItemProblem(item)) continue
-    await upsertProduct(item)
+    await insertProductInput(item)
   }
 }
 

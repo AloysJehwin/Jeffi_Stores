@@ -26,6 +26,8 @@ export interface GoogleMerchantCreds {
   clientEmail: string
   privateKey: string
   merchantId: string
+  // Merchant API primary API data source (`accounts/{id}/dataSources/{id}` or the bare id); found or created when unset.
+  dataSource?: string
 }
 
 export interface AmazonCreds {
@@ -64,6 +66,7 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
       clientEmail: cfg.client_email,
       privateKey: cfg.private_key.includes('\\n') ? cfg.private_key.replace(/\\n/g, '\n') : cfg.private_key,
       merchantId: String(cfg.merchant_id),
+      dataSource: cfg.data_source ? String(cfg.data_source) : undefined,
     }
   }
   if (tenant) throw new IntegrationNotConnectedError('google_merchant', tenant.tenantId)
@@ -73,6 +76,7 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
     clientEmail: sa.client_email,
     privateKey: sa.private_key,
     merchantId: process.env.GMC_MERCHANT_ID || '5762156822',
+    dataSource: process.env.GMC_DATA_SOURCE || undefined,
   }
 }
 

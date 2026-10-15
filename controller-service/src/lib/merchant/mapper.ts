@@ -1,22 +1,23 @@
 import { buildProductHighlights, buildProductDetails } from '@/lib/shared/google-merchant-helpers'
+import { clipTitle, hasIdentifiers, listedPrices } from './item-rules'
 
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
-const TARGET_COUNTRY = 'IN'
-const CONTENT_LANGUAGE = 'en'
-const CHANNEL = 'online'
+// Merchant API v1 ProductInput (products_v1). Attributes live under productAttributes; prices are
+// {amountMicros, currencyCode}; the Content API channel/targetCountry become contentLanguage + feedLabel.
+export const CONTENT_LANGUAGE = 'en'
+export const FEED_LABEL = 'IN'
+const COUNTRY = 'IN'
+const CURRENCY = 'INR'
 
 function buildOfferId(sku: string): string {
   return sku.replace(/[^a-zA-Z0-9_:.-]/g, '_')
 }
 
+export function toPrice(amount: number): { amountMicros: string; currencyCode: string } {
+  return { amountMicros: String(Math.round(amount * 1_000_000)), currencyCode: CURRENCY }
+}
+
 function buildShipping(price: number) {
-  return [
-    {
-      country: TARGET_COUNTRY,
-      service: 'Standard',
-      price: { value: '0', currency: 'INR' },
-    },
-  ]
+  return [{ country: COUNTRY, service: 'Standard', price: toPrice(price) }]
 }
 
 function buildAdditionalImages(product: any, primaryId?: string): Array<{ link: string }> {
@@ -26,13 +27,7 @@ function buildAdditionalImages(product: any, primaryId?: string): Array<{ link: 
     .map((img: any) => ({ link: img.image_url }))
 }
 
-function buildHighlights(product: any): string[] {
-  // Content API v2.1: productHighlights is an array of plain strings.
-  return buildProductHighlights(product)
-}
-
 function buildDetails(product: any): Array<{ sectionName: string; attributeName: string; attributeValue: string }> {
-  // Content API v2.1: attributeValue is a scalar string, NOT an object.
   return buildProductDetails(product).map(d => ({
     sectionName: d.section,
     attributeName: d.attribute,
@@ -40,71 +35,70 @@ function buildDetails(product: any): Array<{ sectionName: string; attributeName:
   }))
 }
 
-// Google: identifierExists=true only when there is a GTIN, or an MPN together with a brand.
-// A brand alone is not a unique identifier.
-function hasIdentifiers(gtin: unknown, mpn: unknown, brand: string): boolean {
-  return !!(gtin || (mpn && brand))
-}
-
-// price is the higher MRP only when it is a real markdown; otherwise the selling price
-// (an MRP below the selling price, e.g. ex-GST, must never become the advertised price).
 function buildPrices(selling: number, mrp: number | null) {
-  const listed = mrp != null && mrp > selling ? mrp : selling
-  const onSale = listed > selling
+  const { price, salePrice } = listedPrices(selling, mrp)
   return {
-    price: { value: listed.toFixed(2), currency: 'INR' },
-    salePrice: onSale ? { value: selling.toFixed(2), currency: 'INR' } : undefined,
+    price: toPrice(price),
+    salePrice: salePrice != null ? toPrice(salePrice) : undefined,
   }
 }
 
-const MAX_TITLE = 150
 const MAX_OFFER_ID = 50
-
-function buildTitle(title: string): string {
-  return title.length > MAX_TITLE ? title.slice(0, MAX_TITLE - 1).trimEnd() + '…' : title
-}
 
 // Problems Google would reject an item for that only the merchant can fix in the product data.
 export function gmcItemProblem(item: any): string | null {
-  if (!item.title?.trim()) return 'Missing product name'
+  const a = item.productAttributes || {}
+  if (!a.title?.trim()) return 'Missing product name'
   if (!item.offerId) return 'Missing SKU'
   if (item.offerId.length > MAX_OFFER_ID) return `SKU is longer than ${MAX_OFFER_ID} characters`
-  if (!item.imageLink) return 'Missing product image'
-  if (!/^https?:\/\//i.test(item.imageLink)) return 'Product image is not a full http(s) URL'
-  if (!(Number(item.price?.value) > 0)) return 'Missing or zero price'
+  if (!a.imageLink) return 'Missing product image'
+  if (!/^https?:\/\//i.test(a.imageLink)) return 'Product image is not a full http(s) URL'
+  if (!(Number(a.price?.amountMicros) > 0)) return 'Missing or zero price'
   return null
 }
 
-export function productToGmcItems(product: any): any[] {
+const availability = (active: boolean, stockStatus: unknown) =>
+  active && stockStatus !== 'Out of Stock' ? 'IN_STOCK' : 'OUT_OF_STOCK'
+
+const gtins = (gtin: unknown) => (gtin ? [String(gtin)] : undefined)
+
+// baseUrl is the store's public origin (see catalogBaseUrl); links must match the site verified
+// in Merchant Center.
+export function productToGmcItems(product: any, baseUrl: string): any[] {
   if (product.is_digital) return []
+  const base = baseUrl.replace(/\/+$/, '')
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
   const imageLink = primaryImage?.image_url || ''
   const additionalImages = buildAdditionalImages(product, primaryImage?.id)
   const brandName = product.brands?.name || ''
   const description = (product.description || product.name || '').slice(0, 5000)
-  const highlights = buildHighlights(product)
+  const highlights = buildProductHighlights(product)
   const details = buildDetails(product)
   const hasVariants = product.has_variants && product.product_variants?.length > 0
   const productActive = product.is_active !== false
 
   const cogs = (cost: any) => {
     const n = Number(cost)
-    return n > 0 ? { value: n.toFixed(2), currency: 'INR' } : undefined
+    return n > 0 ? toPrice(n) : undefined
   }
 
-  const common = {
-    channel: CHANNEL,
+  const input = (offerId: string, attributes: Record<string, unknown>) => ({
+    offerId,
     contentLanguage: CONTENT_LANGUAGE,
-    targetCountry: TARGET_COUNTRY,
+    feedLabel: FEED_LABEL,
+    productAttributes: { ...common, ...attributes },
+  })
+
+  const common = {
     description,
     imageLink,
     additionalImageLinks: additionalImages.map(i => i.link),
     brand: brandName || undefined,
-    gtin: product.gtin || undefined,
+    gtins: gtins(product.gtin),
     mpn: product.mpn || undefined,
     identifierExists: hasIdentifiers(product.gtin, product.mpn, brandName),
-    condition: 'new',
-    ageGroup: 'adult',
+    condition: 'NEW',
+    ageGroup: 'ADULT',
     material: product.material || undefined,
     shipping: buildShipping(0),
     productHighlights: highlights.length ? highlights : undefined,
@@ -117,44 +111,30 @@ export function productToGmcItems(product: any): any[] {
       .filter((v: any) => v.price != null)
       .map((v: any) => {
         const mrp = v.mrp ? Number(v.mrp) : product.mrp ? Number(product.mrp) : null
-
-        return {
-          ...common,
-          offerId: buildOfferId(v.sku),
-          title: buildTitle(`${product.name} - ${v.variant_name}`),
-          link: `${BASE_URL}/products/${product.slug}?sku=${encodeURIComponent(v.sku)}`,
+        return input(buildOfferId(v.sku), {
+          title: clipTitle(`${product.name} - ${v.variant_name}`),
+          link: `${base}/products/${product.slug}?sku=${encodeURIComponent(v.sku)}`,
           ...buildPrices(Number(v.price), mrp),
-          availability: !productActive
-            ? 'out of stock'
-            : v.stock_status !== 'Out of Stock'
-              ? 'in stock'
-              : 'out of stock',
+          availability: availability(productActive, v.stock_status),
           itemGroupId: buildOfferId(product.sku),
-          sizes: v.variant_name ? [v.variant_name] : undefined,
-          gtin: v.gtin || product.gtin || undefined,
+          size: v.variant_name || undefined,
+          gtins: gtins(v.gtin || product.gtin),
           mpn: v.mpn || product.mpn || undefined,
           identifierExists: hasIdentifiers(v.gtin || product.gtin, v.mpn || product.mpn, brandName),
           costOfGoodsSold: cogs(v.cost_price ?? product.cost_price),
-        }
+        })
       })
   }
 
   const mrp = product.mrp ? Number(product.mrp) : null
-
   return [
-    {
-      ...common,
-      offerId: buildOfferId(product.sku),
-      title: buildTitle(product.name || ''),
-      link: `${BASE_URL}/products/${product.slug}`,
+    input(buildOfferId(product.sku), {
+      title: clipTitle(product.name || ''),
+      link: `${base}/products/${product.slug}`,
       ...buildPrices(Number(product.base_price), mrp),
-      availability: !productActive
-        ? 'out of stock'
-        : product.stock_status !== 'Out of Stock'
-          ? 'in stock'
-          : 'out of stock',
-      sizes: product.size ? [product.size] : undefined,
+      availability: availability(productActive, product.stock_status),
+      size: product.size || undefined,
       costOfGoodsSold: cogs(product.cost_price),
-    },
+    }),
   ]
 }
