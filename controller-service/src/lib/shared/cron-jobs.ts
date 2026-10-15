@@ -192,6 +192,28 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'ai:storefront',
   },
   {
+    id: 'google_ads_sync',
+    name: 'Google Ads nightly sync',
+    path: '/api/cron/google-ads-sync',
+    method: 'GET',
+    intervalMs: DAY,
+    intervalLabel: 'every 24 h',
+    startDelayMs: 270 * SEC,
+    lockTtlMs: DAY - MIN,
+    tenantScope: 'google_ads:read',
+  },
+  {
+    id: 'google_ads_refresh',
+    name: 'Google Ads intraday refresh',
+    path: '/api/cron/google-ads-refresh',
+    method: 'GET',
+    intervalMs: 3 * HOUR,
+    intervalLabel: 'every 3 h',
+    startDelayMs: 300 * SEC,
+    lockTtlMs: 3 * HOUR - MIN,
+    tenantScope: 'google_ads:read',
+  },
+  {
     id: 'ai_health',
     name: 'AI platform health',
     path: '/api/internal/ai/health',
@@ -216,7 +238,12 @@ export function inProcessCronEnabled(env: Record<string, string | undefined> = p
 }
 
 // Daily jobs fire at a fixed IST time under k8s instead of a few minutes after every restart.
-const DAILY_AT_IST: Record<string, string> = { daily_briefing: '0 8', customer_notes_digest: '30 9' }
+const DAILY_AT_IST: Record<string, string> = {
+  daily_briefing: '0 8',
+  customer_notes_digest: '30 9',
+  // After midnight in the account zone so yesterday is final in Google Ads.
+  google_ads_sync: '30 4',
+}
 
 // Cron expression (evaluated in Asia/Kolkata) for a job's k8s CronJob. Sub-minute jobs round up to 1m.
 export function cronSchedule(job: CronJob): string {

@@ -404,6 +404,20 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/traffic'],
     group: 'Marketing',
   },
+  {
+    key: 'google_ads:read',
+    label: 'Google Ads (Read)',
+    description: 'View Google Ads performance, campaigns, keywords and sync status',
+    routes: ['/admin/google-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'google_ads:write',
+    label: 'Google Ads (Write)',
+    description: 'Connect or disconnect a Google Ads account and run an Ads sync',
+    routes: ['/admin/google-ads'],
+    group: 'Marketing',
+  },
 
   // Finance
   {
@@ -714,6 +728,8 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/suggest')) return null
   if (pathname.startsWith('/api/admin/social-posts')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/traffic')) return 'traffic:read'
+  if (pathname.startsWith('/api/admin/google-ads')) return 'google_ads:read'
+  if (pathname.startsWith('/api/admin/integrations/google-ads')) return 'google_ads:read'
   if (pathname.startsWith('/api/admin/campaigns')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/loyalty')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/referrals')) return 'campaigns:read'

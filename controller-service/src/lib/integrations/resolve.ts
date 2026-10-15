@@ -1,3 +1,4 @@
+import { createSign } from 'crypto'
 import { resolveTenant, resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getIntegrationCredential } from '../tenant-registry'
 import { decryptToken } from '../crypto/token-cipher'
@@ -115,6 +116,42 @@ export async function googleOAuthAccessToken(
     throw new Error(`${what} token refresh failed: ${reason}`)
   }
   return { token: String(data.access_token), expiresInSec: Number(data.expires_in) || 3600 }
+}
+
+const saTokenCache = new Map<string, { token: string; expiresAt: number }>()
+
+/** Access token for a Google service account (JWT bearer grant) with the given scope. Cached per
+ * account+scope until a minute before expiry. Same flow the Merchant sync uses for the flagship. */
+export async function googleServiceAccountAccessToken(
+  clientEmail: string,
+  privateKey: string,
+  scope: string
+): Promise<{ token: string; expiresInSec: number }> {
+  const key = `${clientEmail}|${scope}`
+  const cached = saTokenCache.get(key)
+  if (cached && Date.now() < cached.expiresAt - 60_000) {
+    return { token: cached.token, expiresInSec: Math.floor((cached.expiresAt - Date.now()) / 1000) }
+  }
+  const now = Math.floor(Date.now() / 1000)
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
+  const payload = Buffer.from(
+    JSON.stringify({ iss: clientEmail, scope, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })
+  ).toString('base64url')
+  const signer = createSign('RSA-SHA256')
+  signer.update(`${header}.${payload}`)
+  const jwt = `${header}.${payload}.${signer.sign(privateKey).toString('base64url')}`
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt }),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok || !data?.access_token) {
+    throw new Error(`Google service account token failed: ${data?.error_description || data?.error || res.status}`)
+  }
+  const expiresInSec = Number(data.expires_in) || 3600
+  saTokenCache.set(key, { token: String(data.access_token), expiresAt: Date.now() + expiresInSec * 1000 })
+  return { token: String(data.access_token), expiresInSec }
 }
 
 export interface GoogleSheetsCreds {

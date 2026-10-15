@@ -7,19 +7,24 @@ import type { AdminOAuthState } from '@/lib/shared/oauth-state'
 // callback sends the user back to that tenant's own admin.
 
 const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
+// Flagship credentials are keyed to this sentinel tenant (see lib/import/jobs.ts); its admin is the platform one.
+const PLATFORM_TENANT_ID = '00000000-0000-0000-0000-000000000000'
 
-export type OAuthProvider = 'google_merchant' | 'amazon_seller' | 'meta'
+export type OAuthProvider = 'google_merchant' | 'amazon_seller' | 'meta' | 'google_ads'
 
 export const OAUTH_CALLBACK_PATHS: Record<OAuthProvider, string> = {
   google_merchant: '/api/admin/integrations/google/callback',
   amazon_seller: '/api/admin/integrations/amazon/callback',
   meta: '/api/admin/social/callback',
+  // Shares the Google callback; the route dispatches on state.provider (one URI for both Google flows).
+  google_ads: '/api/admin/integrations/google/callback',
 }
 
 const REQUIRED_ENV: Record<OAuthProvider, string[]> = {
   google_merchant: ['GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_SECRET', 'CRON_SECRET'],
   amazon_seller: ['AMAZON_SP_APP_ID', 'AMAZON_LWA_APP_CLIENT_ID', 'AMAZON_LWA_APP_CLIENT_SECRET', 'CRON_SECRET'],
   meta: ['META_APP_ID', 'META_APP_SECRET', 'CRON_SECRET'],
+  google_ads: ['GOOGLE_OAUTH_CLIENT_ID', 'GOOGLE_OAUTH_CLIENT_SECRET', 'GOOGLE_ADS_DEVELOPER_TOKEN', 'CRON_SECRET'],
 }
 
 export function oauthRedirectUri(provider: OAuthProvider): string {
@@ -42,7 +47,7 @@ export function oauthProviderInfo(provider: OAuthProvider): OAuthProviderInfo {
 /** Admin base URL of the tenant the verified state belongs to. Callbacks land on the platform host
  * with no tenant in context, so this is derived from the state's tenantId, never the request. */
 export async function tenantAdminBase(state: AdminOAuthState | null): Promise<string> {
-  if (state?.tenantId) {
+  if (state?.tenantId && state.tenantId !== PLATFORM_TENANT_ID) {
     const tenant = await getTenant(state.tenantId).catch(() => null)
     if (tenant?.slug) return `https://admin-${tenant.slug}.${PLATFORM_DOMAIN}`
   }

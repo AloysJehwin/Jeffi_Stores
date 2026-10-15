@@ -83,6 +83,7 @@ Last updated: 2026-08-17.
 | Reviews | `reviews:read` | ✅ | ✅ | ✅ | ✅ |
 | Review Forms | `review_forms:read` | ❌ | ✅ | ✅ | ✅ |
 | Traffic Analytics | `traffic:read` | ❌ | ✅ | ✅ | ✅ |
+| Google Ads (reporting, connect/disconnect) | `google_ads:read` / `google_ads:write` | ❌ | ✅ | ✅ | ✅ |
 | Email Mailer | `mailer:read` | ❌ | ❌ | ✅ | ✅ |
 | Campaigns & Automation | `campaigns:read` | ❌ | ❌ | ✅ | ✅ |
 | **— AI —** | | | | | |

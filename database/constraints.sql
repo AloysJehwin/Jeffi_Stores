@@ -746,6 +746,94 @@ ALTER TABLE ONLY public.amazon_refresh_meta
 
 
 --
+-- Name: ads_account ads_account_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_account
+    ADD CONSTRAINT ads_account_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ads_account
+    ADD CONSTRAINT ads_account_singleton CHECK (id = 1);
+
+--
+-- Name: ads_campaigns ads_campaigns_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_campaigns
+    ADD CONSTRAINT ads_campaigns_pkey PRIMARY KEY (campaign_id);
+
+--
+-- Name: ads_ad_groups ads_ad_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_ad_groups
+    ADD CONSTRAINT ads_ad_groups_pkey PRIMARY KEY (ad_group_id);
+
+--
+-- Name: ads_ads ads_ads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_ads
+    ADD CONSTRAINT ads_ads_pkey PRIMARY KEY (ad_group_id, ad_id);
+
+--
+-- Name: ads_keywords ads_keywords_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_keywords
+    ADD CONSTRAINT ads_keywords_pkey PRIMARY KEY (ad_group_id, criterion_id);
+
+--
+-- Name: ads_daily_metrics ads_daily_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_daily_metrics
+    ADD CONSTRAINT ads_daily_metrics_pkey PRIMARY KEY (date, campaign_id, ad_group_id, device, network);
+
+--
+-- Name: ads_product_metrics ads_product_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_product_metrics
+    ADD CONSTRAINT ads_product_metrics_pkey PRIMARY KEY (date, campaign_id, item_id);
+
+--
+-- Name: ads_search_terms ads_search_terms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_search_terms
+    ADD CONSTRAINT ads_search_terms_pkey PRIMARY KEY (date, campaign_id, ad_group_id, search_term);
+
+--
+-- Name: ads_geo_metrics ads_geo_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_geo_metrics
+    ADD CONSTRAINT ads_geo_metrics_pkey PRIMARY KEY (date, location);
+
+--
+-- Name: ads_recommendations ads_recommendations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_recommendations
+    ADD CONSTRAINT ads_recommendations_pkey PRIMARY KEY (resource_name);
+
+--
+-- Name: ads_change_events ads_change_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_change_events
+    ADD CONSTRAINT ads_change_events_pkey PRIMARY KEY (resource_name);
+
+--
+-- Name: ads_sync_log ads_sync_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_sync_log
+    ADD CONSTRAINT ads_sync_log_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: homepage_drafts homepage_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 

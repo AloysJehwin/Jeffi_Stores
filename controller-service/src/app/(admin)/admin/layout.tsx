@@ -63,6 +63,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/shelving', label: 'Shelving', scope: 'shelving:read', group: 'Finance' },
     { href: '/admin/gst', label: 'GST Compliance', scope: 'gst:read', group: 'Finance' },
     { href: '/admin/traffic', label: 'Traffic', scope: 'traffic:read', group: 'Marketing' },
+    { href: '/admin/google-ads', label: 'Google Ads', scope: 'google_ads:read', group: 'Marketing' },
     { href: '/admin/coupons', label: 'Coupons', scope: 'coupons:read', group: 'Marketing' },
     { href: '/admin/offers', label: 'Bank Offers', scope: 'coupons:read', group: 'Marketing' },
     { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms:read', group: 'Marketing' },

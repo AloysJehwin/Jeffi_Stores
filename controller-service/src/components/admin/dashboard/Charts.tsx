@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 
-interface TrendPoint {
+type TrendPoint = {
   label: string
   revenue: number
   orders: number
@@ -12,14 +12,19 @@ interface TrendPoint {
   aov: number
 }
 
-type SeriesKey = keyof Omit<TrendPoint, 'label'>
+/** Any time series row: a date label plus numeric values keyed by series. */
+export type ChartPoint = { label: string } & Record<string, number | string>
+
+type SeriesKey = string
 type Axis = 'money' | 'count'
-interface SeriesDef {
+export interface SeriesDef {
   key: SeriesKey
   label: string
   color: string
   kind: 'area' | 'line' | 'bar'
   axis: Axis
+  /** Initially shown; defaults to the first two series. */
+  on?: boolean
 }
 
 const SERIES: SeriesDef[] = [
@@ -50,7 +55,7 @@ function compact(v: number): string {
 
 export type TrendBucket = 'hour' | 'day' | 'week' | 'month'
 
-function inferBucket(points: TrendPoint[]): TrendBucket {
+function inferBucket(points: { label: string }[]): TrendBucket {
   const times = points.map(p => new Date(p.label).getTime()).filter(t => !isNaN(t))
   if (times.length < 2) return 'day'
   const gaps = times
@@ -90,19 +95,20 @@ export function TrendChart({
   points,
   height = 240,
   bucket,
+  series,
+  ariaLabel = 'Revenue and orders over time',
 }: {
-  points: TrendPoint[]
+  points: TrendPoint[] | ChartPoint[]
   height?: number
   bucket?: TrendBucket
+  /** Series to plot; defaults to the order series (revenue, orders, ...). */
+  series?: SeriesDef[]
+  ariaLabel?: string
 }) {
-  const [active, setActive] = useState<Record<SeriesKey, boolean>>({
-    revenue: true,
-    orders: true,
-    paidOrders: false,
-    aov: false,
-    units: false,
-    customers: false,
-  })
+  const SERIES_DEFS = series ?? SERIES
+  const [active, setActive] = useState<Record<SeriesKey, boolean>>(() =>
+    Object.fromEntries(SERIES_DEFS.map((s, i) => [s.key, s.on ?? i < 2]))
+  )
   const [hover, setHover] = useState<number | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
 
@@ -119,8 +125,8 @@ export function TrendChart({
   // Axis labels, markers and the tooltip are HTML positioned by percentage, so they
   // never distort with the stretch.
   const n = points.length
-  const val = (p: TrendPoint, key: SeriesKey) => {
-    const v = p[key]
+  const val = (p: TrendPoint | ChartPoint, key: SeriesKey) => {
+    const v = (p as ChartPoint)[key]
     return typeof v === 'number' && isFinite(v) ? v : 0
   }
   const insetT = 3,
@@ -128,7 +134,7 @@ export function TrendChart({
     insetX = 1
   const px = (i: number) => insetX + (n === 1 ? (100 - insetX * 2) / 2 : (i / (n - 1)) * (100 - insetX * 2))
 
-  const activeSeries = SERIES.filter(s => active[s.key])
+  const activeSeries = SERIES_DEFS.filter(s => active[s.key])
   const hasMoney = activeSeries.some(s => s.axis === 'money')
   const hasCount = activeSeries.some(s => s.axis === 'count')
   const axisMax = (axis: Axis) => {
@@ -190,7 +196,7 @@ export function TrendChart({
   return (
     <div className="w-full">
       <div className="flex items-center gap-2 flex-wrap mb-3">
-        {SERIES.map(s => (
+        {SERIES_DEFS.map(s => (
           <SeriesChip
             key={s.key}
             label={s.label}
@@ -235,7 +241,7 @@ export function TrendChart({
           className="absolute top-0 outline-none rounded focus-visible:ring-2 focus-visible:ring-accent-500/50 touch-none"
           style={{ ...canvasStyle, bottom: 20 }}
           role="img"
-          aria-label="Revenue and orders over time. Use the arrow keys to read each point."
+          aria-label={`${ariaLabel}. Use the arrow keys to read each point.`}
           tabIndex={0}
           onPointerMove={onPointer}
           onPointerDown={onPointer}

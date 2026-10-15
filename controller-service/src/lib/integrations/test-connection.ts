@@ -4,6 +4,9 @@ import { spApiRequest } from '@/lib/amazon/client'
 import { getTenantSocialAccounts } from '@/lib/tenant-registry'
 import { decryptToken } from '@/lib/crypto/token-cipher'
 import { getPageInfo } from '@/lib/catalog/meta'
+import { googleAdsClientFor } from '@/lib/google-ads/credentials'
+import { verifyAccount } from '@/lib/google-ads/accounts'
+import { formatCustomerId } from '@/lib/google-ads/client'
 
 // "Test connection" for the store-admin credentials popup: one cheap authenticated read per
 // provider using the stored credentials, so a bad key shows up before a sync or post fails.
@@ -59,6 +62,21 @@ export async function testMeta(tenantId: string): Promise<ConnectionTestResult> 
         : ' Instagram link changed; reconnect.'
       : ''
     return { ok: true, message: `Reached Facebook Page ${page.pageName || page.pageId}.${igNote}` }
+  } catch (e) {
+    return failure(e)
+  }
+}
+
+export async function testGoogleAds(tenantId?: string | null): Promise<ConnectionTestResult> {
+  try {
+    const client = await googleAdsClientFor(tenantId, { retryDelays: [] })
+    const info = await verifyAccount(client)
+    const via = client.loginCustomerId ? ` through manager ${formatCustomerId(client.loginCustomerId)}` : ''
+    const test = info.test_account ? ' (test account)' : ''
+    return {
+      ok: true,
+      message: `Reached Google Ads account ${info.descriptive_name || ''} ${formatCustomerId(info.customer_id)}${test}${via}.`.replace(/\s+/g, ' '),
+    }
   } catch (e) {
     return failure(e)
   }
