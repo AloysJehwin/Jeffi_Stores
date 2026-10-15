@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
+import { captureAttribution } from '@/lib/shared/attribution'
 
 function classifyPage(path: string): string {
   if (path === '/') return 'home'
@@ -37,6 +38,8 @@ export default function PageTracker() {
     if (pathname === lastTracked.current) return
     lastTracked.current = pathname
 
+    // Capture on every route, not only tracked page types: an ad can land anywhere.
+    const attr = captureAttribution()
     const page = classifyPage(pathname)
     if (page === 'other') return
 
@@ -50,6 +53,16 @@ export default function PageTracker() {
         page,
         path: pathname,
         referrer,
+        attribution: attr
+          ? {
+              utm_source: attr.utm_source,
+              utm_medium: attr.utm_medium,
+              utm_campaign: attr.utm_campaign,
+              gclid: attr.gclid,
+              gbraid: attr.gbraid,
+              wbraid: attr.wbraid,
+            }
+          : undefined,
       })
     )
   }, [pathname])

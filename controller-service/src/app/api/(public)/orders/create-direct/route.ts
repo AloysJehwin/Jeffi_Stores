@@ -12,6 +12,7 @@ import { getBusinessDiscountMap } from '@/lib/catalog/business-discount'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { verifyIntent } from '@/lib/orders/checkout-intent'
 import { checkPincodeServiceability } from '@/lib/shipping/delhivery'
+import { attributionFromRequest, attachOrderAttribution } from '@/lib/orders/attribution'
 
 const DirectItemSchema = z.object({
   productId: zUuid,
@@ -267,6 +268,7 @@ export async function POST(request: NextRequest) {
       extraDays: Number(product.extra_delivery_days ?? 0),
     })
 
+    const attribution = attributionFromRequest(request)
     const order = await withTransaction(async client => {
       let shippingAddressId = null
       let billingAddressId = null
@@ -416,6 +418,8 @@ export async function POST(request: NextRequest) {
         )
         await client.query(`UPDATE coupons SET times_used = times_used + 1 WHERE id = $1`, [couponId])
       }
+
+      await attachOrderAttribution(client, createdOrder.id, attribution)
 
       return createdOrder
     })

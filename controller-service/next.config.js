@@ -14,13 +14,13 @@ const VAULT_ORIGINS = `https://${VAULT_BUCKET}.s3.us-east-1.amazonaws.com https:
 
 const CSP = [
   "default-src 'self' https://*.jeffistores.in",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://maps.googleapis.com https://www.googletagmanager.com https://dm9rri2wgl1e.cloudfront.net",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://maps.googleapis.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://dm9rri2wgl1e.cloudfront.net",
   "style-src 'self' 'unsafe-inline' https://*.jeffistores.in https://fonts.googleapis.com https://maps.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
-  `connect-src 'self' https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://oauth2.googleapis.com https://maps.googleapis.com https://dm9rri2wgl1e.cloudfront.net https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.merchant-center-analytics.goog ${VAULT_ORIGINS}`,
+  `connect-src 'self' https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://oauth2.googleapis.com https://maps.googleapis.com https://dm9rri2wgl1e.cloudfront.net https://www.google-analytics.com https://analytics.google.com https://www.googletagmanager.com https://www.merchant-center-analytics.goog https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://pagead2.googlesyndication.com https://td.doubleclick.net https://*.google-analytics.com https://*.analytics.google.com ${VAULT_ORIGINS}`,
   `media-src 'self' blob: ${VAULT_ORIGINS}`,
-  "img-src 'self' data: blob: https://*.jeffistores.in https://*.razorpay.com https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com https://lh3.googleusercontent.com https://maps.gstatic.com https://maps.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com",
-  'frame-src data: https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com',
+  "img-src 'self' data: blob: https://*.jeffistores.in https://*.razorpay.com https://dm9rri2wgl1e.cloudfront.net https://*.amazonaws.com https://lh3.googleusercontent.com https://maps.gstatic.com https://maps.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://www.googleadservices.com https://googleads.g.doubleclick.net https://www.google.com https://www.google.co.in https://td.doubleclick.net",
+  'frame-src data: https://*.jeffistores.in https://*.razorpay.com https://accounts.google.com https://www.googletagmanager.com https://td.doubleclick.net',
   'child-src https://*.razorpay.com blob:',
   "worker-src 'self' blob: https://dm9rri2wgl1e.cloudfront.net",
   "object-src 'none'",

@@ -85,6 +85,22 @@ describe('POST /api/track', () => {
     expect(db.query).toHaveBeenCalledWith(expect.any(String), expect.arrayContaining(['https://google.com']))
   })
 
+  it('stores the session attribution, trimmed, null when absent', async () => {
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+
+    await POST(
+      makePost({
+        ...VALID_BODY,
+        attribution: { utm_source: ' google ', utm_medium: 'cpc', utm_campaign: 'diwali', gclid: 'G1', wbraid: 7 },
+      }) as any
+    )
+    const params = vi.mocked(db.query).mock.calls[0][1] as unknown[]
+    expect(params.slice(7)).toEqual(['google', 'cpc', 'diwali', 'G1', null, null])
+
+    await POST(makePost(VALID_BODY) as any)
+    expect((vi.mocked(db.query).mock.calls[1][1] as unknown[]).slice(7)).toEqual([null, null, null, null, null, null])
+  })
+
   it('returns 500 when db insert throws', async () => {
     vi.mocked(db.query).mockRejectedValue(new Error('db error'))
 
@@ -94,7 +110,9 @@ describe('POST /api/track', () => {
     expect(body.ok).toBe(false)
   })
   it('rejects a URL sent as the page type with 400 instead of a db error', async () => {
-    const res = await POST(makePost({ sessionId: 'sess-1', page: '/products/unbrako-hex-bolt-metric-10-9-m20', path: '/products/x' }) as any)
+    const res = await POST(
+      makePost({ sessionId: 'sess-1', page: '/products/unbrako-hex-bolt-metric-10-9-m20', path: '/products/x' }) as any
+    )
     expect(res.status).toBe(400)
   })
 })
