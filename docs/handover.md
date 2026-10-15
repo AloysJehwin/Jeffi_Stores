@@ -34,19 +34,19 @@ fan-out, COD settlement, and a real AWS provisioning provider. Next up (NOT star
 - **Recommend /clear before resuming** to drop context; all code is on-disk.
 
 ## What Was Completed This Session
-- **Razorpay Route (POBO)**: `src/lib/razorpay-route.ts` — createLinkedAccount, transferToLinkedAccount (3% commission), reverseTransfer, recordCodSettlement
-- **Bank verification**: switched to Razorpay FAV (instant, `src/lib/bank-verify.ts`) — no RazorpayX/UTR
-- **KYC approval** (`src/app/api/admin/ecom/kyc/[tenantId]/approve/route.ts`): creates Route linked account + subscription + approval email
-- **Payment split**: `fireRouteTransfer()` in `src/app/api/razorpay/verify/route.ts`
-- **Store-owner admin**: `src/lib/tenant-admin-provision.ts` — on subscription.charged, creates super_admin + mTLS cert in tenant DB, emails cert
-- **Onboarding emails**: `src/lib/ecom-emails.ts` (KYC submitted/approved/rejected, payment confirmed, store live)
+- **Razorpay Route (POBO)**: `controller-service/src/lib/razorpay-route.ts` — createLinkedAccount, transferToLinkedAccount (3% commission), reverseTransfer, recordCodSettlement
+- **Bank verification**: switched to Razorpay FAV (instant, `controller-service/src/lib/bank-verify.ts`) — no RazorpayX/UTR
+- **KYC approval** (`controller-service/src/app/api/admin/ecom/kyc/[tenantId]/approve/route.ts`): creates Route linked account + subscription + approval email
+- **Payment split**: `fireRouteTransfer()` in `controller-service/src/app/api/razorpay/verify/route.ts`
+- **Store-owner admin**: `controller-service/src/lib/tenant-admin-provision.ts` — on subscription.charged, creates super_admin + mTLS cert in tenant DB, emails cert
+- **Onboarding emails**: `controller-service/src/lib/ecom-emails.ts` (KYC submitted/approved/rejected, payment confirmed, store live)
 - **Per-tenant emails**: generated columns `noreply-{slug}@` / `campaigns-{slug}@` on tenants
-- **Plan gating**: `src/lib/plan-gate.ts`. Basic scopes fixed. Product form hides inventory flags; brand form hides returns policy; WhatsApp gated to crm:read; ecom admin section blocked on tenant subdomains; SMS/WhatsApp toggles in site settings (Growth+)
-- **Storefront Google auth**: `src/lib/google-oauth-popup.ts` strips ANY jeffistores.in subdomain (fixes tenant `{slug}.` OAuth)
-- **Migration fan-out**: `src/lib/tenant-migrations.ts` + `tenant-migrations-schema.ts` + `POST /api/admin/ecom/migrations/run`
-- **Custom domains**: `tenant_custom_domains` table, `src/app/api/ecom/domains/*`, `CustomDomains.tsx` UI, DNS CNAME verify
+- **Plan gating**: `controller-service/src/lib/plan-gate.ts`. Basic scopes fixed. Product form hides inventory flags; brand form hides returns policy; WhatsApp gated to crm:read; ecom admin section blocked on tenant subdomains; SMS/WhatsApp toggles in site settings (Growth+)
+- **Storefront Google auth**: `controller-service/src/lib/google-oauth-popup.ts` strips ANY jeffistores.in subdomain (fixes tenant `{slug}.` OAuth)
+- **Migration fan-out**: `controller-service/src/lib/tenant-migrations.ts` + `tenant-migrations-schema.ts` + `POST /api/admin/ecom/migrations/run`
+- **Custom domains**: `tenant_custom_domains` table, `controller-service/src/app/api/ecom/domains/*`, `CustomDomains.tsx` UI, DNS CNAME verify
 - **COD settlement**: ledger-based via `recordCodSettlement`, real Delhivery charge correction
-- **AWS provisioning provider**: `src/lib/provisioning/aws-provider.ts` (real @aws-sdk RDS/S3), enabled via `PROVISIONING_PROVIDER=aws`; installed `@aws-sdk/client-rds`
+- **AWS provisioning provider**: `controller-service/src/lib/provisioning/aws-provider.ts` (real @aws-sdk RDS/S3), enabled via `PROVISIONING_PROVIDER=aws`; installed `@aws-sdk/client-rds`
 
 ## What Needs To Be Done Next (ordered)
 
@@ -62,13 +62,13 @@ fan-out, COD settlement, and a real AWS provisioning provider. Next up (NOT star
    status→terminated (+clearTenantCache = store offline) → `backupDb` → `putTenantBackup` (S3
    dual owner/slug keys) → delete RDS+bucket → `clearTenantInfra`. Auto-fires on
    `subscription.cancelled`/`completed` in the ecom webhook; manual admin button in `TenantActions`.
-   Backup is **pure-JS** (`src/lib/tenant-db-backup.ts`, no pg_dump binary) — round-trip PROVEN
+   Backup is **pure-JS** (`controller-service/src/lib/tenant-db-backup.ts`, no pg_dump binary) — round-trip PROVEN
    against local PG (FK order via `session_replication_role=replica`, bytea intact).
 3. **Restore-on-re-onboard** — ✅ DONE. `restore_data` step in the state machine (no-op unless the
    job carries `restoreFromKey`). `findLatestBackup({ownerId,slug})` + `/api/ecom/onboard/restore-available`;
    OnboardWizard shows a "we found a backup" banner + opt-in; `provision/route.ts` resolves the key.
 4. **Provisioning driver** — ✅ DONE, now EVENT-DRIVEN (reworked 2026-08-22). No cron worker:
-   `triggerProvisioning()` (`src/lib/provisioning/trigger.ts`) is the single entry for all 4 flows,
+   `triggerProvisioning()` (`controller-service/src/lib/provisioning/trigger.ts`) is the single entry for all 4 flows,
    and for AWS it kicks a self re-invoke loop (`POST /api/internal/provisioning/advance`,
    `Bearer $CRON_SECRET`) that advances one step per tick until done/failed. Only `reconcileOrphanedTenants()`
    is scheduled (hourly, from `instrumentation.ts`). ⚠️ MUST run inside the VPC (see finding).
@@ -95,7 +95,7 @@ LIVE and BILLING — deprovision when done testing (admin button, or subscriptio
 `aloys-store.jeffistores.in` no longer resolves. **No stray tenant billing.**
 
 ### 🐛 THREE schema-load bugs fixed in `buildTenantSchemaSql()` (would have broken live too)
-`src/lib/tenant-migrations-schema.ts` now: (1) `stripPsqlMetaCommands` drops `\`-prefixed psql
+`controller-service/src/lib/tenant-migrations-schema.ts` now: (1) `stripPsqlMetaCommands` drops `\`-prefixed psql
 lines (a stray `\unrestrict` from pg_dump broke the `pg` driver); (2) `hoistForeignKeys` moves all
 `ADD CONSTRAINT … FOREIGN KEY` to the end (FKs in orders.sql referenced PKs defined later in
 constraints.sql → "no unique constraint matching"); (3) dedupes FKs by name + self-guards each
@@ -122,9 +122,9 @@ Live-test + deprovision/backup/restore plan: `/Users/I578432/.claude/plans/cheek
 
 ## Important File Paths
 - `docs/PLAN_FEATURE_MATRIX.md` — authoritative plan/feature matrix
-- `src/lib/provisioning/{aws-provider,stub-provider,steps,provider,index}.ts`
+- `controller-service/src/lib/provisioning/{aws-provider,stub-provider,steps,provider,index}.ts`
 - `database/control-plane/schema.sql`
-- `src/lib/{razorpay-route,razorpay-subscriptions,bank-verify,plan-gate,ecom-emails,tenant-admin-provision,tenant-migrations}.ts`
+- `controller-service/src/lib/{razorpay-route,razorpay-subscriptions,bank-verify,plan-gate,ecom-emails,tenant-admin-provision,tenant-migrations}.ts`
 
 ## Known Issues / Gotchas
 - Route `accounts.create` fails in TEST mode ("Invalid business type") — LIVE keys only. Code handles gracefully.

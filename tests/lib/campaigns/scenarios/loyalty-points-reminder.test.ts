@@ -71,7 +71,10 @@ describe('loyaltyPointsReminder scenario', () => {
     })
 
     it('reminds at most once per cooldown window', async () => {
-      await loyaltyPointsReminder.findEligible({ campaign, params: { ...defaultParams, sendCooldown: { value: 14, unit: 'days' } } })
+      await loyaltyPointsReminder.findEligible({
+        campaign,
+        params: { ...defaultParams, sendCooldown: { value: 14, unit: 'days' } },
+      })
       const sql = String(mockQueryMany.mock.calls[0][0])
       const dedupe = sql.slice(sql.indexOf('NOT EXISTS'), sql.indexOf('ORDER BY'))
       expect(dedupe).toContain('ecs.sent_at >')
@@ -88,7 +91,12 @@ describe('loyaltyPointsReminder scenario', () => {
 
     it('lists customers reminded within the cooldown window', async () => {
       mockQueryMany.mockResolvedValue([
-        { user_id: 'u1', reason: 'cooldown', reason_detail: 'Reminded within the cooldown window', blocked_until: null },
+        {
+          user_id: 'u1',
+          reason: 'cooldown',
+          reason_detail: 'Reminded within the cooldown window',
+          blocked_until: null,
+        },
       ])
       const rows = await loyaltyPointsReminder.findSuppressed!({ campaign, params: defaultParams })
       expect(rows[0]).toMatchObject({ user_id: 'u1', reason: 'cooldown' })
@@ -122,7 +130,7 @@ describe('loyaltyPointsReminder scenario', () => {
       const [kind, userId, , cooldown] = mockSendWa.mock.calls[0]
       expect(kind).toBe('loyalty_points_reminder')
       expect(userId).toBe('u1')
-      expect(cooldown).toBe(1)
+      expect(cooldown).toBe(days(1))
     })
 
     it('returns no_user when the user is gone', async () => {

@@ -49,9 +49,9 @@ describe('createRazorpaySubscription', () => {
     const { createRazorpaySubscription } = await import('@/lib/payments/razorpay-subscriptions')
     const out = await createRazorpaySubscription(subOpts)
     expect(out).toEqual({ subscriptionId: 'sub_1', shortUrl: 'https://rzp.io/s1' })
-    // plan created monthly with the basic monthly amount (₹4999 = 499900 paise)
+    // plan created monthly with the basic monthly amount (₹2999 = 299900 paise)
     expect(rz.plans.create.mock.calls[0][0]).toMatchObject({ period: 'monthly', interval: 1 })
-    expect(rz.plans.create.mock.calls[0][0].item.amount).toBe(499900)
+    expect(rz.plans.create.mock.calls[0][0].item.amount).toBe(299900)
     // no yearly offer on a monthly sub
     expect(rz.subscriptions.create.mock.calls[0][0].offer_id).toBeNull()
   })
@@ -72,7 +72,7 @@ describe('createRazorpaySubscription', () => {
     const { createRazorpaySubscription } = await import('@/lib/payments/razorpay-subscriptions')
     await createRazorpaySubscription({ ...subOpts, interval: 'yearly' })
     expect(rz.plans.create.mock.calls[0][0].period).toBe('yearly')
-    expect(rz.plans.create.mock.calls[0][0].item.amount).toBe(499900 * 12)
+    expect(rz.plans.create.mock.calls[0][0].item.amount).toBe(299900 * 10)
     expect(rz.subscriptions.create.mock.calls[0][0].offer_id).toBe('offer_yr')
   })
 
@@ -127,11 +127,11 @@ describe('upgradeSubscription', () => {
 
   it('cancels the old sub, prorates the unused half-cycle into a negative addon', async () => {
     const now = Math.floor(Date.now() / 1000)
-    // Half the cycle remains → half the ₹4999 (499900 paise) old plan = 249950 credit.
+    // Half the cycle remains → half the ₹2999 (299900 paise) old plan = 149950 credit.
     rz.subscriptions.fetch.mockResolvedValue({
       current_start: now - 15 * 86400,
       current_end: now + 15 * 86400,
-      plan: { item: { amount: 499900 } },
+      plan: { item: { amount: 299900 } },
     })
     rz.subscriptions.cancel.mockResolvedValue({})
     rz.plans.create.mockResolvedValue({ id: 'plan_growth' })
@@ -140,9 +140,9 @@ describe('upgradeSubscription', () => {
     const out = await upgradeSubscription(upOpts)
     expect(rz.subscriptions.cancel).toHaveBeenCalledWith('sub_old', { cancel_at_cycle_end: 0 })
     expect(out.subscriptionId).toBe('sub_new')
-    // ~half of 499900 → allow rounding slack
-    expect(out.proratedCreditPaise).toBeGreaterThan(240000)
-    expect(out.proratedCreditPaise).toBeLessThan(260000)
+    // ~half of 299900 → allow rounding slack
+    expect(out.proratedCreditPaise).toBeGreaterThan(140000)
+    expect(out.proratedCreditPaise).toBeLessThan(160000)
     const created = rz.subscriptions.create.mock.calls[0][0]
     expect(created.addons[0].item.amount).toBe(-out.proratedCreditPaise)
     expect(created.notes.upgraded_from).toBe('sub_old')
@@ -153,7 +153,7 @@ describe('upgradeSubscription', () => {
     rz.subscriptions.fetch.mockResolvedValue({
       current_start: now - 30 * 86400,
       current_end: now - 1,
-      plan: { item: { amount: 499900 } },
+      plan: { item: { amount: 299900 } },
     })
     rz.subscriptions.cancel.mockResolvedValue({})
     rz.plans.create.mockResolvedValue({ id: 'plan_growth' })
@@ -297,9 +297,9 @@ describe('verifyWebhookSignature', () => {
 describe('price helpers', () => {
   it('yearlyPaise = monthly × 12; planPaise switches on interval', async () => {
     const { yearlyPaise, planPaise, MONTHLY_PAISE } = await import('@/lib/payments/razorpay-subscriptions')
-    expect(yearlyPaise('growth')).toBe(MONTHLY_PAISE.growth * 12)
+    expect(yearlyPaise('growth')).toBe(MONTHLY_PAISE.growth * 10)
     expect(planPaise('pro', 'monthly')).toBe(MONTHLY_PAISE.pro)
-    expect(planPaise('pro', 'yearly')).toBe(MONTHLY_PAISE.pro * 12)
+    expect(planPaise('pro', 'yearly')).toBe(MONTHLY_PAISE.pro * 10)
     expect(yearlyPaise('nope')).toBe(0)
   })
 })

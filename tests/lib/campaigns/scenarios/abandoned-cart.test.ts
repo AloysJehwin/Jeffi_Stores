@@ -69,6 +69,13 @@ describe('abandonedCart scenario', () => {
   })
 
   describe('findEligible', () => {
+    it('scopes the email-dedup NOT EXISTS to channel=email (whatsapp/sms markers never block the email)', async () => {
+      mockQueryMany.mockResolvedValue([])
+      await abandonedCart.findEligible({ campaign, params: defaultParams })
+      const seq1Sql = String(mockQueryMany.mock.calls[0][0])
+      expect(seq1Sql).toContain("channel = 'email'")
+    })
+
     it('passes durations to the seq1 query as canonical-minute strings', async () => {
       mockQueryMany.mockResolvedValue([])
       await abandonedCart.findEligible({ campaign, params: defaultParams })
@@ -136,13 +143,13 @@ describe('abandonedCart scenario', () => {
       mockQueryMany.mockResolvedValue([
         { product_id: 'p1', product_slug: 'widget', name: 'Widget', quantity: 1, price: 100, image_url: 'img.jpg' },
       ])
-      await abandonedCart.send(
-        { user_id: 'u1', sequence: 1 } as any,
-        { campaign, params: { ...defaultParams, whatsappEnabled: true, sendCooldownDays: 7 } as any }
-      )
+      await abandonedCart.send({ user_id: 'u1', sequence: 1 } as any, {
+        campaign,
+        params: { ...defaultParams, whatsappEnabled: true, sendCooldownDays: 7 } as any,
+      })
       expect(mockSendWhatsApp).toHaveBeenCalledOnce()
-      const [, , , cooldownDays] = mockSendWhatsApp.mock.calls[0]
-      expect(cooldownDays).toBe(7)
+      const [, , , cooldownMin] = mockSendWhatsApp.mock.calls[0]
+      expect(cooldownMin).toBe(10080) // 7 days in minutes
     })
   })
 })

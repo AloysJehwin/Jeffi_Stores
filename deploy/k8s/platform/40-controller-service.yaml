@@ -1,0 +1,156 @@
+# jeffi-stores-controller-service: the platform store (jeffistores.in + platform subdomains). Every tenant runs the same image.
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-controller-service
+  namespace: jeffi
+  labels: { app: controller-service, jeffi.io/service: controller, jeffi.io/tenant: jeffi-stores }
+spec:
+  # No replicas: the HPA below owns the count; a fixed value would reset it on every deploy.
+  revisionHistoryLimit: 5
+  # One pod at a time, no surge: the 1-vCPU core has no room for a third pod; the other one keeps serving.
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 1, maxSurge: 0 } }
+  selector: { matchLabels: { app: controller-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: controller-service, jeffi.io/service: controller, jeffi.io/tenant: jeffi-stores }
+    spec:
+      serviceAccountName: jeffi-stores-controller-service
+      nodeSelector: { jeffi.io/role: core }
+      imagePullSecrets: [{ name: regcred }]
+      terminationGracePeriodSeconds: 60
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-controller-service:latest
+          ports: [{ name: http, containerPort: 3000 }]
+          envFrom:
+            - configMapRef: { name: provisioning, optional: true }
+          env:
+            - { name: SM_SECRET_ID, value: jeffi/production }
+            - { name: WEB_CONCURRENCY, value: '1' }
+            - { name: IN_PROCESS_CRON, value: 'false' }
+            - { name: CLIENT_CERT_PROXY, value: traefik }
+            - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
+            - { name: DOCUMENTS_URL, value: 'http://jeffi-stores-document-service.jeffi.svc.cluster.local:3102' }
+            # Traces → Coroot in-cluster (the public k8s. URL is behind mTLS). Every request is traced (14-day retention).
+            - { name: OTEL_SERVICE_NAME, value: jeffi-stores-controller-service }
+            - { name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT, value: 'http://coroot-coroot.observability:8080/v1/traces' }
+            - { name: OTEL_EXPORTER_OTLP_PROTOCOL, value: http/protobuf }
+            - { name: OTEL_TRACES_SAMPLER, value: parentbased_traceidratio }
+            - { name: OTEL_TRACES_SAMPLER_ARG, value: '1.0' }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=640 }
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+            - { name: REDIS_URL, value: 'redis://:$(REDIS_PASSWORD)@redis:6379' }
+            - name: GOOGLE_SERVICE_ACCOUNT_JSON
+              valueFrom: { secretKeyRef: { name: google-sa, key: json, optional: true } }
+          resources:
+            requests: { cpu: 150m, memory: 512Mi }
+            limits: { cpu: 1500m, memory: 900Mi }
+          startupProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: { path: /api/ready, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/health, port: http, httpHeaders: [{ name: Host, value: localhost }] }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop: { exec: { command: [sleep, '10'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: certs
+          projected:
+            sources:
+              - configMap: { name: rds-ca }
+              - secret: { name: platform-ca-key }
+        - name: tmp
+          emptyDir: { sizeLimit: 512Mi }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app: controller-service, jeffi.io/tenant: jeffi-stores } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
+spec:
+  selector: { app: controller-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3000, targetPort: http }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: jeffi-stores-controller-service-cloudfront-origin, namespace: jeffi }
+spec:
+  entryPoints: [web]
+  routes:
+    - match: Host(`jeffistores.in`) || Host(`www.jeffistores.in`)
+      kind: Rule
+      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: >-
+        Host(`jeffistores.in`) || Host(`www.jeffistores.in`) || Host(`business.jeffistores.in`) ||
+        Host(`forms.jeffistores.in`) || Host(`certificate.jeffistores.in`) || Host(`ecom.jeffistores.in`) ||
+        Host(`vault.jeffistores.in`)
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
+    # Hosts not claimed by a tenant namespace or a service route fall through here; unknown slugs 404.
+    - match: HostRegexp(`^[a-z0-9-]+\.jeffistores\.in$`) || HostRegexp(`^[a-z0-9-]+\.business\.jeffistores\.in$`)
+      priority: 2
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
+  # No options: the TLSOption named `default` applies automatically (naming it is an error).
+  tls: {}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: jeffi-stores-controller-service-admin, namespace: jeffi }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`admin.jeffistores.in`)
+      kind: Rule
+      middlewares:
+        - { name: strip-client-cert, namespace: jeffi-edge }
+        - { name: pass-client-cert, namespace: jeffi-edge }
+      services: [{ name: jeffi-stores-controller-service, port: 3000 }]
+  tls:
+    options: { name: platform-mtls, namespace: jeffi-edge }
+---
+# Two pods: the core has one vCPU (the account's EC2 limit), where more pods add no CPU. Back to 2→4 (and a
+# 300m request) on a bigger core.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: jeffi-stores-controller-service, namespace: jeffi }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: jeffi-stores-controller-service }
+  minReplicas: 2
+  maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+  behavior:
+    scaleDown: { stabilizationWindowSeconds: 300 }

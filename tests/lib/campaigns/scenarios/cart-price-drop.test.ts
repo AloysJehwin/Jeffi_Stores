@@ -100,11 +100,11 @@ describe('cartPriceDrop scenario', () => {
     it('sends WhatsApp with a day-converted cooldown when enabled', async () => {
       await cartPriceDrop.send({ user_id: 'u1' }, { campaign, params: { ...defaultParams, whatsappEnabled: true } })
       expect(mockSendWa).toHaveBeenCalledOnce()
-      const [kind, userId, vars, cooldownDays] = mockSendWa.mock.calls[0]
+      const [kind, userId, vars, cooldownMin] = mockSendWa.mock.calls[0]
       expect(kind).toBe('cart_price_drop')
       expect(userId).toBe('u1')
       expect(vars.items).toBe('TV')
-      expect(cooldownDays).toBe(7)
+      expect(cooldownMin).toBe(10080) // 7 days in minutes
     })
 
     it('returns no_items when nothing dropped', async () => {

@@ -62,7 +62,7 @@ query → RAG (top 50) → re-ranker (top 10) → LLM ranks (top 5) → response
 | Model | `cross-encoder/ms-marco-MiniLM-L6-v2` fine-tuned on our pairs |
 | Training time | ~2 hours on RTX 4080 |
 | Inference time | ~50ms for 50 candidates |
-| Code complexity | Low. New `src/lib/reranker.ts` + a training script |
+| Code complexity | Low. New `controller-service/src/lib/reranker.ts` + a training script |
 | When to trigger | 500 explicit rows OR 2,000 implicit rows |
 | Improvement expected | top-5 precision +15-25% (typical for re-rankers on domain data) |
 
@@ -132,7 +132,7 @@ Use the feedback data to find common failure patterns and improve the system pro
 
 ### Step 3 — Wire into the pipeline (1 day)
 
-`src/lib/reranker.ts`:
+`controller-service/src/lib/reranker.ts`:
 - Calls a small Python service on the Razer (`uvicorn` + the trained model) at `100.110.153.68:8001/rerank`
 - Or: re-export to ONNX and run via `onnxruntime-node` in-process (faster, fewer moving parts — explore second)
 - Inserts between `searchCandidatesViaRag` (returns 50) and `callRanker` (gets 10)

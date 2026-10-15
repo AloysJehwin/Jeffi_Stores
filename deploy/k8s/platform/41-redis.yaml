@@ -1,0 +1,42 @@
+# Per-namespace Redis (OTP state, cron/provisioning locks, session pub/sub). Password from Secret redis.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: redis, namespace: jeffi, labels: { app: redis } }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: redis } }
+  template:
+    metadata: { labels: { app: redis } }
+    spec:
+      nodeSelector: { jeffi.io/role: core }
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: [--requirepass, $(REDIS_PASSWORD), --appendonly, 'yes', --maxmemory, 96mb, --maxmemory-policy, volatile-lru]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom: { secretKeyRef: { name: redis, key: password } }
+          ports: [{ containerPort: 6379 }]
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 128Mi }
+          volumeMounts: [{ name: data, mountPath: /data }]
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: redis-data }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: redis-data, namespace: jeffi }
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources: { requests: { storage: 1Gi } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis, namespace: jeffi }
+spec:
+  selector: { app: redis }
+  ports: [{ port: 6379 }]

@@ -4,10 +4,10 @@ import { join } from 'path'
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
 
-const canvas = read('src/components/ui/BlurhashCanvas.tsx')
-const imgWithSkeleton = read('src/components/ui/ImgWithSkeleton.tsx')
-const storeImage = read('src/components/visitor/StoreImage.tsx')
-const adminImage = read('src/components/admin/AdminImage.tsx')
+const canvas = read('controller-service/src/components/ui/BlurhashCanvas.tsx')
+const imgWithSkeleton = read('controller-service/src/components/ui/ImgWithSkeleton.tsx')
+const storeImage = read('controller-service/src/components/visitor/StoreImage.tsx')
+const adminImage = read('controller-service/src/components/admin/AdminImage.tsx')
 
 describe('BlurhashCanvas', () => {
   it('validates the hash before decoding', () => {

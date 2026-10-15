@@ -44,10 +44,12 @@ describe('ensureBuiltinCampaignRows', () => {
     await ensureBuiltinCampaignRows()
     const [campSql, campParams] = mockQuery.mock.calls[1]
     // enabled column is the literal false in the VALUES tuple
-    expect(campSql).toMatch(/enabled\)/)
-    expect(campSql).toMatch(/false\)/)
+    expect(campSql).toMatch(/enabled, email_template_slug, sms_template_slug\)/)
+    expect(campSql).toMatch(/false, \$\d+, \$\d+\)/)
     // params carry kind twice (kind + scenario_kind) + name + description + subject + body
     expect(campParams).toContain('birthday')
+    // linked to its library templates from the start
+    expect(campParams).toContain('campaign/birthday')
   })
 
   it('seeds new coupon-kind rows with the kind default discount, others with 0', async () => {
@@ -57,11 +59,11 @@ describe('ensureBuiltinCampaignRows', () => {
     ])
     await ensureBuiltinCampaignRows()
     const [campSql, campParams] = mockQuery.mock.calls[1]
-    expect(campSql).toContain('discount_percent, enabled)')
+    expect(campSql).toContain('discount_percent, enabled, email_template_slug, sms_template_slug)')
     expect(campSql).toMatch(/ON CONFLICT \(kind\) DO NOTHING/)
-    // Each tuple is 7 params: kind, name, description, scenario_kind, subject, body, discount_percent.
+    // Each tuple is 9 params: kind, name, description, scenario_kind, subject, body, discount_percent, email + sms slug.
     expect((campParams as unknown[])[6]).toBe(15)
-    expect((campParams as unknown[])[13]).toBe(0)
+    expect((campParams as unknown[])[15]).toBe(0)
   })
 
   it('swallows DB errors (never throws into the request path)', async () => {

@@ -33,7 +33,17 @@ CREATE TABLE public.campaigns (
     scenario_kind character varying(64),
     parameters jsonb DEFAULT '{}'::jsonb NOT NULL,
     coupon_id uuid,
-    draft_fields jsonb
+    draft_fields jsonb,
+    template_layout character varying(32) DEFAULT 'classic' NOT NULL,
+    template_mode character varying(16) DEFAULT 'richtext' NOT NULL,
+    blocks jsonb,
+    sms_template text,
+    wa_template_sid character varying(64),
+    wa_variables jsonb,
+    wa_header_image_url text,
+    email_template_slug character varying(80),
+    sms_template_slug character varying(80),
+    wa_template_slug character varying(80)
 );
 
 
@@ -102,16 +112,30 @@ CREATE TABLE public.coupon_drafts (
 
 
 --
+-- Name: campaign_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.campaign_drafts (
+    campaign_id uuid DEFAULT gen_random_uuid() NOT NULL,
+    kind character varying(64) NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: email_campaign_logs; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.email_campaign_logs (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     campaign_id uuid NOT NULL,
-    email character varying(255) NOT NULL,
+    email character varying(255),
     status character varying(20) DEFAULT 'sent'::character varying NOT NULL,
     error text,
-    sent_at timestamp with time zone DEFAULT now()
+    sent_at timestamp with time zone DEFAULT now(),
+    channel character varying(16) DEFAULT 'email'::character varying NOT NULL,
+    to_address character varying(255)
 );
 
 
@@ -132,7 +156,10 @@ CREATE TABLE public.email_campaigns (
     scheduled_at timestamp with time zone,
     sent_at timestamp with time zone,
     created_by uuid,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    wizard_step smallint DEFAULT 1 NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    channels jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -154,7 +181,8 @@ CREATE TABLE public.email_campaigns_sent (
     unsubscribed_at timestamp with time zone,
     bounced_at timestamp with time zone,
     complained_at timestamp with time zone,
-    metadata jsonb DEFAULT '{}'::jsonb
+    metadata jsonb DEFAULT '{}'::jsonb,
+    channel character varying(16) DEFAULT 'email'::character varying NOT NULL
 );
 
 

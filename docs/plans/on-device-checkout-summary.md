@@ -16,8 +16,8 @@ Steps 2–6. **No GPU work runs until the user explicitly approves the fine-tune
 - **Strict capability gate**, **silent UX** (summary appears only on capable devices), progressive enhancement — never blocks checkout.
 
 ## Already built (Step 1)
-- `src/lib/on-device/capability.ts` — `detectOnDeviceCapability()`: WebGPU adapter + `deviceMemory>=4GB` + GPU limit checks; model-cache + storage probes. Verified CAPABLE on Apple Silicon (16GB, 4096MB buffers).
-- `src/components/on-device/OnDeviceCapabilityDebug.tsx` + `/dev/on-device` page.
+- `controller-service/src/lib/on-device/capability.ts` — `detectOnDeviceCapability()`: WebGPU adapter + `deviceMemory>=4GB` + GPU limit checks; model-cache + storage probes. Verified CAPABLE on Apple Silicon (16GB, 4096MB buffers).
+- `controller-service/src/components/on-device/OnDeviceCapabilityDebug.tsx` + `/dev/on-device` page.
 
 ## Conventions to honor (from ADR-0001)
 - Training on the Razer RTX 4080 only; export to **ONNX**; scripts in `scripts/`.
@@ -31,7 +31,7 @@ Generate `(session-signals JSON → ideal recap summary)` pairs from the **local
 - Render an **ideal recap** from curated templates in the target voice (2–3 sentences, warm, concrete: names categories/brands, notes completeness, reassures). Vary templates so the model generalizes, not memorizes.
 - Output JSONL `{"prompt","completion"}`; deterministic 90/10 train/val split; target ~1–3k examples.
 - **User reviews a sample** for tone before training.
-- Define the **prompt serialization format** here — shared verbatim by training AND the browser runtime (single source of truth in `src/lib/on-device/prompt.ts`).
+- Define the **prompt serialization format** here — shared verbatim by training AND the browser runtime (single source of truth in `controller-service/src/lib/on-device/prompt.ts`).
 
 ## Step 3 — Fine-tune on Razer 4080 — `scripts/train-gemma-onboarding.py` (GPU, needs approval)
 - LoRA fine-tune `google/gemma-3-270m` on the JSONL using the existing `~/sd-cover/.venv` (+ `peft`, `trl`, `datasets`). Rank ~16, few epochs; eval on val split.
@@ -44,20 +44,20 @@ Generate `(session-signals JSON → ideal recap summary)` pairs from the **local
 - **TOP RISK — verify Gemma-3-270M is supported** by installed `optimum` + transformers.js at build time (arch support moves fast). If not exportable/loadable, fall back to nearest supported small Gemma and note it. Validate BEFORE Step 5.
 - Host weights under `public/models/onboarding/` (or CDN); lazy-fetch + cache in Cache Storage (`MODEL_CACHE_NAME` from Step 1).
 
-## Step 5 — Browser runtime — `src/lib/on-device/runtime.ts`
+## Step 5 — Browser runtime — `controller-service/src/lib/on-device/runtime.ts`
 - Add `@huggingface/transformers`. Load with `device:'webgpu'`, `dtype:'q4'` from our hosted path; browser-cached.
 - API: `loadSummarizer()` (idempotent, lazy) + `generateRecap(signals)→string` via the shared serializer. Run in a **Web Worker** so checkout never janks.
 - Gated behind `detectOnDeviceCapability()` → capable only; silent first load, background download, summary appears when ready.
 
 ## Step 6 — Signal collection + checkout UI
-- **Session tracker** `src/lib/on-device/session-signals.ts`: sessionStorage store of recently-viewed product names/categories + search terms; tiny hooks on product/search pages (no backend). Cart via `useCart()`; past-order **categories only** (anonymized) fetched once or skipped if logged out.
+- **Session tracker** `controller-service/src/lib/on-device/session-signals.ts`: sessionStorage store of recently-viewed product names/categories + search terms; tiny hooks on product/search pages (no backend). Cart via `useCart()`; past-order **categories only** (anonymized) fetched once or skipped if logged out.
 - **`buildSignals()`** merges all four sources → serialized prompt (aggregated, no PII).
-- **`<CheckoutRecapSummary/>`** on `src/app/checkout/review/page.tsx`: mounts client-side, runs the gate, renders a small "Your order at a glance" card that streams the on-device summary on capable devices; renders nothing otherwise or on error. Non-blocking.
+- **`<CheckoutRecapSummary/>`** on `controller-service/src/app/checkout/review/page.tsx`: mounts client-side, runs the gate, renders a small "Your order at a glance" card that streams the on-device summary on capable devices; renders nothing otherwise or on error. Non-blocking.
 
 ## Critical files
-- **New:** `scripts/gen-onboarding-dataset.mjs`, `scripts/train-gemma-onboarding.py`, `scripts/export-gemma-onnx.py`, `src/lib/on-device/prompt.ts`, `src/lib/on-device/runtime.ts`, `src/lib/on-device/session-signals.ts`, `src/components/on-device/CheckoutRecapSummary.tsx`, `public/models/onboarding/*`, `docs/adr/0008-on-device-summary.md`.
-- **Edit:** `src/app/checkout/review/page.tsx`, product/search pages (tracking hooks), `package.json`.
-- **Reuse:** `src/lib/on-device/capability.ts`, `useCart()`, `useAuth()`, pricing helpers.
+- **New:** `scripts/gen-onboarding-dataset.mjs`, `scripts/train-gemma-onboarding.py`, `scripts/export-gemma-onnx.py`, `controller-service/src/lib/on-device/prompt.ts`, `controller-service/src/lib/on-device/runtime.ts`, `controller-service/src/lib/on-device/session-signals.ts`, `controller-service/src/components/on-device/CheckoutRecapSummary.tsx`, `public/models/onboarding/*`, `docs/adr/0008-on-device-summary.md`.
+- **Edit:** `controller-service/src/app/checkout/review/page.tsx`, product/search pages (tracking hooks), `package.json`.
+- **Reuse:** `controller-service/src/lib/on-device/capability.ts`, `useCart()`, `useAuth()`, pricing helpers.
 
 ## Verification
 - Dataset: user sign-off on sample summaries.

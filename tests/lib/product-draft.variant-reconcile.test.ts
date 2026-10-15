@@ -10,6 +10,7 @@ const mockClientQuery = vi.fn() as any
 const mockWithTransaction = vi.fn()
 
 vi.mock('@/lib/shared/db', () => ({
+  query: async () => ({ rows: [] }),
   queryOne: (...args: any[]) => mockQueryOne(...args),
   queryMany: (...args: any[]) => mockQueryMany(...args),
   withTransaction: (...args: any[]) => mockWithTransaction(...args),

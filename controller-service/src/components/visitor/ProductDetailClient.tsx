@@ -1,0 +1,884 @@
+'use client'
+
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import Link from 'next/link'
+import ProductImageGallery from './ProductImageGallery'
+
+import ProductActions from './ProductActions'
+import BusinessPriceBadge from './BusinessPriceBadge'
+import RazorpayOffers from './RazorpayOffers'
+import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
+import { useWishlist } from '@/contexts/WishlistContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { digitalActive } from '@/lib/catalog/digital'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
+import { useRouter } from 'next/navigation'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import ReviewSummaryLink from './pdp/ReviewSummaryLink'
+import type { ReviewSummary } from '@/lib/shared/review-summary-types'
+import { round2 } from '@/lib/catalog/gst'
+
+interface ProductImage {
+  id: string
+  image_url: string
+  thumbnail_url: string
+  is_primary: boolean
+  display_order?: number
+}
+
+interface SubVariant {
+  id: string
+  sub_variant_name: string
+  sku?: string | null
+  price: number | null
+  mrp: number | null
+  price_ex_gst: number | null
+  stock_status: string
+  is_active: boolean
+}
+
+interface Variant {
+  id: string
+  variant_name: string
+  sku: string
+  price: number | null
+  mrp: number | null
+  mrp_ex_gst: number | null
+  price_ex_gst: number | null
+  stock_status: string
+  pricing_type?: string
+  unit?: string
+  numeric_value?: number | null
+  sub_variant_type?: string | null
+  sell_unit_id?: string | null
+  variant_images?: ProductImage[]
+  sub_variants?: SubVariant[]
+}
+
+interface ProductDetailClientProps {
+  product: {
+    id: string
+    name: string
+    sku: string
+    slug: string
+    description?: string | null
+    base_price: number
+    mrp?: number | null
+    price_ex_gst?: number | null
+    gst_percentage?: number | null
+    stock_status: string
+    has_variants: boolean
+    variant_type?: string | null
+    discount_pct?: number | null
+    extra_delivery_days?: number | null
+    handling_days?: number | null
+    weight?: number | null
+    dimensions?: string | null
+    material?: string | null
+    finish?: string | null
+    size?: string | null
+    hsn_code?: string | null
+    mpn?: string | null
+    gtin?: string | null
+    weight_grams?: number | null
+    length_cm?: number | null
+    breadth_cm?: number | null
+    height_cm?: number | null
+    package_type?: string | null
+    brands?: {
+      id: string
+      name: string
+      slug: string
+      return_allowed?: boolean
+      return_window_days?: number
+      replacement_allowed?: boolean
+      replacement_window_days?: number
+    } | null
+    categories?: {
+      id: string
+      name: string
+      slug: string
+      return_allowed?: boolean
+      return_window_days?: number
+      replacement_allowed?: boolean
+      replacement_window_days?: number
+    } | null
+    product_images: ProductImage[]
+    product_variants: Variant[]
+    product_units?: Array<{
+      id: string
+      variant_id: string | null
+      sub_variant_id: string | null
+      unit: string
+      factor: number
+      is_base: boolean
+      is_purchase_default: boolean
+      display_label: string | null
+      dimension: string
+      min_qty?: number | null
+      max_qty?: number | null
+      qty_step?: number | null
+    }>
+    sell_unit_id?: string | null
+    // Identification & Compliance
+    barcode?: string | null
+    isbn?: string | null
+    asin?: string | null
+    brand_part_number?: string | null
+    country_of_origin?: string | null
+    // Physical Attributes
+    color?: string | null
+    color_hex?: string | null
+    volume_ml?: number | null
+    net_weight_grams?: number | null
+    fragile?: boolean | null
+    hazardous?: boolean | null
+    flammable?: boolean | null
+    // Certifications & Standards
+    certifications?: string[] | null
+    compliance_standard?: string | null
+    safety_rating?: string | null
+    warranty_months?: number | null
+    warranty_type?: string | null
+    // Condition & Lifecycle
+    condition?: string | null
+    launch_date?: string | null
+    discontinue_date?: string | null
+    // Age & Audience
+    age_min?: number | null
+    age_max?: number | null
+    target_gender?: string | null
+    target_audience?: string[] | null
+    is_cod_allowed?: boolean | null
+    is_digital?: boolean | null
+    is_subscription?: boolean | null
+    subscription_intervals?: string[] | null
+    owned_in_vault?: boolean | null
+  }
+  initialSkuParam?: string
+  freeShippingThreshold?: number
+  reviewSummary?: ReviewSummary | null
+}
+
+interface PolicyProps {
+  returnAllowed: boolean
+  returnDays: number
+  replacementAllowed: boolean
+  replacementDays: number
+  isCodAllowed?: boolean
+  freeShippingThreshold?: number
+}
+
+const DeliveryInfo = ({
+  returnAllowed,
+  returnDays,
+  replacementAllowed,
+  replacementDays,
+  isCodAllowed,
+  freeShippingThreshold = 500,
+}: PolicyProps) => {
+  const [activePolicy, setActivePolicy] = useState<null | {
+    label: string
+    sub: string
+    detail: string
+    bullets: string[]
+    color: string
+    href: string
+    hrefLabel: string
+    icon: React.ReactNode
+  }>(null)
+
+  const items = [
+    {
+      icon: (
+        <svg
+          className="w-7 h-7"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+          <path d="M13 16V5a1 1 0 00-1-1H4a1 1 0 00-1 1v11m10 0h-3M6 16H3m4-7h6l3 5" />
+        </svg>
+      ),
+      label: 'Free Delivery',
+      sub: `On orders above ₹${freeShippingThreshold.toLocaleString('en-IN')}`,
+      detail: `Free delivery on all orders above ₹${freeShippingThreshold.toLocaleString('en-IN')}. Standard shipping charges apply below this threshold.`,
+      bullets: [
+        'Delivered within 3–7 business days',
+        'Same-day dispatch on orders placed before 2 PM',
+        'Tracking link sent via SMS & email after dispatch',
+        'Delivery available across India including remote areas',
+      ],
+      color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+      href: '/legal/shipping-policy',
+      hrefLabel: 'Read Shipping Policy',
+    },
+    {
+      icon: (
+        <svg
+          className="w-7 h-7"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      ),
+      label: returnAllowed ? 'Easy Returns' : 'Non-Returnable',
+      sub: returnAllowed ? `${returnDays}-day return policy` : 'This product cannot be returned',
+      detail: returnAllowed
+        ? `Hassle-free returns within ${returnDays} days of delivery.`
+        : 'This product is non-returnable due to its nature.',
+      bullets: returnAllowed
+        ? [
+            `Raise a return request within ${returnDays} days of delivery`,
+            'Item must be unused and in original packaging',
+            'Refund processed within 5–7 business days after pickup',
+            'Free pickup arranged from your doorstep',
+          ]
+        : [
+            'Please review the product details carefully before ordering',
+            'Damaged or defective items — contact support within 48 hours',
+            'Wrong item received? We will arrange a replacement',
+            'Our team is available 9 AM – 6 PM Mon–Sat',
+          ],
+      color: returnAllowed
+        ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
+        : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400',
+      href: '/legal/return-refund-policy',
+      hrefLabel: 'Read Return & Refund Policy',
+    },
+    {
+      icon: (
+        <svg
+          className="w-7 h-7"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+        </svg>
+      ),
+      label: replacementAllowed ? 'Free Replacement' : 'Non-Replaceable',
+      sub: replacementAllowed ? `${replacementDays}-day guarantee` : 'This product cannot be replaced',
+      detail: replacementAllowed
+        ? `Free replacement within ${replacementDays} days for defective or damaged products.`
+        : 'This product is not eligible for replacement under our standard policy.',
+      bullets: replacementAllowed
+        ? [
+            `Request replacement within ${replacementDays} days of delivery`,
+            'Applicable for manufacturing defects & damage on delivery',
+            'Upload photos of the defect when raising the request',
+            'Replacement dispatched within 2–3 business days of approval',
+          ]
+        : [
+            'Damaged on delivery? Contact support within 48 hours with photos',
+            'Incorrect item received will be replaced at no cost',
+            'Manufacturing defects covered under brand warranty',
+            'Contact us at support@jeffistores.in for assistance',
+          ],
+      color: replacementAllowed
+        ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
+        : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400',
+      href: '/legal/return-refund-policy',
+      hrefLabel: 'Read Return & Refund Policy',
+    },
+    {
+      icon: (
+        <svg
+          className="w-7 h-7"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      ),
+      label: '100% Genuine',
+      sub: 'Verified authentic products',
+      detail: 'Every product is sourced directly from authorised distributors or manufacturers.',
+      bullets: [
+        'Sourced directly from authorised distributors',
+        'Zero tolerance for counterfeit or grey-market goods',
+        'Quality inspection before every dispatch',
+        'Brand warranty honoured on all genuine products',
+      ],
+      color: 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400',
+      href: '/legal/warranty-policy',
+      hrefLabel: 'Read Warranty Policy',
+    },
+    {
+      icon: (
+        <svg
+          className="w-7 h-7"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      ),
+      label: 'Secure Payment',
+      sub: 'Encrypted & protected checkout',
+      detail:
+        'All payments are processed over an encrypted, PCI-DSS compliant gateway. Your card and bank details are never stored on our servers.',
+      bullets: [
+        '256-bit SSL encrypted checkout',
+        'UPI, Cards, Net Banking & Wallets accepted',
+        isCodAllowed ? 'Cash on Delivery available for eligible orders' : 'Prepaid orders only for this product',
+        'Instant payment confirmation & receipt',
+      ],
+      color: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
+      href: '/legal/terms',
+      hrefLabel: 'Read Payment Terms',
+    },
+  ]
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3 items-stretch">
+        {items.slice(0, 4).map((item, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => setActivePolicy(item)}
+            className="flex items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group h-full overflow-hidden text-left w-full"
+          >
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${item.color}`}>
+              {item.icon}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground leading-tight group-hover:text-accent-600 transition-colors">
+                {item.label}
+              </p>
+              <p className="text-[11px] text-foreground-muted leading-snug mt-0.5">{item.sub}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {/* Policy popup modal — rendered via portal to avoid z-index/overflow clipping */}
+      {activePolicy &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            onClick={() => setActivePolicy(null)}
+          >
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <div
+              className="relative bg-surface rounded-2xl border border-border-default shadow-2xl w-full max-w-sm p-5 space-y-4"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${activePolicy.color}`}>
+                  {activePolicy.icon}
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-foreground">{activePolicy.label}</p>
+                  <p className="text-xs text-foreground-muted">{activePolicy.sub}</p>
+                </div>
+              </div>
+              <p className="text-sm text-foreground-secondary leading-relaxed">{activePolicy.detail}</p>
+              <ul className="space-y-2">
+                {activePolicy.bullets.map((b: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-foreground-secondary">
+                    <svg
+                      className="w-4 h-4 mt-0.5 shrink-0 text-accent-500"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2.5}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {b}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex items-center justify-between pt-1">
+                <Link
+                  href={activePolicy.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-accent-600 hover:underline flex items-center gap-1"
+                >
+                  {activePolicy.hrefLabel}
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setActivePolicy(null)}
+                  className="text-xs text-foreground-muted hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-surface-secondary"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+
+      <button
+        type="button"
+        onClick={() => setActivePolicy(items[4])}
+        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group text-left"
+      >
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${items[4].color}`}>
+          {items[4].icon}
+        </div>
+        <span className="text-[11px] font-medium text-foreground-muted group-hover:text-accent-600 transition-colors w-10 leading-tight shrink-0">
+          Secure Payment
+        </span>
+        <div className="flex items-center gap-1 flex-wrap ml-2">
+          {['UPI', 'Cards', 'Net Banking', 'Wallets'].map(m => (
+            <span
+              key={m}
+              className="text-[9px] font-semibold text-foreground-secondary bg-surface-secondary border border-border-default px-1 py-0.5 rounded whitespace-nowrap"
+            >
+              {m}
+            </span>
+          ))}
+          {isCodAllowed && (
+            <span className="text-[9px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1 py-0.5 rounded whitespace-nowrap">
+              Cash on Delivery
+            </span>
+          )}
+        </div>
+      </button>
+    </div>
+  )
+}
+
+interface PincodeCheckerProps {
+  pincode: string
+  setPincode: (v: string) => void
+  pincodeResult: { ok: boolean; message: string } | null
+  setPincodeResult: (v: { ok: boolean; message: string } | null) => void
+  pincodeChecking: boolean
+  checkPincode: () => void
+  pincodeRef: React.RefObject<HTMLInputElement>
+}
+
+const PincodeChecker = ({
+  pincode,
+  setPincode,
+  pincodeResult,
+  setPincodeResult,
+  pincodeChecking,
+  checkPincode,
+  pincodeRef,
+}: PincodeCheckerProps) => (
+  <div className="mt-3 p-3 rounded-xl border border-border-default bg-surface-elevated">
+    <p className="text-xs font-semibold text-foreground-secondary mb-2 uppercase tracking-wide">Check Delivery</p>
+    <div className="flex gap-2">
+      <input
+        ref={pincodeRef}
+        type="text"
+        inputMode="numeric"
+        maxLength={6}
+        value={pincode}
+        onChange={e => {
+          setPincode(e.target.value.replace(/\D/g, ''))
+          setPincodeResult(null)
+        }}
+        onKeyDown={e => e.key === 'Enter' && checkPincode()}
+        placeholder="Enter pincode"
+        className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+      />
+      <button
+        onClick={checkPincode}
+        disabled={pincodeChecking}
+        className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-60"
+      >
+        {pincodeChecking ? 'Checking…' : 'Check'}
+      </button>
+    </div>
+    {pincodeResult && (
+      <p
+        className={`text-xs mt-2 font-medium ${pincodeResult.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+      >
+        {pincodeResult.ok ? '✓ ' : '✗ '}
+        {pincodeResult.message}
+      </p>
+    )}
+  </div>
+)
+
+export default function ProductDetailClient({
+  product,
+  initialSkuParam,
+  freeShippingThreshold = 500,
+  reviewSummary,
+}: ProductDetailClientProps) {
+  const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
+  const { has: inWishlist, toggle: toggleWishlist } = useWishlist()
+  const isInWishlist = inWishlist(product.id)
+  const [wishlistLoading, setWishlistLoading] = useState(false)
+  const [selectedUnit, setSelectedUnit] = useState<{
+    key: string
+    label: string | null
+    min: number
+    max: number | null
+    step: number
+    factor: number
+    dimension: string
+  }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1, dimension: 'count' })
+  const [pincode, setPincode] = useState('')
+  const [pincodeResult, setPincodeResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [pincodeChecking, setPincodeChecking] = useState(false)
+  const [notifyEmail, setNotifyEmail] = useState('')
+  const [notifySubmitted, setNotifySubmitted] = useState(false)
+  const pincodeRef = useRef<HTMLInputElement>(null)
+  const { user } = useAuth()
+  const { showToast, showConfirm } = useToast()
+  const gstEnabled = useStoreConfig().flags.gstEnabled
+  const digitalMaster = useStoreConfig().flags.digitalProductsEnabled
+  const isDigital = digitalActive(digitalMaster, product.is_digital ?? false)
+  const router = useRouter()
+  const [vaultOwned, setVaultOwned] = useState<{ owned: boolean; url: string | null }>({
+    owned: product.owned_in_vault ?? false,
+    url: null,
+  })
+
+  useEffect(() => {
+    if (!isDigital || !user) return
+    let cancelled = false
+    fetch(`/api/vault/owned?productId=${encodeURIComponent(product.id)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        if (!cancelled && d) setVaultOwned({ owned: !!d.owned, url: d.url ?? null })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [isDigital, user, product.id])
+
+  useEffect(() => {
+    if (user?.email) setNotifyEmail(user.email)
+  }, [user])
+
+  const checkPincode = useCallback(async () => {
+    const p = pincode.trim()
+    if (!/^\d{6}$/.test(p)) {
+      setPincodeResult({ ok: false, message: 'Enter a valid 6-digit pincode' })
+      return
+    }
+    setPincodeChecking(true)
+    setPincodeResult(null)
+    try {
+      const res = await fetch(`/api/delivery-check?pincode=${p}`)
+      const data = await res.json()
+      setPincodeResult({ ok: data.serviceable, message: data.message })
+    } catch {
+      setPincodeResult({ ok: false, message: 'Could not check delivery. Try again.' })
+    } finally {
+      setPincodeChecking(false)
+    }
+  }, [pincode])
+
+  const handleNotifyMe = useCallback(async () => {
+    const email = notifyEmail.trim()
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showToast('Enter a valid email address', 'error')
+      return
+    }
+    try {
+      await fetch('/api/notify-back-in-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: product.id, email }),
+        credentials: 'include',
+      })
+      setNotifySubmitted(true)
+    } catch {
+      showToast('Failed to save. Try again.', 'error')
+    }
+  }, [notifyEmail, product.id])
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [product.slug])
+
+  useEffect(() => {
+    fetch(`/api/products/${product.id}/view`, { method: 'POST', credentials: 'include' }).catch(() => {})
+  }, [product.id])
+
+  const hasVariants = product.has_variants && product.product_variants?.length > 0
+  const primaryImage = product.product_images?.find(img => img.is_primary) ?? product.product_images?.[0]
+  const displayPrice = pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
+  // Keep the MRP on the same basis as the shown price so the discount % is honest.
+  const gstRatePdp = product.gst_percentage ? Number(product.gst_percentage) : 0
+  const rawMrp = product.mrp ? Number(product.mrp) : null
+  const mrp = !gstEnabled && rawMrp != null && gstRatePdp > 0 ? round2(rawMrp / (1 + gstRatePdp / 100)) : rawMrp
+  const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
+
+  const brand = product.brands
+  const cat = product.categories
+  const returnAllowed =
+    brand?.return_allowed === false || cat?.return_allowed === false
+      ? false
+      : (brand?.return_allowed ?? cat?.return_allowed ?? true)
+  const returnDays = returnAllowed
+    ? brand?.return_allowed === false
+      ? (brand.return_window_days ?? 7)
+      : (cat?.return_window_days ?? brand?.return_window_days ?? 7)
+    : 0
+  const replacementAllowed =
+    brand?.replacement_allowed === false || cat?.replacement_allowed === false
+      ? false
+      : (brand?.replacement_allowed ?? cat?.replacement_allowed ?? true)
+  const replacementDays = replacementAllowed
+    ? brand?.replacement_allowed === false
+      ? (brand.replacement_window_days ?? 7)
+      : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7)
+    : 0
+  const policy: PolicyProps = {
+    returnAllowed,
+    returnDays,
+    replacementAllowed,
+    replacementDays,
+    isCodAllowed: product.is_cod_allowed ?? false,
+    freeShippingThreshold,
+  }
+
+  const handleWishlist = useCallback(async () => {
+    if (!user) {
+      showConfirm({
+        title: 'Sign In Required',
+        message: 'Please sign in to save items to your wishlist.',
+        confirmText: 'Sign In',
+        cancelText: 'Maybe Later',
+        type: 'info',
+        onConfirm: () => router.push(`/login?redirect=/products/${product.slug}`),
+      })
+      return
+    }
+    setWishlistLoading(true)
+    const result = await toggleWishlist(product.id)
+    setWishlistLoading(false)
+    if (result === 'added') showToast('Added to wishlist!', 'success')
+    else if (result === 'removed') showToast('Removed from wishlist', 'success')
+    else showToast('Failed to update wishlist', 'error')
+  }, [user, product.id, product.slug, toggleWishlist])
+
+  const handleShare = useCallback(async () => {
+    const url = window.location.href
+    const shareData = { title: product.name, text: `Check out ${product.name}`, url }
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData)
+      } catch {}
+    } else {
+      await navigator.clipboard.writeText(url)
+      showToast('Link copied to clipboard!', 'success')
+    }
+  }, [product.name])
+
+  const handleVariantChange = (variant: Variant | null) => {
+    if (variant?.variant_images && variant.variant_images.length > 0) {
+      setVariantImages(variant.variant_images)
+    } else {
+      setVariantImages(undefined)
+    }
+  }
+
+  return (
+    <>
+      {/* Image column — order-1 on mobile, natural on desktop */}
+      <div className="order-1 lg:order-none">
+        <ProductImageGallery
+          images={product.product_images || []}
+          productName={product.name}
+          variantImages={variantImages}
+          discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
+        />
+
+        <div className="hidden lg:block mt-4">
+          {isDigital ? (
+            <div className="rounded-lg border border-border-default bg-surface-secondary/40 p-4 text-sm text-foreground-secondary">
+              Digital product — delivered instantly to your vault. No shipping.
+            </div>
+          ) : (
+            <>
+              <DeliveryInfo {...policy} />
+              <PincodeChecker
+                pincode={pincode}
+                setPincode={setPincode}
+                pincodeResult={pincodeResult}
+                setPincodeResult={setPincodeResult}
+                pincodeChecking={pincodeChecking}
+                checkPincode={checkPincode}
+                pincodeRef={pincodeRef}
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Product info column — order-2 on mobile, natural on desktop */}
+      <div className="order-2 lg:order-none">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1">{product.name}</h1>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            {' '}
+            <button
+              onClick={handleWishlist}
+              disabled={wishlistLoading}
+              aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+              className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-60"
+            >
+              <svg
+                className={`w-5 h-5 transition-transform duration-300 ${isInWishlist ? 'animate-heart-pulse' : ''}`}
+                fill={isInWishlist ? 'currentColor' : 'none'}
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+                style={{ color: isInWishlist ? '#ef4444' : undefined }}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={handleShare}
+              aria-label="Share product"
+              className="w-10 h-10 rounded-full border border-border-secondary bg-surface-elevated hover:bg-surface-secondary flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {reviewSummary && <ReviewSummaryLink summary={reviewSummary} className="-mt-2 mb-4" />}
+
+        <ProductWarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} />
+
+        {/* Low stock urgency + notify me for out-of-stock */}
+        <div className="mb-4">
+          {product.stock_status === 'Low Stock' && (
+            <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 px-2 py-0.5 rounded-full">
+              Only a few left — order soon
+            </span>
+          )}
+          {product.stock_status === 'Out of Stock' && (
+            <div className="space-y-3">
+              {notifySubmitted ? (
+                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-3 py-2 rounded-lg">
+                  <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fillRule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  We&apos;ll email you when this is back in stock.
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={notifyEmail}
+                    onChange={e => setNotifyEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={handleNotifyMe}
+                    className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors"
+                  >
+                    Notify Me
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {!hasVariants && <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />}
+
+        <ProductActions
+          productId={product.id}
+          productName={product.name}
+          sku={product.sku}
+          stockStatus={product.stock_status}
+          basePrice={displayPrice}
+          basePriceExGst={product.price_ex_gst ?? null}
+          salePrice={null}
+          mrp={rawMrp}
+          gstPercentage={product.gst_percentage ? Number(product.gst_percentage) : null}
+          variants={hasVariants ? product.product_variants : []}
+          variantType={product.variant_type || 'Variant'}
+          initialSkuParam={initialSkuParam}
+          discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
+          extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
+          handlingDays={Number(product.handling_days ?? 2)}
+          isCodAllowed={product.is_cod_allowed ?? false}
+          onVariantChange={handleVariantChange}
+          onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
+          productUnits={product.product_units ?? []}
+          sellUnitId={product.sell_unit_id ?? null}
+          launchDate={product.launch_date ?? null}
+          discontinueDate={product.discontinue_date ?? null}
+          stickyImage={primaryImage?.thumbnail_url || primaryImage?.image_url || null}
+          digital={isDigital}
+          alreadyOwned={vaultOwned.owned}
+          vaultUrl={vaultOwned.url}
+          isSubscription={product.is_subscription ?? false}
+          subscriptionIntervals={product.subscription_intervals ?? null}
+        />
+
+        <RazorpayOffers />
+
+        {/* Product Specifications — rendered in page.tsx Specifications card */}
+      </div>
+
+      <div className="order-3 lg:hidden">
+        <DeliveryInfo {...policy} />
+        <PincodeChecker
+          pincode={pincode}
+          setPincode={setPincode}
+          pincodeResult={pincodeResult}
+          setPincodeResult={setPincodeResult}
+          pincodeChecking={pincodeChecking}
+          checkPincode={checkPincode}
+          pincodeRef={pincodeRef}
+        />
+      </div>
+    </>
+  )
+}

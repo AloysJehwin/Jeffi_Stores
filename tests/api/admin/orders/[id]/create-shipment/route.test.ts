@@ -57,7 +57,7 @@ const baseOrder = {
   customer_name: null,
   consignee_phone: '9876543210',
   customer_phone: null,
-  address_line1: '123 Main',
+  address_line1: '123 Main Street',
   address_line2: 'Apt 4',
   landmark: null,
   city: 'Raipur',
@@ -284,28 +284,14 @@ describe('POST /api/admin/orders/[id]/create-shipment', () => {
     expect(body.estimatedDeliveryDate).toBeNull()
   })
 
-  it('reads TAT from array shape and falls back on missing consignee fields', async () => {
-    mockQueryOne
-      .mockResolvedValueOnce({
-        ...baseOrder,
-        full_name: null,
-        customer_name: null, // → 'Customer'
-        consignee_phone: null,
-        customer_phone: null, // → default 9999999999
-        order_number: null, // baseRef uses id slice
-        city: null,
-        state: null,
-      })
-      .mockResolvedValueOnce(null)
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce(okCreateResponse())
-      .mockResolvedValueOnce({ ok: true, json: async () => [{ tat: 2 }] }) // array shape tat
+  it('refuses a shipment with no consignee name or phone instead of sending placeholders (Delhivery ER0005)', async () => {
+    mockQueryOne.mockResolvedValueOnce({ ...baseOrder, full_name: null, customer_name: null, consignee_phone: null, customer_phone: null })
+    global.fetch = vi.fn()
 
     const res = await POST(makeReq(), params)
-    const body = await res.json()
-    expect(res.status).toBe(200)
-    expect(body.estimatedDeliveryDate).toBeTruthy()
+    expect(res.status).toBe(422)
+    expect((await res.json()).error).toMatch(/consignee name.*mobile number/)
+    expect(global.fetch).not.toHaveBeenCalled()
   })
 
   it('normalizes a 12-digit 91-prefixed phone to 10 digits', async () => {
@@ -349,8 +335,8 @@ describe('POST /api/admin/orders/[id]/create-shipment minimal order', () => {
     city: 'Raipur',
     state: 'Chhattisgarh',
     postal_code: '492001',
-    consignee_phone: '9999999999',
-    customer_phone: '9999999999',
+    consignee_phone: '9893012345',
+    customer_phone: '9893012345',
     awb_number: null,
     created_at: new Date().toISOString(),
   }

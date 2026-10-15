@@ -21,10 +21,10 @@
 
 **Risk: LOW–MEDIUM**
 
-All database queries use parameterized `$1, $2, ...` placeholders via `node-postgres` — no raw string concatenation found anywhere. `parseBody()` in `src/lib/validate.ts` wraps every mutating API handler with Zod schemas. The Google Merchant feed (`src/app/api/feed/google/route.ts`) correctly escapes XML via `escapeXml()`. Next.js React renderer handles JSX output escaping.
+All database queries use parameterized `$1, $2, ...` placeholders via `node-postgres` — no raw string concatenation found anywhere. `parseBody()` in `controller-service/src/lib/validate.ts` wraps every mutating API handler with Zod schemas. The Google Merchant feed (`controller-service/src/app/api/feed/google/route.ts`) correctly escapes XML via `escapeXml()`. Next.js React renderer handles JSX output escaping.
 
 **Gaps:**
-- `shippingAddress: z.any().optional()` in `src/app/api/orders/create/route.ts:16` — the address object is never schema-validated. Individual fields are accessed by key and passed directly to `INSERT INTO addresses (...)` at line 197–210. Unexpected types reach the DB.
+- `shippingAddress: z.any().optional()` in `controller-service/src/app/api/orders/create/route.ts:16` — the address object is never schema-validated. Individual fields are accessed by key and passed directly to `INSERT INTO addresses (...)` at line 197–210. Unexpected types reach the DB.
 - `notes: z.string().nullish()` at line 17 has no `max()` constraint — unbounded string stored into `orders.notes`.
 
 **Recommendations:**
@@ -48,13 +48,13 @@ Three-portal JWT architecture with type segregation:
 Cross-portal confusion prevented by `X-Auth-Portal: business` header in `authenticateAnyUser()`. Admin RBAC via `requireAdminScope()` + `hasScope()` + `getScopeForPath()`. mTLS enforced: `x-client-cert-cn` header validated against `authCertCN` in JWT.
 
 **Critical gaps:**
-- **Admin login and MFA routes receive zero rate limiting.** Middleware applies `applyRateLimit` only on non-admin paths (`if (!isAdminApiPath && ...)` in `middleware.ts:54`). `/api/admin/login`, `/api/admin/mfa/verify`, and `/api/admin/mfa/enroll-*` are all in `publicApiPaths` but have no TIERS entry in `src/lib/rate-limit.ts`. A credential stuffing loop against admin login is completely unthrottled.
+- **Admin login and MFA routes receive zero rate limiting.** Middleware applies `applyRateLimit` only on non-admin paths (`if (!isAdminApiPath && ...)` in `middleware.ts:54`). `/api/admin/login`, `/api/admin/mfa/verify`, and `/api/admin/mfa/enroll-*` are all in `publicApiPaths` but have no TIERS entry in `controller-service/src/lib/rate-limit.ts`. A credential stuffing loop against admin login is completely unthrottled.
 - **`x-forwarded-host` trusted without allowlist validation** in `buildRedirectUrl` (`middleware.ts:27–36`) — enables open redirects if the load balancer passes this header unfiltered.
 - **`approvalStatus` check for business users** is only at middleware redirect level, not per-API-route. A business user whose status changes post-login stays valid until 8-hour token expiry.
 - No token revocation list — compromised tokens remain valid until expiry.
 
 **Recommendations:**
-1. Add TIERS entries to `src/lib/rate-limit.ts`: `/api/admin/login` → 5/60s, `/api/admin/mfa/` → 10/60s
+1. Add TIERS entries to `controller-service/src/lib/rate-limit.ts`: `/api/admin/login` → 5/60s, `/api/admin/mfa/` → 10/60s
 2. Apply rate limiting before the `publicApiPaths` bypass for admin auth routes
 3. Validate `x-forwarded-host` against an explicit allowlist (`['jeffistores.in', 'admin.jeffistores.in', 'business.jeffistores.in']`)
 4. Implement progressive lockout: 5 failed admin login attempts → 15-min lockout via `admins.failed_login_count`
@@ -65,18 +65,18 @@ Cross-portal confusion prevented by `X-Auth-Portal: business` header in `authent
 
 **Risk: MEDIUM**
 
-- JWT expiry: `8h` — consistent between `JWT_EXPIRES_IN` and cookie `maxAge = JWT_MAX_AGE_S` in `src/lib/jwt.ts:14–15`
+- JWT expiry: `8h` — consistent between `JWT_EXPIRES_IN` and cookie `maxAge = JWT_MAX_AGE_S` in `controller-service/src/lib/jwt.ts:14–15`
 - MFA ticket TTL: 5 minutes — correctly short-lived
 - Cookies: `httpOnly: true`, `secure` in production, `sameSite: 'lax'`
 
 **Gaps:**
-- **`createSessionToken` dead code in `src/lib/auth.ts:118–129`** — returns a plain JS object with a millisecond `exp` field, not a JWT. Not cryptographically verified. Risk of accidental reuse in future code.
+- **`createSessionToken` dead code in `controller-service/src/lib/auth.ts:118–129`** — returns a plain JS object with a millisecond `exp` field, not a JWT. Not cryptographically verified. Risk of accidental reuse in future code.
 - **Cookie domain is `.jeffistores.in` (all subdomains)** — admin token sent to every subdomain. Mitigated by `httpOnly`, but increases blast radius.
 - No sliding-window session renewal — users are hard-logged-out at 8h regardless of activity
 - No server-side token revocation — compromised tokens live to expiry
 
 **Recommendations:**
-1. Delete `createSessionToken` and `isSessionValid` from `src/lib/auth.ts` — the JWT system via `generateToken` is the authoritative path
+1. Delete `createSessionToken` and `isSessionValid` from `controller-service/src/lib/auth.ts` — the JWT system via `generateToken` is the authoritative path
 2. Implement Redis-backed JWT blocklist keyed on `jti` for revocation; check in `verifyToken()`
 3. Consider reducing admin JWT to 4h with sliding refresh on activity
 
@@ -89,7 +89,7 @@ Cross-portal confusion prevented by `X-Auth-Portal: business` header in `authent
 `JWT_SECRET` and `MFA_ENCRYPTION_KEY` have startup-time validation (throw if missing). MFA uses AES-256-GCM with random 12-byte IV — correct.
 
 **Critical gap:**
-- **`RAZORPAY_KEY_SECRET` has no startup guard** — accessed with `!` non-null assertion at `src/app/api/razorpay/verify/route.ts:44`. If absent at runtime, HMAC call uses `undefined` and silently accepts any payment signature.
+- **`RAZORPAY_KEY_SECRET` has no startup guard** — accessed with `!` non-null assertion at `controller-service/src/app/api/razorpay/verify/route.ts:44`. If absent at runtime, HMAC call uses `undefined` and silently accepts any payment signature.
 
 **Other gaps:**
 - `CRON_SECRET` has no startup validation
@@ -98,7 +98,7 @@ Cross-portal confusion prevented by `X-Auth-Portal: business` header in `authent
 - Razorpay webhook handler (if it exists) must verify `X-Razorpay-Signature` using `RAZORPAY_WEBHOOK_SECRET`
 
 **Recommendations:**
-1. Add startup guard: `if (!process.env.RAZORPAY_KEY_SECRET) throw new Error('RAZORPAY_KEY_SECRET is not set')` in `src/lib/razorpay.ts`
+1. Add startup guard: `if (!process.env.RAZORPAY_KEY_SECRET) throw new Error('RAZORPAY_KEY_SECRET is not set')` in `controller-service/src/lib/razorpay.ts`
 2. Add same guard for `CRON_SECRET`
 3. Add `trufflesecurity/trufflehog-actions-scan` to CI
 4. Run `git log --all --full-history -- '**/*.json' | grep jeffi-stores` to confirm no key file committed
@@ -112,8 +112,8 @@ Cross-portal confusion prevented by `X-Auth-Portal: business` header in `authent
 HSTS set correctly in middleware: `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`. mTLS admin path enforced via `x-client-cert-cn`. Certificate revocation checked against `admin_certificates` table.
 
 **Gaps:**
-- **`rejectUnauthorized: false` fallback** when `certs/global-bundle.pem` is missing (`src/lib/db.ts:47`) — silently disables TLS certificate verification for RDS. Should fail hard, not silently degrade.
-- **IAM auth path also disables cert verification** (`src/lib/db.ts:38`: `ssl: { rejectUnauthorized: false }`) — protects credentials but leaves the TLS connection open to MitM within the VPC.
+- **`rejectUnauthorized: false` fallback** when `certs/global-bundle.pem` is missing (`controller-service/src/lib/db.ts:47`) — silently disables TLS certificate verification for RDS. Should fail hard, not silently degrade.
+- **IAM auth path also disables cert verification** (`controller-service/src/lib/db.ts:38`: `ssl: { rejectUnauthorized: false }`) — protects credentials but leaves the TLS connection open to MitM within the VPC.
 - No `upgrade-insecure-requests` in CSP (`next.config.js:9–21`)
 
 **Recommendations:**
@@ -131,7 +131,7 @@ HSTS set correctly in middleware: `Strict-Transport-Security: max-age=63072000; 
 
 **Risk: HIGH**
 
-Rate limiting implemented in `src/lib/rate-limit.ts` with Upstash Redis primary and in-memory `Map` fallback. Tiered by path:
+Rate limiting implemented in `controller-service/src/lib/rate-limit.ts` with Upstash Redis primary and in-memory `Map` fallback. Tiered by path:
 
 | Path | Limit | Window |
 |------|-------|--------|
@@ -228,7 +228,7 @@ Two audit systems in parallel:
 
 **Critical gap:**
 ```ts
-// src/lib/db.ts
+// controller-service/src/lib/db.ts
 pool.on('error', () => {}) // completely silent
 ```
 Pool errors (connection drops, auth failures, SSL errors) disappear without trace. No logging, no metric, no alert.
@@ -270,9 +270,9 @@ Known single points of failure with no resilience tests:
 **Recommendations (priority order):**
 1. Install Vitest: `npm install -D vitest @vitest/coverage-v8`
 2. Write unit tests first — pure logic with no I/O:
-   - GST calculation (`src/lib/gst.ts`)
-   - Rate limit tier matching (`src/lib/rate-limit.ts`)
-   - Coupon discount logic (`src/app/api/orders/create/route.ts:119–158`)
+   - GST calculation (`controller-service/src/lib/gst.ts`)
+   - Rate limit tier matching (`controller-service/src/lib/rate-limit.ts`)
+   - Coupon discount logic (`controller-service/src/app/api/orders/create/route.ts:119–158`)
 3. Install Playwright: `npm install -D @playwright/test`
 4. E2E: checkout flow, admin login, product add
 5. Add `test` job to CI between `typecheck` and `build`
@@ -290,7 +290,7 @@ CI runs lint + typecheck on PRs. No `CODEOWNERS` file. No PR template (`.github/
 
 **Recommendations:**
 1. Add `.github/pull_request_template.md` with checklist: tests, migrations, env vars, breaking changes, accessibility
-2. Add `.github/CODEOWNERS` — require `@AloysJehwin` review for `src/lib/`, `database/`, `.github/workflows/`
+2. Add `.github/CODEOWNERS` — require `@AloysJehwin` review for `controller-service/src/lib/`, `database/`, `.github/workflows/`
 3. Enable GitHub branch protection on `main`: require 1 approval, require CI green, prohibit force-push and direct commits
 
 ---
@@ -323,7 +323,7 @@ All API routes have top-level `try/catch` returning generic `500` — no stack t
 No retry library (`p-retry`, `axios-retry`) installed. No exponential-backoff retry loops for any external call: Razorpay, Delhivery, SES.
 
 **Critical gap — Razorpay duplicate order:**
-`razorpay.orders.create` in `src/app/api/razorpay/create-order/route.ts:85,135` has no idempotency key. A network timeout that retries the call (manually or via any future retry layer) silently creates a duplicate Razorpay order.
+`razorpay.orders.create` in `controller-service/src/app/api/razorpay/create-order/route.ts:85,135` has no idempotency key. A network timeout that retries the call (manually or via any future retry layer) silently creates a duplicate Razorpay order.
 
 **Critical gap — draft token expiry after payment captured:**
 Draft token TTL is 600 seconds. If a user's checkout takes longer, the token expires and `verifyRoute` returns `400 'Invalid or expired checkout session'` — after money has already been captured by Razorpay. No recovery path offered.
@@ -343,7 +343,7 @@ Draft token TTL is 600 seconds. If a user's checkout takes longer, the token exp
 No circuit breaker library installed. No circuit breaker pattern implemented. If Razorpay hangs, each incoming checkout request holds a connection pool slot for the full HTTP timeout — under load, the 20-connection pool is exhausted by blocked requests.
 
 **Additional gap:**
-`quoteShipping` fetch has no timeout (`AbortSignal`): `src/lib/order-commit.ts:289–310`. A hung shipping-rate service holds the request open indefinitely.
+`quoteShipping` fetch has no timeout (`AbortSignal`): `controller-service/src/lib/order-commit.ts:289–310`. A hung shipping-rate service holds the request open indefinitely.
 
 `getRazorpayInstance()` creates a new SDK client on every call — no singleton.
 
@@ -363,10 +363,10 @@ No circuit breaker library installed. No circuit breaker pattern implemented. If
 
 **Critical race conditions:**
 
-**1. Order creation TOCTOU** (`src/app/api/orders/create/route.ts:45–58`):
+**1. Order creation TOCTOU** (`controller-service/src/app/api/orders/create/route.ts:45–58`):
 The duplicate-order check runs outside the transaction. Two concurrent requests for the same user can both pass the check before either commits, creating two pending orders.
 
-**2. Non-atomic cart increment** (`src/app/api/cart/route.ts:200–226`):
+**2. Non-atomic cart increment** (`controller-service/src/app/api/cart/route.ts:200–226`):
 ```ts
 const existingItem = await queryOne('SELECT * FROM cart_items ...')
 const newQuantity = Number(existingItem.quantity) + Number(quantity)
@@ -398,7 +398,7 @@ DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity
 
 **No application-level caching exists.** Upstash Redis is in the tech stack but used only for rate limiting — not for data caching.
 
-Homepage (`src/app/page.tsx:9`): `export const dynamic = 'force-dynamic'` — every visitor triggers fresh DB queries.
+Homepage (`controller-service/src/app/page.tsx:9`): `export const dynamic = 'force-dynamic'` — every visitor triggers fresh DB queries.
 
 `React.cache()` on `getProductBySlug` deduplicates within a single render pass only — zero cross-request caching.
 

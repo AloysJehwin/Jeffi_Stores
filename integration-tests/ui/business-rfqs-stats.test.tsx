@@ -38,7 +38,7 @@ describe('RfqTrendChart (render)', () => {
 })
 
 describe('Business RFQs stats layout (regression guard for 50a2cb6f)', () => {
-  const pageSrc = readFileSync(join(process.cwd(), 'src/app/(admin)/admin/business/rfqs/page.tsx'), 'utf8')
+  const pageSrc = readFileSync(join(process.cwd(), 'controller-service/src/app/(admin)/admin/business/rfqs/page.tsx'), 'utf8')
 
   // The gradient card holds 6 stat tiles (2–3 rows), taller than a fixed 14rem. A hard lg:h-56
   // clipped it so the bottom tiles overflowed into the search bar. min-h lets the row grow.

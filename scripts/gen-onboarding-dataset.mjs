@@ -6,7 +6,7 @@
  * Reads the LOCAL catalog only (never live). Samples real products / categories /
  * brands, synthesizes plausible shopping sessions, and pairs each with a templated
  * "ideal" 2–3 sentence recap in the target voice. Output is JSONL that mirrors the
- * shared prompt serialization (src/lib/on-device/prompt.ts).
+ * shared prompt serialization (controller-service/src/lib/on-device/prompt.ts).
  *
  * Privacy: uses catalog data + synthetic sessions only — no real customers, no PII.
  *
@@ -89,7 +89,7 @@ function renderRecap(cart, cats, brands, total) {
     .trim()
 }
 
-// ── prompt serialization (mirrors src/lib/on-device/prompt.ts) ────────────────
+// ── prompt serialization (mirrors controller-service/src/lib/on-device/prompt.ts) ────────────────
 const RECAP_INSTRUCTION =
   'You are a friendly shopping assistant for an industrial hardware store. ' +
   'Write a warm, concise 2–3 sentence recap of what the customer is about to buy, ' +

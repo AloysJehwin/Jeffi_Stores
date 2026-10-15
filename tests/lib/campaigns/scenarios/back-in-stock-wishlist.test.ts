@@ -1,4 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { days } from '@/lib/campaigns/duration'
 
 vi.mock('@/lib/shared/db', () => ({ queryMany: vi.fn(), query: vi.fn().mockResolvedValue({ rows: [] }) }))
 vi.mock('@/lib/shared/automation-emails', () => ({
@@ -119,7 +120,7 @@ describe('backInStockWishlist scenario', () => {
       expect(kind).toBe('back_in_stock_wishlist')
       expect(userId).toBe('u1')
       expect(vars.product).toBe('Widget')
-      expect(cd).toBe(1)
+      expect(cd).toBe(days(1))
     })
 
     it('returns no_user when the user is gone', async () => {

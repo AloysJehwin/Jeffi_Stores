@@ -35,6 +35,7 @@ const defaultOpts = {
     healthScoreMax: 50,
     maxRecipientsPerSweep: 50,
     whatsappEnabled: false,
+    smsEnabled: false,
   },
 }
 

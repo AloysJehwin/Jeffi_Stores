@@ -1,0 +1,36 @@
+{
+  "name": "public-api-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env.local --import tsx --watch src/server.ts",
+    "start": "node --import tsx src/server.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "predev": "SM_SECRET_ID=${SM_SECRET_ID:-jeffi/public-api/local} ENV_OUT_DIR=. node ../deploy/load-secrets.mjs"
+  },
+  "dependencies": {
+    "@jeffi/api-contracts": "*",
+    "@jeffi/pricing": "*",
+    "@jeffi/service-auth": "*",
+    "@jeffi/wallet": "*",
+    "@asteasolutions/zod-to-openapi": "^8.1.0",
+    "@scalar/fastify-api-reference": "^1.25.0",
+    "fastify": "^5.2.1",
+    "@fastify/rate-limit": "^10.2.1",
+    "ioredis": "^5.4.1",
+    "pg": "^8.13.0",
+    "undici": "^7.1.0",
+    "zod": "^4.4.3",
+    "tsx": "^4.19.2",
+    "@aws-sdk/client-secrets-manager": "^3.1110.0",
+    "@jeffi/tenancy": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  }
+}

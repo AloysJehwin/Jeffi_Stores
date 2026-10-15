@@ -148,11 +148,11 @@ TAT = zone TAT + extraDeliveryDays.
 | File | Role |
 |------|------|
 | `database/catalog.sql` | Schema: `product_units` table + partial unique indexes |
-| `src/components/visitor/ProductActions.tsx` | Price display + qty input (visitor detail page) |
-| `src/components/business/ProductActions.tsx` | Price display + qty input (business detail page) |
-| `src/components/visitor/ProductCard.tsx` | Card EDD + price (visitor listings) |
-| `src/components/business/ProductCard.tsx` | Card EDD + price (business listings) |
-| `src/components/shared/QuantityInput.tsx` | Reusable qty widgets: CountStepper, LengthRuler, SliderInput, AreaInput |
-| `src/app/cart/page.tsx` | Cart item price, totals, qty input with clamp+snap |
-| `src/contexts/CartContext.tsx` | Cart totals (getCartTotal, getCartTax) |
-| `src/app/api/products/edd/route.ts` | EDD calculation with extraDays |
+| `controller-service/src/components/visitor/ProductActions.tsx` | Price display + qty input (visitor detail page) |
+| `controller-service/src/components/business/ProductActions.tsx` | Price display + qty input (business detail page) |
+| `controller-service/src/components/visitor/ProductCard.tsx` | Card EDD + price (visitor listings) |
+| `controller-service/src/components/business/ProductCard.tsx` | Card EDD + price (business listings) |
+| `controller-service/src/components/shared/QuantityInput.tsx` | Reusable qty widgets: CountStepper, LengthRuler, SliderInput, AreaInput |
+| `controller-service/src/app/cart/page.tsx` | Cart item price, totals, qty input with clamp+snap |
+| `controller-service/src/contexts/CartContext.tsx` | Cart totals (getCartTotal, getCartTax) |
+| `controller-service/src/app/api/products/edd/route.ts` | EDD calculation with extraDays |

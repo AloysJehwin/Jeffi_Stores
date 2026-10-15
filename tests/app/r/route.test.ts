@@ -30,17 +30,24 @@ describe('GET /r/[code]', () => {
 
   it('remembers a valid code for 30 days and sends the visitor to signup', async () => {
     const res = await visit('asha7k2q')
-    expect(res.headers.get('location')).toBe('https://shop.test/signup?ref=1')
+    expect(res.headers.get('location')).toBe('/signup?ref=1')
     const cookie = res.headers.get('set-cookie') ?? ''
     expect(cookie).toContain('ref_code=ASHA7K2Q')
     expect(cookie).toMatch(/Max-Age=2592000/i)
     expect(cookie).toMatch(/HttpOnly/i)
   })
 
+  it('never leaks the server bind address behind the proxy (request URL is 0.0.0.0:3000)', async () => {
+    const req = new NextRequest('http://0.0.0.0:3000/r/ASHA7K2Q', { headers: { host: 'jeffistores.in' } })
+    const res = await GET(req, { params: Promise.resolve({ code: 'ASHA7K2Q' }) })
+    expect(res.status).toBe(307)
+    expect(res.headers.get('location')).toBe('/signup?ref=1')
+  })
+
   it('sends a signed-in customer home without crediting anyone', async () => {
     mockAuth.mockResolvedValue({ userId: 'u9' })
     const res = await visit('ASHA7K2Q')
-    expect(res.headers.get('location')).toBe('https://shop.test/')
+    expect(res.headers.get('location')).toBe('/')
     expect(res.headers.get('set-cookie')).toBeNull()
   })
 
@@ -48,7 +55,7 @@ describe('GET /r/[code]', () => {
     mockResolve.mockResolvedValue(null)
     expect((await visit('ASHA7K2Q')).headers.get('set-cookie')).toBeNull()
     mockResolve.mockResolvedValue({ referralId: 'r1', referrerUserId: 'u1', referrerFirstName: 'Asha' })
-    expect((await visit('no!')).headers.get('location')).toBe('https://shop.test/')
+    expect((await visit('no!')).headers.get('location')).toBe('/')
     mockLive.mockResolvedValue(false)
     expect((await visit('ASHA7K2Q')).headers.get('set-cookie')).toBeNull()
   })

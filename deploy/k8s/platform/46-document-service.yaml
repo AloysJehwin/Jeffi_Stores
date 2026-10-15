@@ -1,0 +1,85 @@
+# Platform documents: the platform store's invoices/quotations/POs plus services-only tenants' API documents.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jeffi-stores-document-service
+  namespace: jeffi
+  labels: { app: document-service, jeffi.io/service: documents, jeffi.io/tenant: jeffi-stores }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 5
+  strategy: { type: RollingUpdate, rollingUpdate: { maxUnavailable: 0, maxSurge: 1 } }
+  selector: { matchLabels: { app: document-service, jeffi.io/tenant: jeffi-stores } }
+  template:
+    metadata:
+      labels: { app: document-service, jeffi.io/service: documents, jeffi.io/tenant: jeffi-stores }
+    spec:
+      nodeSelector: { jeffi.io/role: core }
+      imagePullSecrets: [{ name: regcred }]
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      securityContext: { runAsUser: 1001, runAsGroup: 1001, fsGroup: 1001 }
+      containers:
+        - name: app
+          image: 708835965056.dkr.ecr.us-east-1.amazonaws.com/jeffi-stores-document-service:latest
+          ports: [{ name: http, containerPort: 3102 }]
+          env:
+            - { name: SM_SECRET_ID, value: jeffi/documents/production }
+            - { name: NODE_OPTIONS, value: --max-old-space-size=448 }
+            - { name: SERVICE_SKIP_STORE_TENANTS, value: 'true' }
+            - { name: PUBLIC_BASE_URL, value: 'https://public.jeffistores.in' }
+            - { name: MESSAGING_URL, value: 'http://jeffi-stores-messaging-service.jeffi.svc.cluster.local:3101' }
+            - { name: DB_IAM_AUTH, value: 'true' }
+          resources:
+            requests: { cpu: 50m, memory: 256Mi }
+            limits: { cpu: 1, memory: 512Mi }
+          startupProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 5, failureThreshold: 24 }
+          readinessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 10, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /healthz, port: http }, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 3 }
+          lifecycle:
+            preStop: { exec: { command: [sleep, '5'] } }
+          volumeMounts:
+            - { name: certs, mountPath: /app/certs, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+            # Images up to local-0012293f lack the tsconfig base; without it tsx renders JSX as React.createElement.
+            - { name: tsconfig, mountPath: /app/tsconfig.services.json, subPath: tsconfig.services.json, readOnly: true }
+      volumes:
+        - name: certs
+          configMap: { name: rds-ca }
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }
+        - name: tsconfig
+          configMap: { name: services-tsconfig }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: services-tsconfig, namespace: jeffi }
+data:
+  tsconfig.services.json: |
+    {
+      "compilerOptions": {
+        "target": "ES2022", "module": "ESNext", "moduleResolution": "Bundler", "strict": true, "esModuleInterop": true,
+        "skipLibCheck": true, "resolveJsonModule": true, "noEmit": true, "types": ["node"]
+      }
+    }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: jeffi-stores-document-service, namespace: jeffi }
+spec:
+  selector: { app: document-service, jeffi.io/tenant: jeffi-stores }
+  ports: [{ name: http, port: 3102, targetPort: http }]
+---
+# invoice./quotation./purchaseorder.jeffistores.in: the platform store's public document links.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata: { name: jeffi-stores-document-service, namespace: jeffi }
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: Host(`invoice.jeffistores.in`) || Host(`quotation.jeffistores.in`) || Host(`purchaseorder.jeffistores.in`)
+      priority: 100
+      kind: Rule
+      middlewares: [{ name: strip-client-cert, namespace: jeffi-edge }]
+      services: [{ name: jeffi-stores-document-service, port: 3102 }]
+  tls: {}

@@ -82,6 +82,7 @@ describe('GET /api/admin/campaigns/[kind]', () => {
 
   it('returns campaign with recent sends and total', async () => {
     mockQueryOne.mockResolvedValueOnce(sampleCampaign as any)
+    mockQueryOne.mockResolvedValueOnce({ campaign_id: 'd1' } as any) // draft row insert
     mockQueryMany.mockResolvedValueOnce(sampleSends as any)
     mockQueryOne.mockResolvedValueOnce({ total: '5' } as any)
 

@@ -80,10 +80,11 @@ describe('cancelDelhiveryShipment', () => {
 
     await cancelDelhiveryShipment('AWB-001')
 
-    expect(mockQuery).toHaveBeenCalledOnce()
-    const [sql, params] = mockQuery.mock.calls[0]
-    expect(sql).toContain('awb_number = NULL')
-    expect(params[0]).toBe('AWB-001')
+    // Two queries now: a prior-status SELECT (so a picked-up shipment's wallet hold is not released),
+    // then the UPDATE that clears the AWB.
+    const update = mockQuery.mock.calls.find(c => String(c[0]).includes('awb_number = NULL'))
+    expect(update).toBeDefined()
+    expect(update![1][0]).toBe('AWB-001')
   })
 
   it('handles fetch json parse failure gracefully', async () => {

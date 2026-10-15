@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
-const src = readFileSync(join(process.cwd(), 'src/components/admin/site-controls/controls.tsx'), 'utf8')
+const src = readFileSync(join(process.cwd(), 'controller-service/src/components/admin/site-controls/controls.tsx'), 'utf8')
 const sectionCard = src.slice(src.indexOf('export function SectionCard'), src.indexOf('export function FullSpan'))
 
 describe('SectionCard collapse', () => {
@@ -42,7 +42,7 @@ describe('SectionCard collapse', () => {
 })
 
 describe('CustomerTagDefinitionsCard', () => {
-  const tagCard = readFileSync(join(process.cwd(), 'src/components/admin/CustomerTagDefinitionsCard.tsx'), 'utf8')
+  const tagCard = readFileSync(join(process.cwd(), 'controller-service/src/components/admin/CustomerTagDefinitionsCard.tsx'), 'utf8')
 
   it('uses the shared SectionCard so it collapses with the rest', () => {
     expect(tagCard).toContain("from '@/components/admin/site-controls/controls'")

@@ -103,9 +103,11 @@ describe('SubscribeCheckout', () => {
 
   it('renders the per-cycle quote for the selected address and discloses the mandate merchant', async () => {
     render(<SubscribeCheckout isBusiness={false} />)
+    // The first quote can go out before the addresses load; wait for the one scoped to the address.
+    const addressed = () => calls('/api/subscriptions/quote').map(c => JSON.parse(c[1].body)).find(b => b.addressId === 'a1')
+    await waitFor(() => expect(addressed()).toBeTruthy())
     await waitFor(() => expect(screen.getByTestId('subscribe-summary').textContent).toContain('₹850.00'))
-    const body = JSON.parse(calls('/api/subscriptions/quote').at(-1)![1].body)
-    expect(body).toMatchObject({ productId: 'p1', interval: 'monthly', quantity: 2, addressId: 'a1' })
+    expect(addressed()).toMatchObject({ productId: 'p1', interval: 'monthly', quantity: 2, addressId: 'a1' })
     expect(screen.getByText('Jeffi')).toBeTruthy()
     expect(screen.getByText(/₹15,000/)).toBeTruthy()
   })

@@ -1,0 +1,24 @@
+import Link from 'next/link'
+import CampaignViewClient from './CampaignViewClient'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
+export default async function CampaignViewPage({ params }: { params: Promise<{ kind: string }> }) {
+  const { kind } = await params
+  const host = await getHost()
+  return (
+    <div className="p-4 sm:p-6 space-y-5">
+      <div className="flex items-center gap-2 text-sm text-foreground-secondary">
+        <Link href={ap('/admin/campaigns', host)} className="text-accent-500 hover:text-accent-600 transition-colors">
+          Campaigns
+        </Link>
+        <span>/</span>
+        <span className="text-foreground capitalize">{kind.replace(/_/g, ' ')}</span>
+      </div>
+      <CampaignViewClient kind={kind} />
+    </div>
+  )
+}

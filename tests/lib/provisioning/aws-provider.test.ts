@@ -181,6 +181,16 @@ describe('AwsProvisioningProvider', () => {
       })
     })
 
+    it('falls back to gp2, then the next class, when AWS has no capacity', async () => {
+      const p = await makeProvider()
+      rdsSend
+        .mockRejectedValueOnce(awsError('InsufficientDBInstanceCapacity'))
+        .mockRejectedValueOnce(awsError('InsufficientDBInstanceCapacity'))
+      await p.createDbInstance({ dbInstanceId: 'x', paramGroup: 'pg', maxConnections: 45 })
+      const shapes = sentInputs(rdsSend).map((i: any) => `${i.DBInstanceClass}/${i.StorageType}`)
+      expect(shapes).toEqual(['db.t4g.micro/gp3', 'db.t4g.micro/gp2', 'db.t3.micro/gp3'])
+    })
+
     it('rethrows a genuine failure', async () => {
       const p = await makeProvider()
       rdsSend.mockRejectedValueOnce(awsError('InvalidParameterValue'))

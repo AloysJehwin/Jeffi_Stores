@@ -318,10 +318,14 @@ describe('tenant-registry (data layer, extended)', () => {
     it('inserts tenant + infra in a transaction on success', async () => {
       const mod = await importRegistry()
       queueRows({ rows: [{ id: 'plan-1' }] }, { rows: [] }) // plan ok, no dup
-      queueClient({ rows: [] }, { rows: [{ id: 'new-t' }] }, { rows: [] }, { rows: [] }) // BEGIN, INSERT tenants, INSERT infra, COMMIT
+      queueClient({ rows: [] }, { rows: [{ id: 'new-t' }] }, { rows: [] }, { rows: [] }, { rows: [] }, { rows: [] }) // BEGIN, tenants, infra, wallet, ledger, COMMIT
       const out: any = await mod.createTenant({ slug: 'acme', displayName: 'Acme', planSlug: 'pro', dailyPayout: true })
       expect(out).toEqual({ ok: true, tenantId: 'new-t', slug: 'acme' })
       expect(String(clientQuery.mock.calls[0][0])).toBe('BEGIN')
+      // seeds a ₹100 welcome wallet credit inside the same tx
+      const sql = clientQuery.mock.calls.map((c: any) => String(c[0])).join('\n')
+      expect(sql).toMatch(/INSERT INTO tenant_wallets .* VALUES \(\$1, 100\)/)
+      expect(sql).toMatch(/wallet_ledger/)
       expect(clientRelease).toHaveBeenCalled()
     })
 

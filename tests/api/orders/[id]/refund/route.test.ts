@@ -31,12 +31,8 @@ vi.mock('@/lib/payments/razorpay', () => ({
   getRazorpayInstanceFor: vi.fn(),
   isRazorpayEnabled: vi.fn().mockReturnValue(true),
 }))
-vi.mock('@/lib/payments/razorpay-route', () => ({
-  fetchTransfersForPayment: vi.fn().mockResolvedValue({ ok: true, transfers: [] }),
-  fetchTransferIdForPayment: vi.fn().mockResolvedValue(null),
-  reverseTransfer: vi.fn().mockResolvedValue(undefined),
-  reverseTransfersForRefund: vi.fn().mockResolvedValue({ reversedPaise: 0, unrecoveredPaise: 0, perTransfer: [] }),
-  recordRefundSettlement: vi.fn().mockResolvedValue(undefined),
+vi.mock('@/lib/payments/route-settlement', () => ({
+  applyRouteRefund: vi.fn().mockResolvedValue({ status: 'recorded', reversedPaise: 0, unrecoveredPaise: 0 }),
 }))
 vi.mock('@/lib/tenant-registry', () => ({
   controlPlanePool: () => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
@@ -49,7 +45,7 @@ import { POST } from '@/app/api/(public)/orders/[id]/refund/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as razorpayLib from '@/lib/payments/razorpay'
-import * as razorpayRoute from '@/lib/payments/razorpay-route'
+import * as routeSettlement from '@/lib/payments/route-settlement'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 
 const ADMIN = { adminId: 'admin-1', username: 'admin', role: 'super_admin', scopes: ['orders:write'] }
@@ -224,15 +220,18 @@ describe('POST /api/orders/[id]/refund', () => {
     vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({
       instance: { payments: { refund: mockRefund } },
     } as any)
-    vi.mocked(razorpayRoute.reverseTransfersForRefund).mockResolvedValue({
+    vi.mocked(routeSettlement.applyRouteRefund).mockResolvedValue({
+      status: 'recorded',
       reversedPaise: 386,
       unrecoveredPaise: 0,
-      perTransfer: [{ transferId: 'trf_x', amountPaise: 386 }],
     })
     const res = await POST(makeRequest() as any, PARAMS)
     expect(res.status).toBe(200)
-    // The helper owns the capping rule; the route passes the buyer amount and lets it cap.
-    expect(razorpayRoute.reverseTransfersForRefund).toHaveBeenCalledWith('pay_rzp_123', 50000)
+    // The helper owns the own-vs-platform + capping rules; the route passes the refund id, buyer
+    // amount in paise and order ref.
+    expect(routeSettlement.applyRouteRefund).toHaveBeenCalledWith(
+      expect.objectContaining({ paymentId: 'pay_rzp_123', refundId: 'rfnd_123', refundPaise: 50000 })
+    )
   })
 
   it('still refunds the buyer when the clawback cannot be recovered', async () => {
@@ -244,10 +243,10 @@ describe('POST /api/orders/[id]/refund', () => {
       instance: { payments: { refund: mockRefund } },
     } as any)
     // Linked account had no floating balance — Razorpay hard-fails the reversal.
-    vi.mocked(razorpayRoute.reverseTransfersForRefund).mockResolvedValue({
+    vi.mocked(routeSettlement.applyRouteRefund).mockResolvedValue({
+      status: 'recorded',
       reversedPaise: 0,
       unrecoveredPaise: 386,
-      perTransfer: [{ transferId: 'trf_z', amountPaise: 386, error: 'insufficient balance' }],
     })
     const res = await POST(makeRequest() as any, PARAMS)
     // The buyer is never held hostage to the tenant's balance.

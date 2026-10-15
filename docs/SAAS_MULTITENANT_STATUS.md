@@ -1,5 +1,5 @@
 # SaaS Multi-Tenant Foundation — Status Summary
-_Last updated: 2026-08-26_
+_Last updated: 2026-10-14_
 
 Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until instructed)
 
@@ -10,6 +10,33 @@ Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until 
 > only, not checked in; Phases 0–5 "not started"), `archive/PROVISIONING_ENGINE_PLAN.md` ("Design
 > for review, no code"), `archive/PROXY_ASG_PLAN.md` (flags `/api/health` debt that is already fixed — readiness now lives at
 > `/api/ready`). Read those for *design rationale only*; trust this file for current state.
+
+---
+
+## Service pods and go-live (2026-10-14)
+
+- The Next app is `controller-service/` (was `src/`). Every service runs as its own pod:
+  - platform (`jeffi`): `jeffi-stores-{controller,messaging,document,public-api}-service`;
+  - each store tenant (`tenant-{slug}`): `{slug}-{controller,messaging,document}-service`, sized per plan (`provisioning/tiers.ts`) and pinned with `SERVICE_TENANT_SLUG`;
+  - public-api is shared.
+- A pinned pod serves and runs background loops for its own tenant only; the platform's pods skip store tenants (`SERVICE_SKIP_STORE_TENANTS`, `packages/tenancy/src/service-scope.ts`).
+- Routes: `public.` → public-api (`/webhooks/` → messaging); `invoice.`/`quotation.`/`purchaseorder.` → the platform document-service; `invoice-`/`quotation-`/`purchaseorder-{slug}.` → the store's own document-service.
+- Existing stores move to the new layout through `POST /api/internal/provisioning/reconcile-k8s`, which `rollout.sh` runs.
+- Production DB: the control plane merges into `jeffi_stores` at go-live (`CONTROL_PLANE_RDS_DB=jeffi_stores`); `jeffi_control_plane` stays a week as the fallback.
+- Releases without CI: `deploy/k8s/bootstrap/release.sh`. DB changes are user-run scripts in `deploy/k8s/db/`. Go-live steps: [`GO_LIVE_RUNBOOK.md`](GO_LIVE_RUNBOOK.md).
+- **Live state:** not deployed yet; production runs `5c4ffbf4`.
+
+## Kubernetes (2026-10-08)
+
+Tenant compute is moving from AMI-built EC2s to k3s. The plan is in [`K8S_MIGRATION_PLAN.md`](K8S_MIGRATION_PLAN.md) and the runbook in [`deploy/k8s/README.md`](../deploy/k8s/README.md).
+
+- **Selection:** `PROVISIONING_COMPUTE=k8s` switches `ensure_compute` to `controller-service/src/lib/k8s/tenant-compute.ts`. Each tenant gets the namespace `tenant-{slug}`, with per-plan pod sizing (`controller-service/src/lib/provisioning/tiers.ts`).
+  - Basic tenants run on shared `pool-basic-N` nodes.
+  - Growth and above get a dedicated `t-{slug}` node.
+- **DNS:** a single `*.jeffistores.in` wildcard. `configure_dns` no longer writes per-host records in k8s mode.
+- **Plan changes:** go through `reconcileK8sPlan`. A node that is still joining parks the change as `k8sPendingPlan`, which the worker retries.
+- **Tenant-admin CA bundle:** is a Secret (`jeffi-edge/client-ca-bundle`) patched by `mtls-fleet` instead of being pushed over SSM.
+- **Live state:** live on k3s since 2026-10-09 (`5c4ffbf4`).
 
 ---
 
@@ -39,9 +66,9 @@ All of these were **found by actually running the engine end-to-end** and are no
 
 | Fix | Commit | File(s) |
 |-----|--------|---------|
-| Middleware dropped `x-tenant-slug` on storefront/doc/tenant-admin rewrites → silently fell back to platform DB | `7af2bd1e` | `src/middleware.ts` |
-| `getPool()` ignored resolved tenant ctx (`enterWith` didn't survive the `await` back to caller) | `28c3729d` | `src/lib/db.ts` |
-| `aws-provider.tenantPool()` used IAM token for master user — wrong; master user is password-auth | `28c3729d` | `src/lib/provisioning/aws-provider.ts` |
+| Middleware dropped `x-tenant-slug` on storefront/doc/tenant-admin rewrites → silently fell back to platform DB | `7af2bd1e` | `controller-service/src/middleware.ts` |
+| `getPool()` ignored resolved tenant ctx (`enterWith` didn't survive the `await` back to caller) | `28c3729d` | `controller-service/src/lib/db.ts` |
+| `aws-provider.tenantPool()` used IAM token for master user — wrong; master user is password-auth | `28c3729d` | `controller-service/src/lib/provisioning/aws-provider.ts` |
 
 ### 3. Provisioning Engine Hardening (2026-08-18 session)
 
@@ -138,7 +165,7 @@ It is idempotent (`InvalidPermission.Duplicate` = success) and re-runs on retry,
 change self-heals. With the flag absent, `PubliclyAccessible` is `false` and **no SG call is made at
 all** — prod behavior is unchanged.
 
-Implemented via `authorizeSgIngress` / `revokeSgIngress` / `currentPublicIp` in `src/lib/ec2-client.ts`
+Implemented via `authorizeSgIngress` / `revokeSgIngress` / `currentPublicIp` in `controller-service/src/lib/ec2-client.ts`
 (the existing minimal SigV4 EC2 Query-API client — deliberately avoids adding `@aws-sdk/client-ec2`,
 which would version-skew against the installed 3.477 SDK).
 
@@ -149,7 +176,7 @@ which would version-skew against the installed 3.477 SDK).
 
 ### 7. Key Files
 ```
-src/lib/provisioning/
+controller-service/src/lib/provisioning/
   steps.ts          — 15-step state machine (preflight→activate) + reprovisionDns (DNS-only plan change)
   trigger.ts        — single entry point for all 4 flows (triggerProvisioning + kickAdvance)
   aws-provider.ts   — real @aws-sdk RDS/S3/Route53 impl
@@ -158,16 +185,16 @@ src/lib/provisioning/
   seed.ts           — optional seed_data seam (no-op; extend per profile)
   index.ts          — provider factory (PROVISIONING_PROVIDER=aws|stub)
 
-src/lib/tenant-dns.ts            — Route53 UPSERT/DELETE (value-agnostic teardown)
-src/lib/tenant-registry.ts       — control-plane pool, lookupTenant, reconcileOrphanedTenants
-src/lib/db.ts                    — tenant-aware DB pool, ensureTenantContext
-src/middleware.ts                 — host→tenant resolver, x-tenant-slug forwarding
-src/app/api/ecom/provisioning/route.ts        — canonical owner-portal trigger (owner-session gated)
-src/app/api/internal/provisioning/worker/route.ts    — ACTIVE driver; advances every in-flight job one step per 45s tick
-src/app/api/internal/provisioning/advance/route.ts   — legacy single-tenant self-advance loop (superseded; see below)
-src/app/api/internal/provisioning/reconcile/route.ts — hourly drift sweep (from instrumentation.ts)
-src/instrumentation.ts            — in-app scheduler; 45s provisioning worker + hourly reconcile
-src/lib/ec2-client.ts             — minimal SigV4 EC2 Query-API client (no @aws-sdk/client-ec2 dep)
+controller-service/src/lib/tenant-dns.ts            — Route53 UPSERT/DELETE (value-agnostic teardown)
+controller-service/src/lib/tenant-registry.ts       — control-plane pool, lookupTenant, reconcileOrphanedTenants
+controller-service/src/lib/db.ts                    — tenant-aware DB pool, ensureTenantContext
+controller-service/src/middleware.ts                 — host→tenant resolver, x-tenant-slug forwarding
+controller-service/src/app/api/ecom/provisioning/route.ts        — canonical owner-portal trigger (owner-session gated)
+controller-service/src/app/api/internal/provisioning/worker/route.ts    — ACTIVE driver; advances every in-flight job one step per 45s tick
+controller-service/src/app/api/internal/provisioning/advance/route.ts   — legacy single-tenant self-advance loop (superseded; see below)
+controller-service/src/app/api/internal/provisioning/reconcile/route.ts — hourly drift sweep (from instrumentation.ts)
+controller-service/src/instrumentation.ts            — in-app scheduler; 45s provisioning worker + hourly reconcile
+controller-service/src/lib/ec2-client.ts             — minimal SigV4 EC2 Query-API client (no @aws-sdk/client-ec2 dep)
 deploy/nginx-servers.conf        — nginx including tenant wildcard server_name blocks
 database/control-plane/schema.sql
 ```
@@ -181,7 +208,7 @@ database/control-plane/schema.sql
 | # | Item | Notes |
 |---|------|-------|
 | 🔴 **1** | **Merge PR #425 → main** | Deploys all code fixes + makes prod pick up `RDS_MASTER_PASSWORD`. This is the real gate. Do NOT merge until you've reviewed. |
-| 🔴 **2** | **Provisioning is now EVENT-DRIVEN (no cron)** | **Reworked 2026-08-22.** Provisioning is triggered by exactly four flows, all from the ecom owner portal, each handing a full self-contained payload to `triggerProvisioning()` (`src/lib/provisioning/trigger.ts`): (1) first provision — `subscription.charged` webhook + onboard success page; (2) plan upgrade/downgrade — `change-plan` route → `reprovisionDns` (DNS-only, never recreates infra); (3) deprovision on missed payment — `subscription.cancelled`/`completed` webhook; (4) owner cancel — `POST /api/ecom/provisioning {action:'deprovision'}` cancels the Razorpay sub, and the webhook then deprovisions. The **GitHub Actions driver + `/api/cron/provisioning-worker` are deleted** (the GH workflow was also disabled in the Actions tab).<br><br>**⚠️ Corrected 2026-08-26 — how jobs advance.** This row previously claimed there was "no more cron worker" and that the engine self-advanced via a `setTimeout` re-invoke loop against `/api/internal/provisioning/advance`. **That approach was tried and abandoned** — in the Next server model the request scope is torn down after the response, so the post-response timer may never fire (observed in practice: the loop never started; see the comment in `trigger.ts`). What actually runs today:<br>• `triggerProvisioning()` drives the cheap control-plane steps **inline**, bounded to `MAX_INLINE_STEPS = 6`, then stops as soon as the job parks on a polling step (`wait_db_available` / `verify_serving`) or hits a terminal state.<br>• A **recurring in-app worker** takes it from there: `GET /api/internal/provisioning/worker` (Bearer `CRON_SECRET`), fired every **45s** by `setInterval` in `src/instrumentation.ts`. It advances *every* active job one step per tick — this is what carries a job across the ~10-min RDS create.<br>• `/api/internal/provisioning/advance` still exists but is **not wired to the scheduler**; it is legacy. Both routes fire `provisionTenantOwnerAdmin` on transition to `done`. The `provisionTenantOwnerAdmin` super_admin/cert now fires when the job reaches `done` (after the tenant RDS exists), not at payment time. Admin operator routes (`/api/admin/ecom/customers/[id]/provision`+`/deprovision`) are kept as a manual override and now route through the same shared trigger. |
+| 🔴 **2** | **Provisioning is now EVENT-DRIVEN (no cron)** | **Reworked 2026-08-22.** Provisioning is triggered by exactly four flows, all from the ecom owner portal, each handing a full self-contained payload to `triggerProvisioning()` (`controller-service/src/lib/provisioning/trigger.ts`): (1) first provision — `subscription.charged` webhook + onboard success page; (2) plan upgrade/downgrade — `change-plan` route → `reprovisionDns` (DNS-only, never recreates infra); (3) deprovision on missed payment — `subscription.cancelled`/`completed` webhook; (4) owner cancel — `POST /api/ecom/provisioning {action:'deprovision'}` cancels the Razorpay sub, and the webhook then deprovisions. The **GitHub Actions driver + `/api/cron/provisioning-worker` are deleted** (the GH workflow was also disabled in the Actions tab).<br><br>**⚠️ Corrected 2026-08-26 — how jobs advance.** This row previously claimed there was "no more cron worker" and that the engine self-advanced via a `setTimeout` re-invoke loop against `/api/internal/provisioning/advance`. **That approach was tried and abandoned** — in the Next server model the request scope is torn down after the response, so the post-response timer may never fire (observed in practice: the loop never started; see the comment in `trigger.ts`). What actually runs today:<br>• `triggerProvisioning()` drives the cheap control-plane steps **inline**, bounded to `MAX_INLINE_STEPS = 6`, then stops as soon as the job parks on a polling step (`wait_db_available` / `verify_serving`) or hits a terminal state.<br>• A **recurring in-app worker** takes it from there: `GET /api/internal/provisioning/worker` (Bearer `CRON_SECRET`), fired every **45s** by `setInterval` in `controller-service/src/instrumentation.ts`. It advances *every* active job one step per tick — this is what carries a job across the ~10-min RDS create.<br>• `/api/internal/provisioning/advance` still exists but is **not wired to the scheduler**; it is legacy. Both routes fire `provisionTenantOwnerAdmin` on transition to `done`. The `provisionTenantOwnerAdmin` super_admin/cert now fires when the job reaches `done` (after the tenant RDS exists), not at payment time. Admin operator routes (`/api/admin/ecom/customers/[id]/provision`+`/deprovision`) are kept as a manual override and now route through the same shared trigger. |
 | | *Schedules in `instrumentation.ts`* | Two: the **45s provisioning worker** (above) and `reconcileOrphanedTenants()` (drift sweep) **hourly** against `/api/internal/provisioning/reconcile`. The sweep does not need 60-second resolution. |
 | | *Clarification on "in-VPC"* | The worker/reconcile routes run **on the app**, which is already in-VPC, so their data-plane steps (`load_schema`, `restore_data`, backup) reach the `PubliclyAccessible: false` tenant RDS fine. Self-calls target `APP_URL` (`https://jeffistores.in`) with `Authorization: Bearer $CRON_SECRET`; CloudFront `/api/*` forwards `Authorization` (Managed-AllViewer) + disables caching, so it is a safe self-call host. **Running the engine from a laptop is the exception** — see *Local provisioning testing* below. |
 
@@ -192,7 +219,7 @@ database/control-plane/schema.sql
 | 🟡 **3** | **Add alerting on failed/stuck provisioning jobs** | Query `provisioning_jobs WHERE status='failed'` or `updated_at < now()-interval '30min' AND status IN ('pending','running')` |
 | 🟡 **4** | **Document the deprovision multi-minute reality** | RDS delete takes several minutes; deprovision returns before the DB is actually gone. Operators should know to wait before re-provisioning the same slug. |
 | 🟡 **5** | **Wildcard cert renewal is now a fleet-wide SPOF** | Cert expires **2026-11-15**. Every tenant's HTTPS depends on it. Wildcards need DNS-01, so certbot auto-renew must retain working `dns-route53` creds on the box — a silent renewal failure takes down *all* tenants at once. Verify `certbot renew --dry-run` + add an expiry alert. |
-| 🟡 **6** | **Release the idle EIP `32.196.38.130`** | The old (pre-EIP-swap) address is still allocated and **unassociated** — AWS bills idle EIPs (~$3.60/mo). Three other EIPs are attached to non-instance ENIs and are worth an audit at the same time. |
+| 🟡 **6** | ~~Release the idle EIP `32.196.38.130`~~ | **Reused (2026-10-08)** as the k3s core node's address — see `deploy/k8s/README.md`. |
 | 🟡 **7** | **`deploy/aws/aws-infrastructure.yaml` still documents the dead IP** | `32.196.38.130` appears in 4 places incl. `EC2_HOST`. Verified **not consumed by any tooling** (doc-only, so nothing breaks) — but it's the file an operator would trust mid-incident. Update to `52.20.193.62`. |
 | 🟡 **8** | **Never re-enable the EC2/RDS start-stop schedules** | `jeffi-start/stop-ec2` + `jeffi-start/stop-rds` in EventBridge group `jeffi-stores` are currently **DISABLED** (app runs 24/7 — correct for SaaS). Re-enabling them would take **every tenant storefront offline overnight**, and would stall the provisioning worker during the down window. The stale comment in `deploy/sync-cron-setup.sh` ("app is only up 09:00–00:00 IST") predates this and should be corrected. |
 | 🟡 **9** | **Local AWS CLI is authenticated as account ROOT** | The `default` profile holds **root access keys** (`arn:aws:iam::708835965056:root`, `AccountAccessKeysPresent: 1`). Root keys bypass all IAM policy/boundaries/SCPs; root MFA (enabled) does **not** protect them. 5 IAM users already exist. Point `default` at a scoped IAM admin (or Identity Center) and delete the root access keys. Does not affect the app, which correctly uses the `jeffi-tenant-provisioning` role on the EC2 instance profile. |
@@ -222,3 +249,23 @@ These are nice-to-have improvements beyond what was built:
 ## Architecture in One Paragraph
 
 Each signed-up tenant gets a dedicated `db.t4g.micro` RDS Postgres instance + an S3 bucket, provisioned by a 15-step state machine (`steps.ts`) driven by an in-app recurring worker (45s tick) running in-VPC. DNS (`{slug}.jeffistores.in` etc.) points at the shared prod EC2 via Route53 A-records. The app's middleware resolves the request `Host` header to a `TenantContext` and forwards `x-tenant-slug` to the route handler; `db.ts` uses that to route queries to the tenant's own RDS instead of the platform DB. Deprovision backs up the DB to S3, deletes RDS + bucket, and clears DNS — a returning owner can restore from the backup on re-onboard.
+
+## Service types & public API (added 2026-10-13)
+
+- `tenants.service_types text[]` — `store`, `messaging`, `documents` (default `{store}`). Onboarding now starts with a service picker (`onboard/OnboardEntry.tsx`): store → the existing 8-step wizard (extra services carried on submit); services-only → `ServicesOnboard.tsx` → `POST /api/ecom/onboard/services`, which creates an **active** tenant on the `services` plan (tier 0, product `services`) with the welcome wallet credit, auto-approved KYC, no subscription and **no provisioning**.
+- Dashboard gate (`lib/ecom/owner-context.ts`): only store-only tenants are held in `/onboard` while `pending_approval`/`awaiting_payment`.
+- Console nav is filtered by service type (`dashboard/nav.ts` `navFor`). New pages: Wallet (Razorpay top-up via `/api/ecom/wallet/topup/*`), API keys, Messaging (templates + log), Documents, Add a store (`upgradeTenantToStore` — same tenant id and wallet).
+- Public API: `public.jeffistores.in` → `public-api-service/`; keys in control-plane `api_keys` / `api_key_usage_daily`. See `docs/MICROSERVICES_PLAN.md` addendum.
+- Hosts: `public.` is served by the gateway, not the Next app (`deploy/k8s/platform/47-public-api-service.yaml`).
+
+## Invoices / quotations / purchase orders live in document-service (added 2026-10-13)
+
+- **Tenant document hosts** `invoice-{slug}.`, `quotation-{slug}.`, `purchaseorder-{slug}.jeffistores.in` are served by `document-service/` (`controller-service/src/tenant/public.tsx`: HTML viewer, `/<token>/json`, `/<token>/pdf`; also reachable as `/t/:app/:token`). The Next app no longer has `(business)/{invoice,quotation,purchaseorder}` pages or `api/public/{invoice,quotation,purchaseorder}` routes. Dev: middleware rewrites those hosts to `DOCUMENTS_URL`. Prod: the store's `documents` IngressRoute sends them to `{slug}-document-service`; the platform's own `invoice.`/`quotation.`/`purchaseorder.` hosts go to `jeffi-stores-document-service`.
+- **Admin APIs** keep their URLs. `/api/admin/invoices/**`, `/api/admin/quotations/**`, `/api/admin/inventory/po/**` (incl. receive/GRN), `/api/admin/business/rfqs/[id]/convert-to-quotation`, `/api/admin/orders/[id]/einvoice` and `/api/orders/[id]/invoice` are thin Next routes: `authenticateAdmin` + scope check, then `controller-service/src/lib/documents/proxy.ts` forwards to document-service with an HMAC service token carrying `adminId/role/scopes` (or `userId` for the customer invoice download). Handlers are the lifted monolith code under `document-service/src/admin/**` (Next shim in `controller-service/src/shim.ts`).
+- **Data access**: `packages/tenancy` resolves the tenant from the control plane (`tenant_infra`) and opens a per-tenant pg pool (IAM auth; `localhost` endpoint uses `DATABASE_URL` creds in dev). It exposes the monolith's `query/queryOne/queryMany/getClient/withTransaction` names (audit `admin_id` set from the token) so lifted code is a path rewrite. Tenant S3 upload via `uploadInvoicePDF`.
+- **Numbering / PDF from the monolith** (checkout, Razorpay webhooks, subscription cycles, COD remittance): `controller-service/src/lib/documents/invoice.ts` is now a client → `POST /orders/:id/invoice/{draft,number,generate}` on document-service. `assignInvoiceNumber` runs in the service's own transaction after the order transaction commits (idempotent).
+- **Emails** from the service (invoice/quotation/PO finalized, business invoice) go through messaging-service (`internal: true`, cost price), not the monolith's SMTP; the online-order "status update with PDF attachment" became the invoice-finalized email with the view link (no attachments in messaging-service yet).
+- Also moved: PO receive/GRN (`po/[id]/receive` + receive drafts) and `business/rfqs/[id]/convert-to-quotation`. Still in the monolith: legacy `admin/cash-sale/**`, `receipt-pdf.ts` and `store-logo.ts` (packing-slip/brochure/legacy receipt).
+- E2E verified locally (scratch script, 49 checks): invoice draft→finalize→edit→amend→publish, cash sale, quotation→PDF→convert-to-invoice, PO draft→create→receive (GRN)→public page, e-invoice stub, RFQ→quotation, stock deltas on each step, emails logged in messaging-service.
+- On the platform's own host the proxy sends the platform tenant id; document-service serves it from the main DB (`runAsPlatform`, `platformPool`).
+- Env (`jeffi/services/local`): `DATABASE_URL`, `AWS_*`, `S3_BUCKET_NAME`, `RAZORPAY_KEY_*`, `SES_FROM_EMAIL`, `DEV_PUBLIC_PORT`; prod also needs `RDS_USER`, `EINVOICE_*`.
