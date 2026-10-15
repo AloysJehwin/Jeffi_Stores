@@ -8,7 +8,7 @@ import type { Design } from '../types.js'
 // Space-efficient A5; `thermal` (legacy thermal-80mm) gives an 80 mm roll receipt.
 function Thermal({ m, t }: { m: DocModel; t: Theme }) {
   const W = 226.77
-  const h = 300 + m.lines.length * 26 + (m.notes ? 40 : 0)
+  const h = 300 + m.lines.length * 26 + (m.notes ? 40 : 0) + (m.totals.charges.length + 4) * 12
   const row = (a: string, b: string, bold = false) => (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
       <Text style={{ fontSize: bold ? 9 : 7.5, fontWeight: bold ? 700 : 400 }}>{a}</Text>
@@ -32,7 +32,15 @@ function Thermal({ m, t }: { m: DocModel; t: Theme }) {
           {m.showPrices && row(`${l.quantity} × ${money(l.rate)}`, money(l.total))}
         </View>
       ))}
-      {m.showPrices && <>{dash}{row('Subtotal', money(m.totals.subtotal))}{m.totals.is_igst ? row('IGST', money(m.totals.igst)) : <>{row('CGST', money(m.totals.cgst))}{row('SGST', money(m.totals.sgst))}</>}{row(m.type === 'receipt' ? 'PAID' : 'TOTAL', money(m.totals.total), true)}</>}
+      {m.showPrices && <>
+        {dash}{row('Subtotal', money(m.totals.subtotal))}
+        {m.totals.discount > 0 && row('Discount', `-${money(m.totals.discount)}`)}
+        {m.totals.charges.map(ch => <View key={ch.label}>{row(ch.label, money(ch.amount))}</View>)}
+        {m.totals.is_igst ? row('IGST', money(m.totals.igst)) : <>{row('CGST', money(m.totals.cgst))}{row('SGST', money(m.totals.sgst))}</>}
+        {m.totals.round_off !== 0 && row('Round off', money(m.totals.round_off))}
+        {row(m.type === 'receipt' ? 'PAID' : 'TOTAL', money(m.totals.total), true)}
+        {m.type !== 'receipt' && m.totals.amount_paid > 0 && <>{row('Paid', `-${money(m.totals.amount_paid)}`)}{row('BALANCE DUE', money(m.totals.balance_due), true)}</>}
+      </>}
       {dash}
       <View style={{ alignItems: 'center' }}>
         <Image src={m.qr} style={{ width: 56, height: 56 }} />

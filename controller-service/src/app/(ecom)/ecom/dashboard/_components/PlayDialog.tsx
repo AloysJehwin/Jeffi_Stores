@@ -15,7 +15,9 @@ import { fmt } from './finance'
 
 interface Key { id: string; name: string; key_prefix: string; scopes: string[]; status: string }
 interface Party { name: string; gstin?: string; address?: string; phone?: string; email?: string; state?: string }
-type Item = { description: string; quantity: string; unit_price: string; gst_rate: string }
+type Item = { description: string; quantity: string; unit_price: string; gst_rate: string; discount_pct: string }
+const ITEM_GRID = 'grid grid-cols-[1fr_3.5rem_5.5rem_3.5rem_3.5rem_auto] items-center gap-2'
+const NEW_ITEM: Item = { description: '', quantity: '1', unit_price: '', gst_rate: '18', discount_pct: '' }
 
 export const DOC_TYPES = [
   { key: 'invoice', label: 'Invoice' }, { key: 'quotation', label: 'Quotation' }, { key: 'receipt', label: 'Receipt' },
@@ -79,9 +81,13 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
   const [type, setType] = useState('invoice')
   const [sell, setSell] = useState<Party>({ name: seller?.name ?? '', gstin: seller?.gstin ?? '', address: seller?.address ?? '', phone: seller?.phone ?? '', state: '' })
   const [buyer, setBuyer] = useState<Party>({ name: '', email: '' })
-  const [items, setItems] = useState<Item[]>([{ description: '', quantity: '1', unit_price: '', gst_rate: '18' }])
+  const [items, setItems] = useState<Item[]>([NEW_ITEM])
   const [number, setNumber] = useState('')
   const [date, setDate] = useState('')
+  const [disc, setDisc] = useState({ value: '', mode: 'percent', label: '' })
+  const [shipping, setShipping] = useState('')
+  const [paid, setPaid] = useState('')
+  const [roundOff, setRoundOff] = useState(false)
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -132,9 +138,16 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
       ...(date ? { date } : {}),
       seller: compact(sell),
       buyer: compact(buyer),
-      items: items.map(i => ({ description: i.description.trim(), quantity: Number(i.quantity), unit_price: Number(i.unit_price), gst_rate: Number(i.gst_rate) })),
+      items: items.map(i => ({
+        description: i.description.trim(), quantity: Number(i.quantity), unit_price: Number(i.unit_price), gst_rate: Number(i.gst_rate),
+        ...(Number(i.discount_pct) > 0 ? { discount_pct: Number(i.discount_pct) } : {}),
+      })),
+      ...(Number(disc.value) > 0 ? { discount: { [disc.mode === 'percent' ? 'percent' : 'amount']: Number(disc.value), ...(disc.label.trim() ? { label: disc.label.trim() } : {}) } } : {}),
+      ...(Number(shipping) > 0 ? { charges: [{ label: 'Shipping', amount: Number(shipping) }] } : {}),
+      ...(roundOff ? { round_off: true } : {}),
+      ...(Number(paid) > 0 ? { amount_paid: Number(paid) } : {}),
     }
-  }, [target, varNames, vars, to, fields, mediaUrl, buttonUrl, number, date, sell, buyer, items])
+  }, [target, varNames, vars, to, fields, mediaUrl, buttonUrl, number, date, sell, buyer, items, disc, shipping, roundOff, paid])
 
   const curl = target.kind === 'message' ? curlFor('/v1/messages', request) : curlFor(`/v1/documents/${type}`, request, false)
   // Hosts the file on the CDN (converted to a WhatsApp-safe format) and fills media_url with it.
@@ -232,20 +245,35 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
                 <Field label="Buyer email"><input className={input} type="email" value={buyer.email ?? ''} onChange={e => setBuyer({ ...buyer, email: e.target.value })} /></Field>
               </div>
               <div>
-                <div className="mb-1 text-xs font-medium text-foreground-secondary">Items</div>
+                <div className={`${ITEM_GRID} mb-1 text-xs font-medium text-foreground-secondary`}><span>Items</span><span>Qty</span><span>Price</span><span>GST %</span><span>Disc %</span><span /></div>
                 <div className="space-y-2">
                   {items.map((it, i) => (
-                    <div key={i} className="grid grid-cols-[1fr_4rem_6rem_4rem_auto] items-center gap-2">
+                    <div key={i} className={ITEM_GRID}>
                       <input className={input} aria-label="Description" placeholder="Description" value={it.description} onChange={e => setItem(i, { description: e.target.value })} />
                       <input className={input} aria-label="Quantity" type="number" min="1" value={it.quantity} onChange={e => setItem(i, { quantity: e.target.value })} />
                       <input className={input} aria-label="Unit price" type="number" min="0" placeholder="Price" value={it.unit_price} onChange={e => setItem(i, { unit_price: e.target.value })} />
                       <input className={input} aria-label="GST %" type="number" min="0" max="28" value={it.gst_rate} onChange={e => setItem(i, { gst_rate: e.target.value })} />
+                      <input className={input} aria-label="Discount %" type="number" min="0" max="100" placeholder="0" value={it.discount_pct} onChange={e => setItem(i, { discount_pct: e.target.value })} />
                       <button type="button" aria-label="Remove item" disabled={items.length === 1} onClick={() => setItems(list => list.filter((_, n) => n !== i))} className="rounded-full p-1.5 text-foreground-muted hover:bg-surface-secondary disabled:opacity-30"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={() => setItems(list => [...list, { description: '', quantity: '1', unit_price: '', gst_rate: '18' }])} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-foreground-secondary hover:text-foreground"><Plus className="w-3.5 h-3.5" /> Add item</button>
+                <button type="button" onClick={() => setItems(list => [...list, NEW_ITEM])} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-foreground-secondary hover:text-foreground"><Plus className="w-3.5 h-3.5" /> Add item</button>
               </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Discount on the total (optional)" hint="Applied before GST, across all items">
+                  <div className="flex gap-2">
+                    <input className={`${input} min-w-0 flex-1`} type="number" min="0" placeholder="0" value={disc.value} onChange={e => setDisc({ ...disc, value: e.target.value })} />
+                    <AdminSelect className="w-24 shrink-0" value={disc.mode} onChange={v => setDisc({ ...disc, mode: v })} options={[{ value: 'percent', label: '%' }, { value: 'amount', label: '₹' }]} />
+                  </div>
+                </Field>
+                <Field label="Discount label (optional)" hint="Shown on the document"><input className={input} placeholder="e.g. Festive offer" value={disc.label} onChange={e => setDisc({ ...disc, label: e.target.value })} /></Field>
+                <Field label="Shipping (optional)"><input className={input} type="number" min="0" placeholder="₹0" value={shipping} onChange={e => setShipping(e.target.value)} /></Field>
+                <Field label="Amount paid (optional)" hint="The document shows the balance due"><input className={input} type="number" min="0" placeholder="₹0" value={paid} onChange={e => setPaid(e.target.value)} /></Field>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-foreground-secondary">
+                <input type="checkbox" className="accent-accent-600" checked={roundOff} onChange={e => setRoundOff(e.target.checked)} /> Round the total to the nearest rupee
+              </label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Number (optional)" hint="Left blank, the next number in your series is used"><input className={input} value={number} onChange={e => setNumber(e.target.value)} /></Field>
                 <Field label="Date (optional)"><DatePicker className="w-full" value={date} onChange={setDate} clearable placeholder="Today" triggerClassName={input} /></Field>
