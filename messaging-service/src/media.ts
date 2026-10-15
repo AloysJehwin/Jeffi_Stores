@@ -1,7 +1,7 @@
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import sharp from 'sharp'
-import { uploadTemplateAsset } from '@jeffi/tenancy'
+import { uploadCdnAsset } from '@jeffi/tenancy'
 
 // WhatsApp header media from anywhere: a URL (any host, any image format — e.g. a Google image link with no
 // extension) or uploaded bytes is fetched, turned into something WhatsApp accepts and re-hosted on our CDN,
@@ -74,21 +74,22 @@ export async function normalizeMedia(bytes: Buffer, declared: string): Promise<{
   throw new MediaError(415, 'unsupported_media', 'Use an image (any format), an MP4 video or a PDF')
 }
 
-/** Normalizes and hosts the media; returns its CDN URL. */
-export async function hostMedia(bytes: Buffer, declared: string) {
+/** Normalizes and hosts the media; returns its CDN URL (under `base`, a template's header prefix, when given). */
+export async function hostMedia(bytes: Buffer, declared: string, base?: string) {
   const media = await normalizeMedia(bytes, declared)
-  const { url } = await uploadTemplateAsset(media.bytes, 'media', media.mime)
+  const { url } = await uploadCdnAsset(media.bytes, media.mime, base)
   return { url, content_type: media.mime, bytes: media.bytes.length, width: media.width ?? null, height: media.height ?? null }
 }
 
 // The same source in a batch/bulk send is fetched, hosted and charged once (per pod, for an hour).
 const hosted = new Map<string, { url: string; at: number }>()
-export async function hostUrl(raw: string): Promise<{ url: string; fresh: boolean }> {
-  const hit = hosted.get(raw)
+export async function hostUrl(raw: string, base?: string): Promise<{ url: string; fresh: boolean }> {
+  const cacheKey = `${base ?? ''}|${raw}`
+  const hit = hosted.get(cacheKey)
   if (hit && Date.now() - hit.at < 3_600_000) return { url: hit.url, fresh: false }
   const src = await fetchMedia(raw)
-  const { url } = await hostMedia(src.bytes, src.type)
+  const { url } = await hostMedia(src.bytes, src.type, base)
   if (hosted.size > 500) hosted.delete(hosted.keys().next().value!)
-  hosted.set(raw, { url, at: Date.now() })
+  hosted.set(cacheKey, { url, at: Date.now() })
   return { url, fresh: true }
 }

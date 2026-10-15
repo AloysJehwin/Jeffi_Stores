@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import sharp from 'sharp'
 
-vi.mock('@jeffi/tenancy', () => ({ uploadTemplateAsset: vi.fn(async (_b: Buffer, _t: string, mime: string) => ({ key: 'k', url: `https://cdn.test/media.${mime.split('/')[1]}` })) }))
+vi.mock('@jeffi/tenancy', () => ({ uploadCdnAsset: vi.fn(async (_b: Buffer, mime: string) => ({ key: 'k', url: `https://cdn.test/media.${mime.split('/')[1]}` })) }))
 const { normalizeMedia, fetchMedia, hostMedia } = await import('../src/media')
 
 const png = (w: number, h: number, alpha = false) =>

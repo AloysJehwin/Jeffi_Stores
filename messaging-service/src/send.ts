@@ -113,7 +113,10 @@ async function actionVars(ctx: Ctx, blocks: any, vars: Vars, req: SendMessageReq
     if (!req.media_url) throw new SendError(422, 'missing_variables', `This template has an image header — pass media_url (an image under ${prefix}) or variables.${mediaSlot}`, { missing: [mediaSlot] })
     let url = req.media_url
     if (!url.startsWith(prefix)) {
-      const h = await hostUrl(url).catch(mediaErr)
+      const h = await hostUrl(url, prefix).catch(e => {
+        if (e instanceof MediaError) mediaErr(e)
+        throw new SendError(422, 'media_host_unsupported', `This template's header must be under ${prefix}, which is not our media CDN — pass a link under it`)
+      })
       url = h.url
       mediaHosted = h.fresh
       if (!url.startsWith(prefix)) throw new SendError(500, 'media_host_mismatch', `Re-hosted media is not under ${prefix}`)
