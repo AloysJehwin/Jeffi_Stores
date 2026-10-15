@@ -25,13 +25,13 @@
     "semantic_hash": ""
   },
   ".github/workflows/ci.yml": {
-    "mtime": 1792058351.7126117,
-    "ast_hash": "f5207db47a7848a300ddfcf2a17255b2",
+    "mtime": 1792075382.7233236,
+    "ast_hash": "c245c6ff9aeb22f8b3c6a0962cd0c176",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1791944343.9402015,
-    "ast_hash": "6b768008255a8677e817c4d7af7a97e3",
+    "mtime": 1792075404.6956823,
+    "ast_hash": "aa1202edfc7deed003b777620b8543e4",
     "semantic_hash": ""
   },
   "README.md": {
@@ -1290,8 +1290,8 @@
     "semantic_hash": ""
   },
   "vitest.config.ts": {
-    "mtime": 1791939342.54914,
-    "ast_hash": "576437a9be6a963abe2dc4b925ffecb0",
+    "mtime": 1792071730.9612057,
+    "ast_hash": "ea733e902adce4397ce126805de537b5",
     "semantic_hash": ""
   },
   ".github/pull_request_template.md": {
@@ -3815,8 +3815,8 @@
     "semantic_hash": ""
   },
   "tests/components/subscriptions/subscribe-checkout.test.tsx": {
-    "mtime": 1791399124.3174145,
-    "ast_hash": "d0c1df1860b6f2268dc6c621f9f4d852",
+    "mtime": 1792059733.5347872,
+    "ast_hash": "5eed7aa9a9a8dbe751a12d966f139962",
     "semantic_hash": ""
   },
   "tests/components/subscriptions/subscribe-option.test.tsx": {
@@ -4280,8 +4280,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/README.md": {
-    "mtime": 1792058469.75712,
-    "ast_hash": "f421363889ba725509b6cb3a8008a736",
+    "mtime": 1792075404.669097,
+    "ast_hash": "a88aeaa8bdb249352590a77289b15ffc",
     "semantic_hash": ""
   },
   "deploy/k8s/platform/00-namespaces.yaml": {
@@ -16265,8 +16265,8 @@
     "semantic_hash": ""
   },
   "docs/GO_LIVE_RUNBOOK.md": {
-    "mtime": 1792058469.7577677,
-    "ast_hash": "db5ed40def4cf35449cc678d1643a8bf",
+    "mtime": 1792075404.6873786,
+    "ast_hash": "7a87375af330efc9ba1af97410beba7f",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/form-file.ts": {
@@ -16295,13 +16295,18 @@
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/github-oidc.sh": {
-    "mtime": 1792058422.1455767,
-    "ast_hash": "26f512ba6a46caf0efdddf5464aff752",
+    "mtime": 1792075369.01287,
+    "ast_hash": "0e1ab3ddadb67cb1759a31d133d8c227",
     "semantic_hash": ""
   },
   "deploy/k8s/bootstrap/image-tag.sh": {
     "mtime": 1792058181.0574307,
     "ast_hash": "959265569ad517abbbccc6720f611a09",
+    "semantic_hash": ""
+  },
+  "deploy/k8s/db/release-db.sh": {
+    "mtime": 1792075123.3883877,
+    "ast_hash": "6d9e6816c665d0474fcf1e74b26eb830",
     "semantic_hash": ""
   }
 }
