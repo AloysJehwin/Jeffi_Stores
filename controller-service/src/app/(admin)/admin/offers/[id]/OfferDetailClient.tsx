@@ -7,6 +7,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import Toggle from '@/components/ui/Toggle'
+import DatePicker from '@/components/ui/DatePicker'
 import OfferProductPicker, { type AssignOption } from '@/components/admin/OffersProductPicker'
 import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
@@ -172,30 +173,36 @@ export default function OfferDetailClient({
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
               <div>
                 <label className="block text-xs font-medium text-foreground-secondary mb-1">Launch date</label>
-                <input
-                  type="date"
+                <DatePicker
+                  className="w-full"
                   value={toDateInput(startsAt)}
-                  onChange={e => {
-                    const v = fromDateInput(e.target.value, false)
+                  onChange={d => {
+                    const v = fromDateInput(d, false)
                     setStartsAt(v)
                     save({ startsAt: v })
                   }}
+                  max={toDateInput(endsAt) || undefined}
+                  clearable
+                  placeholder="No date"
                   disabled={!canWrite}
-                  className={INPUT_CLASS}
+                  triggerClassName={INPUT_CLASS}
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-foreground-secondary mb-1">End date</label>
-                <input
-                  type="date"
+                <DatePicker
+                  className="w-full"
                   value={toDateInput(endsAt)}
-                  onChange={e => {
-                    const v = fromDateInput(e.target.value, true)
+                  onChange={d => {
+                    const v = fromDateInput(d, true)
                     setEndsAt(v)
                     save({ endsAt: v })
                   }}
+                  min={toDateInput(startsAt) || undefined}
+                  clearable
+                  placeholder="No date"
                   disabled={!canWrite}
-                  className={INPUT_CLASS}
+                  triggerClassName={INPUT_CLASS}
                 />
               </div>
             </div>

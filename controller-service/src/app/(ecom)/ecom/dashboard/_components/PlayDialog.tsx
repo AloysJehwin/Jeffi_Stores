@@ -6,6 +6,7 @@ import { AlertTriangle, Check, Copy, Download, Loader2, Play, Plus, Trash2, Uplo
 import { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 import { AUTO_VARIABLES, curlFor, templateCallFields } from '@/components/admin/messaging-templates/template-call-fields'
 import AdminSelect from '@/components/admin/AdminSelect'
+import DatePicker from '@/components/ui/DatePicker'
 import { PhoneInput, isValidPhone } from '../../_ui/phone'
 import PdfPreview from '../documents/PdfPreview'
 import { fmt } from './finance'
@@ -247,7 +248,7 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label="Number (optional)" hint="Left blank, the next number in your series is used"><input className={input} value={number} onChange={e => setNumber(e.target.value)} /></Field>
-                <Field label="Date (optional)"><input className={input} type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
+                <Field label="Date (optional)"><DatePicker className="w-full" value={date} onChange={setDate} clearable placeholder="Today" triggerClassName={input} /></Field>
               </div>
             </>
           )}

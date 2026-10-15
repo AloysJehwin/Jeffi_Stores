@@ -166,3 +166,9 @@ html:has(.ecom-scope) body {
 .ecom-scope [data-adminselect-dropdown] button { border-radius: 0.625rem; }
 .ecom-scope [data-adminselect-dropdown] [class*='uppercase'] { background-color: var(--org-chrome); border-radius: 0.5rem; }
 .ecom-scope [data-datepicker-popup] button { border-radius: 9999px; }
+.ecom-scope [data-datepicker-popup] button:hover:not(:disabled):not([data-selected]) { background-color: var(--hover-bg) !important; }
+.ecom-scope [data-datepicker-popup] button[data-selected],
+.ecom-scope [data-datepicker-popup] .bg-accent-500 { background-color: var(--sel-bg) !important; color: var(--sel-fg) !important; }
+.ecom-scope [data-datepicker-popup] button[data-today]:not([data-selected]) { border-color: var(--org-terracotta) !important; color: var(--org-terracotta-deep) !important; background-color: transparent !important; }
+.ecom-scope [data-datepicker-popup] button:focus-visible { outline: 2px solid var(--org-terracotta); outline-offset: 2px; }
+.ecom-scope [data-datepicker-trigger][aria-expanded='true'] { border-color: var(--org-terracotta) !important; box-shadow: var(--focus-halo) !important; }
