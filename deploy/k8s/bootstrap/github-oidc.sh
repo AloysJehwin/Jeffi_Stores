@@ -3,7 +3,8 @@
 # its ci.yml job needs:
 #   jeffi-github-build   any branch's images job: push the four images to ECR, read jeffi/production for the
 #                        NEXT_PUBLIC_* build args. It cannot reach the cluster or the database.
-#   jeffi-github-deploy  only a job in the approved `production` environment: read jeffi/production (the RDS
+#   jeffi-github-deploy  only jobs in the `production` (approval) and `production-release` (the stages after it)
+#                        environments: read jeffi/production (the RDS
 #                        master password for 05-table-owner.sh), SSM tunnels to the core and through it to RDS,
 #                        log in to RDS as app_user (schema diff, migrations), invalidate CloudFront.
 # Idempotent; --dry-run prints the policies. Then set the secrets it prints.
@@ -15,12 +16,13 @@ PROVIDER=arn:aws:iam::$ACCOUNT:oidc-provider/token.actions.githubusercontent.com
 CORE_ID=$(aws ec2 describe-addresses --public-ips "$CORE_IP" --query 'Addresses[0].InstanceId' --output text)
 DB_RESOURCE=$(aws rds describe-db-instances --db-instance-identifier "$RDS_INSTANCE" --query 'DBInstances[0].DbiResourceId' --output text)
 
-trust() { # <subject suffix>, e.g. environment:production
+trust() { # <subject suffix>..., e.g. environment:production
+  local subs; subs=$(printf ',"repo:%s:%s"' $(for x in "$@"; do echo "$GH_REPO $x"; done)); subs=${subs#,}
   cat <<JSON
 {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Federated":"$PROVIDER"},
  "Action":"sts:AssumeRoleWithWebIdentity",
  "Condition":{"StringEquals":{"token.actions.githubusercontent.com:aud":"sts.amazonaws.com"},
-  "StringLike":{"token.actions.githubusercontent.com:sub":"repo:$GH_REPO:$1"}}}]}
+  "StringLike":{"token.actions.githubusercontent.com:sub":[$subs]}}}]}
 JSON
 }
 repos() { for r in controller messaging document public-api; do printf '"arn:aws:ecr:%s:%s:repository/jeffi-stores-%s-service",' "$AWS_REGION" "$ACCOUNT" "$r"; done; }
@@ -37,7 +39,7 @@ BUILD_POLICY=$(cat <<JSON
 ]}
 JSON
 )
-DEPLOY_TRUST=$(trust "environment:production")
+DEPLOY_TRUST=$(trust "environment:production" "environment:production-release")
 DEPLOY_POLICY=$(cat <<JSON
 {"Version":"2012-10-17","Statement":[
  $SECRET,

@@ -45,6 +45,7 @@ concurrency:
 
 env:
   AWS_REGION: us-east-1
+  DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
 
 jobs:
   verify-scripts:
@@ -236,72 +237,39 @@ jobs:
           echo "schema=$([ -n "$schema" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "migrations=$([ -n "$migrations" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
-  deploy:
-    name: Deploy to production
+  # Production: one approval (the `production` environment), then each stage is its own job in the
+  # `production-release` environment (no reviewer, same branches) so the graph shows where a release stands.
+  approve:
+    name: Approve release
     runs-on: ubuntu-latest
     needs: [images, release-notes]
     environment:
       name: production
       url: https://jeffistores.in
+    steps:
+      - run: echo "Approved ${{ needs.images.outputs.tag }}, dry_run=${{ env.DRY }}"
+
+  db-schema:
+    name: Database · schema
+    runs-on: ubuntu-latest
+    needs: [images, release-notes, approve]
+    if: ${{ !failure() && !cancelled() && needs.approve.result == 'success' && (needs.release-notes.outputs.schema == 'true' || (github.event_name == 'workflow_dispatch' && (inputs.dry_run || inputs.schema))) }}
+    environment: production-release
     concurrency:
       group: deploy-production
       cancel-in-progress: false
     permissions:
       id-token: write
       contents: read
-    env:
-      DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-      TUNNEL: ssm
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/release-setup
         with:
-          fetch-depth: 0
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-          role-duration-seconds: 7200
-      - name: Tools (Session Manager plugin, psql)
-        run: |
-          set -euo pipefail
-          { echo "OUT_DIR=$RUNNER_TEMP/db"; echo "RELEASE_WORK_DIR=$RUNNER_TEMP/release"; } >> "$GITHUB_ENV"
-          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client python3-venv >/dev/null
-          command -v session-manager-plugin >/dev/null && exit 0
-          curl -fsSL -o /tmp/smp.deb https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb
-          sudo dpkg -i /tmp/smp.deb
-      - name: Kubeconfig (k3s admin, server 127.0.0.1:16443 through the tunnel)
-        env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-        run: |
-          mkdir -p ~/.kube
-          echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/jeffi-k3s.yaml
-          chmod 600 ~/.kube/jeffi-k3s.yaml
-      - name: Database — jeffi_stores schema
-        if: needs.release-notes.outputs.schema == 'true' || env.DRY == 'true' || (github.event_name == 'workflow_dispatch' && inputs.schema)
+          role-arn: ${{ secrets.AWS_ROLE_ARN }}
+          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
+      - name: jeffi_stores schema diff, manual.sql, control-plane diff and plan seed
         run: bash deploy/k8s/db/release-db.sh --schema --yes ${{ env.DRY == 'true' && '--dry-run' || '' }}
-      - name: Database — migration files
-        run: bash deploy/k8s/db/release-db.sh --migrations --yes ${{ env.DRY == 'true' && '--dry-run' || '' }}
-      - name: Roll out ${{ needs.images.outputs.tag }} (platform, tenant databases, stores)
-        if: env.DRY != 'true'
-        run: bash deploy/k8s/bootstrap/release.sh --rollout-only
-      - name: Dry run — cluster and tenant fan-out
-        if: env.DRY == 'true'
-        run: |
-          set -euo pipefail
-          tag=${{ needs.images.outputs.tag }}
-          bash deploy/k8s/db/40-tenant-fanout.sh "${tag#local-}" --dry-run
-          bash -c 'source deploy/k8s/db/lib.sh; k8s_tunnel; kubectl -n jeffi get deploy -o wide; kubectl get ns -l jeffi.io/tier=tenant'
-          echo "Dry run: would roll out $tag; nothing was changed."
-      - name: Invalidate CloudFront
-        if: env.DRY != 'true'
-        env:
-          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-        run: |
-          set -euo pipefail
-          id=$(aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/*' --query 'Invalidation.Id' --output text)
-          aws cloudfront wait invalidation-completed --distribution-id "$DIST_ID" --id "$id"
-          echo "Invalidation $id complete"
-      - name: SQL applied (summary)
+      - name: SQL (summary)
         if: always()
         run: |
           shopt -s nullglob
@@ -312,16 +280,144 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: release-logs
-          path: |
-            ${{ runner.temp }}/db
-            ${{ runner.temp }}/release
+          name: db-${{ github.job }}
+          path: ${{ runner.temp }}/db
           if-no-files-found: ignore
+
+  db-migrations:
+    name: Database · migrations
+    runs-on: ubuntu-latest
+    needs: [images, approve, db-schema]
+    if: ${{ !failure() && !cancelled() && needs.approve.result == 'success' }}
+    environment: production-release
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/release-setup
+        with:
+          role-arn: ${{ secrets.AWS_ROLE_ARN }}
+          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
+      - name: Pending database/migrations files
+        run: bash deploy/k8s/db/release-db.sh --migrations --yes ${{ env.DRY == 'true' && '--dry-run' || '' }}
+      - name: SQL (summary)
+        if: always()
+        run: |
+          shopt -s nullglob
+          for f in "$OUT_DIR"/applied-schema-platform.sql "$OUT_DIR"/schema-*.sql; do
+            [ -s "$f" ] || continue
+            { echo "<details><summary>$(basename "$f") ($(grep -c ';' "$f") statements)</summary>"; echo; echo '```sql'; head -c 60000 "$f"; echo '```'; echo '</details>'; } >> "$GITHUB_STEP_SUMMARY"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: db-${{ github.job }}
+          path: ${{ runner.temp }}/db
+          if-no-files-found: ignore
+
+  rollout-platform:
+    name: Roll out · platform
+    runs-on: ubuntu-latest
+    needs: [images, db-migrations]
+    if: success()
+    environment: production-release
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/release-setup
+        with:
+          role-arn: ${{ secrets.AWS_ROLE_ARN }}
+          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
+      - name: Controller, messaging, documents, public-api and CronJobs at ${{ needs.images.outputs.tag }}
+        run: bash deploy/k8s/bootstrap/rollout.sh ${{ needs.images.outputs.tag }} platform ${{ env.DRY == 'true' && '--dry-run' || '' }}
+
+  db-tenants:
+    name: Database · tenants
+    runs-on: ubuntu-latest
+    needs: [images, rollout-platform]
+    if: success()
+    environment: production-release
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/release-setup
+        with:
+          role-arn: ${{ secrets.AWS_ROLE_ARN }}
+          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
+      - name: Schema and migration files to every store's database
+        run: bash deploy/k8s/bootstrap/rollout.sh ${{ needs.images.outputs.tag }} tenant-db ${{ env.DRY == 'true' && '--dry-run' || '' }}
+
+  rollout-stores:
+    name: Roll out · stores
+    runs-on: ubuntu-latest
+    needs: [images, db-tenants]
+    if: success()
+    environment: production-release
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/release-setup
+        with:
+          role-arn: ${{ secrets.AWS_ROLE_ARN }}
+          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
+      - name: Every store's controller, messaging and document pods at ${{ needs.images.outputs.tag }}
+        run: bash deploy/k8s/bootstrap/rollout.sh ${{ needs.images.outputs.tag }} stores ${{ env.DRY == 'true' && '--dry-run' || '' }}
+
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    needs: [images, rollout-stores]
+    if: success()
+    environment: production-release
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/release-setup
+        with:
+          role-arn: ${{ secrets.AWS_ROLE_ARN }}
+          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
+      - name: Invalidate CloudFront
+        if: env.DRY != 'true'
+        env:
+          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+        run: |
+          set -euo pipefail
+          id=$(aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/*' --query 'Invalidation.Id' --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "$DIST_ID" --id "$id"
+          echo "Invalidation $id complete"
+      - name: Smoke test (live commit and every host)
+        run: |
+          tag=${{ needs.images.outputs.tag }}
+          bash deploy/k8s/bootstrap/smoke.sh "${tag#local-}" ${{ env.DRY == 'true' && '--dry-run' || '' }}
 
   summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [verify-scripts, lint, typecheck, test, build, pr-gate, images, release-notes, deploy]
+    needs: [verify-scripts, lint, typecheck, test, build, pr-gate, images, release-notes, approve, db-schema, db-migrations, rollout-platform, db-tenants, rollout-stores, verify]
     if: always()
     steps:
       - run: |
@@ -333,8 +429,14 @@ jobs:
           echo "PR Gate:        ${{ needs.pr-gate.result }}"
           echo "Images:         ${{ needs.images.result }}"
           echo "Release notes:  ${{ needs.release-notes.result }}"
-          echo "Deploy:         ${{ needs.deploy.result }}"
-          case "${{ needs.verify-scripts.result }} ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.test.result }} ${{ needs.build.result }} ${{ needs.pr-gate.result }} ${{ needs.images.result }} ${{ needs.release-notes.result }} ${{ needs.deploy.result }}" in
+          echo "Approve:        ${{ needs.approve.result }}"
+          echo "DB schema:      ${{ needs.db-schema.result }}"
+          echo "DB migrations:  ${{ needs.db-migrations.result }}"
+          echo "Platform:       ${{ needs.rollout-platform.result }}"
+          echo "DB tenants:     ${{ needs.db-tenants.result }}"
+          echo "Stores:         ${{ needs.rollout-stores.result }}"
+          echo "Verify:         ${{ needs.verify.result }}"
+          case "${{ needs.verify-scripts.result }} ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.test.result }} ${{ needs.build.result }} ${{ needs.pr-gate.result }} ${{ needs.images.result }} ${{ needs.release-notes.result }} ${{ needs.approve.result }} ${{ needs.db-schema.result }} ${{ needs.db-migrations.result }} ${{ needs.rollout-platform.result }} ${{ needs.db-tenants.result }} ${{ needs.rollout-stores.result }} ${{ needs.verify.result }}" in
             *failure*|*cancelled*) echo "Pipeline FAILED"; exit 1 ;;
           esac
           echo "Pipeline OK"
