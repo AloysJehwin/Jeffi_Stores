@@ -581,9 +581,14 @@ async function handle(request: NextRequest) {
   }
 
   if (isAdminApiPath) {
-    // OAuth callbacks return cross-site from Google; the SameSite=Strict admin cookie is not sent.
-    // These authenticate via the HMAC-signed `state` in the route handler, not the session cookie.
-    const oauthCallbackPaths = ['/api/admin/data-source/google/callback']
+    // OAuth callbacks return cross-site from the provider; the SameSite=Strict admin cookie is not
+    // sent. These authenticate via the HMAC-signed `state` in the route handler, not the session cookie.
+    const oauthCallbackPaths = [
+      '/api/admin/data-source/google/callback',
+      '/api/admin/integrations/google/callback',
+      '/api/admin/integrations/amazon/callback',
+      '/api/admin/social/callback',
+    ]
     if (oauthCallbackPaths.some(p => pathname.startsWith(p)) && request.method === 'GET') {
       return addSecurityHeaders(passThrough())
     }

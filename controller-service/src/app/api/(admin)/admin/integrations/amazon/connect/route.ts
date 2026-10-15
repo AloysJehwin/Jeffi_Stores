@@ -2,21 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
 import { signAdminState } from '@/lib/shared/oauth-state'
+import { oauthProviderInfo, oauthRedirectUri } from '@/lib/integrations/oauth'
 
 export const dynamic = 'force-dynamic'
 
-// Store-admin "Connect Amazon Seller". Admin-scope gated; tenant from ALS. Signs a state
-// (tenantId + nonce) to defend the callback, then redirects to Amazon Seller Central's LWA
-// consent screen (SP-API OAuth flow).
+// Store-admin "Connect Amazon Seller" (SP-API website authorization). Signs a state carrying the
+// tenant, then sends the seller to Seller Central's consent page. Amazon returns to the fixed
+// platform redirect URI, which must be registered on the SP-API app.
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
   const tenant = await resolveTenant()
   if (!tenant) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
 
-  const appId = process.env.AMAZON_LWA_APP_CLIENT_ID
-  if (!appId) return NextResponse.json({ error: 'Amazon OAuth not configured' }, { status: 503 })
+  const info = oauthProviderInfo('amazon_seller')
+  if (!info.enabled) {
+    const back = `${await currentAdminBaseUrlAsync()}/admin/merchant-sync`
+    return NextResponse.redirect(`${back}?connected=0&provider=amazon&error=not_configured`)
+  }
 
   const state = signAdminState({
     tenantId: tenant.tenantId,
@@ -24,9 +29,12 @@ export async function GET(request: NextRequest) {
     nonce: crypto.randomBytes(8).toString('hex'),
   })
 
-  const url = new URL('https://sellercentral.amazon.com/apps/authorize/consent')
-  url.searchParams.set('application_id', appId)
+  const host = process.env.AMAZON_SELLER_CENTRAL_URL || 'https://sellercentral.amazon.in'
+  const url = new URL('/apps/authorize/consent', host)
+  url.searchParams.set('application_id', process.env.AMAZON_SP_APP_ID!)
   url.searchParams.set('state', state)
+  url.searchParams.set('redirect_uri', oauthRedirectUri('amazon_seller'))
+  if (process.env.AMAZON_SP_APP_DRAFT === 'true') url.searchParams.set('version', 'beta')
 
   return NextResponse.redirect(url.toString())
 }

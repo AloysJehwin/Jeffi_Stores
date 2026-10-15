@@ -92,6 +92,40 @@ describe('integrations/resolve', () => {
       expect(google.loadGoogleServiceAccount).not.toHaveBeenCalled()
     })
 
+    it("uses a tenant's Google sign-in refresh token when there is no service account", async () => {
+      ctx.getCurrentTenant.mockReturnValue({ tenantId: 't-1' })
+      registry.getIntegrationCredential.mockResolvedValue(
+        credRow({ oauth_refresh_token: 'rt-1', merchant_id: '5550001' })
+      )
+      const { resolveGoogleMerchantCreds } = await import('@/lib/integrations/resolve')
+      expect(await resolveGoogleMerchantCreds()).toEqual({
+        clientEmail: '',
+        privateKey: '',
+        refreshToken: 'rt-1',
+        merchantId: '5550001',
+        dataSource: undefined,
+      })
+      expect(google.loadGoogleServiceAccount).not.toHaveBeenCalled()
+    })
+
+    it('googleOAuthAccessToken refreshes with the platform OAuth client and surfaces Google errors', async () => {
+      process.env.GOOGLE_OAUTH_CLIENT_ID = 'gcid'
+      process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'gsecret'
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'at', expires_in: 1200 }) })
+      const { googleOAuthAccessToken } = await import('@/lib/integrations/resolve')
+      expect(await googleOAuthAccessToken('rt-1')).toEqual({ token: 'at', expiresInSec: 1200 })
+      const body = String(fetchMock.mock.calls[0][1].body)
+      expect(body).toContain('grant_type=refresh_token')
+      expect(body).toContain('client_id=gcid')
+      fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({ error: 'invalid_grant' }) })
+      await expect(googleOAuthAccessToken('rt-1', 'Google Merchant')).rejects.toThrow(
+        'Google Merchant token refresh failed: invalid_grant'
+      )
+      vi.unstubAllGlobals()
+    })
+
     it('un-escapes a private_key stored with literal "\\n" sequences', async () => {
       ctx.getCurrentTenant.mockReturnValue({ tenantId: 't-1' })
       registry.getIntegrationCredential.mockResolvedValue(

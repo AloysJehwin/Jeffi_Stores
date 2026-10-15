@@ -1,84 +1,74 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/auth/jwt'
-import { resolveTenantId } from '@/lib/tenancy/tenant-context'
-import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
-import { saveIntegrationCredential } from '@/lib/tenant-registry'
-import { encryptToken } from '@/lib/crypto/token-cipher'
+import { NextRequest } from 'next/server'
+import { saveIntegrationCredential, getIntegrationCredential } from '@/lib/tenant-registry'
+import { encryptToken, decryptToken } from '@/lib/crypto/token-cipher'
 import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
+import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
 
 export const dynamic = 'force-dynamic'
 
-// Amazon LWA (SP-API) OAuth callback (store admin). Verifies the signed state, re-checks the admin
-// session + that the state's tenant matches the request's ALS tenant, exchanges the spapi_oauth_code
-// for a refresh token, encrypts + persists it with the LWA client credentials and the seller/
-// marketplace ids Amazon carries back. Redirects to the store-admin merchant-sync page.
+// Amazon SP-API OAuth callback. Lands on the platform OAuth host, cross-site, so the SameSite=Strict
+// admin cookie is absent: trust comes from the HMAC-signed state (issued only by the admin-gated
+// connect route). Exchanges spapi_oauth_code for a refresh token and stores it on the state's tenant.
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
-  const backTo = `${await currentAdminBaseUrlAsync()}/admin/merchant-sync`
-
-  const err = params.get('error')
-  if (err) return returnToAdmin(`${backTo}?connected=0&error=${encodeURIComponent(err)}`)
-
-  const code = params.get('spapi_oauth_code')
   const rawState = params.get('state')
-  if (!code || !rawState) return returnToAdmin(`${backTo}?connected=0&error=missing_params`)
+  const state = rawState ? verifyAdminState(rawState) : null
+  const backTo = `${await tenantAdminBase(state)}/admin/merchant-sync`
+  const fail = (reason: string) => returnToAdmin(`${backTo}?connected=0&provider=amazon&error=${reason}`)
 
-  const state = verifyAdminState(rawState)
-  if (!state || state.provider !== 'amazon_seller') {
-    return returnToAdmin(`${backTo}?connected=0&error=bad_state`)
-  }
+  const err = params.get('error_description') || params.get('error')
+  if (err) return fail(errorParam(err))
+  if (!state || state.provider !== 'amazon_seller') return fail('bad_state')
+  const code = params.get('spapi_oauth_code')
+  if (!code) return fail('missing_params')
 
-  const admin = await requireAdminScope(request, 'merchant_sync:write')
-  if (admin instanceof NextResponse) return returnToAdmin(`${backTo}?connected=0&error=not_authorized`)
-  const tenantId = await resolveTenantId()
-  if (tenantId !== state.tenantId) {
-    return returnToAdmin(`${backTo}?connected=0&error=tenant_mismatch`)
-  }
+  const clientId = process.env.AMAZON_LWA_APP_CLIENT_ID
+  const clientSecret = process.env.AMAZON_LWA_APP_CLIENT_SECRET
+  if (!clientId || !clientSecret) return fail('not_configured')
 
   try {
-    const clientId = process.env.AMAZON_LWA_APP_CLIENT_ID
-    const clientSecret = process.env.AMAZON_LWA_APP_CLIENT_SECRET
-    if (!clientId || !clientSecret) return returnToAdmin(`${backTo}?connected=0&error=not_configured`)
-
-    const body = new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      client_id: clientId,
-      client_secret: clientSecret,
-    })
     const res = await fetch('https://api.amazon.com/auth/o2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: oauthRedirectUri('amazon_seller'),
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
     })
     const data = await res.json().catch(() => null)
     if (!res.ok || !data?.refresh_token) {
-      const reason = data?.error_description || data?.error || 'exchange_failed'
-      return returnToAdmin(`${backTo}?connected=0&error=${encodeURIComponent(String(reason).slice(0, 80))}`)
+      return fail(errorParam(data?.error_description || data?.error || 'exchange_failed'))
     }
 
+    // Amazon returns no marketplace; keep one the tenant set earlier, else India.
+    let marketplaceId = 'A21TJRUUN4KGV'
+    const existing = await getIntegrationCredential(state.tenantId, 'amazon_seller')
+    if (existing) {
+      try {
+        marketplaceId = JSON.parse(decryptToken(existing.config_enc))?.marketplace_id || marketplaceId
+      } catch {}
+    }
     const sellerId = params.get('selling_partner_id') || ''
-    const marketplaceId = params.get('marketplace_id') || 'A21TJRUUN4KGV'
-    const normalized = {
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: data.refresh_token,
-      seller_id: sellerId,
-      marketplace_id: marketplaceId,
-    }
-
     await saveIntegrationCredential({
       tenantId: state.tenantId,
       provider: 'amazon_seller',
       label: 'Amazon Seller',
-      configEnc: encryptToken(JSON.stringify(normalized)),
+      configEnc: encryptToken(
+        JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: data.refresh_token,
+          seller_id: sellerId,
+          marketplace_id: marketplaceId,
+        })
+      ),
       meta: { seller_id: sellerId, marketplace_id: marketplaceId, connected_via: 'oauth' },
     })
-
     return returnToAdmin(`${backTo}?connected=amazon`)
-  } catch (e: any) {
-    return returnToAdmin(
-      `${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`
-    )
+  } catch (e) {
+    return fail(errorParam(e))
   }
 }
