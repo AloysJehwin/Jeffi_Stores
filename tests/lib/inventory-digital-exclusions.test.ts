@@ -38,7 +38,7 @@ describe('digital products are never stock-tracked', () => {
       /p\.is_active = TRUE AND p\.is_digital = FALSE\s+AND \(p\.inventory_quantity <= \$1/,
     ],
     ['controller-service/src/lib/shared/dashboard-insights.ts', /COALESCE\(p\.is_draft, false\) = false AND p\.is_digital = false/],
-    ['controller-service/src/app/api/(admin)/admin/inventory/po/[id]/receive/route.ts', /is digital — it has no stock to receive/],
+    ['document-service/src/admin/po/receive.ts', /is digital — it has no stock to receive/],
   ])('%s excludes digital products', (file, pattern) => {
     expect(readFileSync(file, 'utf8')).toMatch(pattern)
   })

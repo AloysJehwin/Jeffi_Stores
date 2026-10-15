@@ -60,6 +60,12 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // Hard-delete of a deprovisioned tenant — gated on isPlatformAdmin (platform super-admin),
   // which is strictly stronger than any :write scope, so a read-only member can never reach it.
   'ecom/customers/[id]/purge',
+  // Approve/reject a tenant's Messaging/Documents service — /api/admin/ecom/* is isPlatformAdmin-only
+  // in middleware, same as the kyc + purge controls above.
+  'ecom/customers/[id]/services',
+  // Closes the caller's OWN editor session (admin_id must match); opening one is gated on the
+  // resource's :write scope, so a read-only member never holds a session to close.
+  'editor-sessions/[id]/close',
   // Signature-verified webhook, not an admin action.
   'financial/payables/webhook',
   // Renders a preview; writes nothing.
@@ -82,9 +88,14 @@ function mutatingRoutesWithoutWriteScope(): string[] {
   for (const f of files) {
     const src = fs.readFileSync(path.join(process.cwd(), f), 'utf8')
     if (!/export async function (POST|PATCH|PUT|DELETE)\b/.test(src)) continue
-    // Gates: hasScope(...), requireAdminScope(req, '...:write'), and aiDenial(role, scopes, '...:write'),
+    // Gates: hasScope(...), requireAdminScope(req, '...:write'), aiDenial(role, scopes, '...:write'),
+    // proxyAdminDocs(req, path, '...:write') (document-service proxy; checks hasScope before forwarding),
     // or aiDenial on a resolveAiScope() result, which only yields AI_ACTION_SCOPES (all :write).
-    if (/hasScope\([^)]*:write'\)|requireAdminScope\([^)]*:write'\)|aiDenial\([^)]*:write'\)/.test(src)) continue
+    if (/hasScope\([^)]*:write'\)|requireAdminScope\([^)]*:write'\)|aiDenial\([^)]*:write'\)|proxyAdminDocs\([^)]*:write'\)/.test(src)) continue
+    // hasScope over a const list/map whose scope literals are all :write (uploads/image EDIT_SCOPES.some(...),
+    // editor-sessions WRITE_SCOPE[resourceType]).
+    const lits = src.match(/'[a-z_]+:(?:read|write)'/g) ?? []
+    if (/hasScope\(/.test(src) && lits.length > 0 && lits.every(l => l.endsWith(":write'"))) continue
     if (/aiDenial\(/.test(src) && /resolveAiScope\(/.test(src)) continue
     if (/CRON_SECRET|verifyCronRequest|authenticateServiceAccount/.test(src)) continue
     const route = f.replace('controller-service/src/app/api/(admin)/admin/', '').replace('/route.ts', '')

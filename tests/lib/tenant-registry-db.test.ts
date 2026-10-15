@@ -93,13 +93,13 @@ describe('tenant-registry (database layer)', () => {
       if (savedDb) process.env.DATABASE_URL = savedDb
     })
 
-    it('derives a local control-plane URL from DATABASE_URL outside production', async () => {
+    it('falls back to DATABASE_URL (control plane lives in the unified app DB)', async () => {
       delete process.env.CONTROL_PLANE_DATABASE_URL
       const saved = process.env.DATABASE_URL
       process.env.DATABASE_URL = 'postgres://user@localhost:5432/jeffi_production_ready'
       const { controlPlanePool } = await importRegistry()
       controlPlanePool()
-      expect(capturedConfigs[0].connectionString).toContain('/jeffi_control_plane')
+      expect(capturedConfigs[0].connectionString).toBe('postgres://user@localhost:5432/jeffi_production_ready')
       if (saved) process.env.DATABASE_URL = saved
       else delete process.env.DATABASE_URL
     })
@@ -132,14 +132,15 @@ describe('tenant-registry (database layer)', () => {
       await expect(mod.reconcileOrphanedTenants()).resolves.toEqual([])
     })
 
-    it('only targets ACTIVE tenants that have no rds_endpoint', async () => {
+    it('only targets ACTIVE store tenants whose infra row has no rds_endpoint', async () => {
       const mod = await importRegistry()
       queueRows({ rows: [], rowCount: 0 })
       await mod.reconcileOrphanedTenants()
       const sql = String(poolQuery.mock.calls[0][0])
       expect(sql).toMatch(/status='suspended'/)
       expect(sql).toMatch(/t\.status='active'/)
-      expect(sql).toMatch(/rds_endpoint IS NOT NULL/)
+      expect(sql).toMatch(/'store' = ANY\(t\.service_types\)/)
+      expect(sql).toMatch(/i\.rds_endpoint IS NULL/)
     })
   })
 

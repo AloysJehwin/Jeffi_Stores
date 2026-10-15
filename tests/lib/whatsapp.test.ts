@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// twilio only backs the free-text (24h window) path now; templates go through messaging-service.
 const messagesCreate = vi.hoisted(() => vi.fn())
 vi.mock('twilio', () => ({
   default: vi.fn(() => ({ messages: { create: messagesCreate } })),
@@ -7,6 +8,13 @@ vi.mock('twilio', () => ({
 
 vi.mock('@/lib/shared/message-log', () => ({
   logMessage: vi.fn(),
+}))
+
+const sendByTemplate = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/shared/send-by-template', () => ({ sendByTemplate }))
+
+vi.mock('@/lib/catalog/brand', () => ({
+  storeBaseUrlAsync: vi.fn(async () => 'https://acme.jeffistores.in'),
 }))
 
 // Order links resolve to the exact order page on the customer's store.
@@ -17,6 +25,7 @@ vi.mock('@/lib/shared/customer-links', () => ({
 import { logMessage } from '@/lib/shared/message-log'
 
 const mockLog = vi.mocked(logMessage)
+const sent = (i = 0) => sendByTemplate.mock.calls[i][0]
 
 async function loadWa(env: Record<string, string | undefined> = {}) {
   vi.resetModules()
@@ -25,7 +34,6 @@ async function loadWa(env: Record<string, string | undefined> = {}) {
     TWILIO_AUTH_TOKEN: 'tok_test',
     TWILIO_WHATSAPP_FROM: '+18722179910',
     WHATSAPP_DISABLED: undefined,
-    TWILIO_WA_PAYMENT_FAILED_SID: undefined,
   }
   const merged = { ...base, ...env }
   for (const [k, v] of Object.entries(merged)) {
@@ -37,6 +45,7 @@ async function loadWa(env: Record<string, string | undefined> = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   messagesCreate.mockResolvedValue({ sid: 'WA1' })
+  sendByTemplate.mockResolvedValue({ id: 'm1', status: 'sent' })
 })
 
 afterEach(() => {
@@ -44,32 +53,29 @@ afterEach(() => {
 })
 
 describe('sendTemplate path', () => {
-  it('sendOTPWhatsApp sends contentSid + contentVariables with whatsapp: prefix', async () => {
+  it('sendOTPWhatsApp sends the otp/verify slug with numbered variables', async () => {
     const wa = await loadWa()
     const ok = await wa.sendOTPWhatsApp({ phone: '9876543210', otp: '123456' })
     expect(ok).toBe(true)
-    const arg = messagesCreate.mock.calls[0][0]
-    expect(arg.from).toBe('whatsapp:+18722179910')
-    expect(arg.to).toBe('whatsapp:+919876543210')
-    expect(arg.contentSid).toBeTruthy()
-    expect(JSON.parse(arg.contentVariables)).toEqual({ '1': '123456' })
-    expect(mockLog).toHaveBeenCalledWith(
-      expect.objectContaining({ channel: 'whatsapp', status: 'sent', providerSid: 'WA1' })
+    expect(sendByTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'whatsapp', slug: 'otp/verify', to: '+919876543210', variables: { '1': '123456' } })
     )
+    expect(messagesCreate).not.toHaveBeenCalled()
   })
 
   it('sendOrderConfirmedWhatsApp passes order + amount vars', async () => {
     const wa = await loadWa()
     const ok = await wa.sendOrderConfirmedWhatsApp({ phone: '9876543210', orderNumber: 'ORD1', total: 999 })
     expect(ok).toBe(true)
-    const vars = JSON.parse(messagesCreate.mock.calls[0][0].contentVariables)
-    expect(vars['1']).toBe('ORD1')
+    expect(sent().slug).toBe('order/confirmed')
+    expect(sent().variables['1']).toBe('ORD1')
+    expect(sent().variables['2']).toContain('999')
   })
 
   it('sendOrderShippedWhatsApp fills courier + tracking defaults', async () => {
     const wa = await loadWa()
     await wa.sendOrderShippedWhatsApp({ phone: '9876543210', orderNumber: 'ORD2' })
-    const vars = JSON.parse(messagesCreate.mock.calls[0][0].contentVariables)
+    const vars = sent().variables
     expect(vars['1']).toBe('ORD2')
     expect(vars['2']).toBe('courier')
     // No AWB yet: the order's own page, not a made-up platform path.
@@ -79,7 +85,7 @@ describe('sendTemplate path', () => {
   it('sendOrderShippedWhatsApp keeps the AWB when there is one', async () => {
     const wa = await loadWa()
     await wa.sendOrderShippedWhatsApp({ phone: '9876543210', orderNumber: 'ORD3', trackingId: 'AWB123' })
-    expect(JSON.parse(messagesCreate.mock.calls[0][0].contentVariables)['3']).toBe('AWB123')
+    expect(sent().variables['3']).toBe('AWB123')
   })
 
   it('sendOrderDeliveredWhatsApp / Cancelled / OutForDelivery return true', async () => {
@@ -87,6 +93,7 @@ describe('sendTemplate path', () => {
     expect(await wa.sendOrderDeliveredWhatsApp({ phone: '9876543210', orderNumber: 'A' })).toBe(true)
     expect(await wa.sendOrderCancelledWhatsApp({ phone: '9876543210', orderNumber: 'B' })).toBe(true)
     expect(await wa.sendOutForDeliveryWhatsApp({ phone: '9876543210', orderNumber: 'C' })).toBe(true)
+    expect(sendByTemplate.mock.calls.map(c => c[0].slug)).toEqual(['order/delivered', 'order/cancelled', 'order/out-for-delivery'])
   })
 
   it('marketing + support senders return true', async () => {
@@ -108,25 +115,20 @@ describe('sendTemplate path', () => {
     expect(await wa.sendReturnInitiatedWhatsApp({ phone: '9876543210', orderNumber: 'O' })).toBe(true)
     expect(await wa.sendRefundProcessedWhatsApp({ phone: '9876543210', amount: '100', orderNumber: 'O' })).toBe(true)
     expect(await wa.sendFeedbackRequestWhatsApp({ phone: '9876543210', orderNumber: 'O', url: 'u' })).toBe(true)
+    expect(sendByTemplate).toHaveBeenCalledTimes(13)
   })
 
-  it('sendPaymentFailedWhatsApp returns false when no template configured', async () => {
+  it('sendPaymentFailedWhatsApp sends the order/payment-failed slug', async () => {
     const wa = await loadWa()
-    expect(await wa.sendPaymentFailedWhatsApp({ phone: '9876543210', orderNumber: 'O' })).toBe(false)
-    expect(messagesCreate).not.toHaveBeenCalled()
-  })
-
-  it('sendPaymentFailedWhatsApp sends when template SID configured', async () => {
-    const wa = await loadWa({ TWILIO_WA_PAYMENT_FAILED_SID: 'HXpay' })
     expect(await wa.sendPaymentFailedWhatsApp({ phone: '9876543210', orderNumber: 'O' })).toBe(true)
-    expect(messagesCreate.mock.calls[0][0].contentSid).toBe('HXpay')
+    expect(sent().slug).toBe('order/payment-failed')
+    expect(sent().variables['1']).toBe('O')
   })
 
-  it('logs failure and returns false when create rejects', async () => {
-    messagesCreate.mockRejectedValueOnce(new Error('meta reject'))
+  it('returns false when messaging-service reports a failed send', async () => {
+    sendByTemplate.mockResolvedValueOnce({ status: 'failed', error: 'meta reject' })
     const wa = await loadWa()
     expect(await wa.sendOTPWhatsApp({ phone: '9876543210', otp: '1' })).toBe(false)
-    expect(mockLog).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed', error: 'meta reject' }))
   })
 })
 
@@ -139,6 +141,10 @@ describe('sendFreeTextWhatsApp', () => {
     expect(arg.body).toBe('hello there')
     expect(arg.contentSid).toBeUndefined()
     expect(arg.to).toBe('whatsapp:+919876543210')
+    expect(arg.from).toBe('whatsapp:+18722179910')
+    expect(mockLog).toHaveBeenCalledWith(
+      expect.objectContaining({ channel: 'whatsapp', status: 'sent', providerSid: 'WA1', provider: 'twilio' })
+    )
   })
 
   it('returns false for invalid phone', async () => {
@@ -174,13 +180,13 @@ describe('sendTemplateByKey', () => {
     for (const [key, vars] of cases) {
       expect(await wa.sendTemplateByKey('9876543210', key, vars)).toBe(true)
     }
-    expect(messagesCreate).toHaveBeenCalledTimes(cases.length)
+    expect(sendByTemplate).toHaveBeenCalledTimes(cases.length)
   })
 
   it('returns false for an unknown key', async () => {
     const wa = await loadWa()
     expect(await wa.sendTemplateByKey('9876543210', 'nope', {})).toBe(false)
-    expect(messagesCreate).not.toHaveBeenCalled()
+    expect(sendByTemplate).not.toHaveBeenCalled()
   })
 })
 
@@ -200,12 +206,13 @@ describe('guards', () => {
     const wa = await loadWa({ WHATSAPP_DISABLED: 'true' })
     expect(await wa.sendOTPWhatsApp({ phone: '9876543210', otp: '1' })).toBe(false)
     expect(await wa.sendFreeTextWhatsApp({ phone: '9876543210', body: 'x' })).toBe(false)
+    expect(sendByTemplate).not.toHaveBeenCalled()
     expect(messagesCreate).not.toHaveBeenCalled()
   })
 
-  it('returns false when creds missing', async () => {
+  it('free-text returns false when creds missing', async () => {
     const wa = await loadWa({ TWILIO_ACCOUNT_SID: undefined, TWILIO_AUTH_TOKEN: undefined })
-    expect(await wa.sendOTPWhatsApp({ phone: '9876543210', otp: '1' })).toBe(false)
     expect(await wa.sendFreeTextWhatsApp({ phone: '9876543210', body: 'x' })).toBe(false)
+    expect(messagesCreate).not.toHaveBeenCalled()
   })
 })

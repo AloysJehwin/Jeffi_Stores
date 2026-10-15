@@ -141,7 +141,8 @@ describe('POST /api/admin/ai-enrich-field', () => {
     aiReply('not json at all !!!')
     const res = await POST(makeReq({ value: 'hex bolt M8' }))
     expect(res.status).toBe(502)
-    expect((await res.json()).error).toMatch(/unparseable/i)
+    // lib/ai/enrich-field reports an unparseable reply as an empty result.
+    expect((await res.json()).error).toMatch(/empty result/i)
   })
 
   it('returns 502 when AI returns empty result field', async () => {

@@ -10,7 +10,10 @@ vi.mock('../src/db.js', () => ({
     return { rows: [], rowCount: 1 }
   }) },
   q: vi.fn(async () => []),
-  one: vi.fn(async (_sql: string, params: any[]) => rows.get(params[0])),
+  one: vi.fn(async (sql: string, params: any[]) => {
+    if (sql.startsWith('UPDATE messages SET status=')) Object.assign(rows.get(params[0]), { status: params[1] })
+    return rows.get(params[0])
+  }),
 }))
 vi.mock('@jeffi/wallet', () => ({ debit: vi.fn(), trueUp: vi.fn() }))
 vi.mock('../src/send.js', () => ({ sendMessage: vi.fn(), getMessage: vi.fn(), toApi: (m: any) => m, SendError: class extends Error {} }))

@@ -6,6 +6,9 @@ vi.mock('twilio', () => ({
   default: vi.fn(() => ({ messages: { create: messagesCreate } })),
 }))
 vi.mock('@/lib/shared/message-log', () => ({ logMessage: vi.fn() }))
+// Template wrappers dispatch a library slug through messaging-service; free-text WA stays inline.
+const sendByTemplate = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/shared/send-by-template', () => ({ sendByTemplate }))
 vi.mock('@/lib/shared/customer-links', () => ({ orderUrlByNumber: vi.fn(async () => null) }))
 vi.mock('@/lib/catalog/brand', () => ({
   storeBaseUrlAsync: vi.fn(async () => 'https://acme.jeffistores.in'),
@@ -42,6 +45,7 @@ async function loadWhatsApp() {
 beforeEach(() => {
   vi.clearAllMocks()
   messagesCreate.mockResolvedValue({ sid: 'SM1' })
+  sendByTemplate.mockResolvedValue({ id: 'm1', status: 'sent' })
 })
 afterEach(() => vi.unstubAllEnvs())
 
@@ -51,7 +55,7 @@ describe('Site Controls gating — SMS', () => {
     const sms = await loadSms()
     const ok = await sms.sendOTPSMS({ phone: '9876543210', otp: '123456' })
     expect(ok).toBe(false)
-    expect(messagesCreate).not.toHaveBeenCalled()
+    expect(sendByTemplate).not.toHaveBeenCalled()
   })
 
   it('sends when smsEnabled is true', async () => {
@@ -59,7 +63,7 @@ describe('Site Controls gating — SMS', () => {
     const sms = await loadSms()
     const ok = await sms.sendOTPSMS({ phone: '9876543210', otp: '123456' })
     expect(ok).toBe(true)
-    expect(messagesCreate).toHaveBeenCalledOnce()
+    expect(sendByTemplate).toHaveBeenCalledOnce()
   })
 
   it('gates sendCampaignSMS on smsEnabled too', async () => {
@@ -85,7 +89,7 @@ describe('Site Controls gating — WhatsApp', () => {
     const wa = await loadWhatsApp()
     const ok = await wa.sendOTPWhatsApp({ phone: '9876543210', otp: '123456' })
     expect(ok).toBe(false)
-    expect(messagesCreate).not.toHaveBeenCalled()
+    expect(sendByTemplate).not.toHaveBeenCalled()
   })
 
   it('does NOT send free-text when whatsappEnabled is false', async () => {
@@ -101,6 +105,6 @@ describe('Site Controls gating — WhatsApp', () => {
     const wa = await loadWhatsApp()
     const ok = await wa.sendOTPWhatsApp({ phone: '9876543210', otp: '123456' })
     expect(ok).toBe(true)
-    expect(messagesCreate).toHaveBeenCalledOnce()
+    expect(sendByTemplate).toHaveBeenCalledOnce()
   })
 })
