@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
+import { Segmented } from '../_ui'
 
 type Interval = 'monthly' | 'yearly'
 interface Plan {
@@ -26,25 +27,8 @@ export default function PricingCards({ plans }: { plans: Plan[] }) {
     <>
       {/* Interval toggle */}
       <div className="flex justify-center mb-10">
-        <div className="inline-flex items-center rounded-full org-sand p-1 gap-1">
-          <button
-            type="button"
-            onClick={() => setInterval('monthly')}
-            className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors ${interval === 'monthly' ? 'ecom-accent-bg text-white' : 'text-foreground-secondary hover:text-foreground'}`}
-          >
-            Monthly
-          </button>
-          <button
-            type="button"
-            onClick={() => setInterval('yearly')}
-            className={`px-5 py-2 rounded-full text-sm font-semibold transition-colors flex items-center gap-2 ${interval === 'yearly' ? 'ecom-accent-bg text-white' : 'text-foreground-secondary hover:text-foreground'}`}
-          >
-            Yearly
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold org-sage org-sage-text">
-              2 months free
-            </span>
-          </button>
-        </div>
+        <Segmented<Interval> ariaLabel="Billing interval" value={interval} onChange={setInterval}
+          options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: <span className="px-2 py-0.5 rounded-full text-[10px] font-bold org-sage org-sage-text">2 months free</span> }]} />
       </div>
 
       {/* Plan cards */}

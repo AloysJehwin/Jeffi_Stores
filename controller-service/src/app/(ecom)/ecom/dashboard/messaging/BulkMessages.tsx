@@ -8,6 +8,7 @@ import BulkJobs, { Pill, type BulkItem } from '../_components/BulkJobs'
 import { fmt } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
 import AIEnrichButton, { ECOM_ENRICH_ENDPOINT } from '@/components/admin/AIEnrichButton'
+import { Segmented, fieldCls, focusRing } from '../../_ui'
 
 type Channel = 'email' | 'sms' | 'whatsapp'
 type Row = Record<string, string>
@@ -106,17 +107,8 @@ export default function BulkMessages({ prices, balance }: { prices: Record<strin
   const form = (
     <Card title="New bulk send">
       <div className="space-y-5">
-        <div role="tablist" className="inline-flex rounded-full org-sand p-1">
-          {CHANNELS.map(c => {
-            const on = c.key === channel
-            return (
-              <button key={c.key} type="button" role="tab" aria-selected={on} onClick={() => { setChannel(c.key); setFile(null) }}
-                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold ${on ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
-                <c.icon className={`w-4 h-4 ${on ? 'ecom-accent-text' : ''}`} /> {c.label}
-              </button>
-            )
-          })}
-        </div>
+        <Segmented<Channel> ariaLabel="Channel" value={channel} onChange={k => { setChannel(k); setFile(null) }}
+          options={CHANNELS.map(c => ({ value: c.key, label: c.label, icon: c.icon }))} />
 
         <div>
           <div className="mb-2 text-sm font-semibold">Template</div>
@@ -126,13 +118,13 @@ export default function BulkMessages({ prices, balance }: { prices: Record<strin
               <button type="button" onClick={() => { setTpl(null); setFile(null) }} className="ml-auto text-xs font-semibold org-brown">Change</button>
             </div>
           ) : (
-            <div className="rounded-lg border border-border-default">
+            <div className={`overflow-hidden rounded-lg ${fieldCls}`}>
               <div className="flex items-center gap-2 border-b border-border-default px-3"><Search className="w-4 h-4 text-foreground-muted" />
-                <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search templates" className="h-9 w-full bg-transparent text-sm outline-none" />
+                <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search templates" aria-label="Search templates" className="h-9 w-full bg-transparent text-sm outline-none focus:shadow-none" />
               </div>
               <div className="max-h-56 overflow-y-auto">
                 {templates === null ? <p className="p-3 text-xs text-foreground-muted">Loading…</p> : shown.length === 0 ? <p className="p-3 text-xs text-foreground-muted">No templates.</p> : shown.map(t => (
-                  <button key={t.slug} type="button" onClick={() => pickTemplate(t)} className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-surface-secondary">
+                  <button key={t.slug} type="button" onClick={() => pickTemplate(t)} className={`flex w-full items-center gap-3 rounded-none px-3 py-2 text-left text-sm ecom-hover ${focusRing}`}>
                     <span>{t.name || t.slug}</span><span className="ml-auto font-mono text-[11px] text-foreground-muted">{t.slug}</span>
                   </button>
                 ))}
@@ -165,7 +157,7 @@ export default function BulkMessages({ prices, balance }: { prices: Record<strin
               {parsed!.missing.map(c => <span key={c} className="rounded-full bg-[#f6d5cc] px-2 py-0.5 text-[#8a2e1f]">missing: {c}</span>)}
             </div>
             <label className="block text-xs text-foreground-muted">Job name
-              <div className="mt-1 flex max-w-sm items-center gap-2"><input value={reference} onChange={e => setReference(e.target.value.slice(0, 120))} className="block h-9 w-full rounded-lg border border-border-default bg-surface-elevated px-3 text-sm text-foreground" />
+              <div className="mt-1 flex max-w-sm items-center gap-2"><input value={reference} onChange={e => setReference(e.target.value.slice(0, 120))} className={`block h-9 w-full rounded-lg bg-surface-elevated px-3 text-sm text-foreground ${fieldCls}`} />
                 <AIEnrichButton placement="inline" fieldLabel="Bulk send name" value={reference} onChange={v => setReference(v.slice(0, 120))} scope="mailer:write" endpoint={ECOM_ENRICH_ENDPOINT} format="plain" maxLength={120} write context={`A short internal name for a bulk message job (channel ${channel}, template ${tpl?.name ?? ''}).`} /></div>
             </label>
             {parsed!.errors.length > 0 && (

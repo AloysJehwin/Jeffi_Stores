@@ -7,6 +7,7 @@ import PdfPreview from './PdfPreview'
 import { useToast } from '@/contexts/ToastContext'
 import PlayDialog, { PlayButton } from '../_components/PlayDialog'
 import type { Seller } from './BulkDocuments'
+import { ChoiceCards, Segmented, fieldCls, focusRing } from '../../_ui'
 
 interface Design { key: string; name: string; description: string; accent: string; font: string; thumbnail_url: string }
 interface Settings { design: string | null; accent: string | null; font: string | null; has_logo: boolean }
@@ -19,8 +20,15 @@ const TYPES = [
 const SWATCHES = ['#4f46e5', '#0f766e', '#1e3a5f', '#b91c1c', '#c2410c', '#a16207', '#15803d', '#7c3aed', '#db2777', '#111827']
 const HEX = /^#[0-9a-fA-F]{6}$/
 
-const pill = (on: boolean) =>
-  `rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${on ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`
+// Web-font names first; the generic family keeps each card legible when the face isn't installed.
+const FONT_STACK: Record<string, string> = {
+  modern: 'Inter, ui-sans-serif, system-ui, sans-serif',
+  geometric: '"DM Sans", Inter, ui-sans-serif, system-ui, sans-serif',
+  classic: 'Lora, Georgia, "Times New Roman", serif',
+  editorial: '"Playfair Display", Playfair, Georgia, serif',
+  technical: '"IBM Plex Sans", "Plex Sans", ui-sans-serif, system-ui, sans-serif',
+  system: '"Noto Sans", ui-sans-serif, system-ui, sans-serif',
+}
 
 export default function DesignsPanel({ seller, prices }: { seller: Seller | null; prices: Record<string, number> }) {
   const { showToast } = useToast()
@@ -116,25 +124,22 @@ export default function DesignsPanel({ seller, prices }: { seller: Seller | null
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       <div className="space-y-6">
         <Card title="Design">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {designs.map(d => {
-              const on = d.key === design
-              return (
-                <button key={d.key} type="button" onClick={() => setDesign(d.key)} title={d.description}
-                  className={`group overflow-hidden rounded-xl border text-left transition-all ${on ? 'border-transparent ring-2 ring-[var(--org-terracotta)]' : 'border-border-default hover:border-foreground-muted'}`}>
+          <ChoiceCards ariaLabel="Design" value={design} onChange={setDesign} columns="grid-cols-2 sm:grid-cols-3" cardClassName="overflow-hidden p-0"
+            options={designs.map(d => ({
+              value: d.key, label: d.name, title: d.description,
+              content: (
+                <>
                   <div className="relative aspect-[3/4] overflow-hidden bg-white">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={`${API}/designs/${d.key}/thumbnail.png`} alt="" loading="lazy" className="h-full w-full object-cover object-top" />
-                    {on && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full ecom-accent-bg text-white"><Check className="w-3 h-3" /></span>}
                     <PlayButton className="absolute left-1.5 top-1.5 bg-surface-elevated/90 shadow-sm" onClick={() => setPlay({ kind: 'document', design: d.key, name: d.name })} />
                   </div>
                   <div className="px-2.5 py-2">
                     <div className="text-xs font-semibold text-foreground">{d.name}{saved?.design === d.key && <span className="ml-1.5 text-[10px] font-medium text-foreground-muted">· current</span>}</div>
                   </div>
-                </button>
-              )
-            })}
-          </div>
+                </>
+              ),
+            }))} />
           {current && <p className="mt-3 text-xs text-foreground-secondary">{current.description}</p>}
         </Card>
 
@@ -147,13 +152,14 @@ export default function DesignsPanel({ seller, prices }: { seller: Seller | null
               <div className="flex flex-wrap items-center gap-2">
                 {SWATCHES.map(c => (
                   <button key={c} type="button" aria-label={c} onClick={() => { setAccent(c); setHex(c) }}
-                    className={`h-7 w-7 rounded-full border border-black/10 ${shownAccent.toLowerCase() === c ? 'ring-2 ring-offset-2 ring-foreground' : ''}`} style={{ background: c }} />
+                    aria-pressed={shownAccent.toLowerCase() === c}
+                    className={`h-7 w-7 rounded-full border border-black/10 ${focusRing} ${shownAccent.toLowerCase() === c ? 'ring-2 ring-offset-2 ring-foreground' : ''}`} style={{ background: c }} />
                 ))}
-                <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-full border border-border-default" style={{ background: shownAccent }} title="Custom colour">
+                <label className="relative h-7 w-7 cursor-pointer overflow-hidden rounded-full border border-border-default focus-within:ring-2 focus-within:ring-[var(--org-terracotta)] focus-within:ring-offset-2" style={{ background: shownAccent }} title="Custom colour">
                   <input type="color" value={shownAccent} onChange={e => { setAccent(e.target.value); setHex(e.target.value) }} className="absolute inset-0 cursor-pointer opacity-0" />
                 </label>
                 <input value={hex || shownAccent} onChange={e => { setHex(e.target.value); if (HEX.test(e.target.value)) setAccent(e.target.value.toLowerCase()) }}
-                  className="h-8 w-24 rounded-lg border border-border-default bg-surface-elevated px-2 font-mono text-xs" />
+                  aria-label="Accent hex" className={`h-8 w-24 rounded-lg bg-surface-elevated px-2 font-mono text-xs ${fieldCls}`} />
               </div>
             </div>
 
@@ -161,9 +167,19 @@ export default function DesignsPanel({ seller, prices }: { seller: Seller | null
               <div className="mb-2 flex items-center justify-between text-sm font-semibold">Fonts
                 {font && <button type="button" onClick={() => setFont(null)} className="text-xs font-medium text-foreground-muted hover:text-foreground">Use design default</button>}
               </div>
-              <div className="flex flex-wrap gap-1 rounded-2xl org-sand p-1">
-                {fonts.map(f => <button key={f.key} type="button" onClick={() => setFont(f.key)} className={pill((font ?? current?.font) === f.key)}>{f.label.replace(' — ', ' · ')}</button>)}
-              </div>
+              <ChoiceCards ariaLabel="Font" value={font ?? current?.font ?? null} onChange={setFont} cardClassName="px-4 py-3"
+                options={fonts.map(f => {
+                  const [name, faces] = f.label.split(' — ')
+                  return {
+                    value: f.key, label: name,
+                    content: (
+                      <>
+                        <div className="pr-6 text-lg font-semibold leading-tight text-foreground" style={{ fontFamily: FONT_STACK[f.key] }}>{name}</div>
+                        {faces && <div className="mt-0.5 text-xs text-foreground-muted">{faces}</div>}
+                      </>
+                    ),
+                  }
+                })} />
             </div>
 
             <div>
@@ -176,7 +192,7 @@ export default function DesignsPanel({ seller, prices }: { seller: Seller | null
                     : <span className="text-[11px] text-foreground-muted">No logo</span>}
                 </div>
                 <input ref={file} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden onChange={e => uploadLogo(e.target.files?.[0] ?? null)} />
-                <button type="button" disabled={busy === 'logo'} onClick={() => file.current?.click()} className="inline-flex items-center gap-1.5 rounded-full border border-border-default px-3 py-1.5 text-xs font-semibold hover:bg-surface-secondary disabled:opacity-50">
+                <button type="button" disabled={busy === 'logo'} onClick={() => file.current?.click()} className="ecom-focus inline-flex items-center gap-1.5 rounded-full border border-border-default px-3 py-1.5 text-xs font-semibold hover:bg-surface-secondary disabled:opacity-50">
                   {busy === 'logo' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />} {saved?.has_logo ? 'Replace' : 'Upload'}
                 </button>
                 {saved?.has_logo && <button type="button" aria-label="Remove logo" onClick={() => uploadLogo(null)} className="rounded-full p-1.5 text-foreground-muted hover:bg-surface-secondary hover:text-foreground"><Trash2 className="w-4 h-4" /></button>}
@@ -213,9 +229,7 @@ export default function DesignsPanel({ seller, prices }: { seller: Seller | null
       </div>
 
       <div className="lg:sticky lg:top-6 lg:self-start space-y-3">
-        <div role="tablist" className="flex flex-wrap gap-1 rounded-full org-sand p-1">
-          {TYPES.map(t => <button key={t.key} role="tab" aria-selected={type === t.key} type="button" onClick={() => setType(t.key)} className={pill(type === t.key)}>{t.label}</button>)}
-        </div>
+        <Segmented ariaLabel="Document type" size="sm" value={type} onChange={setType} options={TYPES.map(t => ({ value: t.key, label: t.label }))} />
         <div className="max-h-[80vh] overflow-y-auto rounded-2xl border border-border-default bg-zinc-100 p-3">
           <PdfPreview url={previewUrl} />
         </div>

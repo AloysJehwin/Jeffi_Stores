@@ -8,6 +8,7 @@ import BulkJobs, { type BulkItem } from '../_components/BulkJobs'
 import { fmt } from '../_components/finance'
 import { useToast } from '@/contexts/ToastContext'
 import AIEnrichButton, { ECOM_ENRICH_ENDPOINT } from '@/components/admin/AIEnrichButton'
+import { Segmented, fieldCls } from '../../_ui'
 
 export interface Seller { name: string; gstin?: string; address?: string; phone?: string }
 type Row = Record<string, string>
@@ -123,12 +124,10 @@ export default function BulkDocuments({ seller, prices, balance }: { seller: Sel
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs text-foreground-muted">Type when the CSV has none</span>
-            <div className="flex flex-wrap gap-1 rounded-full org-sand p-1">
-              {TYPES.map(([k, l]) => <button key={k} type="button" onClick={() => setType(k)} className={`rounded-full px-3 py-1 text-xs font-semibold ${type === k ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary'}`}>{l}</button>)}
-            </div>
+            <Segmented ariaLabel="Default document type" size="sm" value={type} onChange={setType} options={TYPES.map(([k, l]) => ({ value: k, label: l }))} />
           </div>
           <label className="block text-xs text-foreground-muted">Job name
-            <div className="mt-1 flex max-w-sm items-center gap-2"><input value={reference} onChange={e => setReference(e.target.value.slice(0, 120))} className="block h-9 w-full rounded-lg border border-border-default bg-surface-elevated px-3 text-sm text-foreground" />
+            <div className="mt-1 flex max-w-sm items-center gap-2"><input value={reference} onChange={e => setReference(e.target.value.slice(0, 120))} className={`block h-9 w-full rounded-lg bg-surface-elevated px-3 text-sm text-foreground ${fieldCls}`} />
               <AIEnrichButton placement="inline" fieldLabel="Bulk job name" value={reference} onChange={v => setReference(v.slice(0, 120))} scope="mailer:write" endpoint={ECOM_ENRICH_ENDPOINT} format="plain" maxLength={120} write context={`A short internal name for a bulk document render job (${parsed?.docs.length ?? 0} documents of type ${type}).`} /></div>
           </label>
           {parsed!.docs.length > 0 && (

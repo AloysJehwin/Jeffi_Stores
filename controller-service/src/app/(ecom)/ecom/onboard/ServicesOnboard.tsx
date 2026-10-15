@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Eyebrow, Display, Pill } from '../_ui'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { PhoneInput, isValidPhone } from '../_ui/phone'
 
 // Short onboarding for messaging/documents-only customers: no plan, warehouse or bank step.
 type Form = {
@@ -38,7 +39,7 @@ function Field({ label, children, hint }: { label: string; children: React.React
     </label>
   )
 }
-const input = 'w-full rounded-xl bg-surface-elevated px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
+const input = 'w-full rounded-xl bg-surface-elevated px-4 py-3 text-sm text-foreground ecom-field border-transparent'
 
 export default function ServicesOnboard({ services, ownerName, onBack }: { services: ('messaging' | 'documents')[]; ownerName: string | null; onBack: () => void }) {
   const router = useRouter()
@@ -47,7 +48,7 @@ export default function ServicesOnboard({ services, ownerName, onBack }: { servi
   const [error, setError] = useState<string | null>(null)
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF(p => ({ ...p, [k]: v }))
 
-  const valid = f.displayName.length >= 2 && f.slug.length >= 3 && f.businessName.length >= 2 && f.pan.length === 10 && f.businessAddress.length >= 5 && (f.gstNumber === '' || f.gstNumber.length === 15) && f.ownerName && f.mobile.length >= 10 && f.legalsAccepted
+  const valid = f.displayName.length >= 2 && f.slug.length >= 3 && f.businessName.length >= 2 && f.pan.length === 10 && f.businessAddress.length >= 5 && (f.gstNumber === '' || f.gstNumber.length === 15) && f.ownerName && isValidPhone(f.mobile) && f.legalsAccepted
 
   async function submit() {
     setBusy(true)
@@ -84,7 +85,7 @@ export default function ServicesOnboard({ services, ownerName, onBack }: { servi
         <Field label="Business address"><textarea className={input} rows={2} value={f.businessAddress} onChange={e => set('businessAddress', e.target.value)} /></Field>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label="Your name"><input className={input} value={f.ownerName} onChange={e => set('ownerName', e.target.value)} /></Field>
-          <Field label="Mobile"><input className={input} value={f.mobile} onChange={e => set('mobile', e.target.value.replace(/[^\d+]/g, ''))} placeholder="98765 43210" /></Field>
+          <Field label="Mobile"><PhoneInput value={f.mobile} onChange={v => set('mobile', v)} inputClassName={`${input} min-w-0 flex-1`} /></Field>
         </div>
         <label className="flex items-start gap-3 text-sm text-foreground-secondary">
           <input type="checkbox" className="mt-1" checked={f.legalsAccepted} onChange={e => set('legalsAccepted', e.target.checked)} />

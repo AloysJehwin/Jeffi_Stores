@@ -17,7 +17,7 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
   const [busy, setBusy] = useState(false)
 
   const input =
-    'w-full rounded-xl bg-surface-elevated px-4 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
+    'w-full rounded-xl bg-surface-elevated px-4 py-3 text-sm text-foreground ecom-field border-transparent'
 
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault()

@@ -7,6 +7,7 @@ import { SkeletonRows } from './Skeleton'
 import Pager from './Pager'
 import { STATUS_PILL, fmt, fmtDate } from './finance'
 import { useToast } from '@/contexts/ToastContext'
+import { Segmented } from '../../_ui'
 
 export interface BulkJob {
   id: string; status: string; total: number; succeeded: number; failed: number; skipped: number; pending: number
@@ -151,12 +152,8 @@ function JobDetail({ base, job, columns, row, onBack, onAct }: {
         <Progress j={job} />
         {job.error && <p className="mt-3 text-sm text-[#8a2e1f]">Stopped: {job.error}</p>}
       </Card>
-      <div role="tablist" className="inline-flex rounded-full org-sand p-1">
-        {[['', 'All'], ['done', 'Done'], ['failed', 'Failed'], ['skipped', 'Skipped'], ['pending', 'Pending']].map(([k, l]) => (
-          <button key={k} type="button" role="tab" aria-selected={status === k} onClick={() => filter(k)}
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${status === k ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>{l}</button>
-        ))}
-      </div>
+      <Segmented ariaLabel="Filter by status" size="sm" value={status} onChange={filter}
+        options={[['', 'All'], ['done', 'Done'], ['failed', 'Failed'], ['skipped', 'Skipped'], ['pending', 'Pending']].map(([k, l]) => ({ value: k, label: l }))} />
       <Card>
         {data === null ? <SkeletonRows rows={6} cols={columns.length + 2} /> : data.items.length === 0 ? <p className="text-sm text-foreground-secondary">Nothing here.</p> : (
           <div className="-m-6 overflow-x-auto">

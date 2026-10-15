@@ -125,7 +125,7 @@ export default function CustomDomains({
               value={newDomain}
               onChange={e => setNewDomain(e.target.value)}
               placeholder="shop.yourbrand.com"
-              className="flex-1 rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="flex-1 rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground ecom-field"
             />
             <button
               onClick={addDomain}
