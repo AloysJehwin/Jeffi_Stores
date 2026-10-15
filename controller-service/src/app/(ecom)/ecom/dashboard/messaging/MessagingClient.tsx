@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Mail, MessageSquare, MessageCircle, Plus, Search } from 'lucide-react'
+import { Mail, MessageSquare, MessageCircle, Play, Plus, Search } from 'lucide-react'
 import { Card } from '../_components/Card'
 import { SkeletonRows } from '../_components/Skeleton'
 import Pager, { useCursorPages } from '../_components/Pager'
@@ -10,6 +10,7 @@ import { useToast } from '@/contexts/ToastContext'
 import BulkMessages from './BulkMessages'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 import { ECOM_ENRICH_ENDPOINT } from '@/components/admin/AIEnrichButton'
+import PlayDialog, { PlayButton, type PlayTarget } from '../_components/PlayDialog'
 
 interface ListItem { id: string; slug: string; channel: Channel; name: string; category?: string | null; approval_status?: string | null; source?: 'tenant' | 'platform'; review_status?: string | null }
 interface Msg { id: string; channel: string; to: string; template: string | null; status: string; price_inr: number; charged_inr: number; error: string | null; created_at: string }
@@ -36,6 +37,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
   const [gov, setGov] = useState<{ editing_enabled: boolean; review_required: boolean } | null>(null)
   const [review, setReview] = useState<{ status: string; note: string | null } | null>(null)
   const canEdit = gov?.editing_enabled !== false
+  const [play, setPlay] = useState<PlayTarget | null>(null)
 
   const loadTpls = useCallback(() => {
     setItems(null)
@@ -213,9 +215,12 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-sm font-medium truncate">{it.name || it.slug}</span>
-                                {opening === it.slug
-                                  ? <span className="h-3 w-3 shrink-0 rounded-full border-2 border-[var(--org-terracotta)] border-t-transparent animate-spin" />
-                                  : <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${it.source === 'tenant' ? 'org-peach org-brown' : 'org-sand text-foreground-muted'}`}>{it.source === 'tenant' ? 'Customised' : 'Standard'}</span>}
+                                <span className="flex shrink-0 items-center gap-1">
+                                  <PlayButton className="-my-1" onClick={() => setPlay({ kind: 'message', channel: it.channel, slug: it.slug, name: it.name })} />
+                                  {opening === it.slug
+                                    ? <span className="h-3 w-3 shrink-0 rounded-full border-2 border-[var(--org-terracotta)] border-t-transparent animate-spin" />
+                                    : <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${it.source === 'tenant' ? 'org-peach org-brown' : 'org-sand text-foreground-muted'}`}>{it.source === 'tenant' ? 'Customised' : 'Standard'}</span>}
+                                </span>
                               </div>
                               <div className="mt-0.5 flex items-center gap-2 text-xs text-foreground-muted">
                                 <code className="truncate">{it.slug}</code>
@@ -257,6 +262,14 @@ export default function MessagingClient(props: { prices: Record<string, number>;
               )}
               {selected && (
                 <Card>
+                  {selected.id && (
+                    <div className="-mt-2 mb-3 flex items-center justify-end">
+                      <button type="button" onClick={() => setPlay({ kind: 'message', channel: selected.channel, slug: selected.slug, name: selected.name })}
+                        title="Test live" aria-label="Test live" className="inline-flex items-center gap-1.5 rounded-full border border-border-default px-3 py-1.5 text-xs font-semibold hover:bg-surface-secondary">
+                        <Play className="w-3.5 h-3.5" /> Test live
+                      </button>
+                    </div>
+                  )}
                   <fieldset disabled={!canEdit} className="min-w-0">
                   {!selected.id && (
                     <label className="block mb-4">
@@ -281,6 +294,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
           </div>
         </>
       )}
+      {play && <PlayDialog target={play} prices={props.prices} onClose={() => setPlay(null)} />}
     </div>
   )
 }

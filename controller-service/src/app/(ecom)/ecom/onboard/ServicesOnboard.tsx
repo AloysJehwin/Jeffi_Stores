@@ -28,12 +28,13 @@ const TYPES = [
 ]
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
 
+// The input sits at the bottom of the (stretched) grid cell, so two fields in a row line up even when one has a hint.
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
-    <label className="block">
+    <label className="flex h-full flex-col">
       <span className="text-sm font-semibold text-foreground">{label}</span>
       {hint && <span className="block text-xs text-foreground-muted mt-0.5">{hint}</span>}
-      <div className="mt-1.5">{children}</div>
+      <div className="mt-auto pt-1.5">{children}</div>
     </label>
   )
 }

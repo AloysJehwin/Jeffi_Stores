@@ -7,6 +7,7 @@ import SiteReachabilityBadge from './SiteReachabilityBadge'
 import PageHeader from './_components/PageHeader'
 import { Card, Row } from './_components/Card'
 import { MoneyTiles, STATUS_PILL, fmt } from './_components/finance'
+import AddStoreClient from './add-store/AddStoreClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const fmtDay = (d: Date) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
   const renewalDate = rzpSub?.current_end ? fmtDay(new Date(rzpSub.current_end * 1000)) : null
 
-  const isLive = tenant.status === 'active'
+  const isLive = tenant.status === 'active' && tenant.store_request !== 'provisioning'
   const isStore = (tenant.service_types ?? ['store']).includes('store')
   const storeUrl = `https://${tenant.slug}.jeffistores.in`
   const monthly = Number(tenant.monthly_price_inr ?? 0)
@@ -45,6 +46,8 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
       />
 
       <div className="space-y-6">
+        {(!isStore || tenant.store_request) && <AddStoreClient tenant={tenant} />}
+
         <div
           className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
             ownRazorpay ? 'bg-[var(--console-sage)] text-[var(--console-sage-deep)]' : 'bg-[var(--console-terracotta-soft)] ecom-accent-text'
@@ -96,7 +99,6 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                 : [
                     ['/dashboard/api-keys', 'API keys'],
                     ['/dashboard/wallet', 'Wallet & top-up'],
-                    ['/dashboard/add-store', 'Add an online store'],
                     ['/dashboard/business', 'Business details'],
                   ]
               ).map(([href, label]) => (

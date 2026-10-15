@@ -109,9 +109,9 @@ export async function setSubscriptionStatus(
 
 export async function getTenantBySubscriptionId(
   subscriptionId: string
-): Promise<{ id: string; slug: string; status: string } | null> {
+): Promise<{ id: string; slug: string; status: string; store_request: string | null } | null> {
   const pool = controlPlanePool()
-  const r = await pool.query(`SELECT id, slug, status FROM tenants WHERE razorpay_subscription_id=$1`, [subscriptionId])
+  const r = await pool.query(`SELECT id, slug, status, store_request FROM tenants WHERE razorpay_subscription_id=$1`, [subscriptionId])
   return r.rows[0] ?? null
 }
 

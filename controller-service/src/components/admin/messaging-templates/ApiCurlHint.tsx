@@ -2,45 +2,21 @@
 
 import { useMemo, useState } from 'react'
 import { Terminal, Copy, Check } from 'lucide-react'
-import { sampleVariableMap } from '@/lib/templates/variables-shared'
 import type { EditorTemplate } from './TemplateEditor'
+import { API_BASE, curlFor, templateCallFields } from './template-call-fields'
 
-// "Send via API": a ready-to-copy curl for POST /v1/messages built from this template — its variables
-// with sample values, WhatsApp {{n}} slots, and media_url / button_url when it has an image or link button.
-
-const API_BASE = 'https://public.jeffistores.in'
-const TOKEN = /\{\{?\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}?\}/g
-const SLOT = /\{\{\s*(\d+)\s*\}\}/g
-// Filled by the API on every send; callers only pass them to override.
-const AUTO = new Set(['store_name', 'store_email', 'store_phone', 'store_web', 'current_year', 'date', 'customer_email'])
-
-const curlFor = (path: string, body: unknown, idem = true) => [
-  `curl -X POST ${API_BASE}${path} \\`,
-  `  -H "Authorization: Bearer $JEFFI_API_KEY" \\`,
-  `  -H "Content-Type: application/json" \\`,
-  ...(idem ? [`  -H "Idempotency-Key: $(uuidgen)" \\`] : []),
-  `  -d '${JSON.stringify(body, null, 2).replace(/'/g, "'\\''")}'`,
-].join('\n')
+// "Send via API": a ready-to-copy curl for POST /v1/messages built from this template.
 
 export default function ApiCurlHint({ value, note }: { value: EditorTemplate; note?: string }) {
   const [copied, setCopied] = useState(false)
   const [mode, setMode] = useState<'single' | 'bulk'>('single')
   const { single, bulk } = useMemo(() => {
-    const samples = sampleVariableMap()
-    const blocks = (value.blocks && typeof value.blocks === 'object' ? value.blocks : {}) as any
     const to = value.channel === 'email' ? 'customer@example.com' : '+919876543210'
     const to2 = value.channel === 'email' ? 'another@example.com' : '+919812345678'
+    const { variables, mediaSlot, buttonSlot } = templateCallFields({ channel: value.channel, subject: value.subject, body: value.body, blocks: value.blocks })
     const extra: Record<string, unknown> = {}
-    let variables: Record<string, string> | undefined
-    if (value.channel === 'whatsapp') {
-      const slots = [...new Set([...(value.body ?? '').matchAll(SLOT)].map(m => m[1]))].sort((a, b) => +a - +b)
-      if (slots.length) variables = Object.fromEntries(slots.map(n => [n, blocks.variables?.[n] || `value ${n}`]))
-      if (/\{\{\s*\d+\s*\}\}/.test(blocks.types?.['twilio/media']?.media?.[0] ?? '')) extra.media_url = 'https://dm9rri2wgl1e.cloudfront.net/products/…/photo.jpg'
-      if ((blocks.buttons ?? []).some((b: any) => b.type === 'url' && /\{\{\s*\d+\s*\}\}/.test(b.value ?? ''))) extra.button_url = 'https://your-store.example/products/…'
-    } else {
-      const names = [...new Set([...`${value.subject ?? ''} ${value.body ?? ''}`.matchAll(TOKEN)].map(m => m[1]))].filter(k => !AUTO.has(k) && !/^\d+$/.test(k))
-      if (names.length) variables = Object.fromEntries(names.map(k => [k, samples[k] ?? `<${k}>`]))
-    }
+    if (mediaSlot) extra.media_url = 'https://dm9rri2wgl1e.cloudfront.net/products/…/photo.jpg'
+    if (buttonSlot) extra.button_url = 'https://your-store.example/products/…'
     const template = value.slug || 'your/template-slug'
     const one = (addr: string, ref?: string) => ({ to: addr, ...(variables ? { variables } : {}), ...extra, ...(ref ? { reference: ref } : {}) })
     return {
