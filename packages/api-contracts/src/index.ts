@@ -16,6 +16,11 @@ const Phone = z.string().regex(/^\+?[0-9]{10,15}$/, 'E.164 or 10-digit Indian nu
 const Email = z.string().email()
 
 // ── messages ──
+// Host header media for WhatsApp: a link from anywhere (any image format), or a file as base64.
+export const HostMediaRequest = z
+  .object({ url: z.string().url().optional(), data: z.string().optional(), content_type: z.string().optional() })
+  .refine(b => !!b.url !== !!b.data, { message: 'Pass either url, or data with content_type' })
+export const HostedMedia = z.object({ id: z.string(), url: z.string().url(), charged_inr: z.number() })
 export const SendMessageRequest = z
   .object({
     channel: Channel,

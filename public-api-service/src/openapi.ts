@@ -16,6 +16,12 @@ r.registerPath({
   responses: { 200: { description: 'Message accepted and handed to the provider', content: { 'application/json': { schema: C.Message } } }, ...err(402, 'Insufficient wallet balance'), ...err(422, 'Template variables missing') },
 })
 r.registerPath({
+  method: 'post', path: '/v1/media', tags: ['Messages'], security: sec, summary: 'Host media for a WhatsApp header',
+  description: 'Pass a link from anywhere (any image format, including links without a file extension) or a file as base64. Images are converted to a WhatsApp-safe JPEG (≤ 5 MB); MP4 video and PDF are kept as they are. Returns a URL to use as `media_url`. Charged at the media price; `POST /v1/messages` does the same automatically when given an outside `media_url`.',
+  request: { body: { content: { 'application/json': { schema: C.HostMediaRequest } } } },
+  responses: { 200: { description: 'Hosted', content: { 'application/json': { schema: C.HostedMedia } } }, ...err(402, 'Insufficient wallet balance'), ...err(413, 'Too large'), ...err(415, 'Unsupported media'), ...err(422, 'Link unreachable or private') },
+})
+r.registerPath({
   method: 'post', path: '/v1/messages/batch', tags: ['Messages'], security: sec, summary: 'Send a campaign batch (≤ 500 recipients)',
   request: { body: { content: { 'application/json': { schema: C.BatchMessageRequest } } } },
   responses: { 200: { description: 'Per-recipient outcome', content: { 'application/json': { schema: C.BatchMessageResponse } } } },

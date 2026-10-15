@@ -7,6 +7,8 @@ export const MESSAGING_COST_INR: Record<MessagingChannel, number> = { sms: 7, wh
 export const DOCUMENT_COST_INR: Record<DocumentType, number> = {
   invoice: 0.5, quotation: 0.5, receipt: 0.25, packing_slip: 0.25, label: 0.1, purchase_order: 0.5,
 }
+// Re-hosting a WhatsApp header (fetch or upload, convert to a WhatsApp-safe image, put on the CDN).
+export const MEDIA_COST_INR = 0.5
 export const USD_INR_RATE = 88
 export const PUBLIC_MARGIN = 0.4 // public API price = provider cost × (1 + margin)
 
@@ -20,6 +22,9 @@ export function withMargin(costInr: number): number {
 export function messagePriceInr(channel: MessagingChannel, internal = false): number {
   return internal ? round2(MESSAGING_COST_INR[channel]) : withMargin(MESSAGING_COST_INR[channel])
 }
+export function mediaPriceInr(internal = false): number {
+  return internal ? round2(MEDIA_COST_INR) : withMargin(MEDIA_COST_INR)
+}
 export function documentPriceInr(type: DocumentType): number {
   return withMargin(DOCUMENT_COST_INR[type])
 }
@@ -29,5 +34,6 @@ export function priceList() {
     currency: 'INR',
     messages: Object.fromEntries((Object.keys(MESSAGING_COST_INR) as MessagingChannel[]).map(c => [c, messagePriceInr(c)])),
     documents: Object.fromEntries((Object.keys(DOCUMENT_COST_INR) as DocumentType[]).map(d => [d, documentPriceInr(d)])),
+    media: mediaPriceInr(),
   }
 }

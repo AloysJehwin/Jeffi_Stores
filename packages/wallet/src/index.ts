@@ -4,7 +4,7 @@ import { controlPlanePool } from '@jeffi/tenancy'
 // Standalone control-plane wallet client for the services. Same tables + idempotency rules as
 // src/lib/payments/wallet.ts in the monolith (external_ref unique per tenant). The pool is tenancy's, so
 // the services' IAM settings (CONTROL_PLANE_IAM_AUTH + CONTROL_PLANE_RDS_*) and the DATABASE_URL fallback apply.
-export type WalletCategory = 'sms' | 'whatsapp' | 'email' | 'document' | 'campaign' | 'ai' | 'recharge' | 'adjustment'
+export type WalletCategory = 'sms' | 'whatsapp' | 'email' | 'media' | 'document' | 'campaign' | 'ai' | 'recharge' | 'adjustment'
 const FLAGSHIP_TENANT_ID = '00000000-0000-0000-0000-000000000000'
 const round2 = (n: number) => Math.round(n * 100) / 100
 
