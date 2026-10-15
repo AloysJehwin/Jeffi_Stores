@@ -21,10 +21,12 @@ for a in "$@"; do case $a in --dry-run) DRY_RUN=true ;; --yes) YES=true ;; esac;
 
 say() { printf '\n== %s\n' "$*"; }
 # Images are tagged by the last commit that changed what goes into them, so script/doc-only commits reuse them.
+# Fixed at 8 characters: %h's length depends on the clone, and a Mac and CI must agree on the tag.
 image_sha() {
-  git -C "$REPO" log -1 --format=%h -- . ':(exclude)docs' ':(exclude)deploy/k8s' ':(exclude)tests' \
-    ':(exclude)integration-tests' ':(exclude)graphify-out' ':(exclude).github' ':(exclude,glob)*.md'
+  git -C "$REPO" log -1 --format=%H -- . ':(exclude)docs' ':(exclude)deploy/k8s' ':(exclude)tests' \
+    ':(exclude)integration-tests' ':(exclude)graphify-out' ':(exclude).github' ':(exclude,glob)*.md' | cut -c1-8
 }
+image_tag() { echo "local-$(image_sha)"; }
 confirm() {
   $YES && return 0
   read -r -p "$1 Type yes to continue: " a
@@ -48,22 +50,23 @@ sys.exit(0 if any(ip in ipaddress.ip_network(c) for c in sys.argv[2:]) else 1)' 
   return 1
 }
 
-# SSH forward to the core; when port 22 is unreachable (a VPN's rotating exit IPs), the same forward over
-# SSM Session Manager, which needs no inbound rule.
+# SSH forward to the core; when port 22 is unreachable (a VPN's rotating exit IPs, a CI runner), the same
+# forward over SSM Session Manager, which needs no inbound rule. TUNNEL=ssm skips the SSH attempt.
 ssh_forward() { # <local port> <target>; replaces one of ours that holds the port but stopped forwarding (network change, sleep)
   pkill -f "ssh .*-L $1:" 2>/dev/null || true
   pkill -f "localPortNumber[^0-9]{0,6}$1([^0-9]|$)" 2>/dev/null || true; sleep 1
-  ssh -i "$SSH_KEY" -f -N -o ConnectTimeout=8 -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L "$1:$2" "$CORE" && return 0
+  [ "${TUNNEL:-auto}" = ssm ] ||
+    { ssh -i "$SSH_KEY" -f -N -o ConnectTimeout=8 -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -L "$1:$2" "$CORE" && return 0; }
   ssm_forward "$1" "$2" && return 0
   ssh_allowed || true
   return 1
 }
 ssm_forward() {
   command -v session-manager-plugin >/dev/null ||
-    { echo "SSH failed. To tunnel over SSM instead (no port 22): brew install --cask session-manager-plugin" >&2; return 1; }
+    { echo "SSH failed. To tunnel over SSM instead (no port 22) install the Session Manager plugin: brew install --cask session-manager-plugin, or on Linux the .deb from https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" >&2; return 1; }
   local id
   id=$(aws ec2 describe-addresses --public-ips "$CORE_IP" --query 'Addresses[0].InstanceId' --output text)
-  echo "SSH failed; forwarding :$1 over SSM ($id)" >&2
+  echo "Forwarding :$1 over SSM ($id)" >&2
   # The remote-host document refuses 127.0.0.1; a port on the core itself has its own document.
   local doc=AWS-StartPortForwardingSessionToRemoteHost params="host=${2%:*},portNumber=${2##*:},localPortNumber=$1"
   [ "${2%:*}" = 127.0.0.1 ] && { doc=AWS-StartPortForwardingSession; params="portNumber=${2##*:},localPortNumber=$1"; }
@@ -120,9 +123,9 @@ schema_diff() {
 k8s_up() { kubectl get nodes --request-timeout=10s >/dev/null 2>&1; }
 k8s_tunnel() {
   if listening 16443; then for _ in 1 2 3; do k8s_up && return 0; sleep 2; done; fi
-  ssh_forward 16443 127.0.0.1:6443
+  ssh_forward 16443 127.0.0.1:6443 || { echo "Could not open a tunnel to the cluster through $CORE" >&2; exit 1; }
   for _ in $(seq 1 10); do k8s_up && return 0; sleep 2; done
-  echo "Could not reach the cluster through $CORE" >&2; exit 1
+  echo "Tunnel is up but the cluster does not answer (KUBECONFIG=$KUBECONFIG)" >&2; exit 1
 }
 # POST an internal route from inside the controller pod; CRON_SECRET goes over stdin, never into argv.
 in_cluster() {
