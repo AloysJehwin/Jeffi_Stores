@@ -13,7 +13,7 @@ export default async function MessagingPage() {
   return (
     <>
       <PageHeader eyebrow="Developers" title="Messaging" description="Templates, bulk sends and the delivery log for email, SMS and WhatsApp sent through your API keys." />
-      {hasService(tenant, 'messaging') ? <MessagingClient prices={priceList().messages} balance={Number(wallet?.balance ?? 0)} /> : <p className="text-sm text-foreground-secondary">Messaging is not enabled. Turn it on from API keys.</p>}
+      {hasService(tenant, 'messaging') ? <MessagingClient prices={{ ...priceList().messages, media: priceList().media }} balance={Number(wallet?.balance ?? 0)} /> : <p className="text-sm text-foreground-secondary">Messaging is not enabled. Turn it on from API keys.</p>}
     </>
   )
 }

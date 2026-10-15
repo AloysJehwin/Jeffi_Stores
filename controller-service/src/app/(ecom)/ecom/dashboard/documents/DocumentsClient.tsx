@@ -8,6 +8,7 @@ import { SkeletonRows } from '../_components/Skeleton'
 import Pager, { useCursorPages } from '../_components/Pager'
 import { Card } from '../_components/Card'
 import { fmt, fmtDate } from '../_components/finance'
+import { Segmented } from '../../_ui'
 
 interface Doc { id: string; type: string; number: string; template: string; totals: { total: number }; pdf_url: string; view_url: string; price_inr: number; created_at: string }
 
@@ -19,14 +20,8 @@ export default function DocumentsClient(props: { seller: Seller | null; prices: 
   const pick = (t: Tab) => { setTab(t); history.replaceState(null, '', t === 'documents' ? location.pathname : `#${t}`) }
   return (
     <div className="space-y-6">
-      <div role="tablist" className="inline-flex rounded-full org-sand p-1">
-        {([['documents', 'Documents', FileText], ['designs', 'Designs', Palette], ['bulk', 'Bulk', Layers]] as const).map(([k, label, Icon]) => (
-          <button key={k} role="tab" aria-selected={tab === k} type="button" onClick={() => pick(k)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${tab === k ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
-            <Icon className={`w-4 h-4 ${tab === k ? 'ecom-accent-text' : ''}`} /> {label}
-          </button>
-        ))}
-      </div>
+      <Segmented<Tab> ariaLabel="Documents sections" value={tab} onChange={pick}
+        options={[{ value: 'documents', label: 'Documents', icon: FileText }, { value: 'designs', label: 'Designs', icon: Palette }, { value: 'bulk', label: 'Bulk', icon: Layers }]} />
       {tab === 'documents' ? <DocumentList /> : tab === 'designs' ? <DesignsPanel seller={props.seller} prices={props.prices} /> : <BulkDocuments {...props} />}
     </div>
   )

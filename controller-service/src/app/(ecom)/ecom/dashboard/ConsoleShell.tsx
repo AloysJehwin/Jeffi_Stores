@@ -61,7 +61,7 @@ export default function ConsoleShell({ owner, tenants, current, children }: Prop
 
       <TenantSwitcher items={tenants} value={current.slug} disabled={switching} onChange={switchTenant} />
 
-      <nav className="flex-1 space-y-5 overflow-y-auto">
+      <nav className="-mx-1 flex-1 space-y-5 overflow-y-auto px-1 py-1">
         {groups.map((g, gi) => (
           <div key={gi}>
             {g.title && (
@@ -78,10 +78,11 @@ export default function ConsoleShell({ owner, tenants, current, children }: Prop
                     <Link
                       href={item.href}
                       onClick={() => setOpen(false)}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-colors ${
+                      aria-current={active ? 'page' : undefined}
+                      className={`ecom-focus flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-colors ${
                         active
-                          ? 'bg-[var(--console-terracotta-soft)] text-[var(--console-terracotta-deep)] font-semibold'
-                          : 'text-foreground-secondary hover:bg-surface-secondary hover:text-foreground'
+                          ? 'ecom-current font-semibold'
+                          : 'text-foreground-secondary ecom-hover hover:text-foreground'
                       }`}
                     >
                       <Icon className="w-4 h-4 flex-shrink-0" />

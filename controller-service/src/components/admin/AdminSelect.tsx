@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { portalRoot } from '@/lib/shared/portal-root'
 
@@ -60,6 +60,7 @@ export default function AdminSelect({
   const containerRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const [dropUp, setDropUp] = useState(false)
   const [dropRect, setDropRect] = useState<{ top: number; bottom: number; left: number; width: number } | null>(null)
 
@@ -78,19 +79,25 @@ export default function AdminSelect({
     [isControlled, onChange]
   )
 
-  const openDropdown = useCallback(() => {
+  const openDropdown = useCallback((fromKeyboard = false) => {
     if (disabled || !buttonRef.current) return
     const rect = buttonRef.current.getBoundingClientRect()
-    const rowH = compact ? 28 : xs ? 26 : sm ? 34 : 42
-    const dropdownHeight = Math.min(options.length * rowH + 8, 280)
-    const spaceBelow = window.innerHeight - rect.bottom
-    const up = spaceBelow < dropdownHeight && rect.top > spaceBelow
-    setDropUp(up)
+    setDropUp(false)
     setDropRect({ top: rect.bottom, bottom: rect.top, left: rect.left, width: rect.width })
     setIsOpen(true)
     const idx = options.findIndex(o => o.value === currentValue)
-    setHighlightedIndex(idx >= 0 ? idx : 0)
-  }, [disabled, compact, xs, sm, options, currentValue])
+    setHighlightedIndex(fromKeyboard ? Math.max(idx, 0) : -1)
+  }, [disabled, options, currentValue])
+
+  // Flip from the rendered list's real height, so rows with a hint aren't under-counted.
+  useLayoutEffect(() => {
+    if (!isOpen || !dropRect || !dropdownRef.current) return
+    const h = dropdownRef.current.offsetHeight
+    const spaceBelow = window.innerHeight - dropRect.top
+    setDropUp(spaceBelow < h + 8 && dropRect.bottom > spaceBelow)
+    const sel = listRef.current?.querySelector('[aria-selected="true"]')
+    if (sel instanceof HTMLElement && typeof sel.scrollIntoView === 'function') sel.scrollIntoView({ block: 'nearest' })
+  }, [isOpen, dropRect])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -121,7 +128,7 @@ export default function AdminSelect({
     if (isOpen && highlightedIndex >= 0 && listRef.current) {
       const items = listRef.current.children
       if (items[highlightedIndex]) {
-        ;(items[highlightedIndex] as HTMLElement).scrollIntoView({ block: 'nearest' })
+        ;(items[highlightedIndex] as HTMLElement).scrollIntoView?.({ block: 'nearest' })
       }
     }
   }, [highlightedIndex, isOpen])
@@ -134,14 +141,14 @@ export default function AdminSelect({
         e.preventDefault()
         if (isOpen && highlightedIndex >= 0) {
           if (!options[highlightedIndex].disabled) handleSelect(options[highlightedIndex].value)
-        } else {
-          openDropdown()
+        } else if (!isOpen) {
+          openDropdown(true)
         }
         break
       case 'ArrowDown':
         e.preventDefault()
         if (!isOpen) {
-          openDropdown()
+          openDropdown(true)
         } else {
           setHighlightedIndex(prev => Math.min(prev + 1, options.length - 1))
         }
@@ -158,9 +165,6 @@ export default function AdminSelect({
         break
     }
   }
-
-  const rowH = compact ? 28 : xs ? 26 : sm ? 34 : 42
-  const maxDropdownH = Math.min(options.length * rowH + 8, 280)
 
   let lastGroup: string | undefined
 
@@ -189,6 +193,7 @@ export default function AdminSelect({
             ${compact || xs ? 'rounded' : 'rounded-lg'}
             ${compact ? 'px-2 py-0.5 text-xs gap-1 leading-none' : xs ? 'field-xs gap-1' : sm ? 'field-sm gap-2' : 'field-md gap-2'}
             ${isOpen ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-secondary hover:border-border-default'}
+            focus:outline-none focus-visible:border-accent-500 focus-visible:ring-2 focus-visible:ring-accent-500/40
             ${error ? 'border-red-400 ring-red-500' : ''}
             ${disabled ? 'opacity-50 cursor-not-allowed bg-surface-secondary' : ''}
           `}
@@ -212,6 +217,7 @@ export default function AdminSelect({
           typeof document !== 'undefined' &&
           createPortal(
             <div
+              ref={dropdownRef}
               data-adminselect-dropdown
               className="fixed z-[9999] bg-surface-elevated border border-border-default rounded-lg shadow-xl overflow-hidden"
               style={{
@@ -219,11 +225,10 @@ export default function AdminSelect({
                 bottom: dropUp ? window.innerHeight - dropRect.bottom + 4 : undefined,
                 left: dropRect.left,
                 width: dropRect.width,
-                maxHeight: maxDropdownH,
                 animation: 'adminSelectFadeIn 0.12s ease-out',
               }}
             >
-              <ul ref={listRef} role="listbox" className="overflow-y-auto py-1" style={{ maxHeight: maxDropdownH }}>
+              <ul ref={listRef} role="listbox" className="max-h-[280px] overflow-y-auto py-1">
                 {options.map((option, index) => {
                   const showGroupHeader = option.group && option.group !== lastGroup
                   if (option.group) lastGroup = option.group
@@ -241,14 +246,16 @@ export default function AdminSelect({
                         type="button"
                         role="option"
                         aria-selected={option.value === currentValue}
+                        data-highlighted={highlightedIndex === index || undefined}
                         disabled={option.disabled}
                         onClick={() => !option.disabled && handleSelect(option.value)}
                         onMouseEnter={() => setHighlightedIndex(index)}
+                        onMouseLeave={() => setHighlightedIndex(-1)}
                         className={`w-full text-left transition-colors flex items-center justify-between
                         ${compact || xs ? 'px-2.5 py-1 text-xs' : sm ? 'px-3 py-1.5 text-sm' : 'px-4 py-2 text-sm'}
                         ${option.indent ? (compact || xs ? 'pl-5' : sm ? 'pl-6' : 'pl-8') : ''}
                         ${highlightedIndex === index ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300' : 'text-foreground-secondary'}
-                        ${option.value === currentValue ? 'font-medium text-accent-600 dark:text-accent-400' : ''}
+                        ${option.value === currentValue ? 'font-semibold text-accent-600 dark:text-accent-400' : ''}
                         ${option.disabled ? 'opacity-50 cursor-not-allowed' : ''}
                       `}
                       >

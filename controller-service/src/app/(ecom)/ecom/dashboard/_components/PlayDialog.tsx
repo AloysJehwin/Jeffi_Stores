@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, Check, Copy, Download, Loader2, Play, Plus, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Download, Loader2, Play, Plus, Trash2, Upload, X } from 'lucide-react'
 import { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 import { AUTO_VARIABLES, curlFor, templateCallFields } from '@/components/admin/messaging-templates/template-call-fields'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { PhoneInput, isValidPhone } from '../../_ui/phone'
 import PdfPreview from '../documents/PdfPreview'
 import { fmt } from './finance'
 
@@ -24,7 +25,7 @@ export type PlayTarget =
   | { kind: 'message'; channel: Channel; slug: string; name?: string; template?: EditorTemplate }
   | { kind: 'document'; design: string; name?: string }
 
-const input = 'w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
+const input = 'w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground ecom-field'
 const MSG = '/api/ecom/svc/messaging'
 
 function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
@@ -67,6 +68,8 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
   const [tpl, setTpl] = useState<EditorTemplate | null>(target.kind === 'message' ? target.template ?? null : null)
   const [missing, setMissing] = useState<string[] | null>(null)
   const [to, setTo] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [mediaNote, setMediaNote] = useState<{ text: string; error?: boolean } | null>(null)
   const [vars, setVars] = useState<Record<string, string>>({})
   const [mediaUrl, setMediaUrl] = useState('')
   const [buttonUrl, setButtonUrl] = useState('')
@@ -133,6 +136,19 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
   }, [target, varNames, vars, to, fields, mediaUrl, buttonUrl, number, date, sell, buyer, items])
 
   const curl = target.kind === 'message' ? curlFor('/v1/messages', request) : curlFor(`/v1/documents/${type}`, request, false)
+  // Hosts the file on the CDN (converted to a WhatsApp-safe format) and fills media_url with it.
+  async function uploadMedia(file: File) {
+    if (file.size > 6 * 1024 * 1024) { setMediaNote({ text: 'Files up to 6 MB here; host bigger ones with POST /v1/media.', error: true }); return }
+    setUploading(true); setMediaNote(null)
+    try {
+      const data = btoa(Array.from(new Uint8Array(await file.arrayBuffer()), b => String.fromCharCode(b)).join(''))
+      const r = await fetch(`${MSG}/media`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ data, content_type: file.type }) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok || !d.url) throw new Error(d.message || d.error || 'Upload failed')
+      setMediaUrl(d.url)
+      setMediaNote({ text: `Hosted${d.charged_inr ? ` · ${fmt(d.charged_inr)} charged` : ''}.` })
+    } catch (e: any) { setMediaNote({ text: e.message, error: true }) } finally { setUploading(false) }
+  }
   const price = target.kind === 'message' ? prices[target.channel] : prices[type]
 
   async function run() {
@@ -150,7 +166,7 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
   const setItem = (i: number, patch: Partial<Item>) => setItems(list => list.map((it, n) => (n === i ? { ...it, ...patch } : it)))
   const ok = result && result.status >= 200 && result.status < 300
   const err = result && !ok ? (result.body?.message || result.body?.error?.message || result.body?.error || `Request failed (${result.status})`) : null
-  const ready = !!keyId && (target.kind === 'message' ? !!to.trim() && missing !== null : !!sell.name?.trim() && !!buyer.name?.trim() && items.every(i => i.description.trim() && Number(i.quantity) > 0 && i.unit_price !== ''))
+  const ready = !!keyId && (target.kind === 'message' ? (target.channel === 'email' ? !!to.trim() : isValidPhone(to)) && missing !== null : !!sell.name?.trim() && !!buyer.name?.trim() && items.every(i => i.description.trim() && Number(i.quantity) > 0 && i.unit_price !== ''))
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:p-8" role="dialog" aria-modal="true" aria-label="Test live">
@@ -171,8 +187,10 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
 
           {target.kind === 'message' ? (
             <>
-              <Field label={target.channel === 'email' ? 'Recipient email' : 'Recipient phone'} hint={target.channel === 'email' ? undefined : 'With country code, e.g. +919876543210'}>
-                <input className={input} type={target.channel === 'email' ? 'email' : 'tel'} value={to} onChange={e => setTo(e.target.value)} placeholder={target.channel === 'email' ? 'you@example.com' : '+91…'} />
+              <Field label={target.channel === 'email' ? 'Recipient email' : 'Recipient phone'} >
+                {target.channel === 'email'
+                  ? <input className={input} type="email" value={to} onChange={e => setTo(e.target.value)} placeholder="you@example.com" />
+                  : <PhoneInput value={to} onChange={setTo} inputClassName={`${input} min-w-0 flex-1`} />}
               </Field>
               {missing === null && <div className="h-9 animate-pulse rounded-lg org-sand" />}
               {varNames.length > 0 && (
@@ -184,7 +202,19 @@ export default function PlayDialog({ target, prices, seller, onClose }: {
                   ))}
                 </div>
               )}
-              {fields?.mediaSlot && <Field label="Image URL (media_url)"><input className={input} value={mediaUrl} onChange={e => setMediaUrl(e.target.value)} placeholder="https://…/photo.jpg" /></Field>}
+              {fields?.mediaSlot && (
+                <Field label="Header image or media (media_url)"
+                  hint={`Paste any image link (any format) or upload a file. Links from elsewhere are converted and hosted for ${prices.media != null ? fmt(prices.media) : 'a small fee'}; already-hosted links are free.`}>
+                  <div className="flex gap-2">
+                    <input className={`${input} min-w-0 flex-1`} value={mediaUrl} onChange={e => { setMediaUrl(e.target.value); setMediaNote(null) }} placeholder="https://… (any image link)" />
+                    <label className={`inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-border-default px-3 text-xs font-semibold text-foreground hover:bg-surface-secondary ${uploading ? 'pointer-events-none opacity-50' : ''}`}>
+                      {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />} {uploading ? 'Uploading…' : 'Upload'}
+                      <input type="file" hidden accept="image/*,video/mp4,application/pdf" onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) uploadMedia(f) }} />
+                    </label>
+                  </div>
+                  {mediaNote && <span className={`mt-1 block text-[11px] ${mediaNote.error ? 'text-[#8a2e1f]' : 'text-foreground-muted'}`}>{mediaNote.text}</span>}
+                </Field>
+              )}
               {fields?.buttonSlot && <Field label="Button link (button_url)"><input className={input} value={buttonUrl} onChange={e => setButtonUrl(e.target.value)} placeholder="https://…" /></Field>}
             </>
           ) : (

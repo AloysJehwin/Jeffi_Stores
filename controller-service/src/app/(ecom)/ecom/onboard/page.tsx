@@ -34,16 +34,16 @@ function SidebarLayout({ currentStep, children }: { currentStep: number; childre
             return (
               <div
                 key={s.id}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl ${active ? 'bg-accent-50' : ''}`}
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl ${active ? 'ecom-current' : ''}`}
               >
                 <span
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${active ? 'bg-accent-600 text-white' : done ? 'org-sage org-sage-text' : 'bg-surface-secondary text-foreground-muted'}`}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${active ? 'ecom-sel' : done ? 'org-sage org-sage-text' : 'bg-surface-secondary text-foreground-muted'}`}
                 >
                   {done ? '✓' : s.id + 1}
                 </span>
                 <div>
                   <div
-                    className={`text-sm font-medium ${active ? 'text-accent-700' : done ? 'text-foreground-secondary' : 'text-foreground-muted'}`}
+                    className={`text-sm font-medium ${active ? 'font-semibold text-foreground' : done ? 'text-foreground-secondary' : 'text-foreground-muted'}`}
                   >
                     {s.label}
                   </div>
