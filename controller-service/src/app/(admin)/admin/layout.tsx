@@ -177,11 +177,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // The shipping wallet pays for Delhivery on the platform account, for EVERY plan — so gate the
   // badge + Wallet nav on platform-Delhivery + delhivery:read (which every plan has), NOT on
   // financial:* (Pro+ only). getSiteControls already resolved ownDelhivery (flagship reads as own).
-  const showWallet = !controls.ownDelhivery && hasScope(role, scopes, 'delhivery:read')
+  // AI usage is charged to the wallet too, so every tenant sees it; the flagship has no wallet.
+  const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+  const walletTenantId = await resolveTenantId().catch(() => null)
+  const showWallet = !!walletTenantId && hasScope(role, scopes, 'delhivery:read')
   let wallet: { balance: number; minBalance: number } | null = null
   if (showWallet) {
-    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
-    const tenantId = await resolveTenantId().catch(() => null)
+    const tenantId = walletTenantId
     if (tenantId) {
       const { getWalletBalance } = await import('@/lib/payments/wallet')
       const w = await getWalletBalance(tenantId).catch(() => null)

@@ -1,5 +1,4 @@
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
-import { getSiteControls } from '@/lib/catalog/site-controls'
 import { getTenantWallet } from '@/lib/payments/wallet'
 import { redirect } from 'next/navigation'
 import { queryMany } from '@/lib/shared/db'
@@ -23,13 +22,10 @@ async function aiSpend(): Promise<AiSpendRow[]> {
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// Platform-Delhivery tenants only — own-Delhivery/flagship have no platform wallet. The nav link
-// and badge are already gated in the layout; this guards a direct URL hit.
+// Every tenant: the wallet pays for platform Delhivery shipping and for AI usage. The flagship has none.
 export default async function WalletPage() {
-  const controls = await getSiteControls()
-  if (controls.ownDelhivery) redirect('/admin/dashboard')
-
   const tenantId = await resolveTenantId().catch(() => null)
+  if (!tenantId) redirect('/admin/dashboard')
   const [wallet, ai] = await Promise.all([
     tenantId ? getTenantWallet(tenantId, 500).catch(() => null) : null,
     tenantId ? aiSpend() : [],
