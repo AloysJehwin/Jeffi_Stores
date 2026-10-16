@@ -14,6 +14,8 @@ import ProductSupplierList, { SupplierRow } from './ProductSupplierList'
 import Toggle from '@/components/ui/Toggle'
 import DatePicker from '@/components/ui/DatePicker'
 import AIEnrichButton from './AIEnrichButton'
+import AiMediaButton from './ai/AiMediaButton'
+import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import UnitsManager, { UnitLoadedInfo } from './UnitsManager'
 import {
   deriveSellableItems,
@@ -3145,11 +3147,31 @@ export default function ProductForm({
             <div className="md:col-span-2">
               {useDraftImages ? (
                 <div className="space-y-3">
-                  <div>
-                    <h3 className="text-sm font-medium text-foreground-secondary">Product Images</h3>
-                    <p className="text-xs text-foreground-muted mt-1">
-                      Up to 5 images. Drag to reorder, or star one to make it the main image.
-                    </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-medium text-foreground-secondary">Product Images</h3>
+                      <p className="text-xs text-foreground-muted mt-1">
+                        Up to 5 images. Drag to reorder, or star one to make it the main image.
+                      </p>
+                    </div>
+                    {productImages.length + productImagePendingAdds < 5 && (
+                      <AiMediaButton
+                        feature="product_image"
+                        label="AI image"
+                        sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait]}
+                        defaultPrompt={`${productName || 'The product'} on a clean white studio background, soft shadow`}
+                        referenceImageUrl={(() => {
+                          const primary = productImages.find((i: any) => i.is_primary) ?? productImages[0]
+                          const url = primary?.image_url as string | undefined
+                          return url?.startsWith('http') ? url : undefined
+                        })()}
+                        usageRef={productId || undefined}
+                        saveToGallery
+                        onPick={img => {
+                          if (img.galleryId) void addProductImagesFromGallery([{ id: img.galleryId }])
+                        }}
+                      />
+                    )}
                   </div>
                   <ImageGalleryEditor
                     images={productImages}

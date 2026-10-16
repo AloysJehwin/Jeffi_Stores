@@ -2,16 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 import { makeHomepageDraftDb, slideRow } from '../../../helpers/homepage-draft-db'
 
-vi.mock('@/lib/auth/jwt', () => ({ authenticateAdmin: vi.fn() }))
+vi.mock('@/lib/auth/jwt', () => {
+  const authenticateAdmin = vi.fn()
+  return { authenticateAdmin, requireAdminScope: vi.fn((r: unknown) => authenticateAdmin(r)) }
+})
+vi.mock('@/lib/auth/plan-gate', () => ({ currentTenantPlanGate: vi.fn().mockResolvedValue({ allowed: true, plan: 'platform', upgradeRequired: null }) }))
 vi.mock('@/lib/auth/scopes', () => ({ hasScope: vi.fn().mockReturnValue(true) }))
 
-const { mockUpload, mockRun } = vi.hoisted(() => ({ mockUpload: vi.fn(), mockRun: vi.fn() }))
+const { mockUpload, mockGenerate } = vi.hoisted(() => ({ mockUpload: vi.fn(), mockGenerate: vi.fn() }))
 vi.mock('@/lib/shared/s3', () => ({ uploadGalleryImage: mockUpload }))
-vi.mock('replicate', () => ({
-  default: class {
-    run = mockRun
-  },
-}))
+vi.mock('@/lib/ai/media', () => ({ generateImage: mockGenerate, AiMediaError: class extends Error { status = 502 } }))
+vi.mock('@/lib/ai/billing', () => ({ AiWalletError: class extends Error { status = 402 } }))
 
 const fake = makeHomepageDraftDb()
 vi.mock('@/lib/shared/db', () => ({
@@ -274,12 +275,11 @@ describe('POST /api/admin/hero-slides/[id]/image', () => {
 
 describe('POST /api/admin/hero-slides/[id]/generate-image', () => {
   it('stores the generated image on the draft slide', async () => {
-    vi.stubEnv('REPLICATE_API_TOKEN', 'test-token')
-    mockRun.mockResolvedValue(['https://replicate.example/out.png'])
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(new Uint8Array([1, 2, 3]))))
+    mockGenerate.mockResolvedValue({ images: [{ url: 'https://cdn.example.com/gallery/new.png', width: 1536, height: 640, blurhash: 'LEHV6nWB2yk8' }], usageId: 'u1', priceInr: 0, provider: 'razer', model: 'sd' })
     const res = await GENERATE(req('POST', { prompt: 'bolts and nuts on steel' }), paramsFor(S1))
     expect(res.status).toBe(200)
     expect((await res.json()).url).toBe('https://cdn.example.com/gallery/new.png')
+    expect(mockGenerate).toHaveBeenCalledWith(expect.objectContaining({ feature: 'hero_image', ref: S1, width: 1536, height: 640 }))
     expect(draftSlide(S1)).toMatchObject({
       image_url: 'https://cdn.example.com/gallery/new.png',
       blurhash: 'LEHV6nWB2yk8',
@@ -288,9 +288,8 @@ describe('POST /api/admin/hero-slides/[id]/generate-image', () => {
   })
 
   it('404s a slide that is not in the editable set', async () => {
-    vi.stubEnv('REPLICATE_API_TOKEN', 'test-token')
     const res = await GENERATE(req('POST', { prompt: 'bolts and nuts on steel' }), paramsFor(MISSING))
     expect(res.status).toBe(404)
-    expect(mockRun).not.toHaveBeenCalled()
+    expect(mockGenerate).not.toHaveBeenCalled()
   })
 })

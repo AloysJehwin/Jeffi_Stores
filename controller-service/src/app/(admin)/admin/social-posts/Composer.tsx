@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Hash, Plus } from 'lucide-react'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
+import AiMediaButton from '@/components/admin/ai/AiMediaButton'
+import AiVideoButton from '@/components/admin/ai/AiVideoButton'
+import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
@@ -432,11 +435,38 @@ export default function Composer({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className={lbl}>Image URL</label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className={lbl}>Image URL</label>
+                <AiMediaButton
+                  feature="social_image"
+                  compact
+                  defaultPrompt={product?.name ? `${product.name}, product shot` : caption.slice(0, 160)}
+                  sizes={
+                    platforms.includes('ig_reel')
+                      ? [AI_SIZE_PRESETS.story, AI_SIZE_PRESETS.portrait, AI_SIZE_PRESETS.square]
+                      : [AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait, AI_SIZE_PRESETS.landscape, AI_SIZE_PRESETS.story]
+                  }
+                  referenceImageUrl={allImages[0]?.startsWith('http') ? allImages[0] : undefined}
+                  saveToGallery
+                  onPick={img => setImageUrl(img.url)}
+                />
+              </div>
               <ImageUrlInput value={imageUrl} onChange={setImageUrl} className={inputCls} placeholder="https://... or upload" />
             </div>
             <div>
-              <label className={lbl}>Video URL (Reels, YouTube)</label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className={lbl}>Video URL (Reels, YouTube)</label>
+                {platforms.some(p => p === 'ig_reel' || p === 'youtube') && (
+                  <AiVideoButton
+                    feature="social_video"
+                    compact
+                    defaultPrompt={caption.slice(0, 160)}
+                    defaultImageUrl={imageUrl || undefined}
+                    defaultAspect="9:16"
+                    onPick={url => setVideoUrl(url)}
+                  />
+                )}
+              </div>
               <input className={inputCls} value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="https://..." />
             </div>
             <div className="sm:col-span-2">
