@@ -18,6 +18,9 @@ export interface AiToolDef {
   }
 }
 
+/** Text providers the gateway can route chat to ('razer' = the Ollama pool). */
+export type TextProviderName = 'razer'
+
 export type ModelHint = 'sql' | 'copy' | 'agent' | 'fast' | 'enrich' | 'email'
 
 export interface AiChatRequest {
@@ -27,6 +30,8 @@ export interface AiChatRequest {
   jsonMode?: boolean
   modelHint?: ModelHint
   forceProvider?: 'openai' | 'ollama'
+  /** Allowed text providers in order; overrides the gateway default. forceProvider still wins. */
+  providers?: TextProviderName[]
   tools?: AiToolDef[]
   /** Bypass the LLM cache (both KV and semantic) for this request. */
   noCache?: boolean
@@ -82,6 +87,8 @@ export interface ImageGenerateRequest {
   n?: number
   quality?: ImageQuality
   provider?: ImageProviderName
+  /** Allowed providers in order; overrides the gateway's AI_IMAGE_PROVIDERS. `provider` still wins. */
+  providers?: ImageProviderName[]
   /** Image-to-image / edit when the provider supports it. */
   referenceImageUrl?: string
   seed?: number
@@ -123,6 +130,8 @@ export interface VideoGenerateRequest {
   durationSec?: number
   aspect?: VideoAspect
   provider?: VideoProviderName
+  /** Allowed providers in order; overrides the gateway's AI_VIDEO_PROVIDERS. `provider` still wins. */
+  providers?: VideoProviderName[]
   namespace?: string
 }
 
@@ -156,6 +165,21 @@ export interface VideoJobResponse {
   provider?: VideoProviderName
   model?: string
   error?: string
+}
+
+// ── Provider status (GET /v1/providers) ─────────────────────────────────────
+export interface ProviderStatus<N extends string = string> {
+  name: N
+  /** Credentials/endpoint present (text: the Ollama pool answered its last probe). */
+  configured: boolean
+}
+
+export interface ProvidersResponse {
+  text: ProviderStatus<TextProviderName>[]
+  image: ProviderStatus<ImageProviderName>[]
+  video: ProviderStatus<VideoProviderName>[]
+  /** The gateway's own default order per capability. */
+  defaults: { text: TextProviderName[]; image: ImageProviderName[]; video: VideoProviderName[] }
 }
 
 export interface VisionRequest {

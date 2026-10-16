@@ -13,7 +13,6 @@ import {
   TextAreaControl,
   NumberControl,
   ToggleControl,
-  SelectControl,
   FullSpan,
   KeyboardShortcutControl,
 } from '@/components/admin/site-controls/controls'
@@ -24,10 +23,14 @@ import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinition
 import TemplateVariablesPanel from '@/components/admin/site-controls/TemplateVariablesPanel'
 import DeliveryEstimateCard from '@/components/admin/site-controls/DeliveryEstimateCard'
 import GoogleTagCard from '@/components/admin/site-controls/GoogleTagCard'
+import ProvidersCard from '@/components/admin/site-controls/ProvidersCard'
 import { resolveTenant } from '@/lib/tenancy/tenant-context'
 import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
+import { getProviderPolicy } from '@/lib/providers/policy'
 import { getReferralSettings } from '@/lib/referrals/settings'
+
+const providerLabel = (p: string) => (p === 'aws' ? 'AWS' : 'Twilio')
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -105,7 +108,12 @@ export default async function SiteControlsPage() {
   }
 
   await seedBuiltinShortcuts()
-  const [c, loyalty, referral] = await Promise.all([getSiteControls(), getLoyaltySettings(), getReferralSettings()])
+  const [c, loyalty, referral, providerPolicy] = await Promise.all([
+    getSiteControls(),
+    getLoyaltySettings(),
+    getReferralSettings(),
+    getProviderPolicy(),
+  ])
   const inv = await loadInvoiceKeys()
   const delivery = await getDeliverySettings()
   const isTenant = (await resolveTenant().catch(() => null)) != null
@@ -290,28 +298,10 @@ export default async function SiteControlsPage() {
                 />
               </FullSpan>
               <FullSpan>
-                <SelectControl
-                  settingKey="feature_sms_provider"
-                  label="SMS provider"
-                  hint="Which gateway sends SMS for this store. AWS is unavailable until onboarding completes."
-                  initial={c.flags.smsProvider}
-                  options={[
-                    { value: 'twilio', label: 'Twilio' },
-                    { value: 'aws', label: 'AWS' },
-                  ]}
-                />
-              </FullSpan>
-              <FullSpan>
-                <SelectControl
-                  settingKey="feature_whatsapp_provider"
-                  label="WhatsApp provider"
-                  hint="Which gateway sends WhatsApp for this store. AWS is unavailable until onboarding completes."
-                  initial={c.flags.whatsappProvider}
-                  options={[
-                    { value: 'twilio', label: 'Twilio' },
-                    { value: 'aws', label: 'AWS' },
-                  ]}
-                />
+                <p className="text-xs text-foreground-muted">
+                  SMS is sent through {providerLabel(providerPolicy.smsProvider)} and WhatsApp through{' '}
+                  {providerLabel(providerPolicy.whatsappProvider)}. Providers are managed by the platform.
+                </p>
               </FullSpan>
             </SectionCard>
           </div>
@@ -616,6 +606,12 @@ export default async function SiteControlsPage() {
             }}
           />
         </div>
+
+        {!isTenant && isPlatformOwner(admin.role) && (
+          <div>
+            <ProvidersCard />
+          </div>
+        )}
 
         <div>
           <CustomerTagDefinitionsCard isSuperAdmin={isPlatformOwner(admin.role)} />

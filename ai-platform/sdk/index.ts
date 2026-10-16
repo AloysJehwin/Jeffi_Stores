@@ -6,6 +6,7 @@ import type {
   VisionRequest, VisionResponse,
   ImageGenerateRequest, ImageGenerateResponse,
   VideoGenerateRequest, VideoStartResponse, VideoJobResponse,
+  ProvidersResponse,
 } from './types'
 
 export * from './types'
@@ -55,6 +56,11 @@ export async function generateVideo(req: VideoGenerateRequest): Promise<VideoSta
 export async function videoJob(jobId: string): Promise<VideoJobResponse> {
   const r = await get<VideoJobResponse>(cfg(), `/v1/jobs/${encodeURIComponent(jobId)}`)
   return r.result ? { ...r, result: { ...r.result, videoUrl: absolute(r.result.videoUrl) } } : r
+}
+
+/** Which providers the gateway can route to, and its default order per capability. */
+export async function providers(): Promise<ProvidersResponse> {
+  return get<ProvidersResponse>(cfg(), '/v1/providers')
 }
 
 // The gateway returns /v1/files/<id> unless AI_PUBLIC_URL is set; resolve against the gateway URL.

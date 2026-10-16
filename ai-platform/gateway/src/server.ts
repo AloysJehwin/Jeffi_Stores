@@ -16,13 +16,13 @@ import { googleProvider } from './providers/google'
 import { replicateProvider } from './providers/replicate'
 import {
   handleImageGenerate, handleVideoStart, readVideoJob, advanceVideoJob, readImageCache,
-  parseImageRequest, parseImageProviders, parseVideoProviders,
+  parseImageRequest, parseImageProviders, parseVideoProviders, textRoute, providerStatus, TEXT_PROVIDER_ORDER,
   ValidationError, UpstreamError, NotConfiguredError,
   type ImageRouterDeps, type VideoRouterDeps,
 } from './media'
 import type {
   AiChatRequest, AiChatResponse, EmbedRequest, EmbedResponse, VisionRequest, VisionResponse,
-  ImageGenerateRequest, ImageGenerateResponse,
+  ImageGenerateRequest, ImageGenerateResponse, ProvidersResponse,
 } from '../../sdk/types'
 
 const redis = new IORedis(CONFIG.redisUrl, { maxRetriesPerRequest: 3 })
@@ -92,6 +92,8 @@ async function readiness(): Promise<{ ok: boolean; reason?: string; queue: boole
 // ── Chat with the two-tier cache in front of the durable queue ───────────────
 async function handleChat(req: AiChatRequest): Promise<AiChatResponse> {
   const start = Date.now()
+  // Only the Ollama pool ('razer') serves chat today; an order without it has nothing to run on.
+  if (!textRoute(req).includes('razer')) throw new NotConfiguredError('no text provider in the requested order is available')
   const model = modelForHint(req.modelHint)
   const policy = policyFor(req)
 
@@ -116,6 +118,15 @@ async function handleChat(req: AiChatRequest): Promise<AiChatResponse> {
 
   const usage = tokenUsage('ollama', r.model, r.promptTokens ?? 0, r.completionTokens ?? 0)
   return { content: r.content, toolCalls: r.toolCalls, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false, cache: null, usage }
+}
+
+function providersReport(): ProvidersResponse {
+  return {
+    text: [{ name: 'razer', configured: !ollamaPool.knownDown() }],
+    image: providerStatus(imageDeps.order, imageDeps.providers),
+    video: providerStatus(videoDeps.order, videoDeps.providers),
+    defaults: { text: TEXT_PROVIDER_ORDER, image: imageDeps.order, video: videoDeps.order },
+  }
 }
 
 // Cache hits cost nothing.
@@ -184,6 +195,9 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/healthz') {
       const o = ollamaPool.status()
       return json(res, 200, { ok: true, ollama: { ok: o.ok, active: o.active, checkedAt: o.checkedAt }, waiters: pendingWaiters() })
+    }
+    if (req.method === 'GET' && path === '/v1/providers') {
+      return json(res, 200, providersReport())
     }
     if (req.method === 'POST' && path === '/v1/chat') {
       return json(res, 200, await handleChat(await readBody(req)))
