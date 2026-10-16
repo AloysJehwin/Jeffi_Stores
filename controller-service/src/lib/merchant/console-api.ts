@@ -33,7 +33,8 @@ export const REPORT_QUERIES = {
     `SELECT date, offer_id, title, marketing_method, clicks, impressions, conversions, conversion_value
      FROM product_performance_view WHERE date BETWEEN '${from}' AND '${to}'`,
   priceCompetitiveness: () =>
-    `SELECT offer_id, report_country_code, title, brand, price, benchmark_price FROM price_competitiveness_product_view WHERE report_country_code = 'IN'`,
+    // Google requires id and every filtered column in SELECT on this view.
+    `SELECT id, offer_id, report_country_code, title, brand, price, benchmark_price FROM price_competitiveness_product_view WHERE report_country_code = 'IN'`,
   priceInsights: () =>
     // Google requires id in SELECT on this view.
     `SELECT id, offer_id, title, brand, price, suggested_price, predicted_impressions_change_fraction,
