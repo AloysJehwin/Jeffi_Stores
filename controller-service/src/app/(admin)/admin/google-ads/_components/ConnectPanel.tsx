@@ -169,7 +169,10 @@ export default function ConnectPanel({
                 <Link2 className="w-4 h-4" /> Connect with Google
               </a>
               {!status.oauth.enabled && (
-                <p className="text-xs text-foreground-muted">Missing: {status.oauth.missing.join(', ')}</p>
+                <p className="text-xs text-foreground-muted">
+                  Sign-in needs {status.oauth.missing.join(', ')} on the platform, with redirect URI{' '}
+                  <code className="break-all">{status.oauth.redirectUri}</code>.
+                </p>
               )}
             </>
           ) : (

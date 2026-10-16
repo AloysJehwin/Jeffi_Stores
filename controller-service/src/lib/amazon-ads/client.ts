@@ -6,7 +6,8 @@ import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
 import { fetchWithRetry } from '@/lib/channels/ratelimit'
 
 // Amazon Ads API (Sponsored Products v3, Reporting v3). Its own Login with Amazon app, separate
-// from the Selling Partner app: AMAZON_ADS_CLIENT_ID / AMAZON_ADS_CLIENT_SECRET. India profiles are
+// from the Selling Partner app: the owner's own app (client_id/client_secret in the stored config)
+// or the platform's AMAZON_ADS_CLIENT_ID / AMAZON_ADS_CLIENT_SECRET. India profiles are
 // served by the EU endpoint. Credentials are a tenant_integration_credentials row 'amazon_ads';
 // the flagship is keyed to the platform tenant like Google Ads.
 
@@ -18,6 +19,9 @@ export const LWA_TOKEN = process.env.AMAZON_ADS_TOKEN_URL || 'https://api.amazon
 
 export interface AmazonAdsConfig {
   refresh_token: string
+  /** The owner's own LWA app; the platform app env is used when absent. */
+  client_id?: string
+  client_secret?: string
   profile_id?: string
   profile_name?: string
   country_code?: string
@@ -36,6 +40,21 @@ export class AmazonAdsApiError extends Error {
 }
 
 export const adsEnvReady = () => !!(process.env.AMAZON_ADS_CLIENT_ID && process.env.AMAZON_ADS_CLIENT_SECRET)
+
+export interface AdsApp {
+  clientId: string
+  clientSecret: string
+}
+
+/** The LWA app for a config: its own when stored, else the platform env. */
+export function adsApp(cfg?: Pick<AmazonAdsConfig, 'client_id' | 'client_secret'> | null): AdsApp {
+  if (cfg?.client_id && cfg.client_secret) return { clientId: cfg.client_id, clientSecret: cfg.client_secret }
+  return { clientId: process.env.AMAZON_ADS_CLIENT_ID ?? '', clientSecret: process.env.AMAZON_ADS_CLIENT_SECRET ?? '' }
+}
+
+/** True when API calls can be made for this owner: its own app or the platform app. */
+export const adsAppReady = (cfg?: Pick<AmazonAdsConfig, 'client_id' | 'client_secret'> | null) =>
+  !!(cfg?.client_id && cfg.client_secret) || adsEnvReady()
 
 export async function amazonAdsTenantKey(): Promise<string> {
   return (await resolveTenantId()) ?? PLATFORM_TENANT_ID
@@ -67,8 +86,9 @@ export async function disconnectAmazonAds(tenantKey: string): Promise<void> {
 
 const tokens = new Map<string, { token: string; expiresAt: number }>()
 
-export async function lwaAccessToken(refreshToken: string): Promise<string> {
-  const hit = tokens.get(refreshToken)
+export async function lwaAccessToken(refreshToken: string, app: AdsApp = adsApp()): Promise<string> {
+  const key = `${app.clientId}:${refreshToken}`
+  const hit = tokens.get(key)
   if (hit && hit.expiresAt > Date.now() + 60_000) return hit.token
   const res = await fetch(LWA_TOKEN, {
     method: 'POST',
@@ -76,13 +96,13 @@ export async function lwaAccessToken(refreshToken: string): Promise<string> {
     body: new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
-      client_id: process.env.AMAZON_ADS_CLIENT_ID ?? '',
-      client_secret: process.env.AMAZON_ADS_CLIENT_SECRET ?? '',
+      client_id: app.clientId,
+      client_secret: app.clientSecret,
     }),
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok || !data.access_token) throw new AmazonAdsApiError(401, `Amazon Ads sign-in failed: ${data.error_description || data.error || res.status}`)
-  tokens.set(refreshToken, { token: data.access_token, expiresAt: Date.now() + Number(data.expires_in ?? 3600) * 1000 })
+  tokens.set(key, { token: data.access_token, expiresAt: Date.now() + Number(data.expires_in ?? 3600) * 1000 })
   return data.access_token
 }
 
@@ -97,15 +117,16 @@ export interface AdsRequest {
 export class AmazonAdsClient {
   constructor(
     private refreshToken: string,
-    public profileId: string | null
+    public profileId: string | null,
+    private app: AdsApp = adsApp()
   ) {}
 
   async request<T = any>(method: string, path: string, opts: AdsRequest = {}): Promise<T> {
-    const token = await lwaAccessToken(this.refreshToken)
+    const token = await lwaAccessToken(this.refreshToken, this.app)
     const type = opts.contentType ?? (opts.vnd ? `application/vnd.${opts.vnd}.v3+json` : 'application/json')
     const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
-      'Amazon-Advertising-API-ClientId': process.env.AMAZON_ADS_CLIENT_ID ?? '',
+      'Amazon-Advertising-API-ClientId': this.app.clientId,
       'Content-Type': type,
       Accept: type,
     }
@@ -142,7 +163,7 @@ export class AmazonAdsClient {
 export async function amazonAdsClient(): Promise<AmazonAdsClient> {
   const cfg = await readAmazonAdsConfig()
   if (!cfg?.refresh_token || !cfg.profile_id) throw new IntegrationNotConnectedError(AMAZON_ADS_PROVIDER, await amazonAdsTenantKey())
-  return new AmazonAdsClient(cfg.refresh_token, cfg.profile_id)
+  return new AmazonAdsClient(cfg.refresh_token, cfg.profile_id, adsApp(cfg))
 }
 
 export interface AdsProfile {
@@ -153,8 +174,8 @@ export interface AdsProfile {
   type: string
 }
 
-export async function listProfiles(refreshToken: string): Promise<AdsProfile[]> {
-  const c = new AmazonAdsClient(refreshToken, null)
+export async function listProfiles(refreshToken: string, app: AdsApp = adsApp()): Promise<AdsProfile[]> {
+  const c = new AmazonAdsClient(refreshToken, null, app)
   const rows = await c.request<any[]>('GET', '/v2/profiles', { profile: false })
   return (rows ?? []).map(p => ({
     profileId: String(p.profileId),

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { RefreshCw, Unplug } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
+import ConnectionsGear, { NotConnectedState, type ConnectionState } from '@/components/admin/ConnectionsGear'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
@@ -75,6 +76,7 @@ export default function AmazonAdsConsole() {
   const [error, setError] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [gearOpen, setGearOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const reload = useCallback(() => setReloadKey(k => k + 1), [])
   const canWrite = useCanWrite('amazon_ads')
@@ -96,7 +98,8 @@ export default function AmazonAdsConsole() {
         ok: false,
         text: ERRORS[sp.get('error') ?? ''] || decodeURIComponent(sp.get('error') ?? 'Sign-in failed'),
       })
-    else setBanner({ ok: true, text: 'Signed in with Amazon. Choose the advertising profile below.' })
+    else setBanner({ ok: true, text: 'Signed in with Amazon. Choose the advertising profile in the gear (top right).' })
+    if (c === '0' || sp.get('pick')) setGearOpen(true)
     const url = new URL(window.location.href)
     ;['connected', 'error', 'pick'].forEach(k => url.searchParams.delete(k))
     window.history.replaceState(null, '', url.toString())
@@ -136,52 +139,55 @@ export default function AmazonAdsConsole() {
     reload()
   }
 
-  if (!status) return <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
-  if (!status.envReady)
-    return (
-      <Banner ok={false}>
-        Amazon Ads is not set up on this platform yet: it needs the Amazon Ads API app (AMAZON_ADS_CLIENT_ID and
-        AMAZON_ADS_CLIENT_SECRET), which Amazon approves separately from Seller Central.
-      </Banner>
-    )
+  const onChanged = (msg?: string) => {
+    if (msg) setBanner({ ok: true, text: msg })
+    loadStatus()
+    reload()
+  }
+  const state: ConnectionState = status?.connected ? 'connected' : status?.pending ? 'pending' : 'none'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Amazon Ads</h1>
+          <p className="text-sm text-foreground-secondary mt-0.5">
+            Sponsored Products: spend, ACoS and TACoS, campaigns, keywords, search terms and products
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
+          {status?.connected && canWrite && (
+            <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={sync} />
+          )}
+          <ConnectionsGear
+            title="Amazon Ads connection"
+            scope="amazon_ads"
+            state={state}
+            open={gearOpen}
+            onOpenChange={setGearOpen}
+          >
+            {status ? (
+              <ConnectPanel status={status} canWrite={canWrite} onChanged={onChanged} />
+            ) : (
+              <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
+            )}
+          </ConnectionsGear>
+        </div>
+      </div>
+
       {banner && <Banner ok={banner.ok}>{banner.text}</Banner>}
-      {!status.connected ? (
-        <ConnectPanel
-          status={status}
-          canWrite={canWrite}
-          onChanged={() => {
-            loadStatus()
-            reload()
-          }}
-        />
+      {!status ? (
+        <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
+      ) : !status.connected ? (
+        <NotConnectedState provider="Amazon Ads" onOpen={() => setGearOpen(true)} />
       ) : (
         <>
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3 flex-wrap">
-              <RangePresets value={range} onChange={setRange} endOffset={1} />
-              <span className="text-xs text-foreground-muted">
-                {status.profileName} ({status.countryCode}) ·{' '}
-                {status.connectedVia === 'manual' ? 'entered manually' : 'Amazon sign-in'}
-              </span>
-            </div>
-            {canWrite && (
-              <div className="flex gap-1">
-                <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={sync} />
-                <IconButton
-                  icon={Unplug}
-                  label="Disconnect"
-                  variant="danger"
-                  onClick={async () => {
-                    await api('/api/admin/amazon-ads/connection', { method: 'DELETE' })
-                    setBanner({ ok: true, text: 'Amazon Ads disconnected. Synced data is kept.' })
-                    loadStatus()
-                  }}
-                />
-              </div>
-            )}
+          <div className="flex items-center gap-3 flex-wrap">
+            <RangePresets value={range} onChange={setRange} endOffset={1} />
+            <span className="text-xs text-foreground-muted">
+              {status.profileName} ({status.countryCode}) ·{' '}
+              {status.connectedVia === 'manual' ? 'entered manually' : 'Amazon sign-in'}
+            </span>
           </div>
           <Tabs tabs={TABS} value={tab} onChange={setTab} />
           {error ? (
@@ -197,24 +203,65 @@ export default function AmazonAdsConsole() {
   )
 }
 
-function ConnectPanel({ status, canWrite, onChanged }: { status: any; canWrite: boolean; onChanged: () => void }) {
-  const [manual, setManual] = useState({ refreshToken: '', profileId: '' })
+const CONNECT_URL = '/api/admin/integrations/amazon-ads/connect'
+
+function ConnectPanel({
+  status,
+  canWrite,
+  onChanged,
+}: {
+  status: any
+  canWrite: boolean
+  onChanged: (msg?: string) => void
+}) {
+  const [manual, setManual] = useState({ clientId: '', clientSecret: '', refreshToken: '', profileId: '' })
   const [msg, setMsg] = useState<string | null>(null)
-  const choose = async (body: Record<string, string>) => {
+  const [busy, setBusy] = useState(false)
+  const envReady = !!status.oauth?.enabled
+  const needApp = !status.envReady
+
+  const post = async (body: Record<string, string>, done?: string) => {
     setMsg(null)
+    setBusy(true)
     const r = await api('/api/admin/amazon-ads/connection', { method: 'POST', json: body })
-    if (r.ok) onChanged()
+    setBusy(false)
+    if (r.ok) onChanged(done)
     else setMsg(r.data.error || 'Could not connect')
   }
-  if (!canWrite)
-    return (
-      <p className="text-sm text-foreground-muted">
-        Amazon Ads is not connected yet. An admin with Amazon Ads write access can connect it.
-      </p>
-    )
+  const disconnect = async () => {
+    setBusy(true)
+    await api('/api/admin/amazon-ads/connection', { method: 'DELETE' })
+    setBusy(false)
+    onChanged('Amazon Ads disconnected. Synced data is kept.')
+  }
+  const manualBody = () => {
+    const b: Record<string, string> = { refreshToken: manual.refreshToken.trim() }
+    if (manual.clientId.trim()) Object.assign(b, { clientId: manual.clientId.trim(), clientSecret: manual.clientSecret.trim() })
+    if (manual.profileId) b.profileId = manual.profileId
+    return b
+  }
+  const appOk = needApp ? !!(manual.clientId.trim() && manual.clientSecret.trim()) : !manual.clientId.trim() === !manual.clientSecret.trim()
+
   return (
-    <Section title="Connect Amazon Ads">
-      {status.pending ? (
+    <div className="space-y-5">
+      {status.connected && (
+        <div className="rounded-xl border border-border-default p-4 space-y-1">
+          <p className="text-sm font-medium text-foreground">
+            {status.profileName} <span className="text-foreground-muted">({status.countryCode})</span>
+          </p>
+          <p className="text-xs text-foreground-muted">
+            Profile {status.profileId} · {status.connectedVia === 'manual' ? 'entered manually' : 'Amazon sign-in'}
+            {status.ownApp ? ` · own app ${status.clientId}` : ' · platform app'}
+          </p>
+          {canWrite && (
+            <button type="button" className={`${btnGhost} mt-2 text-red-600`} disabled={busy} onClick={disconnect}>
+              <Unplug className="w-4 h-4" /> Disconnect
+            </button>
+          )}
+        </div>
+      )}
+
+      {status.pending && (
         <div className="space-y-2">
           <p className="text-sm">Choose the advertising profile for this store:</p>
           {status.profileError && <p className="text-sm text-red-500">{status.profileError}</p>}
@@ -230,7 +277,8 @@ function ConnectPanel({ status, canWrite, onChanged }: { status: any; canWrite: 
                 key={p.profileId}
                 type="button"
                 className={`${btnGhost} justify-between`}
-                onClick={() => choose({ profileId: p.profileId })}
+                disabled={!canWrite || busy}
+                onClick={() => post({ profileId: p.profileId }, 'Amazon Ads connected. Use Sync now to pull campaigns.')}
               >
                 <span>
                   {p.name}{' '}
@@ -242,52 +290,97 @@ function ConnectPanel({ status, canWrite, onChanged }: { status: any; canWrite: 
               </button>
             ))}
           </div>
-          <a className="text-xs underline" href="/api/admin/integrations/amazon-ads/connect">
-            Sign in with a different Amazon account
-          </a>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {status.oauth?.enabled ? (
-            <a className={btnPrimary} href="/api/admin/integrations/amazon-ads/connect">
-              Connect with Amazon
-            </a>
-          ) : (
-            <p className="text-xs text-foreground-muted">
-              Sign-in with Amazon needs {status.oauth?.missing?.join(', ')}; you can still enter a refresh token below.
-            </p>
+          {canWrite && (
+            <button type="button" className="text-xs underline" disabled={busy} onClick={disconnect}>
+              Start over
+            </button>
           )}
-          <div className="grid gap-2 md:grid-cols-3 items-end">
-            <label className="text-xs text-foreground-muted md:col-span-2">
-              Or enter a refresh token (from the Amazon Ads API app)
-              <input
-                className={inputCls}
-                type="password"
-                value={manual.refreshToken}
-                onChange={e => setManual(m => ({ ...m, refreshToken: e.target.value }))}
-              />
-            </label>
-            <label className="text-xs text-foreground-muted">
-              Profile id
-              <input
-                className={inputCls}
-                value={manual.profileId}
-                onChange={e => setManual(m => ({ ...m, profileId: e.target.value.trim() }))}
-              />
-            </label>
-          </div>
-          <button
-            type="button"
-            className={btnPrimary}
-            disabled={!manual.refreshToken || !manual.profileId}
-            onClick={() => choose(manual)}
-          >
-            Connect
-          </button>
         </div>
       )}
-      {msg && <p className="text-sm text-red-500 mt-2">{msg}</p>}
-    </Section>
+
+      {canWrite && !status.pending && (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <a
+              className={`${btnPrimary} ${envReady ? '' : 'pointer-events-none opacity-50'}`}
+              href={envReady ? CONNECT_URL : undefined}
+              aria-disabled={!envReady}
+            >
+              {status.connected ? 'Sign in with a different Amazon account' : 'Connect with Amazon'}
+            </a>
+            {!envReady && (
+              <p className="text-xs text-foreground-muted">
+                Sign-in needs {(status.oauth?.missing ?? []).join(', ')} on the platform, with redirect URI{' '}
+                <code className="break-all">{status.oauth?.redirectUri}</code>. Or enter your own app below.
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-foreground-secondary">
+              Or enter by hand{needApp ? ' (your own Amazon Ads API app)' : ''}
+            </p>
+            <div className="grid gap-2 md:grid-cols-2">
+              <label className="text-xs text-foreground-muted">
+                App Client ID{needApp ? '' : ' (optional, your own app)'}
+                <input
+                  className={inputCls}
+                  placeholder="amzn1.application-oa2-client..."
+                  value={manual.clientId}
+                  onChange={e => setManual(m => ({ ...m, clientId: e.target.value }))}
+                />
+              </label>
+              <label className="text-xs text-foreground-muted">
+                App Client Secret{needApp ? '' : ' (optional)'}
+                <input
+                  className={inputCls}
+                  type="password"
+                  autoComplete="off"
+                  value={manual.clientSecret}
+                  onChange={e => setManual(m => ({ ...m, clientSecret: e.target.value }))}
+                />
+              </label>
+              <label className="text-xs text-foreground-muted">
+                Refresh token (issued to that app)
+                <input
+                  className={inputCls}
+                  type="password"
+                  autoComplete="off"
+                  value={manual.refreshToken}
+                  onChange={e => setManual(m => ({ ...m, refreshToken: e.target.value }))}
+                />
+              </label>
+              <label className="text-xs text-foreground-muted">
+                Profile id (optional, or load the profiles)
+                <input
+                  className={inputCls}
+                  value={manual.profileId}
+                  onChange={e => setManual(m => ({ ...m, profileId: e.target.value.trim() }))}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className={btnPrimary}
+              disabled={busy || !manual.refreshToken.trim() || !appOk}
+              onClick={() =>
+                post(
+                  manualBody(),
+                  manual.profileId ? 'Amazon Ads connected. Use Sync now to pull campaigns.' : undefined
+                )
+              }
+            >
+              {manual.profileId ? 'Connect' : 'Load profiles'}
+            </button>
+          </div>
+        </div>
+      )}
+      {!canWrite && !status.connected && (
+        <p className="text-sm text-foreground-muted">
+          Amazon Ads is not connected yet. An admin with Amazon Ads write access can connect it.
+        </p>
+      )}
+      {msg && <p className="text-sm text-red-500">{msg}</p>}
+    </div>
   )
 }
 

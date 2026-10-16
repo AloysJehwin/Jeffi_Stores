@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertCircle, ArrowLeftRight, CheckCircle2, PlugZap, RefreshCw, Unplug } from 'lucide-react'
+import { btnGhost } from '@/components/admin/channels/ui'
 import IconButton from '@/components/ui/IconButton'
+import ConnectionsGear, { NotConnectedState, type ConnectionState } from '@/components/admin/ConnectionsGear'
 import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -90,6 +92,7 @@ export default function GoogleAdsClient({
   const [busy, setBusy] = useState<'sync' | 'test' | 'disconnect' | null>(null)
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
+  const [gearOpen, setGearOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const reload = useCallback(() => setReloadKey(k => k + 1), [])
 
@@ -101,8 +104,9 @@ export default function GoogleAdsClient({
       const err = searchParams.get('error') || 'exchange_failed'
       setBanner({ ok: false, text: ERRORS[err] || decodeURIComponent(err) })
     } else if (searchParams.get('pick')) {
-      setBanner({ ok: true, text: 'Signed in with Google. Now choose the account below.' })
+      setBanner({ ok: true, text: 'Signed in with Google. Now choose the account in the gear (top right).' })
     }
+    if (connected === '0' || searchParams.get('pick')) setGearOpen(true)
     const url = new URL(window.location.href)
     ;['connected', 'provider', 'error', 'pick'].forEach(k => url.searchParams.delete(k))
     window.history.replaceState(null, '', url.toString())
@@ -176,6 +180,22 @@ export default function GoogleAdsClient({
   const envReady = status.env.developerToken
   const canWrite = useCanWrite('google_ads')
 
+  const state: ConnectionState = connected ? 'connected' : status.pendingAccount ? 'pending' : 'none'
+  const bannerEl = banner && (
+    <div
+      className={`rounded-lg border px-4 py-3 text-sm flex items-start gap-2 ${
+        banner.ok ? 'border-green-500/40 bg-green-500/5' : 'border-red-500/40 bg-red-500/5'
+      }`}
+    >
+      {banner.ok ? (
+        <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-600 shrink-0" />
+      ) : (
+        <AlertCircle className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />
+      )}
+      <span>{banner.text}</span>
+    </div>
+  )
+
   return (
     <div className="p-4 sm:p-6 space-y-5">
       <div className="flex items-start justify-between flex-wrap gap-3">
@@ -189,71 +209,85 @@ export default function GoogleAdsClient({
               : 'Reporting and campaigns for your Google Ads account'}
           </p>
         </div>
-        {connected && (
-          <div className="flex items-center gap-1">
-            <NewCampaignButton onCreated={reload} />
-            {canWrite && (
-              <IconButton icon={RefreshCw} label="Sync now (last 30 days)" busy={busy === 'sync'} onClick={() => action('sync')} />
+        <div className="flex items-center gap-1">
+          {connected && <NewCampaignButton onCreated={reload} />}
+          {connected && canWrite && (
+            <IconButton icon={RefreshCw} label="Sync now (last 30 days)" busy={busy === 'sync'} onClick={() => action('sync')} />
+          )}
+          <ConnectionsGear
+            title="Google Ads connection"
+            scope="google_ads"
+            state={state}
+            open={gearOpen}
+            onOpenChange={setGearOpen}
+          >
+            {bannerEl}
+            {!envReady && <NotConfigured status={status} />}
+            {connected && (
+              <div className="rounded-xl border border-border-default p-4 space-y-2">
+                <p className="text-sm font-medium text-foreground">
+                  {status.accountName || 'Account'} <span className="text-foreground-muted">{formatCid(status.customerId)}</span>
+                </p>
+                <p className="text-xs text-foreground-muted">
+                  {status.loginCustomerId ? `Via manager ${formatCid(status.loginCustomerId)} · ` : ''}
+                  {VIA_LABEL[status.connectedVia ?? 'oauth']}
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <button type="button" className={btnGhost} disabled={busy === 'test'} onClick={() => action('test')}>
+                    <PlugZap className="w-4 h-4" /> Test connection
+                  </button>
+                  {canWrite && (
+                    <button type="button" className={btnGhost} onClick={() => setShowConnect(s => !s)}>
+                      <ArrowLeftRight className="w-4 h-4" /> Change account
+                    </button>
+                  )}
+                  {canWrite && status.connectedVia !== 'platform' && (
+                    <button
+                      type="button"
+                      className={`${btnGhost} text-red-600`}
+                      disabled={busy === 'disconnect'}
+                      onClick={() => setConfirmDisconnect(true)}
+                    >
+                      <Unplug className="w-4 h-4" /> Disconnect
+                    </button>
+                  )}
+                </div>
+                {confirmDisconnect && (
+                  <div className="rounded-lg border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm flex flex-wrap items-center gap-3">
+                    <span>Disconnect Google Ads? Syncing stops; reports already synced stay.</span>
+                    <button type="button" onClick={() => action('disconnect')} className="rounded-md bg-red-600 px-3 py-1.5 text-white text-xs">
+                      Disconnect
+                    </button>
+                    <button type="button" onClick={() => setConfirmDisconnect(false)} className="text-xs text-foreground-muted">
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
-            <IconButton icon={PlugZap} label="Test connection" busy={busy === 'test'} onClick={() => action('test')} />
-            {canWrite && <IconButton icon={ArrowLeftRight} label="Change account" onClick={() => setShowConnect(s => !s)} />}
-            {canWrite && status.connectedVia !== 'platform' && (
-              <IconButton
-                icon={Unplug}
-                label="Disconnect"
-                variant="danger"
-                busy={busy === 'disconnect'}
-                onClick={() => setConfirmDisconnect(true)}
+            {canWrite && (!connected || showConnect || status.pendingAccount) && (
+              <ConnectPanel
+                status={status}
+                onChanged={s => {
+                  if (s) setStatus(s)
+                  else refreshStatus()
+                  setShowConnect(false)
+                  setBanner({ ok: true, text: 'Google Ads connected. Run Sync now to pull the last 30 days.' })
+                }}
               />
             )}
-          </div>
-        )}
+            {!canWrite && !connected && (
+              <p className="text-sm text-foreground-muted">
+                Google Ads is not connected yet. An admin with Google Ads write access can connect it.
+              </p>
+            )}
+          </ConnectionsGear>
+        </div>
       </div>
 
-      {banner && (
-        <div
-          className={`rounded-lg border px-4 py-3 text-sm flex items-start gap-2 ${
-            banner.ok ? 'border-green-500/40 bg-green-500/5' : 'border-red-500/40 bg-red-500/5'
-          }`}
-        >
-          {banner.ok ? (
-            <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-600 shrink-0" />
-          ) : (
-            <AlertCircle className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />
-          )}
-          <span>{banner.text}</span>
-        </div>
-      )}
+      {bannerEl}
 
-      {confirmDisconnect && (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm flex flex-wrap items-center gap-3">
-          <span>Disconnect Google Ads? Syncing stops; reports already synced stay.</span>
-          <button type="button" onClick={() => action('disconnect')} className="rounded-md bg-red-600 px-3 py-1.5 text-white text-xs">
-            Disconnect
-          </button>
-          <button type="button" onClick={() => setConfirmDisconnect(false)} className="text-xs text-foreground-muted">
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {!envReady && <NotConfigured status={status} />}
-
-      {envReady && !canWrite && !connected && (
-        <p className="text-sm text-foreground-muted">Google Ads is not connected yet. An admin with Google Ads write access can connect it.</p>
-      )}
-
-      {envReady && canWrite && (!connected || showConnect || status.pendingAccount) && (
-        <ConnectPanel
-          status={status}
-          onChanged={s => {
-            if (s) setStatus(s)
-            else refreshStatus()
-            setShowConnect(false)
-            setBanner({ ok: true, text: 'Google Ads connected. Run Sync now to pull the last 30 days.' })
-          }}
-        />
-      )}
+      {!connected && <NotConnectedState provider="Google Ads" onOpen={() => setGearOpen(true)} />}
 
       {connected && (
         <>

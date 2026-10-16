@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { RefreshCw, Send, Unplug } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
+import ConnectionsGear, { NotConnectedState, type ConnectionState } from '@/components/admin/ConnectionsGear'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
@@ -68,6 +69,7 @@ export default function MetaAdsConsole() {
   const [error, setError] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [gearOpen, setGearOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const reload = useCallback(() => setReloadKey(k => k + 1), [])
   const canWrite = useCanWrite('meta_ads')
@@ -89,7 +91,8 @@ export default function MetaAdsConsole() {
         ok: false,
         text: ERRORS[sp.get('error') ?? ''] || decodeURIComponent(sp.get('error') ?? 'Sign-in failed'),
       })
-    else setBanner({ ok: true, text: 'Signed in with Facebook. Choose the ad account below.' })
+    else setBanner({ ok: true, text: 'Signed in with Facebook. Choose the ad account in the gear (top right).' })
+    if (c === '0' || sp.get('pick')) setGearOpen(true)
     const url = new URL(window.location.href)
     ;['connected', 'error', 'pick'].forEach(k => url.searchParams.delete(k))
     window.history.replaceState(null, '', url.toString())
@@ -131,51 +134,64 @@ export default function MetaAdsConsole() {
     reload()
   }
 
-  if (!status) return <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
-  if (!status.envReady)
-    return (
-      <Banner ok={false}>
-        Meta Ads needs the platform&apos;s Meta app (META_APP_ID and META_APP_SECRET) with ads permissions approved by
-        Meta.
-      </Banner>
-    )
+  const onConnChanged = (msg?: string) => {
+    if (msg) setBanner({ ok: true, text: msg })
+    loadStatus()
+    reload()
+  }
+  const state: ConnectionState = status?.connected ? 'connected' : status?.pending ? 'pending' : 'none'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Meta Ads</h1>
+          <p className="text-sm text-foreground-secondary mt-0.5">
+            Facebook and Instagram ads: spend, purchases, true ROAS from your orders, and the Conversions API
+          </p>
+        </div>
+        <div className="flex items-center gap-1">
+          {status?.connected && canWrite && (
+            <>
+              <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={() => run('sync')} />
+              <IconButton
+                icon={Send}
+                label="Send purchases to Meta now"
+                busy={busy === 'capi'}
+                onClick={() => run('capi')}
+              />
+            </>
+          )}
+          <ConnectionsGear
+            title="Meta Ads connection"
+            scope="meta_ads"
+            state={state}
+            open={gearOpen}
+            onOpenChange={setGearOpen}
+          >
+            {status ? (
+              <ConnectPanel status={status} canWrite={canWrite} onChanged={onConnChanged} />
+            ) : (
+              <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
+            )}
+          </ConnectionsGear>
+        </div>
+      </div>
+
       {banner && <Banner ok={banner.ok}>{banner.text}</Banner>}
-      {!status.connected ? (
-        <ConnectPanel status={status} canWrite={canWrite} onChanged={loadStatus} />
+      {!status ? (
+        <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
+      ) : !status.connected ? (
+        <NotConnectedState provider="Meta Ads" onOpen={() => setGearOpen(true)} />
       ) : (
         <>
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-3 flex-wrap">
-              <RangePresets value={range} onChange={setRange} />
-              <span className="text-xs text-foreground-muted">
-                {status.adAccountName} ({status.adAccountId})
-                {status.tokenExpiresAt ? ` · sign-in valid until ${when(status.tokenExpiresAt)}` : ''}
-              </span>
-            </div>
-            {canWrite && (
-              <div className="flex gap-1">
-                <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={() => run('sync')} />
-                <IconButton
-                  icon={Send}
-                  label="Send purchases to Meta now"
-                  busy={busy === 'capi'}
-                  onClick={() => run('capi')}
-                />
-                <IconButton
-                  icon={Unplug}
-                  label="Disconnect"
-                  variant="danger"
-                  onClick={async () => {
-                    await api('/api/admin/meta-ads/connection', { method: 'DELETE' })
-                    setBanner({ ok: true, text: 'Meta Ads disconnected. Synced data is kept.' })
-                    loadStatus()
-                  }}
-                />
-              </div>
-            )}
+          <div className="flex items-center gap-3 flex-wrap">
+            <RangePresets value={range} onChange={setRange} />
+            <span className="text-xs text-foreground-muted">
+              {status.adAccountName} ({status.adAccountId}) ·{' '}
+              {status.connectedVia === 'manual' ? 'system user token' : 'Facebook sign-in'}
+              {status.tokenExpiresAt ? ` · sign-in valid until ${when(status.tokenExpiresAt)}` : ''}
+            </span>
           </div>
           <Tabs tabs={TABS} value={tab} onChange={setTab} />
           {error ? (
@@ -199,24 +215,58 @@ export default function MetaAdsConsole() {
   )
 }
 
-function ConnectPanel({ status, canWrite, onChanged }: { status: any; canWrite: boolean; onChanged: () => void }) {
+const CONNECT_URL = '/api/admin/integrations/meta-ads/connect'
+
+function ConnectPanel({
+  status,
+  canWrite,
+  onChanged,
+}: {
+  status: any
+  canWrite: boolean
+  onChanged: (msg?: string) => void
+}) {
   const [manual, setManual] = useState({ accessToken: '', adAccountId: '' })
   const [msg, setMsg] = useState<string | null>(null)
-  const post = async (body: Record<string, string>) => {
+  const [busy, setBusy] = useState(false)
+  const oauthOk = !!status.oauth?.enabled
+
+  const post = async (body: Record<string, string>, done?: string) => {
     setMsg(null)
+    setBusy(true)
     const r = await api('/api/admin/meta-ads/connection', { method: 'POST', json: body })
-    if (r.ok) onChanged()
+    setBusy(false)
+    if (r.ok) onChanged(done)
     else setMsg(r.data.error || 'Could not connect')
   }
-  if (!canWrite)
-    return (
-      <p className="text-sm text-foreground-muted">
-        Meta Ads is not connected yet. An admin with Meta Ads write access can connect it.
-      </p>
-    )
+  const disconnect = async () => {
+    setBusy(true)
+    await api('/api/admin/meta-ads/connection', { method: 'DELETE' })
+    setBusy(false)
+    onChanged('Meta Ads disconnected. Synced data is kept.')
+  }
+
   return (
-    <Section title="Connect Meta Ads">
-      {status.pending ? (
+    <div className="space-y-5">
+      {status.connected && (
+        <div className="rounded-xl border border-border-default p-4 space-y-1">
+          <p className="text-sm font-medium text-foreground">
+            {status.adAccountName} <span className="text-foreground-muted">({status.adAccountId})</span>
+          </p>
+          <p className="text-xs text-foreground-muted">
+            {status.connectedVia === 'manual' ? 'System user token, entered by hand' : 'Facebook sign-in'}
+            {status.tokenExpiresAt ? ` · valid until ${when(status.tokenExpiresAt)}` : ''}
+            {` · pixel ${status.pixelId ?? 'not set'}`}
+          </p>
+          {canWrite && (
+            <button type="button" className={`${btnGhost} mt-2 text-red-600`} disabled={busy} onClick={disconnect}>
+              <Unplug className="w-4 h-4" /> Disconnect
+            </button>
+          )}
+        </div>
+      )}
+
+      {status.pending && (
         <div className="space-y-2">
           <p className="text-sm">Choose the ad account for this store:</p>
           {status.accountError && <p className="text-sm text-red-500">{status.accountError}</p>}
@@ -228,7 +278,8 @@ function ConnectPanel({ status, canWrite, onChanged }: { status: any; canWrite: 
               key={a.id}
               type="button"
               className={`${btnGhost} w-full justify-between`}
-              onClick={() => post({ adAccountId: a.id })}
+              disabled={!canWrite || busy}
+              onClick={() => post({ adAccountId: a.id }, 'Meta Ads connected. Use Sync now to pull the last 30 days.')}
             >
               <span>{a.name}</span>
               <span className="text-xs text-foreground-muted">
@@ -236,49 +287,71 @@ function ConnectPanel({ status, canWrite, onChanged }: { status: any; canWrite: 
               </span>
             </button>
           ))}
-          <a className="text-xs underline" href="/api/admin/integrations/meta-ads/connect">
-            Sign in with a different Facebook user
-          </a>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {status.oauth?.enabled && (
-            <a className={btnPrimary} href="/api/admin/integrations/meta-ads/connect">
-              Connect with Facebook
-            </a>
+          {canWrite && (
+            <button type="button" className="text-xs underline" disabled={busy} onClick={disconnect}>
+              Start over
+            </button>
           )}
-          <div className="grid gap-2 md:grid-cols-3 items-end">
-            <label className="text-xs text-foreground-muted md:col-span-2">
-              Or a system user access token (Business Settings, does not expire)
-              <input
-                className={inputCls}
-                type="password"
-                value={manual.accessToken}
-                onChange={e => setManual(m => ({ ...m, accessToken: e.target.value }))}
-              />
-            </label>
-            <label className="text-xs text-foreground-muted">
-              Ad account id
-              <input
-                className={inputCls}
-                placeholder="act_123..."
-                value={manual.adAccountId}
-                onChange={e => setManual(m => ({ ...m, adAccountId: e.target.value.trim() }))}
-              />
-            </label>
-          </div>
-          <button
-            type="button"
-            className={btnPrimary}
-            disabled={!manual.accessToken || !manual.adAccountId}
-            onClick={() => post(manual)}
-          >
-            Connect
-          </button>
         </div>
       )}
-      {msg && <p className="text-sm text-red-500 mt-2">{msg}</p>}
-    </Section>
+
+      {canWrite && !status.pending && (
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <a
+              className={`${btnPrimary} ${oauthOk ? '' : 'pointer-events-none opacity-50'}`}
+              href={oauthOk ? CONNECT_URL : undefined}
+              aria-disabled={!oauthOk}
+            >
+              {status.connected ? 'Sign in with a different Facebook user' : 'Connect with Facebook'}
+            </a>
+            {!oauthOk && (
+              <p className="text-xs text-foreground-muted">
+                Sign-in needs {(status.oauth?.missing ?? []).join(', ')} on the platform, with redirect URI{' '}
+                <code className="break-all">{status.oauth?.redirectUri}</code>. A system user token works without it.
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <div className="grid gap-2 md:grid-cols-3 items-end">
+              <label className="text-xs text-foreground-muted md:col-span-2">
+                Or a system user access token (Business Settings, does not expire)
+                <input
+                  className={inputCls}
+                  type="password"
+                  autoComplete="off"
+                  value={manual.accessToken}
+                  onChange={e => setManual(m => ({ ...m, accessToken: e.target.value }))}
+                />
+              </label>
+              <label className="text-xs text-foreground-muted">
+                Ad account id
+                <input
+                  className={inputCls}
+                  placeholder="act_123..."
+                  value={manual.adAccountId}
+                  onChange={e => setManual(m => ({ ...m, adAccountId: e.target.value.trim() }))}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className={btnPrimary}
+              disabled={busy || !manual.accessToken || !manual.adAccountId}
+              onClick={() => post(manual, 'Meta Ads connected. Use Sync now to pull the last 30 days.')}
+            >
+              Connect
+            </button>
+          </div>
+        </div>
+      )}
+      {!canWrite && !status.connected && (
+        <p className="text-sm text-foreground-muted">
+          Meta Ads is not connected yet. An admin with Meta Ads write access can connect it.
+        </p>
+      )}
+      {msg && <p className="text-sm text-red-500">{msg}</p>}
+    </div>
   )
 }
 
