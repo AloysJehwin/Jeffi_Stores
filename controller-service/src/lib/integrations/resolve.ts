@@ -87,8 +87,14 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
     }
   }
   if (tenant) throw new IntegrationNotConnectedError('google_merchant', tenant.tenantId)
-  // Off-tenant only (Jeffi's own): env service-account + GMC_MERCHANT_ID.
-  const sa = loadGoogleServiceAccount()
+  // Off-tenant only (Jeffi's own): env service-account + GMC_MERCHANT_ID; without a key the flagship
+  // is not connected, like a store, rather than failing on a missing file.
+  let sa: ReturnType<typeof loadGoogleServiceAccount>
+  try {
+    sa = loadGoogleServiceAccount()
+  } catch {
+    throw new IntegrationNotConnectedError('google_merchant', PLATFORM_TENANT_ID)
+  }
   return {
     clientEmail: sa.client_email,
     privateKey: sa.private_key,
