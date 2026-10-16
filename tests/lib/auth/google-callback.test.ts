@@ -36,3 +36,20 @@ describe('Google callback page', () => {
     expect(run(st('n5|/login')).replace).toHaveBeenCalledWith(expect.stringMatching(/^\/login#/))
   })
 })
+
+describe('Google callback safety net', () => {
+  it('retries and offers a Continue link if the tab is still on the page', () => {
+    const replace = vi.fn(), assign = vi.fn(), timers: (() => void)[] = []
+    const link: any = { setAttribute: vi.fn() }, msg: any = { innerHTML: '', textContent: '' }
+    runInNewContext(CALLBACK_SCRIPT, {
+      window: { opener: null }, location: { hash: '#state=' + encodeURIComponent('n|' + encodeURIComponent('http://admin-acme.localhost:3000/login')) + '&access_token=t', replace, assign },
+      document: { getElementById: (id: string) => (id === 'c' ? link : msg) },
+      setTimeout: (f: () => void) => timers.push(f), URL, URLSearchParams, decodeURIComponent,
+    })
+    expect(replace).toHaveBeenCalledTimes(1)
+    timers.forEach(f => f())
+    expect(assign).toHaveBeenCalledWith(replace.mock.calls[0][0])
+    expect(msg.innerHTML).toMatch(/Continue signing in/)
+    expect(link.setAttribute).toHaveBeenCalledWith('href', replace.mock.calls[0][0])
+  })
+})

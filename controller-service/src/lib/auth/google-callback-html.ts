@@ -20,8 +20,21 @@ export const CALLBACK_SCRIPT = `
     }
   } catch (e) {}
   var go = function () {
-    if (back) { location.replace(back + '#' + hash); return; }
-    document.getElementById('m').textContent = 'This sign-in link is incomplete. Close this tab and sign in again.';
+    if (!back) {
+      document.getElementById('m').textContent = 'This sign-in link is incomplete. Close this tab and sign in again.';
+      return;
+    }
+    var target = back + '#' + hash;
+    location.replace(target);
+    // Safety net: some browsers drop a script navigation on a page reached by a cross-site redirect.
+    // Still here after a moment: try again, then offer a link so the tab never sits on this page.
+    setTimeout(function () {
+      try { location.assign(target); } catch (e) {}
+      var m = document.getElementById('m');
+      if (m) m.innerHTML = 'Still here? <a id="c" href="#">Continue signing in</a>';
+      var c = document.getElementById('c');
+      if (c) c.setAttribute('href', target);
+    }, 1500);
   };
   if (state.slice(0, 2) === 'p.' && window.opener && !window.opener.closed) {
     try {
