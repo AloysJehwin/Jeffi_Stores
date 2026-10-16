@@ -28,6 +28,24 @@ export async function post<T>(config: SdkConfig, path: string, body: unknown): P
   }
 }
 
+export async function get<T>(config: SdkConfig, path: string): Promise<T> {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), config.requestTimeoutMs)
+  try {
+    const res = await fetch(`${config.gatewayUrl}${path}`, { signal: ctrl.signal })
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '')
+      throw new AiClientError(`AI gateway HTTP ${res.status}: ${detail}`, 'gateway')
+    }
+    return (await res.json()) as T
+  } catch (err) {
+    if (err instanceof AiClientError) throw err
+    throw new AiClientError(err instanceof Error ? err.message : 'AI gateway request failed', 'gateway', err)
+  } finally {
+    clearTimeout(t)
+  }
+}
+
 export async function getHealth(config: SdkConfig): Promise<boolean> {
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), config.healthTimeoutMs)

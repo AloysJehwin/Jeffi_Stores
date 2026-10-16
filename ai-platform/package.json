@@ -10,7 +10,7 @@
   "scripts": {
     "build": "npm run build --workspace sdk && npm run build --workspace gateway",
     "typecheck": "tsc -p sdk/tsconfig.json --noEmit && tsc -p gateway/tsconfig.json --noEmit",
-    "test": "node --test gateway/dist/**/*.test.js"
+    "test": "vitest run --config vitest.config.mts"
   },
   "engines": {
     "node": ">=20"

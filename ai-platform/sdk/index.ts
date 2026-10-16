@@ -1,9 +1,11 @@
 import { loadConfig, type SdkConfig } from './config'
-import { post, getHealth } from './transport'
+import { post, get, getHealth } from './transport'
 import type {
   AiChatRequest, AiChatResponse,
   EmbedRequest, EmbedResponse,
   VisionRequest, VisionResponse,
+  ImageGenerateRequest, ImageGenerateResponse,
+  VideoGenerateRequest, VideoStartResponse, VideoJobResponse,
 } from './types'
 
 export * from './types'
@@ -36,6 +38,28 @@ export async function embed(req: EmbedRequest): Promise<EmbedResponse> {
 /** Vision / OCR over one or more base64 images. */
 export async function vision(req: VisionRequest): Promise<VisionResponse> {
   return post<VisionResponse>(cfg(), '/v1/vision', req)
+}
+
+/** Text-to-image / image-edit. Returns short-lived gateway URLs the app persists itself. */
+export async function generateImage(req: ImageGenerateRequest): Promise<ImageGenerateResponse> {
+  const r = await post<ImageGenerateResponse>(cfg(), '/v1/images/generate', req)
+  return { ...r, images: r.images.map(i => ({ ...i, url: absolute(i.url) })) }
+}
+
+/** Start a text-to-video (or image-to-video) job; poll with videoJob(jobId). */
+export async function generateVideo(req: VideoGenerateRequest): Promise<VideoStartResponse> {
+  return post<VideoStartResponse>(cfg(), '/v1/video/generate', req)
+}
+
+/** State of a video job started with generateVideo(). */
+export async function videoJob(jobId: string): Promise<VideoJobResponse> {
+  const r = await get<VideoJobResponse>(cfg(), `/v1/jobs/${encodeURIComponent(jobId)}`)
+  return r.result ? { ...r, result: { ...r.result, videoUrl: absolute(r.result.videoUrl) } } : r
+}
+
+// The gateway returns /v1/files/<id> unless AI_PUBLIC_URL is set; resolve against the gateway URL.
+function absolute(url: string): string {
+  return url.startsWith('/') ? `${cfg().gatewayUrl}${url}` : url
 }
 
 /** Is the gateway reachable? (does not guarantee a model is loaded) */

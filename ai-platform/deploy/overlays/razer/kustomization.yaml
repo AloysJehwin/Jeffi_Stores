@@ -55,6 +55,15 @@ patches:
       - op: replace
         path: /data/OLLAMA_BASE_URLS
         value: "http://10.42.0.1:11434,http://100.82.208.8:11434"
+      # Stable Diffusion WebUI (A1111 API, --api) on the host, same addressing rule as Ollama.
+      # Empty until the WebUI service is installed; razer is then skipped for images.
+      - op: replace
+        path: /data/SD_WEBUI_URL
+        value: ""
+      # Tailnet address of the gateway LB, so returned /v1/files URLs are fetchable by the app.
+      - op: replace
+        path: /data/AI_PUBLIC_URL
+        value: "http://100.82.208.8:8080"
   - patch: |
       apiVersion: v1
       kind: PersistentVolumeClaim

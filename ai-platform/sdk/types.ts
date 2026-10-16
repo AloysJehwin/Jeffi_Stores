@@ -39,6 +39,12 @@ export interface AiToolCall {
   arguments: Record<string, unknown>
 }
 
+export interface TokenUsage {
+  promptTokens: number
+  completionTokens: number
+  costInr: number
+}
+
 export interface AiChatResponse {
   content: string
   toolCalls?: AiToolCall[]
@@ -48,6 +54,7 @@ export interface AiChatResponse {
   fallbackUsed: boolean
   /** Which cache tier served this, when any. */
   cache?: 'kv' | 'semantic' | null
+  usage?: TokenUsage
 }
 
 export interface EmbedRequest {
@@ -58,6 +65,97 @@ export interface EmbedRequest {
 export interface EmbedResponse {
   embeddings: number[][]
   model: string
+  usage?: TokenUsage
+}
+
+// ── Image generation ────────────────────────────────────────────────────────
+export type ImageProviderName = 'razer' | 'google' | 'replicate'
+export type ImageQuality = 'draft' | 'standard' | 'premium'
+
+export interface ImageGenerateRequest {
+  prompt: string
+  negativePrompt?: string
+  /** Default 1024, clamped 256..1536, snapped to a multiple of 64. */
+  width?: number
+  height?: number
+  /** 1..4, default 1. */
+  n?: number
+  quality?: ImageQuality
+  provider?: ImageProviderName
+  /** Image-to-image / edit when the provider supports it. */
+  referenceImageUrl?: string
+  seed?: number
+  /** Cache partition (tenant id); hits only ever come from the same namespace. */
+  namespace?: string
+}
+
+export interface GeneratedImageRef {
+  /** Short-lived gateway URL (/v1/files/<id>); the app persists to its own storage. */
+  url: string
+  width: number
+  height: number
+  mime: string
+}
+
+export interface ImageUsage {
+  units: number
+  unitType: 'image'
+  costInr: number
+}
+
+export interface ImageGenerateResponse {
+  images: GeneratedImageRef[]
+  provider: ImageProviderName
+  model: string
+  usage: ImageUsage
+  latencyMs: number
+  cache?: 'kv' | null
+}
+
+// ── Video generation (async) ────────────────────────────────────────────────
+export type VideoProviderName = 'google' | 'replicate'
+export type VideoAspect = '9:16' | '16:9' | '1:1'
+
+export interface VideoGenerateRequest {
+  prompt: string
+  imageUrl?: string
+  /** 2..8, default 5. */
+  durationSec?: number
+  aspect?: VideoAspect
+  provider?: VideoProviderName
+  namespace?: string
+}
+
+export interface VideoStartResponse {
+  jobId: string
+  provider: VideoProviderName
+  model: string
+  estimatedCostInr: number
+}
+
+export type VideoJobStatus = 'queued' | 'running' | 'done' | 'failed'
+
+export interface VideoJobResult {
+  videoUrl: string
+  durationSec: number
+  width: number
+  height: number
+  mime: string
+}
+
+export interface VideoUsage {
+  units: number
+  unitType: 'video_second'
+  costInr: number
+}
+
+export interface VideoJobResponse {
+  status: VideoJobStatus
+  result?: VideoJobResult
+  usage?: VideoUsage
+  provider?: VideoProviderName
+  model?: string
+  error?: string
 }
 
 export interface VisionRequest {
