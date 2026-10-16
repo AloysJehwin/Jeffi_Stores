@@ -536,14 +536,14 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'inventory:read',
     label: 'Inventory (Read)',
     description: 'View stock levels, purchase orders, suppliers and movements',
-    routes: ['/admin/inventory', '/admin/suppliers'],
+    routes: ['/admin/inventory', '/admin/suppliers', '/admin/purchase-orders'],
     group: 'Finance',
   },
   {
     key: 'inventory:write',
     label: 'Inventory (Write)',
     description: 'Manage stock, raise purchase orders and update supplier records',
-    routes: ['/admin/inventory', '/admin/suppliers'],
+    routes: ['/admin/inventory', '/admin/suppliers', '/admin/purchase-orders'],
     group: 'Finance',
   },
   // Shelving — previously piggybacked on inventory:read. Dedicated key for tiering.
@@ -809,6 +809,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/crm')) return 'crm:read'
   if (pathname.startsWith('/api/admin/tasks')) return 'tasks:read'
   if (pathname.startsWith('/api/admin/suppliers')) return 'inventory:read'
+  if (pathname.startsWith('/api/admin/purchase-orders')) return 'inventory:read'
   if (pathname.startsWith('/api/admin/shelving')) return 'shelving:read'
   if (pathname.startsWith('/api/admin/merchant')) return 'merchant_sync:read'
   if (pathname.startsWith('/api/admin/channels')) return null

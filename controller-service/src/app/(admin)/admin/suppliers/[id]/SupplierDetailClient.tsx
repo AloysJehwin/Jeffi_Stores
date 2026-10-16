@@ -58,7 +58,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
         <p className="text-foreground-secondary">Supplier not found.</p>
         {data?.error && <p className="text-red-500 text-xs mt-1 font-mono">{data.error}</p>}
         <Link
-          href={ap('/admin/inventory?tab=suppliers')}
+          href={ap('/admin/suppliers?tab=suppliers')}
           className="text-accent-500 hover:underline text-sm mt-2 inline-block"
         >
           ← Back to Suppliers
@@ -138,7 +138,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
     <div className="p-4 sm:p-6 space-y-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
         <a
-          href={ap('/admin/inventory?tab=suppliers')}
+          href={ap('/admin/suppliers?tab=suppliers')}
           className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -152,7 +152,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-2">
           <Link
-            href={ap('/admin/inventory')}
+            href={ap('/admin/suppliers?tab=suppliers')}
             className="text-foreground-secondary hover:text-foreground transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -167,7 +167,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
           )}
         </div>
         <Link
-          href={ap(`/admin/inventory?tab=suppliers`)}
+          href={ap(`/admin/suppliers?tab=suppliers`)}
           className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
         >
           All Suppliers
@@ -323,7 +323,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                       <tr key={po.id} className="hover:bg-surface-secondary/40 transition-colors">
                         <td className="px-4 py-3">
                           <Link
-                            href={ap(`/admin/inventory?po=${po.po_number}`)}
+                            href={ap(`/admin/purchase-orders?tab=orders&po=${po.po_number}`)}
                             className="font-mono font-medium text-accent-500 hover:underline"
                           >
                             {po.po_number}

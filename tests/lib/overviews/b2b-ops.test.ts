@@ -117,7 +117,7 @@ describe('suppliers', () => {
       2
     )
     expect(a.map(x => x.key)).toEqual(['payables_overdue', 'po_overdue', 'payables_due', 'drafts'])
-    expect(a[1]).toMatchObject({ severity: 'critical', href: '/admin/inventory?tab=po&po=p1' })
+    expect(a[1]).toMatchObject({ severity: 'critical', href: '/admin/purchase-orders?tab=orders&po=p1' })
   })
 })
 

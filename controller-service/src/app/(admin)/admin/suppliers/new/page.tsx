@@ -73,7 +73,7 @@ export default function NewSupplierPage() {
         setSaving(false)
         return
       }
-      router.push(ap('/admin/inventory?tab=suppliers'))
+      router.push(ap('/admin/suppliers?tab=suppliers'))
     } catch {
       setError('Failed to create supplier')
       setSaving(false)
@@ -85,7 +85,7 @@ export default function NewSupplierPage() {
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
         <Link
-          href={ap('/admin/inventory?tab=suppliers')}
+          href={ap('/admin/suppliers?tab=suppliers')}
           className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -256,7 +256,7 @@ export default function NewSupplierPage() {
               {saving ? 'Saving...' : 'Create Supplier'}
             </button>
           </RequireWrite>
-          <Link href={ap('/admin/inventory?tab=suppliers')} className={btnSecondary}>
+          <Link href={ap('/admin/suppliers?tab=suppliers')} className={btnSecondary}>
             Cancel
           </Link>
         </div>

@@ -21,7 +21,7 @@ const QUICK_ACTIONS: { label: string; icon: string; path: string; scope: string;
   { label: 'New Product', path: '/admin/products/add', icon: 'Products', scope: 'products:write', primary: true },
   { label: 'Cash Sale', path: '/admin/cash-sale', icon: 'Cash Sale', scope: 'invoices:write' },
   { label: 'Quotation', path: '/admin/quotations', icon: 'Quotations', scope: 'quotations:read' },
-  { label: 'New PO', path: '/admin/inventory/po/new', icon: 'Inventory', scope: 'inventory:write' },
+  { label: 'New PO', path: '/admin/purchase-orders/new', icon: 'Inventory', scope: 'inventory:write' },
   { label: 'Orders', path: '/admin/orders', icon: 'Orders', scope: 'orders:read' },
   { label: 'Packing Slips', path: '/admin/packing-slips', icon: 'Packing Slips', scope: 'packing_slips:read' },
   { label: 'Returns', path: '/admin/returns', icon: 'Returns', scope: 'orders:read' },

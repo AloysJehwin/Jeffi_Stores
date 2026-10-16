@@ -9,7 +9,7 @@ import {
   OverviewSkeleton,
   type AttentionItem,
 } from '@/components/admin/overview/kit'
-import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct, btnGhost } from '@/components/admin/channels/ui'
+import { Kpi, KpiGrid, Section, Table, Badge, money, count, pct } from '@/components/admin/channels/ui'
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { formatKpi, type OverviewKpi } from '@/lib/overviews/ops-kpi'
 import { ap } from '@/lib/shared/admin-path'
@@ -52,17 +52,6 @@ export default function SuppliersOverview() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <Link href={ap('/admin/inventory?tab=suppliers')} className={btnGhost}>
-          All suppliers
-        </Link>
-        <Link href={ap('/admin/inventory?tab=po')} className={btnGhost}>
-          Purchase orders
-        </Link>
-        <Link href={ap('/admin/financial?tab=payables')} className={btnGhost}>
-          Payables
-        </Link>
-      </div>
       <PeriodBar value={period} onChange={setPeriod} onRefresh={reload} busy={loading} />
       {error && <p className="text-sm text-red-500">{error}</p>}
       {loading || !data ? (
@@ -151,7 +140,7 @@ export default function SuppliersOverview() {
                   {data.overdue_pos.map(p => (
                     <li key={p.id}>
                       <Link
-                        href={ap(`/admin/inventory?tab=po&po=${p.id}`)}
+                        href={ap(`/admin/purchase-orders?tab=orders&po=${p.id}`)}
                         className="flex items-start justify-between gap-2 py-2 text-sm hover:text-accent-500"
                       >
                         <span className="min-w-0">

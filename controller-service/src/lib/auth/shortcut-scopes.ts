@@ -13,7 +13,7 @@ export const BUILTIN_SHORTCUT_SCOPES: Record<
   newProduct: { path: '/admin/products/add', scope: 'products:write' },
   cashSale: { path: '/admin/cash-sale', scope: 'invoices:read' },
   quotation: { path: '/admin/quotations', scope: 'quotations:read' },
-  newPo: { path: '/admin/inventory/po/new', scope: 'inventory:write' },
+  newPo: { path: '/admin/purchase-orders/new', scope: 'inventory:write' },
   orders: { path: '/admin/orders', scope: 'orders:read' },
   packingSlips: { path: '/admin/packing-slips', scope: 'packing_slips:read' },
   returns: { path: '/admin/returns', scope: 'returns:read' },
