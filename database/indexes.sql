@@ -2303,3 +2303,8 @@ CREATE INDEX IF NOT EXISTS idx_aads_keywords_ad_group ON public.aads_keywords (a
 CREATE INDEX IF NOT EXISTS idx_mads_daily_metrics_campaign ON public.mads_daily_metrics (campaign_id, date);
 
 CREATE INDEX IF NOT EXISTS idx_mads_capi_events_status ON public.mads_capi_events (status, created_at DESC);
+
+CREATE INDEX idx_cart_items_created_at ON public.cart_items USING btree (created_at);
+CREATE INDEX idx_pending_payment_intents_created_at ON public.pending_payment_intents USING btree (created_at);
+CREATE INDEX idx_product_views_user_created ON public.product_views USING btree (user_id, created_at);
+CREATE INDEX idx_wishlist_items_product_id ON public.wishlist_items USING btree (product_id);
