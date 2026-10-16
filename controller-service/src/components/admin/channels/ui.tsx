@@ -247,7 +247,7 @@ export function TabAction({
   disabled?: boolean
 }) {
   const cls =
-    'inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-2 sm:px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-600 disabled:opacity-50 whitespace-nowrap'
+    'inline-flex h-control items-center gap-1.5 rounded-lg bg-accent-500 px-2 sm:px-3 text-sm font-medium text-white hover:bg-accent-600 disabled:opacity-50 whitespace-nowrap'
   const inner = (
     <>
       {icon}
@@ -332,11 +332,11 @@ export function Table<T>({ rows, cols, rowKey, empty, pageSize = PAGE }: { rows:
       </div>
       {pages > 1 && (
         <div className="flex items-center justify-end gap-2 pt-3 text-xs text-foreground-muted">
-          <button type="button" disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-2 py-1 border border-border-default rounded disabled:opacity-40">
+          <button type="button" disabled={page === 1} onClick={() => setPage(p => p - 1)} className="control-sm border border-border-default disabled:opacity-40">
             Prev
           </button>
           {page} / {pages}
-          <button type="button" disabled={page >= pages} onClick={() => setPage(p => p + 1)} className="px-2 py-1 border border-border-default rounded disabled:opacity-40">
+          <button type="button" disabled={page >= pages} onClick={() => setPage(p => p + 1)} className="control-sm border border-border-default disabled:opacity-40">
             Next
           </button>
         </div>
@@ -371,7 +371,7 @@ export function lastDays(n: number, endOffset = 0): { from: string; to: string }
 
 export function RangePresets({ value, onChange, presets = [7, 14, 30, 90], endOffset = 0 }: { value: { from: string; to: string }; onChange: (r: { from: string; to: string }) => void; presets?: number[]; endOffset?: number }) {
   return (
-    <div className="flex gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg w-fit">
+    <div className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg w-fit">
       {presets.map(n => {
         const r = lastDays(n, endOffset)
         const active = r.from === value.from && r.to === value.to
@@ -380,7 +380,7 @@ export function RangePresets({ value, onChange, presets = [7, 14, 30, 90], endOf
             key={n}
             type="button"
             onClick={() => onChange(r)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md ${active ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+            className={`flex items-center px-3 text-xs font-medium rounded-md ${active ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
           >
             {n}d
           </button>

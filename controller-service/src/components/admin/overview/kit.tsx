@@ -34,13 +34,13 @@ export function PeriodBar({ value, onChange, onRefresh, busy }: { value: Period;
   const prev = previousPeriod(value)
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div className="flex flex-wrap gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg">
+      <div className="flex h-control max-w-full overflow-x-auto gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg">
         {PERIOD_PRESETS.map(p => (
           <button
             key={p.id}
             type="button"
             onClick={() => onChange(parsePeriod(null, null, undefined, p.id))}
-            className={`px-2.5 py-1.5 text-xs font-medium rounded-md ${active === p.id ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+            className={`flex items-center px-2.5 text-xs font-medium rounded-md whitespace-nowrap ${active === p.id ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
           >
             {p.label}
           </button>
@@ -53,7 +53,7 @@ export function PeriodBar({ value, onChange, onRefresh, busy }: { value: Period;
       </div>
       <span className="text-xs text-foreground-muted">vs {prev.from} to {prev.to}</span>
       {onRefresh && (
-        <button type="button" onClick={onRefresh} aria-label="Refresh" className="ml-auto p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-elevated">
+        <button type="button" onClick={onRefresh} aria-label="Refresh" className="ml-auto control-md control-icon text-foreground-muted hover:text-foreground hover:bg-surface-elevated">
           <RefreshCw className={`w-4 h-4 ${busy ? 'animate-spin' : ''}`} />
         </button>
       )}

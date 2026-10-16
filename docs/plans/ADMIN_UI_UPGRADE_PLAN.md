@@ -8,6 +8,7 @@ Reference implementation: `financial/_components/AiCostsTab.tsx`, `financial/_co
 
 - **Application-native UI.** Everything uses our own admin components and tokens (the AI costs tab look), so every page feels like one app. No third-party UI kits, no native browser controls, no one-off styling.
 - **Existing logic must not break.** Waves change markup and layout only: server actions, API calls, scopes, write gates, drafts, URL params and validations stay as they are. Any behaviour change is a separate, explicit task.
+- **One control height: 32px.** Every input, select, search box, date picker, button, icon button and segmented chip bar (period presets, filter chips) is exactly the height of the tab-line action button ("Add New Product"): 32px, via `h-control` / `.field-md` / `.control-md` (the `sm` tier is the same height with tighter padding; `xs` 26px stays only for controls inside table cells). Chips inside a segmented bar fill the bar's 32px. Never set control height with padding (`py-*`).
 - **Mobile.** View, lists and overviews are fully usable on mobile. Create and edit stay desktop only, except orders and common actions (status, confirm, ship, cancel, refund, notes, scan, stock adjust, approvals, replies).
 
 ## 1. Where things stand
