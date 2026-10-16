@@ -8,6 +8,8 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { Tabs } from '@/components/admin/channels/ui'
+import ReviewsOverview from './_components/ReviewsOverview'
 
 interface Review {
   id: string
@@ -53,7 +55,52 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-export default function ReviewsClient({ canWrite: canWriteProp = false }: { canWrite?: boolean }) {
+type View = 'overview' | 'reviews'
+
+export default function ReviewsClient({ canWrite = false }: { canWrite?: boolean }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  // Old links (?filter / ?q without ?view) still open the list.
+  const initial: View =
+    searchParams.get('view') === 'reviews' || (!searchParams.get('view') && (searchParams.has('filter') || searchParams.has('q')))
+      ? 'reviews'
+      : 'overview'
+  const [view, setView] = useState<View>(initial)
+
+  useEffect(() => {
+    const v = searchParams.get('view')
+    if (v === 'reviews' || v === 'overview') setView(v)
+  }, [searchParams])
+
+  function switchView(v: View) {
+    setView(v)
+    const p = new URLSearchParams(window.location.search)
+    p.set('view', v)
+    router.replace(ap(`/admin/reviews?${p.toString()}`), { scroll: false })
+  }
+
+  return (
+    <div className="p-4 sm:p-6 space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Reviews</h1>
+        <p className="text-sm text-foreground-muted mt-0.5">
+          Ratings, review requests and moderation of customer reviews before they appear on product pages
+        </p>
+      </div>
+      <Tabs
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'reviews', label: 'Reviews' },
+        ]}
+        value={view}
+        onChange={switchView}
+      />
+      {view === 'overview' ? <ReviewsOverview /> : <ReviewsList canWrite={canWrite} />}
+    </div>
+  )
+}
+
+function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const hasWriteScope = useCanWrite('reviews:write')
@@ -178,16 +225,9 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
   const pendingCount = reviews.filter(r => !r.is_approved).length
 
   return (
-    <div className="p-4 sm:p-6">
-      {/* Header */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Reviews</h1>
-          <p className="text-sm text-foreground-muted mt-0.5">
-            Moderate customer reviews before they appear on product pages
-          </p>
-        </div>
-        {filter === 'pending' && !isLoading && pendingCount > 0 && (
+    <div>
+      {filter === 'pending' && !isLoading && pendingCount > 0 && (
+        <div className="mb-3 flex justify-end">
           <span className="inline-flex items-center gap-1.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-sm font-semibold px-3 py-1.5 rounded-full">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path
@@ -198,8 +238,8 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
             </svg>
             {pendingCount} awaiting approval
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="bg-surface-elevated rounded-xl border border-border-default mb-5 overflow-hidden">

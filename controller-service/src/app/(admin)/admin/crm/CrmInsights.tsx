@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { AnalyticsRange } from '@/lib/queries'
 import type { CrmInsights as CrmInsightsData, CrmSegment, CrmSegmentKey } from '@/lib/shared/crm-insights-shared'
 import { CRM_SEGMENT_KEYS } from '@/lib/shared/crm-insights-shared'
@@ -35,7 +35,14 @@ const SEGMENT_LABEL: Record<CrmSegmentKey, string> = {
   lead: 'Lead',
 }
 
-export default function CrmInsights({ initial }: { initial: CrmInsightsData }) {
+export default function CrmInsights({
+  initial,
+  syncRange,
+}: {
+  initial: CrmInsightsData
+  /** Follows the overview period when it maps onto a range. */
+  syncRange?: AnalyticsRange | null
+}) {
   const [data, setData] = useState<CrmInsightsData>(initial)
   const [range, setRange] = useState<AnalyticsRange>(initial.range)
   const [segment, setSegment] = useState<CrmSegment>(initial.segment)
@@ -61,6 +68,13 @@ export default function CrmInsights({ initial }: { initial: CrmInsightsData }) {
     },
     [range, segment, loading, refetch]
   )
+
+  useEffect(() => {
+    if (!syncRange || syncRange === range) return
+    setRange(syncRange)
+    refetch(syncRange, segment)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncRange])
 
   const changeSegment = useCallback(
     (seg: CrmSegment) => {

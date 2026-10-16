@@ -7,6 +7,7 @@ import { rsCompact } from '@/components/admin/dashboard/Primitives'
 export type DonutSegment = { label: string; value: number; color: string }
 export type RankedItem = { name: string; value: number; sub?: string }
 export type PoTrendPoint = { month: string; value: number }
+export type MovementPoint = { day: string; in: number; out: number }
 
 function monthLabel(m: string, full = false): string {
   const [y, mm] = m.split('-')
@@ -14,6 +15,19 @@ function monthLabel(m: string, full = false): string {
   if (isNaN(d.getTime())) return m
   return d.toLocaleDateString('en-IN', { month: 'short', year: full ? 'numeric' : undefined })
 }
+
+function dayLabel(d: string, full = false): string {
+  const dt = new Date(`${d}T00:00:00Z`)
+  if (isNaN(dt.getTime())) return d
+  return dt.toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: full ? 'numeric' : undefined,
+    timeZone: 'UTC',
+  })
+}
+
+const unitsFmt = (v: number) => Math.round(v).toLocaleString('en-IN')
 
 function ChartCard({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -34,7 +48,19 @@ const PAD = { top: 10, right: 10, bottom: 20, left: 40 }
 type Line = { key: string; label: string; color: string; points: number[] }
 
 // Hand-rolled single-line SVG trend in the RevenueTrendChart house style (no chart library).
-function TrendLines({ months, lines, ariaLabel }: { months: string[]; lines: Line[]; ariaLabel: string }) {
+function TrendLines({
+  months,
+  lines,
+  ariaLabel,
+  labelOf = monthLabel,
+  fmt = rsCompact,
+}: {
+  months: string[]
+  lines: Line[]
+  ariaLabel: string
+  labelOf?: (k: string, full?: boolean) => string
+  fmt?: (v: number) => string
+}) {
   const uid = useId()
   const [hover, setHover] = useState<number | null>(null)
   const active = lines.filter(l => l.points.some(p => p !== 0))
@@ -76,7 +102,7 @@ function TrendLines({ months, lines, ariaLabel }: { months: string[]; lines: Lin
                   strokeDasharray={i === yTicks.length - 1 ? undefined : '3 3'}
                 />
                 <text x={PAD.left - 4} y={y(t) + 3} textAnchor="end" className="fill-foreground-muted" fontSize={9}>
-                  {rsCompact(t).replace('Rs ', '')}
+                  {fmt(t).replace('Rs ', '')}
                 </text>
               </g>
             ))}
@@ -92,7 +118,7 @@ function TrendLines({ months, lines, ariaLabel }: { months: string[]; lines: Lin
                     className="fill-foreground-muted"
                     fontSize={9}
                   >
-                    {monthLabel(m)}
+                    {labelOf(m)}
                   </text>
                 )
             )}
@@ -143,12 +169,12 @@ function TrendLines({ months, lines, ariaLabel }: { months: string[]; lines: Lin
               className="absolute z-10 text-[11px] rounded-lg px-2.5 py-2 shadow-lg pointer-events-none bg-surface-elevated ring-1 ring-border-default"
               style={{ left: `${(x(hover) / VIEW_W) * 100}%`, top: 0, transform: 'translateX(-50%)' }}
             >
-              <div className="font-semibold mb-1 text-foreground whitespace-nowrap">{monthLabel(months[hover], true)}</div>
+              <div className="font-semibold mb-1 text-foreground whitespace-nowrap">{labelOf(months[hover], true)}</div>
               {active.map(l => (
                 <div key={l.key} className="flex items-center gap-1.5 whitespace-nowrap">
                   <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ background: l.color }} />
                   <span className="text-foreground-muted">{l.label}</span>
-                  <span className="ml-auto font-semibold tabular-nums text-foreground">{rsCompact(l.points[hover])}</span>
+                  <span className="ml-auto font-semibold tabular-nums text-foreground">{fmt(l.points[hover])}</span>
                 </div>
               ))}
             </div>
@@ -172,7 +198,7 @@ const PO_VALUE = 'rgb(59 130 246)'
 
 export function StockValueDonutCard({ segments, total }: { segments: DonutSegment[]; total: string }) {
   return (
-    <ChartCard title="Stock value by category" hint="Cost-basis share">
+    <ChartCard title="Stock value by category" hint="At cost">
       <DonutSplit segments={segments} centerValue={total} centerLabel="Total stock value" />
     </ChartCard>
   )
@@ -180,7 +206,7 @@ export function StockValueDonutCard({ segments, total }: { segments: DonutSegmen
 
 export function TopStockValueCard({ items }: { items: RankedItem[] }) {
   return (
-    <ChartCard title="Top products by stock value" hint="Cost basis, highest first">
+    <ChartCard title="Top SKUs by stock value" hint="At cost, highest first">
       <RankedBars items={items} barClass="bg-accent-500" />
     </ChartCard>
   )
@@ -200,6 +226,24 @@ export function PoValueTrendCard({ data }: { data: PoTrendPoint[] }) {
   return (
     <ChartCard title="Purchase order value trend" hint="By order month">
       <TrendLines months={months} lines={lines} ariaLabel="Purchase order value by month." />
+    </ChartCard>
+  )
+}
+
+export function MovementTrendCard({ data, hint }: { data: MovementPoint[]; hint?: string }) {
+  const lines: Line[] = [
+    { key: 'in', label: 'Units in', color: 'rgb(16 185 129)', points: data.map(d => d.in) },
+    { key: 'out', label: 'Units out', color: 'rgb(239 68 68)', points: data.map(d => d.out) },
+  ]
+  return (
+    <ChartCard title="Stock movements" hint={hint}>
+      <TrendLines
+        months={data.map(d => d.day)}
+        lines={lines}
+        ariaLabel="Units received and issued per day."
+        labelOf={dayLabel}
+        fmt={unitsFmt}
+      />
     </ChartCard>
   )
 }

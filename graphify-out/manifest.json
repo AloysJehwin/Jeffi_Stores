@@ -6235,8 +6235,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/crm/CrmInsights.tsx": {
-    "mtime": 1791908161.8014894,
-    "ast_hash": "5bea60fa332e4e33307363ff53137b03",
+    "mtime": 1792149066.7682018,
+    "ast_hash": "97653223c32a8b96144591b6605e0c98",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/crm/CrmMailerPanel.tsx": {
@@ -6320,8 +6320,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/crm/page.tsx": {
-    "mtime": 1791908161.8374257,
-    "ast_hash": "23ca65831f00067168407014ea220720",
+    "mtime": 1792149087.4903502,
+    "ast_hash": "ac11c577ae582c660697ef5aef13b188",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/customer-programs/_components/BirthdayProgram.tsx": {
@@ -6645,13 +6645,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/financial/_components/OverviewCharts.tsx": {
-    "mtime": 1790931248.337826,
-    "ast_hash": "d722c2e46e0ee8e6664b21feb00a5b69",
+    "mtime": 1792149087.158631,
+    "ast_hash": "87658291eaf50ebf72b74f06de6ccc3a",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/financial/_components/OverviewTab.tsx": {
-    "mtime": 1790931248.3402057,
-    "ast_hash": "f8e927b31f381955a61bffdec4dacb1b",
+    "mtime": 1792149228.4743376,
+    "ast_hash": "4865f0baee4c6476a68b692a27bf03d3",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/financial/_components/PLTab.tsx": {
@@ -6760,13 +6760,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/inventory/_components/InventoryOverviewCharts.tsx": {
-    "mtime": 1790931248.414038,
-    "ast_hash": "b11279534aaac91e7eb2ee69bcd79409",
+    "mtime": 1792149201.127755,
+    "ast_hash": "9077d22efbabbd0c2c73a1f5780947f9",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/inventory/_components/InventoryOverviewTab.tsx": {
-    "mtime": 1790931248.418142,
-    "ast_hash": "bdaf4e66d500b21b07dd674777b77b39",
+    "mtime": 1792149201.0924594,
+    "ast_hash": "bdaff8adc25ca964cf91a217795d2b18",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/inventory/_components/PurchaseOrdersMobileList.tsx": {
@@ -7415,8 +7415,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/reviews/ReviewsClient.tsx": {
-    "mtime": 1791399412.4857342,
-    "ast_hash": "a800e2fcbc2c1d2b2b98ca1e281ff15f",
+    "mtime": 1792149043.5454063,
+    "ast_hash": "2462afbb17136e68641c33dd7d2d9231",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/reviews/loading.tsx": {
@@ -17500,8 +17500,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/merchant/_components/MerchantConsole.tsx": {
-    "mtime": 1792141504.7427933,
-    "ast_hash": "be42d44f73b57944912cd66e27a8f1ef",
+    "mtime": 1792147815.715749,
+    "ast_hash": "b7ac01c1d266869bc0c4829a87a25a0f",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/merchant/_components/ReportTabs.tsx": {
@@ -17595,8 +17595,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/amazon/_components/AmazonConsole.tsx": {
-    "mtime": 1792143117.4621236,
-    "ast_hash": "14426b96312f52e5018cc0b9e3b71d5d",
+    "mtime": 1792147815.7135143,
+    "ast_hash": "3f7dce2a8b4ee05a19cf93da161308ca",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/amazon/_components/AmazonTabs.tsx": {
@@ -17730,8 +17730,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/amazon-ads/_components/AmazonAdsConsole.tsx": {
-    "mtime": 1792143641.0511184,
-    "ast_hash": "43b125b7269bfbb353249538a198f178",
+    "mtime": 1792147815.714147,
+    "ast_hash": "7ee30ad959e8212ac6f99b5d400648c6",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/amazon-ads/page.tsx": {
@@ -17805,8 +17805,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/meta-ads/_components/MetaAdsConsole.tsx": {
-    "mtime": 1792144168.435317,
-    "ast_hash": "a974b7fe24c2f11d53b907aa854e7631",
+    "mtime": 1792147815.7150445,
+    "ast_hash": "0a373f6da75955ad969e1249bc7d5e63",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/meta-ads/page.tsx": {
@@ -18115,8 +18115,123 @@
     "semantic_hash": ""
   },
   "tests/lib/social/providers.test.ts": {
-    "mtime": 1792144600.372914,
-    "ast_hash": "d02c1c1c099311c6cb0897641c052f57",
+    "mtime": 1792147513.7360234,
+    "ast_hash": "977bf5025a36ed7b23d56cf129841196",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/crm/CrmOverview.tsx": {
+    "mtime": 1792149097.6000328,
+    "ast_hash": "f652557d88da3615e03aff5e8f41284c",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/crm/_lib/overview.ts": {
+    "mtime": 1792148953.2034144,
+    "ast_hash": "4383f97b8c5d41699cc9ca791f761200",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/crm/_lib/period.ts": {
+    "mtime": 1792148929.088857,
+    "ast_hash": "fa26bd5b951aa552ac5da91791289959",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/financial/_components/overview-period.ts": {
+    "mtime": 1792148948.65809,
+    "ast_hash": "e7259a247a7c4d19b237aebd59dfef9f",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/inventory/_components/inventoryOverviewPeriod.ts": {
+    "mtime": 1792149201.1381478,
+    "ast_hash": "5b5454ae87fde043107dd753f9c9da83",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/reviews/_components/ReviewsOverview.tsx": {
+    "mtime": 1792149043.5448565,
+    "ast_hash": "b625ae821bbe4431b5339ae1001c65da",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/crm/overview/route.ts": {
+    "mtime": 1792149007.3255184,
+    "ast_hash": "52c2a32f432fe0b790d75d9154f45c8e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/crm/overview/summary.ts": {
+    "mtime": 1792148982.4594996,
+    "ast_hash": "b152ac90132b901f7782ce70cbf8933e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/financial/overview/route.ts": {
+    "mtime": 1792149043.3138404,
+    "ast_hash": "c472687d69d68d26b685d346bf8e3394",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/financial/overview/summary.ts": {
+    "mtime": 1792149069.03278,
+    "ast_hash": "5be178e062a19b7f552015e50deeb95b",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/inventory/overview/compute.ts": {
+    "mtime": 1792148985.8375664,
+    "ast_hash": "5256cf4bd6e6cbe200679b20cabff649",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/inventory/overview/route.ts": {
+    "mtime": 1792149201.163385,
+    "ast_hash": "6d66afa28ebf10daa8363390ff59012b",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/reviews/overview/route.ts": {
+    "mtime": 1792148933.719037,
+    "ast_hash": "0bb9e0a5e2a3484cbe75d7e703347b3e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/reviews/overview-period.ts": {
+    "mtime": 1792148973.1153777,
+    "ast_hash": "f72914f50555a857351dc4c9b48b00b3",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/crm/overview/route.test.ts": {
+    "mtime": 1792149139.3267088,
+    "ast_hash": "b5fff606b66e4ac2c7744c5e49028ab5",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/reviews/overview.test.ts": {
+    "mtime": 1792149138.446566,
+    "ast_hash": "ec059f8e03f75f0719591f20a0dc8aec",
+    "semantic_hash": ""
+  },
+  "tests/lib/crm-overview.test.ts": {
+    "mtime": 1792149139.308464,
+    "ast_hash": "9c8010c3a537457c69034e965bdf5200",
+    "semantic_hash": ""
+  },
+  "tests/lib/reviews-overview-period.test.ts": {
+    "mtime": 1792149138.4300342,
+    "ast_hash": "6e4f25977afdbffeeed66f8ec401e62c",
+    "semantic_hash": ""
+  },
+  "docs/runbooks/integration-keys-setup.md": {
+    "mtime": 1792148645.909723,
+    "ast_hash": "6112bb5e672c24d4b4e01747407a618b",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/financial/overview/route.test.ts": {
+    "mtime": 1792149195.591188,
+    "ast_hash": "3807f9894853f1e071460b9c9ccf9148",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/inventory/overview.test.ts": {
+    "mtime": 1792149266.6920571,
+    "ast_hash": "e85f39d9a07f312f51c7d46408b39c8e",
+    "semantic_hash": ""
+  },
+  "tests/lib/finance-overview-period.test.ts": {
+    "mtime": 1792149195.5834908,
+    "ast_hash": "dc2df018761983738061290677740989",
+    "semantic_hash": ""
+  },
+  "tests/lib/inventory-overview.test.ts": {
+    "mtime": 1792149266.6801906,
+    "ast_hash": "db9c6b15d19f12860c2e964f645c28af",
     "semantic_hash": ""
   }
 }
