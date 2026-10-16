@@ -42,10 +42,11 @@ describe('GAQL builders', () => {
   })
 
   it('bounds and sanitizes change_event', () => {
-    const q = Q.changeEvents("2026-10-03 00:00:00'; DROP", 50000)
+    const q = Q.changeEvents("2026-10-03 00:00:00'; DROP", "2026-10-16 23:59:59' OR", 50000)
     expect(q).toContain("change_event.change_date_time >= '2026-10-03 00:00:00 '")
+    expect(q).toContain("AND change_event.change_date_time <= '2026-10-16 23:59:59 '")
     expect(q).toContain('LIMIT 10000')
-    expect(Q.changeEvents('2026-10-03 00:00:00', 0)).toContain('LIMIT 1')
+    expect(Q.changeEvents('2026-10-03 00:00:00', '2026-10-16 23:59:59', 0)).toContain('LIMIT 1')
   })
 
   it('only quotes well-formed geo target resource names', () => {

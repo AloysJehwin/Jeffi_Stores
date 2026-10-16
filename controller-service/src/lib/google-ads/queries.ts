@@ -113,13 +113,14 @@ export const Q = {
        recommendation.dismissed
      FROM recommendation`,
 
-  /** change_event requires a bounded window (max 30 days) and a LIMIT. */
-  changeEvents: (sinceDateTime: string, limit = 1000) =>
+  /** change_event requires both ends of the window (max 30 days apart) and a LIMIT. */
+  changeEvents: (sinceDateTime: string, untilDateTime: string, limit = 1000) =>
     `SELECT change_event.resource_name, change_event.change_date_time, change_event.change_resource_type,
        change_event.change_resource_name, change_event.client_type, change_event.user_email,
        change_event.resource_change_operation, change_event.changed_fields, change_event.campaign
      FROM change_event
      WHERE change_event.change_date_time >= '${sinceDateTime.replace(/[^0-9: -]/g, '')}'
+       AND change_event.change_date_time <= '${untilDateTime.replace(/[^0-9: -]/g, '')}'
      ORDER BY change_event.change_date_time DESC
      LIMIT ${Math.max(1, Math.min(10000, Math.floor(limit)))}`,
 
