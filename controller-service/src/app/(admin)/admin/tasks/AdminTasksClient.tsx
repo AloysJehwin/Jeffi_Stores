@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
@@ -187,11 +187,22 @@ function AssignSelect({
   )
 }
 
+const SCOPES = ['mine', 'all', 'unassigned'] as const
+const STATUSES = ['open', 'overdue', 'completed'] as const
+
 export default function AdminTasksClient() {
   const router = useRouter()
   const canWrite = useCanWrite('tasks:write')
-  const [scope, setScope] = useState<'mine' | 'all' | 'unassigned'>('mine')
-  const [status, setStatus] = useState<'open' | 'overdue' | 'completed'>('open')
+  // ?scope= and ?status= (from the overview strip's links) preselect the list filters.
+  const sp = useSearchParams()
+  const qScope = SCOPES.find(s => s === sp.get('scope'))
+  const qStatus = STATUSES.find(s => s === sp.get('status'))
+  const [scope, setScope] = useState<'mine' | 'all' | 'unassigned'>(qScope ?? 'mine')
+  const [status, setStatus] = useState<'open' | 'overdue' | 'completed'>(qStatus ?? 'open')
+  useEffect(() => {
+    if (qScope) setScope(qScope)
+    if (qStatus) setStatus(qStatus)
+  }, [qScope, qStatus])
   const [priority, setPriority] = useState<string>('all')
   const [segment, setSegment] = useState<string>('all')
   const [search, setSearch] = useState('')

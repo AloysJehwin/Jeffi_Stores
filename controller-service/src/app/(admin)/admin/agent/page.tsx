@@ -1,12 +1,13 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, Suspense } from 'react'
 import {
   Bot,
   Send,
   MessageSquare,
   Slash,
   LayoutGrid,
+  BarChart3,
   CheckCircle,
   XCircle,
   Loader2,
@@ -19,6 +20,7 @@ import { useToast } from '@/contexts/ToastContext'
 import AdminAgentMessage from '@/components/admin/AdminAgentMessage'
 import AdminAgentBlocks, { type UiBlock } from '@/components/admin/AdminAgentBlocks'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import AgentOverview from './_components/AgentOverview'
 
 interface ProposedAction {
   id: string
@@ -734,7 +736,7 @@ interface ConversationListItem {
   message_count: number
 }
 
-type Tab = 'chat' | 'slash' | 'tools'
+type Tab = 'chat' | 'slash' | 'tools' | 'overview'
 
 export default function AdminAgentPage() {
   const { showToast } = useToast()
@@ -1014,6 +1016,7 @@ export default function AdminAgentPage() {
         {(
           [
             { id: 'chat', label: 'Chat', icon: MessageSquare },
+            { id: 'overview', label: 'Overview', icon: BarChart3 },
             { id: 'slash', label: 'Slash', icon: Slash },
             { id: 'tools', label: 'Tools', icon: LayoutGrid },
           ] as const
@@ -1322,6 +1325,14 @@ export default function AdminAgentPage() {
       )}
 
       {/* Tools tab */}
+      {tab === 'overview' && (
+        <div className="flex-1 overflow-y-auto p-4">
+          <Suspense fallback={null}>
+            <AgentOverview />
+          </Suspense>
+        </div>
+      )}
+
       {tab === 'tools' && (
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           <p className="text-xs text-foreground-muted">
