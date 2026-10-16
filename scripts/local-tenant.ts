@@ -97,11 +97,12 @@ async function main() {
 
   await cp.query(
     `INSERT INTO tenant_infra (tenant_id, rds_endpoint, rds_db, rds_port, iam_auth, region, s3_bucket)
-     VALUES ($1, 'localhost', $2, $3, false, 'local', $4)
+     VALUES ($1, 'localhost', $2, $3, false, 'local', NULL)
      ON CONFLICT (tenant_id) DO UPDATE SET
        rds_endpoint = 'localhost', rds_db = EXCLUDED.rds_db, rds_port = EXCLUDED.rds_port,
-       iam_auth = false, region = 'local', updated_at = now()`,
-    [tenantId, tenantDb, port, `local-${slug}`]
+       iam_auth = false, region = 'local', s3_bucket = NULL, updated_at = now()`,
+    // No tenant bucket locally: uploads fall back to S3_BUCKET_NAME under the local S3_KEY_PREFIX.
+    [tenantId, tenantDb, port]
   )
   await cp.end()
 
