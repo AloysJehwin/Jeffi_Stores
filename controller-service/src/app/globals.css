@@ -219,6 +219,15 @@
   }
 }
 
+/* Every text-like input in the admin is one control height, whatever classes it carries,
+   so ad-hoc search boxes line up with the selects and buttons beside them. Textareas,
+   checkboxes, radios, ranges and files are left alone. */
+.admin-shell input:not(.field-xs):where(:not([type]), [type='text'], [type='search'], [type='email'], [type='url'], [type='tel'], [type='number'], [type='password'], [type='date'], [type='datetime-local'], [type='time']) {
+  height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 /* A textarea is the one control that must NOT be pinned — it grows with rows. */
 textarea.field-md,
 textarea.field-normal,

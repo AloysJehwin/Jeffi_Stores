@@ -70,7 +70,7 @@ export default function AdminShell({
 
   return (
     <AdminHostProvider host={host}>
-      <div className="fixed inset-0 flex flex-col bg-surface-secondary">
+      <div className="admin-shell fixed inset-0 flex flex-col bg-surface-secondary">
         {/* Top bar — full width, spans above sidebar + content */}
         <div className="flex items-center px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0 gap-3">
           {/* Mobile hamburger */}
