@@ -7,6 +7,7 @@ import IconButton from '@/components/ui/IconButton'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, RangePresets, Tabs, api, lastDays } from '@/components/admin/channels/ui'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import type { MerchantTab } from '@/lib/merchant/console-data'
 import GoogleMerchantPanel from './GoogleMerchantPanel'
@@ -46,7 +47,7 @@ export default function MerchantConsole({ connected }: { connected: boolean }) {
   const data = loaded?.tab === tab ? loaded.data : null
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'reports' | 'status' | null>(null)
-  const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
   const [reloadKey, setReloadKey] = useState(0)
   const reload = useCallback(() => setReloadKey(k => k + 1), [])
   const canWrite = useCanWrite('merchant_sync')
@@ -67,19 +68,16 @@ export default function MerchantConsole({ connected }: { connected: boolean }) {
 
   async function refresh(kind: 'reports' | 'status') {
     setBusy(kind)
-    setBanner(null)
     const r = await api('/api/admin/merchant/console/refresh', { method: 'POST', json: { kind } })
     setBusy(null)
-    if (!r.ok) setBanner({ ok: false, text: r.data.error || 'Refresh failed' })
-    else if (kind === 'status') setBanner({ ok: true, text: `Refreshed the status of ${r.data.summary?.total ?? 0} products from Google.` })
-    else
-      setBanner({
-        ok: r.data.status !== 'error',
-        text:
-          r.data.status === 'success'
-            ? 'Refreshed reports and account settings from Google.'
-            : `Refreshed with problems: ${(r.data.errors ?? []).map((e: any) => `${e.step}: ${e.message}`).join('; ')}`,
-      })
+    if (!r.ok) toast.error(r.data.error || 'Refresh failed')
+    else if (kind === 'status') toast.success(`Refreshed the status of ${r.data.summary?.total ?? 0} products from Google.`)
+    else if (r.data.status === 'success') toast.success('Refreshed reports and account settings from Google.')
+    else {
+      const text = `Refreshed with problems: ${(r.data.errors ?? []).map((e: any) => `${e.step}: ${e.message}`).join('; ')}`
+      if (r.data.status === 'error') toast.error(text)
+      else toast.warning(text)
+    }
     reload()
   }
 
@@ -93,7 +91,6 @@ export default function MerchantConsole({ connected }: { connected: boolean }) {
 
   return (
     <div className="space-y-4">
-      {banner && <Banner ok={banner.ok}>{banner.text}</Banner>}
       <Tabs
         tabs={TABS}
         value={tab}

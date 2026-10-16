@@ -4,7 +4,7 @@ import { Banner, Kpi, KpiGrid, Section, Table, count, money, type Col } from '@/
 import { PeriodBar, OverviewSkeleton, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { delta } from '@/lib/overview/period'
 import { AI_CAPABILITY_LABEL, aiFeatureLabel } from '@/lib/ai/feature-labels'
-import { KeyedTrendCard, MixDonutCard, type TrendPoint } from './OverviewCharts'
+import { KeyedTrendCard, MixDonutCard, type TrendPoint } from '@/components/admin/kit/charts'
 
 type Totals = { calls: number; cost_inr: number; price_inr: number; failed: number; unpaid: number }
 type Grouped = { key: string; calls: number; cost_inr: number; price_inr: number; failed: number }

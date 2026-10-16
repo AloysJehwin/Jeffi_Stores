@@ -213,3 +213,8 @@ export function useToast() {
   if (!context) throw new Error('useToast must be used within a ToastProvider')
   return context
 }
+
+/** Same as useToast, but undefined outside a ToastProvider instead of throwing (kit helpers). */
+export function useToastOptional() {
+  return useContext(ToastContext)
+}

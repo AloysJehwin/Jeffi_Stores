@@ -1,6 +1,6 @@
 # Admin UI upgrade: one design language for every page
 
-Status: in progress (phase 0 started 2026-10-17) (2026-10-17). Companion to `PAGE_OVERVIEWS_PLAN.md` (which put an Overview tab on most areas) and `MAIN_DASHBOARD_PLAN.md`. That work moved the *overview* tabs onto a shared kit. This plan moves everything else (lists, view, create and edit pages, consoles, settings) onto the same language.
+Status: phase 0 (kit) and phase 1 (Brands pilot) done 2026-10-17; kit API not frozen until the light/dark 1440/390 screenshot review. Companion to `PAGE_OVERVIEWS_PLAN.md` (which put an Overview tab on most areas) and `MAIN_DASHBOARD_PLAN.md`. That work moved the *overview* tabs onto a shared kit. This plan moves everything else (lists, view, create and edit pages, consoles, settings) onto the same language.
 
 Reference implementation: `financial/_components/AiCostsTab.tsx`, `financial/_components/OverviewCharts.tsx` (`KeyedTrendCard`, `MixDonutCard`, `ChartCard`), `components/admin/overview/kit.tsx`, `components/admin/channels/ui.tsx`, `components/ui/Select.tsx`, `components/ui/DatePicker.tsx`.
 
@@ -265,3 +265,33 @@ Per page or per wave:
 - Manual pass, light and dark, at 1440 px and 390 px: header and actions, loading skeleton (throttle network), empty state (filter to nothing), error banner (force a 500), read-only admin (write controls disabled, layout unchanged), and one real create, edit and delete through the server action.
 - A marker report run before and after each wave (the counts in section 1: hard-coded palette classes, `dark:` count, `fixed inset-0`, `SortableHeader`/`ResponsiveList` imports, `MobileEditBlock` uses), with the totals recorded in this doc so progress is visible.
 - `graphify update .` after each wave.
+
+## 8. Kit usage (phase 0, 2026-10-17)
+
+Everything imports from `@/components/admin/kit` (barrel) or a module directly. `channels/ui.tsx` and `overview/kit.tsx` are now named re-exports of `kit/core.tsx` and `kit/period.tsx`, so old imports keep working; new code imports from the kit.
+
+| Module | Exports |
+|---|---|
+| `core.tsx` (client) | `Section`, `Kpi`, `KpiGrid`, `Badge`, `Banner`, `Empty`, `Tabs`, `TabLinks`, `TabStrip`, `TabAction`, `TabActionsHost/Portal`, `Table`/`Col`, `api`, `money`, `count`, `pct`, `change`, `when`, `lastDays`, `RangePresets`, `inputCls`, `btnPrimary`, `btnGhost` |
+| `period.tsx` (client) | `usePeriod`, `PeriodBar`, `useOverviewData`, `AttentionList`, `OverviewSkeleton` |
+| `tones.ts` | `Tone`, `TONE_CLS`, `badgeCls(tone)` (plain module, usable in server components) |
+| `layout.tsx` (server-safe) | `PageHeader {title, description?, back?, badges?, actions?, meta?, media?}`, `PageBody`, `EntityPage {header, tabs?, notices?, kpis?, attention?, main, aside?}`, `Card {title?, hint?, action?, flush?}`, `Fields {cols}`, `Field {label, value, hint?, copy?, mono?, span?}`, `BackLink` |
+| `actions.tsx` (client) | `KitAction {label, icon?, href?, onClick?, danger?, confirm?, scope?, disabled?, busy?}`, `ActionButton`, `DetailHeader {title, subtitle?, status?, identifiers?, media?, back?, primary?, secondary?, actions?}`, `CopyValue` |
+| `form.tsx` (client) | `FormPage {header?, footer?, onDirtyChange?, guardUnload?}`, `FormSection {title, description?, aside?, id?, collapsible?}`, `FormGrid {cols}`, `FormField {label, htmlFor?, hint?, error?, required?, span?}`, `TextInput`, `NumberInput`, `MoneyInput`, `TextArea`, `FormButton` (type="submit", passes name/value), `FormFooter {submitLabel?, pending?, dirty?, cancelHref?/onCancel?, secondary?, autosave?, children}`, `fieldInputCls` |
+| `data-table.tsx` (client) | `DataTable<T> {rows, cols: DataCol<T>[], rowKey, mode, total?, page?, pageSize?, pageHref?, search?, filters?, savedViews?, toolbar?, selectable?, bulkActions?, rowActions?, onRowClick?, mobileCard?, mobile?, loading?, error?, empty?, bare?}`, `DataToolbar {search?, filters?, savedViews?}` (URL-bound, same semantics as `AdminFilters`), `DataCol`, `FilterDef`, `BulkAction` |
+| `dialog.tsx` (client) | `Dialog {open, onClose, title, description?, size?, footer?}` (portal, Esc, focus trap, scroll lock), `ConfirmDialog` (renders `useConfirm`/`usePrompt`; their API is unchanged), `Sheet` (mobile bottom sheet) |
+| `states.tsx` (server-safe) | `EmptyState {icon?, title, body?, action?, actionNode?, bare?}`, `ErrorState`, `TableSkeleton`, `ListSkeleton`, `DetailSkeleton`, `FormSkeleton` |
+| `status.tsx` (server-safe) | `StatusBadge {status, map?, label?}`, maps `ACTIVE_STATUS`, `ORDER_STATUS`, `PAYMENT_STATUS`, `SHIPMENT_STATUS`, `INVOICE_STATUS`, `QUOTATION_STATUS`, `humanize` |
+| `charts.tsx` (client) | `ChartCard {title, hint?, action?}`, `TrendLines`, `KeyedTrendCard`, `MixDonutCard`, `RankedBarsCard`, plus `DonutSplit`, `RankedBars`, `TrendChart` re-exported from `dashboard/Charts` (the merge into one trend API is wave F) |
+| `toast.ts` (client) | `useActionToast()` returns `{ success, error, info, warning, result(res, { success?, error?, warning? }) }`; `resultToast(res)` picks text and tone. No-op outside a `ToastProvider` |
+
+Rules of use:
+- **Server pages cannot pass functions to client components.** `DataTable` columns, `KitAction.onClick` and `rowActions` live in a small client component next to the page (`brands/_components/BrandsTable.tsx`); the page passes rows and plain props. Server-safe pieces (`PageHeader`, `EntityPage`, `Card`, `Fields`, `StatusBadge`, states) take ReactNode slots directly.
+- **Keep the toolbar outside the list Suspense.** Render `DataToolbar` in the page and `DataTable` (without `search`/`filters`) inside the keyed Suspense, so the search box stays mounted while the table reloads.
+- **Action responses go through `useActionToast`**, not a banner. A minimal migration keeps the old call sites: replace `const [banner, setBanner] = useState(...)` with `const setBanner = useCallback(b => b && toast.result(b), [toast])` and delete the banner markup (done in `google-ads/GoogleAdsClient.tsx`).
+- `FormFooter` renders inside the `<form>`; custom intent buttons go in as `FormButton name="intent" value="..."` children.
+- `KitAction.scope` disables (never hides) the button; the server gate stays as it is.
+
+### Phase 1 pilot (Brands) notes
+
+Brands list, view, add and edit are on the kit; behaviour unchanged (same queries, params, page links, toggle, delete, drafts, server actions). `BrandTableRow.tsx` was folded into `brands/_components/BrandsTable.tsx` and deleted. Toast conversion: `google-ads/GoogleAdsClient.tsx` (connect, sync, test, disconnect, OAuth return), `google-ads/_components/ManageContext.tsx` (campaign edits) and `merchant/_components/MerchantConsole.tsx` (refresh). Still using inline result banners, for their waves: `amazon/_components/AmazonConsole.tsx`, `amazon-ads/_components/AmazonAdsConsole.tsx`, `meta-ads/_components/MetaAdsConsole.tsx`, `social-posts` (`SocialPostsClient`, `Composer`, `Insights`), google-ads `AudiencesView`, `AlertsPanel`, `ConnectPanel` (invite notice), `ConversionsView`, and the `CampaignWizard` result panel; also `data-source` tabs and `components/admin/site-controls/ProvidersCard.tsx`.

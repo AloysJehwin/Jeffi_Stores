@@ -1,5 +1,9 @@
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import { ListSkeleton } from '@/components/admin/kit'
 
 export default function Loading() {
-  return <AdminSkeleton variant="list" />
+  return (
+    <div className="p-4 sm:p-6">
+      <ListSkeleton kpis={3} />
+    </div>
+  )
 }

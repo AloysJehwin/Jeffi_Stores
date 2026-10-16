@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { AlertCircle, ArrowLeftRight, CheckCircle2, PlugZap, RefreshCw, Unplug } from 'lucide-react'
+import { ArrowLeftRight, PlugZap, RefreshCw, Unplug } from 'lucide-react'
 import { btnGhost, Tabs } from '@/components/admin/channels/ui'
+import { useActionToast } from '@/components/admin/kit/toast'
 import IconButton from '@/components/ui/IconButton'
 import ConnectionsGear, { NotConnectedState, type ConnectionState } from '@/components/admin/ConnectionsGear'
 import DatePicker from '@/components/ui/DatePicker'
@@ -88,7 +89,9 @@ export default function GoogleAdsClient({
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  // Action responses are toasts; null (the old "clear the banner") is a no-op.
+  const setBanner = useCallback((b: { ok: boolean; text: string; warn?: boolean } | null) => b && toast.result({ ok: b.ok, text: b.text }, { warning: b.warn }), [toast])
   const [busy, setBusy] = useState<'sync' | 'test' | 'disconnect' | null>(null)
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
   const [showConnect, setShowConnect] = useState(false)
@@ -143,7 +146,6 @@ export default function GoogleAdsClient({
 
   async function action(kind: 'sync' | 'test' | 'disconnect') {
     setBusy(kind)
-    setBanner(null)
     try {
       if (kind === 'test') {
         const r = await fetch('/api/admin/google-ads/test', { credentials: 'include' })
@@ -156,6 +158,7 @@ export default function GoogleAdsClient({
         else
           setBanner({
             ok: d.status !== 'error',
+            warn: d.status !== 'success',
             text:
               d.status === 'success'
                 ? 'Synced the last 30 days from Google Ads.'
@@ -181,21 +184,6 @@ export default function GoogleAdsClient({
   const canWrite = useCanWrite('google_ads')
 
   const state: ConnectionState = connected ? 'connected' : status.pendingAccount ? 'pending' : 'none'
-  const bannerEl = banner && (
-    <div
-      className={`rounded-lg border px-4 py-3 text-sm flex items-start gap-2 ${
-        banner.ok ? 'border-green-500/40 bg-green-500/5' : 'border-red-500/40 bg-red-500/5'
-      }`}
-    >
-      {banner.ok ? (
-        <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-600 shrink-0" />
-      ) : (
-        <AlertCircle className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />
-      )}
-      <span>{banner.text}</span>
-    </div>
-  )
-
   return (
     <div className="p-4 sm:p-6 space-y-5">
       <div className="flex items-start justify-between flex-wrap gap-3">
@@ -217,7 +205,6 @@ export default function GoogleAdsClient({
             open={gearOpen}
             onOpenChange={setGearOpen}
           >
-            {bannerEl}
             {!envReady && <NotConfigured status={status} />}
             {connected && (
               <div className="rounded-xl border border-border-default p-4 space-y-2">
@@ -281,7 +268,6 @@ export default function GoogleAdsClient({
         </div>
       </div>
 
-      {bannerEl}
 
       {!connected && <NotConnectedState provider="Google Ads" onOpen={() => setGearOpen(true)} />}
 

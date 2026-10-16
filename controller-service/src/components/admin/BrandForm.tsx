@@ -2,7 +2,6 @@
 
 import { useState, useRef } from 'react'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
-import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
@@ -10,6 +9,7 @@ import AIFillForm from './AIFillForm'
 import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
+import { FormButton, FormField, FormFooter, FormGrid, FormSection, TextArea, TextInput, NumberInput, fieldInputCls, useActionToast } from '@/components/admin/kit'
 
 interface BrandFormProps {
   action: (formData: FormData) => Promise<void>
@@ -30,7 +30,6 @@ export default function BrandForm({
 }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [logoUrl, setLogoUrl] = useState(brand?.logo_url || '')
-  const [error, setError] = useState<string | null>(null)
   const [brandName, setBrandName] = useState<string>(brand?.name || '')
   const [description, setDescription] = useState<string>(brand?.description || '')
   const [isActive, setIsActive] = useState<boolean>(brand?.is_active ?? true)
@@ -39,6 +38,7 @@ export default function BrandForm({
   const [replacementAllowed, setReplacementAllowed] = useState<boolean>(brand?.replacement_allowed ?? true)
   const [replacementDays, setReplacementDays] = useState<number>(brand?.replacement_window_days ?? 7)
   const formRef = useRef<HTMLFormElement>(null)
+  const toast = useActionToast()
   const edit = useEditSession({ resourceType: 'brand', resourceId: brand?.id ?? null })
 
   function setInput(name: string, value: string) {
@@ -67,14 +67,13 @@ export default function BrandForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setIsSubmitting(true)
-    setError(null)
 
     try {
       const formData = new FormData(e.currentTarget)
       await action(formData)
     } catch (err: any) {
       if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
-      setError('Failed to save brand. Please try again.')
+      toast.error('Failed to save brand. Please try again.')
       setIsSubmitting(false)
     }
   }
@@ -87,56 +86,44 @@ export default function BrandForm({
   }
 
   return (
-    <form
-      ref={formRef}
-      onSubmit={handleSubmit}
-      className="bg-surface-elevated rounded-lg shadow-sm border border-border-default"
-    >
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
-      <div className="p-4 sm:p-6">
-        {edit.sessionId && (
-          <div className="mb-4 flex justify-end">
-            <EditorToolbar
-              autosaveStatus={'idle' as AutosaveStatus}
-              sessionStatus={edit.status}
-              onSave={async () => { await edit.save() }}
-              onCancel={edit.cancel}
-              cancelHref={ap('/admin/brands')}
-              hideSave
-            />
-          </div>
-        )}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300">
-            {error}
-          </div>
-        )}
-        <div className="mb-6">
-          <AIFillForm
-            fields={[
-              { name: 'name', label: 'Brand Name', type: 'text' },
-              { name: 'slug', label: 'URL Slug', type: 'text' },
-              { name: 'description', label: 'Description', type: 'textarea' },
-              { name: 'website', label: 'Website URL', type: 'text' },
-              { name: 'is_active', label: 'Active', type: 'boolean' },
-              { name: 'return_allowed', label: 'Returns Allowed', type: 'boolean' },
-              { name: 'return_window_days', label: 'Return Window Days', type: 'number' },
-              { name: 'replacement_allowed', label: 'Replacement Allowed', type: 'boolean' },
-              { name: 'replacement_window_days', label: 'Replacement Window Days', type: 'number' },
-            ]}
-            onFill={handleAIFill}
-            scope="brands:write"
-            context="Product brand carried by this store"
+      {edit.sessionId && (
+        <div className="flex justify-end">
+          <EditorToolbar
+            autosaveStatus={'idle' as AutosaveStatus}
+            sessionStatus={edit.status}
+            onSave={async () => { await edit.save() }}
+            onCancel={edit.cancel}
+            cancelHref={ap('/admin/brands')}
+            hideSave
           />
         </div>
+      )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Brand Name *
-            </label>
-            <input
-              type="text"
+      <FormSection
+        title="Brand"
+        description="Name, slug, website, logo and description."
+      >
+        <AIFillForm
+          fields={[
+            { name: 'name', label: 'Brand Name', type: 'text' },
+            { name: 'slug', label: 'URL Slug', type: 'text' },
+            { name: 'description', label: 'Description', type: 'textarea' },
+            { name: 'website', label: 'Website URL', type: 'text' },
+            { name: 'is_active', label: 'Active', type: 'boolean' },
+            { name: 'return_allowed', label: 'Returns Allowed', type: 'boolean' },
+            { name: 'return_window_days', label: 'Return Window Days', type: 'number' },
+            { name: 'replacement_allowed', label: 'Replacement Allowed', type: 'boolean' },
+            { name: 'replacement_window_days', label: 'Replacement Window Days', type: 'number' },
+          ]}
+          onFill={handleAIFill}
+          scope="brands:write"
+          context="Product brand carried by this store"
+        />
+        <FormGrid>
+          <FormField label="Brand Name" htmlFor="name" required>
+            <TextInput
               id="name"
               name="name"
               required
@@ -148,56 +135,29 @@ export default function BrandForm({
                   slugInput.value = generateSlug(e.target.value)
                 }
               }}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="e.g. Stanley, DeWalt"
             />
-          </div>
+          </FormField>
 
-          <div>
-            <label htmlFor="slug" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Slug *
-            </label>
-            <input
-              type="text"
-              id="slug"
-              name="slug"
-              required
-              defaultValue={brand?.slug}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="e.g. stanley, dewalt"
-            />
-            <p className="text-xs text-foreground-muted mt-1">URL-friendly identifier. Auto-filled from name.</p>
-          </div>
+          <FormField label="Slug" htmlFor="slug" required hint="URL-friendly identifier. Auto-filled from name.">
+            <TextInput id="slug" name="slug" required defaultValue={brand?.slug} placeholder="e.g. stanley, dewalt" />
+          </FormField>
 
-          <div>
-            <label htmlFor="website" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Website
-            </label>
-            <input
-              type="url"
-              id="website"
-              name="website"
-              defaultValue={brand?.website || ''}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="https://example.com"
-            />
-          </div>
+          <FormField label="Website" htmlFor="website">
+            <TextInput type="url" id="website" name="website" defaultValue={brand?.website || ''} placeholder="https://example.com" />
+          </FormField>
 
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-2">Logo</label>
+          <FormField label="Logo">
             <ImageUrlInput
               name="logo_url"
               value={logoUrl}
               onChange={setLogoUrl}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className={fieldInputCls}
               placeholder="https://example.com/logo.png or upload"
             />
-          </div>
+          </FormField>
 
-          <div className="md:col-span-2">
-            <label htmlFor="description" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Description
-            </label>
+          <FormField label="Description" htmlFor="description" span={2}>
             <AIEnrichButton
               fieldLabel="Description"
               value={description}
@@ -206,137 +166,84 @@ export default function BrandForm({
               context={`Brand: ${brandName}`}
               multiline
             >
-              <textarea
+              <TextArea
                 id="description"
                 name="description"
                 rows={3}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                className="w-full px-4 py-2 pr-8 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                className="pr-8"
                 placeholder="Enter brand description"
               />
             </AIEnrichButton>
-          </div>
+          </FormField>
 
-          <div className="md:col-span-2">
-            <div className="flex items-center">
-              <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
-              <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
-            </div>
+          <div className="md:col-span-2 flex items-center">
+            <input type="hidden" name="is_active" value={isActive ? 'true' : ''} />
+            <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
           </div>
-        </div>
-      </div>
+        </FormGrid>
+      </FormSection>
 
       {hasReturns && (
-        <div className="px-4 sm:px-6 py-5 border-t border-border-default">
-          <h2 className="text-base font-semibold text-foreground mb-4">Return &amp; Replacement Policy</h2>
-          <p className="text-xs text-foreground-muted mb-4">
-            Brand policy takes priority over category policy on the product page.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <FormSection title="Return & Replacement Policy" description="Brand policy takes priority over category policy on the product page.">
+          <FormGrid>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <input type="hidden" name="return_allowed" value={returnAllowed ? 'true' : 'false'} />
-                <Toggle
-                  id="return_allowed"
-                  checked={returnAllowed}
-                  onChange={setReturnAllowed}
-                  label="Returns Allowed"
-                />
+                <Toggle id="return_allowed" checked={returnAllowed} onChange={setReturnAllowed} label="Returns Allowed" />
               </div>
               {returnAllowed && (
-                <div>
-                  <label
-                    htmlFor="return_window_days"
-                    className="block text-sm font-medium text-foreground-secondary mb-1"
-                  >
-                    Return window (days)
-                  </label>
-                  <input
-                    type="number"
+                <FormField label="Return window (days)" htmlFor="return_window_days">
+                  <NumberInput
                     id="return_window_days"
                     name="return_window_days"
                     min={1}
                     max={90}
                     value={returnDays}
                     onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                   />
-                </div>
+                </FormField>
               )}
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <input type="hidden" name="replacement_allowed" value={replacementAllowed ? 'true' : 'false'} />
-                <Toggle
-                  id="replacement_allowed"
-                  checked={replacementAllowed}
-                  onChange={setReplacementAllowed}
-                  label="Replacement Allowed"
-                />
+                <Toggle id="replacement_allowed" checked={replacementAllowed} onChange={setReplacementAllowed} label="Replacement Allowed" />
               </div>
               {replacementAllowed && (
-                <div>
-                  <label
-                    htmlFor="replacement_window_days"
-                    className="block text-sm font-medium text-foreground-secondary mb-1"
-                  >
-                    Replacement window (days)
-                  </label>
-                  <input
-                    type="number"
+                <FormField label="Replacement window (days)" htmlFor="replacement_window_days">
+                  <NumberInput
                     id="replacement_window_days"
                     name="replacement_window_days"
                     min={1}
                     max={90}
                     value={replacementDays}
                     onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                   />
-                </div>
+                </FormField>
               )}
             </div>
-          </div>
-        </div>
+          </FormGrid>
+        </FormSection>
       )}
-      <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex justify-end gap-4">
-        <Link
-          href={ap('/admin/brands')}
-          className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
-        >
-          Cancel
-        </Link>
+
+      <FormFooter cancelHref={ap('/admin/brands')}>
         {isDraft ? (
           <>
-            <button
-              type="submit"
-              name="intent"
-              value="draft"
-              disabled={isSubmitting}
-              className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50"
-            >
+            <FormButton variant="secondary" name="intent" value="draft" disabled={isSubmitting}>
               {isSubmitting ? 'Saving…' : 'Save Draft'}
-            </button>
-            <button
-              type="submit"
-              name="intent"
-              value="publish"
-              disabled={isSubmitting}
-              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
-            >
+            </FormButton>
+            <FormButton name="intent" value="publish" disabled={isSubmitting}>
               {isSubmitting ? 'Publishing…' : 'Publish'}
-            </button>
+            </FormButton>
           </>
         ) : (
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
+          <FormButton disabled={isSubmitting}>
             {isSubmitting ? 'Saving...' : submitLabel || (brand ? 'Update Brand' : 'Create Brand')}
-          </button>
+          </FormButton>
         )}
-      </div>
+      </FormFooter>
     </form>
   )
 }
