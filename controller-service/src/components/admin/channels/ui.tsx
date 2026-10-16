@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertCircle, CheckCircle2, TrendingDown, TrendingUp } from 'lucide-react'
 
 // Building blocks shared by the channel consoles (Merchant, Amazon, Amazon Ads, Meta Ads, Social),
@@ -86,24 +86,65 @@ export function Banner({ ok, children }: { ok: boolean; children: React.ReactNod
   )
 }
 
-export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: { id: T; label: string; count?: number }[]; value: T; onChange: (t: T) => void }) {
+/** Tab bar with optional actions on the same line. Tabs scroll sideways when they overflow (no
+ * visible scrollbar, edge fades show there is more); actions stay pinned on the right. */
+export function Tabs<T extends string>({
+  tabs,
+  value,
+  onChange,
+  actions,
+}: {
+  tabs: { id: T; label: string; count?: number }[]
+  value: T
+  onChange: (t: T) => void
+  actions?: React.ReactNode
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [edges, setEdges] = useState({ left: false, right: false })
+  const measure = () => {
+    const el = ref.current
+    if (el) setEdges({ left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 })
+  }
+  useEffect(() => {
+    measure()
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [tabs.length])
+  useEffect(() => {
+    ref.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [value])
   return (
-    <div className="flex gap-0.5 border-b border-border-default overflow-x-auto" role="tablist">
-      {tabs.map(t => (
-        <button
-          key={t.id}
-          type="button"
-          role="tab"
-          aria-selected={value === t.id}
-          onClick={() => onChange(t.id)}
-          className={`px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${
-            value === t.id ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'
-          }`}
+    <div className="flex items-end gap-2 border-b border-border-default">
+      <div className="relative flex-1 min-w-0">
+        <div
+          ref={ref}
+          onScroll={measure}
+          className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          role="tablist"
         >
-          {t.label}
-          {t.count ? <span className="ml-1 text-xs text-accent-500">({t.count})</span> : null}
-        </button>
-      ))}
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={value === t.id}
+              onClick={() => onChange(t.id)}
+              className={`px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 shrink-0 ${
+                value === t.id ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'
+              }`}
+            >
+              {t.label}
+              {t.count ? <span className="ml-1 text-xs text-accent-500">({t.count})</span> : null}
+            </button>
+          ))}
+        </div>
+        {edges.left && <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-surface-secondary to-transparent" />}
+        {edges.right && <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-surface-secondary to-transparent" />}
+      </div>
+      {actions && <div className="flex items-center gap-1 shrink-0 pb-1">{actions}</div>}
     </div>
   )
 }

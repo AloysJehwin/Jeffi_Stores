@@ -75,18 +75,22 @@ export default function AmazonConsole({ connected }: { connected: boolean }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end gap-1">
-        {canWrite && (
-          <>
-            <IconButton icon={RefreshCw} label="Refresh listing status" busy={busy === 'status'} onClick={() => refresh('status')} />
-            <IconButton icon={Trophy} label="Refresh Buy Box and offers" busy={busy === 'offers'} onClick={() => refresh('offers')} />
-            <IconButton icon={Calculator} label="Refresh fee estimates" busy={busy === 'fees'} onClick={() => refresh('fees')} />
-            <IconButton icon={FileBarChart} label="Collect sales reports and settlements" busy={busy === 'reports'} onClick={() => refresh('reports')} />
-          </>
-        )}
-      </div>
       {banner && <Banner ok={banner.ok}>{banner.text}</Banner>}
-      <Tabs tabs={TABS} value={tab} onChange={setTab} />
+      <Tabs
+        tabs={TABS}
+        value={tab}
+        onChange={setTab}
+        actions={
+          canWrite && (
+            <>
+              <IconButton icon={RefreshCw} label="Refresh listing status" busy={busy === 'status'} onClick={() => refresh('status')} />
+              <IconButton icon={Trophy} label="Refresh Buy Box and offers" busy={busy === 'offers'} onClick={() => refresh('offers')} />
+              <IconButton icon={Calculator} label="Refresh fee estimates" busy={busy === 'fees'} onClick={() => refresh('fees')} />
+              <IconButton icon={FileBarChart} label="Collect sales reports and settlements" busy={busy === 'reports'} onClick={() => refresh('reports')} />
+            </>
+          )
+        }
+      />
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
       ) : DATA_TABS.has(tab) && !data ? (
