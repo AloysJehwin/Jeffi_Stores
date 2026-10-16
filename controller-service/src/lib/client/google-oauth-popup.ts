@@ -32,6 +32,17 @@ export function consumeGoogleRedirect(): GoogleOAuthResult | null {
   return { accessToken, error: accessToken ? null : error }
 }
 
+/**
+ * The origin Google returns to. Only jeffistores.in and localhost are registered redirect URIs, so any
+ * subdomain (admin., business., ecom., {slug}., admin-{slug}.) collapses to the root; the callback page
+ * then sends the tab back to the exact host it started on.
+ */
+export function googleRedirectOrigin(origin: string): string {
+  return origin
+    .replace(/^(https?:\/\/)([a-z0-9-]+\.)+(jeffistores\.in)/i, '$1$3')
+    .replace(/^(https?:\/\/)([a-z0-9-]+\.)+(localhost)\b/i, '$1$3')
+}
+
 export function openGoogleOAuthPopup({
   clientId,
   scope = 'openid email profile',
@@ -50,19 +61,7 @@ export function openGoogleOAuthPopup({
     // (business./ecom./admin.) AND tenant storefronts ({slug}.jeffistores.in) are not.
     // Collapse any subdomain of jeffistores.in down to the bare root so the callback
     // always lands on the registered URI, then postMessage's the token back up.
-    const stripAppSubdomain = (origin: string) => {
-      // e.g. https://acme.jeffistores.in → https://jeffistores.in
-      //      https://admin-acme.jeffistores.in → https://jeffistores.in
-      //      https://ecom.jeffistores.in → https://jeffistores.in
-      return (
-        origin
-          .replace(/^(https?:\/\/)([a-z0-9-]+\.)+(jeffistores\.in)/i, '$1$3')
-          // Strip app subdomains on non-jeffistores hosts too (e.g. certificate.localhost:3000 →
-          // localhost:3000), so the callback lands on the one registered dev redirect URI.
-          .replace(/^(https?:\/\/)(business|ecom|admin|certificate)\./, '$1')
-      )
-    }
-    const mainOrigin = stripAppSubdomain(window.location.origin)
+    const mainOrigin = googleRedirectOrigin(window.location.origin)
     const redirectUri = `${mainOrigin}/auth/google/callback`
 
     // State carries the FULL return URL (origin included) so the callback, which always runs on the root
@@ -141,7 +140,7 @@ export function openGoogleOAuthPopup({
 
     const onMessage = (event: MessageEvent) => {
       // Accept postMessage from the main origin (callback page) even when on an app subdomain
-      const expectedOrigin = stripAppSubdomain(window.location.origin)
+      const expectedOrigin = googleRedirectOrigin(window.location.origin)
       if (event.origin !== expectedOrigin && event.origin !== window.location.origin) return
       const data = event.data
       if (!data || data.source !== 'jeffi-google-oauth') return
