@@ -1,61 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/auth/jwt'
+import { requireAdminScope } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
-import { listSocialPostsForScope, enqueueSocialPost } from '@/lib/tenant-registry'
+import { readJson } from '@/lib/channels/route'
+import { listPosts } from '@/lib/social/data'
+import { ComposeSchema, composePosts } from '@/lib/social/posts'
 
 export const dynamic = 'force-dynamic'
 
-const PLATFORMS = ['fb', 'ig', 'ig_reel'] as const
-type Platform = (typeof PLATFORMS)[number]
-
+// The post queue: a store sees only its own posts; the flagship (no tenant) sees the platform queue.
 export async function GET(request: NextRequest) {
-  const admin = await authenticateAdmin(request)
-  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:read')) {
-    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  }
-  // Tenant resolved from the middleware header (ALS is empty at handler start on the extension-token
-  // path). A tenant admin sees only their own queue; the flagship (no tenant header) sees the
-  // platform queue (tenant_id IS NULL).
-  const posts = await listSocialPostsForScope(await resolveTenantId())
+  const admin = await requireAdminScope(request, 'social:read')
+  if (admin instanceof NextResponse) return admin
+  const sp = request.nextUrl.searchParams
+  const posts = await listPosts(await resolveTenantId(), { from: sp.get('from') ?? undefined, to: sp.get('to') ?? undefined })
   return NextResponse.json({ posts })
 }
 
+// Compose one post to several networks. Admins without approval rights queue it for approval.
 export async function POST(request: NextRequest) {
-  const admin = await authenticateAdmin(request)
-  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'campaigns:write')) {
-    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
-  }
-
-  const body = await request.json().catch(() => null)
-  if (!body) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
-
-  const platform = body.platform as Platform
-  if (!PLATFORMS.includes(platform)) {
-    return NextResponse.json({ error: 'platform must be one of fb, ig, ig_reel' }, { status: 400 })
-  }
-
-  const scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : null
-  if (scheduledAt && isNaN(scheduledAt.getTime())) {
-    return NextResponse.json({ error: 'Invalid scheduledAt' }, { status: 400 })
-  }
-
-  const imageUrls = Array.isArray(body.imageUrls)
-    ? body.imageUrls.filter((u: unknown) => typeof u === 'string' && u)
-    : null
-
-  const post = await enqueueSocialPost({
-    tenantId: await resolveTenantId(),
-    productId: body.productId ?? null,
-    platform,
-    caption: body.caption ?? null,
-    hashtags: body.hashtags ?? null,
-    imageUrl: body.imageUrl ?? null,
-    imageUrls,
-    videoUrl: body.videoUrl ?? null,
-    scheduledAt,
+  const admin = await requireAdminScope(request, 'social:write')
+  if (admin instanceof NextResponse) return admin
+  const parsed = ComposeSchema.safeParse(await readJson(request))
+  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid post' }, { status: 400 })
+  const canApprove = hasScope(admin.role, admin.scopes, 'social:approve')
+  const posts = await composePosts(await resolveTenantId(), parsed.data, {
+    approval: !canApprove || !!parsed.data.requestApproval,
+    createdBy: admin.email ?? admin.adminId ?? null,
   })
-  return NextResponse.json({ post })
+  return NextResponse.json({ posts, post: posts[0] })
 }

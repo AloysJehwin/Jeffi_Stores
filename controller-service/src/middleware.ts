@@ -596,6 +596,7 @@ async function handle(request: NextRequest) {
       '/api/admin/integrations/amazon-ads/callback',
       '/api/admin/integrations/meta-ads/callback',
       '/api/admin/social/callback',
+      '/api/admin/social/network/callback',
     ]
     if (oauthCallbackPaths.some(p => pathname.startsWith(p)) && request.method === 'GET') {
       return addSecurityHeaders(passThrough())

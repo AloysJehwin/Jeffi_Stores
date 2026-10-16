@@ -3,7 +3,7 @@ import { controlPlanePool } from './shared'
 export interface TenantSocialAccount {
   id: string
   tenant_id: string
-  provider: 'facebook' | 'instagram'
+  provider: 'facebook' | 'instagram' | 'gbp' | 'youtube' | 'pinterest' | 'linkedin' | 'x'
   page_id: string | null
   page_name: string | null
   ig_user_id: string | null
@@ -59,11 +59,13 @@ export async function getTenantSocialAccounts(tenantId: string): Promise<TenantS
   return r.rows as TenantSocialAccount[]
 }
 
+export type SocialPlatform = 'fb' | 'ig' | 'ig_reel' | 'gbp' | 'youtube' | 'pinterest' | 'linkedin' | 'x'
+
 export interface ScheduledSocialPost {
   id: string
   tenant_id: string | null
   product_id: string | null
-  platform: 'fb' | 'ig' | 'ig_reel'
+  platform: SocialPlatform
   caption: string | null
   hashtags: string | null
   image_url: string | null
@@ -74,25 +76,43 @@ export interface ScheduledSocialPost {
   posted_id: string | null
   last_error: string | null
   attempts: number
+  group_id?: string | null
+  title?: string | null
+  link_url?: string | null
+  next_attempt_at?: string | null
+  approval_status?: 'none' | 'pending' | 'approved' | 'rejected'
+  approved_by?: string | null
+  permalink?: string | null
+  source?: string
+  created_by?: string | null
 }
 
 /** Queue a post. scheduled_at defaults to now (post-ASAP) when omitted. tenantId null = Jeffi platform. */
 export async function enqueueSocialPost(p: {
   tenantId: string | null
   productId?: string | null
-  platform: 'fb' | 'ig' | 'ig_reel'
+  platform: SocialPlatform
   caption?: string | null
   hashtags?: string | null
   imageUrl?: string | null
   imageUrls?: string[] | null
   videoUrl?: string | null
   scheduledAt?: Date | null
+  groupId?: string | null
+  title?: string | null
+  linkUrl?: string | null
+  status?: 'draft' | 'pending'
+  approvalStatus?: 'none' | 'pending'
+  source?: 'manual' | 'autopost'
+  autopostRuleId?: string | null
+  createdBy?: string | null
 }): Promise<ScheduledSocialPost> {
   const pool = controlPlanePool()
   const r = await pool.query(
     `INSERT INTO scheduled_social_posts
-       (tenant_id, product_id, platform, caption, hashtags, image_url, image_urls, video_url, scheduled_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8, COALESCE($9, now())) RETURNING *`,
+       (tenant_id, product_id, platform, caption, hashtags, image_url, image_urls, video_url, scheduled_at,
+        group_id, title, link_url, status, approval_status, source, autopost_rule_id, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8, COALESCE($9, now()), $10,$11,$12, COALESCE($13,'pending'), COALESCE($14,'none'), COALESCE($15,'manual'), $16, $17) RETURNING *`,
     [
       p.tenantId,
       p.productId ?? null,
@@ -103,9 +123,41 @@ export async function enqueueSocialPost(p: {
       p.imageUrls?.length ? p.imageUrls : null,
       p.videoUrl ?? null,
       p.scheduledAt ? p.scheduledAt.toISOString() : null,
+      p.groupId ?? null,
+      p.title ?? null,
+      p.linkUrl ?? null,
+      p.status ?? null,
+      p.approvalStatus ?? null,
+      p.source ?? null,
+      p.autopostRuleId ?? null,
+      p.createdBy ?? null,
     ]
   )
   return r.rows[0] as ScheduledSocialPost
+}
+
+const STUCK_MINUTES = 15
+
+/** Claims due posts for this tick: resets ones stuck in 'publishing', then marks due, approved
+ * posts 'publishing' with SKIP LOCKED so two ticks never take the same row. */
+export async function claimDueSocialPosts(limit = 20): Promise<ScheduledSocialPost[]> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE scheduled_social_posts SET status = 'pending', next_attempt_at = now(), last_error = 'Publishing did not finish; retrying', updated_at = now()
+     WHERE status = 'publishing' AND updated_at < now() - make_interval(mins => $1)`,
+    [STUCK_MINUTES]
+  )
+  const r = await pool.query(
+    `UPDATE scheduled_social_posts SET status = 'publishing', attempts = attempts + 1, updated_at = now()
+     WHERE id IN (
+       SELECT id FROM scheduled_social_posts
+        WHERE status = 'pending' AND scheduled_at <= now() AND approval_status IN ('none', 'approved')
+          AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+        ORDER BY scheduled_at ASC LIMIT $1 FOR UPDATE SKIP LOCKED)
+     RETURNING *`,
+    [limit]
+  )
+  return r.rows as ScheduledSocialPost[]
 }
 
 /** Posts whose scheduled time has arrived and are still pending. */
@@ -168,6 +220,8 @@ export async function updateSocialPost(
     lastError?: string | null
     caption?: string
     bumpAttempts?: boolean
+    nextAttemptAt?: Date | null
+    permalink?: string | null
   }
 ): Promise<void> {
   const pool = controlPlanePool()
@@ -188,6 +242,14 @@ export async function updateSocialPost(
   if (patch.caption !== undefined) {
     args.push(patch.caption)
     sets.push(`caption=$${args.length}`)
+  }
+  if (patch.nextAttemptAt !== undefined) {
+    args.push(patch.nextAttemptAt ? patch.nextAttemptAt.toISOString() : null)
+    sets.push(`next_attempt_at=$${args.length}`)
+  }
+  if (patch.permalink !== undefined) {
+    args.push(patch.permalink)
+    sets.push(`permalink=$${args.length}`)
   }
   if (patch.bumpAttempts) sets.push('attempts = attempts + 1')
   args.push(id)
