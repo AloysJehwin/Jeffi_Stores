@@ -12,6 +12,17 @@ Reference implementation: `financial/_components/AiCostsTab.tsx`, `financial/_co
 - **Status messages are toasts.** Every success, info, warning and error response from an action (save, sync, refresh, connect, delete, send, import) shows as a toast via `contexts/ToastContext.tsx`, not an inline banner or status strip. Inline messages stay only for persistent state that is not a response (a field validation error under its input, a "needs reconnect" connection state, an empty or error state that replaces the content).
 - **Mobile.** View, lists and overviews are fully usable on mobile. Create and edit stay desktop only, except orders and common actions (status, confirm, ship, cancel, refund, notes, scan, stock adjust, approvals, replies).
 
+## Kit API freeze decisions (2026-10-17)
+
+- Filter selects carry their label inside ("Status: All"); approved by the user.
+- `ConfirmDialog` portals to `document.body`; approved.
+- No unsaved-changes prompt on forms (`guardUnload` stays opt-in and off).
+- Server list pages use a small client table wrapper per list (as `BrandsTable`) for columns and row actions; that is the standard pattern.
+- `Card` (server-safe) is the section card; `Section` stays as an alias for existing client code.
+- Back links unify on `BackLink` in both `PageHeader` and `DetailHeader`.
+- Wave owners verify `StatusBadge` maps against real status values before relying on them.
+- Every text-like input in the admin is 32px via the `.admin-shell` rule in globals.css; `field-xs` (26px) only inside table cells.
+
 ## 1. Where things stand
 
 Audit of all 138 `page.tsx` files under `app/(admin)/admin` (about 40 are redirect-only aliases such as `brands/[id]` to `brands/[id]/view`, `edit/[id]` to `[id]/edit`, `mailer/*`, `loyalty`, `referrals`, `merchant-sync`; they need no work).
