@@ -17,7 +17,7 @@ type OAuthMap = Partial<Record<'google_merchant' | 'amazon_seller' | 'meta', OAu
 type Toast = { ok: boolean; text: string } | null
 type SetToast = (t: Toast) => void
 
-// Store-admin credentials popup. Opened by a gear button on /admin/merchant-sync (google + amazon)
+// Store-admin credentials popup. Opened by a gear button on /admin/merchant and /admin/amazon (google + amazon)
 // and /admin/social-posts (meta). Each provider can connect by OAuth (when the platform app is
 // configured) or by entering credentials directly. All fetches target the admin-scoped routes; the
 // tenant is resolved from the admin host server-side, never sent from the client.

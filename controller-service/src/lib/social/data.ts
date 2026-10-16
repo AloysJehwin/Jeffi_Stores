@@ -125,7 +125,7 @@ export async function listConnections(tenantId: string | null) {
     const p = providerFor(network)
     const row = rows.find(a => a.provider === network)
     const missing = network === 'facebook' || network === 'instagram' ? meta.missing : (p.oauth?.env ?? []).filter(k => !process.env[k])
-    const platformEnv = !tenantId && (network === 'facebook' || network === 'instagram') && !!process.env.META_JEFFI_PAGE_TOKEN
+    const platformEnv = !tenantId && !row && (network === 'facebook' || network === 'instagram') && !!process.env.META_JEFFI_PAGE_TOKEN
     return {
       network,
       label: NETWORK_LABEL[network],

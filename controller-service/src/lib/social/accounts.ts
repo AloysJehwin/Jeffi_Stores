@@ -80,12 +80,12 @@ const EXPIRY_MARGIN_MS = 5 * 60_000
 export async function authFor(tenantId: string | null, network: Network): Promise<SocialAuth | null> {
   const rows = await listAccounts(tenantId)
   if (network === 'facebook' || network === 'instagram') {
-    if (!tenantId) return metaEnvAuth(network)
     const fb = rows.find(a => a.provider === 'facebook')
     const ig = rows.find(a => a.provider === 'instagram')
     const src = network === 'instagram' ? ig : (fb ?? ig)
     const target = network === 'instagram' ? ig?.ig_user_id : (fb ?? src)?.page_id
-    if (!src || !target) return null
+    // The flagship connects through the same gear; env is only its fallback.
+    if (!src || !target) return tenantId ? null : metaEnvAuth(network)
     return { accessToken: decryptToken(src.access_token_enc), targetId: target, targetName: src.page_name }
   }
   const row = rows.find(a => a.provider === network && a.status === 'connected')

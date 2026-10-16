@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { credentialOwnerId } from '@/lib/integrations/owner'
 import { testGoogleMerchant, testAmazonSeller, testMeta } from '@/lib/integrations/test-connection'
 
 export const dynamic = 'force-dynamic'
@@ -18,8 +18,7 @@ export async function POST(request: NextRequest) {
 
   const admin = await requireAdminScope(request, provider === 'meta' ? 'campaigns:write' : 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
-  const tenant = await resolveTenant()
-  if (!tenant) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
+  const tenant = { tenantId: await credentialOwnerId() }
 
   const result =
     provider === 'google_merchant'

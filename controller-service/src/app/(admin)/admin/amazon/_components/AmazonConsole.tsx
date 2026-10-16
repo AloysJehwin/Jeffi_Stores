@@ -8,7 +8,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, Tabs, api } from '@/components/admin/channels/ui'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
-import AmazonMerchantPanel from '../../merchant-sync/_components/AmazonMerchantPanel'
+import AmazonMerchantPanel from './AmazonMerchantPanel'
 import { BuyboxView, FeesView, OrdersStockView, OverviewView, RepricerView, SalesView, SuppressedView } from './AmazonTabs'
 
 type Tab = 'overview' | 'sales' | 'orders' | 'listings' | 'suppressed' | 'buybox' | 'fees' | 'repricer' | 'alerts' | 'changes' | 'runs'

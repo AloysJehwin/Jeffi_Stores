@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { credentialOwnerId } from '@/lib/integrations/owner'
 import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
 import { buildOAuthUrl } from '@/lib/catalog/meta'
 import { signAdminState } from '@/lib/shared/oauth-state'
@@ -15,8 +15,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const admin = await requireAdminScope(request, 'campaigns:write')
   if (admin instanceof NextResponse) return admin
-  const tenant = await resolveTenant()
-  if (!tenant) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
+  const tenant = { tenantId: await credentialOwnerId() }
 
   const { provider } = await params
   if (provider !== 'facebook' && provider !== 'instagram') {

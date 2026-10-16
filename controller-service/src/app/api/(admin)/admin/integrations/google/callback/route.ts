@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
   const state = rawState ? verifyAdminState(rawState) : null
   // One Google redirect URI serves Merchant Center and Google Ads; the signed state says which.
   if (state?.provider === 'google_ads') return completeGoogleAdsOAuth(params, state)
-  const backTo = `${await tenantAdminBase(state)}/admin/merchant-sync`
+  const backTo = `${await tenantAdminBase(state)}/admin/merchant`
   const fail = (reason: string) => returnToAdmin(`${backTo}?connected=0&provider=google&error=${reason}`)
 
   const err = params.get('error')
