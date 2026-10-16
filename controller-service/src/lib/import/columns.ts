@@ -475,3 +475,7 @@ const LINK_KEYS = new Set(['row_type', 'parent_sku', 'variant_sku'])
 
 export const CORE_SHEETS: readonly SheetName[] = ['Products', 'Variants', 'Sub-variants']
 export const ATTRIBUTE_SHEETS: readonly SheetName[] = SHEET_ORDER.filter(s => !CORE_SHEETS.includes(s))
+
+// The worked example the template ships on every sheet. Uploading the template with it left in
+// must not create a demo product, so the parser drops rows that are exactly this example.
+export const TEMPLATE_EXAMPLE = { sku: 'TSHIRT-001', name: 'Cotton T-Shirt' } as const

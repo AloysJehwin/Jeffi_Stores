@@ -8,6 +8,8 @@ vi.mock('@/lib/import/jobs', () => ({
   resolveImportTenantId: vi.fn(),
   isSheetSyncRunning: vi.fn(),
   cancelPendingSheetSyncs: vi.fn(),
+  withImportLock: vi.fn((_t: string, _k: string, fn: () => unknown) => fn()),
+  ImportBusyError: class extends Error {},
 }))
 vi.mock('@/lib/import/sheet-links', () => ({ forgetSheetOwnership: vi.fn(), releaseSheetProducts: vi.fn() }))
 vi.mock('@/lib/tenant-registry', () => ({ deleteIntegrationCredential: vi.fn(), lookupTenantContextById: vi.fn() }))
@@ -91,7 +93,9 @@ describe('POST /api/admin/data-source/google/disconnect', () => {
 
   it('keeps the credential when the re-tag fails, so the disconnect can be retried', async () => {
     vi.mocked(releaseSheetProducts).mockRejectedValue(new Error('store db down'))
-    await expect(POST(req())).rejects.toThrow('store db down')
+    const res = await POST(req())
+    expect(res.status).toBe(500)
+    expect((await res.json()).error).toMatch(/still connected/)
     expect(deleteIntegrationCredential).not.toHaveBeenCalled()
   })
 })

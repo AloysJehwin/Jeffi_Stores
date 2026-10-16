@@ -7,6 +7,11 @@ vi.mock('@/lib/shared/s3', () => ({ uploadImportFile: vi.fn().mockResolvedValue(
 vi.mock('@/lib/import/jobs', () => ({
   enqueueImportJob: vi.fn().mockResolvedValue({ id: 'job-1', status: 'queued' }),
   resolveImportTenantId: vi.fn().mockResolvedValue('tenant-1'),
+  withImportLock: vi.fn((_t: string, _k: string, fn: () => unknown) => fn()),
+  hasActiveSheetSync: vi.fn().mockResolvedValue(false),
+  setSheetsNeedsReconnect: vi.fn().mockResolvedValue(undefined),
+  setSheetsSpreadsheet: vi.fn().mockResolvedValue(undefined),
+  ImportBusyError: class extends Error {},
 }))
 vi.mock('@/lib/integrations/resolve', () => ({
   resolveGoogleSheetsCreds: vi.fn().mockResolvedValue({ accessToken: 'tok', spreadsheetId: 'sheet-1' }),
@@ -53,14 +58,15 @@ describe('POST /api/admin/data-source/google/sync', () => {
     ])
     const res = await POST(req())
     expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ jobId: 'job-1', totalRows: 2 })
+    // One product (with its variant) is one unit of work: totals match the worker's processed count.
+    expect(await res.json()).toMatchObject({ jobId: 'job-1', totalRows: 1, products: 1, invalid: 0 })
     const ranges = mockBatch.mock.calls[0][1]
     expect(ranges).toEqual(["'Products'!A:ZZ", "'Product · Shipping'!A:ZZ", "'Variants'!A:ZZ", "'Sub-variants'!A:ZZ"])
     expect(mockRead).not.toHaveBeenCalled()
     expect(vi.mocked(enqueueImportJob).mock.calls[0][0]).toMatchObject({
       source: 'google_sheet',
       spreadsheetId: 'sheet-1',
-      totalRows: 2,
+      totalRows: 1,
     })
   })
 
@@ -84,9 +90,24 @@ describe('POST /api/admin/data-source/google/sync', () => {
     expect((await res.json()).error).toMatch(/No data rows/)
   })
 
-  it('502s when Google refuses the read', async () => {
-    mockTitles.mockRejectedValue(new Error('The caller does not have permission'))
+  it('403s with an actionable message when Google refuses the read', async () => {
+    mockTitles.mockRejectedValue(Object.assign(new Error('The caller does not have permission'), { status: 403 }))
+    const res = await POST(req())
+    expect(res.status).toBe(403)
+    expect((await res.json()).error).toMatch(/cannot open this sheet/)
+  })
+
+  it('404s when the sheet was deleted', async () => {
+    mockTitles.mockRejectedValue(Object.assign(new Error('Requested entity was not found.'), { status: 404 }))
+    const res = await POST(req())
+    expect(res.status).toBe(404)
+    expect((await res.json()).error).toMatch(/not found/)
+  })
+
+  it('502s without leaking the raw error for an unknown Google failure', async () => {
+    mockTitles.mockRejectedValue(new Error('weird internal thing xyz'))
     const res = await POST(req())
     expect(res.status).toBe(502)
+    expect((await res.json()).error).not.toMatch(/xyz/)
   })
 })

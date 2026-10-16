@@ -6,6 +6,8 @@ import {
   keyColumnsFor,
   sheetFor,
   SHEET_ORDER,
+  TEMPLATE_EXAMPLE,
+  HEADER_ROW,
   type ImportColumn,
   type SheetName,
 } from './columns'
@@ -215,8 +217,8 @@ function exampleFor(sheet: SheetName): Record<string, string>[] {
     case 'Products':
       return [
         {
-          sku: 'TSHIRT-001',
-          name: 'Cotton T-Shirt',
+          sku: TEMPLATE_EXAMPLE.sku,
+          name: TEMPLATE_EXAMPLE.name,
           category: 'Apparel',
           brand: 'Acme',
           base_price: '499',
@@ -273,6 +275,13 @@ function exampleFor(sheet: SheetName): Record<string, string>[] {
     default:
       return [{ sku: 'TSHIRT-001' }]
   }
+}
+
+/** The flat single-sheet layout as CSV: the header row and a help row (skipped on upload). */
+export function buildTemplateCsv(): string {
+  const esc = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)
+  const help = ALL_COLUMNS.map(c => c.help ?? '')
+  return [HEADER_ROW, help].map(r => r.map(esc).join(',')).join('\r\n') + '\r\n'
 }
 
 // Header used by the parser to detect the help row on an uploaded file.

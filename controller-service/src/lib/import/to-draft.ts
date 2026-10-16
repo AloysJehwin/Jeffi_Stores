@@ -34,6 +34,32 @@ export function backfillBlankOptionalFields(
   return fields
 }
 
+// The shared publish SQL writes many columns as bare NULLIF, so a blank cell on a NEW product is
+// NULL and a NOT NULL column fails the publish. Those take the skeleton row's DB defaults instead.
+const NEVER_DEFAULTED = new Set(['id', 'sku', 'name', 'slug', 'data_source', 'is_draft', 'created_at', 'updated_at'])
+
+/** Fill a new product's blank NOT NULL fields (`notNullKeys`) from its freshly inserted skeleton row;
+ * discount_pct is derived from mrp and base_price when both are given, as the product editor shows it. */
+export function fillCreateDefaults(
+  fields: Record<string, unknown>,
+  skeleton: Record<string, unknown> | null,
+  notNullKeys: Iterable<string>
+): Record<string, unknown> {
+  if (fields.discount_pct === undefined) {
+    const mrp = Number(fields.mrp)
+    const price = Number(fields.base_price)
+    if (Number.isFinite(mrp) && Number.isFinite(price) && mrp > 0 && price >= 0 && price <= mrp) {
+      fields.discount_pct = Math.round(((mrp - price) / mrp) * 10000) / 100
+    }
+  }
+  for (const key of notNullKeys) {
+    if (NEVER_DEFAULTED.has(key) || fields[key] !== undefined) continue
+    const v = skeleton?.[key]
+    if (v !== null && v !== undefined) fields[key] = v
+  }
+  return fields
+}
+
 export interface ResolvedIds {
   categoryId: string | null
   brandId: string | null

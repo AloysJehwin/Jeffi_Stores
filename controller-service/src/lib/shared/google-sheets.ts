@@ -479,6 +479,25 @@ async function removeProductFromSheet(sku: string, token: string) {
   }
 }
 
+/** A failed Google API call; `status` is the HTTP status Google answered with. */
+export class GoogleApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public reason?: string
+  ) {
+    super(message)
+    this.name = 'GoogleApiError'
+  }
+}
+
+const googleError = (data: any, status: number, fallback: string) =>
+  new GoogleApiError(
+    data?.error?.message || `${fallback} (${status})`,
+    status,
+    data?.error?.status || data?.error?.errors?.[0]?.reason
+  )
+
 // Read a value matrix from any spreadsheet with a caller-supplied OAuth access token — the
 // tenant-scoped counterpart to the write helpers above, which use the platform service account.
 // Used by the Data Source Google-sheet sync, which resolves the tenant's own token first.
@@ -489,8 +508,7 @@ export async function readSheetValues(spreadsheetId: string, range: string, acce
   )
   const data = await res.json().catch(() => null)
   if (!res.ok) {
-    const reason = data?.error?.message || `sheets read failed (${res.status})`
-    throw new Error(reason)
+    throw googleError(data, res.status, 'sheets read failed')
   }
   return (data?.values as string[][]) || []
 }
@@ -522,8 +540,7 @@ export async function createSheetFromWorkbook(title: string, xlsx: Buffer, acces
   })
   const data = await res.json().catch(() => null)
   if (!res.ok || !data?.id) {
-    const reason = data?.error?.message || `drive create failed (${res.status})`
-    throw new Error(reason)
+    throw googleError(data, res.status, 'drive create failed')
   }
   return String(data.id)
 }
@@ -535,7 +552,7 @@ export async function listSheetTitles(spreadsheetId: string, accessToken: string
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(data?.error?.message || `sheets metadata failed (${res.status})`)
+  if (!res.ok) throw googleError(data, res.status, 'sheets metadata failed')
   const sheets = (data?.sheets as Array<{ properties?: { title?: string } }>) || []
   return sheets.map(s => String(s.properties?.title || '')).filter(Boolean)
 }
@@ -553,7 +570,7 @@ export async function readSheetValuesBatch(
     { headers: { Authorization: `Bearer ${accessToken}` } }
   )
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(data?.error?.message || `sheets batch read failed (${res.status})`)
+  if (!res.ok) throw googleError(data, res.status, 'sheets batch read failed')
   const vrs = (data?.valueRanges as Array<{ values?: string[][] }>) || []
   return ranges.map((_, i) => vrs[i]?.values || [])
 }
