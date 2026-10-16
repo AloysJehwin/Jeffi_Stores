@@ -20,10 +20,35 @@ data:
   RAG_EMBED_MODEL: "nomic-embed-text"
   AI_JOB_ATTEMPTS: "3"
   AI_WORKER_CONCURRENCY: "2"
+  # Images and video (see README "Images and video").
+  AI_IMAGE_PROVIDERS: "razer,google,replicate"
+  AI_VIDEO_PROVIDERS: "google,replicate"
+  AI_PUBLIC_URL: ""
+  AI_IMAGE_CACHE_TTL_SECONDS: "3600"
+  AI_FILES_TTL_SECONDS: "3600"
+  AI_VIDEO_TTL_SECONDS: "86400"
+  AI_VIDEO_POLL_MS: "10000"
+  AI_USD_INR: "84"
+  AI_PRICES_JSON: ""
+  SD_WEBUI_URL: ""
+  SD_MODEL: ""
+  SD_STEPS: "25"
+  SD_CFG: "7"
+  SD_SAMPLER: "DPM++ 2M Karras"
+  SD_TIMEOUT_MS: "180000"
+  GOOGLE_IMAGE_MODEL: "gemini-3.1-flash-image"
+  GOOGLE_IMAGE_PREMIUM_MODEL: "gemini-3-pro-image"
+  GOOGLE_IMAGEN_MODEL: ""
+  GOOGLE_VEO_MODEL: "veo-3.1-fast-generate-preview"
+  GOOGLE_VEO_FALLBACK: "veo-3.0-generate-001"
+  GOOGLE_TIMEOUT_MS: "120000"
+  REPLICATE_TIMEOUT_MS: "180000"
 ---
 # secret.example.yaml — copy to a real Secret (never commit real values).
 # AI_CACHE_PG_URL: postgres connection for the ai_cache (pgvector) table.
 # OPENAI_API_KEY: only used when a request forces the openai provider.
+# GOOGLE_AI_API_KEY: Gemini API key (images, Veo video). Empty = google skipped.
+# REPLICATE_API_TOKEN: Replicate token (Flux, Wan video). Empty = replicate skipped.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -33,3 +58,5 @@ type: Opaque
 stringData:
   AI_CACHE_PG_URL: ""
   OPENAI_API_KEY: ""
+  GOOGLE_AI_API_KEY: ""
+  REPLICATE_API_TOKEN: ""

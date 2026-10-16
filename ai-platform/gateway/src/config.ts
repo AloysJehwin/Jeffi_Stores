@@ -21,6 +21,13 @@ export const CONFIG = {
 
   port: Number(process.env.PORT) || 8080,
 
+  // Media: provider order, public base for /v1/files URLs (empty = relative; the SDK absolutises).
+  imageProviders: process.env.AI_IMAGE_PROVIDERS || '',
+  videoProviders: process.env.AI_VIDEO_PROVIDERS || '',
+  publicUrl: (process.env.AI_PUBLIC_URL || '').replace(/\/$/, ''),
+  imageCacheTtlSeconds: Number(process.env.AI_IMAGE_CACHE_TTL_SECONDS) || 3600,
+  videoPollMs: Number(process.env.AI_VIDEO_POLL_MS) || 10_000,
+
   // OpenAI escape hatch (only when a request forces it) — parity with the old client.
   openaiApiKey: process.env.OPENAI_API_KEY || '',
   openaiModel: process.env.OPENAI_MODEL || 'gpt-4o-mini',
