@@ -6,6 +6,7 @@ export const AI_IMAGE_FEATURES = [
   'ads_image',
   'email_hero',
   'hero_image',
+  'offer_image',
   'generate_image',
 ] as const
 export type AiImageFeature = (typeof AI_IMAGE_FEATURES)[number]
