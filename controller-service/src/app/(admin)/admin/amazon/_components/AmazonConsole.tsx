@@ -2,19 +2,20 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Calculator, RefreshCw, Trophy } from 'lucide-react'
+import { Calculator, FileBarChart, RefreshCw, Trophy } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, Tabs, api } from '@/components/admin/channels/ui'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import AmazonMerchantPanel from '../../merchant-sync/_components/AmazonMerchantPanel'
-import { BuyboxView, FeesView, OrdersStockView, OverviewView, RepricerView, SuppressedView } from './AmazonTabs'
+import { BuyboxView, FeesView, OrdersStockView, OverviewView, RepricerView, SalesView, SuppressedView } from './AmazonTabs'
 
-type Tab = 'overview' | 'orders' | 'listings' | 'suppressed' | 'buybox' | 'fees' | 'repricer' | 'alerts' | 'changes' | 'runs'
+type Tab = 'overview' | 'sales' | 'orders' | 'listings' | 'suppressed' | 'buybox' | 'fees' | 'repricer' | 'alerts' | 'changes' | 'runs'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'sales', label: 'Sales & payouts' },
   { id: 'orders', label: 'Orders & stock' },
   { id: 'listings', label: 'Listings & push' },
   { id: 'suppressed', label: 'Suppressed' },
@@ -25,7 +26,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'changes', label: 'Change history' },
   { id: 'runs', label: 'Job runs' },
 ]
-const DATA_TABS = new Set<Tab>(['overview', 'suppressed', 'buybox', 'fees', 'repricer'])
+const DATA_TABS = new Set<Tab>(['overview', 'sales', 'suppressed', 'buybox', 'fees', 'repricer'])
 const ALERT_PARAMS = { minOffers: 'minimum offers', minMarginPct: 'margin %', hours: 'hours', units: 'units' }
 const RUN_LABELS = { pricing: 'Buy Box and repricer', fees: 'Fee estimates', orders: 'Order import', stock: 'Stock push', reports: 'Sales reports' }
 
@@ -56,7 +57,7 @@ export default function AmazonConsole({ connected }: { connected: boolean }) {
     router.push(`${ap('/admin/amazon')}?${params.toString()}`, { scroll: false })
   }
 
-  async function refresh(kind: 'status' | 'offers' | 'fees') {
+  async function refresh(kind: 'status' | 'offers' | 'fees' | 'reports') {
     setBusy(kind)
     setBanner(null)
     const r = await api('/api/admin/amazon/console/refresh', { method: 'POST', json: { kind } })
@@ -64,7 +65,7 @@ export default function AmazonConsole({ connected }: { connected: boolean }) {
     if (!r.ok) setBanner({ ok: false, text: r.data.error || 'Refresh failed' })
     else if (r.data.status && r.data.status !== 'success')
       setBanner({ ok: false, text: `Refreshed with problems: ${(r.data.errors ?? []).map((e: any) => `${e.step}: ${e.message}`).join('; ')}` })
-    else setBanner({ ok: true, text: kind === 'status' ? 'Listing status refreshed.' : kind === 'offers' ? 'Buy Box and offers refreshed.' : 'Fee estimates refreshed.' })
+    else setBanner({ ok: true, text: kind === 'status' ? 'Listing status refreshed.' : kind === 'offers' ? 'Buy Box and offers refreshed.' : kind === 'reports' ? 'Reports collected; a new sales report is requested and arrives on the next run.' : 'Fee estimates refreshed.' })
     reload()
   }
 
@@ -80,6 +81,7 @@ export default function AmazonConsole({ connected }: { connected: boolean }) {
             <IconButton icon={RefreshCw} label="Refresh listing status" busy={busy === 'status'} onClick={() => refresh('status')} />
             <IconButton icon={Trophy} label="Refresh Buy Box and offers" busy={busy === 'offers'} onClick={() => refresh('offers')} />
             <IconButton icon={Calculator} label="Refresh fee estimates" busy={busy === 'fees'} onClick={() => refresh('fees')} />
+            <IconButton icon={FileBarChart} label="Collect sales reports and settlements" busy={busy === 'reports'} onClick={() => refresh('reports')} />
           </>
         )}
       </div>
@@ -100,6 +102,8 @@ function Body({ tab, data, onChanged }: { tab: Tab; data: any; onChanged: () => 
   switch (tab) {
     case 'overview':
       return <OverviewView d={data} />
+    case 'sales':
+      return <SalesView d={data} />
     case 'orders':
       return <OrdersStockView onChanged={onChanged} />
     case 'listings':

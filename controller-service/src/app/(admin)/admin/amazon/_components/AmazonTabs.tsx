@@ -5,6 +5,7 @@ import { Trash2 } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
+import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, api, btnPrimary, count, inputCls, money, pct, when } from '@/components/admin/channels/ui'
 
 const PRICE = '/api/admin/amazon/console/price'
@@ -417,6 +418,71 @@ export function OrdersStockView({ onChanged }: { onChanged: () => void }) {
             { key: 'amz', label: 'Amazon shows', num: true, render: (r: any) => r.amazon_quantity ?? '-' },
             { key: 'at', label: 'Sent', render: (r: any) => when(r.pushed_at) },
             { key: 'err', label: '', render: (r: any) => (r.push_error ? <span className="text-xs text-red-500">{r.push_error}</span> : null) },
+          ]}
+        />
+      </Section>
+    </div>
+  )
+}
+
+const SALES_SERIES: SeriesDef[] = [
+  { key: 'sales', label: 'Ordered sales', color: 'rgb(16 185 129)', kind: 'line', axis: 'money', on: true },
+  { key: 'sessions', label: 'Sessions', color: 'rgb(59 130 246)', kind: 'bar', axis: 'count', on: true },
+  { key: 'units', label: 'Units', color: 'rgb(168 85 247)', kind: 'line', axis: 'count', on: false },
+]
+
+export function SalesView({ d }: { d: any }) {
+  if (!d) return null
+  const days = d.daily ?? []
+  const sum = (k: string) => days.reduce((s: number, x: any) => s + Number(x[k] ?? 0), 0)
+  const sessions = sum('sessions')
+  const units = sum('units_ordered')
+  const p = d.profit
+  return (
+    <div className="space-y-5">
+      <KpiGrid>
+        <Kpi label="Ordered sales" value={money(sum('ordered_sales'))} sub="last 45 days, Amazon's report" highlight />
+        <Kpi label="Units" value={count(units)} />
+        <Kpi label="Sessions" value={count(sessions)} />
+        <Kpi label="Conversion" value={pct(sessions ? units / sessions : null)} sub="units per session" />
+        <Kpi label="Est. profit, 30 days" value={money(p.profit)} sub={`sales ex GST ${money(p.revenue)} − cost ${money(p.cost)} − fees ${money(p.fees)}`} />
+        <Kpi label="Lines without cost" value={count(p.linesWithoutCost)} sub={`of ${count(p.lines)} order lines; add cost prices for a true profit`} />
+      </KpiGrid>
+      <Section title="Sales and traffic by day">
+        {days.length ? (
+          <TrendChart points={days.map((x: any) => ({ label: String(x.date).slice(0, 10), sales: Number(x.ordered_sales), sessions: Number(x.sessions), units: Number(x.units_ordered) }))} series={SALES_SERIES} ariaLabel="Amazon sales and sessions by day" />
+        ) : (
+          <Empty msg="No report yet. Amazon builds it in a few minutes after it is requested; reports refresh every 6 hours." />
+        )}
+      </Section>
+      <Section title="By product (child ASIN)">
+        <Table
+          rows={d.asins ?? []}
+          rowKey={(r: any) => r.asin}
+          empty="No product breakdown yet."
+          cols={[
+            { key: 'title', label: 'Product', render: (r: any) => r.title ?? r.sku ?? r.asin },
+            { key: 'sales', label: 'Sales', num: true, render: (r: any) => money(Number(r.ordered_sales)), sort: (r: any) => Number(r.ordered_sales) },
+            { key: 'units', label: 'Units', num: true, render: (r: any) => count(r.units_ordered), sort: (r: any) => r.units_ordered },
+            { key: 'sessions', label: 'Sessions', num: true, render: (r: any) => count(r.sessions), sort: (r: any) => r.sessions },
+            { key: 'conv', label: 'Unit session %', num: true, render: (r: any) => (r.unit_session_pct == null ? '-' : `${Number(r.unit_session_pct).toFixed(1)}%`) },
+            { key: 'bb', label: 'Buy Box %', num: true, render: (r: any) => (r.buy_box_pct == null ? '-' : `${Number(r.buy_box_pct).toFixed(0)}%`) },
+          ]}
+        />
+      </Section>
+      <Section title="Settlements (payouts)">
+        <Table
+          rows={d.settlements ?? []}
+          rowKey={(r: any) => r.settlement_id}
+          empty="No settlements yet. Amazon creates one per payout."
+          cols={[
+            { key: 'period', label: 'Period', render: (r: any) => `${String(r.start_date ?? '').slice(0, 10)} to ${String(r.end_date ?? '').slice(0, 10)}` },
+            { key: 'deposit', label: 'Paid', render: (r: any) => String(r.deposit_date ?? '-').slice(0, 10) },
+            { key: 'sales', label: 'Sales', num: true, render: (r: any) => money(Number(r.product_sales), 2) },
+            { key: 'fees', label: 'Fees', num: true, render: (r: any) => money(Number(r.fees), 2) },
+            { key: 'refunds', label: 'Refunds', num: true, render: (r: any) => money(Number(r.refunds), 2) },
+            { key: 'tax', label: 'TCS / TDS', num: true, render: (r: any) => money(Number(r.tax_withheld), 2) },
+            { key: 'total', label: 'Payout', num: true, render: (r: any) => <strong>{money(Number(r.total_amount), 2)}</strong> },
           ]}
         />
       </Section>

@@ -324,6 +324,17 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'amazon:read',
   },
   {
+    id: 'amazon_reports',
+    name: 'Amazon sales, traffic and settlement reports',
+    path: '/api/cron/amazon-reports',
+    method: 'GET',
+    intervalMs: 6 * HOUR,
+    intervalLabel: 'every 6 h',
+    startDelayMs: 480 * SEC,
+    lockTtlMs: 6 * HOUR - MIN,
+    tenantScope: 'amazon:read',
+  },
+  {
     id: 'ai_health',
     name: 'AI platform health',
     path: '/api/internal/ai/health',
