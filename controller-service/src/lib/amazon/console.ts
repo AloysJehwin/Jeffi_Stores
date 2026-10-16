@@ -212,7 +212,7 @@ export async function refreshFees(): Promise<RunResult> {
 
 // ---- Console tabs ----
 
-export const AMAZON_TABS = ['overview', 'listings', 'suppressed', 'buybox', 'fees', 'repricer', 'alerts', 'changes', 'runs'] as const
+export const AMAZON_TABS = ['overview', 'sales', 'orders', 'listings', 'suppressed', 'buybox', 'fees', 'repricer', 'alerts', 'changes', 'runs'] as const
 export type AmazonTab = (typeof AMAZON_TABS)[number]
 
 /** Suppressed: Amazon reports an error, or the listing is not discoverable (not shown in search). */
@@ -316,6 +316,8 @@ export async function loadAmazonTab(tab: AmazonTab) {
   switch (tab) {
     case 'overview':
       return loadAmazonOverview()
+    case 'sales':
+      return (await import('./reports')).loadAmazonSales()
     case 'suppressed':
       return loadSuppressed()
     case 'buybox':

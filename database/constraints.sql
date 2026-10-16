@@ -3682,3 +3682,8 @@ ALTER TABLE ONLY public.amazon_order_items ADD CONSTRAINT amazon_order_items_pke
 ALTER TABLE ONLY public.amazon_inventory_state ADD CONSTRAINT amazon_inventory_state_pkey PRIMARY KEY (sku);
 ALTER TABLE ONLY public.amazon_order_items ADD CONSTRAINT amazon_order_items_order_fkey FOREIGN KEY (amazon_order_id) REFERENCES public.amazon_orders(amazon_order_id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.amazon_orders ADD CONSTRAINT amazon_orders_order_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.amazon_report_requests ADD CONSTRAINT amazon_report_requests_pkey PRIMARY KEY (report_id);
+ALTER TABLE ONLY public.amazon_sales_traffic_daily ADD CONSTRAINT amazon_sales_traffic_daily_pkey PRIMARY KEY (date);
+ALTER TABLE ONLY public.amazon_sales_traffic_asin ADD CONSTRAINT amazon_sales_traffic_asin_pkey PRIMARY KEY (asin);
+ALTER TABLE ONLY public.amazon_settlements ADD CONSTRAINT amazon_settlements_pkey PRIMARY KEY (settlement_id);

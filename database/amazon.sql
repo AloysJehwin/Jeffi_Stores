@@ -211,3 +211,79 @@ CREATE TABLE public.amazon_inventory_state (
     amazon_checked_at timestamp with time zone,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: amazon_report_requests; Type: TABLE; Schema: public; Owner: -
+-- Reports API requests in flight (they take minutes): requested by one run, collected by a later one.
+--
+
+CREATE TABLE public.amazon_report_requests (
+    report_id text NOT NULL,
+    report_type text NOT NULL,
+    data_start date,
+    data_end date,
+    status character varying(16) DEFAULT 'requested'::character varying NOT NULL,
+    error text,
+    requested_at timestamp with time zone DEFAULT now() NOT NULL,
+    collected_at timestamp with time zone
+);
+
+
+--
+-- Name: amazon_sales_traffic_daily; Type: TABLE; Schema: public; Owner: -
+-- Sales and traffic report by day (whole account).
+--
+
+CREATE TABLE public.amazon_sales_traffic_daily (
+    date date NOT NULL,
+    ordered_sales numeric(14,2) DEFAULT 0 NOT NULL,
+    units_ordered integer DEFAULT 0 NOT NULL,
+    order_items integer DEFAULT 0 NOT NULL,
+    units_refunded integer DEFAULT 0 NOT NULL,
+    sessions integer DEFAULT 0 NOT NULL,
+    page_views integer DEFAULT 0 NOT NULL,
+    buy_box_pct numeric(6,2),
+    unit_session_pct numeric(6,2)
+);
+
+
+--
+-- Name: amazon_sales_traffic_asin; Type: TABLE; Schema: public; Owner: -
+-- Sales and traffic report by child ASIN over the report window (data_start..data_end).
+--
+
+CREATE TABLE public.amazon_sales_traffic_asin (
+    asin text NOT NULL,
+    sku text,
+    data_start date NOT NULL,
+    data_end date NOT NULL,
+    ordered_sales numeric(14,2) DEFAULT 0 NOT NULL,
+    units_ordered integer DEFAULT 0 NOT NULL,
+    sessions integer DEFAULT 0 NOT NULL,
+    page_views integer DEFAULT 0 NOT NULL,
+    buy_box_pct numeric(6,2),
+    unit_session_pct numeric(6,2)
+);
+
+
+--
+-- Name: amazon_settlements; Type: TABLE; Schema: public; Owner: -
+-- One row per Amazon settlement (payout): totals by kind from the V2 settlement report.
+--
+
+CREATE TABLE public.amazon_settlements (
+    settlement_id text NOT NULL,
+    start_date timestamp with time zone,
+    end_date timestamp with time zone,
+    deposit_date timestamp with time zone,
+    total_amount numeric(14,2),
+    currency character varying(8) DEFAULT 'INR'::character varying NOT NULL,
+    product_sales numeric(14,2) DEFAULT 0 NOT NULL,
+    fees numeric(14,2) DEFAULT 0 NOT NULL,
+    refunds numeric(14,2) DEFAULT 0 NOT NULL,
+    tax_withheld numeric(14,2) DEFAULT 0 NOT NULL,
+    other numeric(14,2) DEFAULT 0 NOT NULL,
+    breakdown jsonb DEFAULT '{}'::jsonb NOT NULL,
+    imported_at timestamp with time zone DEFAULT now() NOT NULL
+);
