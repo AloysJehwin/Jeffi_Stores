@@ -4,6 +4,7 @@ import { encryptToken } from '@/lib/crypto/token-cipher'
 import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
 import { completeGoogleAdsOAuth } from '@/lib/google-ads/oauth-callback'
+import { registerMerchantApi } from '@/lib/merchant/registration'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,7 +57,13 @@ export async function GET(request: NextRequest) {
       ),
       meta: { merchant_id: state.merchantId, connected_via: 'oauth' },
     })
-    return returnToAdmin(`${backTo}?connected=google`)
+    // The Merchant API needs our Cloud project registered with the account once; the admin who just
+    // signed in can do it, so do it now. A failure does not undo the connection.
+    const reg = data.access_token
+      ? await registerMerchantApi(data.access_token, state.merchantId).catch(() => null)
+      : null
+    const regParam = reg && !reg.ok ? `&register_error=${encodeURIComponent(reg.message.slice(0, 200))}` : ''
+    return returnToAdmin(`${backTo}?connected=google${regParam}`)
   } catch (e) {
     return fail(errorParam(e))
   }
