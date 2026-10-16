@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { cookies } from 'next/headers'
 import { ap } from '@/lib/shared/admin-path'
@@ -9,6 +10,7 @@ import AccessDenied from '@/components/admin/AccessDenied'
 import LoyaltyProgram from './_components/LoyaltyProgram'
 import ReferralProgram from './_components/ReferralProgram'
 import BirthdayProgram from './_components/BirthdayProgram'
+import ProgramsOverview from './_components/ProgramsOverview'
 import { PROGRAMS_PATH } from './_components/ProgramSection'
 
 export const dynamic = 'force-dynamic'
@@ -17,6 +19,7 @@ export const revalidate = 0
 // Each program is switched on or off in Site Controls; one that is off still shows here, greyed out.
 // New programs get a tab here.
 const TABS = [
+  { key: 'overview', label: 'Overview' },
   { key: 'loyalty', label: 'Loyalty' },
   { key: 'referrals', label: 'Refer & Earn' },
   { key: 'birthday', label: 'Birthday rewards' },
@@ -52,7 +55,9 @@ export default async function CustomerProgramsPage({
     return <AccessDenied scopeKey="campaigns" scopeLabel="Programs" />
   }
 
-  const tab: TabKey = TABS.find(t => t.key === params.tab)?.key ?? 'loyalty'
+  // Overview is the default; an old link carrying loyalty list params (page, tier, search) still opens Loyalty.
+  const tab: TabKey =
+    TABS.find(t => t.key === params.tab)?.key ?? (params.page || params.tier || params.search ? 'loyalty' : 'overview')
   const basePath = ap(PROGRAMS_PATH, host)
   const search = params.search || ''
   const page = pageNumber(params.page)
@@ -70,7 +75,7 @@ export default async function CustomerProgramsPage({
         {TABS.map(t => (
           <Link
             key={t.key}
-            href={t.key === 'loyalty' ? basePath : `${basePath}?tab=${t.key}`}
+            href={t.key === 'overview' ? basePath : `${basePath}?tab=${t.key}`}
             role="tab"
             aria-selected={tab === t.key}
             className={`shrink-0 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
@@ -84,6 +89,11 @@ export default async function CustomerProgramsPage({
         ))}
       </div>
 
+      {tab === 'overview' && (
+        <Suspense fallback={null}>
+          <ProgramsOverview />
+        </Suspense>
+      )}
       {tab === 'loyalty' && <LoyaltyProgram host={host} query={{ page, tier: params.tier || '', search }} />}
       {tab === 'referrals' && <ReferralProgram host={host} query={{ page, status: params.status || '', search }} />}
       {tab === 'birthday' && <BirthdayProgram host={host} />}

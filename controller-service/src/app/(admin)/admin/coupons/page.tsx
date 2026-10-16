@@ -14,6 +14,9 @@ import { sortOptions } from '@/components/admin/sortOptions'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import DraftRowActions from '@/components/admin/DraftRowActions'
+import { resolveListTab } from '@/lib/overviews/marketing'
+import OverviewTabs from './_components/OverviewTabs'
+import CouponsOverview from './_components/CouponsOverview'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -77,11 +80,16 @@ async function getFilteredCoupons(filters: {
   return { coupons, total }
 }
 
-export default function CouponsPage({
+const LIST_KEYS = ['is_active', 'search', 'campaign', 'page', 'sort', 'dir'] as const
+
+export default async function CouponsPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
+  const sp = await searchParams
+  const tab = resolveListTab(sp, LIST_KEYS)
+  const host = await getHost()
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -94,35 +102,45 @@ export default function CouponsPage({
         </Suspense>
       </div>
 
-      <Suspense fallback={<AdminStatsSkeleton cards={4} gridClass="grid-cols-2 sm:grid-cols-4" />}>
-        <CouponsStats />
-      </Suspense>
+      <OverviewTabs basePath={ap('/admin/coupons', host)} active={tab} sp={sp} listLabel="Coupons" />
 
-      <AdminFilters
-        filters={[
-          {
-            name: 'is_active',
-            label: 'Status',
-            options: [
-              { value: 'true', label: 'Active' },
-              { value: 'false', label: 'Inactive' },
-            ],
-          },
-          {
-            name: 'campaign',
-            label: 'Source',
-            options: [
-              { value: '__manual__', label: 'Manual' },
-              { value: 'winback_90', label: 'Winback 90d' },
-              { value: 'winback_180', label: 'Winback 180d' },
-            ],
-          },
-        ]}
-        searchPlaceholder="Search by code or description..."
-        suggestType="coupons"
-      />
+      {tab === 'overview' ? (
+        <Suspense fallback={null}>
+          <CouponsOverview />
+        </Suspense>
+      ) : (
+        <>
+          <Suspense fallback={<AdminStatsSkeleton cards={4} gridClass="grid-cols-2 sm:grid-cols-4" />}>
+            <CouponsStats />
+          </Suspense>
 
-      <CouponsListSection searchParams={searchParams} />
+          <AdminFilters
+            filters={[
+              {
+                name: 'is_active',
+                label: 'Status',
+                options: [
+                  { value: 'true', label: 'Active' },
+                  { value: 'false', label: 'Inactive' },
+                ],
+              },
+              {
+                name: 'campaign',
+                label: 'Source',
+                options: [
+                  { value: '__manual__', label: 'Manual' },
+                  { value: 'winback_90', label: 'Winback 90d' },
+                  { value: 'winback_180', label: 'Winback 180d' },
+                ],
+              },
+            ]}
+            searchPlaceholder="Search by code or description..."
+            suggestType="coupons"
+          />
+
+          <CouponsListSection searchParams={searchParams} />
+        </>
+      )}
     </div>
   )
 }
@@ -313,27 +331,25 @@ async function CouponsListContent({
   })
 
   const buildUrl = (p: number) => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
     if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (campaign) params.set('campaign', campaign)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
-    const qs = params.toString()
-    return ap(`/admin/coupons${qs ? `?${qs}` : ''}`, host)
+    return ap(`/admin/coupons?${params}`, host)
   }
 
   const currentListUrl = (() => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
     if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (campaign) params.set('campaign', campaign)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (page > 1) params.set('page', String(page))
-    const qs = params.toString()
-    return `/admin/coupons${qs ? `?${qs}` : ''}`
+    return `/admin/coupons?${params}`
   })()
 
   return (
