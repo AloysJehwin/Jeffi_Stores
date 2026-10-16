@@ -922,3 +922,27 @@ ALTER TABLE ONLY public.api_key_usage_daily ADD CONSTRAINT api_key_usage_daily_a
 CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON public.api_keys USING btree (tenant_id, status);
 
 -- ─────────────────────────────────────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ai_price_list: platform-wide AI price list (docs/plans/AI_MEDIA_PLATFORM_PLAN.md). One row per
+-- (capability, provider, model, unit_type). cost_inr is the platform's cost per unit; price_inr is
+-- what a tenant's wallet is charged per unit (Razer rows carry a non-zero price so local inference
+-- is still charged). Edited at /admin/ecom/ai-pricing; seeded in seed-plans.sql.
+CREATE TABLE IF NOT EXISTS public.ai_price_list (
+    id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    capability  character varying(16) NOT NULL,   -- text | embed | vision | image | video
+    provider    character varying(32) NOT NULL,   -- ollama | razer | google | replicate | openai
+    model       character varying(128) NOT NULL,  -- '*' = default for the provider
+    unit_type   character varying(16) NOT NULL,   -- token_1k_in | token_1k_out | image | video_second | call
+    cost_inr    numeric(10,4) NOT NULL DEFAULT 0,
+    price_inr   numeric(10,4) NOT NULL DEFAULT 0,
+    active      boolean NOT NULL DEFAULT true,
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_key UNIQUE (capability, provider, model, unit_type);
+ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_capability_check
+    CHECK (capability IN ('text','embed','vision','image','video'));
+ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_unit_type_check
+    CHECK (unit_type IN ('token_1k_in','token_1k_out','image','video_second','call'));
+CREATE INDEX IF NOT EXISTS idx_ai_price_list_lookup ON public.ai_price_list USING btree (capability, unit_type, active);

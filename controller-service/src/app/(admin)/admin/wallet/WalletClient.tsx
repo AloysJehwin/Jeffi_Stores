@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { topupAmounts } from '@/lib/billing/topup-amounts'
+import { aiFeatureLabel, aiLedgerNote } from '@/lib/ai/feature-labels'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
@@ -26,6 +27,7 @@ type LedgerEntry = {
   occurred_at: string
 }
 type Wallet = { balance: number; minBalance: number; currency: string; ledger: LedgerEntry[] }
+export type AiSpendRow = { feature: string; calls: number; spent: number; unpaid: number }
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
@@ -38,10 +40,15 @@ const CATEGORY_LABEL: Record<string, string> = {
   goodwill_credit: 'Goodwill credit',
   campaign: 'Campaign',
   ai: 'AI',
+  sms: 'SMS',
+  whatsapp: 'WhatsApp',
+  email: 'Email',
+  media: 'Media',
   adjustment: 'Adjustment',
 }
 const catOf = (e: LedgerEntry) => e.category || e.entry_type
 const catLabel = (c: string) => CATEGORY_LABEL[c] || c
+const noteOf = (e: LedgerEntry) => (e.category === 'ai' ? aiLedgerNote(e.note) : e.note)
 
 const DIRECTION_OPTIONS = [
   { value: 'all', label: 'All directions' },
@@ -60,7 +67,15 @@ function loadRazorpayScript(): Promise<boolean> {
   })
 }
 
-export default function WalletClient({ initial }: { initial: Wallet | null }) {
+export default function WalletClient({
+  initial,
+  aiSpend = [],
+  aiSpendDays = 30,
+}: {
+  initial: Wallet | null
+  aiSpend?: AiSpendRow[]
+  aiSpendDays?: number
+}) {
   const canWrite = useCanWrite('delhivery:write')
   const [wallet, setWallet] = useState<Wallet | null>(initial)
   const [amount, setAmount] = useState('')
@@ -89,7 +104,7 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
       if (from && e.occurred_at.slice(0, 10) < from) return false
       if (to && e.occurred_at.slice(0, 10) > to) return false
       if (q) {
-        const hay = `${e.order_ref ?? ''} ${e.awb ?? ''} ${e.note ?? ''}`.toLowerCase()
+        const hay = `${e.order_ref ?? ''} ${e.awb ?? ''} ${noteOf(e) ?? ''}`.toLowerCase()
         if (!hay.includes(q.toLowerCase())) return false
       }
       return true
@@ -177,7 +192,7 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
         Number(e.amount).toFixed(2),
         e.order_ref ?? '',
         e.awb ?? '',
-        (e.note ?? '').replace(/\s+/g, ' '),
+        (noteOf(e) ?? '').replace(/\s+/g, ' '),
       ]
         .map(x => esc(String(x)))
         .join(',')
@@ -198,7 +213,7 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Shipping Wallet</h1>
         <p className="text-sm text-foreground-muted mt-1">
-          Prepaid balance the platform debits for Delhivery charges — forward shipments, return pickups and corrections.
+          Prepaid balance the platform debits for Delhivery charges (forward shipments, return pickups, corrections), messaging and AI.
         </p>
       </div>
 
@@ -246,6 +261,8 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
           )}
         </div>
       )}
+
+      {aiSpend.length > 0 && <AiSpendSection rows={aiSpend} days={aiSpendDays} />}
 
       {/* Filter bar (shared AdminSelect + DatePicker, same as Financial Transactions) */}
       <div className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
@@ -320,7 +337,7 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
                       <td className="px-4 py-2.5 text-foreground-secondary">
                         {e.order_ref && <span className="mr-2">{e.order_ref}</span>}
                         {e.awb && <span className="text-foreground-muted">{e.awb}</span>}
-                        {e.note && <span className="block text-xs text-foreground-muted">{e.note}</span>}
+                        {e.note && <span className="block text-xs text-foreground-muted">{noteOf(e)}</span>}
                       </td>
                       <td
                         className={`px-4 py-2.5 text-right font-semibold whitespace-nowrap ${
@@ -339,6 +356,40 @@ export default function WalletClient({ initial }: { initial: Wallet | null }) {
         </div>
       )}
       <p className="text-xs text-foreground-muted">Showing the most recent {ledger.length} entries.</p>
+    </div>
+  )
+}
+
+function AiSpendSection({ rows, days }: { rows: AiSpendRow[]; days: number }) {
+  const total = rows.reduce((a, r) => a + r.spent, 0)
+  const unpaid = rows.reduce((a, r) => a + r.unpaid, 0)
+  return (
+    <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-border-default flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm font-semibold text-foreground">AI spend, last {days} days</p>
+        <p className="text-sm text-foreground-secondary tabular-nums">
+          {inr(total)}
+          {unpaid > 0 && <span className="ml-2 text-amber-600 dark:text-amber-400">{unpaid} unpaid calls</span>}
+        </p>
+      </div>
+      <table className="w-full text-sm">
+        <thead className="border-b border-border-default">
+          <tr>
+            <th className={thCls}>Feature</th>
+            <th className={thRight}>Calls</th>
+            <th className={thRight}>Spent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => (
+            <tr key={r.feature} className="border-b border-border-default last:border-0">
+              <td className="px-4 py-2.5 text-foreground">{aiFeatureLabel(r.feature)}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums text-foreground-secondary">{r.calls.toLocaleString('en-IN')}</td>
+              <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">{inr(r.spent)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }

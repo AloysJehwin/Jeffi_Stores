@@ -725,15 +725,15 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'ecom_billing:read',
     label: 'Ecom Billing (Read)',
     description: 'View tenant subscriptions, settlement ledger and payouts',
-    routes: ['/admin/ecom/billing'],
+    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing'],
     group: 'Ecom Store',
     platformOnly: true,
   },
   {
     key: 'ecom_billing:write',
     label: 'Ecom Billing (Write)',
-    description: 'Manage tenant subscriptions, adjust settlements and trigger payouts',
-    routes: ['/admin/ecom/billing'],
+    description: 'Manage tenant subscriptions, adjust settlements, trigger payouts and edit the AI price list',
+    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing'],
     group: 'Ecom Store',
     platformOnly: true,
   },
@@ -847,6 +847,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/ecom/customers')) return 'ecom_customers:read'
   if (pathname.startsWith('/api/admin/ecom/instances')) return 'ecom_instances:read'
   if (pathname.startsWith('/api/admin/ecom/billing')) return 'ecom_billing:read'
+  if (pathname.startsWith('/api/admin/ecom/ai-pricing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/admin/ecom/store-status')) return 'ecom_customers:read'
   if (pathname.startsWith('/api/internal/cron-record')) return null
   if (pathname.startsWith('/api/admin/business/customers')) return 'business_customers:read'

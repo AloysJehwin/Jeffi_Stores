@@ -18,6 +18,7 @@ export async function suggestHashtags(text: string, count = 15): Promise<string[
   if (!(await currentTenantPlanGate(AI_ADMIN_SCOPE)).allowed) throw Object.assign(new Error('AI suggestions need a plan with AI'), { status: 403 })
   const { storeDescriptorForPrompt } = await import('@/lib/catalog/brand')
   const r = await aiChat({
+    feature: 'social_hashtags',
     modelHint: 'email',
     jsonMode: true,
     temperature: 0.4,

@@ -168,6 +168,30 @@ ALTER TABLE ONLY public.ai_feedback
 
 
 --
+-- Name: ai_usage ai_usage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_usage
+    ADD CONSTRAINT ai_usage_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_usage ai_usage_status_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_usage
+    ADD CONSTRAINT ai_usage_status_check CHECK (((status)::text = ANY (ARRAY['pending'::text, 'ok'::text, 'failed'::text, 'unpaid'::text])));
+
+
+--
+-- Name: ai_usage ai_usage_capability_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_usage
+    ADD CONSTRAINT ai_usage_capability_check CHECK (((capability)::text = ANY (ARRAY['text'::text, 'embed'::text, 'vision'::text, 'image'::text, 'video'::text])));
+
+
+--
 -- Name: ai_queries ai_queries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 

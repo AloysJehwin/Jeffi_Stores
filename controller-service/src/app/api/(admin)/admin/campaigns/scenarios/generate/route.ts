@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const r = await aiChat({
+      feature: 'campaign_scenario',
       modelHint: 'sql',
       jsonMode: true,
       temperature: 0.2,

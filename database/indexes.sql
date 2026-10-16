@@ -209,6 +209,20 @@ CREATE INDEX idx_ai_queries_recommended_user ON public.ai_queries USING gin (rec
 CREATE INDEX idx_ai_queries_user_time ON public.ai_queries USING btree (user_id, created_at DESC);
 
 
+--
+-- Name: idx_ai_usage_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_usage_created ON public.ai_usage USING btree (created_at DESC);
+
+
+--
+-- Name: idx_ai_usage_feature_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_usage_feature_created ON public.ai_usage USING btree (feature, created_at DESC);
+
+
 
 --
 -- Name: idx_back_in_stock_notify_product; Type: INDEX; Schema: public; Owner: -

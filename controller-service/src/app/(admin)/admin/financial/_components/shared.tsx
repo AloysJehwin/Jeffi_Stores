@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { formatINR as formatINRBase, formatDate as formatDateBase } from '@/lib/shared/format'
 
 export type Tab =
-  'overview' | 'receivables' | 'payables' | 'transactions' | 'pl' | 'cashflow' | 'cod_remittance' | 'messaging'
+  'overview' | 'receivables' | 'payables' | 'transactions' | 'pl' | 'cashflow' | 'cod_remittance' | 'messaging' | 'ai_costs'
 
 export const inputCls =
   'w-full px-3 py-1.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400'

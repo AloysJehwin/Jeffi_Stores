@@ -580,4 +580,31 @@ INSERT INTO public.tenants (id, slug, display_name, status)
 VALUES ('00000000-0000-0000-0000-000000000000', 'platform', 'Platform (flagship)', 'active')
 ON CONFLICT DO NOTHING;
 
+
+-- AI price list (ai_price_list). cost_inr = platform cost per unit, price_inr = tenant wallet
+-- charge per unit (gateway costs at ~Rs 85/USD, prices with a margin). Razer rows carry a non-zero
+-- compute price so local inference is still charged.
+-- Rows insert once (ON CONFLICT DO NOTHING): the platform admin edits them at /admin/ecom/ai-pricing.
+INSERT INTO public.ai_price_list (capability, provider, model, unit_type, cost_inr, price_inr) VALUES
+  ('text',  'ollama',    '*',                              'token_1k_in',   0.0200,  0.0600),
+  ('text',  'ollama',    '*',                              'token_1k_out',  0.0200,  0.0600),
+  ('text',  'google',    '*',                              'token_1k_in',   0.0300,  0.0900),
+  ('text',  'google',    '*',                              'token_1k_out',  0.1200,  0.3600),
+  ('embed', 'ollama',    '*',                              'token_1k_in',   0.0050,  0.0150),
+  ('vision','ollama',    '*',                              'call',          0.0500,  0.2000),
+  ('image', 'razer',     '*',                              'image',         0.3000,  2.0000),
+  ('image', 'google',    'gemini-3.1-flash-image',         'image',         3.3000,  6.0000),
+  ('image', 'google',    'gemini-3-pro-image',             'image',        11.4000, 20.0000),
+  ('image', 'google',    '*',                              'image',         3.3000,  6.0000),
+  ('image', 'replicate', 'black-forest-labs/flux-schnell', 'image',         0.2600,  2.0000),
+  ('image', 'replicate', 'black-forest-labs/flux-dev',     'image',         2.1300,  4.0000),
+  ('image', 'replicate', '*',                              'image',         3.4000,  6.0000),
+  ('video', 'google',    'veo-3.1-fast-generate-preview',  'video_second',  8.5000, 15.0000),
+  ('video', 'google',    'veo-3.0-generate-001',           'video_second', 34.0000, 50.0000),
+  ('video', 'google',    '*',                              'video_second',  8.5000, 15.0000),
+  ('video', 'replicate', 'wan-video/wan-2.2-t2v-fast',     'video_second',  2.0000,  5.0000),
+  ('video', 'replicate', 'wan-video/wan-2.2-i2v-fast',     'video_second',  2.0000,  5.0000),
+  ('video', 'replicate', '*',                              'video_second',  2.0000,  5.0000)
+ON CONFLICT (capability, provider, model, unit_type) DO NOTHING;
+
 COMMIT;

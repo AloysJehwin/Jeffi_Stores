@@ -271,3 +271,34 @@ export function TopPayablesCard({ items }: { items: RankedItem[] }) {
     </ChartCard>
   )
 }
+
+const SERIES_PALETTE = ['rgb(59 130 246)', 'rgb(16 185 129)', 'rgb(234 179 8)', 'rgb(168 85 247)', 'rgb(239 68 68)', 'rgb(236 72 153)']
+
+/** One line per key (e.g. AI cost per provider) over the period. */
+export function KeyedTrendCard({
+  title,
+  hint,
+  data,
+  keys,
+  labels,
+  granularity,
+}: {
+  title: string
+  hint?: string
+  data: TrendPoint[]
+  keys: string[]
+  labels?: Record<string, string>
+  granularity: Granularity
+}) {
+  const lines: Line[] = keys.map((k, i) => ({
+    key: k,
+    label: labels?.[k] ?? k,
+    color: SERIES_PALETTE[i % SERIES_PALETTE.length],
+    points: data.map(d => num(d, k)),
+  }))
+  return (
+    <ChartCard title={title} hint={hint ?? GRAN_HINT[granularity]}>
+      <TrendLines months={data.map(d => d.label)} lines={lines} granularity={granularity} ariaLabel={`${title} over the period.`} />
+    </ChartCard>
+  )
+}
