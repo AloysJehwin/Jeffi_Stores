@@ -3,6 +3,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
+vi.mock('@/lib/providers/policy', () => ({ getAiRouting: vi.fn(async () => ({})) }))
 vi.mock('@/lib/tenancy/tenant-context', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/tenancy/tenant-context')>()),
   resolveTenantId: vi.fn(async () => null),
