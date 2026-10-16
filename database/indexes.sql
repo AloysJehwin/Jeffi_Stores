@@ -2283,3 +2283,7 @@ CREATE INDEX IF NOT EXISTS idx_channel_alerts_key_notified ON public.channel_ale
 CREATE INDEX IF NOT EXISTS idx_channel_alerts_status_seen ON public.channel_alerts (channel, status, last_seen_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_channel_change_log_channel ON public.channel_change_log (channel, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_gmc_product_performance_offer ON public.gmc_product_performance (offer_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_gmc_best_sellers_status ON public.gmc_best_sellers (report_date, catalog_status);

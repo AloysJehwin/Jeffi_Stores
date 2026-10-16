@@ -85,8 +85,8 @@
     "semantic_hash": ""
   },
   "database/constraints.sql": {
-    "mtime": 1792139670.2905836,
-    "ast_hash": "b731d676520486b93e2ad9e57af9213a",
+    "mtime": 1792141115.0676556,
+    "ast_hash": "ec6879face81f396c0f657c42406808b",
     "semantic_hash": ""
   },
   "database/crm.sql": {
@@ -105,8 +105,8 @@
     "semantic_hash": ""
   },
   "database/indexes.sql": {
-    "mtime": 1792139670.3002403,
-    "ast_hash": "1b51bf70028a70a1897cceccf9ca2e66",
+    "mtime": 1792141115.073338,
+    "ast_hash": "54535c389042e4e726edaee21b6b34f5",
     "semantic_hash": ""
   },
   "database/inventory.sql": {
@@ -4330,8 +4330,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/platform/cronjobs.yaml": {
-    "mtime": 1792124001.9074192,
-    "ast_hash": "7f994574f5454e85f885c8d4cfbfd129",
+    "mtime": 1792141427.6624448,
+    "ast_hash": "612edd7bef651d53acc28b7376ef5c20",
     "semantic_hash": ""
   },
   "deploy/k8s/platform/kustomization.yaml": {
@@ -6865,8 +6865,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/layout.tsx": {
-    "mtime": 1792140991.5274768,
-    "ast_hash": "3e1a446de8e0bf953624d6cb742eb3a1",
+    "mtime": 1792141611.194632,
+    "ast_hash": "40fd4d66ab5cad745af996a8158c55da",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/loading.tsx": {
@@ -13860,8 +13860,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/auth/scopes.ts": {
-    "mtime": 1792140429.2394195,
-    "ast_hash": "ceb9d855c0447dfea90e66f97ab75ecb",
+    "mtime": 1792141607.1348784,
+    "ast_hash": "2cd054011a4666557160e4fd8b086cc1",
     "semantic_hash": ""
   },
   "controller-service/src/lib/auth/session-binding-gate.ts": {
@@ -15080,8 +15080,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/cron-jobs.ts": {
-    "mtime": 1792124001.5057583,
-    "ast_hash": "fc7920ebc0edbe43ee67c0f82de7e4ab",
+    "mtime": 1792141426.4961848,
+    "ast_hash": "78608e2981378f9c16c0db31dc03142f",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/cron-record.ts": {
@@ -15630,8 +15630,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/tenant-migrations-schema.ts": {
-    "mtime": 1792139670.3259652,
-    "ast_hash": "0b985c0f33eaaeb6aa6392ebf6c83ef0",
+    "mtime": 1792141115.0963907,
+    "ast_hash": "6a09cc3c87b740397d283e75ba7e0896",
     "semantic_hash": ""
   },
   "controller-service/src/lib/tenant-migrations.ts": {
@@ -17445,8 +17445,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/components/admin/channels/ui.tsx": {
-    "mtime": 1792140478.2532456,
-    "ast_hash": "1c2b6bda22911beeb0c376a4e3d5ffc4",
+    "mtime": 1792141472.5406396,
+    "ast_hash": "549fa3d71d61db620d4ea6a79c11abbe",
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/alerts-engine.ts": {
@@ -17465,8 +17465,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/registry.ts": {
-    "mtime": 1792140987.0089922,
-    "ast_hash": "40cb3839ed3194c89f16762996cc821c",
+    "mtime": 1792141228.3196557,
+    "ast_hash": "ceb83c4c8c18ac4f0813ccb0ed641a8c",
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/report-store.ts": {
@@ -17475,8 +17475,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/route.ts": {
-    "mtime": 1792139771.3141613,
-    "ast_hash": "dfb034d56a0f87d2f18ce585642eb029",
+    "mtime": 1792141391.5229878,
+    "ast_hash": "7a0d89a40feda469243e8c85db688714",
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/sync-run.ts": {
@@ -17497,6 +17497,101 @@
   "tests/lib/channels/kit.test.ts": {
     "mtime": 1792140890.3891935,
     "ast_hash": "4866568ed9a4cdb4606a98da79a68e83",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/merchant/_components/MerchantConsole.tsx": {
+    "mtime": 1792141504.7427933,
+    "ast_hash": "be42d44f73b57944912cd66e27a8f1ef",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/merchant/_components/ReportTabs.tsx": {
+    "mtime": 1792141990.4863482,
+    "ast_hash": "b35b055abeed615f84813e95c918f888",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/merchant/_components/SettingsTabs.tsx": {
+    "mtime": 1792141990.4868903,
+    "ast_hash": "da48fec339a4e9547f3b582f75e2f09d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/merchant/page.tsx": {
+    "mtime": 1792141483.4357831,
+    "ast_hash": "e7df12820810d20acd173fe15487775e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/merchant/console/actions/route.ts": {
+    "mtime": 1792141391.5241377,
+    "ast_hash": "dbd1c92ae4e194a54d5c17668aad3344",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/merchant/console/issues/[offerId]/route.ts": {
+    "mtime": 1792141391.523703,
+    "ast_hash": "37edbfbb73f92e52a57c369ad5daac13",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/merchant/console/refresh/route.ts": {
+    "mtime": 1792141391.523936,
+    "ast_hash": "554ffb27e79b54a66f43997c55b15b37",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/merchant/console/route.ts": {
+    "mtime": 1792141391.5233555,
+    "ast_hash": "d8a507470a8c678e7d833b5ad32129ee",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/gmc-reports/route.ts": {
+    "mtime": 1792141375.1343412,
+    "ast_hash": "24f2de8a6314704ca16bad9186815bbb",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/gmc-status-refresh/route.ts": {
+    "mtime": 1792141375.1405926,
+    "ast_hash": "3e21676a9912b44ef1c791f913197822",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/channels/PreviewApply.tsx": {
+    "mtime": 1792141990.4858053,
+    "ast_hash": "79322230c0fcca691d9ecbb8bcf2bd79",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/merchant/actions.ts": {
+    "mtime": 1792141689.9496174,
+    "ast_hash": "0d7a334f7a3a185139729c5b50c08427",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/merchant/alerts.ts": {
+    "mtime": 1792141224.0524273,
+    "ast_hash": "7033dd7fc51c1ce1ab49ae269a8873b6",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/merchant/console-api.ts": {
+    "mtime": 1792141150.732968,
+    "ast_hash": "3987418cd71db4ddbfe33ad6f94279fd",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/merchant/console-data.ts": {
+    "mtime": 1792141271.457917,
+    "ast_hash": "1ce3fd51a07f8e2ef88d2038b6514385",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/merchant/reports.ts": {
+    "mtime": 1792141192.7552783,
+    "ast_hash": "4add472d9b122106a2b476ec532ff3ee",
+    "semantic_hash": ""
+  },
+  "database/merchant.sql": {
+    "mtime": 1792141105.961759,
+    "ast_hash": "c78235f1f2dcf70a93d0caee5962e5cd",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/merchant/console/routes.test.ts": {
+    "mtime": 1792141714.5102224,
+    "ast_hash": "3aca78a099ee8ef3a3dbe61a3150dbd6",
+    "semantic_hash": ""
+  },
+  "tests/lib/merchant/console.test.ts": {
+    "mtime": 1792141689.9499307,
+    "ast_hash": "6c46c970ca548eca95bdfc9484311b49",
     "semantic_hash": ""
   }
 }
