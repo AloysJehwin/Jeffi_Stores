@@ -13,11 +13,34 @@ import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import RevenueTrendChart from '@/components/admin/RevenueTrendChart'
 import OrdersMobileList from './_components/OrdersMobileList'
+import OrdersOverview from './_components/OrdersOverview'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 const PAGE_SIZE = 25
+
+// Params that belong to the list; a URL carrying any of them (old links, filters) opens the list tab.
+const LIST_PARAMS = [
+  'status',
+  'payment_status',
+  'source',
+  'search',
+  'sort',
+  'dir',
+  'page',
+  'date_from',
+  'date_to',
+  'amount_min',
+  'amount_max',
+  'awb',
+  'shipment_status',
+  'payment_mode',
+  'coupon_code',
+  'cod_pending',
+  '_adv',
+]
 
 type SP = { [key: string]: string | string[] | undefined }
 function sp(resolvedSearchParams: SP, key: string) {
@@ -110,6 +133,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
+    params.set('tab', 'list')
     const qs = params.toString()
     return ap(`/admin/orders${qs ? `?${qs}` : ''}`, host)
   }
@@ -124,6 +148,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (page > 1) params.set('page', String(page))
+    params.set('tab', 'list')
     const qs = params.toString()
     return `/admin/orders${qs ? `?${qs}` : ''}`
   })()
@@ -212,16 +237,57 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
   )
 }
 
-export default function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const resolved = await searchParams
+  const host = await getHost()
+  const tabParam = sp(resolved, 'tab')
+  const tab =
+    tabParam === 'list' || (tabParam !== 'overview' && LIST_PARAMS.some(k => sp(resolved, k))) ? 'list' : 'overview'
+  const tabCls = (on: boolean) =>
+    `px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${on ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'}`
+
   return (
     <div className="p-4 sm:p-6">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Orders</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
         </div>
       </div>
 
+      <div className="flex gap-0.5 border-b border-border-default overflow-x-auto mb-5" role="tablist">
+        <Link
+          href={ap('/admin/orders?tab=overview', host)}
+          role="tab"
+          aria-selected={tab === 'overview'}
+          className={tabCls(tab === 'overview')}
+        >
+          Overview
+        </Link>
+        <Link
+          href={ap('/admin/orders?tab=list', host)}
+          role="tab"
+          aria-selected={tab === 'list'}
+          className={tabCls(tab === 'list')}
+        >
+          All orders
+        </Link>
+      </div>
+
+      {tab === 'overview' ? (
+        <Suspense fallback={null}>
+          <OrdersOverview />
+        </Suspense>
+      ) : (
+        <OrdersList searchParams={searchParams} />
+      )}
+    </div>
+  )
+}
+
+function OrdersList({ searchParams }: { searchParams: Promise<SP> }) {
+  return (
+    <>
       <Suspense fallback={<AdminStatsSkeleton cards={4} banner />}>
         <OrdersStats />
       </Suspense>
@@ -332,7 +398,7 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
       />
 
       <OrdersListSection searchParams={searchParams} />
-    </div>
+    </>
   )
 }
 

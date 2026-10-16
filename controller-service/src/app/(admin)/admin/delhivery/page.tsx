@@ -3,7 +3,9 @@ import { getSiteControls } from '@/lib/catalog/site-controls'
 import { ap } from '@/lib/shared/admin-path'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getTenant } from '@/lib/tenant-registry'
+import { Suspense } from 'react'
 import DelhiveryPageClient, { type DeliveryMode } from './DelhiveryPageClient'
+import DelhiveryTabs from './_components/DelhiveryTabs'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -26,24 +28,26 @@ export default async function DelhiveryPage() {
         <Link href={ap('/admin/orders')} className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block">
           ← Back to Orders
         </Link>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
-          Delhivery Pickup Request
-        </h1>
-        <p className="text-foreground-secondary mt-1">
-          Orders with an AWB not yet included in a pickup request. Pickup slot: 14:00–18:00.
-        </p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Delhivery</h1>
+        <p className="text-foreground-secondary mt-1">Shipments, deliveries, pickups and COD remittance</p>
       </div>
 
-      <DelhiveryPageClient
-        deliveryMode={deliveryMode}
-        defaultWarehouse={{
-          pickupLocation: c.values.pickupLocation,
-          sellerName: c.values.sellerName,
-          sellerAddress: c.values.sellerAddress,
-          sellerPhone: c.values.sellerPhone,
-          originPincode: c.values.delhiveryOriginPincode,
-        }}
-      />
+      <Suspense fallback={null}>
+        <DelhiveryTabs
+          pickups={
+            <DelhiveryPageClient
+              deliveryMode={deliveryMode}
+              defaultWarehouse={{
+                pickupLocation: c.values.pickupLocation,
+                sellerName: c.values.sellerName,
+                sellerAddress: c.values.sellerAddress,
+                sellerPhone: c.values.sellerPhone,
+                originPincode: c.values.delhiveryOriginPincode,
+              }}
+            />
+          }
+        />
+      </Suspense>
     </div>
   )
 }
