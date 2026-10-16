@@ -10,6 +10,9 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import MailerMobileList from './_components/MailerMobileList'
+import MessagingOverview from './_components/MessagingOverview'
+import OverviewTabs from '../../coupons/_components/OverviewTabs'
+import { resolveListTab } from '@/lib/overviews/marketing'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -24,9 +27,14 @@ const TEMPLATE_LABELS: Record<string, string> = {
   custom: 'Custom',
 }
 
-const channelLabel = (c: { template_key: string; channels?: Record<string, { slug: string }> | null }, labels: Record<string, string>) =>
+const channelLabel = (
+  c: { template_key: string; channels?: Record<string, { slug: string }> | null },
+  labels: Record<string, string>
+) =>
   c.template_key === 'library'
-    ? Object.entries(c.channels ?? {}).map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`).join(' · ') || 'No channels'
+    ? Object.entries(c.channels ?? {})
+        .map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`)
+        .join(' · ') || 'No channels'
     : labels[c.template_key] || c.template_key
 
 const STATUS_STYLES: Record<string, string> = {
@@ -54,15 +62,19 @@ interface Campaign {
 export default async function MailerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; search?: string }>
+  searchParams: Promise<{ page?: string; search?: string; tab?: string; from?: string; to?: string }>
 }) {
   const host = await getHost()
+  const sp = await searchParams
+  const tab = resolveListTab(sp, ['page', 'search'])
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Messaging</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Send email, SMS and WhatsApp messages to your customers</p>
+          <p className="text-foreground-secondary mt-1 text-sm">
+            Send email, SMS and WhatsApp messages to your customers
+          </p>
         </div>
         <div className="hidden md:block">
           <Link
@@ -74,9 +86,18 @@ export default async function MailerPage({
         </div>
       </div>
 
-      <AdminFilters filters={[]} searchPlaceholder="Search by title or subject..." />
+      <OverviewTabs basePath={ap('/admin/marketing/messaging', host)} active={tab} sp={sp} listLabel="Messages" />
 
-      <MailerListSection searchParams={searchParams} />
+      {tab === 'overview' ? (
+        <Suspense fallback={null}>
+          <MessagingOverview />
+        </Suspense>
+      ) : (
+        <>
+          <AdminFilters filters={[]} searchPlaceholder="Search by title or subject..." />
+          <MailerListSection searchParams={searchParams} />
+        </>
+      )}
     </div>
   )
 }
@@ -134,19 +155,17 @@ async function MailerListContent({
   }
 
   const buildUrl = (p: number) => {
-    const qs = new URLSearchParams()
+    const qs = new URLSearchParams({ tab: 'list' })
     if (search) qs.set('search', search)
     if (p > 1) qs.set('page', String(p))
-    const s = qs.toString()
-    return ap(`/admin/marketing/messaging${s ? `?${s}` : ''}`, host)
+    return ap(`/admin/marketing/messaging?${qs}`, host)
   }
 
   const currentListUrl = (() => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (search) params.set('search', search)
     if (page > 1) params.set('page', String(page))
-    const qs = params.toString()
-    return `/admin/marketing/messaging${qs ? `?${qs}` : ''}`
+    return `/admin/marketing/messaging?${params}`
   })()
 
   if (migrationPending) {
@@ -220,9 +239,7 @@ async function MailerListContent({
                 </Link>
                 <p className="text-xs text-foreground-muted truncate max-w-[200px]">{c.subject}</p>
               </td>
-              <td className="px-4 py-3 text-foreground-secondary">
-                {channelLabel(c, TEMPLATE_LABELS)}
-              </td>
+              <td className="px-4 py-3 text-foreground-secondary">{channelLabel(c, TEMPLATE_LABELS)}</td>
               <td className="px-4 py-3 capitalize text-foreground-secondary">{c.audience_type.replace('_', ' ')}</td>
               <td className="px-4 py-3 text-foreground-secondary">{c.recipient_count ?? '—'}</td>
               <td className="px-4 py-3">
@@ -251,7 +268,10 @@ async function MailerListContent({
                   <MailerRowActions
                     id={c.id}
                     title={c.title}
-                    viewHref={ap(`/admin/marketing/messaging/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)}
+                    viewHref={ap(
+                      `/admin/marketing/messaging/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`,
+                      host
+                    )}
                     canDelete={c.status !== 'sending'}
                   />
                 </div>

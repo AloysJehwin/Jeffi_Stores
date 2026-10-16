@@ -836,6 +836,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/google-ads')) return 'google_ads:read'
   if (pathname.startsWith('/api/admin/integrations/google-ads')) return 'google_ads:read'
   if (pathname.startsWith('/api/admin/campaigns')) return 'campaigns:read'
+  if (pathname.startsWith('/api/admin/customer-programs')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/loyalty')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/referrals')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/agent')) return 'agent:read'

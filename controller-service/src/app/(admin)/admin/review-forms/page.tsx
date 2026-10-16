@@ -10,6 +10,9 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { formsHostForHost } from '@/lib/tenant-registry'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import { resolveListTab } from '@/lib/overviews/marketing'
+import OverviewTabs from '../coupons/_components/OverviewTabs'
+import ReviewFormsOverview from './_components/ReviewFormsOverview'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -51,6 +54,8 @@ export default async function ReviewFormsPage({
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
   const host = await getHost()
+  const sp = await searchParams
+  const tab = resolveListTab(sp, ['search', 'page'])
 
   return (
     <div className="p-4 sm:p-6">
@@ -71,13 +76,23 @@ export default async function ReviewFormsPage({
         </div>
       </div>
 
-      <AdminFilters filters={[]} searchPlaceholder="Search by title or slug..." suggestType="review_forms" />
+      <OverviewTabs basePath={ap('/admin/review-forms', host)} active={tab} sp={sp} listLabel="Forms" />
 
-      <Suspense fallback={null}>
-        <ReviewFormsDraftsBanner host={host} />
-      </Suspense>
+      {tab === 'overview' ? (
+        <Suspense fallback={null}>
+          <ReviewFormsOverview />
+        </Suspense>
+      ) : (
+        <>
+          <AdminFilters filters={[]} searchPlaceholder="Search by title or slug..." suggestType="review_forms" />
 
-      <ReviewFormsListSection searchParams={searchParams} host={host} />
+          <Suspense fallback={null}>
+            <ReviewFormsDraftsBanner host={host} />
+          </Suspense>
+
+          <ReviewFormsListSection searchParams={searchParams} host={host} />
+        </>
+      )}
     </div>
   )
 }
@@ -184,7 +199,7 @@ async function ReviewFormsListContent({
   const formsBase = `https://${formsHostForHost(host)}`
 
   const buildUrl = (p: number) => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
@@ -192,7 +207,7 @@ async function ReviewFormsListContent({
   }
 
   const currentListUrl = (() => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (page > 1) params.set('page', String(page))
     const qs = params.toString()
@@ -233,11 +248,7 @@ async function ReviewFormsListContent({
 
         <div className="md:hidden p-4">
           {forms.length > 0 ? (
-            <ReviewFormsMobileList
-              forms={forms as FormRow[]}
-              backUrl={currentListUrl}
-              formsBase={formsBase}
-            />
+            <ReviewFormsMobileList forms={forms as FormRow[]} backUrl={currentListUrl} formsBase={formsBase} />
           ) : (
             <p className="text-center text-foreground-muted text-sm">No review forms yet.</p>
           )}

@@ -11,6 +11,9 @@ import { getHost } from '@/lib/tenancy/get-host'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import CustomerEngagementChart from '@/components/admin/CustomerEngagementChart'
+import CustomersOverview from './_components/CustomersOverview'
+import OverviewTabs from '../coupons/_components/OverviewTabs'
+import { resolveListTab } from '@/lib/overviews/marketing'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -61,7 +64,12 @@ async function CustomersStats() {
   )
 }
 
-export default function CustomersPage({ searchParams }: { searchParams: Promise<SP> }) {
+const LIST_KEYS = ['status', 'segment', 'health', 'tag', 'search', 'page', 'sort', 'dir'] as const
+
+export default async function CustomersPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const sp = await searchParams
+  const tab = resolveListTab(sp, LIST_KEYS)
+  const host = await getHost()
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
@@ -69,53 +77,63 @@ export default function CustomersPage({ searchParams }: { searchParams: Promise<
         <p className="text-foreground-secondary mt-1 text-sm">View and manage customer accounts</p>
       </div>
 
-      <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
-        <CustomersStats />
-      </Suspense>
+      <OverviewTabs basePath={ap('/admin/customers', host)} active={tab} sp={sp} listLabel="Customers" />
 
-      <AdminFilters
-        filters={[
-          {
-            name: 'status',
-            label: 'Status',
-            options: [
-              { value: 'active', label: 'Active' },
-              { value: 'inactive', label: 'Inactive' },
-              { value: 'flagged', label: 'Flagged' },
-            ],
-          },
-          {
-            name: 'segment',
-            label: 'Segment',
-            options: [
-              { value: 'vip', label: 'VIP (₹50k+)' },
-              { value: 'loyal', label: 'Loyal' },
-              { value: 'repeat', label: 'Repeat (3+)' },
-              { value: 'one_time', label: 'One-time' },
-              { value: 'new', label: 'New (<30d)' },
-              { value: 'at_risk', label: 'At Risk (90-180d)' },
-              { value: 'dormant', label: 'Dormant (180d+)' },
-              { value: 'b2b', label: 'B2B' },
-              { value: 'lead', label: 'Lead (no orders)' },
-            ],
-          },
-          {
-            name: 'health',
-            label: 'Health',
-            options: [
-              { value: 'healthy', label: 'Healthy (≥70)' },
-              { value: 'at_risk', label: 'At Risk (40-69)' },
-              { value: 'critical', label: 'Critical (<40)' },
-              { value: 'unknown', label: 'Not scored' },
-            ],
-          },
-        ]}
-        searchPlaceholder="Search by name, email or phone..."
-        suggestType="customers"
-        searchParam="search"
-      />
+      {tab === 'overview' ? (
+        <Suspense fallback={null}>
+          <CustomersOverview />
+        </Suspense>
+      ) : (
+        <>
+          <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
+            <CustomersStats />
+          </Suspense>
 
-      <CustomersListSection searchParams={searchParams} />
+          <AdminFilters
+            filters={[
+              {
+                name: 'status',
+                label: 'Status',
+                options: [
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' },
+                  { value: 'flagged', label: 'Flagged' },
+                ],
+              },
+              {
+                name: 'segment',
+                label: 'Segment',
+                options: [
+                  { value: 'vip', label: 'VIP (₹50k+)' },
+                  { value: 'loyal', label: 'Loyal' },
+                  { value: 'repeat', label: 'Repeat (3+)' },
+                  { value: 'one_time', label: 'One-time' },
+                  { value: 'new', label: 'New (<30d)' },
+                  { value: 'at_risk', label: 'At Risk (90-180d)' },
+                  { value: 'dormant', label: 'Dormant (180d+)' },
+                  { value: 'b2b', label: 'B2B' },
+                  { value: 'lead', label: 'Lead (no orders)' },
+                ],
+              },
+              {
+                name: 'health',
+                label: 'Health',
+                options: [
+                  { value: 'healthy', label: 'Healthy (≥70)' },
+                  { value: 'at_risk', label: 'At Risk (40-69)' },
+                  { value: 'critical', label: 'Critical (<40)' },
+                  { value: 'unknown', label: 'Not scored' },
+                ],
+              },
+            ]}
+            searchPlaceholder="Search by name, email or phone..."
+            suggestType="customers"
+            searchParam="search"
+          />
+
+          <CustomersListSection searchParams={searchParams} />
+        </>
+      )}
     </div>
   )
 }
@@ -152,7 +170,7 @@ async function CustomersListContent({ resolvedSearchParams }: { resolvedSearchPa
   })
 
   const buildUrl = (p: number) => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
     if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (resolvedSearchParams.segment) params.set('segment', resolvedSearchParams.segment)
@@ -166,7 +184,7 @@ async function CustomersListContent({ resolvedSearchParams }: { resolvedSearchPa
   }
 
   const currentListUrl = (() => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
     if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (resolvedSearchParams.segment) params.set('segment', resolvedSearchParams.segment)
