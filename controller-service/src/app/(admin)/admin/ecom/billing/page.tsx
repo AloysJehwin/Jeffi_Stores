@@ -1,10 +1,13 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { listTenants, billingSummary } from '@/lib/tenant-registry'
 import { EcomHero, EcomFilters, StatusPill } from '@/components/admin/ecom/EcomUI'
 import EcomBillingMobileList from './_components/EcomBillingMobileList'
+import EcomTabs, { ecomTab } from '../_components/EcomTabs'
+import EcomBillingOverview from './_components/EcomBillingOverview'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,6 +20,22 @@ export default async function EcomBillingPage({ searchParams }: { searchParams: 
   if (!isPlatformAdmin(role)) redirect('/admin')
 
   const sp = await searchParams
+  const tab = ecomTab(sp)
+  if (tab === 'overview')
+    return (
+      <div className="p-6 w-full">
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-foreground">Billing</h1>
+          <p className="text-sm text-foreground-muted mt-1">
+            Tenant transactions, splits &amp; settlement — click a store for detail
+          </p>
+        </div>
+        <EcomTabs base="/admin/ecom/billing" active="overview" listLabel="All stores" />
+        <Suspense>
+          <EcomBillingOverview />
+        </Suspense>
+      </div>
+    )
   const [tenants, summary] = await Promise.all([
     listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q'), product: 'store' }),
     billingSummary(),
@@ -24,12 +43,13 @@ export default async function EcomBillingPage({ searchParams }: { searchParams: 
 
   return (
     <div className="p-6 w-full">
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-2xl font-bold text-foreground">Billing</h1>
         <p className="text-sm text-foreground-muted mt-1">
           Tenant transactions, splits &amp; settlement — click a store for detail
         </p>
       </div>
+      <EcomTabs base="/admin/ecom/billing" active="list" listLabel="All stores" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
         <EcomHero

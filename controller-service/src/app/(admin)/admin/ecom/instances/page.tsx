@@ -1,10 +1,13 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { listTenants } from '@/lib/tenant-registry'
 import { EcomFilters } from '@/components/admin/ecom/EcomUI'
 import EcomInstancesMobileList from './_components/EcomInstancesMobileList'
+import EcomTabs, { ecomTab } from '../_components/EcomTabs'
+import EcomInstancesOverview from './_components/EcomInstancesOverview'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,17 +20,37 @@ export default async function EcomInstancesPage({ searchParams }: { searchParams
   if (!isPlatformAdmin(role)) redirect('/admin')
 
   const sp = await searchParams
-  const tenants = await listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q'), product: 'store' })
+  const tab = ecomTab(sp)
+  if (tab === 'overview')
+    return (
+      <div className="p-6 w-full">
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-foreground">Instances</h1>
+          <p className="text-sm text-foreground-muted mt-1">Per-tenant infrastructure</p>
+        </div>
+        <EcomTabs base="/admin/ecom/instances" active="overview" listLabel="All instances" />
+        <Suspense>
+          <EcomInstancesOverview />
+        </Suspense>
+      </div>
+    )
+  const tenants = await listTenants({
+    status: one(sp, 'status'),
+    plan: one(sp, 'plan'),
+    q: one(sp, 'q'),
+    product: 'store',
+  })
   const provisioned = tenants.filter(t => t.rds_endpoint).length
 
   return (
     <div className="p-6 w-full">
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-2xl font-bold text-foreground">Instances</h1>
         <p className="text-sm text-foreground-muted mt-1">
           Per-tenant infrastructure — {provisioned}/{tenants.length} provisioned
         </p>
       </div>
+      <EcomTabs base="/admin/ecom/instances" active="list" listLabel="All instances" />
 
       <EcomFilters />
 
