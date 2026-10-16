@@ -2287,3 +2287,5 @@ CREATE INDEX IF NOT EXISTS idx_channel_change_log_channel ON public.channel_chan
 CREATE INDEX IF NOT EXISTS idx_gmc_product_performance_offer ON public.gmc_product_performance (offer_id, date);
 
 CREATE INDEX IF NOT EXISTS idx_gmc_best_sellers_status ON public.gmc_best_sellers (report_date, catalog_status);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_amazon_repricer_rules_sku ON public.amazon_repricer_rules (COALESCE(sku, ''));

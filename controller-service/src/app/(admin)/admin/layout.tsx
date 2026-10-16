@@ -42,6 +42,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/catalog-enrichment', label: 'AI Enrichment', scope: 'catalog_enrichment:read', group: 'Catalogue' },
     { href: '/admin/merchant', label: 'Google Merchant', scope: 'merchant_sync:read', group: 'Catalogue' },
     { href: '/admin/merchant-sync', label: 'Merchant Sync', scope: 'merchant_sync:read', group: 'Catalogue' },
+    { href: '/admin/amazon', label: 'Amazon', scope: 'amazon:read', group: 'Catalogue' },
     { href: '/admin/data-source', label: 'Data Source', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/social-posts', label: 'Social Posts', scope: 'social:read', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders:read', group: 'Sales' },

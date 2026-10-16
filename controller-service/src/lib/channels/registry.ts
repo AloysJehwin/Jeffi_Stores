@@ -6,6 +6,8 @@ export async function ruleSetFor(channel: Channel): Promise<RuleSet<any, any> | 
   switch (channel) {
     case 'gmc':
       return (await import('@/lib/merchant/alerts')).GMC_RULES
+    case 'amazon':
+      return (await import('@/lib/amazon/alerts')).AMAZON_RULES
     default:
       return null
   }
