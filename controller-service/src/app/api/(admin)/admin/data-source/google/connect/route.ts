@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
     'https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.file'
   )
   url.searchParams.set('access_type', 'offline')
-  url.searchParams.set('prompt', 'consent')
+  url.searchParams.set('prompt', 'select_account consent')
   url.searchParams.set('state', state)
 
   return NextResponse.redirect(url.toString())

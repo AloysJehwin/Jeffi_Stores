@@ -104,6 +104,19 @@ export default function ConnectPanel({
     }
   }
 
+  // Drops the pending sign-in and starts Google's sign-in again with the account chooser.
+  async function useAnotherAccount() {
+    setBusy(true)
+    setError(null)
+    const r = await fetch('/api/admin/google-ads/connection', { method: 'DELETE', credentials: 'include' }).catch(() => null)
+    if (r && !r.ok) {
+      setError((await r.json().catch(() => ({}))).error || 'Could not clear the sign-in')
+      setBusy(false)
+      return
+    }
+    window.location.href = '/api/admin/integrations/google-ads/connect'
+  }
+
   const disabled = !status.env.developerToken || !canWrite
   const tabs: { id: Method; label: string; show: boolean }[] = [
     { id: 'google', label: 'Sign in with Google', show: true },
@@ -168,7 +181,10 @@ export default function ConnectPanel({
                 </p>
               )}
               {accounts && accounts.length === 0 && (
-                <p className="text-sm text-foreground-muted">No advertiser accounts are reachable with this sign-in.</p>
+                <p className="text-sm text-foreground-muted">
+                  No usable Google Ads account is reachable with this sign-in. Sign in with the Google user that has access to
+                  your Google Ads account (or its manager account).
+                </p>
               )}
               <ul className="divide-y divide-border-default rounded-lg border border-border-default">
                 {(accounts ?? []).map(a => (
@@ -205,6 +221,11 @@ export default function ConnectPanel({
                     ))}
                   </ul>
                 </details>
+              )}
+              {canWrite && (
+                <button type="button" disabled={busy} className={btnGhost} onClick={useAnotherAccount}>
+                  <Link2 className="w-4 h-4" /> Sign in with a different Google account
+                </button>
               )}
             </div>
           )}
