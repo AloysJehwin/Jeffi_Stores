@@ -85,8 +85,8 @@
     "semantic_hash": ""
   },
   "database/constraints.sql": {
-    "mtime": 1792143029.0080929,
-    "ast_hash": "bfcb0dc47775a994d15c3ac35db4cf2e",
+    "mtime": 1792143282.4291902,
+    "ast_hash": "2df61015aa548eb2699f078c549db084",
     "semantic_hash": ""
   },
   "database/crm.sql": {
@@ -105,8 +105,8 @@
     "semantic_hash": ""
   },
   "database/indexes.sql": {
-    "mtime": 1792142697.375839,
-    "ast_hash": "b1f914615d69e8ad2a87456bb1cb2945",
+    "mtime": 1792143282.43704,
+    "ast_hash": "e4966e37a5c537a546acf0de6ea4a29a",
     "semantic_hash": ""
   },
   "database/inventory.sql": {
@@ -4330,8 +4330,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/platform/cronjobs.yaml": {
-    "mtime": 1792143085.6138284,
-    "ast_hash": "73dccde55fc284e5bb9fda002e39e5f4",
+    "mtime": 1792143463.7483444,
+    "ast_hash": "41964ad2e0aad557ef2517f030d35f19",
     "semantic_hash": ""
   },
   "deploy/k8s/platform/kustomization.yaml": {
@@ -6865,8 +6865,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/layout.tsx": {
-    "mtime": 1792142531.5274818,
-    "ast_hash": "31030fc0f17a229c419a6c21d73e9f5b",
+    "mtime": 1792143480.0645173,
+    "ast_hash": "9065c88406fa4ef30a190ebac0531d06",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/loading.tsx": {
@@ -13860,8 +13860,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/auth/scopes.ts": {
-    "mtime": 1792141607.1348784,
-    "ast_hash": "2cd054011a4666557160e4fd8b086cc1",
+    "mtime": 1792143415.2772396,
+    "ast_hash": "1d07f6619611f69609601887e59bcf52",
     "semantic_hash": ""
   },
   "controller-service/src/lib/auth/session-binding-gate.ts": {
@@ -15080,8 +15080,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/cron-jobs.ts": {
-    "mtime": 1792143084.6561801,
-    "ast_hash": "7f66f2db0f39ab19c9a4ac70c1a48bc9",
+    "mtime": 1792143462.928657,
+    "ast_hash": "6315fddc0e57cb54eaa92bbd46f4ebda",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/cron-record.ts": {
@@ -15630,8 +15630,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/tenant-migrations-schema.ts": {
-    "mtime": 1792141115.0963907,
-    "ast_hash": "6a09cc3c87b740397d283e75ba7e0896",
+    "mtime": 1792143282.462424,
+    "ast_hash": "c3608ef3512090220d849e0ef6389e94",
     "semantic_hash": ""
   },
   "controller-service/src/lib/tenant-migrations.ts": {
@@ -15745,8 +15745,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/middleware.ts": {
-    "mtime": 1792129784.2492292,
-    "ast_hash": "983dbe035c8e3a02eb721e40b112aca4",
+    "mtime": 1792143462.8258712,
+    "ast_hash": "078018e43a87d92710681629bf239ba5",
     "semantic_hash": ""
   },
   "controller-service/src/types/google.d.ts": {
@@ -16500,8 +16500,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/integrations/oauth.ts": {
-    "mtime": 1792128060.3677242,
-    "ast_hash": "6626ae771ceaa1728b5fdb441960a6ee",
+    "mtime": 1792143415.276279,
+    "ast_hash": "ec76451c449553d35d32f60bfcf6cf5e",
     "semantic_hash": ""
   },
   "controller-service/src/lib/integrations/test-connection.ts": {
@@ -17465,8 +17465,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/registry.ts": {
-    "mtime": 1792142417.477971,
-    "ast_hash": "d4b256b32cd0dd6177b24699016464c2",
+    "mtime": 1792143462.9294639,
+    "ast_hash": "ef200f18af0a6faeea67b873a324e9ad",
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/report-store.ts": {
@@ -17727,6 +17727,81 @@
   "tests/lib/amazon/reports.test.ts": {
     "mtime": 1792143136.2297187,
     "ast_hash": "f1513d8bc1c5b9b7f754dc8b9ddac4ac",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/amazon-ads/_components/AmazonAdsConsole.tsx": {
+    "mtime": 1792143641.0511184,
+    "ast_hash": "43b125b7269bfbb353249538a198f178",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/amazon-ads/page.tsx": {
+    "mtime": 1792143480.0348904,
+    "ast_hash": "8e21cc86736a55bc732a8799f285f647",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/amazon-ads/connection/route.ts": {
+    "mtime": 1792143462.8756127,
+    "ast_hash": "16152b0fabe2dc561b1d123e97c17cfd",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/amazon-ads/console/actions/route.ts": {
+    "mtime": 1792143462.8936434,
+    "ast_hash": "72f977827abde00b39d9173791a08aa9",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/amazon-ads/console/route.ts": {
+    "mtime": 1792143462.8851788,
+    "ast_hash": "55a01e1b7c4103ad2520751a7fd6450d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/amazon-ads/console/sync/route.ts": {
+    "mtime": 1792143462.9010472,
+    "ast_hash": "485bd419f24d8ba3e415d291c2ea9ff0",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/integrations/amazon-ads/callback/route.ts": {
+    "mtime": 1792143462.8641248,
+    "ast_hash": "3a530381e2dd9aae67c0256152f265c2",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/integrations/amazon-ads/connect/route.ts": {
+    "mtime": 1792143462.8529017,
+    "ast_hash": "69ea435c3a4e0fe62f666ff28d41db60",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/amazon-ads-sync/route.ts": {
+    "mtime": 1792143462.9069178,
+    "ast_hash": "2241905476e97758c707210200aaf1ad",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/amazon-ads/alerts.ts": {
+    "mtime": 1792143400.407623,
+    "ast_hash": "bd785c616ea9cfeb689ecd0219e347f0",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/amazon-ads/client.ts": {
+    "mtime": 1792143251.9257495,
+    "ast_hash": "ba3809be7bc8a9d4f927a7d5a6def285",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/amazon-ads/console.ts": {
+    "mtime": 1792143377.0299318,
+    "ast_hash": "f18e63c157de3c285851bef5677559f0",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/amazon-ads/sync.ts": {
+    "mtime": 1792143316.9310644,
+    "ast_hash": "284e8044c429f4979eb16898eaeb95a5",
+    "semantic_hash": ""
+  },
+  "database/amazon-ads.sql": {
+    "mtime": 1792143282.41774,
+    "ast_hash": "baa2698f3c12ffaa30e38a3b49bda2ef",
+    "semantic_hash": ""
+  },
+  "tests/lib/amazon-ads/amazon-ads.test.ts": {
+    "mtime": 1792143646.4874084,
+    "ast_hash": "5c80e937f449917b234f8836e337bc9a",
     "semantic_hash": ""
   }
 }

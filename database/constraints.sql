@@ -3687,3 +3687,14 @@ ALTER TABLE ONLY public.amazon_report_requests ADD CONSTRAINT amazon_report_requ
 ALTER TABLE ONLY public.amazon_sales_traffic_daily ADD CONSTRAINT amazon_sales_traffic_daily_pkey PRIMARY KEY (date);
 ALTER TABLE ONLY public.amazon_sales_traffic_asin ADD CONSTRAINT amazon_sales_traffic_asin_pkey PRIMARY KEY (asin);
 ALTER TABLE ONLY public.amazon_settlements ADD CONSTRAINT amazon_settlements_pkey PRIMARY KEY (settlement_id);
+
+ALTER TABLE ONLY public.aads_profile ADD CONSTRAINT aads_profile_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.aads_profile ADD CONSTRAINT aads_profile_single CHECK ((id = 1));
+ALTER TABLE ONLY public.aads_campaigns ADD CONSTRAINT aads_campaigns_pkey PRIMARY KEY (campaign_id);
+ALTER TABLE ONLY public.aads_ad_groups ADD CONSTRAINT aads_ad_groups_pkey PRIMARY KEY (ad_group_id);
+ALTER TABLE ONLY public.aads_keywords ADD CONSTRAINT aads_keywords_pkey PRIMARY KEY (keyword_id);
+ALTER TABLE ONLY public.aads_product_ads ADD CONSTRAINT aads_product_ads_pkey PRIMARY KEY (ad_id);
+ALTER TABLE ONLY public.aads_daily_metrics ADD CONSTRAINT aads_daily_metrics_pkey PRIMARY KEY (date, campaign_id);
+ALTER TABLE ONLY public.aads_search_terms ADD CONSTRAINT aads_search_terms_pkey PRIMARY KEY (date, campaign_id, ad_group_id, keyword_id, search_term);
+ALTER TABLE ONLY public.aads_product_metrics ADD CONSTRAINT aads_product_metrics_pkey PRIMARY KEY (date, campaign_id, ad_group_id, sku);
+ALTER TABLE ONLY public.aads_report_requests ADD CONSTRAINT aads_report_requests_pkey PRIMARY KEY (report_id);
