@@ -33,14 +33,15 @@ export const REPORT_QUERIES = {
     `SELECT date, offer_id, title, marketing_method, clicks, impressions, conversions, conversion_value
      FROM product_performance_view WHERE date BETWEEN '${from}' AND '${to}'`,
   priceCompetitiveness: () =>
-    `SELECT offer_id, title, brand, price, benchmark_price FROM price_competitiveness_product_view WHERE report_country_code = 'IN'`,
+    `SELECT offer_id, report_country_code, title, brand, price, benchmark_price FROM price_competitiveness_product_view WHERE report_country_code = 'IN'`,
   priceInsights: () =>
-    `SELECT offer_id, title, brand, price, suggested_price, predicted_impressions_change_fraction,
+    // Google requires id in SELECT on this view.
+    `SELECT id, offer_id, title, brand, price, suggested_price, predicted_impressions_change_fraction,
        predicted_clicks_change_fraction, predicted_conversions_change_fraction, effectiveness
      FROM price_insights_product_view`,
   bestSellers: (reportDate: string) =>
-    `SELECT report_date, report_category_id, rank, previous_rank, title, brand, category_l1, category_l2, category_l3,
-       relative_demand, inventory_status, brand_inventory_status, variant_gtins
+    `SELECT report_date, report_country_code, report_category_id, report_granularity, rank, previous_rank, title, brand,
+       category_l1, category_l2, category_l3, relative_demand, inventory_status, brand_inventory_status, variant_gtins
      FROM best_sellers_product_cluster_view
      WHERE report_country_code = 'IN' AND report_granularity = 'WEEKLY' AND report_date = '${reportDate}'`,
 }
