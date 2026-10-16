@@ -34,7 +34,6 @@ export async function GET(request: NextRequest) {
   url.searchParams.set('redirect_uri', oauthRedirectUri('google_ads'))
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', `${GOOGLE_ADS_SCOPE} ${DATA_MANAGER_SCOPE}`)
-  url.searchParams.set('include_granted_scopes', 'true')
   url.searchParams.set('access_type', 'offline')
   // select_account: always let the owner choose which Google user signs in.
   url.searchParams.set('prompt', 'select_account consent')

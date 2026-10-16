@@ -44,8 +44,9 @@ export async function googleJson<T>(
   return (res.status === 204 ? {} : await res.json().catch(() => ({}))) as T
 }
 
-// Same request shape as the Merchant and Ads sign-ins on this client: a confidential web client with
-// a signed state, so no PKCE (Google rejected these sign-ins with invalid_request when it was sent).
+// A confidential web client with a signed state, so no PKCE. No include_granted_scopes: it merges the
+// account's earlier grants to this client (e.g. drive.file from the Sheets data source) into the
+// request, and Google refuses drive.file together with the YouTube scopes (invalid_request).
 export function googleAuthorizeUrl(scopes: string[], redirectUri: string, state: string, _codeChallenge?: string): string {
   const p = new URLSearchParams({
     client_id: process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
@@ -54,7 +55,6 @@ export function googleAuthorizeUrl(scopes: string[], redirectUri: string, state:
     scope: scopes.join(' '),
     access_type: 'offline',
     prompt: 'select_account consent',
-    include_granted_scopes: 'true',
     state,
   })
   return `${GOOGLE_AUTH}?${p}`
