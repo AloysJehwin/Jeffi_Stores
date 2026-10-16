@@ -132,6 +132,20 @@ describe('merchant/client', () => {
         /HTTP 403: The caller does not have permission — the service account test@project\.iam\.gserviceaccount\.com has no access to Merchant Center account 12345/
       )
     })
+
+    it('reports an unregistered platform project as a platform setup issue', async () => {
+      const { gmcErrorMessage } = await import('@/lib/merchant/client')
+      const body = JSON.stringify({ error: { message: 'GCP project with id p and number 1 is not registered with the merchant account.' } })
+      const m = gmcErrorMessage(401, body, { refreshToken: 'r', merchantId: '9' })
+      expect(m).toMatch(/platform setup step/)
+      expect(m).not.toMatch(/service account/)
+    })
+
+    it('names the connected Google account for an OAuth connection', async () => {
+      const { gmcErrorMessage } = await import('@/lib/merchant/client')
+      const m = gmcErrorMessage(403, JSON.stringify({ error: { message: 'Denied' } }), { refreshToken: 'r', merchantId: '9' })
+      expect(m).toMatch(/the Google account you connected has no access to Merchant Center account 9/)
+    })
   })
 
   describe('resolveDataSource', () => {
