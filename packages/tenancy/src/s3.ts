@@ -48,6 +48,20 @@ const EXT_BY_MIME: Record<string, string> = {
   'video/mp4': 'mp4', 'application/pdf': 'pdf',
 }
 
+// The flagship CDN in front of the default bucket; approved WhatsApp header prefixes point at it.
+export const MEDIA_CDN_URL = (process.env.MEDIA_CDN_URL || CLOUDFRONT_URL || 'https://dm9rri2wgl1e.cloudfront.net').replace(/\/$/, '')
+
+/** Puts the file in the CDN's bucket under `base` (a URL on MEDIA_CDN_URL) and returns its CDN link, whatever
+ *  the tenant's own bucket or this pod's CLOUDFRONT_URL is. */
+export async function uploadCdnAsset(buf: Buffer, mime: string, base = `${MEDIA_CDN_URL}/`): Promise<{ key: string; url: string }> {
+  const u = new URL(base)
+  if (u.origin !== new URL(MEDIA_CDN_URL).origin) throw new Error(`${u.origin} is not our media CDN`)
+  const dir = u.pathname.replace(/^\//, '') || KEY_PREFIX
+  const key = `${dir}template-assets/media/${randomUUID()}.${EXT_BY_MIME[mime] || 'bin'}`
+  await s3().send(new PutObjectCommand({ Bucket: DEFAULT_BUCKET, Key: key, Body: buf, ContentType: mime, CacheControl: 'public, max-age=31536000, immutable' }))
+  return { key, url: `${u.origin}/${key}` }
+}
+
 export async function uploadTemplateAsset(
   buf: Buffer, templateId: string | null, mime: string
 ): Promise<{ key: string; url: string }> {

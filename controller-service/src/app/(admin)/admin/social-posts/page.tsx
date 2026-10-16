@@ -4,6 +4,7 @@ import SocialPostsClient from './SocialPostsClient'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getTenantSocialAccounts } from '@/lib/tenant-registry'
+import { oauthProviderInfo } from '@/lib/integrations/oauth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -27,8 +28,10 @@ export default async function SocialPostsPage() {
             socialAccounts={socialAccounts.map(s => ({
               provider: s.provider,
               page_name: s.page_name,
+              page_id: s.page_id,
               status: s.status,
             }))}
+            oauth={{ meta: oauthProviderInfo('meta') }}
           />
         </div>
       )}

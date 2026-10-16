@@ -124,6 +124,25 @@ export async function getPageAndIgAccounts(userToken: string): Promise<MetaAccou
   }
 }
 
+export interface MetaPageInfo {
+  pageId: string
+  pageName: string
+  igUserId: string | null
+}
+
+/** Read a Page with the given token (validates a pasted Page token and finds its linked IG account). */
+export async function getPageInfo(pageId: string, accessToken: string): Promise<MetaPageInfo> {
+  const page = await graphGet(encodeURIComponent(pageId), {
+    access_token: accessToken,
+    fields: 'id,name,instagram_business_account',
+  })
+  return {
+    pageId: String(page.id),
+    pageName: String(page.name ?? ''),
+    igUserId: page.instagram_business_account?.id ?? null,
+  }
+}
+
 // ── Facebook publishing ────────────────────────────────────────────────────────
 
 /** Post to a Facebook Page — a photo post when imageUrl is given, else a text/link post. */

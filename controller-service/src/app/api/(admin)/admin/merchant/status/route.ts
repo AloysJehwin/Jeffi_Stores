@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { getLastSyncStatus } from '@/lib/merchant/sync'
+import { getLastSyncStatus, isMerchantSyncRunning } from '@/lib/merchant/sync'
 
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -9,6 +9,6 @@ export async function GET(request: NextRequest) {
   if (!hasScope(admin.role, admin.scopes, 'merchant_sync:read'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const status = await getLastSyncStatus()
-  return NextResponse.json({ status: status ?? null })
+  const [status, running] = await Promise.all([getLastSyncStatus(), isMerchantSyncRunning()])
+  return NextResponse.json({ status: status ?? null, running })
 }

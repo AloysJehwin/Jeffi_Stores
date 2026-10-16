@@ -141,3 +141,15 @@ describe('openGoogleOAuthPopup — postMessage with accessToken', () => {
     expect(result.error).toContain('timed out')
   })
 })
+
+describe('googleRedirectOrigin', () => {
+  it('collapses every app and store subdomain to a registered redirect origin', async () => {
+    const { googleRedirectOrigin } = await import('@/lib/client/google-oauth-popup')
+    expect(googleRedirectOrigin('https://admin-acme.jeffistores.in')).toBe('https://jeffistores.in')
+    expect(googleRedirectOrigin('https://acme.jeffistores.in')).toBe('https://jeffistores.in')
+    expect(googleRedirectOrigin('http://admin-testco.localhost:3000')).toBe('http://localhost:3000')
+    expect(googleRedirectOrigin('http://testco.localhost:3000')).toBe('http://localhost:3000')
+    expect(googleRedirectOrigin('http://localhost:3000')).toBe('http://localhost:3000')
+    expect(googleRedirectOrigin('https://shop.example.com')).toBe('https://shop.example.com')
+  })
+})

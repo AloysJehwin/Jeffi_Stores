@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card } from '../_components/Card'
+import { ChoiceChips, fieldCls } from '../../_ui'
 import { STATUS_PILL, fmt, fmtDate } from '../_components/finance'
 import Pager from '../_components/Pager'
 import { topupAmounts } from '@/lib/billing/topup-amounts'
@@ -50,8 +51,9 @@ export default function WalletClient({ initial, keyId, tenantName }: { initial: 
       </div>
       <Card title="Top up">
         <div className="flex flex-wrap items-center gap-3">
-          {AMOUNTS.map(a => <button key={a} onClick={() => setAmount(a)} className={`rounded-full px-4 py-2 text-sm font-semibold ${amount === a ? 'ecom-accent-bg text-white' : 'org-sand org-sand-hover'}`}>{fmt(a)}</button>)}
-          <input type="number" min={100} value={amount} onChange={e => setAmount(Number(e.target.value))} className="w-32 rounded-xl bg-surface-elevated px-3 py-2 text-sm" />
+          <ChoiceChips size="md" ariaLabel="Top-up amount" value={String(amount)} onChange={v => setAmount(Number(v))}
+            options={AMOUNTS.map(a => ({ value: String(a), label: fmt(a) }))} />
+          <input type="number" min={100} value={amount} onChange={e => setAmount(Number(e.target.value))} aria-label="Custom amount" className={`w-32 rounded-xl bg-surface-elevated px-3 py-2 text-sm ${fieldCls}`} />
           <button onClick={topUp} disabled={busy || amount < 100} className="ecom-accent-bg rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-40">{busy ? 'Opening…' : 'Pay with Razorpay'}</button>
         </div>
         {amount >= 100 && (

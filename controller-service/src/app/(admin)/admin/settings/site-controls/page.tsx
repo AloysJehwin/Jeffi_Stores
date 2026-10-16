@@ -23,6 +23,8 @@ import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
 import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
 import TemplateVariablesPanel from '@/components/admin/site-controls/TemplateVariablesPanel'
 import DeliveryEstimateCard from '@/components/admin/site-controls/DeliveryEstimateCard'
+import GoogleTagCard from '@/components/admin/site-controls/GoogleTagCard'
+import { resolveTenant } from '@/lib/tenancy/tenant-context'
 import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getReferralSettings } from '@/lib/referrals/settings'
@@ -106,6 +108,7 @@ export default async function SiteControlsPage() {
   const [c, loyalty, referral] = await Promise.all([getSiteControls(), getLoyaltySettings(), getReferralSettings()])
   const inv = await loadInvoiceKeys()
   const delivery = await getDeliverySettings()
+  const isTenant = (await resolveTenant().catch(() => null)) != null
   const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
   const hasInventory = hasScope(admin.role, admin.scopes || [], 'inventory:read')
   // Customer reward programs (loyalty / refer & earn / birthday) ship on the campaigns scope — Pro+
@@ -601,6 +604,17 @@ export default async function SiteControlsPage() {
               />
             </FullSpan>
           </SectionCard>
+        </div>
+
+        <div>
+          <GoogleTagCard
+            isTenant={isTenant}
+            initial={{
+              google_tag_id: c.marketing.googleTagId,
+              google_ads_conversion_id: c.marketing.googleAdsConversionId,
+              google_ads_conversion_label: c.marketing.googleAdsConversionLabel,
+            }}
+          />
         </div>
 
         <div>

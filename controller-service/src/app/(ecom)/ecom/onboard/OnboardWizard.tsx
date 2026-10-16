@@ -3,7 +3,9 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckMark } from '@/app/(ecom)/ecom/Shapes'
+import { ChoiceCards, ChoiceChips, Segmented, focusRing } from '../_ui'
 import { useToast } from '@/contexts/ToastContext'
+import { PhoneInput } from '../_ui/phone'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -50,7 +52,7 @@ const BUSINESS_TYPES = [
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 const inp =
-  'w-full rounded-xl border border-border-default bg-surface px-4 py-3 text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 transition-colors'
+  'w-full rounded-xl border border-border-default bg-surface px-4 py-3 text-sm text-foreground placeholder:text-foreground-muted ecom-field'
 const lbl = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 
 function slugify(s: string) {
@@ -149,8 +151,11 @@ export default function OnboardWizard({
   reusingPreviousDetails,
   ownerName,
   extraServices = [],
+  upgrade,
 }: {
   plans: Plan[]
+  /** A services workspace adding a store: the tenant (and its subdomain) already exists. */
+  upgrade?: { tenantId: string; slug: string; displayName: string }
   /** Messaging / documents picked alongside the store on the service picker. */
   extraServices?: ('messaging' | 'documents')[]
   /** Name on the owner's sign-in account, used only to prefill the editable name field. */
@@ -217,6 +222,7 @@ export default function OnboardWizard({
   // merely accepted. Keeps the UI from claiming a verification that did not happen.
   const [bankNameConfirmed, setBankNameConfirmed] = useState(false)
   const [bankMsg, setBankMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [bankOnFile, setBankOnFile] = useState(!!upgrade && !!init.bankVerified)
 
   // Step 6 — Branding & Legals
   const [ownerFullName, setOwnerFullName] = useState<string>(init.ownerName ?? ownerName ?? '')
@@ -246,7 +252,7 @@ export default function OnboardWizard({
     }
   }, [])
 
-  const effectiveSlug = slugEdited ? slug : slugify(displayName)
+  const effectiveSlug = upgrade ? upgrade.slug : slugEdited ? slug : slugify(displayName)
   const selectedPlan = plans.find(p => p.slug === planSlug)
   const monthly = Number(selectedPlan?.monthly_price_inr ?? 0)
   const price = interval === 'yearly' ? monthly * 10 : monthly
@@ -455,7 +461,7 @@ export default function OnboardWizard({
       }
       // Application submitted → tenant is pending_approval (NOT paid/live). Stay in the onboard
       // flow, which shows the 'under review' → payment states. Only a live store goes to /dashboard.
-      router.push('/onboard')
+      router.push(upgrade ? '/dashboard/add-store' : '/onboard')
       router.refresh()
     } catch {
       showToast('Network error', 'error')
@@ -549,15 +555,16 @@ export default function OnboardWizard({
                 type="button"
                 onClick={() => (s.id < step ? goTo(s.id as StepIdx) : undefined)}
                 disabled={s.id > step}
-                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-colors ${active ? 'bg-accent-50 text-accent-700' : done ? 'text-foreground-secondary hover:bg-surface-secondary cursor-pointer' : 'text-foreground-muted cursor-default'}`}
+                aria-current={active ? 'step' : undefined}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-colors ${focusRing} ${active ? 'ecom-current' : done ? 'text-foreground-secondary ecom-hover cursor-pointer' : 'text-foreground-muted cursor-default'}`}
               >
                 <span
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? 'bg-accent-600 text-white' : done ? 'org-sage org-sage-text' : 'bg-surface-secondary text-foreground-muted'}`}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${active ? 'ecom-sel' : done ? 'org-sage org-sage-text' : 'bg-surface-secondary text-foreground-muted'}`}
                 >
                   {done ? <CheckMark className="w-4 h-4" /> : <StepIcon icon={s.icon} className="w-4 h-4" />}
                 </span>
                 <div>
-                  <div className={`text-sm font-medium ${active ? 'text-accent-700' : ''}`}>
+                  <div className={`text-sm ${active ? 'font-semibold text-foreground' : 'font-medium'}`}>
                     {s.label}
                   </div>
                   <div className="text-xs text-foreground-muted">{s.desc}</div>
@@ -586,7 +593,7 @@ export default function OnboardWizard({
             {STEPS.map(s => (
               <div
                 key={s.id}
-                className={`h-1 flex-1 rounded-full transition-colors ${s.id < step ? 'ecom-accent-bg' : s.id === step ? 'bg-accent-600' : 'bg-surface-secondary'}`}
+                className={`h-1 flex-1 rounded-full transition-colors ${s.id < step ? 'ecom-accent-bg' : s.id === step ? 'ecom-sel' : 'bg-surface-secondary'}`}
               />
             ))}
           </div>
@@ -632,48 +639,26 @@ export default function OnboardWizard({
                   </p>
                 </div>
               )}
-              <div className="inline-flex items-center rounded-xl border border-border-default bg-surface p-1 mb-8 gap-1">
-                {(['monthly', 'yearly'] as Interval[]).map(iv => (
-                  <button
-                    key={iv}
-                    type="button"
-                    onClick={() => setInterval(iv)}
-                    className={`px-5 py-2 rounded-xl text-sm font-medium transition-colors capitalize ${interval === iv ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-muted hover:text-foreground'}`}
-                  >
-                    {iv}{' '}
-                    {iv === 'yearly' && (
-                      <span className="ml-1 text-[10px] org-sage-text font-bold">2 months free</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                {plans.map(p => {
+              <Segmented<Interval> ariaLabel="Billing interval" className="mb-8" value={interval} onChange={setInterval}
+                options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: '2 months free' }]} />
+              <ChoiceCards ariaLabel="Plan" columns="grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" cardClassName="bg-surface-elevated p-5" value={planSlug} onChange={setPlanSlug}
+                options={plans.map(p => {
                   const m = Number(p.monthly_price_inr)
                   const pr = interval === 'yearly' ? m * 10 : m
-                  return (
-                    <button
-                      key={p.slug}
-                      type="button"
-                      onClick={() => setPlanSlug(p.slug)}
-                      className={`rounded-2xl border-2 p-5 text-left transition-all ${planSlug === p.slug ? 'border-accent-500 bg-accent-50 shadow-md' : 'border-border-default bg-surface-elevated hover:border-accent-300'}`}
-                    >
-                      <div className="font-bold text-foreground text-base">{p.name}</div>
-                      <div className="text-2xl font-extrabold text-foreground mt-2">₹{pr.toLocaleString('en-IN')}</div>
-                      <div className="text-xs text-foreground-muted">/{interval === 'yearly' ? 'yr' : 'mo'}</div>
-                      {interval === 'yearly' && (
-                        <div className="text-xs org-sage-text mt-1">2 months free</div>
-                      )}
-                      {planSlug === p.slug && (
-                        <div className="mt-3 flex items-center gap-1 text-xs text-accent-600 font-semibold">
-                          <CheckMark className="w-3.5 h-3.5" />
-                          Selected
-                        </div>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
+                  return {
+                    value: p.slug, label: p.name,
+                    content: (
+                      <>
+                        <div className="pr-6 font-bold text-foreground text-base">{p.name}</div>
+                        <div className="text-2xl font-extrabold text-foreground mt-2">₹{pr.toLocaleString('en-IN')}</div>
+                        <div className="text-xs text-foreground-muted">/{interval === 'yearly' ? 'yr' : 'mo'}</div>
+                        {interval === 'yearly' && (
+                          <div className="text-xs org-sage-text mt-1">2 months free</div>
+                        )}
+                      </>
+                    ),
+                  }
+                })} />
             </div>
           )}
 
@@ -696,8 +681,9 @@ export default function OnboardWizard({
                   <label className={lbl}>Subdomain</label>
                   <div className="flex items-center gap-2">
                     <input
-                      className={inp}
+                      className={`${inp} ${upgrade ? 'opacity-70 cursor-not-allowed' : ''}`}
                       value={effectiveSlug}
+                      readOnly={!!upgrade}
                       onChange={e => {
                         setSlugEdited(true)
                         setSlug(slugify(e.target.value))
@@ -706,25 +692,16 @@ export default function OnboardWizard({
                     />
                     <span className="text-sm text-foreground-muted whitespace-nowrap font-mono">.jeffistores.in</span>
                   </div>
+                  {upgrade && (
+                    <p className="text-xs text-foreground-muted mt-1">Your workspace&apos;s subdomain — already reserved for your store.</p>
+                  )}
                 </div>
                 <div>
                   <label className={lbl}>
                     What will you sell? <span className="text-foreground-muted font-normal">(pick all that apply)</span>
                   </label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {PRODUCT_CATEGORIES.map(c => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() =>
-                          setProductCats(prev => (prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]))
-                        }
-                        className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${productCats.includes(c) ? 'bg-accent-600 text-white border-accent-600' : 'border-border-default text-foreground-secondary hover:border-accent-400'}`}
-                      >
-                        {c}
-                      </button>
-                    ))}
-                  </div>
+                  <ChoiceChips multiple size="md" ariaLabel="Product categories" className="mt-2" value={productCats} onChange={setProductCats}
+                    options={PRODUCT_CATEGORIES.map(c => ({ value: c, label: c }))} />
                   {productCats.length === 0 && (
                     <p className="text-xs text-foreground-muted mt-2">Select at least one category.</p>
                   )}
@@ -765,18 +742,8 @@ export default function OnboardWizard({
                 </div>
                 <div>
                   <label className={lbl}>Business type</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {BUSINESS_TYPES.map(t => (
-                      <button
-                        key={t.value}
-                        type="button"
-                        onClick={() => setBizType(t.value)}
-                        className={`px-3 py-2.5 rounded-xl border text-sm text-left transition-colors ${bizType === t.value ? 'border-accent-500 bg-accent-50 text-accent-700 font-medium' : 'border-border-default text-foreground-secondary hover:border-accent-300'}`}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
-                  </div>
+                  <ChoiceCards ariaLabel="Business type" columns="grid-cols-2 sm:grid-cols-3" cardClassName="px-3 py-2.5 text-sm" value={bizType || null} onChange={setBizType}
+                    options={BUSINESS_TYPES.map(t => ({ value: t.value, label: <span className="font-medium">{t.label}</span> }))} />
                 </div>
                 <div>
                   <label className={lbl}>PAN number</label>
@@ -928,12 +895,7 @@ export default function OnboardWizard({
                   </div>
                   <div>
                     <label className={lbl}>Seller phone</label>
-                    <input
-                      className={inp}
-                      placeholder="+91 98765 43210"
-                      value={wh.sellerPhone}
-                      onChange={e => setWh({ ...wh, sellerPhone: e.target.value })}
-                    />
+                    <PhoneInput countries={['IN']} value={wh.sellerPhone} onChange={v => setWh({ ...wh, sellerPhone: v })} inputClassName={`${inp} min-w-0 flex-1`} />
                   </div>
                 </div>
                 <div>
@@ -1003,6 +965,33 @@ export default function OnboardWizard({
                 Where your sales will be settled. We verify instantly via a ₹1 bank check.
               </p>
               <div className="space-y-4">
+                {bankOnFile ? (
+                  <div className="rounded-xl border border-[var(--org-sage-deep)]/40 org-sage p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold org-sage-text">
+                      <CheckMark className="w-4 h-4" /> Verified account on file
+                    </div>
+                    <div className="mt-2 text-sm text-foreground space-y-0.5">
+                      <div>{bank.holderName}</div>
+                      <div className="font-mono text-xs">
+                        •••• {String(bank.accountNumber).slice(-4)} · {bank.ifsc}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBankOnFile(false)
+                        setBankVerified(false)
+                        setBankNameConfirmed(false)
+                        setBankMsg(null)
+                        setBank({ accountNumber: '', ifsc: '', holderName: '' })
+                      }}
+                      className="mt-3 text-xs font-semibold text-foreground-secondary hover:text-foreground underline"
+                    >
+                      Use a different account
+                    </button>
+                  </div>
+                ) : (
+                <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="col-span-full sm:col-span-2">
                     <label className={lbl}>Account holder name</label>
@@ -1079,6 +1068,8 @@ export default function OnboardWizard({
                   >
                     {bankMsg.text}
                   </p>
+                )}
+                </>
                 )}
 
                 <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-border-default bg-surface-elevated hover:bg-surface-secondary transition-colors">
@@ -1167,13 +1158,7 @@ export default function OnboardWizard({
 
               <div className="mb-6">
                 <label className={lbl}>Mobile number</label>
-                <input
-                  className={inp}
-                  inputMode="numeric"
-                  placeholder="10-digit mobile"
-                  value={mobile}
-                  onChange={e => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                />
+                <PhoneInput countries={['IN']} value={mobile} onChange={setMobile} inputClassName={`${inp} min-w-0 flex-1`} />
                 <p className="text-xs text-foreground-muted mt-1">Used for account + payout notifications.</p>
               </div>
 

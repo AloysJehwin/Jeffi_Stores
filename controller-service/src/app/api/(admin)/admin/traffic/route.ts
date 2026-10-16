@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/shared/db'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
+import { getTrafficSources } from '@/lib/analytics/traffic-sources'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'dashboard:read'))
+  if (!hasScope(admin.role, admin.scopes, 'traffic:read'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
     conversionLaggards,
     topSearchTerms,
     noResultSearches,
+    sources,
   ] = await Promise.all([
     queryMany<{ page: string; sessions: string; users: string }>(
       `
@@ -248,6 +250,8 @@ export async function GET(req: NextRequest) {
     `,
       [days]
     ).catch(() => [] as { query: string; searches: string }[]),
+
+    getTrafficSources(days),
   ])
 
   const funnelOrder = ['home', 'categories', 'category', 'product', 'cart', 'checkout', 'order_placed']
@@ -324,6 +328,7 @@ export async function GET(req: NextRequest) {
       query: r.query,
       searches: parseInt(r.searches),
     })),
+    sources,
     totals: {
       sessions: totalSessions,
       pageviews: totalPageviews,

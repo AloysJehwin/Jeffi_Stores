@@ -1,3 +1,4 @@
+import { createSign } from 'crypto'
 import { resolveTenant, resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getIntegrationCredential } from '../tenant-registry'
 import { decryptToken } from '../crypto/token-cipher'
@@ -23,9 +24,13 @@ export class IntegrationNotConnectedError extends Error {
 }
 
 export interface GoogleMerchantCreds {
+  // Service-account creds; empty when the tenant connected with Google sign-in (refreshToken).
   clientEmail: string
   privateKey: string
+  refreshToken?: string
   merchantId: string
+  // Merchant API primary API data source (`accounts/{id}/dataSources/{id}` or the bare id); found or created when unset.
+  dataSource?: string
 }
 
 export interface AmazonCreds {
@@ -64,6 +69,16 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
       clientEmail: cfg.client_email,
       privateKey: cfg.private_key.includes('\\n') ? cfg.private_key.replace(/\\n/g, '\n') : cfg.private_key,
       merchantId: String(cfg.merchant_id),
+      dataSource: cfg.data_source ? String(cfg.data_source) : undefined,
+    }
+  }
+  if (cfg?.oauth_refresh_token && cfg?.merchant_id) {
+    return {
+      clientEmail: '',
+      privateKey: '',
+      refreshToken: String(cfg.oauth_refresh_token),
+      merchantId: String(cfg.merchant_id),
+      dataSource: cfg.data_source ? String(cfg.data_source) : undefined,
     }
   }
   if (tenant) throw new IntegrationNotConnectedError('google_merchant', tenant.tenantId)
@@ -73,7 +88,75 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
     clientEmail: sa.client_email,
     privateKey: sa.private_key,
     merchantId: process.env.GMC_MERCHANT_ID || '5762156822',
+    dataSource: process.env.GMC_DATA_SOURCE || undefined,
   }
+}
+
+/** Exchange a refresh token issued to the platform's Google OAuth client for an access token.
+ * `scope` is what Google reports as granted to the token (space-separated), when it says. */
+export async function googleOAuthAccessToken(
+  refreshToken: string,
+  what = 'Google'
+): Promise<{ token: string; expiresInSec: number; scope?: string }> {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
+  if (!clientId || !clientSecret) throw new Error('Google OAuth not configured')
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok || !data?.access_token) {
+    const reason = data?.error_description || data?.error || 'token_refresh_failed'
+    throw new Error(`${what} token refresh failed: ${reason}`)
+  }
+  return {
+    token: String(data.access_token),
+    expiresInSec: Number(data.expires_in) || 3600,
+    ...(typeof data.scope === 'string' ? { scope: data.scope } : {}),
+  }
+}
+
+const saTokenCache = new Map<string, { token: string; expiresAt: number }>()
+
+/** Access token for a Google service account (JWT bearer grant) with the given scope. Cached per
+ * account+scope until a minute before expiry. Same flow the Merchant sync uses for the flagship. */
+export async function googleServiceAccountAccessToken(
+  clientEmail: string,
+  privateKey: string,
+  scope: string
+): Promise<{ token: string; expiresInSec: number }> {
+  const key = `${clientEmail}|${scope}`
+  const cached = saTokenCache.get(key)
+  if (cached && Date.now() < cached.expiresAt - 60_000) {
+    return { token: cached.token, expiresInSec: Math.floor((cached.expiresAt - Date.now()) / 1000) }
+  }
+  const now = Math.floor(Date.now() / 1000)
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
+  const payload = Buffer.from(
+    JSON.stringify({ iss: clientEmail, scope, aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 })
+  ).toString('base64url')
+  const signer = createSign('RSA-SHA256')
+  signer.update(`${header}.${payload}`)
+  const jwt = `${header}.${payload}.${signer.sign(privateKey).toString('base64url')}`
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: jwt }),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok || !data?.access_token) {
+    throw new Error(`Google service account token failed: ${data?.error_description || data?.error || res.status}`)
+  }
+  const expiresInSec = Number(data.expires_in) || 3600
+  saTokenCache.set(key, { token: String(data.access_token), expiresAt: Date.now() + expiresInSec * 1000 })
+  return { token: String(data.access_token), expiresInSec }
 }
 
 export interface GoogleSheetsCreds {
@@ -92,28 +175,8 @@ export async function resolveGoogleSheetsCreds(tenantId?: string): Promise<Googl
   const cfg = id ? await tenantConfigFor(id, 'google_sheets') : null
   const refreshToken = cfg?.oauth_refresh_token
   if (refreshToken) {
-    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
-    const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
-    if (!clientId || !clientSecret) throw new Error('Google OAuth not configured')
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: String(refreshToken),
-        grant_type: 'refresh_token',
-      }),
-    })
-    const data = await res.json().catch(() => null)
-    if (!res.ok || !data?.access_token) {
-      const reason = data?.error_description || data?.error || 'token_refresh_failed'
-      throw new Error(`Google Sheets token refresh failed: ${reason}`)
-    }
-    return {
-      accessToken: String(data.access_token),
-      spreadsheetId: cfg?.spreadsheet_id ? String(cfg.spreadsheet_id) : null,
-    }
+    const { token } = await googleOAuthAccessToken(String(refreshToken), 'Google Sheets')
+    return { accessToken: token, spreadsheetId: cfg?.spreadsheet_id ? String(cfg.spreadsheet_id) : null }
   }
   throw new IntegrationNotConnectedError('google_sheets', id ?? 'platform')
 }

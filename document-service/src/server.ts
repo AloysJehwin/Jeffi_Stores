@@ -89,7 +89,11 @@ async function toApi(d: DocRow) {
     type: d.type,
     number: d.number,
     template: d.template,
-    totals: { subtotal: d.totals.subtotal, cgst: d.totals.cgst, sgst: d.totals.sgst, igst: d.totals.igst, total: d.totals.total },
+    totals: {
+      subtotal: d.totals.subtotal, discount: d.totals.discount ?? 0, charges: d.totals.charges_total ?? 0, taxable: d.totals.taxable ?? d.totals.subtotal,
+      cgst: d.totals.cgst, sgst: d.totals.sgst, igst: d.totals.igst, round_off: d.totals.round_off ?? 0, total: d.totals.total,
+      amount_paid: d.totals.amount_paid ?? 0, balance_due: d.totals.balance_due ?? d.totals.total,
+    },
     pdf_url: await pdfUrl(d.s3_key, `${PUBLIC_BASE}/d/${d.view_token}/pdf`),
     view_url: `${PUBLIC_BASE}/d/${d.view_token}`,
     price_inr: Number(d.price_inr),

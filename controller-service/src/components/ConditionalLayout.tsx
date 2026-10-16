@@ -14,6 +14,7 @@ import CompareBar from '@/components/visitor/CompareBar'
 import PageTracker from './visitor/PageTracker'
 import PolicyConsentGate from './PolicyConsentGate'
 import NumberInputWheelGuard from './NumberInputWheelGuard'
+import CookieConsentBanner, { StorefrontFooterBar } from './visitor/CookieConsentBanner'
 
 export default function ConditionalLayout({
   children,
@@ -25,6 +26,7 @@ export default function ConditionalLayout({
   isEcomSubdomain,
   isCertPortalSubdomain,
   isVaultSubdomain,
+  cookieConsent,
 }: {
   children: React.ReactNode
   initialStoreConfig?: StoreConfig
@@ -35,6 +37,7 @@ export default function ConditionalLayout({
   isEcomSubdomain?: boolean
   isCertPortalSubdomain?: boolean
   isVaultSubdomain?: boolean
+  cookieConsent?: boolean
 }) {
   const pathname = usePathname()
   // The vault brings its own chrome; host paths there are /library, not /vault/*.
@@ -83,9 +86,11 @@ export default function ConditionalLayout({
                       <PageTracker />
                       <Header />
                       <main className="flex-1 bg-surface pt-16 lg:pt-20">{children}</main>
+                      {cookieConsent && <StorefrontFooterBar />}
                     </div>
                     <CompareBar />
                     <PolicyConsentGate />
+                    {cookieConsent && <CookieConsentBanner />}
                   </CompareProvider>
                 </ConfirmProvider>
               </ToastProvider>

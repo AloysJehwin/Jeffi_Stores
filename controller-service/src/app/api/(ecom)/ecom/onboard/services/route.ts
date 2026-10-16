@@ -19,7 +19,7 @@ const Schema = z.object({
   businessAddress: z.string().min(5).max(1000),
   gstNumber: z.string().length(15).optional().or(z.literal('')),
   ownerName: z.string().min(1).max(120),
-  mobile: z.string().min(10).max(15),
+  mobile: z.string().regex(/^\+\d{8,15}$/, 'Enter the mobile with its country code'),
   legalsAccepted: z.literal(true),
 })
 

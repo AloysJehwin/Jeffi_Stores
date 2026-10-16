@@ -11,6 +11,12 @@ vi.mock('@/lib/amazon/sync', () => ({
   sendAmazonSyncFailureEmail: vi.fn(),
   validateProductForAmazon: vi.fn(),
   dryRunAmazonSync: vi.fn(),
+  AmazonSyncInProgressError: class AmazonSyncInProgressError extends Error {
+    constructor() {
+      super('An Amazon sync is already running. Wait for it to finish.')
+      this.name = 'AmazonSyncInProgressError'
+    }
+  },
 }))
 
 // ── Imports ─────────────────────────────────────────────────────────────────────
@@ -24,6 +30,7 @@ import {
   sendAmazonSyncFailureEmail,
   validateProductForAmazon,
   dryRunAmazonSync,
+  AmazonSyncInProgressError,
 } from '@/lib/amazon/sync'
 
 const mockAuth = vi.mocked(authenticateAdmin)
@@ -230,6 +237,16 @@ describe('POST /api/admin/merchant/amazon/sync — modes', () => {
     expect((await res.json()).mode).toBe('full')
   })
 
+  it('returns 409 when a sync is already running', async () => {
+    mockSyncAll.mockRejectedValue(new AmazonSyncInProgressError())
+    const res = await POST(makePost({ body: {} }))
+    expect(res.status).toBe(409)
+    const data = await res.json()
+    expect(data.inProgress).toBe(true)
+    expect(data.error).toMatch(/already running/)
+    expect(mockFailEmail).not.toHaveBeenCalled()
+  })
+
   it('returns 500 when sync throws', async () => {
     mockSyncAll.mockRejectedValue(new Error('SP-API down'))
     const res = await POST(makePost({ body: {} }))
@@ -287,6 +304,14 @@ describe('GET /api/admin/merchant/amazon/sync', () => {
     mockSyncAll.mockResolvedValue(result as any)
     await GET(makeGet({ auth: 'Bearer cron-key' }))
     expect(mockFailEmail).toHaveBeenCalledWith(result)
+    delete process.env.CRON_SECRET
+  })
+
+  it('returns 409 to the cron when a sync is already running', async () => {
+    process.env.CRON_SECRET = 'cron-key'
+    mockSyncAll.mockRejectedValue(new AmazonSyncInProgressError())
+    const res = await GET(makeGet({ auth: 'Bearer cron-key' }))
+    expect(res.status).toBe(409)
     delete process.env.CRON_SECRET
   })
 

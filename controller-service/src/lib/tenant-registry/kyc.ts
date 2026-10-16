@@ -77,6 +77,8 @@ export async function saveKyc(
     logo_s3_key?: string | null
     seal_s3_key?: string | null
     legals_accepted?: boolean
+    /** Re-submission on an existing tenant: back to the review queue. */
+    review_again?: boolean
   }
 ): Promise<void> {
   const pool = controlPlanePool()
@@ -92,6 +94,10 @@ export async function saveKyc(
        seal_s3_key=COALESCE(EXCLUDED.seal_s3_key, tenant_kyc.seal_s3_key),
        legals_accepted_version=COALESCE(EXCLUDED.legals_accepted_version, tenant_kyc.legals_accepted_version),
        legals_accepted_at=COALESCE(EXCLUDED.legals_accepted_at, tenant_kyc.legals_accepted_at),
+       status=CASE WHEN $15 THEN 'pending' ELSE tenant_kyc.status END,
+       reviewed_by=CASE WHEN $15 THEN NULL ELSE tenant_kyc.reviewed_by END,
+       reviewed_at=CASE WHEN $15 THEN NULL ELSE tenant_kyc.reviewed_at END,
+       reviewer_note=CASE WHEN $15 THEN NULL ELSE tenant_kyc.reviewer_note END,
        updated_at=now()`,
     [
       tenantId,
@@ -108,6 +114,7 @@ export async function saveKyc(
       kyc.seal_s3_key ?? null,
       kyc.legals_accepted ? process.env.POLICY_VERSION || '1' : null,
       kyc.legals_accepted ? new Date().toISOString() : null,
+      !!kyc.review_again,
     ]
   )
 }
@@ -126,7 +133,15 @@ export async function approveKyc(tenantId: string, reviewerEmail: string): Promi
   )
   // Approved but NOT paid yet → 'awaiting_payment'. The provisioning ENGINE (and 'provisioning'
   // status) only starts after subscription.charged — never before payment.
-  await pool.query(`UPDATE tenants SET status='awaiting_payment', updated_at=now() WHERE id=$1`, [tenantId])
+  // A services workspace applying for a store stays live; only its store application moves on.
+  await pool.query(
+    `UPDATE tenants SET
+       status = CASE WHEN store_request IS NULL THEN 'awaiting_payment' ELSE status END,
+       store_request = CASE WHEN store_request = 'pending_approval' THEN 'awaiting_payment' ELSE store_request END,
+       updated_at=now()
+     WHERE id=$1`,
+    [tenantId]
+  )
 }
 
 export async function rejectKyc(tenantId: string, reviewerEmail: string, note: string): Promise<void> {
@@ -135,7 +150,14 @@ export async function rejectKyc(tenantId: string, reviewerEmail: string, note: s
     `UPDATE tenant_kyc SET status='rejected', reviewed_by=$2, reviewed_at=now(), reviewer_note=$3, updated_at=now() WHERE tenant_id=$1`,
     [tenantId, reviewerEmail, note]
   )
-  await pool.query(`UPDATE tenants SET status='rejected', updated_at=now() WHERE id=$1`, [tenantId])
+  // A rejected store application leaves the services workspace running; it can apply again.
+  await pool.query(
+    `UPDATE tenants SET
+       status = CASE WHEN store_request IS NULL THEN 'rejected' ELSE status END,
+       store_request = NULL, updated_at=now()
+     WHERE id=$1`,
+    [tenantId]
+  )
 }
 
 // ── Social accounts + scheduled posts (Meta auto-posting) ─────────────────────

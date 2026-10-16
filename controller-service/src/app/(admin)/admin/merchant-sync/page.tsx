@@ -2,6 +2,7 @@ import MerchantSyncClient from './_components/MerchantSyncClient'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { listIntegrationCredentials } from '@/lib/tenant-registry'
+import { oauthProviderInfo } from '@/lib/integrations/oauth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -19,7 +20,17 @@ export default async function MerchantSyncPage() {
             Manage and inspect the product feeds pushed to online marketplaces.
           </p>
         </div>
-        {tenantId && <AdminIntegrationsPopup scope="merchant" integrations={integrations} socialAccounts={[]} />}
+        {tenantId && (
+          <AdminIntegrationsPopup
+            scope="merchant"
+            integrations={integrations}
+            socialAccounts={[]}
+            oauth={{
+              google_merchant: oauthProviderInfo('google_merchant'),
+              amazon_seller: oauthProviderInfo('amazon_seller'),
+            }}
+          />
+        )}
       </div>
 
       <MerchantSyncClient />

@@ -15,6 +15,8 @@ import {
   saveDraft,
   saveIntegrationCredential,
   updateOwnerName,
+  hasService,
+  applyStoreUpgrade,
 } from '@/lib/tenant-registry'
 import { sendKycSubmittedEmail } from '@/lib/shared/ecom-emails'
 import { OnboardSchema } from '@/lib/catalog/onboard-schema'
@@ -29,9 +31,10 @@ export async function POST(request: NextRequest) {
   const owner = await resolveOwnerSession(sid, extractSessionSignals(request))
   if (!owner) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
 
-  // One store per owner
+  // One store per owner. A services workspace without a store applies for one on its own tenant.
   const existing = await getOwnerTenants(owner.id)
-  if (existing.length > 0) return NextResponse.json({ error: 'You already have a store.' }, { status: 400 })
+  const upgrade = existing.length === 1 && !hasService(existing[0], 'store') && !existing[0].store_request ? existing[0] : null
+  if (existing.length > 0 && !upgrade) return NextResponse.json({ error: 'You already have a store.' }, { status: 400 })
 
   // Bank must be verified before submitting
   if (!(await hasVerifiedBank(owner.id))) {
@@ -63,8 +66,13 @@ export async function POST(request: NextRequest) {
   const capacityError = await dedicatedCapacityError(d.planSlug)
   if (capacityError) return NextResponse.json({ error: capacityError, code: 'capacity' }, { status: 409 })
 
-  // 1. Create tenant with status='pending_approval' (NOT provisioning yet).
-  const result = await createTenant({
+  // 1. Create tenant with status='pending_approval' (NOT provisioning yet). An upgrade keeps its
+  //    tenant (and status); the application is tracked on store_request until the first payment.
+  const result = upgrade
+    ? await applyStoreUpgrade(upgrade.id, d).then(r =>
+        r.ok ? { ok: true as const, tenantId: upgrade.id, slug: upgrade.slug } : r
+      )
+    : await createTenant({
     slug: d.slug,
     displayName: d.displayName,
     planSlug: d.planSlug,
@@ -79,7 +87,7 @@ export async function POST(request: NextRequest) {
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
 
   // 2. Link owner → tenant.
-  await linkOwnerTenant(owner.id, result.tenantId)
+  if (!upgrade) await linkOwnerTenant(owner.id, result.tenantId)
 
   // 2a. Provisioning names the owner admin and addresses the access certificate from owners.name.
   await updateOwnerName(owner.id, d.ownerName)
@@ -116,7 +124,7 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // 3. Save KYC details for admin review.
+  // 3. Save KYC details for admin review (an upgrade's auto-approved services KYC goes back to review).
   await saveKyc(result.tenantId, owner.id, {
     gst_number: d.gstNumber,
     gst_cert_s3_key: d.gstCertS3Key ?? null,
@@ -129,13 +137,19 @@ export async function POST(request: NextRequest) {
     logo_s3_key: d.logoS3Key ?? null,
     seal_s3_key: d.sealS3Key ?? null,
     legals_accepted: !!d.legalsAccepted,
+    review_again: !!upgrade,
   })
 
   // 4. Persist restore intent (if any) into the draft, then mark submitted. The
   //    provision step reads this to decide whether to restore the owner's prior backup.
-  if (d.restorePreviousData) {
+  // An upgrade's warehouse lives on the draft too: approval reads it for the Route linked account.
+  if (d.restorePreviousData || upgrade) {
     const existing = (await getDraft(owner.id))?.data ?? {}
-    await saveDraft(owner.id, 6, { ...existing, restorePreviousData: true })
+    await saveDraft(owner.id, 6, {
+      ...existing,
+      ...(d.restorePreviousData ? { restorePreviousData: true } : {}),
+      ...(upgrade && d.warehouse ? { wh: { ...existing.wh, ...d.warehouse } } : {}),
+    })
   }
   await markDraftSubmitted(owner.id)
 

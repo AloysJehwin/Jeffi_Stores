@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import { syncAllProductsToMerchant, syncProductToMerchant, sendSyncFailureEmail } from '@/lib/merchant/sync'
+import {
+  syncAllProductsToMerchant,
+  syncProductToMerchant,
+  sendSyncFailureEmail,
+  MerchantSyncInProgressError,
+} from '@/lib/merchant/sync'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
 
 function isSameOriginRequest(request: NextRequest): boolean {
@@ -50,6 +55,9 @@ export async function POST(request: NextRequest) {
     }
     return NextResponse.json({ success: true, mode: 'full', ...result })
   } catch (err: any) {
+    if (err instanceof MerchantSyncInProgressError) {
+      return NextResponse.json({ error: err.message, inProgress: true }, { status: 409 })
+    }
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
@@ -71,6 +79,9 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json({ success: true, ...result })
   } catch (err: any) {
+    if (err instanceof MerchantSyncInProgressError) {
+      return NextResponse.json({ error: err.message, inProgress: true }, { status: 409 })
+    }
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

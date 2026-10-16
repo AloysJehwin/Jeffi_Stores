@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Mail, MessageSquare, MessageCircle, Plus, Search } from 'lucide-react'
+import { Mail, MessageSquare, MessageCircle, Play, Plus, Search } from 'lucide-react'
 import { Card } from '../_components/Card'
 import { SkeletonRows } from '../_components/Skeleton'
 import Pager, { useCursorPages } from '../_components/Pager'
@@ -10,6 +10,8 @@ import { useToast } from '@/contexts/ToastContext'
 import BulkMessages from './BulkMessages'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 import { ECOM_ENRICH_ENDPOINT } from '@/components/admin/AIEnrichButton'
+import PlayDialog, { PlayButton, type PlayTarget } from '../_components/PlayDialog'
+import { Segmented, currentRowCls, fieldCls, focusRing } from '../../_ui'
 
 interface ListItem { id: string; slug: string; channel: Channel; name: string; category?: string | null; approval_status?: string | null; source?: 'tenant' | 'platform'; review_status?: string | null }
 interface Msg { id: string; channel: string; to: string; template: string | null; status: string; price_inr: number; charged_inr: number; error: string | null; created_at: string }
@@ -36,6 +38,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
   const [gov, setGov] = useState<{ editing_enabled: boolean; review_required: boolean } | null>(null)
   const [review, setReview] = useState<{ status: string; note: string | null } | null>(null)
   const canEdit = gov?.editing_enabled !== false
+  const [play, setPlay] = useState<PlayTarget | null>(null)
 
   const loadTpls = useCallback(() => {
     setItems(null)
@@ -128,13 +131,8 @@ export default function MessagingClient(props: { prices: Record<string, number>;
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2">
-        {(['log', 'templates', 'bulk'] as const).map(t => (
-          <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${tab === t ? 'ecom-accent-bg text-white' : 'org-sand org-sand-hover'}`}>
-            {t === 'log' ? 'Message log' : t === 'templates' ? 'Templates' : 'Bulk'}
-          </button>
-        ))}
-      </div>
+      <Segmented ariaLabel="Messaging sections" value={tab} onChange={setTab}
+        options={[{ value: 'log', label: 'Message log' }, { value: 'templates', label: 'Templates' }, { value: 'bulk', label: 'Bulk' }]} />
 
       {tab === 'bulk' && <BulkMessages {...props} />}
 
@@ -153,25 +151,8 @@ export default function MessagingClient(props: { prices: Record<string, number>;
       {tab === 'templates' && (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div role="tablist" className="inline-flex rounded-full org-sand p-1">
-              {CHANNELS.map(c => {
-                const on = channel === c.key
-                const Icon = c.icon
-                return (
-                  <button
-                    key={c.key}
-                    role="tab"
-                    aria-selected={on}
-                    onClick={() => { setChannel(c.key); setSelected(null); setQuery('') }}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${on ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}
-                  >
-                    <Icon className={`w-4 h-4 ${on ? 'ecom-accent-text' : ''}`} />
-                    {c.label}
-                    {on && items && <span className="text-xs font-medium text-foreground-muted tabular-nums">{items.length}</span>}
-                  </button>
-                )
-              })}
-            </div>
+            <Segmented<Channel> ariaLabel="Channel" value={channel} onChange={k => { setChannel(k); setSelected(null); setQuery('') }}
+              options={CHANNELS.map(c => ({ value: c.key, label: c.label, icon: c.icon, count: channel === c.key && items ? items.length : undefined }))} />
             {items && items.length > 0 && (
               <span className="text-xs text-foreground-muted">{customised} customised · {items.length - customised} standard</span>
             )}
@@ -182,9 +163,9 @@ export default function MessagingClient(props: { prices: Record<string, number>;
               <div className="flex items-center gap-2 p-3 border-b border-border-default">
                 <div className="relative flex-1">
                   <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
-                  <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Filter templates" className="w-full bg-surface pl-9 pr-3 py-2 text-sm text-foreground border border-border-default focus:outline-none focus:ring-2 focus:ring-accent-500" />
+                  <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Filter templates" className={`w-full bg-surface pl-9 pr-3 py-2 text-sm text-foreground ${fieldCls}`} />
                 </div>
-                {canEdit && <button onClick={createNew} title="New template" className="ecom-accent-bg rounded-full p-2 text-white shrink-0"><Plus className="w-4 h-4" /></button>}
+                {canEdit && <button onClick={createNew} title="New template" aria-label="New template" className={`ecom-accent-bg rounded-full p-2 text-white shrink-0 ${focusRing}`}><Plus className="w-4 h-4" /></button>}
               </div>
               <div className="max-h-[calc(100vh-320px)] overflow-y-auto overscroll-contain">
                 {items === null && Array.from({ length: 8 }).map((_, i) => (
@@ -209,13 +190,17 @@ export default function MessagingClient(props: { prices: Record<string, number>;
                           <li key={it.id}>
                             <button
                               onClick={() => open(it)}
-                              className={`rounded-none w-full text-left px-4 py-3 border-l-[3px] border-b border-b-border-default transition-colors ${active ? 'border-l-[var(--org-terracotta)] org-peach' : 'border-l-transparent hover:bg-surface-secondary/50'}`}
+                              aria-current={active || undefined}
+                              className={`rounded-none w-full text-left px-4 py-3 border-b border-b-border-default transition-colors ${focusRing} ${active ? currentRowCls : 'ecom-hover'}`}
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <span className="text-sm font-medium truncate">{it.name || it.slug}</span>
-                                {opening === it.slug
-                                  ? <span className="h-3 w-3 shrink-0 rounded-full border-2 border-[var(--org-terracotta)] border-t-transparent animate-spin" />
-                                  : <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${it.source === 'tenant' ? 'org-peach org-brown' : 'org-sand text-foreground-muted'}`}>{it.source === 'tenant' ? 'Customised' : 'Standard'}</span>}
+                                <span className="flex shrink-0 items-center gap-1">
+                                  <PlayButton className="-my-1" onClick={() => setPlay({ kind: 'message', channel: it.channel, slug: it.slug, name: it.name })} />
+                                  {opening === it.slug
+                                    ? <span className="h-3 w-3 shrink-0 rounded-full border-2 border-[var(--org-terracotta)] border-t-transparent animate-spin" />
+                                    : <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${it.source === 'tenant' ? 'org-peach org-brown' : 'org-sand text-foreground-muted'}`}>{it.source === 'tenant' ? 'Customised' : 'Standard'}</span>}
+                                </span>
                               </div>
                               <div className="mt-0.5 flex items-center gap-2 text-xs text-foreground-muted">
                                 <code className="truncate">{it.slug}</code>
@@ -257,11 +242,19 @@ export default function MessagingClient(props: { prices: Record<string, number>;
               )}
               {selected && (
                 <Card>
+                  {selected.id && (
+                    <div className="-mt-2 mb-3 flex items-center justify-end">
+                      <button type="button" onClick={() => setPlay({ kind: 'message', channel: selected.channel, slug: selected.slug, name: selected.name })}
+                        title="Test live" aria-label="Test live" className="inline-flex items-center gap-1.5 rounded-full border border-border-default px-3 py-1.5 text-xs font-semibold hover:bg-surface-secondary">
+                        <Play className="w-3.5 h-3.5" /> Test live
+                      </button>
+                    </div>
+                  )}
                   <fieldset disabled={!canEdit} className="min-w-0">
                   {!selected.id && (
                     <label className="block mb-4">
                       <span className="text-xs text-foreground-muted">Slug (e.g. order/confirmed)</span>
-                      <input className="mt-1 w-full bg-surface px-3 py-2 text-sm border border-border-default" value={selected.slug} onChange={e => setSelected({ ...selected, slug: e.target.value })} />
+                      <input className={`mt-1 w-full bg-surface px-3 py-2 text-sm ${fieldCls}`} value={selected.slug} onChange={e => setSelected({ ...selected, slug: e.target.value })} />
                     </label>
                   )}
                   <TemplateEditor
@@ -281,6 +274,7 @@ export default function MessagingClient(props: { prices: Record<string, number>;
           </div>
         </>
       )}
+      {play && <PlayDialog target={play} prices={props.prices} onClose={() => setPlay(null)} />}
     </div>
   )
 }

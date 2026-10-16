@@ -746,6 +746,174 @@ ALTER TABLE ONLY public.amazon_refresh_meta
 
 
 --
+-- Name: ads_account ads_account_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_account
+    ADD CONSTRAINT ads_account_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ads_account
+    ADD CONSTRAINT ads_account_singleton CHECK (id = 1);
+
+ALTER TABLE ONLY public.ads_account
+    ADD CONSTRAINT ads_account_conversion_upload_api_check CHECK (((conversion_upload_api)::text = ANY ((ARRAY['data_manager'::character varying, 'ads_api'::character varying])::text[])));
+
+--
+-- Name: ads_campaigns ads_campaigns_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_campaigns
+    ADD CONSTRAINT ads_campaigns_pkey PRIMARY KEY (campaign_id);
+
+
+--
+-- Name: ads_experiments ads_experiments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_experiments
+    ADD CONSTRAINT ads_experiments_pkey PRIMARY KEY (experiment_id);
+
+--
+-- Name: ads_ad_groups ads_ad_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_ad_groups
+    ADD CONSTRAINT ads_ad_groups_pkey PRIMARY KEY (ad_group_id);
+
+--
+-- Name: ads_ads ads_ads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_ads
+    ADD CONSTRAINT ads_ads_pkey PRIMARY KEY (ad_group_id, ad_id);
+
+--
+-- Name: ads_keywords ads_keywords_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_keywords
+    ADD CONSTRAINT ads_keywords_pkey PRIMARY KEY (ad_group_id, criterion_id);
+
+--
+-- Name: ads_daily_metrics ads_daily_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_daily_metrics
+    ADD CONSTRAINT ads_daily_metrics_pkey PRIMARY KEY (date, campaign_id, ad_group_id, device, network);
+
+--
+-- Name: ads_product_metrics ads_product_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_product_metrics
+    ADD CONSTRAINT ads_product_metrics_pkey PRIMARY KEY (date, campaign_id, item_id);
+
+--
+-- Name: ads_search_terms ads_search_terms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_search_terms
+    ADD CONSTRAINT ads_search_terms_pkey PRIMARY KEY (date, campaign_id, ad_group_id, search_term);
+
+--
+-- Name: ads_geo_metrics ads_geo_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_geo_metrics
+    ADD CONSTRAINT ads_geo_metrics_pkey PRIMARY KEY (date, location);
+
+--
+-- Name: ads_recommendations ads_recommendations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_recommendations
+    ADD CONSTRAINT ads_recommendations_pkey PRIMARY KEY (resource_name);
+
+--
+-- Name: ads_change_events ads_change_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_change_events
+    ADD CONSTRAINT ads_change_events_pkey PRIMARY KEY (resource_name);
+
+--
+-- Name: ads_change_log ads_change_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_change_log
+    ADD CONSTRAINT ads_change_log_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ads_change_log
+    ADD CONSTRAINT ads_change_log_status_check CHECK (((status)::text = ANY ((ARRAY['applied'::character varying, 'rejected'::character varying, 'failed'::character varying])::text[])));
+
+--
+-- Name: ads_sync_log ads_sync_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_sync_log
+    ADD CONSTRAINT ads_sync_log_pkey PRIMARY KEY (id);
+
+--
+-- Name: ads_conversion_uploads ads_conversion_uploads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_conversion_uploads
+    ADD CONSTRAINT ads_conversion_uploads_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ads_conversion_uploads
+    ADD CONSTRAINT ads_conversion_uploads_order_kind_version_key UNIQUE (order_id, kind, version);
+
+ALTER TABLE ONLY public.ads_conversion_uploads
+    ADD CONSTRAINT ads_conversion_uploads_kind_check CHECK (((kind)::text = ANY ((ARRAY['purchase'::character varying, 'retraction'::character varying, 'restatement'::character varying])::text[])));
+
+ALTER TABLE ONLY public.ads_conversion_uploads
+    ADD CONSTRAINT ads_conversion_uploads_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'uploaded'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])));
+
+--
+-- Name: ads_conversion_requests ads_conversion_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_conversion_requests
+    ADD CONSTRAINT ads_conversion_requests_pkey PRIMARY KEY (request_id);
+
+ALTER TABLE ONLY public.ads_conversion_requests
+    ADD CONSTRAINT ads_conversion_requests_kind_check CHECK (((kind)::text = ANY ((ARRAY['purchase'::character varying, 'adjustment'::character varying])::text[])));
+
+ALTER TABLE ONLY public.ads_conversion_requests
+    ADD CONSTRAINT ads_conversion_requests_status_check CHECK (((status)::text = ANY ((ARRAY['PROCESSING'::character varying, 'SUCCESS'::character varying, 'PARTIAL_SUCCESS'::character varying, 'FAILED'::character varying, 'UNKNOWN'::character varying, 'TIMED_OUT'::character varying])::text[])));
+
+--
+-- Name: ads_audiences ads_audiences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_audiences
+    ADD CONSTRAINT ads_audiences_pkey PRIMARY KEY (segment);
+
+ALTER TABLE ONLY public.ads_audiences
+    ADD CONSTRAINT ads_audiences_segment_check CHECK (((segment)::text = ANY ((ARRAY['repeat_buyers'::character varying, 'lapsed'::character varying, 'high_value'::character varying, 'recent_buyers'::character varying, 'b2b'::character varying])::text[])));
+
+--
+-- Name: ads_audience_members ads_audience_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_audience_members
+    ADD CONSTRAINT ads_audience_members_pkey PRIMARY KEY (segment, user_id);
+
+--
+-- Name: ads_alerts ads_alerts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_alerts
+    ADD CONSTRAINT ads_alerts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ads_alerts
+    ADD CONSTRAINT ads_alerts_status_check CHECK (((status)::text = ANY ((ARRAY['open'::character varying, 'dismissed'::character varying, 'resolved'::character varying])::text[])));
+
+ALTER TABLE ONLY public.ads_alerts
+    ADD CONSTRAINT ads_alerts_severity_check CHECK (((severity)::text = ANY ((ARRAY['info'::character varying, 'warning'::character varying, 'critical'::character varying])::text[])));
+
+
+--
 -- Name: homepage_drafts homepage_drafts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 

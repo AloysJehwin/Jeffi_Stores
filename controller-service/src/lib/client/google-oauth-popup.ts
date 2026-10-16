@@ -32,6 +32,17 @@ export function consumeGoogleRedirect(): GoogleOAuthResult | null {
   return { accessToken, error: accessToken ? null : error }
 }
 
+/**
+ * The origin Google returns to. Only jeffistores.in and localhost are registered redirect URIs, so any
+ * subdomain (admin., business., ecom., {slug}., admin-{slug}.) collapses to the root; the callback page
+ * then sends the tab back to the exact host it started on.
+ */
+export function googleRedirectOrigin(origin: string): string {
+  return origin
+    .replace(/^(https?:\/\/)([a-z0-9-]+\.)+(jeffistores\.in)/i, '$1$3')
+    .replace(/^(https?:\/\/)([a-z0-9-]+\.)+(localhost)\b/i, '$1$3')
+}
+
 export function openGoogleOAuthPopup({
   clientId,
   scope = 'openid email profile',
@@ -50,28 +61,18 @@ export function openGoogleOAuthPopup({
     // (business./ecom./admin.) AND tenant storefronts ({slug}.jeffistores.in) are not.
     // Collapse any subdomain of jeffistores.in down to the bare root so the callback
     // always lands on the registered URI, then postMessage's the token back up.
-    const stripAppSubdomain = (origin: string) => {
-      // e.g. https://acme.jeffistores.in → https://jeffistores.in
-      //      https://admin-acme.jeffistores.in → https://jeffistores.in
-      //      https://ecom.jeffistores.in → https://jeffistores.in
-      return (
-        origin
-          .replace(/^(https?:\/\/)([a-z0-9-]+\.)+(jeffistores\.in)/i, '$1$3')
-          // Strip app subdomains on non-jeffistores hosts too (e.g. certificate.localhost:3000 →
-          // localhost:3000), so the callback lands on the one registered dev redirect URI.
-          .replace(/^(https?:\/\/)(business|ecom|admin|certificate)\./, '$1')
-      )
-    }
-    const mainOrigin = stripAppSubdomain(window.location.origin)
+    const mainOrigin = googleRedirectOrigin(window.location.origin)
     const redirectUri = `${mainOrigin}/auth/google/callback`
 
     // State carries the FULL return URL (origin included) so the callback, which always runs on the root
     // domain, sends the tab back to the exact page it came from (admin./business./ecom./tenant hosts).
     const nonce = Math.random().toString(36).slice(2)
+    // Same-tab on our own hosts; a popup elsewhere ("p." tells the callback to post back to the opener).
+    const sameTab = isOwnHost(window.location.hostname)
     const path = returnTo || window.location.pathname
     // Keep the query (e.g. ?redirect=) — every caller is the sign-in page itself.
     const destination = `${window.location.origin}${path}${window.location.search}`
-    const state = `${nonce}|${encodeURIComponent(destination)}`
+    const state = `${sameTab ? '' : 'p.'}${nonce}|${encodeURIComponent(destination)}`
 
     const params = new URLSearchParams({
       client_id: clientId,
@@ -87,7 +88,15 @@ export function openGoogleOAuthPopup({
     // Same-tab flow on our own hosts: popups/new tabs could get stuck and need a manual reload. The page
     // unloads, so this promise never settles; the page completes sign-in on return (consumeGoogleRedirect).
     // Custom tenant domains keep the popup: the callback can only safely send a tab back to our hosts.
-    if (isOwnHost(window.location.hostname)) {
+    if (sameTab) {
+      // Back from Google restores this page from the back/forward cache with the button still loading:
+      // settle as a quiet cancel so the caller resets it.
+      const onShow = (e: PageTransitionEvent) => {
+        if (!e.persisted) return
+        window.removeEventListener('pageshow', onShow)
+        resolve({ accessToken: null, error: 'popup_closed' })
+      }
+      window.addEventListener('pageshow', onShow)
       window.location.assign(url)
       return
     }
@@ -131,7 +140,7 @@ export function openGoogleOAuthPopup({
 
     const onMessage = (event: MessageEvent) => {
       // Accept postMessage from the main origin (callback page) even when on an app subdomain
-      const expectedOrigin = stripAppSubdomain(window.location.origin)
+      const expectedOrigin = googleRedirectOrigin(window.location.origin)
       if (event.origin !== expectedOrigin && event.origin !== window.location.origin) return
       const data = event.data
       if (!data || data.source !== 'jeffi-google-oauth') return

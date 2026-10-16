@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { SkeletonRows } from '../_components/Skeleton'
 import { Card } from '../_components/Card'
+import { ChoiceChips, fieldCls } from '../../_ui'
 
 interface Key { id: string; name: string; key_prefix: string; scopes: string[]; status: string; last_used_at: string | null; created_at: string; requests_30d: number; spend_paise_30d: string }
 const SCOPES: [string, string, 'messaging' | 'documents' | null][] = [
@@ -10,10 +11,10 @@ const SCOPES: [string, string, 'messaging' | 'documents' | null][] = [
   ['documents:render', 'Render documents', 'documents'], ['documents:read', 'Read documents', 'documents'], ['wallet:read', 'Read wallet balance', null],
 ]
 
-type Review = 'pending' | 'rejected' | null
 const LABEL = { messaging: 'Messaging', documents: 'Documents' } as const
 
-export default function ApiKeysClient({ services, review, docsUrl }: { services: { messaging: boolean; documents: boolean }; review: { messaging: Review; documents: Review }; docsUrl: string }) {
+// A service still under review is announced by the dashboard layout's banner, on every page.
+export default function ApiKeysClient({ services, docsUrl }: { services: { messaging: boolean; documents: boolean }; docsUrl: string }) {
   const [keys, setKeys] = useState<Key[] | null>(null)
   const [name, setName] = useState('')
   const [scopes, setScopes] = useState<string[]>(SCOPES.filter(([, , s]) => !s || services[s]).map(([k]) => k))
@@ -52,13 +53,6 @@ export default function ApiKeysClient({ services, review, docsUrl }: { services:
   const noService = !services.messaging && !services.documents
   return (
     <div className="space-y-6">
-      {(['messaging', 'documents'] as const).filter(s => services[s] && review[s]).map(s => (
-        <div key={s} className={`rounded-2xl px-5 py-3 text-sm ${review[s] === 'rejected' ? 'bg-[#f6d5cc]/60 text-[#8a2e1f]' : 'org-peach'}`}>
-          {review[s] === 'pending'
-            ? <><strong>{LABEL[s]} API — under review.</strong> Create keys and set things up now; sending starts once we approve it (usually the same day).</>
-            : <><strong>{LABEL[s]} API — not approved.</strong> Reply to our email or write to support@jeffistores.in.</>}
-        </div>
-      ))}
       {noService && (
         <Card title="Request a service">
           <p className="text-sm text-foreground-secondary mb-4">Your workspace has no API services yet. Request one — it uses the same wallet as your store and starts after a quick review.</p>
@@ -95,12 +89,11 @@ export default function ApiKeysClient({ services, review, docsUrl }: { services:
       {!noService && (
         <Card title="Create a key">
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 items-end">
-            <label className="block"><span className="text-xs text-foreground-muted">Name</span><input value={name} onChange={e => setName(e.target.value)} placeholder="Production backend" className="mt-1 w-full rounded-xl bg-surface-elevated px-4 py-2.5 text-sm" /></label>
+            <label className="block"><span className="text-xs text-foreground-muted">Name</span><input value={name} onChange={e => setName(e.target.value)} placeholder="Production backend" className={`mt-1 w-full rounded-xl bg-surface-elevated px-4 py-2.5 text-sm ${fieldCls}`} /></label>
             <button onClick={create} disabled={busy || name.length < 1 || scopes.length === 0} className="ecom-accent-bg rounded-full px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">Create key</button>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {SCOPES.filter(([, , s]) => !s || services[s]).map(([k, l]) => { const on = scopes.includes(k); return <button key={k} onClick={() => setScopes(p => on ? p.filter(x => x !== k) : [...p, k])} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${on ? 'org-peach org-brown' : 'org-sand text-foreground-secondary'}`}>{l}</button> })}
-          </div>
+          <ChoiceChips multiple ariaLabel="Scopes" className="mt-4" value={scopes} onChange={setScopes}
+            options={SCOPES.filter(([, , s]) => !s || services[s]).map(([k, l]) => ({ value: k, label: l }))} />
         </Card>
       )}
 

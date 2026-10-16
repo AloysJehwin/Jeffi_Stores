@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 import { productLabel } from '@/lib/catalog/product-label'
 import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/shared/db'
@@ -382,7 +383,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       `
       SELECT
         o.order_number, o.status, o.payment_status, o.total_amount,
-        o.user_id, o.customer_name, o.customer_email,
+        o.user_id, o.customer_name, o.customer_email, o.gclid, o.gbraid, o.wbraid,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -533,6 +534,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     values.push(orderId)
 
     await query(`UPDATE orders SET ${updates.join(', ')} WHERE id = $${paramIndex}`, values)
+    // Paid, delivered (COD), cancelled, refunded or returned: keep the Google Ads conversion in step.
+    if (statusChanged || paymentStatusChanged) await queueAdsConversion(orderId, currentOrder)
 
     // An override skips the transition rules, so it must leave a trail that says who did it
     // and why — otherwise the order history shows a jump no state machine could produce.

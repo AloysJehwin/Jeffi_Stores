@@ -12,6 +12,7 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import CopySku from '@/components/ui/CopySku'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import { isDigitalLine, digitalLinesSubtotal } from '@/components/visitor/cart/digital-lines'
+import { trackBeginCheckout } from '@/lib/client/analytics'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -408,6 +409,41 @@ function CheckoutPage() {
       })
       .catch(() => {})
   }, [couponId, address, buyNowItem])
+
+  // begin_checkout once per visit to the page, after the cart / buy-now line has loaded.
+  const beganCheckout = useRef(false)
+  useEffect(() => {
+    if (beganCheckout.current || (intentToken && intentMode === null)) return
+    if (isBuyNow) {
+      if (!buyNowItem) return
+      beganCheckout.current = true
+      trackBeginCheckout([
+        {
+          sku: buyNowItem.sku,
+          name: buyNowItem.productName,
+          price: buyNowItem.price,
+          quantity: buyNowItem.qty,
+          variant: buyNowItem.subVariantName || buyNowItem.variantName,
+        },
+      ])
+      return
+    }
+    if (cartLoading || cartItems.length === 0) return
+    beganCheckout.current = true
+    trackBeginCheckout(
+      cartItems.map((i: any) => ({
+        sku: i.sub_variant?.sku || i.variant?.sku || i.products?.sku,
+        name: i.products?.name || '',
+        price: Number(
+          Number(i.price_at_addition) > 0
+            ? i.price_at_addition
+            : (i.sub_variant?.price ?? i.variant?.price ?? i.products?.base_price ?? 0)
+        ),
+        quantity: Number(i.quantity) || 1,
+        variant: i.sub_variant?.sub_variant_name || i.variant?.variant_name || null,
+      }))
+    )
+  }, [isBuyNow, buyNowItem, cartLoading, cartItems, intentToken, intentMode])
 
   const verifyPayment = async (
     razorpay_order_id: string,

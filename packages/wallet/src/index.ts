@@ -1,20 +1,14 @@
 import type pg from 'pg'
-import { mainPool } from '@jeffi/tenancy'
+import { controlPlanePool } from '@jeffi/tenancy'
 
 // Standalone control-plane wallet client for the services. Same tables + idempotency rules as
-// src/lib/payments/wallet.ts in the monolith (external_ref unique per tenant).
-export type WalletCategory = 'sms' | 'whatsapp' | 'email' | 'document' | 'campaign' | 'ai' | 'recharge' | 'adjustment'
+// src/lib/payments/wallet.ts in the monolith (external_ref unique per tenant). The pool is tenancy's, so
+// the services' IAM settings (CONTROL_PLANE_IAM_AUTH + CONTROL_PLANE_RDS_*) and the DATABASE_URL fallback apply.
+export type WalletCategory = 'sms' | 'whatsapp' | 'email' | 'media' | 'document' | 'campaign' | 'ai' | 'recharge' | 'adjustment'
 const FLAGSHIP_TENANT_ID = '00000000-0000-0000-0000-000000000000'
 const round2 = (n: number) => Math.round(n * 100) / 100
 
-let pool: pg.Pool | undefined
-export function controlPlanePool(): pg.Pool {
-  if (pool) return pool
-  const url = process.env.CONTROL_PLANE_DATABASE_URL
-  if (!url) throw new Error('CONTROL_PLANE_DATABASE_URL is not set')
-  pool = mainPool(url, 5)
-  return pool
-}
+export { controlPlanePool }
 
 async function tx<T>(fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
   const c = await controlPlanePool().connect()

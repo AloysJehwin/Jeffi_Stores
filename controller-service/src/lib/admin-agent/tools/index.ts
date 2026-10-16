@@ -7,6 +7,7 @@ import { MARKETING_TOOLS } from './marketing'
 import { CATALOG_TOOLS } from './catalog'
 import { CUSTOMER_OPS_TOOLS } from './customer-ops'
 import { OPERATIONS_TOOLS } from './operations'
+import { GOOGLE_ADS_TOOLS } from './google-ads'
 import { ok, err } from '../tool-envelope'
 import { appPath, repoRoot } from '@/lib/shared/paths'
 
@@ -1194,6 +1195,7 @@ export const TOOLS: ToolDef[] = [
   ...CATALOG_TOOLS,
   ...CUSTOMER_OPS_TOOLS,
   ...OPERATIONS_TOOLS,
+  ...GOOGLE_ADS_TOOLS,
 ]
 
 export function getTool(name: string): ToolDef | null {
