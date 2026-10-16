@@ -22,6 +22,7 @@ const SOURCE_LABELS: Record<string, string> = {
   offline: 'Counter / offline',
   pos: 'Point of sale',
   business: 'Business portal',
+  amazon: 'Amazon',
 }
 const sourceLabel = (s: string) => SOURCE_LABELS[s] || s.replace(/_/g, ' ')
 

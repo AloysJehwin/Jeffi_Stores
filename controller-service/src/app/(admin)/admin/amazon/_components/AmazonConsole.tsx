@@ -9,12 +9,13 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, Tabs, api } from '@/components/admin/channels/ui'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import AmazonMerchantPanel from '../../merchant-sync/_components/AmazonMerchantPanel'
-import { BuyboxView, FeesView, OverviewView, RepricerView, SuppressedView } from './AmazonTabs'
+import { BuyboxView, FeesView, OrdersStockView, OverviewView, RepricerView, SuppressedView } from './AmazonTabs'
 
-type Tab = 'overview' | 'listings' | 'suppressed' | 'buybox' | 'fees' | 'repricer' | 'alerts' | 'changes' | 'runs'
+type Tab = 'overview' | 'orders' | 'listings' | 'suppressed' | 'buybox' | 'fees' | 'repricer' | 'alerts' | 'changes' | 'runs'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
+  { id: 'orders', label: 'Orders & stock' },
   { id: 'listings', label: 'Listings & push' },
   { id: 'suppressed', label: 'Suppressed' },
   { id: 'buybox', label: 'Buy Box & pricing' },
@@ -99,6 +100,8 @@ function Body({ tab, data, onChanged }: { tab: Tab; data: any; onChanged: () => 
   switch (tab) {
     case 'overview':
       return <OverviewView d={data} />
+    case 'orders':
+      return <OrdersStockView onChanged={onChanged} />
     case 'listings':
       return <AmazonMerchantPanel />
     case 'suppressed':

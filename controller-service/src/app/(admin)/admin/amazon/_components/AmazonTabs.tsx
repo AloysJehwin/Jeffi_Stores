@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { ap } from '@/lib/shared/admin-path'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, api, btnPrimary, count, inputCls, money, pct, when } from '@/components/admin/channels/ui'
 
@@ -295,6 +296,130 @@ export function RepricerView({ d, onChanged }: { d: any; onChanged: () => void }
         )}
       </Section>
       {pending && <PreviewApply writeScope="amazon_pricing:write" endpoint={PRICE} payload={pending} applyLabel="Change price" onClose={() => setPending(null)} onDone={onChanged} />}
+    </div>
+  )
+}
+
+const STOCK_TONE: Record<string, 'green' | 'amber' | 'red' | 'muted' | 'blue'> = { deducted: 'green', restored: 'blue', short: 'red', unmatched: 'amber', none: 'muted' }
+
+export function OrdersStockView({ onChanged }: { onChanged: () => void }) {
+  const canWrite = useCanWrite('amazon_orders')
+  const [d, setD] = useState<any>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [form, setForm] = useState<{ importOrders: boolean; pushStock: boolean; buffer: number } | null>(null)
+  const load = async () => {
+    const r = await api('/api/admin/amazon/orders')
+    if (r.ok) {
+      setD(r.data)
+      setForm({ importOrders: r.data.orders.enabled, pushStock: r.data.stock.settings.enabled, buffer: r.data.stock.settings.buffer })
+    } else setNotice(r.data.error || 'Could not load')
+  }
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const run = async (key: string, url: string, method = 'POST', json?: unknown) => {
+    setBusy(key)
+    setNotice(null)
+    const r = await api(url, { method, json })
+    setBusy(null)
+    setNotice(r.ok ? (r.data.status ? `Done (${r.data.status}).` : 'Saved.') : r.data.error || r.data.problems?.[0] || 'Failed')
+    await load()
+    onChanged()
+  }
+  if (!d || !form) return <p className="text-sm text-foreground-muted">{notice ?? 'Loading...'}</p>
+  const s = d.orders.summary ?? {}
+  return (
+    <div className="space-y-5">
+      <KpiGrid>
+        <Kpi label="Amazon orders, 30 days" value={count(Number(s.orders_30d ?? 0))} />
+        <Kpi label="Amazon sales, 30 days" value={money(Number(s.revenue_30d ?? 0))} highlight />
+        <Kpi label="Need attention" value={count(Number(s.needs_attention ?? 0))} sub="short on stock or SKU not matched" />
+      </KpiGrid>
+      <Section title="Settings">
+        <div className="space-y-2 text-sm">
+          <label className="flex items-start gap-2">
+            <input type="checkbox" disabled={!canWrite} checked={form.importOrders} onChange={e => setForm(f => ({ ...f!, importOrders: e.target.checked }))} />
+            <span>
+              Import Amazon orders into Orders every 15 minutes. Orders you ship yourself take stock when Amazon confirms them and give it back if they are cancelled; orders fulfilled by Amazon (FBA) never touch your stock.
+            </span>
+          </label>
+          <label className="flex items-start gap-2">
+            <input type="checkbox" disabled={!canWrite} checked={form.pushStock} onChange={e => setForm(f => ({ ...f!, pushStock: e.target.checked }))} />
+            <span>Keep Amazon&apos;s stock in step with yours (for products that track stock), every 15 minutes, only when it changes.</span>
+          </label>
+          <label className="flex items-center gap-2">
+            Safety buffer
+            <input className={`${inputCls} w-24`} type="number" min={0} max={1000} disabled={!canWrite} value={form.buffer} onChange={e => setForm(f => ({ ...f!, buffer: Number(e.target.value) }))} />
+            units held back from Amazon per SKU
+          </label>
+          {d.stock.pushDisabled && <p className="text-xs text-amber-600">Pushing to Amazon is turned off in this environment, so stock is calculated but not sent.</p>}
+          {canWrite && (
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button type="button" className={btnPrimary} disabled={busy === 'save'} onClick={() => run('save', '/api/admin/amazon/orders-settings', 'PUT', form)}>
+                Save settings
+              </button>
+              <button type="button" className={btnPrimary} disabled={busy === 'import' || !d.orders.enabled} onClick={() => run('import', '/api/admin/amazon/orders/import')}>
+                Import orders now
+              </button>
+              <button type="button" className={btnPrimary} disabled={busy === 'push' || !d.stock.settings.enabled} onClick={() => run('push', '/api/admin/amazon/stock/push')}>
+                Push stock now
+              </button>
+            </div>
+          )}
+          {notice && <p className="text-xs text-foreground-muted">{notice}</p>}
+        </div>
+      </Section>
+      <Section title="Amazon orders">
+        <Table
+          rows={d.orders.rows}
+          rowKey={(r: any) => r.amazon_order_id}
+          empty="No Amazon orders imported yet."
+          cols={[
+            { key: 'when', label: 'Placed', render: (r: any) => <span className="whitespace-nowrap">{when(r.purchase_date)}</span>, sort: (r: any) => r.purchase_date ?? '' },
+            { key: 'id', label: 'Amazon order', render: (r: any) => <span className="font-mono text-xs">{r.amazon_order_id}</span> },
+            { key: 'ours', label: 'Our order', render: (r: any) => (r.order_id ? <a className="text-xs underline" href={ap(`/admin/orders/${r.order_id}`)}>{r.order_number}</a> : '-') },
+            { key: 'status', label: 'Amazon status', render: (r: any) => r.status },
+            { key: 'ch', label: 'Fulfilled by', render: (r: any) => (r.fulfillment_channel === 'AFN' ? <Badge tone="blue">Amazon</Badge> : <Badge>You</Badge>) },
+            { key: 'total', label: 'Total', num: true, render: (r: any) => money(Number(r.order_total ?? 0), 2) },
+            {
+              key: 'items',
+              label: 'Items',
+              render: (r: any) => (
+                <span className="text-xs">
+                  {(r.items ?? []).map((i: any) => `${i.qty} x ${i.sku ?? i.title}${i.matched ? '' : ' (no match)'}`).join(', ')}
+                </span>
+              ),
+            },
+            {
+              key: 'stock',
+              label: 'Stock',
+              render: (r: any) => (
+                <span title={r.stock_note ?? undefined}>
+                  <Badge tone={STOCK_TONE[r.stock_state] ?? 'muted'}>{r.stock_state}</Badge>
+                </span>
+              ),
+            },
+          ]}
+        />
+      </Section>
+      <Section title="Stock on Amazon">
+        <Table
+          rows={d.stock.rows}
+          rowKey={(r: any) => r.sku}
+          empty="Nothing tracked yet. Turn on stock push; only products that track stock and that you ship yourself are included."
+          cols={[
+            { key: 'title', label: 'Product', render: (r: any) => r.title ?? r.sku },
+            { key: 'ours', label: 'Your stock', num: true, render: (r: any) => (r.our_available == null ? '-' : Number(r.our_available)) },
+            { key: 'res', label: 'Held for Amazon', num: true, render: (r: any) => r.reserved },
+            { key: 'pushed', label: 'Sent to Amazon', num: true, render: (r: any) => r.pushed_qty ?? '-' },
+            { key: 'amz', label: 'Amazon shows', num: true, render: (r: any) => r.amazon_quantity ?? '-' },
+            { key: 'at', label: 'Sent', render: (r: any) => when(r.pushed_at) },
+            { key: 'err', label: '', render: (r: any) => (r.push_error ? <span className="text-xs text-red-500">{r.push_error}</span> : null) },
+          ]}
+        />
+      </Section>
     </div>
   )
 }

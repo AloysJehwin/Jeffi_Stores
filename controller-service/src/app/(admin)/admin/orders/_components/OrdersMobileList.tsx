@@ -18,6 +18,7 @@ interface Props {
 
 const SOURCE_LABEL: Record<string, string> = {
   online: 'Online',
+  amazon: 'Amazon',
   business: 'Business',
   cash_sale: 'Cash Sale',
 }
@@ -29,6 +30,7 @@ function sourceLabel(source: string) {
 function sourceBadge(source: string) {
   if (source === 'online') return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
   if (source === 'business') return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+  if (source === 'amazon') return 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
   return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
 }
 

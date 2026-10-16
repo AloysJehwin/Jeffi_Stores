@@ -182,7 +182,7 @@ export async function searchListingsItems(
   return spApiRequest('GET', `${LISTINGS_BASE}/${encodeURIComponent(creds.sellerId)}`, {
     query: {
       marketplaceIds: creds.marketplaceId,
-      includedData: 'summaries,issues',
+      includedData: 'summaries,issues,fulfillmentAvailability',
       pageSize: '20',
       pageToken,
     },

@@ -2289,3 +2289,9 @@ CREATE INDEX IF NOT EXISTS idx_gmc_product_performance_offer ON public.gmc_produ
 CREATE INDEX IF NOT EXISTS idx_gmc_best_sellers_status ON public.gmc_best_sellers (report_date, catalog_status);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_amazon_repricer_rules_sku ON public.amazon_repricer_rules (COALESCE(sku, ''));
+
+CREATE INDEX IF NOT EXISTS idx_amazon_orders_updated ON public.amazon_orders (last_update_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_amazon_order_items_order ON public.amazon_order_items (amazon_order_id);
+
+CREATE INDEX IF NOT EXISTS idx_amazon_order_items_sku ON public.amazon_order_items (sku);
