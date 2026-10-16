@@ -17,7 +17,7 @@ export interface WizardBootstrap {
   categories: { id: string; name: string; slug: string; parentId: string | null; products: number }[]
   brands: { name: string; products: number }[]
   labels: { margin: Record<string, number>; velocity: Record<string, number>; stock: Record<string, number> }
-  images: { id: string; productName: string; url: string }[]
+  images: { id: string; productId?: string; productName: string; url: string }[]
   merchantConnected: boolean
   /** Short store facts for AI prompts and callouts. */
   facts: string[]
@@ -110,7 +110,7 @@ export async function loadWizardBootstrap(): Promise<WizardBootstrap> {
        WHERE b.is_active IS NOT FALSE GROUP BY b.id ORDER BY COUNT(p.id) DESC, b.name LIMIT 200`
     ).catch(() => []),
     queryMany<any>(
-      `SELECT DISTINCT ON (p.id) pi.id, pi.image_url, p.name
+      `SELECT DISTINCT ON (p.id) pi.id, pi.image_url, p.name, p.id AS product_id
        FROM product_images pi JOIN products p ON p.id = pi.product_id
        WHERE p.is_active IS NOT FALSE AND pi.image_url LIKE 'https://%'
        ORDER BY p.id, pi.is_primary DESC NULLS LAST, pi.display_order
@@ -146,7 +146,7 @@ export async function loadWizardBootstrap(): Promise<WizardBootstrap> {
     categories: categories.map(c => ({ id: c.id, name: c.name, slug: c.slug, parentId: c.parent_category_id, products: c.products })),
     brands: brands.map(b => ({ name: b.name, products: b.products })),
     labels,
-    images: images.map(i => ({ id: i.id, productName: i.name, url: i.image_url })),
+    images: images.map(i => ({ id: i.id, productId: i.product_id, productName: i.name, url: i.image_url })),
     merchantConnected,
     facts,
   }

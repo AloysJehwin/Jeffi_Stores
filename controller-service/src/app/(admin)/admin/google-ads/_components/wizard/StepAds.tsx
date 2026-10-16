@@ -8,6 +8,7 @@ import { COUNTS, LIMITS, adTextLength } from '@/lib/google-ads/limits'
 import { MATCH_TYPES, filled, type ListingDimension, type MatchType } from '@/lib/google-ads/campaign-spec'
 import { postJson, errorText } from '../ManageContext'
 import { newAdGroup, parseKeywordLines, type Draft, type DraftAdGroup } from './draft'
+import { AiAssetImage } from './AiAssetImage'
 import { AiButton, Chip, Field, LimitedInput, TextList, btnGhost, inputCls } from './fields'
 
 type Patch = (p: Partial<Draft>) => void
@@ -396,7 +397,8 @@ export function AssetGroupEditor({ d, set, b, canAi }: { d: Draft; set: Patch; b
     if (data.dropped) setAiNote(`${data.dropped} AI line(s) were too long or repeated and were left out.`)
   }
 
-  const images = b.images.filter(i => !filter || i.productName.toLowerCase().includes(filter.toLowerCase())).slice(0, 48)
+  const [aiImages, setAiImages] = useState<WizardBootstrap['images']>([])
+  const images = [...aiImages, ...b.images].filter(i => !filter || i.productName.toLowerCase().includes(filter.toLowerCase())).slice(0, 48)
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -446,6 +448,16 @@ export function AssetGroupEditor({ d, set, b, canAi }: { d: Draft; set: Patch; b
               Product images ({a.imageIds.length}/5): each is fitted to a 1.91:1 and a 1:1 image on white
             </span>
             <input className={inputCls} value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter by product name" />
+        {canAi && a.imageIds.length < 5 && (
+          <AiAssetImage
+            images={[...aiImages, ...b.images]}
+            selected={a.imageIds}
+            onAdd={img => {
+              setAiImages(list => [img, ...list])
+              upd({ imageIds: [...a.imageIds, img.id] })
+            }}
+          />
+        )}
             <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-72 overflow-y-auto">
               {images.map(img => {
                 const on = a.imageIds.includes(img.id)
