@@ -1,7 +1,9 @@
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
+import { Suspense } from 'react'
 import AdminAuditClient from './AdminAuditClient'
+import AuditTabs from './AuditTabs'
 import AccessDenied from '@/components/admin/AccessDenied'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 
@@ -22,5 +24,11 @@ export default async function AdminAuditPage() {
     return <AccessDenied scopeKey="audit" scopeLabel="Audit Log" />
   }
 
-  return <AdminAuditClient />
+  return (
+    <Suspense fallback={null}>
+      <AuditTabs>
+        <AdminAuditClient />
+      </AuditTabs>
+    </Suspense>
+  )
 }

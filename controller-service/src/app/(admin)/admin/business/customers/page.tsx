@@ -13,6 +13,7 @@ import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import BusinessCustomersMobileList from './_components/BusinessCustomersMobileList'
+import B2bCustomersOverview from './_components/B2bCustomersOverview'
 
 const PAGE_SIZE = 25
 
@@ -80,7 +81,7 @@ const STATUS_STYLES: Record<string, string> = {
 // Builds a business-customers URL that preserves the active status/search
 // filters. Shared by the stat cards, status tabs and pagination.
 function buildUrl(resolvedSearchParams: SP, host: string, p: number, extra: Record<string, string> = {}) {
-  const params = new URLSearchParams()
+  const params = new URLSearchParams({ tab: 'list' })
   if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
   if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
   Object.entries(extra).forEach(([k, v]) => params.set(k, v))
@@ -290,6 +291,12 @@ export default async function BusinessCustomersPage({ searchParams }: { searchPa
   if (!session || !hasScope(session.role, session.scopes || [], 'business_customers:read'))
     redirect(ap('/admin/dashboard', host))
 
+  // Overview by default; the list keeps its old filter URLs (status/search/page).
+  const tab = resolvedSearchParams.tab
+  const showList =
+    tab === 'list' ||
+    (!tab && !!(resolvedSearchParams.status || resolvedSearchParams.search || resolvedSearchParams.page))
+
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
@@ -297,47 +304,78 @@ export default async function BusinessCustomersPage({ searchParams }: { searchPa
         <p className="text-foreground-secondary mt-1 text-sm">Manage B2B partner accounts, approvals, and discounts</p>
       </div>
 
-      {/* Stats */}
-      <Suspense fallback={<AdminStatsSkeleton cards={3} gridClass="grid-cols-3" />}>
-        <BusinessCustomersStats resolvedSearchParams={resolvedSearchParams} host={host} />
-      </Suspense>
-
-      {/* Filters */}
-      <form method="get" className="flex gap-3 mb-4">
-        {resolvedSearchParams.status && <input type="hidden" name="status" value={resolvedSearchParams.status} />}
-        <input
-          type="search"
-          name="search"
-          defaultValue={resolvedSearchParams.search}
-          placeholder="Search by email, company, GST…"
-          className="flex-1 px-3 h-control-sm text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-        />
-        <button
-          type="submit"
-          className="px-4 h-control-sm text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
-        >
-          Search
-        </button>
-      </form>
-
-      {/* Status tabs */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {['all', 'pending', 'approved', 'rejected'].map(s => (
+      <div className="flex gap-0.5 border-b border-border-default mb-4" role="tablist">
+        {[
+          {
+            id: 'overview',
+            label: 'Overview',
+            href: ap('/admin/business/customers?tab=overview', host),
+            on: !showList,
+          },
+          { id: 'list', label: 'All accounts', href: buildUrl(resolvedSearchParams, host, 1), on: showList },
+        ].map(t => (
           <Link
-            key={s}
-            href={buildUrl(resolvedSearchParams, host, 1, s === 'all' ? {} : { status: s })}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-full capitalize transition-colors ${
-              (resolvedSearchParams.status ?? 'all') === s
-                ? 'bg-accent-500 text-white'
-                : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
-            }`}
+            key={t.id}
+            href={t.href}
+            role="tab"
+            aria-selected={t.on}
+            className={`px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${t.on ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'}`}
           >
-            {s}
+            {t.label}
           </Link>
         ))}
       </div>
 
-      <BusinessCustomersListSection resolvedSearchParams={resolvedSearchParams} host={host} />
+      {!showList ? (
+        <Suspense fallback={null}>
+          <B2bCustomersOverview />
+        </Suspense>
+      ) : (
+        <>
+          {/* Stats */}
+          <Suspense fallback={<AdminStatsSkeleton cards={3} gridClass="grid-cols-3" />}>
+            <BusinessCustomersStats resolvedSearchParams={resolvedSearchParams} host={host} />
+          </Suspense>
+
+          {/* Filters */}
+          <form method="get" className="flex gap-3 mb-4">
+            <input type="hidden" name="tab" value="list" />
+            {resolvedSearchParams.status && <input type="hidden" name="status" value={resolvedSearchParams.status} />}
+            <input
+              type="search"
+              name="search"
+              defaultValue={resolvedSearchParams.search}
+              placeholder="Search by email, company, GST…"
+              className="flex-1 px-3 h-control-sm text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+            />
+            <button
+              type="submit"
+              className="px-4 h-control-sm text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
+            >
+              Search
+            </button>
+          </form>
+
+          {/* Status tabs */}
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {['all', 'pending', 'approved', 'rejected'].map(s => (
+              <Link
+                key={s}
+                href={buildUrl(resolvedSearchParams, host, 1, s === 'all' ? {} : { status: s })}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-full capitalize transition-colors ${
+                  (resolvedSearchParams.status ?? 'all') === s
+                    ? 'bg-accent-500 text-white'
+                    : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                }`}
+              >
+                {s}
+              </Link>
+            ))}
+          </div>
+
+          <BusinessCustomersListSection resolvedSearchParams={resolvedSearchParams} host={host} />
+        </>
+      )}
     </div>
   )
 }

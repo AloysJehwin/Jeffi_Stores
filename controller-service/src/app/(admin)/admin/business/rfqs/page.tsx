@@ -14,6 +14,7 @@ import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import BusinessRfqsMobileList from './_components/BusinessRfqsMobileList'
 import RfqTrendChart, { type RfqTrendPoint } from './_components/RfqTrendChart'
+import RfqsOverview from './_components/RfqsOverview'
 
 const PAGE_SIZE = 25
 
@@ -150,7 +151,7 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
   const search = resolvedSearchParams.search
 
   const tabUrl = (p: number, extra: Record<string, string> = {}) => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (search) params.set('search', search)
     Object.entries(extra).forEach(([k, v]) => params.set(k, v))
     if (p > 1) params.set('page', String(p))
@@ -159,6 +160,9 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
   }
 
   const key = JSON.stringify(resolvedSearchParams)
+  // Overview by default; the list keeps its old filter URLs (status/search/page).
+  const tab = resolvedSearchParams.tab
+  const showList = tab === 'list' || (!tab && !!(status || search || resolvedSearchParams.page))
 
   return (
     <div className="p-4 sm:p-6">
@@ -169,52 +173,78 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
         </p>
       </div>
 
-      {/* Stats + trend stream above the filters while the shell stays mounted */}
-      <Suspense
-        fallback={<AdminStatsSkeleton cards={6} gridClass="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" banner />}
-      >
-        <BusinessRFQsStats />
-      </Suspense>
-
-      {/* Filters */}
-      <form method="get" className="flex gap-3 mb-4">
-        {status && <input type="hidden" name="status" value={status} />}
-        <input
-          type="search"
-          name="search"
-          defaultValue={search}
-          placeholder="Search by RFQ number, company, email…"
-          className="flex-1 px-3 h-control-sm text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-        />
-        <button
-          type="submit"
-          className="px-4 h-control-sm text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
-        >
-          Search
-        </button>
-      </form>
-
-      {/* Status tabs */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {['all', 'pending', 'reviewed', 'negotiating', 'offer_accepted', 'converted', 'rejected'].map(s => (
+      <div className="flex gap-0.5 border-b border-border-default mb-4" role="tablist">
+        {[
+          { id: 'overview', label: 'Overview', href: ap('/admin/business/rfqs?tab=overview', host), on: !showList },
+          { id: 'list', label: 'All RFQs', href: tabUrl(1, status ? { status } : {}), on: showList },
+        ].map(t => (
           <Link
-            key={s}
-            href={tabUrl(1, s === 'all' ? {} : { status: s })}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
-              (status ?? 'all') === s
-                ? 'bg-accent-500 text-white'
-                : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
-            }`}
+            key={t.id}
+            href={t.href}
+            role="tab"
+            aria-selected={t.on}
+            className={`px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${t.on ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'}`}
           >
-            {STATUS_LABELS[s] ?? s}
+            {t.label}
           </Link>
         ))}
       </div>
 
-      {/* Table — re-shimmers on filter/pagination change while shell stays mounted */}
-      <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={7} />}>
-        <BusinessRFQsListContent resolvedSearchParams={resolvedSearchParams} host={host} />
-      </Suspense>
+      {!showList ? (
+        <Suspense fallback={null}>
+          <RfqsOverview />
+        </Suspense>
+      ) : (
+        <>
+          {/* Stats + trend stream above the filters while the shell stays mounted */}
+          <Suspense
+            fallback={<AdminStatsSkeleton cards={6} gridClass="grid-cols-2 sm:grid-cols-3 lg:grid-cols-6" banner />}
+          >
+            <BusinessRFQsStats />
+          </Suspense>
+
+          {/* Filters */}
+          <form method="get" className="flex gap-3 mb-4">
+            <input type="hidden" name="tab" value="list" />
+            {status && <input type="hidden" name="status" value={status} />}
+            <input
+              type="search"
+              name="search"
+              defaultValue={search}
+              placeholder="Search by RFQ number, company, email…"
+              className="flex-1 px-3 h-control-sm text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+            />
+            <button
+              type="submit"
+              className="px-4 h-control-sm text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
+            >
+              Search
+            </button>
+          </form>
+
+          {/* Status tabs */}
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {['all', 'pending', 'reviewed', 'negotiating', 'offer_accepted', 'converted', 'rejected'].map(s => (
+              <Link
+                key={s}
+                href={tabUrl(1, s === 'all' ? {} : { status: s })}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+                  (status ?? 'all') === s
+                    ? 'bg-accent-500 text-white'
+                    : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                }`}
+              >
+                {STATUS_LABELS[s] ?? s}
+              </Link>
+            ))}
+          </div>
+
+          {/* Table — re-shimmers on filter/pagination change while shell stays mounted */}
+          <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={7} />}>
+            <BusinessRFQsListContent resolvedSearchParams={resolvedSearchParams} host={host} />
+          </Suspense>
+        </>
+      )}
     </div>
   )
 }
@@ -270,7 +300,7 @@ async function BusinessRFQsListContent({ resolvedSearchParams, host }: { resolve
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   const buildUrl = (p: number, extra: Record<string, string> = {}) => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (status) params.set('status', status)
     if (search) params.set('search', search)
     Object.entries(extra).forEach(([k, v]) => params.set(k, v))
