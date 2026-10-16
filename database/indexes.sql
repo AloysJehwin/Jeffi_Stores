@@ -2273,3 +2273,13 @@ CREATE INDEX IF NOT EXISTS idx_bulk_items_job ON public.bulk_job_items (job_id, 
 CREATE INDEX IF NOT EXISTS idx_platform_invoices_tenant ON public.platform_invoices (tenant_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_tenant_service_approvals_pending ON public.tenant_service_approvals (status, requested_at) WHERE status = 'pending';
+
+CREATE INDEX IF NOT EXISTS idx_channel_sync_log_channel ON public.channel_sync_log (channel, kind, started_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_channel_alerts_active_key ON public.channel_alerts (channel, dedupe_key) WHERE ((status)::text = ANY ((ARRAY['open'::character varying, 'dismissed'::character varying])::text[]));
+
+CREATE INDEX IF NOT EXISTS idx_channel_alerts_key_notified ON public.channel_alerts (channel, dedupe_key, notified_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_channel_alerts_status_seen ON public.channel_alerts (channel, status, last_seen_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_channel_change_log_channel ON public.channel_change_log (channel, created_at DESC);

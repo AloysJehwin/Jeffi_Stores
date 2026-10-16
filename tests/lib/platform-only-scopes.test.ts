@@ -48,7 +48,7 @@ describe('control-plane scopes belong to the platform operator alone', () => {
 // +1 with google_ads_campaigns:write, campaign management sold on Pro and up → 80.)
 describe('the plan ladder never exceeds what a tenant may hold', () => {
   it('caps the top tier at the full tenant scope set', () => {
-    expect(TENANT_SCOPE_KEYS.length).toBe(80)
+    expect(TENANT_SCOPE_KEYS.length).toBe(93)
   })
 
   it('keeps every control-plane scope out of the tenant set', () => {

@@ -99,6 +99,41 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/merchant-sync'],
     group: 'Catalogue',
   },
+  {
+    key: 'merchant_sync:settings_write',
+    label: 'Merchant Center Settings (Write)',
+    description: 'Change Google Merchant Center shipping settings, return policies and promotions',
+    routes: ['/admin/merchant'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'amazon:read',
+    label: 'Amazon (Read)',
+    description: 'View Amazon listing health, Buy Box, fees, orders and sales reports',
+    routes: ['/admin/amazon'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'amazon:write',
+    label: 'Amazon (Write)',
+    description: 'Connect Amazon, refresh data and fix listings',
+    routes: ['/admin/amazon'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'amazon_pricing:write',
+    label: 'Amazon Pricing (Write)',
+    description: 'Change Amazon prices and manage repricer rules',
+    routes: ['/admin/amazon'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'amazon_orders:write',
+    label: 'Amazon Orders & Stock (Write)',
+    description: 'Import Amazon orders into Orders and push stock to Amazon',
+    routes: ['/admin/amazon'],
+    group: 'Orders',
+  },
 
   // Sales
   {
@@ -355,14 +390,14 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'campaigns:read',
     label: 'Campaigns (Read)',
     description: 'View marketing campaigns',
-    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/customer-programs', '/admin/loyalty', '/admin/referrals'],
+    routes: ['/admin/campaigns', '/admin/customer-programs', '/admin/loyalty', '/admin/referrals'],
     group: 'Marketing',
   },
   {
     key: 'campaigns:write',
     label: 'Campaigns (Write)',
     description: 'Create and manage marketing campaigns',
-    routes: ['/admin/campaigns', '/admin/social-posts', '/admin/customer-programs', '/admin/loyalty', '/admin/referrals'],
+    routes: ['/admin/campaigns', '/admin/customer-programs', '/admin/loyalty', '/admin/referrals'],
     group: 'Marketing',
   },
   // Customer subscriptions (Razorpay recurring). On every plan; the renewal-reminder campaign
@@ -423,6 +458,62 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     label: 'Google Ads Campaigns (Write)',
     description: 'Create Google Ads campaigns and change budgets, bids, keywords, ads, assets and recommendations',
     routes: ['/admin/google-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'amazon_ads:read',
+    label: 'Amazon Ads (Read)',
+    description: 'View Amazon Sponsored Products performance, campaigns, keywords and search terms',
+    routes: ['/admin/amazon-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'amazon_ads:write',
+    label: 'Amazon Ads (Write)',
+    description: 'Connect Amazon Ads and change campaigns, budgets, bids, keywords and negatives',
+    routes: ['/admin/amazon-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'meta_ads:read',
+    label: 'Meta Ads (Read)',
+    description: 'View Facebook and Instagram ads performance and Conversions API health',
+    routes: ['/admin/meta-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'meta_ads:write',
+    label: 'Meta Ads (Write)',
+    description: 'Connect a Meta ad account and run a Meta Ads sync',
+    routes: ['/admin/meta-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'meta_ads_campaigns:write',
+    label: 'Meta Ads Campaigns (Write)',
+    description: 'Create Meta campaigns and change budgets, ad sets and ads',
+    routes: ['/admin/meta-ads'],
+    group: 'Marketing',
+  },
+  {
+    key: 'social:read',
+    label: 'Social (Read)',
+    description: 'View social posts, the calendar, insights and the social inbox',
+    routes: ['/admin/social-posts'],
+    group: 'Marketing',
+  },
+  {
+    key: 'social:write',
+    label: 'Social (Write)',
+    description: 'Connect social accounts, write and schedule posts, reply to comments',
+    routes: ['/admin/social-posts'],
+    group: 'Marketing',
+  },
+  {
+    key: 'social:approve',
+    label: 'Social (Approve)',
+    description: 'Approve social posts that need sign-off before they publish',
+    routes: ['/admin/social-posts'],
     group: 'Marketing',
   },
 
@@ -719,6 +810,11 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/suppliers')) return 'inventory:read'
   if (pathname.startsWith('/api/admin/shelving')) return 'shelving:read'
   if (pathname.startsWith('/api/admin/merchant')) return 'merchant_sync:read'
+  if (pathname.startsWith('/api/admin/channels')) return null
+  if (pathname.startsWith('/api/admin/amazon-ads')) return 'amazon_ads:read'
+  if (pathname.startsWith('/api/admin/amazon')) return 'amazon:read'
+  if (pathname.startsWith('/api/admin/meta-ads')) return 'meta_ads:read'
+  if (pathname.startsWith('/api/admin/social')) return 'social:read'
   if (pathname.startsWith('/api/admin/returns')) return 'returns:read'
   if (pathname.startsWith('/api/admin/replacements')) return 'replacements:read'
   if (pathname.startsWith('/api/admin/delhivery')) return 'delhivery:read'
@@ -733,7 +829,6 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/mailer')) return 'mailer:read'
   if (pathname.startsWith('/api/admin/messaging-templates')) return 'templates:read'
   if (pathname.startsWith('/api/admin/suggest')) return null
-  if (pathname.startsWith('/api/admin/social-posts')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/traffic')) return 'traffic:read'
   if (pathname.startsWith('/api/admin/google-ads')) return 'google_ads:read'
   if (pathname.startsWith('/api/admin/integrations/google-ads')) return 'google_ads:read'
@@ -776,6 +871,8 @@ const LEGACY_SCOPE_PARENTS: Record<string, string> = {
   'shelving:write': 'inventory:write',
   'campaigns:read': 'mailer:read',
   'campaigns:write': 'mailer:write',
+  'social:read': 'campaigns:read',
+  'social:write': 'campaigns:write',
   'templates:read': 'mailer:read',
   'templates:write': 'mailer:write',
   'controls:read': 'inflation:read',
