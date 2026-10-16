@@ -59,7 +59,9 @@ async function tenantConfigFor(tenantId: string, provider: string): Promise<Reco
  * tenant id), or null. The flagship falls back to env only when it has none stored. */
 async function tenantConfig(provider: string): Promise<Record<string, any> | null> {
   const tenant = await resolveTenant()
-  return tenantConfigFor(tenant?.tenantId ?? PLATFORM_TENANT_ID, provider)
+  if (tenant) return tenantConfigFor(tenant.tenantId, provider)
+  // The flagship's own connection, if any; an unreachable store falls back to env rather than failing.
+  return tenantConfigFor(PLATFORM_TENANT_ID, provider).catch(() => null)
 }
 
 /** Resolve Google Merchant credentials: the tenant's own if connected. In a tenant context an
