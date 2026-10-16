@@ -14,6 +14,7 @@ const LABELS: Record<string, string> = {
   email_hero: 'Email hero image',
   email_copy: 'Email copy',
   hero_image: 'Homepage hero image',
+  offer_image: 'Offer banner image',
   generate_image: 'Image generation',
   admin_agent: 'Admin agent',
   storefront_assistant: 'Storefront assistant',
