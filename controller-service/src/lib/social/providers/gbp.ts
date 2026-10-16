@@ -44,7 +44,9 @@ export async function googleJson<T>(
   return (res.status === 204 ? {} : await res.json().catch(() => ({}))) as T
 }
 
-export function googleAuthorizeUrl(scopes: string[], redirectUri: string, state: string, codeChallenge: string): string {
+// Same request shape as the Merchant and Ads sign-ins on this client: a confidential web client with
+// a signed state, so no PKCE (Google rejected these sign-ins with invalid_request when it was sent).
+export function googleAuthorizeUrl(scopes: string[], redirectUri: string, state: string, _codeChallenge?: string): string {
   const p = new URLSearchParams({
     client_id: process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
     redirect_uri: redirectUri,
@@ -54,8 +56,6 @@ export function googleAuthorizeUrl(scopes: string[], redirectUri: string, state:
     prompt: 'select_account consent',
     include_granted_scopes: 'true',
     state,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
   })
   return `${GOOGLE_AUTH}?${p}`
 }
@@ -89,13 +89,12 @@ export async function googleExchange(
   label: string,
   code: string,
   redirectUri: string,
-  codeVerifier: string
+  _codeVerifier?: string
 ): Promise<TokenSet> {
   const t = await googleToken(network, label, {
     grant_type: 'authorization_code',
     code,
     redirect_uri: redirectUri,
-    code_verifier: codeVerifier,
   })
   return { accessToken: t.access_token, refreshToken: t.refresh_token ?? null, expiresAt: expiresAtFrom(t.expires_in) }
 }
