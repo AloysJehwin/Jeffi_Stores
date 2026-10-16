@@ -4,7 +4,9 @@ import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
+import { Suspense } from 'react'
 import LabelsClient from './LabelsClient'
+import LabelsTabs from './_components/LabelsTabs'
 import { LABEL_SIZES } from '@/lib/documents/label-pdf'
 import { getAllCategories } from '@/lib/queries'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
@@ -42,7 +44,9 @@ export default async function LabelsPage() {
           Generate and download product labels with barcodes and QR codes
         </p>
       </div>
-      <LabelsClient labelSizes={LABEL_SIZES} categories={categories} />
+      <Suspense fallback={null}>
+        <LabelsTabs generator={<LabelsClient labelSizes={LABEL_SIZES} categories={categories} />} />
+      </Suspense>
     </div>
   )
 }

@@ -40,7 +40,7 @@ function statusLabel(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-export default function PackingSlipsClient({ initialOrders }: { initialOrders: Order[] }) {
+export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrders: Order[]; tabs?: React.ReactNode }) {
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -205,6 +205,8 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Packing Slips</h1>
         <p className="text-sm text-foreground-muted mt-1">Download packing slips to attach to parcels</p>
       </div>
+
+      {tabs}
 
       <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3 mb-6">
         <div className="flex flex-wrap gap-2 items-center">

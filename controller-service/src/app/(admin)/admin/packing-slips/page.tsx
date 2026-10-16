@@ -1,7 +1,8 @@
 import { cookies, headers } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 import { queryMany } from '@/lib/shared/db'
-import PackingSlipsClient from './PackingSlipsClient'
+import { Suspense } from 'react'
+import PackingSlipsTabs from './_components/PackingSlipsTabs'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
@@ -30,5 +31,9 @@ async function getInitialOrders() {
 
 export default async function PackingSlipsPage() {
   const orders = await getInitialOrders()
-  return <PackingSlipsClient initialOrders={orders} />
+  return (
+    <Suspense fallback={null}>
+      <PackingSlipsTabs initialOrders={orders} />
+    </Suspense>
+  )
 }
