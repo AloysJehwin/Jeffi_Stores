@@ -8,7 +8,8 @@ import { oauthProviderInfo, oauthRedirectUri } from '@/lib/integrations/oauth'
 
 export const dynamic = 'force-dynamic'
 
-const GMC_OAUTH_SCOPE = 'https://www.googleapis.com/auth/content'
+// openid email: the signed-in address becomes the account's API developer at registration.
+const GMC_OAUTH_SCOPE = 'https://www.googleapis.com/auth/content openid email'
 
 // Store-admin "Connect Google Merchant Center" with Google sign-in. The merchant id is chosen
 // before consent and carried in the signed state; the callback stores a refresh token for it.
