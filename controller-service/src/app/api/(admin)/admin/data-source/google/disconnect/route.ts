@@ -7,6 +7,8 @@ import {
   resolveImportTenantId,
   isSheetSyncRunning,
   cancelPendingSheetSyncs,
+  withImportLock,
+  ImportBusyError,
   PLATFORM_TENANT_ID,
 } from '@/lib/import/jobs'
 import { forgetSheetOwnership, releaseSheetProducts } from '@/lib/import/sheet-links'
@@ -21,28 +23,41 @@ export async function POST(request: NextRequest) {
   if (admin instanceof NextResponse) return admin
 
   const tenantId = await resolveImportTenantId()
-  if (await isSheetSyncRunning(tenantId)) {
-    return NextResponse.json({ error: 'A Google Sheet sync is running. Disconnect once it finishes.' }, { status: 409 })
+  try {
+    return await withImportLock(tenantId, 'sheet', async () => {
+      if (await isSheetSyncRunning(tenantId)) {
+        return NextResponse.json(
+          { error: 'A Google Sheet sync is running. Disconnect once it finishes.' },
+          { status: 409 }
+        )
+      }
+
+      const isPlatform = tenantId === PLATFORM_TENANT_ID
+      const ctx = isPlatform ? null : await lookupTenantContextById(tenantId)
+      if (!isPlatform && !ctx) return NextResponse.json({ error: 'Tenant not resolvable' }, { status: 404 })
+
+      const cancelled = await cancelPendingSheetSyncs(tenantId, 'Google Sheet disconnected before this sync ran')
+      const unlinked = await forgetSheetOwnership(tenantId)
+      const released = ctx ? await runWithTenantContext(ctx, releaseSheetProducts) : await releaseSheetProducts()
+      await deleteIntegrationCredential(tenantId, 'google_sheets')
+
+      await logAdminAudit({
+        adminId: admin.adminId,
+        action: 'update',
+        entityType: 'product',
+        entityId: null,
+        summary: `Disconnected the Google Sheet; ${released} synced product(s) are now managed manually`,
+        metadata: { released, unlinked, cancelled },
+        request,
+      })
+
+      return NextResponse.json({ ok: true, released })
+    })
+  } catch (e) {
+    if (e instanceof ImportBusyError) {
+      return NextResponse.json({ error: 'Another Google Sheet action is in progress. Try again in a moment.' }, { status: 409 })
+    }
+    console.error('[data-source/google/disconnect] failed', { message: (e as Error)?.message })
+    return NextResponse.json({ error: 'Could not disconnect; the sheet is still connected. Try again.' }, { status: 500 })
   }
-
-  const isPlatform = tenantId === PLATFORM_TENANT_ID
-  const ctx = isPlatform ? null : await lookupTenantContextById(tenantId)
-  if (!isPlatform && !ctx) return NextResponse.json({ error: 'Tenant not resolvable' }, { status: 404 })
-
-  const cancelled = await cancelPendingSheetSyncs(tenantId, 'Google Sheet disconnected before this sync ran')
-  const unlinked = await forgetSheetOwnership(tenantId)
-  const released = ctx ? await runWithTenantContext(ctx, releaseSheetProducts) : await releaseSheetProducts()
-  await deleteIntegrationCredential(tenantId, 'google_sheets')
-
-  await logAdminAudit({
-    adminId: admin.adminId,
-    action: 'update',
-    entityType: 'product',
-    entityId: null,
-    summary: `Disconnected the Google Sheet; ${released} synced product(s) are now managed manually`,
-    metadata: { released, unlinked, cancelled },
-    request,
-  })
-
-  return NextResponse.json({ ok: true, released })
 }

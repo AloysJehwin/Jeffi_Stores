@@ -66,10 +66,8 @@ export async function GET(request: NextRequest) {
         has_access_token: Boolean(data?.access_token),
         has_refresh_token: Boolean(data?.refresh_token),
       })
-      const reason = data?.error_description || data?.error || 'exchange_failed'
-      return returnToAdmin(
-        `${backTo}?tab=google_sheet&connected=0&error=${encodeURIComponent(String(reason).slice(0, 80))}`
-      )
+      // Google's reason is logged above; the page gets a fixed code it knows how to explain.
+      return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=exchange_failed`)
     }
 
     // Keep a previously-stored spreadsheet id if this connect didn't carry one.
@@ -83,6 +81,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Granular consent lets the user untick a permission: reading sheets is required, Drive (to
+    // create the template sheet) is optional and reported to the page.
+    const granted = typeof data.scope === 'string' ? data.scope.split(/\s+/) : null
+    if (granted && !granted.some((g: string) => g.endsWith('/auth/spreadsheets.readonly') || g.endsWith('/auth/spreadsheets'))) {
+      return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=sheets_scope_denied`)
+    }
+    const canCreate = granted ? granted.some((g: string) => g.endsWith('/auth/drive.file') || g.endsWith('/auth/drive')) : true
+    const accountEmail = await driveAccountEmail(String(data.access_token || ''))
+
     const normalized: Record<string, any> = { oauth_refresh_token: data.refresh_token }
     if (spreadsheetId) normalized.spreadsheet_id = spreadsheetId
 
@@ -93,6 +100,8 @@ export async function GET(request: NextRequest) {
       configEnc: encryptToken(JSON.stringify(normalized)),
       meta: {
         connected_via: 'oauth',
+        can_create: canCreate,
+        ...(accountEmail ? { account_email: accountEmail } : {}),
         ...(spreadsheetId ? { spreadsheet_id: spreadsheetId } : { needs_spreadsheet_id: true }),
       },
     })
@@ -100,8 +109,23 @@ export async function GET(request: NextRequest) {
     return returnToAdmin(`${backTo}?tab=google_sheet&connected=google_sheets`)
   } catch (e: any) {
     console.error('[data-source/google/callback] failed', { message: e?.message })
-    return returnToAdmin(
-      `${backTo}?tab=google_sheet&connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`
-    )
+    return returnToAdmin(`${backTo}?tab=google_sheet&connected=0&error=save_failed`)
+  }
+}
+
+// The connected account's email, for the connection card. drive.file is enough for about.get; the
+// connection works without it, so any failure just leaves it blank.
+async function driveAccountEmail(accessToken: string): Promise<string | null> {
+  if (!accessToken) return null
+  try {
+    const res = await fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(5000),
+    })
+    if (!res.ok) return null
+    const body = await res.json().catch(() => null)
+    return typeof body?.user?.emailAddress === 'string' ? body.user.emailAddress : null
+  } catch {
+    return null
   }
 }

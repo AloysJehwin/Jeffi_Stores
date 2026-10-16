@@ -5,7 +5,9 @@ import {
   SUBSCRIPTION_INTERVALS,
   isSubscriptionInterval,
 } from '@/lib/subscriptions/intervals'
-import { subscriptionPriceKey } from './columns'
+import { subscriptionPriceKey, ALL_COLUMNS, type RowType } from './columns'
+import { ENUMS } from './enums'
+import { imageUrlProblem } from './image-url'
 import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
 
 const rowRef = (r: ParsedRow) => (r.sheet ? `${r.sheet} row ${r.rowNumber}` : `row ${r.rowNumber}`)
@@ -20,6 +22,7 @@ export interface VariantGroup {
 export interface ProductGroup {
   sku: string
   name: string
+  sheet?: string
   values: Record<string, unknown>
   imageUrls: string[]
   rowNumber: number
@@ -30,7 +33,7 @@ export interface ProductGroup {
 
 export interface GroupResult {
   groups: ProductGroup[]
-  orphans: { rowNumber: number; message: string }[]
+  orphans: { rowNumber: number; sheet?: string; sku?: string | null; message: string }[]
 }
 
 // Fold flat parsed rows into product groups. A `product` row opens a group; following
@@ -40,25 +43,33 @@ export interface GroupResult {
 // groups still import (locked: per-row errors, not all-or-nothing).
 export function groupRows(rows: ParsedRow[]): GroupResult {
   const groups: ProductGroup[] = []
-  const orphans: { rowNumber: number; message: string }[] = []
+  const orphans: GroupResult['orphans'] = []
   const byProductSku = new Map<string, ProductGroup>()
 
   for (const row of rows) {
     if (row.rowType === 'product') {
       const sku = String(row.values.sku ?? '').trim()
       const name = String(row.values.name ?? '').trim()
-      const errors = [...row.errors]
+      const errors = [...row.errors, ...checkValues(row.values, '')]
       if (!sku) errors.push('product row is missing sku')
       if (!name) errors.push('product row is missing name')
+      const warnings: string[] = []
+      const imageUrls = row.imageUrls.filter(u => {
+        const p = imageUrlProblem(u)
+        if (p) warnings.push(`image_urls: "${u.slice(0, 80)}" skipped (${p})`)
+        return !p
+      })
+      warnings.push(...enumWarnings(row.values, 'product', ''))
       const group: ProductGroup = {
         sku,
         name,
+        sheet: row.sheet,
         values: row.values,
-        imageUrls: row.imageUrls,
+        imageUrls,
         rowNumber: row.rowNumber,
         variants: [],
         errors,
-        warnings: [],
+        warnings,
       }
       if (sku && byProductSku.has(sku)) {
         group.errors.push(`duplicate product sku "${sku}" in file (also row ${byProductSku.get(sku)!.rowNumber})`)
@@ -75,12 +86,16 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
       if (!parent) {
         orphans.push({
           rowNumber: row.rowNumber,
-          message: `variant references unknown parent_sku "${row.parentSku ?? ''}"`,
+          sheet: row.sheet,
+          sku: typeof row.values.sku === 'string' ? row.values.sku : null,
+          message: row.parentSku
+            ? `variant's parent_sku "${row.parentSku}" is not a product in this file`
+            : 'variant row is missing parent_sku',
         })
         continue
       }
       const sku = String(row.values.sku ?? '').trim()
-      const errs = [...row.errors]
+      const errs = [...row.errors, ...checkValues(row.values, '')]
       if (!sku) errs.push('variant row is missing variant.sku')
       if (!String(row.values.variant_name ?? '').trim()) errs.push('variant row is missing variant.variant_name')
       // Reject a duplicate variant SKU within the same product — otherwise the publisher throws a
@@ -89,6 +104,20 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
         errs.push(`duplicate variant.sku "${sku}" under product "${parent.sku}"`)
       }
       if (errs.length) parent.errors.push(`${rowRef(row)}: ${errs.join('; ')}`)
+      for (const w of enumWarnings(row.values, 'variant', `variant "${sku}": `)) parent.warnings.push(w)
+      const vImages = String(row.values.image_urls ?? '').trim()
+      if (vImages) {
+        const ok = vImages
+          .split('|')
+          .map(u => u.trim())
+          .filter(Boolean)
+          .filter(u => {
+            const p = imageUrlProblem(u)
+            if (p) parent.warnings.push(`variant "${sku}": image "${u.slice(0, 80)}" skipped (${p})`)
+            return !p
+          })
+        row.values.image_urls = ok.join('|')
+      }
       parent.variants.push({ sku, values: row.values, rowNumber: row.rowNumber, subVariants: [] })
     }
   }
@@ -99,7 +128,10 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
       if (!parent) {
         orphans.push({
           rowNumber: row.rowNumber,
-          message: `sub_variant references unknown parent_sku "${row.parentSku ?? ''}"`,
+          sheet: row.sheet,
+          message: row.parentSku
+            ? `sub-variant's parent_sku "${row.parentSku}" is not a product in this file`
+            : 'sub-variant row is missing parent_sku',
         })
         continue
       }
@@ -108,7 +140,7 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
         parent.errors.push(`${rowRef(row)}: sub_variant references unknown variant_sku "${row.variantSku ?? ''}"`)
         continue
       }
-      const errs = [...row.errors]
+      const errs = [...row.errors, ...checkValues(row.values, '')]
       if (!String(row.values.sub_variant_name ?? '').trim())
         errs.push('sub_variant row is missing sub_variant.sub_variant_name')
       if (errs.length) parent.errors.push(`${rowRef(row)}: ${errs.join('; ')}`)
@@ -122,6 +154,43 @@ export function groupRows(rows: ParsedRow[]): GroupResult {
   }
 
   return { groups, orphans }
+}
+
+const NUMERIC_KEYS = new Set(
+  ALL_COLUMNS.filter(c => (c.coerce === 'number' || c.coerce === 'int') && c.key !== 'sort_order').map(c => c.key)
+)
+const STOCK_STATUS = ENUMS.stock_status
+
+// Values the database would refuse (negative numbers, an unknown stock_status). stock_status is
+// normalised in place so "in stock" imports as "In Stock".
+function checkValues(values: Record<string, unknown>, label: string): string[] {
+  const errors: string[] = []
+  for (const [k, v] of Object.entries(values)) {
+    if (NUMERIC_KEYS.has(k) && !k.startsWith('subscription_price_') && typeof v === 'number' && v < 0) errors.push(`${label}${k} cannot be negative`)
+  }
+  if (values.stock_status !== undefined) {
+    const raw = String(values.stock_status).trim()
+    const hit = STOCK_STATUS.find(s => s.toLowerCase() === raw.toLowerCase())
+    if (hit) values.stock_status = hit
+    else errors.push(`${label}stock_status "${raw}" is not one of ${STOCK_STATUS.join(' | ')}`)
+  }
+  return errors
+}
+
+// Dropdown columns the database does not enforce: an unlisted value still imports, with a warning.
+function enumWarnings(values: Record<string, unknown>, level: RowType, label: string): string[] {
+  const out: string[] = []
+  for (const col of ALL_COLUMNS) {
+    if (!col.enumKey || col.enumKey === 'stock_status' || !col.rowTypes.includes(level)) continue
+    const v = values[col.key]
+    if (v === undefined || v === null || v === '') continue
+    const allowed = ENUMS[col.enumKey]
+    if (!allowed) continue
+    if (!allowed.some(a => a.toLowerCase() === String(v).toLowerCase())) {
+      out.push(`${label}${col.header} "${v}" is not a listed option (${allowed.filter(Boolean).join(', ')})`)
+    }
+  }
+  return out
 }
 
 const isTrue = (v: unknown) => v === true || String(v).toLowerCase() === 'true'
@@ -212,5 +281,16 @@ function checkSubscription(g: ProductGroup): void {
       )
       delete variant.values.subscription_prices
     }
+  }
+}
+
+/** What the worker will see in a file: one unit per product group plus each unattached row, and how
+ * many of those already fail validation. Used for a job's total_rows and the upload preview. */
+export function summarizeRows(rows: ParsedRow[]): { units: number; products: number; invalid: number } {
+  const { groups, orphans } = groupRows(rows)
+  return {
+    units: groups.length + orphans.length,
+    products: groups.length,
+    invalid: orphans.length + groups.filter(g => g.errors.length > 0).length,
   }
 }
