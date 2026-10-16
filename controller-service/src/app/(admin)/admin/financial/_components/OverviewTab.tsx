@@ -1,249 +1,521 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { formatINR } from './shared'
-import { delta, pctStr, rsCompact } from '@/components/admin/dashboard/Primitives'
-import { PctBadge } from '@/components/admin/dashboard/StatCard'
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ap } from '@/lib/shared/admin-path'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
+import { rsCompact } from '@/components/admin/dashboard/Primitives'
+import { Badge, Banner, Kpi, KpiGrid, Section, api, count, money, pct, type Tone } from '@/components/admin/channels/ui'
 import {
   CashflowTrendCard,
+  MixDonutCard,
   OutflowDonutCard,
-  PlTrendCard,
+  RevenueExpenseCard,
   TopPayablesCard,
-  type CashflowPoint,
   type OutflowSegment,
-  type PlPoint,
-  type RankedItem,
+  type TrendPoint,
 } from './OverviewCharts'
+import {
+  PRESETS,
+  changeOf,
+  isValidRange,
+  matchPreset,
+  presetRange,
+  type AgingKey,
+  type Bucket,
+  type Range,
+} from './overview-period'
 
-type CardState = {
-  value: string
-  sub?: string
-  tone?: 'default' | 'positive' | 'negative' | 'warning'
-  failed?: boolean
-  pct?: number | null
-  invert?: boolean
+type Totals = {
+  revenue: number
+  orders: number
+  refunds: number
+  net_sales: number
+  cogs: number
+  gross_profit: number
+  gross_margin: number | null
+  inflow: number
+  supplier_payments: number
+  refunds_out: number
+  outflow: number
+  net_cash: number
+  refunds_issued: number
+  refunds_issued_count: number
+  gst_output: number | null
+  gst_itc: number | null
+  gst_payable: number | null
 }
-
-const fyRange = () => {
-  const now = new Date()
-  const start = now.getMonth() >= 3 ? `${now.getFullYear()}-04-01` : `${now.getFullYear() - 1}-04-01`
-  const end = now.getMonth() >= 3 ? `${now.getFullYear() + 1}-03-31` : `${now.getFullYear()}-03-31`
-  return { start, end }
-}
-
-async function getJson(url: string): Promise<any | null> {
-  try {
-    const res = await fetch(url)
-    const json = await res.json()
-    return json?.error ? null : json
-  } catch {
-    return null
+type Aging = { key: AgingKey; label: string; amount: number; count: number }[]
+type Mix = { key: string; amount: number; count: number }[]
+type Row = Record<string, any>
+type Overview = {
+  range: Range
+  previous_range: Range
+  bucket: Bucket
+  current: Totals
+  previous: Totals
+  series: TrendPoint[]
+  by_method: Mix
+  by_channel: Mix
+  receivables: { total: number; count: number; aging: Aging }
+  payables: {
+    total: number
+    count: number
+    due_7d: number
+    due_7d_count: number
+    overdue: number
+    overdue_count: number
+    aging: Aging
+    top_suppliers: { name: string; amount: number; n: number }[]
+  }
+  cod: { awaiting_remittance: number; awaiting_remittance_count: number; in_transit: number; in_transit_count: number }
+  attention: {
+    receivables: Row[]
+    payables: Row[]
+    cod: Row[]
+    refunds: Row[]
+    returns: Row[]
+    adjustments: Row[]
+    payouts: Row[]
+    cod_stale_days: number
   }
 }
 
-const num = (v: unknown) => (typeof v === 'number' ? v : parseFloat(String(v ?? 0)) || 0)
-
-type Charts = {
-  cashflow: CashflowPoint[]
-  pl: PlPoint[]
-  outflow: OutflowSegment[] | null
-  outflowTotal: number
-  payables: RankedItem[]
+const METHOD: Record<string, { label: string; color: string }> = {
+  online: { label: 'Online (prepaid)', color: 'rgb(59 130 246)' },
+  cod: { label: 'Cash on delivery', color: 'rgb(234 179 8)' },
+  marketplace: { label: 'Marketplace', color: 'rgb(249 115 22)' },
+  upi: { label: 'UPI QR', color: 'rgb(16 185 129)' },
+  credit: { label: 'Credit (B2B)', color: 'rgb(168 85 247)' },
+  cash: { label: 'Cash', color: 'rgb(100 116 139)' },
+  card: { label: 'Card', color: 'rgb(236 72 153)' },
+}
+const CHANNEL: Record<string, { label: string; color: string }> = {
+  website: { label: 'Website', color: 'rgb(59 130 246)' },
+  amazon: { label: 'Amazon', color: 'rgb(249 115 22)' },
+  store: { label: 'Store / POS', color: 'rgb(16 185 129)' },
+  b2b: { label: 'B2B', color: 'rgb(168 85 247)' },
+}
+const FALLBACK_COLOR = 'rgb(148 163 184)'
+const AGING_COLOR: Record<AgingKey, string> = {
+  current: 'bg-green-500',
+  d1_30: 'bg-blue-500',
+  d31_60: 'bg-amber-500',
+  d61_90: 'bg-orange-500',
+  d90_plus: 'bg-red-500',
 }
 
-const OUTFLOW_COLORS = { po: 'rgb(239 68 68)', refunds: 'rgb(234 179 8)' }
+const fmtDay = (iso: string) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`
+
+function toSegments(mix: Mix, labels: Record<string, { label: string; color: string }>): OutflowSegment[] {
+  return mix
+    .filter(m => m.amount > 0)
+    .map(m => ({ label: labels[m.key]?.label ?? m.key, value: m.amount, color: labels[m.key]?.color ?? FALLBACK_COLOR }))
+}
 
 export function OverviewTab() {
+  const router = useRouter()
+  const params = useSearchParams()
+  const range = useMemo<Range>(() => {
+    const r = { from: params.get('from') ?? '', to: params.get('to') ?? '' }
+    return isValidRange(r) ? r : presetRange('30d')
+  }, [params])
+  const [data, setData] = useState<Overview | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [cards, setCards] = useState<Record<string, CardState>>({})
-  const [charts, setCharts] = useState<Charts | null>(null)
 
   useEffect(() => {
     let active = true
-    const { start, end } = fyRange()
-
-    Promise.all([
-      getJson('/api/admin/financial/transactions'),
-      getJson('/api/admin/financial/receivables'),
-      getJson('/api/admin/financial/payables'),
-      getJson('/api/admin/financial/cod-remittance?status=cod_pending'),
-      getJson(`/api/admin/financial/pl?from=${start}&to=${end}`),
-      getJson(`/api/admin/financial/cashflow?from=${start}&to=${end}`),
-    ]).then(([txn, rec, pay, cod, pl, cash]) => {
+    setLoading(true)
+    setError(null)
+    api<Overview>(`/api/admin/financial/overview?from=${range.from}&to=${range.to}`).then(({ ok, data }) => {
       if (!active) return
-
-      const txnSummary = txn?.summary
-      const inflow = num(txnSummary?.total_inflow)
-      const outflow = num(txnSummary?.total_outflow)
-      const net = num(txnSummary?.net)
-
-      const codOrders: any[] = Array.isArray(cod?.orders) ? cod.orders : []
-      const codPendingCount = num(cod?.summary?.cod_pending)
-      const codPendingAmount = codOrders.reduce((s, o) => s + num(o.total_amount), 0)
-
-      const overdueAmount = num(pay?.summary?.overdue)
-
-      const cashMonths: any[] = Array.isArray(cash?.monthly) ? cash.monthly : []
-      const plMonths: any[] = Array.isArray(pl?.monthly) ? pl.monthly : []
-
-      // Net delta: last populated month vs the one before it.
-      const netSeries = cashMonths.map(m => num(m.net))
-      const curNet = netSeries.length ? netSeries[netSeries.length - 1] : null
-      const prevNet = netSeries.length > 1 ? netSeries[netSeries.length - 2] : null
-
-      const plNetSeries = plMonths.map(m => num(m.net_revenue))
-      const curPlNet = plNetSeries.length ? plNetSeries[plNetSeries.length - 1] : null
-      const prevPlNet = plNetSeries.length > 1 ? plNetSeries[plNetSeries.length - 2] : null
-
-      setCards({
-        inflow: txnSummary ? { value: formatINR(inflow), tone: 'positive' } : { value: 'No data', failed: true },
-        outflow: txnSummary ? { value: formatINR(outflow), tone: 'negative' } : { value: 'No data', failed: true },
-        net: txnSummary
-          ? {
-              value: formatINR(net),
-              tone: net >= 0 ? 'positive' : 'negative',
-              pct: delta(curNet, prevNet),
-              sub: curNet != null && prevNet != null ? 'Latest month vs previous' : undefined,
-            }
-          : { value: 'No data', failed: true },
-        receivables: rec?.summary
-          ? { value: formatINR(num(rec.summary.total)), sub: 'Outstanding' }
-          : { value: 'No data', failed: true },
-        payables: pay?.summary
-          ? {
-              value: formatINR(num(pay.summary.total_payable)),
-              sub: overdueAmount > 0 ? `${formatINR(overdueAmount)} overdue` : 'None overdue',
-              tone: overdueAmount > 0 ? 'warning' : 'default',
-            }
-          : { value: 'No data', failed: true },
-        cod: cod?.summary
-          ? {
-              value: formatINR(codPendingAmount),
-              sub: `${codPendingCount} order${codPendingCount === 1 ? '' : 's'} pending`,
-            }
-          : { value: 'No data', failed: true },
-        plNet: pl?.totals
-          ? {
-              value: formatINR(num(pl.totals.net_revenue)),
-              sub: 'This financial year',
-              pct: delta(curPlNet, prevPlNet),
-            }
-          : { value: 'No data', failed: true },
-      })
-
-      const poTotal = cashMonths.reduce((s, m) => s + num(m.po_payments), 0)
-      const refundsTotal = cashMonths.reduce((s, m) => s + num(m.refunds_out), 0)
-      const outflowTotal = poTotal + refundsTotal
-      const outflowSegs: OutflowSegment[] =
-        outflowTotal > 0
-          ? [
-              { label: 'Supplier / PO payments', value: poTotal, color: OUTFLOW_COLORS.po },
-              { label: 'Refunds', value: refundsTotal, color: OUTFLOW_COLORS.refunds },
-            ].filter(s => s.value > 0)
-          : []
-
-      const payableRows: any[] = Array.isArray(pay?.rows) ? pay.rows : []
-      const bySupplier = new Map<string, number>()
-      for (const r of payableRows) {
-        const name = String(r.supplier_name || 'Unknown supplier')
-        const remaining = num(r.total_amount) - num(r.paid_amount)
-        if (remaining > 0) bySupplier.set(name, (bySupplier.get(name) || 0) + remaining)
-      }
-      const payables: RankedItem[] = [...bySupplier.entries()]
-        .map(([name, value]) => ({ name, value, sub: formatINR(value) }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6)
-
-      setCharts({
-        cashflow: cashMonths.map(
-          (m): CashflowPoint => ({
-            month: String(m.month),
-            cashIn: num(m.cash_in),
-            cashOut: num(m.cash_out),
-            net: num(m.net),
-          })
-        ),
-        pl: plMonths.map((m): PlPoint => ({ month: String(m.month), netRevenue: num(m.net_revenue) })),
-        outflow: outflowSegs.length ? outflowSegs : null,
-        outflowTotal,
-        payables,
-      })
-
+      if (ok && !data.error) setData(data)
+      else setError(data.error || 'Could not load the overview')
       setLoading(false)
     })
-
     return () => {
       active = false
     }
-  }, [])
+  }, [range.from, range.to])
 
-  if (loading) {
-    return (
-      <div className="space-y-5">
-        <AdminStatsSkeleton cards={7} gridClass="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3" />
-        <ChartSkeleton bodyClass="h-40" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartSkeleton bodyClass="h-44" />
-          <ChartSkeleton bodyClass="h-44" />
-        </div>
-        <ChartSkeleton bodyClass="h-40" />
-      </div>
-    )
+  const setRange = (r: Range) => {
+    if (!isValidRange(r)) return
+    router.replace(ap(`/admin/financial?tab=overview&from=${r.from}&to=${r.to}`), { scroll: false })
   }
-
-  const hasCashflow = (charts?.cashflow.length ?? 0) > 0
-  const hasPl = (charts?.pl.length ?? 0) > 0
-  const hasOutflow = !!charts?.outflow
-  const hasPayables = (charts?.payables.length ?? 0) > 0
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <KPICard label="Total Inflow" state={cards.inflow} />
-        <KPICard label="Total Outflow" state={cards.outflow} />
-        <KPICard label="Net" state={cards.net} />
-        <KPICard label="Receivables Outstanding" state={cards.receivables} />
-        <KPICard label="Payables Due" state={cards.payables} />
-        <KPICard label="COD Pending Remittance" state={cards.cod} />
-        <KPICard label="Net Revenue" state={cards.plNet} />
-      </div>
-
-      {hasCashflow && <CashflowTrendCard data={charts!.cashflow} />}
-
-      {(hasOutflow || hasPayables) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {hasOutflow && <OutflowDonutCard segments={charts!.outflow!} total={rsCompact(charts!.outflowTotal)} />}
-          {hasPayables && <TopPayablesCard items={charts!.payables} />}
-        </div>
-      )}
-
-      {hasPl && <PlTrendCard data={charts!.pl} />}
+      <PeriodBar range={range} onChange={setRange} previous={data?.range.from === range.from ? data.previous_range : null} />
+      {error && <Banner ok={false}>{error}</Banner>}
+      {loading && !data ? <OverviewSkeleton /> : data && <OverviewBody d={data} dim={loading} />}
     </div>
   )
 }
 
-const toneCls: Record<NonNullable<CardState['tone']>, string> = {
-  default: 'text-foreground',
-  positive: 'text-green-600 dark:text-green-400',
-  negative: 'text-red-600 dark:text-red-400',
-  warning: 'text-yellow-600 dark:text-yellow-400',
+function PeriodBar({ range, onChange, previous }: { range: Range; onChange: (r: Range) => void; previous: Range | null }) {
+  const active = matchPreset(range)
+  const input =
+    'rounded-lg border border-border-default bg-surface px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500/40'
+  return (
+    <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-wrap gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg w-fit max-w-full">
+        {PRESETS.map(p => (
+          <button
+            key={p.key}
+            type="button"
+            onClick={() => onChange(presetRange(p.key))}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
+              active === p.key ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-foreground-secondary">
+        <input
+          type="date"
+          aria-label="From"
+          className={input}
+          value={range.from}
+          max={range.to}
+          onChange={e => onChange({ from: e.target.value, to: range.to })}
+        />
+        <span>to</span>
+        <input
+          type="date"
+          aria-label="To"
+          className={input}
+          value={range.to}
+          min={range.from}
+          onChange={e => onChange({ from: range.from, to: e.target.value })}
+        />
+        {previous && (
+          <span className="text-foreground-muted">
+            vs {fmtDay(previous.from)} to {fmtDay(previous.to)}
+          </span>
+        )}
+      </div>
+    </div>
+  )
 }
 
-function KPICard({ label, state }: { label: string; state?: CardState }) {
-  const s = state ?? { value: 'No data', failed: true }
-  const valueCls = s.failed ? 'text-foreground-secondary' : toneCls[s.tone ?? 'default']
+function OverviewBody({ d, dim }: { d: Overview; dim: boolean }) {
+  const c = d.current
+  const p = d.previous
+  const over30 = d.receivables.aging.filter(b => b.key !== 'current' && b.key !== 'd1_30').reduce((s, b) => s + b.amount, 0)
+  const outflowSegs: OutflowSegment[] = [
+    { label: 'Supplier / PO payments', value: c.supplier_payments, color: 'rgb(239 68 68)' },
+    { label: 'Refunds', value: c.refunds_out, color: 'rgb(234 179 8)' },
+  ].filter(s => s.value > 0)
+  const hasTrend = d.series.some(s => Number(s.revenue) || Number(s.cash_out) || Number(s.cogs))
+
   return (
-    <div className="bg-surface-elevated rounded-xl border border-border-default px-5 py-4">
-      <div className="flex items-center justify-between gap-2 mb-1">
-        <p className="text-xs font-medium uppercase tracking-wide text-foreground-secondary">{label}</p>
-        {!s.failed && s.pct !== undefined && <PctBadge value={s.pct ?? null} invert={s.invert} />}
-      </div>
-      <p className={`text-2xl font-bold ${valueCls}`}>{s.value}</p>
-      {s.sub && <p className="text-xs text-foreground-secondary mt-0.5">{s.sub}</p>}
-      {!s.failed && s.pct != null && !s.sub && (
-        <p className="text-xs text-foreground-secondary mt-0.5">{pctStr(s.pct)} vs previous month</p>
+    <div className={`space-y-5 transition-opacity ${dim ? 'opacity-60' : ''}`}>
+      <KpiGrid>
+        <Kpi
+          label="Net sales"
+          value={money(c.net_sales)}
+          delta={changeOf(c.net_sales, p.net_sales)}
+          sub={`${count(c.orders)} sales, ${money(c.refunds)} reversed`}
+          highlight
+        />
+        <Kpi
+          label="Gross margin"
+          value={c.gross_margin == null ? '-' : pct(c.gross_margin)}
+          delta={c.gross_margin == null ? null : changeOf(c.gross_profit, p.gross_profit)}
+          sub={c.gross_margin == null ? 'No cost prices on items sold' : `${money(c.gross_profit)} gross profit`}
+        />
+        <Kpi label="Inflow" value={money(c.inflow)} delta={changeOf(c.inflow, p.inflow)} sub="Paid sales" />
+        <Kpi
+          label="Outflow"
+          value={money(c.outflow)}
+          delta={changeOf(c.outflow, p.outflow)}
+          invert
+          sub="Supplier payments and refunds"
+        />
+        <Kpi
+          label="Net cash"
+          value={money(c.net_cash)}
+          delta={changeOf(c.net_cash, p.net_cash)}
+          sub={c.net_cash < 0 ? 'More went out than came in' : undefined}
+        />
+        <Kpi
+          label="Refunds issued"
+          value={money(c.refunds_issued)}
+          delta={changeOf(c.refunds_issued, p.refunds_issued)}
+          invert
+          sub={`${count(c.refunds_issued_count)} orders refunded`}
+        />
+        {c.gst_payable != null && (
+          <Kpi
+            label="GST payable"
+            value={money(c.gst_payable)}
+            delta={changeOf(c.gst_payable, p.gst_payable ?? 0)}
+            invert
+            sub={`${money(c.gst_output)} output less ${money(c.gst_itc)} ITC`}
+          />
+        )}
+        <Kpi
+          label="Receivables"
+          value={money(d.receivables.total)}
+          sub={`${count(d.receivables.count)} unpaid, ${money(over30)} over 30 days`}
+        />
+        <Kpi
+          label="Payables due in 7 days"
+          value={money(d.payables.due_7d)}
+          sub={d.payables.overdue > 0 ? `${money(d.payables.overdue)} overdue` : `${money(d.payables.total)} open in total`}
+        />
+        <Kpi
+          label="COD awaiting remittance"
+          value={money(d.cod.awaiting_remittance)}
+          sub={`${count(d.cod.awaiting_remittance_count)} delivered, ${count(d.cod.in_transit_count)} still in transit`}
+        />
+      </KpiGrid>
+
+      <NeedsAttention d={d} />
+
+      {hasTrend ? (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <CashflowTrendCard data={d.series} granularity={d.bucket} />
+          <RevenueExpenseCard data={d.series} granularity={d.bucket} />
+        </div>
+      ) : (
+        <Section title="Trends">
+          <p className="text-sm text-foreground-muted text-center py-6">No sales or payments in this period.</p>
+        </Section>
       )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AgingCard
+          title="Receivables aging"
+          hint="Days since invoice"
+          total={d.receivables.total}
+          aging={d.receivables.aging}
+          href="/admin/financial?tab=receivables"
+        />
+        <AgingCard
+          title="Payables aging"
+          hint="Days past due date"
+          total={d.payables.total}
+          aging={d.payables.aging}
+          href="/admin/financial?tab=payables"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <MixDonutCard
+          title="Sales by payment method"
+          segments={toSegments(d.by_method, METHOD)}
+          total={rsCompact(c.revenue)}
+          totalLabel="Paid sales"
+        />
+        <MixDonutCard
+          title="Sales by channel"
+          segments={toSegments(d.by_channel, CHANNEL)}
+          total={rsCompact(c.revenue)}
+          totalLabel="Paid sales"
+        />
+        {outflowSegs.length ? (
+          <OutflowDonutCard segments={outflowSegs} total={rsCompact(c.outflow)} />
+        ) : (
+          <MixDonutCard title="Outflow composition" segments={[]} total="" totalLabel="" />
+        )}
+      </div>
+
+      {d.payables.top_suppliers.length > 0 && (
+        <TopPayablesCard
+          items={d.payables.top_suppliers.map(s => ({ name: s.name || 'Unknown supplier', value: s.amount, sub: money(s.amount) }))}
+        />
+      )}
+    </div>
+  )
+}
+
+function AgingCard({ title, hint, total, aging, href }: { title: string; hint: string; total: number; aging: Aging; href: string }) {
+  return (
+    <Section
+      title={title}
+      action={
+        <Link href={ap(href)} className="text-xs text-accent-500 hover:underline normal-case">
+          Open
+        </Link>
+      }
+    >
+      <p className="text-xs text-foreground-muted -mt-2 mb-3">
+        {hint}. {money(total)} open.
+      </p>
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-surface-secondary mb-4">
+        {total > 0 &&
+          aging
+            .filter(b => b.amount > 0)
+            .map(b => (
+              <div key={b.key} className={AGING_COLOR[b.key]} style={{ width: `${(b.amount / total) * 100}%` }} title={b.label} />
+            ))}
+      </div>
+      <ul className="space-y-1.5">
+        {aging.map(b => (
+          <li key={b.key} className="flex items-center gap-2 text-sm">
+            <span className={`w-2.5 h-2.5 rounded-sm shrink-0 ${AGING_COLOR[b.key]}`} />
+            <span className="text-foreground-secondary flex-1">{b.label}</span>
+            <span className="text-xs text-foreground-muted tabular-nums">{count(b.count)}</span>
+            <span className="w-28 text-right font-medium tabular-nums text-foreground">{money(b.amount)}</span>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  )
+}
+
+type Item = { key: string; primary: string; secondary: string; amount?: number; href: string }
+type Group = { key: string; title: string; tone: Tone; href: string; action: string; items: Item[] }
+
+function NeedsAttention({ d }: { d: Overview }) {
+  const a = d.attention
+  const orderHref = (id: string) => `/admin/orders/${id}/view`
+  const groups: Group[] = [
+    {
+      key: 'rec',
+      title: 'Overdue receivables (over 30 days)',
+      tone: 'red' as Tone,
+      href: '/admin/financial?tab=receivables',
+      action: 'Receivables',
+      items: a.receivables.map(r => ({
+        key: r.id,
+        primary: `${r.customer_name} · ${r.order_number}`,
+        secondary: `${days(r.days)} since invoice`,
+        amount: r.amount,
+        href: orderHref(r.id),
+      })),
+    },
+    {
+      key: 'pay',
+      title: 'Supplier bills due this week or overdue',
+      tone: 'amber' as Tone,
+      href: '/admin/financial?tab=payables',
+      action: 'Payables',
+      items: a.payables.map(r => ({
+        key: r.id,
+        primary: `${r.supplier_name} · ${r.expense_number}`,
+        secondary: r.days > 0 ? `${days(r.days)} overdue` : `Due ${fmtDay(r.due_date)}`,
+        amount: r.amount,
+        href: '/admin/financial?tab=payables',
+      })),
+    },
+    {
+      key: 'cod',
+      title: `COD delivered but not remitted for over ${a.cod_stale_days} days`,
+      tone: 'amber' as Tone,
+      href: '/admin/financial?tab=cod_remittance',
+      action: 'COD remittance',
+      items: a.cod.map(r => ({
+        key: r.id,
+        primary: `${r.order_number}${r.customer_name ? ` · ${r.customer_name}` : ''}`,
+        secondary: `Delivered ${days(r.days)} ago`,
+        amount: r.amount,
+        href: '/admin/financial?tab=cod_remittance',
+      })),
+    },
+    {
+      key: 'refund',
+      title: 'Cancelled or returned but not refunded',
+      tone: 'red' as Tone,
+      href: '/admin/orders',
+      action: 'Orders',
+      items: [
+        ...a.refunds.map(r => ({
+          key: `o${r.id}`,
+          primary: `${r.order_number}${r.customer_name ? ` · ${r.customer_name}` : ''}`,
+          secondary: `${r.status === 'returned' ? 'Returned' : 'Cancelled'} ${days(r.days)} ago, still marked paid`,
+          amount: r.amount,
+          href: orderHref(r.id),
+        })),
+        ...a.returns.map(r => ({
+          key: `r${r.id}`,
+          primary: `${r.order_number ?? 'Return'}${r.customer_name ? ` · ${r.customer_name}` : ''}`,
+          secondary: `Return received ${days(r.days)} ago, refund pending`,
+          amount: r.amount || undefined,
+          href: r.order_id ? orderHref(r.order_id) : '/admin/returns',
+        })),
+        ...a.adjustments.map(r => ({
+          key: `a${r.id}`,
+          primary: r.order_number,
+          secondary: `Adjustment refund pending for ${days(r.days)}`,
+          amount: r.amount,
+          href: orderHref(r.order_id),
+        })),
+      ],
+    },
+    {
+      key: 'payout',
+      title: 'Supplier payouts failed or stuck',
+      tone: 'red' as Tone,
+      href: '/admin/financial?tab=payables',
+      action: 'Payables',
+      items: a.payouts.map(r => ({
+        key: r.id,
+        primary: `${r.supplier_name} · ${r.expense_number}`,
+        secondary: `Payout ${r.payout_status}${r.payout_status === 'failed' || r.payout_status === 'reversed' ? '' : ` for ${days(r.days)}`}`,
+        amount: r.amount,
+        href: '/admin/financial?tab=payables',
+      })),
+    },
+  ].filter(g => g.items.length > 0)
+
+  if (!groups.length) {
+    return <Banner ok>Nothing needs attention: no overdue receivables, bills due this week, stale COD, pending refunds or stuck payouts.</Banner>
+  }
+
+  return (
+    <Section title="Needs attention">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {groups.map(g => (
+          <div key={g.key} className="rounded-lg border border-border-default p-3 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <p className="text-sm font-medium text-foreground flex items-center gap-2 min-w-0">
+                <Badge tone={g.tone}>{g.items.length}</Badge>
+                <span className="truncate">{g.title}</span>
+              </p>
+              <Link href={ap(g.href)} className="text-xs text-accent-500 hover:underline shrink-0">
+                {g.action}
+              </Link>
+            </div>
+            <ul className="divide-y divide-border-default/60">
+              {g.items.map(it => (
+                <li key={it.key}>
+                  <Link href={ap(it.href)} className="flex items-center gap-3 py-2 hover:bg-surface-secondary rounded px-1 -mx-1">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-foreground truncate">{it.primary}</p>
+                      <p className="text-xs text-foreground-muted">{it.secondary}</p>
+                    </div>
+                    {it.amount != null && <span className="text-sm font-medium tabular-nums text-foreground">{money(it.amount)}</span>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </Section>
+  )
+}
+
+function OverviewSkeleton() {
+  return (
+    <div className="space-y-5">
+      <AdminStatsSkeleton cards={6} gridClass="grid-cols-2 md:grid-cols-3 xl:grid-cols-6" />
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <ChartSkeleton bodyClass="h-44" />
+        <ChartSkeleton bodyClass="h-44" />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartSkeleton bodyClass="h-40" />
+        <ChartSkeleton bodyClass="h-40" />
+      </div>
     </div>
   )
 }
