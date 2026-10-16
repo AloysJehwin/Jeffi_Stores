@@ -195,7 +195,7 @@ export default function DatePicker({
   const displayVal = formatDisplay(value)
 
   return (
-    <div ref={containerRef} className={`relative ${className.includes('w-full') ? 'block' : 'inline-block'} ${className}`}>
+    <div ref={containerRef} className={`relative ${className.includes('w-full') ? 'block' : 'inline-flex align-top'} ${className}`}>
       <button
         type="button"
         disabled={disabled}
