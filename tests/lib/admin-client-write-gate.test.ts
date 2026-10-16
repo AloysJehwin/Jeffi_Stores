@@ -37,6 +37,8 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/components/admin/ecom/tabs/BillingReconcile.tsx',
   'controller-service/src/components/admin/ecom/tabs/MessagingTab.tsx',
   'controller-service/src/components/admin/ecom/tabs/ServiceApprovals.tsx',
+  // Google Ads manager view (unlink): the page redirects non-platform admins and the API is isPlatformAdmin-only.
+  'controller-service/src/app/(admin)/admin/ecom/google-ads/ManagedAccountsClient.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
   'controller-service/src/components/admin/CreateAdminForm.tsx',
   'controller-service/src/components/admin/AdminUserActions.tsx',

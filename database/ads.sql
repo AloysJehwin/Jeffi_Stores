@@ -32,7 +32,10 @@ CREATE TABLE public.ads_account (
     conversion_action_set_at timestamp with time zone,
     conversion_last_run_at timestamp with time zone,
     conversion_last_run jsonb,
-    conversion_upload_api character varying(16) DEFAULT 'data_manager'::character varying NOT NULL
+    conversion_upload_api character varying(16) DEFAULT 'data_manager'::character varying NOT NULL,
+    billing_status character varying(16),
+    billing_account_name text,
+    billing_checked_at timestamp with time zone
 );
 
 COMMENT ON COLUMN public.ads_account.conversion_action IS 'UPLOAD_CLICKS conversion action (customers/{id}/conversionActions/{id}) that server-side purchases are uploaded to; null = uploads off.';
@@ -41,7 +44,40 @@ COMMENT ON COLUMN public.ads_account.conversion_action_owner IS 'Customer that o
 
 COMMENT ON COLUMN public.ads_account.conversion_action_account IS 'The connected customer the action was chosen for; a different connected account means the choice no longer applies.';
 
+COMMENT ON COLUMN public.ads_account.billing_status IS 'Best billing setup Google exposes (APPROVED, APPROVED_HELD, PENDING, CANCELLED) or NONE: monthly invoicing only; card-paid accounts show NONE.';
+
 COMMENT ON COLUMN public.ads_account.conversion_upload_api IS 'How conversions are uploaded: data_manager (Data Manager API events:ingest, default) or ads_api (Google Ads API uploadClickConversions, only for developer tokens Google still allows).';
+
+
+--
+-- Name: ads_experiments; Type: TABLE; Schema: public; Owner: -
+-- Campaign experiments (ExperimentService) with per-arm results as Google reports them
+-- (lib/google-ads/experiments.ts): nightly sync, after each change and on refresh.
+--
+
+CREATE TABLE public.ads_experiments (
+    experiment_id bigint NOT NULL,
+    resource_name text NOT NULL,
+    name text NOT NULL,
+    description text,
+    type character varying(48),
+    status character varying(24),
+    start_date date,
+    end_date date,
+    suffix text,
+    promote_status character varying(24),
+    base_campaign_id bigint,
+    trial_campaign_id bigint,
+    traffic_split integer,
+    change jsonb,
+    results jsonb,
+    async_errors jsonb,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+COMMENT ON COLUMN public.ads_experiments.change IS 'What the treatment arm changes, as set from the console (bid strategy / target); null for experiments made elsewhere.';
+
+COMMENT ON COLUMN public.ads_experiments.results IS 'Treatment vs control metrics with point estimate, margin of error and p-value per metric (experiment resource).';
 
 
 --
@@ -387,3 +423,96 @@ CREATE TABLE public.ads_conversion_requests (
     error text,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: ads_audiences; Type: TABLE; Schema: public; Owner: -
+-- Customer Match lists built from store data (lib/google-ads/audiences), one per segment. Members are
+-- sent through the Data Manager API (audienceMembers:ingest / remove); sizes and match rate are read
+-- back from Google. params: segment settings (days, minOrders, topPercent).
+--
+
+CREATE TABLE public.ads_audiences (
+    segment character varying(32) NOT NULL,
+    enabled boolean DEFAULT false NOT NULL,
+    params jsonb DEFAULT '{}'::jsonb NOT NULL,
+    customer_id bigint,
+    user_list text,
+    name text,
+    segment_count integer DEFAULT 0 NOT NULL,
+    member_count integer DEFAULT 0 NOT NULL,
+    added_count integer DEFAULT 0 NOT NULL,
+    removed_count integer DEFAULT 0 NOT NULL,
+    size_for_search bigint,
+    size_for_display bigint,
+    match_rate integer,
+    match_rate_range character varying(40),
+    eligible_for_search boolean,
+    eligible_for_display boolean,
+    membership_status character varying(16),
+    google_checked_at timestamp with time zone,
+    last_request_id text,
+    last_refresh_at timestamp with time zone,
+    last_refresh_status character varying(16),
+    last_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+COMMENT ON COLUMN public.ads_audiences.segment_count IS 'Customers in the segment before the ad-consent filter; member_count is those uploaded (consented, with an email or phone).';
+
+
+--
+-- Name: ads_audience_members; Type: TABLE; Schema: public; Owner: -
+-- What each list holds in Google: SHA-256 identifiers per customer, so a refresh removes customers
+-- who left the segment (or withdrew ad consent) and re-sends changed contact details.
+--
+
+CREATE TABLE public.ads_audience_members (
+    segment character varying(32) NOT NULL,
+    user_id uuid NOT NULL,
+    identifiers jsonb NOT NULL,
+    fingerprint character(64) NOT NULL,
+    uploaded_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: ads_alerts; Type: TABLE; Schema: public; Owner: -
+-- Alerts from the rules run after each Google Ads sync (lib/google-ads/alerts.ts). One open (or
+-- dismissed) row per dedupe_key while the condition holds; it resolves when the condition clears.
+--
+
+CREATE TABLE public.ads_alerts (
+    id bigint NOT NULL,
+    rule character varying(40) NOT NULL,
+    dedupe_key text NOT NULL,
+    severity character varying(12) NOT NULL,
+    title text NOT NULL,
+    message text,
+    entity_type character varying(32),
+    entity_id text,
+    data jsonb DEFAULT '{}'::jsonb NOT NULL,
+    status character varying(16) DEFAULT 'open'::character varying NOT NULL,
+    first_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    notified_at timestamp with time zone,
+    resolved_at timestamp with time zone,
+    dismissed_at timestamp with time zone,
+    dismissed_by text
+);
+
+
+--
+-- Name: ads_alerts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ads_alerts_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+ALTER SEQUENCE public.ads_alerts_id_seq OWNED BY public.ads_alerts.id;
+ALTER TABLE ONLY public.ads_alerts ALTER COLUMN id SET DEFAULT nextval('public.ads_alerts_id_seq'::regclass);

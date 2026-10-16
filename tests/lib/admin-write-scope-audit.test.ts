@@ -63,6 +63,8 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   // Approve/reject a tenant's Messaging/Documents service — /api/admin/ecom/* is isPlatformAdmin-only
   // in middleware, same as the kyc + purge controls above.
   'ecom/customers/[id]/services',
+  // Unlink a store's Google Ads account from the platform manager: isPlatformAdmin-only, like the ecom controls above.
+  'ecom/google-ads/[customerId]',
   // Closes the caller's OWN editor session (admin_id must match); opening one is gated on the
   // resource's :write scope, so a read-only member never holds a session to close.
   'editor-sessions/[id]/close',

@@ -7,6 +7,7 @@ import { adGroupKeywordOps, campaignNegativeOps } from './keywords'
 import { extensionOps, hasExtensions } from './assets'
 import { AdsMutationError, OpList, rn, runLoggedCall, runMutation, type AdsAction, type AdsEntity, type ChangeActor } from './mutate'
 import type { RefreshTarget } from './refresh'
+import { audienceAttachPlan, AudienceAttachSchema } from './audiences/attach'
 
 // One entry per edit the console offers on existing entities. Each becomes a validated mutate
 // (or, for recommendations, a logged call) and refreshes the mirror rows it touched.
@@ -38,6 +39,7 @@ export const ActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('assets.add'), campaignId: id, extensions: ExtensionsSchema }),
   z.object({ action: z.literal('recommendation.apply'), resourceName: recommendation }),
   z.object({ action: z.literal('recommendation.dismiss'), resourceName: recommendation }),
+  AudienceAttachSchema,
 ])
 
 export type ManageAction = z.infer<typeof ActionSchema>
@@ -198,6 +200,8 @@ async function plan(a: Exclude<ManageAction, { action: 'recommendation.apply' | 
         refresh: { keywordsInAdGroups: [a.adGroupId] },
       }
     }
+    case 'audience.attach':
+      return audienceAttachPlan(a, ads)
     case 'assets.add': {
       if (!hasExtensions(a.extensions)) throw new AdsMutationError('Pick at least one asset to add', 'validate', [], 400)
       const currency = (await queryOne<{ c: string }>(`SELECT currency_code AS c FROM ads_account WHERE id = 1`).catch(() => null))?.c

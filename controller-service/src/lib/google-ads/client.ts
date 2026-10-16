@@ -98,6 +98,10 @@ const FRIENDLY: Record<string, string> = {
   CUSTOMER_NOT_FOUND: 'No Google Ads account exists with that customer id.',
   RESOURCE_EXHAUSTED: 'Google Ads API quota for the developer token is used up for today. Try again later.',
   RESOURCE_TEMPORARILY_EXHAUSTED: 'Google Ads is rate limiting requests. Try again in a few minutes.',
+  CREATION_DENIED_INELIGIBLE_MCC:
+    'The platform manager account is not allowed to create accounts yet (Google requires a manager in good standing with enough spend). Link an existing account instead.',
+  TOO_MANY_ACCOUNTS: 'The platform manager account has reached Google\'s limit on new accounts. Try again later or link an existing account.',
+  TOO_MANY_ACCOUNTS_AT_MANAGER: 'The platform manager account manages the most accounts Google allows. Link an existing account instead.',
   REQUESTED_METRICS_FOR_MANAGER:
     'This is a manager account, which has no ads of its own. Pick one of the client accounts under it.',
 }

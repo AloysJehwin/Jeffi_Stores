@@ -86,10 +86,10 @@ describe('buildCampaign: Search', () => {
     expect(c.endDateTime).toBeUndefined()
   })
 
-  it('targets locations and languages on the new campaign', () => {
+  it('targets locations, and no languages on Search (Google rejects them since Sept 2026)', () => {
     const crit = ops.filter(o => opKey(o) === 'campaignCriterionOperation').map(created)
     expect(crit).toContainEqual({ campaign: `customers/${CID}/campaigns/-2`, location: { geoTargetConstant: 'geoTargetConstants/2356' } })
-    expect(crit).toContainEqual({ campaign: `customers/${CID}/campaigns/-2`, language: { languageConstant: 'languageConstants/1023' } })
+    expect(crit.some((c: any) => c.language)).toBe(false)
     expect(crit).toContainEqual({ campaign: `customers/${CID}/campaigns/-2`, negative: true, keyword: { text: 'free', matchType: 'BROAD' } })
   })
 

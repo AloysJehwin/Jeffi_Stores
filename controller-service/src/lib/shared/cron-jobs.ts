@@ -225,6 +225,28 @@ export const CRON_JOBS: readonly CronJob[] = [
     tenantScope: 'google_ads:read',
   },
   {
+    id: 'google_ads_audiences',
+    name: 'Google Ads Customer Match lists',
+    path: '/api/cron/google-ads-audiences',
+    method: 'GET',
+    intervalMs: DAY,
+    intervalLabel: 'every 24 h',
+    startDelayMs: 345 * SEC,
+    lockTtlMs: DAY - MIN,
+    tenantScope: 'google_ads:read',
+  },
+  {
+    id: 'google_ads_digest',
+    name: 'Google Ads weekly digest',
+    path: '/api/cron/google-ads-digest',
+    method: 'GET',
+    intervalMs: 7 * DAY,
+    intervalLabel: 'every 7 days',
+    startDelayMs: 360 * SEC,
+    lockTtlMs: DAY - MIN,
+    tenantScope: 'google_ads:read',
+  },
+  {
     id: 'ai_health',
     name: 'AI platform health',
     path: '/api/internal/ai/health',
@@ -254,11 +276,19 @@ const DAILY_AT_IST: Record<string, string> = {
   customer_notes_digest: '30 9',
   // After midnight in the account zone so yesterday is final in Google Ads.
   google_ads_sync: '30 4',
+  // After the nightly sync, so lists are built from the same day's orders.
+  google_ads_audiences: '0 6',
+}
+
+// Weekly jobs: minute hour * * day-of-week (IST).
+const WEEKLY_AT_IST: Record<string, string> = {
+  google_ads_digest: '0 9 * * 1',
 }
 
 // Cron expression (evaluated in Asia/Kolkata) for a job's k8s CronJob. Sub-minute jobs round up to 1m.
 export function cronSchedule(job: CronJob): string {
   const mins = Math.max(1, Math.round(job.intervalMs / MIN))
+  if (mins >= 7 * 24 * 60) return WEEKLY_AT_IST[job.id] ?? '0 3 * * 1'
   if (mins >= 24 * 60) return `${DAILY_AT_IST[job.id] ?? '0 3'} * * *`
   if (mins >= 60) {
     const hours = Math.round(mins / 60)

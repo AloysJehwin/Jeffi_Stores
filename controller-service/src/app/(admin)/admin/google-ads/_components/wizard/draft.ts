@@ -1,8 +1,11 @@
 import type { WizardBootstrap } from '@/lib/google-ads/manage-data'
 import {
   DAYS,
+  FEED_TYPES,
+  IMAGE_AD_TYPES,
   INDIA,
   filled,
+  type ImageAdSpec,
   type BidStrategy,
   type CampaignSpec,
   type CampaignType,
@@ -66,6 +69,19 @@ export interface Draft {
     imageIds: string[]
     useStoreLogo: boolean
   }
+  /** Demand Gen / Display ad. */
+  imageAd: {
+    adGroupName: string
+    finalUrl: string
+    headlines: string[]
+    longHeadline: string
+    descriptions: string[]
+    businessName: string
+    callToAction: string
+    imageIds: string[]
+    channels: ImageAdSpec['channels']
+    audiences: string[]
+  }
 }
 
 let seq = 0
@@ -119,6 +135,18 @@ export function newDraft(b: WizardBootstrap): Draft {
       imageIds: [],
       useStoreLogo: true,
     },
+    imageAd: {
+      adGroupName: '',
+      finalUrl: b.store.baseUrl,
+      headlines: ['', '', ''],
+      longHeadline: '',
+      descriptions: ['', ''],
+      businessName: b.store.name,
+      callToAction: '',
+      imageIds: [],
+      channels: 'ALL_CHANNELS',
+      audiences: [],
+    },
   }
 }
 
@@ -161,7 +189,7 @@ export function toSpec(d: Draft, ext: ExtDraft | null): CampaignSpec {
     languages: d.languages,
     schedule: d.scheduleOn ? { days: d.days, startHour: d.startHour, endHour: d.endHour } : null,
     networks: { searchPartners: d.searchPartners, display: d.type === 'SEARCH' && d.display },
-    devices: d.type === 'PERFORMANCE_MAX' ? undefined : devices,
+    devices: d.type === 'PERFORMANCE_MAX' || d.type === 'DEMAND_GEN' ? undefined : devices,
     defaultCpc: n(d.defaultCpc),
     adGroups:
       d.type === 'SEARCH'
@@ -173,8 +201,8 @@ export function toSpec(d: Draft, ext: ExtDraft | null): CampaignSpec {
             ad: { headlines: filled(g.headlines), descriptions: filled(g.descriptions), path1: g.path1.trim(), path2: g.path2.trim(), finalUrl: g.finalUrl.trim() },
           }))
         : undefined,
-    campaignNegatives: d.type === 'PERFORMANCE_MAX' ? undefined : parseKeywordLines(d.campaignNegatives, 'PHRASE'),
-    listing: d.type === 'SEARCH' ? undefined : { dimension: d.listingDimension, values: d.listingDimension === 'ALL' ? [] : d.listingValues },
+    campaignNegatives: d.type === 'SEARCH' || d.type === 'SHOPPING' ? parseKeywordLines(d.campaignNegatives, 'PHRASE') : undefined,
+    listing: !FEED_TYPES.includes(d.type) ? undefined : { dimension: d.listingDimension, values: d.listingDimension === 'ALL' ? [] : d.listingValues },
     assetGroup:
       d.type === 'PERFORMANCE_MAX'
         ? {
@@ -185,6 +213,18 @@ export function toSpec(d: Draft, ext: ExtDraft | null): CampaignSpec {
             descriptions: filled(d.assetGroup.descriptions),
           }
         : undefined,
-    extensions: ext ? toExtensions(ext) : undefined,
+    imageAd: IMAGE_AD_TYPES.includes(d.type)
+      ? {
+          ...d.imageAd,
+          adGroupName: d.imageAd.adGroupName.trim(),
+          headlines: filled(d.imageAd.headlines),
+          longHeadline: d.imageAd.longHeadline.trim(),
+          descriptions: filled(d.imageAd.descriptions),
+          callToAction: (d.imageAd.callToAction || null) as ImageAdSpec['callToAction'],
+          audiences: d.type === 'DEMAND_GEN' ? d.imageAd.audiences : [],
+        }
+      : undefined,
+    // Sitelinks, callouts, promotions and price lists are for Search, Shopping and Performance Max.
+    extensions: ext && !IMAGE_AD_TYPES.includes(d.type) ? toExtensions(ext) : undefined,
   }
 }

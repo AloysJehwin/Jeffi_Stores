@@ -29,6 +29,7 @@ import {
   createTagDefinition,
 } from './customers'
 import { createPickupRequest, syncDelhiveryStatuses, payPayable, exportGstr1 } from './ops'
+import { runGoogleAdsAction } from './google-ads'
 
 const HANDLERS: Record<string, ActionHandler> = {
   send_test_email: sendTestEmail,
@@ -62,6 +63,7 @@ const HANDLERS: Record<string, ActionHandler> = {
   sync_delhivery_statuses: syncDelhiveryStatuses,
   pay_payable: payPayable,
   export_gstr1: exportGstr1,
+  google_ads_action: runGoogleAdsAction,
 }
 
 export async function executeAction(action: AgentAction, cookieHeader: string): Promise<ActionResult> {

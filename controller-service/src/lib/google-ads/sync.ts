@@ -2,6 +2,8 @@ import type { PoolClient } from 'pg'
 import { getClient, queryOne } from '@/lib/shared/db'
 import type { GoogleAdsClient } from './client'
 import { googleAdsClientFor } from './credentials'
+import { billingStatus } from './account-create'
+import { refreshExperiments } from './experiments-read'
 import {
   Q,
   mapAccountBudget,
@@ -156,6 +158,15 @@ async function syncAccount(ads: GoogleAdsClient, db: PoolClient, mode: AdsSyncMo
       budget?.budget_end ?? null,
     ]
   )
+  if (mode === 'full') {
+    const billing = await billingStatus(ads).catch(() => null)
+    if (billing) {
+      await db.query(`UPDATE ads_account SET billing_status = $1, billing_account_name = $2, billing_checked_at = now() WHERE id = 1`, [
+        billing.status,
+        billing.paymentsAccountName,
+      ])
+    }
+  }
   return info
 }
 
@@ -293,6 +304,8 @@ async function runSteps(ctx: StepCtx, mode: AdsSyncMode) {
     await db.query(`DELETE FROM ads_change_events WHERE change_date_time < now() - interval '90 days'`)
     return n
   })
+
+  await step(ctx, 'experiments', () => refreshExperiments(ads, db))
 }
 
 async function writeLog(db: Pick<PoolClient, 'query'>, r: AdsSyncResult) {

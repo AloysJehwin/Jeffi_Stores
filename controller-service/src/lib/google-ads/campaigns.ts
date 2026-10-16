@@ -1,7 +1,7 @@
 import type { GoogleAdsClient } from './client'
 import { googleAdsClientFor } from './credentials'
 import type { CampaignSpec } from './campaign-spec'
-import { filled } from './campaign-spec'
+import { FEED_TYPES, IMAGE_AD_TYPES, filled, usesLanguageCriteria } from './campaign-spec'
 import { cleanAdText } from './limits'
 import {
   AdsMutationError,
@@ -20,9 +20,10 @@ import {
 import { adGroupKeywordOps, campaignNegativeOps } from './keywords'
 import { extensionOps, hasExtensions, type PreparedImages } from './assets'
 import { assetGroupOps } from './pmax'
+import { imageAdOps } from './image-ads'
 import { pmaxTreeOps, shoppingTreeOps, type ListingTree } from './listing'
 
-// Campaign creation for Search, Standard Shopping and Performance Max in one googleAds:mutate with
+// Campaign creation for Search, Standard Shopping, Performance Max, Demand Gen and Display in one googleAds:mutate with
 // temp ids, plus the edits the console offers on existing campaigns. Subdivided product groups and
 // device bid adjustments need real ids, so they go in a second validated mutate right after; if
 // that one fails the new campaign is removed again.
@@ -37,6 +38,8 @@ export function biddingFields(b: CampaignSpec['bidding']): Record<string, any> {
       return { maximizeConversionValue: b.targetRoas ? { targetRoas: b.targetRoas } : {} }
     case 'MANUAL_CPC':
       return { manualCpc: {} }
+    case 'MAXIMIZE_CLICKS':
+      return { targetSpend: {} }
   }
 }
 
@@ -82,7 +85,7 @@ export function buildCampaign(spec: CampaignSpec, ctx: BuildContext): CampaignBu
   const campaign = rn.campaign(cid, campaignTempId)
   const manual = spec.bidding.strategy === 'MANUAL_CPC'
   const feed = { merchantId: ctx.merchantId ?? undefined, feedLabel: ctx.feedLabel ?? 'IN' }
-  if (spec.type !== 'SEARCH' && !ctx.merchantId) throw new AdsMutationError('Link a Merchant Center account first', 'validate', [], 400)
+  if (FEED_TYPES.includes(spec.type) && !ctx.merchantId) throw new AdsMutationError('Link a Merchant Center account first', 'validate', [], 400)
 
   ops.create(
     'campaignBudgetOperation',
@@ -111,7 +114,10 @@ export function buildCampaign(spec: CampaignSpec, ctx: BuildContext): CampaignBu
             networkSettings: { targetGoogleSearch: true, targetSearchNetwork: !!spec.networks?.searchPartners, targetContentNetwork: false },
             shoppingSetting: { ...feed, campaignPriority: 0, enableLocal: false },
           }
-        : { shoppingSetting: feed, brandGuidelinesEnabled: true }
+        : spec.type === 'PERFORMANCE_MAX'
+          ? { shoppingSetting: feed, brandGuidelinesEnabled: true }
+          : {}
+  const demandGen = spec.type === 'DEMAND_GEN'
 
   ops.create(
     'campaignOperation',
@@ -122,7 +128,7 @@ export function buildCampaign(spec: CampaignSpec, ctx: BuildContext): CampaignBu
       advertisingChannelType: spec.type,
       campaignBudget: budget,
       ...EU_POLITICAL,
-      geoTargetTypeSetting: { positiveGeoTargetType: 'PRESENCE' },
+      ...(demandGen ? {} : { geoTargetTypeSetting: { positiveGeoTargetType: 'PRESENCE' } }),
       ...(spec.startDate ? { startDateTime: startDateTime(spec.startDate) } : {}),
       ...(spec.endDate ? { endDateTime: endDateTime(spec.endDate) } : {}),
       ...biddingFields(spec.bidding),
@@ -131,11 +137,12 @@ export function buildCampaign(spec: CampaignSpec, ctx: BuildContext): CampaignBu
     `Campaign ${spec.name}`
   )
 
-  for (const l of spec.locations) ops.create('campaignCriterionOperation', { campaign, location: { geoTargetConstant: l.id } }, `Location ${l.name}`)
-  for (const l of spec.excludedLocations ?? []) {
+  // Demand Gen targets locations and languages on the ad group (imageAdOps).
+  for (const l of demandGen ? [] : spec.locations) ops.create('campaignCriterionOperation', { campaign, location: { geoTargetConstant: l.id } }, `Location ${l.name}`)
+  for (const l of demandGen ? [] : spec.excludedLocations ?? []) {
     ops.create('campaignCriterionOperation', { campaign, negative: true, location: { geoTargetConstant: l.id } }, `Excluded location ${l.name}`)
   }
-  if (spec.type !== 'SHOPPING') {
+  if (usesLanguageCriteria(spec.type) && !demandGen) {
     for (const lang of spec.languages) ops.create('campaignCriterionOperation', { campaign, language: { languageConstant: lang } }, `Language ${lang}`)
   }
   if (spec.schedule) {
@@ -150,7 +157,7 @@ export function buildCampaign(spec: CampaignSpec, ctx: BuildContext): CampaignBu
       )
     }
   }
-  if (spec.type !== 'PERFORMANCE_MAX' && spec.campaignNegatives?.length) campaignNegativeOps(campaign, spec.campaignNegatives, ops)
+  if (spec.type !== 'PERFORMANCE_MAX' && !demandGen && spec.campaignNegatives?.length) campaignNegativeOps(campaign, spec.campaignNegatives, ops)
 
   let parentOpIndex: number | null = null
   let tree: ListingTree | null = null
@@ -206,7 +213,9 @@ export function buildCampaign(spec: CampaignSpec, ctx: BuildContext): CampaignBu
       const root = shoppingTreeOps(cid, String(adGroupTempId), listing, { cpcBid: manual ? spec.defaultCpc : null })
       root.operations.forEach((o, i) => ops.add(Object.keys(o)[0] as OperationKey, Object.values(o)[0]!, root.labels[i]))
     } else tree = listing
-  } else if (spec.assetGroup) {
+  } else if (IMAGE_AD_TYPES.includes(spec.type) && spec.imageAd) {
+    imageAdOps(cid, campaign, spec, { ids, ops, images: ctx.images, stamp })
+  } else if (spec.type === 'PERFORMANCE_MAX' && spec.assetGroup) {
     const before = ops.operations.length
     const { assetGroupTempId } = assetGroupOps(cid, campaign, spec.assetGroup, { ids, ops, images: ctx.images, stamp })
     parentOpIndex = ops.operations.findIndex((o, i) => i >= before && !!o.assetGroupOperation)
@@ -224,7 +233,7 @@ export function buildCampaign(spec: CampaignSpec, ctx: BuildContext): CampaignBu
     budgetTempId,
     parentOpIndex,
     tree,
-    devices: spec.type !== 'PERFORMANCE_MAX' && hasDevices(spec.devices) ? spec.devices! : null,
+    devices: spec.type !== 'PERFORMANCE_MAX' && !demandGen && hasDevices(spec.devices) ? spec.devices! : null,
   }
 }
 
@@ -243,6 +252,9 @@ export function summarizeSpec(spec: CampaignSpec, listing?: ListingTree | null):
     listing: listing ? { dimension: listing.dimension, values: listing.values.length } : undefined,
     assetGroup: spec.assetGroup
       ? { feedOnly: spec.assetGroup.feedOnly, headlines: filled(spec.assetGroup.headlines).length, images: spec.assetGroup.imageIds.length }
+      : undefined,
+    imageAd: spec.imageAd
+      ? { headlines: filled(spec.imageAd.headlines).length, images: spec.imageAd.imageIds.length, audiences: spec.imageAd.audiences.length, channels: spec.imageAd.channels }
       : undefined,
     extensions: spec.extensions
       ? {

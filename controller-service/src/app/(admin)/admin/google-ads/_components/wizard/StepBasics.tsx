@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, MapPin } from 'lucide-react'
+import { ExternalLink, Loader2, MapPin } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import type { WizardBootstrap } from '@/lib/google-ads/manage-data'
-import { DAYS, INDIA, LANGUAGES, STRATEGIES_FOR, type BidStrategy, type CampaignType } from '@/lib/google-ads/campaign-spec'
+import { DAYS, INDIA, LANGUAGES, STRATEGIES_FOR, type BidStrategy, type CampaignType, usesLanguageCriteria } from '@/lib/google-ads/campaign-spec'
 import { money } from '@/lib/google-ads/format'
 import { postJson } from '../ManageContext'
 import type { Draft } from './draft'
@@ -17,15 +17,21 @@ const TYPES: { id: CampaignType; label: string; hint: string }[] = [
   { id: 'SEARCH', label: 'Search', hint: 'Text ads on Google search for the keywords you choose.' },
   { id: 'SHOPPING', label: 'Standard Shopping', hint: 'Product listings from your Merchant Center feed.' },
   { id: 'PERFORMANCE_MAX', label: 'Performance Max', hint: 'Your products across Search, Shopping, YouTube, Display and Gmail.' },
+  { id: 'DEMAND_GEN', label: 'Demand Gen', hint: 'Image ads from your catalogue on YouTube, Discover, Gmail and Display.' },
+  { id: 'DISPLAY', label: 'Display', hint: 'Responsive image ads on websites and apps in the Google Display Network.' },
 ]
+
+/** Google Ads opens the account picker when the account isn't the one in session. */
+export const adsUiUrl = (path: string) => `https://ads.google.com/aw/${path}`
 
 const STRATEGY_LABEL: Record<BidStrategy, string> = {
   MAXIMIZE_CONVERSIONS: 'Maximise conversions',
   MAXIMIZE_CONVERSION_VALUE: 'Maximise conversion value',
   MANUAL_CPC: 'Manual CPC',
+  MAXIMIZE_CLICKS: 'Maximise clicks',
 }
 
-export function StepCampaign({ d, set, b }: { d: Draft; set: Patch; b: WizardBootstrap }) {
+export function StepCampaign({ d, set, b, demandGenMinimum }: { d: Draft; set: Patch; b: WizardBootstrap; demandGenMinimum?: number | null }) {
   const strategies = STRATEGIES_FOR[d.type]
   const today = new Date().toISOString().slice(0, 10)
   return (
@@ -43,16 +49,26 @@ export function StepCampaign({ d, set, b }: { d: Draft; set: Patch; b: WizardBoo
             <p className="text-xs text-foreground-muted mt-1">{t.hint}</p>
           </button>
         ))}
+        <div className="rounded-lg border border-dashed border-border-default p-3 text-left">
+          <p className="text-sm font-medium text-foreground">Video (YouTube)</p>
+          <p className="text-xs text-foreground-muted mt-1">
+            Google&apos;s API cannot create Video campaigns. Create it in Google Ads; it then shows in Campaigns and the reports here.
+          </p>
+          <a href={adsUiUrl('campaigns/new')} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-xs text-accent-600">
+            Create in Google Ads <ExternalLink className="w-3 h-3" />
+          </a>
+        </div>
       </div>
       <Field label="Campaign name">
         <input className={inputCls} value={d.name} onChange={e => set({ name: e.target.value })} placeholder="e.g. Power tools - Search" />
       </Field>
       <Field
         label="Daily budget (₹)"
-        hint={
+        hint={`${
           b.budget.revenue30d > 0
             ? `Last 30 days: ${money(b.budget.revenue30d, b.store.currency)} revenue from ${b.budget.orders30d} orders (${money(b.budget.dailyRevenue, b.store.currency)}/day). Suggested: ${money(b.budget.suggestedDaily, b.store.currency)}/day, about 10% of daily revenue.`
             : `No paid orders in the last 30 days. Suggested starting budget: ${money(b.budget.suggestedDaily, b.store.currency)}/day.`
+        }${d.type === 'DEMAND_GEN' && demandGenMinimum ? ` Demand Gen needs at least ${money(demandGenMinimum, b.store.currency)}/day.` : ''}`
         }
       >
         <input className={inputCls} inputMode="decimal" value={d.dailyBudget} onChange={e => set({ dailyBudget: e.target.value })} />
@@ -199,7 +215,10 @@ export function StepTargeting({ d, set, b }: { d: Draft; set: Patch; b: WizardBo
         {geoError && <p className="text-xs text-red-500">{geoError}</p>}
       </div>
 
-      {d.type !== 'SHOPPING' && (
+      {d.type === 'SEARCH' && (
+        <p className="text-xs text-foreground-secondary">Google matches Search ads to people by the language of your ad text and landing pages, so there is no language setting.</p>
+      )}
+      {usesLanguageCriteria(d.type) && (
         <div className="space-y-1">
           <span className="text-xs font-medium text-foreground-secondary">Languages</span>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
@@ -250,7 +269,7 @@ export function StepTargeting({ d, set, b }: { d: Draft; set: Patch; b: WizardBo
         )}
       </div>
 
-      {d.type !== 'PERFORMANCE_MAX' && (
+      {(d.type === 'SEARCH' || d.type === 'SHOPPING') && (
         <div className="space-y-1">
           <span className="text-xs font-medium text-foreground-secondary">Networks</span>
           <label className="text-sm flex items-center gap-2">
@@ -266,7 +285,7 @@ export function StepTargeting({ d, set, b }: { d: Draft; set: Patch; b: WizardBo
         </div>
       )}
 
-      {d.type !== 'PERFORMANCE_MAX' && (
+      {d.type !== 'PERFORMANCE_MAX' && d.type !== 'DEMAND_GEN' && (
         <div className="space-y-1">
           <span className="text-xs font-medium text-foreground-secondary">Device bid adjustments (%, optional; -100 stops ads on that device)</span>
           <div className="grid gap-2 grid-cols-3">

@@ -105,6 +105,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       platformAdminOnly: true,
     },
     {
+      href: '/admin/ecom/google-ads',
+      label: 'Google Ads Accounts',
+      scope: 'ecom_instances:read',
+      group: 'Ecom Store',
+      platformAdminOnly: true,
+    },
+    {
       href: '/admin/ecom/billing',
       label: 'Billing',
       scope: 'ecom_billing:read',

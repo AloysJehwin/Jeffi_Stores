@@ -626,7 +626,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'ecom_instances:read',
     label: 'Ecom Instances (Read)',
     description: 'View per-tenant EC2/RDS/nginx/CDN/cert infrastructure status',
-    routes: ['/admin/ecom/instances'],
+    routes: ['/admin/ecom/instances', '/admin/ecom/google-ads'],
     group: 'Ecom Store',
     platformOnly: true,
   },

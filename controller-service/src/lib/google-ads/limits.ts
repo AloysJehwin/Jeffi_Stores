@@ -33,6 +33,12 @@ export const COUNTS = {
   priceOfferings: [3, 8],
   sitelinks: [0, 20],
   callouts: [0, 20],
+  demandGenHeadlines: [1, 5],
+  demandGenDescriptions: [1, 5],
+  displayHeadlines: [1, 5],
+  displayDescriptions: [1, 5],
+  /** Product images per image ad (each becomes 2-3 sized images; Google caps Display at 15, Demand Gen at 20). */
+  imageAdImages: [1, 5],
 } as const
 
 // Google counts CJK and other full-width characters as two.
