@@ -558,7 +558,7 @@ CREATE INDEX IF NOT EXISTS idx_tenant_kyc_owner ON public.tenant_kyc USING btree
 CREATE TABLE IF NOT EXISTS public.tenant_social_accounts (
     id                uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     tenant_id         uuid NOT NULL,
-    provider          character varying(16) NOT NULL,          -- 'facebook' | 'instagram'
+    provider          character varying(16) NOT NULL,          -- facebook | instagram | gbp | youtube | pinterest | linkedin | x
     page_id           character varying(64),                   -- FB Page id
     page_name         character varying(200),
     ig_user_id        character varying(64),                   -- IG Business account id (when provider=instagram)
@@ -573,9 +573,9 @@ ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_acco
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_tenant_id_fkey
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_provider_check
-    CHECK (provider IN ('facebook','instagram'));
+    CHECK (provider IN ('facebook','instagram','gbp','youtube','pinterest','linkedin','x'));
 ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_status_check
-    CHECK (status IN ('connected','expired','revoked'));
+    CHECK (status IN ('connected','pending','expired','revoked'));
 CREATE INDEX IF NOT EXISTS idx_tenant_social_tenant ON public.tenant_social_accounts USING btree (tenant_id);
 
 --
@@ -598,17 +598,108 @@ CREATE TABLE IF NOT EXISTS public.scheduled_social_posts (
     last_error    text,
     attempts      integer NOT NULL DEFAULT 0,
     created_at    timestamp with time zone NOT NULL DEFAULT now(),
-    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+    updated_at    timestamp with time zone NOT NULL DEFAULT now(),
+    group_id      uuid,                                    -- one composed post sent to several networks
+    title         text,                                    -- Pinterest / YouTube title
+    link_url      text,                                    -- destination; UTM tags are added at publish
+    next_attempt_at timestamp with time zone,              -- retry backoff after a failure
+    approval_status character varying(16) NOT NULL DEFAULT 'none', -- none|pending|approved|rejected
+    approved_by   text,
+    approved_at   timestamp with time zone,
+    permalink     text,
+    source        character varying(16) NOT NULL DEFAULT 'manual', -- manual|autopost
+    autopost_rule_id uuid,
+    created_by    text
 );
 ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_tenant_id_fkey
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_platform_check
-    CHECK (platform IN ('fb','ig','ig_reel'));
+    CHECK (platform IN ('fb','ig','ig_reel','gbp','youtube','pinterest','linkedin','x'));
 ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_status_check
-    CHECK (status IN ('pending','publishing','posted','failed'));
+    CHECK (status IN ('draft','pending','publishing','posted','failed','cancelled'));
+ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_approval_check
+    CHECK (approval_status IN ('none','pending','approved','rejected'));
 CREATE INDEX IF NOT EXISTS idx_scheduled_social_due ON public.scheduled_social_posts USING btree (scheduled_at) WHERE status = 'pending';
 CREATE INDEX IF NOT EXISTS idx_scheduled_social_tenant ON public.scheduled_social_posts USING btree (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_scheduled_social_group ON public.scheduled_social_posts USING btree (group_id);
+
+--
+-- social_post_insights: latest metrics per published post (refreshed every 6 hours for 30 days).
+--
+CREATE TABLE IF NOT EXISTS public.social_post_insights (
+    post_id       uuid NOT NULL,
+    impressions   bigint, reach bigint, likes bigint, comments bigint, shares bigint, saves bigint, clicks bigint, video_views bigint,
+    fetched_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.social_post_insights ADD CONSTRAINT social_post_insights_pkey PRIMARY KEY (post_id);
+ALTER TABLE ONLY public.social_post_insights ADD CONSTRAINT social_post_insights_post_fkey
+    FOREIGN KEY (post_id) REFERENCES public.scheduled_social_posts(id) ON DELETE CASCADE;
+
+--
+-- social_inbox: comments on our posts and Google reviews, for one inbox with replies.
+--
+CREATE TABLE IF NOT EXISTS public.social_inbox (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid,
+    network       character varying(16) NOT NULL,
+    kind          character varying(16) NOT NULL DEFAULT 'comment', -- comment|review
+    external_id   text NOT NULL,
+    post_id       uuid,
+    author        text,
+    text          text,
+    rating        smallint,
+    created_at    timestamp with time zone,
+    replied_at    timestamp with time zone,
+    reply_text    text,
+    reply_by      text,
+    is_read       boolean NOT NULL DEFAULT false,
+    fetched_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.social_inbox ADD CONSTRAINT social_inbox_pkey PRIMARY KEY (id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_social_inbox_external ON public.social_inbox USING btree (network, external_id);
+CREATE INDEX IF NOT EXISTS idx_social_inbox_tenant ON public.social_inbox USING btree (tenant_id, created_at DESC);
+
+--
+-- social_templates: reusable captions ({name}, {price}, {url} are filled from the product).
+--
+CREATE TABLE IF NOT EXISTS public.social_templates (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid,
+    name          character varying(80) NOT NULL,
+    caption       text NOT NULL,
+    hashtags      text,
+    created_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.social_templates ADD CONSTRAINT social_templates_pkey PRIMARY KEY (id);
+CREATE INDEX IF NOT EXISTS idx_social_templates_tenant ON public.social_templates USING btree (tenant_id);
+
+--
+-- social_autopost_rules: post automatically when a product is added, comes back in stock or drops
+-- in price. social_autopost_seen remembers each product's last state so a change is posted once.
+--
+CREATE TABLE IF NOT EXISTS public.social_autopost_rules (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid,
+    trigger       character varying(16) NOT NULL,           -- new_product|back_in_stock|price_drop
+    platforms     text[] NOT NULL,
+    template_id   uuid,
+    min_drop_pct  numeric(5,2) NOT NULL DEFAULT 10,
+    require_approval boolean NOT NULL DEFAULT true,
+    enabled       boolean NOT NULL DEFAULT true,
+    created_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.social_autopost_rules ADD CONSTRAINT social_autopost_rules_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.social_autopost_rules ADD CONSTRAINT social_autopost_rules_trigger_check
+    CHECK (trigger IN ('new_product','back_in_stock','price_drop'));
+CREATE TABLE IF NOT EXISTS public.social_autopost_seen (
+    tenant_id     uuid NOT NULL,
+    product_id    uuid NOT NULL,
+    in_stock      boolean,
+    price         numeric(12,2),
+    seen_at       timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.social_autopost_seen ADD CONSTRAINT social_autopost_seen_pkey PRIMARY KEY (tenant_id, product_id);
 
 --
 -- tenant_integration_credentials: a tenant's per-provider integration creds (Google Merchant,

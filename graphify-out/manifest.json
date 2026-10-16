@@ -1620,8 +1620,8 @@
     "semantic_hash": ""
   },
   "database/control-plane/schema.sql": {
-    "mtime": 1792084528.1012025,
-    "ast_hash": "4613de2c217ae720ce2a15912128f2dd",
+    "mtime": 1792144347.16728,
+    "ast_hash": "88ce63ab716507a10499d03b893cef63",
     "semantic_hash": ""
   },
   "tests/api/admin/auth/google/route.test.ts": {
@@ -1830,8 +1830,8 @@
     "semantic_hash": ""
   },
   "tests/lib/social/publisher.test.ts": {
-    "mtime": 1790931257.6310523,
-    "ast_hash": "41b53c379df88237879566336fdfcbab",
+    "mtime": 1792145031.25167,
+    "ast_hash": "954b607d1fcfa89ab45855b541bc47d5",
     "semantic_hash": ""
   },
   "tests/lib/ecom-payment-bypass.test.ts": {
@@ -4330,8 +4330,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/platform/cronjobs.yaml": {
-    "mtime": 1792144066.2863429,
-    "ast_hash": "836b79b7c56ef83660882bcb44abdc80",
+    "mtime": 1792144957.9347072,
+    "ast_hash": "061eda210bdafb955d1c5c7e47b7a2fb",
     "semantic_hash": ""
   },
   "deploy/k8s/platform/kustomization.yaml": {
@@ -7505,8 +7505,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/social-posts/SocialPostsClient.tsx": {
-    "mtime": 1791923992.335706,
-    "ast_hash": "d8b5847dd31c24060f534093db808217",
+    "mtime": 1792145378.4699333,
+    "ast_hash": "a103332b7e7de4fc551c88637d210a2d",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/social-posts/loading.tsx": {
@@ -7515,8 +7515,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/social-posts/page.tsx": {
-    "mtime": 1792090553.2662365,
-    "ast_hash": "791c2dc0f1aeae192cbc0bfcde5016c7",
+    "mtime": 1792145384.374,
+    "ast_hash": "5f95d5463e83b5a3aa9116df3523b609",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/subscriptions/[id]/SubscriptionActions.tsx": {
@@ -10740,13 +10740,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/social-posts/[id]/publish/route.ts": {
-    "mtime": 1790931251.210037,
-    "ast_hash": "16a883613b6408d6320803a3dc4aceee",
+    "mtime": 1792144893.8713338,
+    "ast_hash": "0d9444214a5e17cbb2350787164ef07b",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/social-posts/route.ts": {
-    "mtime": 1790931251.2128718,
-    "ast_hash": "fa2668c1c8ad8b11b1c9df69afc080db",
+    "mtime": 1792144893.8491988,
+    "ast_hash": "3bf1b5fc80e7fe4f8ec4f84861c04000",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/social/callback/route.ts": {
@@ -11070,8 +11070,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/cron/publish-social-posts/route.ts": {
-    "mtime": 1790931251.411603,
-    "ast_hash": "d0be4a44879eb6f269bacc8aa2f5fe88",
+    "mtime": 1792144533.5945866,
+    "ast_hash": "cdb953e075dfab9a1d0ad381e18e6bdd",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/cron/reconcile-settlements/route.ts": {
@@ -15080,8 +15080,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/cron-jobs.ts": {
-    "mtime": 1792144065.1055217,
-    "ast_hash": "add38b7ea726501b8f87f7bf3b97a76e",
+    "mtime": 1792144950.5638123,
+    "ast_hash": "de40eaf0474af5e600281330cdd8d213",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/cron-record.ts": {
@@ -15455,8 +15455,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/social/publisher.ts": {
-    "mtime": 1791318065.9465063,
-    "ast_hash": "65c2ecf3be30fe4266399247e10fcc5b",
+    "mtime": 1792144533.5936413,
+    "ast_hash": "33b0c9b0a8d82fc3a1cf8454669b5b6b",
     "semantic_hash": ""
   },
   "controller-service/src/lib/subscriptions/create.ts": {
@@ -15650,8 +15650,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/tenant-registry/index.ts": {
-    "mtime": 1792090348.6995008,
-    "ast_hash": "e6d7fa4836f3adbe083bc8e0ae45e066",
+    "mtime": 1792144501.5799434,
+    "ast_hash": "252be8486b05eb55c3d30d0c71fb04d7",
     "semantic_hash": ""
   },
   "controller-service/src/lib/tenant-registry/integrations.ts": {
@@ -15690,8 +15690,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/tenant-registry/social.ts": {
-    "mtime": 1792090345.8424594,
-    "ast_hash": "31015909f5392d4be64e65bac0de861b",
+    "mtime": 1792144492.1555123,
+    "ast_hash": "e510b49734bdca53b50c8b3d2fed4e28",
     "semantic_hash": ""
   },
   "controller-service/src/lib/tenant-registry/tenants.ts": {
@@ -15745,8 +15745,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/middleware.ts": {
-    "mtime": 1792144065.100731,
-    "ast_hash": "d3085c411c35eca47ac7b8d30cd957cf",
+    "mtime": 1792144950.5644243,
+    "ast_hash": "d384135fdf6b08f6dd38d971c20a14eb",
     "semantic_hash": ""
   },
   "controller-service/src/types/google.d.ts": {
@@ -17465,8 +17465,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/registry.ts": {
-    "mtime": 1792144065.1014967,
-    "ast_hash": "ebd7110dabf48e3c8d4205e94ed8a1f8",
+    "mtime": 1792144777.6861,
+    "ast_hash": "7f808f5f7828e0e991144ebca98240d4",
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/report-store.ts": {
@@ -17887,6 +17887,236 @@
   "tests/lib/meta-ads/meta-ads.test.ts": {
     "mtime": 1792144174.6154811,
     "ast_hash": "a1225e653ea9f61884425ac8e32c88b4",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/social-posts/Accounts.tsx": {
+    "mtime": 1792145322.061014,
+    "ast_hash": "45166276ca0c1f68956bffa1bc7ce37d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/social-posts/Approvals.tsx": {
+    "mtime": 1792145267.9597118,
+    "ast_hash": "624e2de8c26c233cc9e03dcc83ccc8f2",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/social-posts/Calendar.tsx": {
+    "mtime": 1792145194.517007,
+    "ast_hash": "5d162f8c473f3d85207fa69899d976d6",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/social-posts/Composer.tsx": {
+    "mtime": 1792145256.383825,
+    "ast_hash": "560502f2590faff9d80ff2fd572dff9a",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/social-posts/Inbox.tsx": {
+    "mtime": 1792145284.148079,
+    "ast_hash": "743ae1d30c283326a6acf6e3d61b11e3",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/social-posts/Insights.tsx": {
+    "mtime": 1792145301.887337,
+    "ast_hash": "f22bf07fe575a850d8cae7a47aca83ae",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/social-posts/Library.tsx": {
+    "mtime": 1792145357.2982967,
+    "ast_hash": "b3148bb99466b8775261467296072ca6",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/social-posts/PostGroup.tsx": {
+    "mtime": 1792145166.0946448,
+    "ast_hash": "13683fae2cd9af2fc7097dc611696ff1",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/social-posts/shared.ts": {
+    "mtime": 1792145128.6917644,
+    "ast_hash": "b7f9db12f15897b413b603b9b0cf88c7",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social-posts/[id]/approve/route.ts": {
+    "mtime": 1792145085.5729153,
+    "ast_hash": "3a328d24ba3523deddd6f2a5ce656028",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social-posts/[id]/retry/route.ts": {
+    "mtime": 1792144893.8808725,
+    "ast_hash": "770094722376cd46355256349fda88da",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social-posts/[id]/route.ts": {
+    "mtime": 1792144893.8619215,
+    "ast_hash": "5f56be9ba1204fb3413377601f26ada7",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/autopost/[id]/route.ts": {
+    "mtime": 1792144931.7356467,
+    "ast_hash": "4100b2278c003d8d6308ad23c7acb84d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/autopost/route.ts": {
+    "mtime": 1792144931.7292027,
+    "ast_hash": "1e818f86aa77b557ce766fef1940e3a4",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/hashtags/route.ts": {
+    "mtime": 1792144931.7420883,
+    "ast_hash": "45acea9fe2856b4cf4c282cf9e5304c4",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/inbox/[id]/route.ts": {
+    "mtime": 1792144893.9420865,
+    "ast_hash": "1f1b4f6b8fb83c5b7551f30bc9e3644a",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/inbox/route.ts": {
+    "mtime": 1792144893.9343443,
+    "ast_hash": "7721fb6c0157a7e9907872bc865f59df",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/insights/route.ts": {
+    "mtime": 1792144893.9495904,
+    "ast_hash": "af2a599e84f36c73f3ab5784a196993a",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/network/callback/route.ts": {
+    "mtime": 1792144893.9271042,
+    "ast_hash": "a9001001c1ece5552fb22c5a435e133c",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/networks/[network]/connect/route.ts": {
+    "mtime": 1792144893.91828,
+    "ast_hash": "f7b360caad2fc9da23033bcfab692684",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/networks/[network]/route.ts": {
+    "mtime": 1792144893.9083223,
+    "ast_hash": "5c24112dc2b6a1656d3a17d0ac13164d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/networks/route.ts": {
+    "mtime": 1792144893.8980644,
+    "ast_hash": "326177f4d6dbe700dfd6158b77558c9e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/sync/route.ts": {
+    "mtime": 1792144893.956834,
+    "ast_hash": "f4ede696d5341b553d40de948856394a",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/templates/[id]/route.ts": {
+    "mtime": 1792144931.7213244,
+    "ast_hash": "9ce31345ce5901ce565bda54d2af8b9f",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/social/templates/route.ts": {
+    "mtime": 1792144931.7138526,
+    "ast_hash": "9a8e0d225e098b10302a00fe2c145902",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/social-autopost/route.ts": {
+    "mtime": 1792144950.529881,
+    "ast_hash": "ca301fb7a00d8083004191f85f76124e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/social-inbox/route.ts": {
+    "mtime": 1792144950.5203125,
+    "ast_hash": "c6bd1761c15c388d37a6f895ab48729b",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/social-insights/route.ts": {
+    "mtime": 1792144950.50853,
+    "ast_hash": "776e8973540f6f4809a8456a0b42ceda",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/accounts.ts": {
+    "mtime": 1792144465.3050654,
+    "ast_hash": "7dd90583ee6f34df83bb7c059b471953",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/alerts.ts": {
+    "mtime": 1792144769.854754,
+    "ast_hash": "5d2e38af04ee5d0eaf9cbf43f2268991",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/data.ts": {
+    "mtime": 1792144808.6283684,
+    "ast_hash": "20b162f9490f049c1edcecb75398a6bc",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/hashtags.ts": {
+    "mtime": 1792144931.7060232,
+    "ast_hash": "4c7020dcb7530176a3a0688c0c0a7592",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/jobs.ts": {
+    "mtime": 1792144749.4101527,
+    "ast_hash": "8a04f99dc2197f5e423c2b055828945f",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/library.ts": {
+    "mtime": 1792144931.6952972,
+    "ast_hash": "2383923ae19fc1483b2877e451ae3c0f",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/oauth.ts": {
+    "mtime": 1792144697.9929345,
+    "ast_hash": "e4d5d2c5e5f8d9e272728da9b36cbd3e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/posts.ts": {
+    "mtime": 1792144838.5702326,
+    "ast_hash": "5121a11c8f214d6848f6a9c49c243ab3",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/providers/gbp.ts": {
+    "mtime": 1792144442.2759936,
+    "ast_hash": "d7c5ba243952cb096c9c18feae17b932",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/providers/index.ts": {
+    "mtime": 1792144469.2368765,
+    "ast_hash": "a6ad644e2780201641c148325b767249",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/providers/linkedin.ts": {
+    "mtime": 1792144506.6089375,
+    "ast_hash": "97f4b61692fdd816d2b9431fb9daffe3",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/providers/meta.ts": {
+    "mtime": 1792144434.1547208,
+    "ast_hash": "af443065fb4a39e760c52f409d79c04a",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/providers/pinterest.ts": {
+    "mtime": 1792144482.3957362,
+    "ast_hash": "8ef697a42c85ee6dcf949c180a9e11c5",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/providers/types.ts": {
+    "mtime": 1792144365.5890114,
+    "ast_hash": "726d36cd88b1517e727d14a1b3d4ae1c",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/providers/x.ts": {
+    "mtime": 1792144529.518127,
+    "ast_hash": "42d0edd5a192cfcd4379af70fa675d6c",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/social/providers/youtube.ts": {
+    "mtime": 1792144462.9493597,
+    "ast_hash": "a220f88faf6d9efe8b730a881f34d19b",
+    "semantic_hash": ""
+  },
+  "tests/lib/social/jobs.test.ts": {
+    "mtime": 1792145041.8141298,
+    "ast_hash": "e96ebdd321a93fbde20055a46a8b9ae0",
+    "semantic_hash": ""
+  },
+  "tests/lib/social/providers.test.ts": {
+    "mtime": 1792144600.372914,
+    "ast_hash": "d02c1c1c099311c6cb0897641c052f57",
     "semantic_hash": ""
   }
 }
