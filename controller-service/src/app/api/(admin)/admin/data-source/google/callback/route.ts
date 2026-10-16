@@ -3,8 +3,7 @@ import { currentAdminBaseUrl, platformOAuthBaseUrl } from '@/lib/catalog/brand'
 import { saveIntegrationCredential, getIntegrationCredential, getTenant } from '@/lib/tenant-registry'
 import { encryptToken, decryptToken } from '@/lib/crypto/token-cipher'
 import { verifyAdminState, returnToAdmin, safeReturnBase } from '@/lib/shared/oauth-state'
-
-const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
+import { tenantAdminUrl } from '@/lib/integrations/oauth'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,8 +33,8 @@ export async function GET(request: NextRequest) {
   // so a tampered or stale state can never redirect to another tenant's admin.
   const tenant = await getTenant(state.tenantId)
   if (tenant?.slug) {
-    const approved = safeReturnBase(state.returnBase, `https://admin-${tenant.slug}.${PLATFORM_DOMAIN}`)
-    if (approved) backTo = `${approved}/admin/data-source`
+    const expected = tenantAdminUrl(tenant.slug)
+    backTo = `${safeReturnBase(state.returnBase, expected) ?? expected}/admin/data-source`
   }
 
   try {
