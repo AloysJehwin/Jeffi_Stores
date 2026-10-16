@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
+import { Plus } from 'lucide-react'
+import { TabAction } from '@/components/admin/channels/ui'
 import { headers } from 'next/headers'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
@@ -194,9 +195,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
   const tab = resolveListTab(sp)
   return (
     <div className="p-4 sm:p-6">
-      <Suspense fallback={<CategoriesHeaderFallback />}>
-        <CategoriesHeader />
-      </Suspense>
+      <CategoriesHeader />
 
       <TabLinks
         base="/admin/categories"
@@ -205,6 +204,14 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
           { id: 'overview', label: 'Overview' },
           { id: 'list', label: 'Categories' },
         ]}
+        actions={
+          <>
+            <BrochureButton mode="category" />
+            <Suspense fallback={null}>
+              <AddCategoryButton />
+            </Suspense>
+          </>
+        }
       />
       <Suspense fallback={null}>
         <TabMemory storageKey="category" tab={tab} explicit={typeof sp.tab === 'string'} />
@@ -249,44 +256,25 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
   )
 }
 
-async function CategoriesHeader() {
-  const host = await getHost()
-  const h = await headers()
-  const role = h.get('x-user-role') || ''
-  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
-  const canWrite = hasScope(role, scopes, 'categories:write')
+function CategoriesHeader() {
   return (
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Categories</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">Manage product categories and subcategories</p>
-      </div>
-      <div className="flex flex-col sm:flex-row gap-2">
-        <BrochureButton mode="category" />
-        {canWrite && (
-          <Link
-            href={ap('/admin/categories/add', host)}
-            className="hidden md:inline-flex items-center justify-center h-11 bg-accent-500 hover:bg-accent-600 text-white px-5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-          >
-            Add New Category
-          </Link>
-        )}
-      </div>
+    <div className="mb-6">
+      <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Categories</h1>
+      <p className="text-foreground-secondary mt-1 text-sm">Manage product categories and subcategories</p>
     </div>
   )
 }
 
-function CategoriesHeaderFallback() {
+async function AddCategoryButton() {
+  const host = await getHost()
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  if (!hasScope(role, scopes, 'categories:write')) return null
   return (
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Categories</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">Manage product categories and subcategories</p>
-      </div>
-      <div className="hidden md:inline-flex items-center justify-center h-11 bg-accent-500 text-white px-5 rounded-lg font-semibold text-center text-sm sm:text-base opacity-70">
-        Add New Category
-      </div>
-    </div>
+    <span className="hidden md:inline-flex">
+      <TabAction href={ap('/admin/categories/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Category" />
+    </span>
   )
 }
 

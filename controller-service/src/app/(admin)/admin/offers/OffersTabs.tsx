@@ -1,6 +1,7 @@
 'use client'
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { Tabs } from '@/components/admin/channels/ui'
 import OffersClient from './OffersClient'
 import OffersListClient from './OffersListClient'
 import OffersOverview from './OffersOverview'
@@ -35,23 +36,8 @@ export default function OffersTabs({ canWrite }: { canWrite: boolean }) {
 
   return (
     <div>
-      <div className="flex gap-1 border-b border-border mb-6 overflow-x-auto" role="tablist">
-        {TABS.map(t => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => selectTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
-              tab === t.id
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-foreground-muted hover:text-foreground'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
+      <div className="mb-6">
+        <Tabs tabs={TABS} value={tab} onChange={selectTab} />
       </div>
 
       {tab === 'overview' ? (

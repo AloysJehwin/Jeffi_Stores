@@ -14,7 +14,7 @@ import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import RevenueTrendChart from '@/components/admin/RevenueTrendChart'
 import OrdersMobileList from './_components/OrdersMobileList'
 import OrdersOverview from './_components/OrdersOverview'
-import Link from 'next/link'
+import { TabLinks } from '@/components/admin/channels/ui'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -243,8 +243,6 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const tabParam = sp(resolved, 'tab')
   const tab =
     tabParam === 'list' || (tabParam !== 'overview' && LIST_PARAMS.some(k => sp(resolved, k))) ? 'list' : 'overview'
-  const tabCls = (on: boolean) =>
-    `px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${on ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'}`
 
   return (
     <div className="p-4 sm:p-6">
@@ -255,23 +253,14 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
 
-      <div className="flex gap-0.5 border-b border-border-default overflow-x-auto mb-5" role="tablist">
-        <Link
-          href={ap('/admin/orders?tab=overview', host)}
-          role="tab"
-          aria-selected={tab === 'overview'}
-          className={tabCls(tab === 'overview')}
-        >
-          Overview
-        </Link>
-        <Link
-          href={ap('/admin/orders?tab=list', host)}
-          role="tab"
-          aria-selected={tab === 'list'}
-          className={tabCls(tab === 'list')}
-        >
-          All orders
-        </Link>
+      <div className="mb-5">
+        <TabLinks
+          tabs={[
+            { id: 'overview', label: 'Overview', href: ap('/admin/orders?tab=overview', host) },
+            { id: 'list', label: 'All orders', href: ap('/admin/orders?tab=list', host) },
+          ]}
+          value={tab}
+        />
       </div>
 
       {tab === 'overview' ? (

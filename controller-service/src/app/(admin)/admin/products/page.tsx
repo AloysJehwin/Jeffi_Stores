@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
+import { Plus } from 'lucide-react'
+import { TabAction } from '@/components/admin/channels/ui'
 import { cookies, headers } from 'next/headers'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
@@ -355,16 +356,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Products</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage your product inventory</p>
         </div>
-        {canWrite && (
-          <div className="hidden md:block">
-            <Link
-              href={ap('/admin/products/add', host)}
-              className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-            >
-              Add New Product
-            </Link>
-          </div>
-        )}
       </div>
 
       <TabLinks
@@ -374,6 +365,13 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           { id: 'overview', label: 'Overview' },
           { id: 'list', label: 'Products' },
         ]}
+        actions={
+          canWrite && (
+            <span className="hidden md:inline-flex">
+              <TabAction href={ap('/admin/products/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Product" />
+            </span>
+          )
+        }
       />
       <Suspense fallback={null}>
         <TabMemory storageKey="products" tab={tab} explicit={typeof sp.tab === 'string'} />

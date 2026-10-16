@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Tabs } from '@/components/admin/channels/ui'
+import { TabActionsHost, Tabs } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
 import { resolveOverviewTab, type OverviewTab } from '@/lib/overviews/sales-documents'
 import InvoicesClient from './InvoicesClient'
@@ -23,18 +23,20 @@ export default function InvoicesTabs({ canWrite }: { canWrite: boolean }) {
   }
 
   return (
-    <div className="space-y-5">
-      {!editing && (
-        <Tabs
-          tabs={[
-            { id: 'overview', label: 'Overview' },
-            { id: 'list', label: 'Invoices' },
-          ]}
-          value={tab}
-          onChange={go}
-        />
-      )}
-      {tab === 'overview' ? <InvoicesOverview /> : <InvoicesClient canWrite={canWrite} />}
-    </div>
+    <TabActionsHost>
+      <div className="space-y-5">
+        {!editing && (
+          <Tabs
+            tabs={[
+              { id: 'overview', label: 'Overview' },
+              { id: 'list', label: 'Invoices' },
+            ]}
+            value={tab}
+            onChange={go}
+          />
+        )}
+        {tab === 'overview' ? <InvoicesOverview /> : <InvoicesClient canWrite={canWrite} />}
+      </div>
+    </TabActionsHost>
   )
 }

@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
+import { Plus } from 'lucide-react'
+import { TabAction } from '@/components/admin/channels/ui'
 import { queryMany, queryCount } from '@/lib/shared/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
@@ -66,17 +67,19 @@ export default async function ReviewFormsPage({
             Shareable forms that reward customers for Google reviews
           </p>
         </div>
-        <div className="hidden md:block">
-          <Link
-            href={ap('/admin/review-forms/add', host)}
-            className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-          >
-            Create Form
-          </Link>
-        </div>
       </div>
 
-      <OverviewTabs basePath={ap('/admin/review-forms', host)} active={tab} sp={sp} listLabel="Forms" />
+      <OverviewTabs
+        basePath={ap('/admin/review-forms', host)}
+        active={tab}
+        sp={sp}
+        listLabel="Forms"
+        actions={
+          <span className="hidden md:inline-flex">
+            <TabAction href={ap('/admin/review-forms/add', host)} icon={<Plus className="w-4 h-4" />} label="Create Form" />
+          </span>
+        }
+      />
 
       {tab === 'overview' ? (
         <Suspense fallback={null}>

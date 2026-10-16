@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { TabLinks } from '@/components/admin/channels/ui'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -173,21 +174,14 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
         </p>
       </div>
 
-      <div className="flex gap-0.5 border-b border-border-default mb-4" role="tablist">
-        {[
-          { id: 'overview', label: 'Overview', href: ap('/admin/business/rfqs?tab=overview', host), on: !showList },
-          { id: 'list', label: 'All RFQs', href: tabUrl(1, status ? { status } : {}), on: showList },
-        ].map(t => (
-          <Link
-            key={t.id}
-            href={t.href}
-            role="tab"
-            aria-selected={t.on}
-            className={`px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${t.on ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'}`}
-          >
-            {t.label}
-          </Link>
-        ))}
+      <div className="mb-4">
+        <TabLinks
+          tabs={[
+            { id: 'overview', label: 'Overview', href: ap('/admin/business/rfqs?tab=overview', host) },
+            { id: 'list', label: 'All RFQs', href: tabUrl(1, status ? { status } : {}) },
+          ]}
+          value={showList ? 'list' : 'overview'}
+        />
       </div>
 
       {!showList ? (

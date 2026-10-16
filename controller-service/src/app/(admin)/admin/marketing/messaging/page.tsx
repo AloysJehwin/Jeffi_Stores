@@ -1,4 +1,6 @@
 import { Suspense } from 'react'
+import { Plus } from 'lucide-react'
+import { TabAction } from '@/components/admin/channels/ui'
 import Link from 'next/link'
 import { queryMany, queryCount } from '@/lib/shared/db'
 import Pagination from '@/components/admin/Pagination'
@@ -76,17 +78,19 @@ export default async function MailerPage({
             Send email, SMS and WhatsApp messages to your customers
           </p>
         </div>
-        <div className="hidden md:block">
-          <Link
-            href={ap('/admin/marketing/messaging/new', host)}
-            className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-          >
-            New message
-          </Link>
-        </div>
       </div>
 
-      <OverviewTabs basePath={ap('/admin/marketing/messaging', host)} active={tab} sp={sp} listLabel="Messages" />
+      <OverviewTabs
+        basePath={ap('/admin/marketing/messaging', host)}
+        active={tab}
+        sp={sp}
+        listLabel="Messages"
+        actions={
+          <span className="hidden md:inline-flex">
+            <TabAction href={ap('/admin/marketing/messaging/new', host)} icon={<Plus className="w-4 h-4" />} label="New message" />
+          </span>
+        }
+      />
 
       {tab === 'overview' ? (
         <Suspense fallback={null}>

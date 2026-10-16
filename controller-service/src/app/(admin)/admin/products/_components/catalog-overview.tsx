@@ -1,7 +1,6 @@
 'use client'
 
 import { Suspense, useEffect } from 'react'
-import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import {
@@ -12,7 +11,7 @@ import {
   useOverviewData,
   type AttentionItem,
 } from '@/components/admin/overview/kit'
-import { Banner, KpiGrid } from '@/components/admin/channels/ui'
+import { Banner, KpiGrid, TabLinks as SharedTabLinks } from '@/components/admin/channels/ui'
 import type { Period } from '@/lib/overview/period'
 import { resolveListTab, type ListTab } from '@/lib/overviews/catalog'
 
@@ -86,29 +85,16 @@ export function TabLinks({
   base,
   active,
   tabs,
+  actions,
 }: {
   base: string
   active: string
   tabs: { id: string; label: string }[]
+  actions?: React.ReactNode
 }) {
   return (
-    <div className="flex gap-0.5 border-b border-border-default overflow-x-auto mb-6" role="tablist">
-      {tabs.map(t => (
-        <Link
-          key={t.id}
-          href={ap(`${base}?tab=${t.id}`)}
-          role="tab"
-          aria-selected={active === t.id}
-          scroll={false}
-          className={`px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${
-            active === t.id
-              ? 'border-accent-500 text-foreground font-medium'
-              : 'border-transparent text-foreground-muted hover:text-foreground'
-          }`}
-        >
-          {t.label}
-        </Link>
-      ))}
+    <div className="mb-6">
+      <SharedTabLinks tabs={tabs.map(t => ({ ...t, href: ap(`${base}?tab=${t.id}`) }))} value={active} actions={actions} scroll={false} />
     </div>
   )
 }

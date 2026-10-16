@@ -8,6 +8,7 @@ import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import BatchSerialLabels from '@/components/admin/BatchSerialLabels'
 import { LabelPreview, fmtPrice, type PreviewProduct } from '@/components/admin/label-preview'
 import CopySku from '@/components/ui/CopySku'
+import { Tabs } from '@/components/admin/channels/ui'
 
 function Highlight({ text, query }: { text: string; query: string }) {
   const trimmed = query.trim()
@@ -259,24 +260,15 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
   return (
     <div className="space-y-5">
       {/* Label type tabs */}
-      <div className="flex items-center gap-1 border-b border-border-default">
-        {(
-          [
-            { key: 'product', label: 'Product' },
-            { key: 'batch', label: 'Batch product' },
-            { key: 'serial', label: 'Serial product' },
-          ] as const
-        ).map(t => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => changeTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${labelTab === t.key ? 'border-orange-500 text-orange-600 dark:text-orange-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={[
+          { id: 'product' as const, label: 'Product' },
+          { id: 'batch' as const, label: 'Batch product' },
+          { id: 'serial' as const, label: 'Serial product' },
+        ]}
+        value={labelTab}
+        onChange={changeTab}
+      />
 
       {labelTab === 'batch' && <BatchSerialLabels mode="batch" labelSizes={labelSizes} />}
       {labelTab === 'serial' && <BatchSerialLabels mode="serial" labelSizes={labelSizes} />}

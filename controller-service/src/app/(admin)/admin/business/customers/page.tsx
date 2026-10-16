@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { TabLinks } from '@/components/admin/channels/ui'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -304,26 +305,14 @@ export default async function BusinessCustomersPage({ searchParams }: { searchPa
         <p className="text-foreground-secondary mt-1 text-sm">Manage B2B partner accounts, approvals, and discounts</p>
       </div>
 
-      <div className="flex gap-0.5 border-b border-border-default mb-4" role="tablist">
-        {[
-          {
-            id: 'overview',
-            label: 'Overview',
-            href: ap('/admin/business/customers?tab=overview', host),
-            on: !showList,
-          },
-          { id: 'list', label: 'All accounts', href: buildUrl(resolvedSearchParams, host, 1), on: showList },
-        ].map(t => (
-          <Link
-            key={t.id}
-            href={t.href}
-            role="tab"
-            aria-selected={t.on}
-            className={`px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${t.on ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'}`}
-          >
-            {t.label}
-          </Link>
-        ))}
+      <div className="mb-4">
+        <TabLinks
+          tabs={[
+            { id: 'overview', label: 'Overview', href: ap('/admin/business/customers?tab=overview', host) },
+            { id: 'list', label: 'All accounts', href: buildUrl(resolvedSearchParams, host, 1) },
+          ]}
+          value={showList ? 'list' : 'overview'}
+        />
       </div>
 
       {!showList ? (

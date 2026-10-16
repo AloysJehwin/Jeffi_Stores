@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { Plus } from 'lucide-react'
+import { Tabs, TabAction } from '@/components/admin/channels/ui'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp']
@@ -144,29 +146,32 @@ export default function MessagingTemplatesClient() {
             Standard email / SMS / WhatsApp bodies ship with every store. Edit one to customise it for this tenant, or add your own.
           </p>
         </div>
-        <button onClick={createNew} className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap">
-          + New template
-        </button>
       </div>
 
-      <div className="flex items-center gap-1 border-b border-border-default mb-5 overflow-x-auto">
-        {CHANNELS.map(c => (
-          <button
-            key={c}
-            onClick={() => { updateUrl({ channel: c, slug: null }); setSelected(null) }}
-            className={`px-4 py-2.5 -mb-px border-b-2 text-sm font-medium whitespace-nowrap transition-colors ${
-              channel === c ? 'border-accent-500 text-foreground' : 'border-transparent text-foreground-secondary hover:text-foreground'
-            }`}
-          >
-            {CHANNEL_LABEL[c]}
-            {channel === c && !loading && <span className="ml-2 text-xs text-foreground-muted tabular-nums">{items.length}</span>}
-          </button>
-        ))}
-        {!loading && items.length > 0 && (
-          <span className="ml-auto pb-2 text-xs text-foreground-muted whitespace-nowrap">
-            {counts.tenant} customised · {counts.platform} standard
-          </span>
-        )}
+      <div className="mb-5">
+        <Tabs
+          tabs={CHANNELS.map(c => ({
+            id: c,
+            label: (
+              <>
+                {CHANNEL_LABEL[c]}
+                {channel === c && !loading && <span className="ml-1 text-xs text-foreground-muted tabular-nums">{items.length}</span>}
+              </>
+            ),
+          }))}
+          value={channel}
+          onChange={c => { updateUrl({ channel: c, slug: null }); setSelected(null) }}
+          actions={
+            <>
+              {!loading && items.length > 0 && (
+                <span className="hidden sm:inline mr-2 text-xs text-foreground-muted whitespace-nowrap">
+                  {counts.tenant} customised · {counts.platform} standard
+                </span>
+              )}
+              <TabAction onClick={createNew} icon={<Plus className="w-4 h-4" />} label="New template" />
+            </>
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">

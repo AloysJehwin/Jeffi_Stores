@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
+import { Tabs } from '@/components/admin/channels/ui'
 import GoogleSheetDisconnect from './GoogleSheetDisconnect'
 
 // Fixed locale and zone so the server render and the browser agree (no hydration mismatch).
@@ -269,21 +270,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
 
   return (
     <div className="space-y-4">
-      <div className="flex border-b border-border-default gap-1">
-        {tabs.map(t => (
-          <button
-            key={t.key}
-            onClick={() => selectTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              tab === t.key
-                ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400'
-                : 'border-transparent text-foreground-secondary hover:text-foreground'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs tabs={tabs.map(t => ({ id: t.key, label: t.label }))} value={tab} onChange={selectTab} />
 
       {tab === 'import' && (
         <section className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">

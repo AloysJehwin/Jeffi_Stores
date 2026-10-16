@@ -15,6 +15,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
+import { Tabs } from '@/components/admin/channels/ui'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 type Tab = 'locations' | 'labels'
@@ -302,24 +303,19 @@ export default function ShelvingClient() {
   return (
     <div className="h-full flex flex-col">
       {/* Page header + tabs */}
-      <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-surface shrink-0">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Shelving</h1>
-            <p className="text-xs text-foreground-muted mt-0.5">Warehouse → Location → Stock</p>
-          </div>
-          <div className="flex gap-1">
-            {(['locations', 'labels'] as Tab[]).map(t => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px capitalize ${tab === t ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}
-              >
-                {t === 'locations' ? 'Locations' : 'Labels'}
-              </button>
-            ))}
-          </div>
+      <div className="px-4 sm:px-6 pt-4 bg-surface shrink-0">
+        <div className="mb-3">
+          <h1 className="text-xl font-bold text-foreground">Shelving</h1>
+          <p className="text-xs text-foreground-muted mt-0.5">Warehouse → Location → Stock</p>
         </div>
+        <Tabs
+          tabs={[
+            { id: 'locations' as Tab, label: 'Locations' },
+            { id: 'labels' as Tab, label: 'Labels' },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
       </div>
 
       {error && (

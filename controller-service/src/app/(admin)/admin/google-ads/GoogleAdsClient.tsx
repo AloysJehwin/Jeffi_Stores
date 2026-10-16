@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertCircle, ArrowLeftRight, CheckCircle2, PlugZap, RefreshCw, Unplug } from 'lucide-react'
-import { btnGhost } from '@/components/admin/channels/ui'
+import { btnGhost, Tabs } from '@/components/admin/channels/ui'
 import IconButton from '@/components/ui/IconButton'
 import ConnectionsGear, { NotConnectedState, type ConnectionState } from '@/components/admin/ConnectionsGear'
 import DatePicker from '@/components/ui/DatePicker'
@@ -210,10 +210,6 @@ export default function GoogleAdsClient({
           </p>
         </div>
         <div className="flex items-center gap-1">
-          {connected && <NewCampaignButton onCreated={reload} />}
-          {connected && canWrite && (
-            <IconButton icon={RefreshCw} label="Sync now (last 30 days)" busy={busy === 'sync'} onClick={() => action('sync')} />
-          )}
           <ConnectionsGear
             title="Google Ads connection"
             scope="google_ads"
@@ -291,6 +287,20 @@ export default function GoogleAdsClient({
 
       {connected && (
         <>
+          <Tabs
+            tabs={TABS}
+            value={tab}
+            onChange={setTab}
+            actions={
+              <>
+                <NewCampaignButton onCreated={reload} />
+                {canWrite && (
+                  <IconButton icon={RefreshCw} label="Sync now (last 30 days)" busy={busy === 'sync'} onClick={() => action('sync')} />
+                )}
+              </>
+            }
+          />
+
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg">
               {PRESETS.map(n => {
@@ -316,23 +326,8 @@ export default function GoogleAdsClient({
           </div>
 
           {!hasData && !data && (
-            <p className="text-sm text-foreground-muted">No data synced yet. Use Sync now (top right) to pull the last 30 days.</p>
+            <p className="text-sm text-foreground-muted">No data synced yet. Use Sync now (next to the tabs) to pull the last 30 days.</p>
           )}
-
-          <div className="flex gap-0.5 border-b border-border-default overflow-x-auto">
-            {TABS.map(t => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={`px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${
-                  tab === t.id ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
 
           {loadError ? (
             <p className="text-sm text-red-500">{loadError}</p>
