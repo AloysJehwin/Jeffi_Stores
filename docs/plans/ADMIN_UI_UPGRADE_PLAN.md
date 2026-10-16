@@ -1,6 +1,6 @@
 # Admin UI upgrade: one design language for every page
 
-Status: proposed (2026-10-17). Companion to `PAGE_OVERVIEWS_PLAN.md` (which put an Overview tab on most areas) and `MAIN_DASHBOARD_PLAN.md`. That work moved the *overview* tabs onto a shared kit. This plan moves everything else (lists, view, create and edit pages, consoles, settings) onto the same language.
+Status: in progress (phase 0 started 2026-10-17) (2026-10-17). Companion to `PAGE_OVERVIEWS_PLAN.md` (which put an Overview tab on most areas) and `MAIN_DASHBOARD_PLAN.md`. That work moved the *overview* tabs onto a shared kit. This plan moves everything else (lists, view, create and edit pages, consoles, settings) onto the same language.
 
 Reference implementation: `financial/_components/AiCostsTab.tsx`, `financial/_components/OverviewCharts.tsx` (`KeyedTrendCard`, `MixDonutCard`, `ChartCard`), `components/admin/overview/kit.tsx`, `components/admin/channels/ui.tsx`, `components/ui/Select.tsx`, `components/ui/DatePicker.tsx`.
 
@@ -9,6 +9,7 @@ Reference implementation: `financial/_components/AiCostsTab.tsx`, `financial/_co
 - **Application-native UI.** Everything uses our own admin components and tokens (the AI costs tab look), so every page feels like one app. No third-party UI kits, no native browser controls, no one-off styling.
 - **Existing logic must not break.** Waves change markup and layout only: server actions, API calls, scopes, write gates, drafts, URL params and validations stay as they are. Any behaviour change is a separate, explicit task.
 - **One control height: 32px.** Every input, select, search box, date picker, button, icon button and segmented chip bar (period presets, filter chips) is exactly the height of the tab-line action button ("Add New Product"): 32px, via `h-control` / `.field-md` / `.control-md` (the `sm` tier is the same height with tighter padding; `xs` 26px stays only for controls inside table cells). Chips inside a segmented bar fill the bar's 32px. Never set control height with padding (`py-*`).
+- **Status messages are toasts.** Every success, info, warning and error response from an action (save, sync, refresh, connect, delete, send, import) shows as a toast via `contexts/ToastContext.tsx`, not an inline banner or status strip. Inline messages stay only for persistent state that is not a response (a field validation error under its input, a "needs reconnect" connection state, an empty or error state that replaces the content).
 - **Mobile.** View, lists and overviews are fully usable on mobile. Create and edit stay desktop only, except orders and common actions (status, confirm, ship, cancel, refund, notes, scan, stock adjust, approvals, replies).
 
 ## 1. Where things stand
