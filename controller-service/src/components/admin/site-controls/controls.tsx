@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, ReactNode, useEffect } from 'react'
-import { ChevronDown } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import Toggle from '@/components/ui/Toggle'
@@ -25,46 +24,25 @@ async function patchSetting(key: string, value: string | number | boolean): Prom
   return res.ok
 }
 
+/** Always-open settings section (title, description, controls), in the shared Section style. */
 export function SectionCard({
   title,
   description,
   children,
   columns,
-  defaultOpen = false,
 }: {
   title: string
   description?: string
   children: ReactNode
   columns?: boolean
-  defaultOpen?: boolean
 }) {
-  const [open, setOpen] = useState(defaultOpen)
-
   return (
-    <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        aria-expanded={open}
-        className={`w-full flex items-start justify-between gap-3 text-left px-5 py-4 ${open ? 'border-b border-border-default' : ''}`}
-      >
-        <span className="min-w-0">
-          <span className="block text-sm font-semibold text-foreground">{title}</span>
-          {description && <span className="block text-xs text-foreground-muted mt-0.5">{description}</span>}
-        </span>
-        <ChevronDown
-          className={`w-4 h-4 shrink-0 mt-0.5 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`}
-        />
-      </button>
-      {/* Hidden rather than unmounted: KeyboardShortcutControl registers into a global
-          conflict registry on mount, and unmounting would drop those registrations.
-          `hidden` alone is not enough — Tailwind's grid/space-y set `display`, which beats
-          the attribute — so the layout classes are only applied while open. */}
-      <div
-        className={!open ? 'hidden' : columns ? 'p-5 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-5' : 'p-5 space-y-5'}
-      >
-        {children}
+    <section className="bg-surface-elevated border border-border-default rounded-xl p-5">
+      <div className="mb-4">
+        <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">{title}</h2>
+        {description && <p className="text-xs text-foreground-muted mt-1">{description}</p>}
       </div>
+      <div className={columns ? 'grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-5' : 'space-y-5'}>{children}</div>
     </section>
   )
 }

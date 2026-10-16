@@ -5,6 +5,9 @@ import { Plus } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, Banner, Empty, TabAction, Tabs, api, btnGhost, btnPrimary, inputCls, pct } from '@/components/admin/channels/ui'
 import { AI_CAPABILITY_LABEL } from '@/lib/ai/feature-labels'
+import Select from '@/components/ui/Select'
+
+const ctl = `${inputCls} h-control py-0`
 
 type Row = {
   id: string
@@ -81,40 +84,38 @@ export default function AiPricingClient() {
       {adding && canWrite && (
         <div className="bg-surface-elevated border border-border-default rounded-xl p-4 grid gap-3 grid-cols-2 md:grid-cols-7 items-end">
           <Field label="Capability">
-            <select className={inputCls} value={draft.capability} onChange={e => setDraft({ ...draft, capability: e.target.value })}>
-              {CAPS.filter(c => c !== 'all').map(c => (
-                <option key={c} value={c}>
-                  {AI_CAPABILITY_LABEL[c]}
-                </option>
-              ))}
-            </select>
+            <Select
+              aria-label="Capability"
+              value={draft.capability}
+              onChange={v => setDraft({ ...draft, capability: v })}
+              options={CAPS.filter(c => c !== 'all').map(c => ({ value: c as string, label: AI_CAPABILITY_LABEL[c] }))}
+            />
           </Field>
           <Field label="Provider">
-            <input className={inputCls} value={draft.provider} placeholder="razer" onChange={e => setDraft({ ...draft, provider: e.target.value })} />
+            <input className={ctl} value={draft.provider} placeholder="razer" onChange={e => setDraft({ ...draft, provider: e.target.value })} />
           </Field>
           <Field label="Model (* = default)">
-            <input className={inputCls} value={draft.model} onChange={e => setDraft({ ...draft, model: e.target.value })} />
+            <input className={ctl} value={draft.model} onChange={e => setDraft({ ...draft, model: e.target.value })} />
           </Field>
           <Field label="Unit">
-            <select className={inputCls} value={draft.unit_type} onChange={e => setDraft({ ...draft, unit_type: e.target.value })}>
-              {UNITS.map(u => (
-                <option key={u} value={u}>
-                  {UNIT_LABEL[u]}
-                </option>
-              ))}
-            </select>
+            <Select
+              aria-label="Unit"
+              value={draft.unit_type}
+              onChange={v => setDraft({ ...draft, unit_type: v })}
+              options={UNITS.map(u => ({ value: u, label: UNIT_LABEL[u] }))}
+            />
           </Field>
           <Field label="Cost (INR)">
-            <input className={inputCls} type="number" min="0" step="0.0001" value={draft.cost_inr} onChange={e => setDraft({ ...draft, cost_inr: e.target.value })} />
+            <input className={ctl} type="number" min="0" step="0.0001" value={draft.cost_inr} onChange={e => setDraft({ ...draft, cost_inr: e.target.value })} />
           </Field>
           <Field label="Price (INR)">
-            <input className={inputCls} type="number" min="0" step="0.0001" value={draft.price_inr} onChange={e => setDraft({ ...draft, price_inr: e.target.value })} />
+            <input className={ctl} type="number" min="0" step="0.0001" value={draft.price_inr} onChange={e => setDraft({ ...draft, price_inr: e.target.value })} />
           </Field>
           <div className="flex gap-2">
-            <button type="button" className={btnPrimary} onClick={add} disabled={!draft.provider.trim()}>
+            <button type="button" className={`${btnPrimary} h-control py-0`} onClick={add} disabled={!draft.provider.trim()}>
               Add
             </button>
-            <button type="button" className={btnGhost} onClick={() => setAdding(false)}>
+            <button type="button" className={`${btnGhost} h-control py-0`} onClick={() => setAdding(false)}>
               Cancel
             </button>
           </div>
@@ -203,7 +204,7 @@ function MoneyCell({ value, editable, onSave }: { value: number; editable: boole
       min="0"
       step="0.0001"
       aria-label="Amount in INR"
-      className={`${inputCls} !w-28 !py-1 text-right tabular-nums ml-auto`}
+      className={`${inputCls} !w-28 h-control !py-0 text-right tabular-nums ml-auto`}
       value={v}
       onChange={e => setV(e.target.value)}
       onBlur={commit}

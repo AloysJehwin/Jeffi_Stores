@@ -43,7 +43,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   'controller-service/src/components/admin/CreateAdminForm.tsx',
   'controller-service/src/components/admin/AdminUserActions.tsx',
   'controller-service/src/components/admin/ServiceAccountRevokeButton.tsx',
-  // Owner-only revoke rendered only for owners by service-accounts/page.tsx (replaced the button above).
+  // Owner-only revoke rendered only for owners by service-accounts/_components/ServiceAccountsPanel.tsx (replaced the button above).
   'controller-service/src/components/admin/ServiceAccountRowActions.tsx',
   'controller-service/src/app/(admin)/admin/service-accounts/add/page.tsx',
   // Read-only view; its only POST is an export/filter, not a scoped write.
