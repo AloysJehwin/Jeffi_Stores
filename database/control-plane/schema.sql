@@ -946,3 +946,25 @@ ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_capability_ch
 ALTER TABLE ONLY public.ai_price_list ADD CONSTRAINT ai_price_list_unit_type_check
     CHECK (unit_type IN ('token_1k_in','token_1k_out','image','video_second','call'));
 CREATE INDEX IF NOT EXISTS idx_ai_price_list_lookup ON public.ai_price_list USING btree (capability, unit_type, active);
+
+-- platform_provider_settings: which provider serves SMS, WhatsApp and AI (text/image/video) for a
+-- store. tenant_id NULL is the platform default; a row with a tenant_id overrides it for that store.
+-- Managed only by the platform admin at /admin/ecom/providers; read by lib/providers/policy.ts.
+-- value: "twilio"|"aws" for sms_provider/whatsapp_provider, an ordered JSON array of gateway
+-- provider names for ai_*_providers ([] = gateway default), "draft"|"standard"|"premium" for
+-- ai_image_default_quality.
+CREATE TABLE IF NOT EXISTS public.platform_provider_settings (
+    id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id   uuid,
+    key         character varying(48) NOT NULL,
+    value       jsonb NOT NULL,
+    updated_by  character varying(255),
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.platform_provider_settings ADD CONSTRAINT platform_provider_settings_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.platform_provider_settings ADD CONSTRAINT platform_provider_settings_key_check
+    CHECK (key IN ('sms_provider','whatsapp_provider','ai_text_providers','ai_image_providers','ai_video_providers','ai_image_default_quality'));
+ALTER TABLE ONLY public.platform_provider_settings ADD CONSTRAINT platform_provider_settings_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_platform_provider_settings_scope_key ON public.platform_provider_settings
+    USING btree ((COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid)), key);

@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto'
 import type { Redis } from 'ioredis'
 import type {
   GeneratedImageRef, ImageGenerateRequest, ImageGenerateResponse,
-  ImageProviderName, ImageQuality,
+  ImageProviderName, ImageQuality, ProviderStatus, TextProviderName,
   VideoAspect, VideoGenerateRequest, VideoJobResponse, VideoProviderName, VideoStartResponse,
 } from '../../sdk/types'
 import type { FileStore } from './files'
@@ -23,9 +23,11 @@ export class UpstreamError extends Error {
 }
 export class NotConfiguredError extends Error { readonly status = 503 }
 
-interface ParsedImageReq extends ImageGenInput { provider?: ImageProviderName; namespace: string; cacheKey: string }
-interface ParsedVideoReq extends VideoGenInput { provider?: VideoProviderName; namespace: string }
+interface ParsedImageReq extends ImageGenInput { provider?: ImageProviderName; providers?: ImageProviderName[]; namespace: string; cacheKey: string }
+interface ParsedVideoReq extends VideoGenInput { provider?: VideoProviderName; providers?: VideoProviderName[]; namespace: string }
 
+export const TEXT_PROVIDER_ORDER: TextProviderName[] = ['razer']
+const TEXT_PROVIDER_SET = new Set<TextProviderName>(TEXT_PROVIDER_ORDER)
 const IMAGE_PROVIDER_SET = new Set<ImageProviderName>(['razer', 'google', 'replicate'])
 const VIDEO_PROVIDER_SET = new Set<VideoProviderName>(['google', 'replicate'])
 const QUALITIES = new Set<ImageQuality>(['draft', 'standard', 'premium'])
@@ -47,18 +49,51 @@ function parseProviders<T extends string>(raw: string | undefined, def: T[], all
   return out.length ? out : def
 }
 
-/** Image routing order: pinned provider first (when given), else configured order with quality bias. */
+/**
+ * A caller-supplied provider order (tenant policy). Undefined/empty = use the gateway default.
+ * Anything that is not an array of known names is a 400 rather than a silent fallback.
+ */
+export function parseRequestedProviders<T extends string>(raw: unknown, allow: Set<T>, label: string): T[] | undefined {
+  if (raw == null) return undefined
+  if (!Array.isArray(raw)) throw new ValidationError(`${label} providers must be an array`)
+  const out: T[] = []
+  for (const p of raw) {
+    if (typeof p !== 'string' || !allow.has(p as T)) throw new ValidationError(`unknown ${label} provider: ${String(p)}`)
+    if (!out.includes(p as T)) out.push(p as T)
+  }
+  return out.length ? out : undefined
+}
+
+export const parseTextOrder = (raw: unknown) => parseRequestedProviders(raw, TEXT_PROVIDER_SET, 'text')
+export const parseImageOrder = (raw: unknown) => parseRequestedProviders(raw, IMAGE_PROVIDER_SET, 'image')
+export const parseVideoOrder = (raw: unknown) => parseRequestedProviders(raw, VIDEO_PROVIDER_SET, 'video')
+
+/** Text routing: forceProvider wins; else the requested order, else the gateway default. */
+export function textRoute(req: { forceProvider?: string; providers?: unknown }): TextProviderName[] {
+  const order = parseTextOrder(req.providers)
+  return req.forceProvider ? TEXT_PROVIDER_ORDER : order ?? TEXT_PROVIDER_ORDER
+}
+
+/** Image routing order: pinned provider first, then the requested order (or configured) with quality bias. */
 export function imageRoute(req: ImageGenerateRequest, configured: ImageProviderName[]): ImageProviderName[] {
-  if (req.provider) return [req.provider, ...configured.filter(p => p !== req.provider)]
-  const biased = [...configured]
+  const base = parseImageOrder(req.providers) ?? configured
+  if (req.provider) return [req.provider, ...base.filter(p => p !== req.provider)]
+  const biased = [...base]
   if (req.quality === 'premium') biased.sort((a, b) => (a === 'google' ? -1 : b === 'google' ? 1 : 0))
   else if (req.quality === 'draft') biased.sort((a, b) => (a === 'razer' ? -1 : b === 'razer' ? 1 : 0))
   return biased
 }
 
 export function videoRoute(req: VideoGenerateRequest, configured: VideoProviderName[]): VideoProviderName[] {
-  if (req.provider) return [req.provider, ...configured.filter(p => p !== req.provider)]
-  return configured
+  const base = parseVideoOrder(req.providers) ?? configured
+  if (req.provider) return [req.provider, ...base.filter(p => p !== req.provider)]
+  return base
+}
+
+/** Configured state per provider, in the gateway's default order then the rest. */
+export function providerStatus<N extends string>(order: N[], providers: Partial<Record<N, { configured(): boolean }>>): ProviderStatus<N>[] {
+  const names = [...order, ...(Object.keys(providers) as N[]).filter(n => !order.includes(n))]
+  return names.map(name => ({ name, configured: !!providers[name]?.configured() }))
 }
 
 export function parseImageRequest(raw: unknown): ParsedImageReq {
@@ -70,12 +105,13 @@ export function parseImageRequest(raw: unknown): ParsedImageReq {
   const n = clamp(Math.floor(Number(r.n ?? 1)), 1, 4)
   const quality = (QUALITIES.has(r.quality as ImageQuality) ? r.quality : 'standard') as ImageQuality
   const provider = r.provider && IMAGE_PROVIDER_SET.has(r.provider as ImageProviderName) ? (r.provider as ImageProviderName) : undefined
+  const providers = parseImageOrder(r.providers)
   const namespace = typeof r.namespace === 'string' && r.namespace ? r.namespace : 'platform'
   const negativePrompt = typeof r.negativePrompt === 'string' && r.negativePrompt ? r.negativePrompt : undefined
   const referenceImageUrl = typeof r.referenceImageUrl === 'string' && r.referenceImageUrl ? r.referenceImageUrl : undefined
   const seed = typeof r.seed === 'number' && Number.isFinite(r.seed) ? Math.floor(r.seed) : undefined
-  const cacheKey = imageCacheKey({ prompt, negativePrompt, width, height, n, quality, provider, referenceImageUrl, namespace })
-  return { prompt, negativePrompt, width, height, n, quality, provider, referenceImageUrl, seed, namespace, cacheKey }
+  const cacheKey = imageCacheKey({ prompt, negativePrompt, width, height, n, quality, provider, providers, referenceImageUrl, namespace })
+  return { prompt, negativePrompt, width, height, n, quality, provider, providers, referenceImageUrl, seed, namespace, cacheKey }
 }
 
 export function parseVideoRequest(raw: unknown): ParsedVideoReq {
@@ -85,15 +121,17 @@ export function parseVideoRequest(raw: unknown): ParsedVideoReq {
   const durationSec = clamp(Math.round(Number(r.durationSec ?? 5)), 2, 8)
   const aspect = (VIDEO_ASPECTS.has(r.aspect as VideoAspect) ? r.aspect : '16:9') as VideoAspect
   const provider = r.provider && VIDEO_PROVIDER_SET.has(r.provider as VideoProviderName) ? (r.provider as VideoProviderName) : undefined
+  const providers = parseVideoOrder(r.providers)
   const namespace = typeof r.namespace === 'string' && r.namespace ? r.namespace : 'platform'
   const imageUrl = typeof r.imageUrl === 'string' && r.imageUrl ? r.imageUrl : undefined
-  return { prompt, imageUrl, durationSec, aspect, provider, namespace }
+  return { prompt, imageUrl, durationSec, aspect, provider, providers, namespace }
 }
 
 /** Stable hash of the provider-agnostic request (no seed), partitioned by namespace. */
 export function imageCacheKey(req: {
   prompt: string; negativePrompt?: string; width: number; height: number
-  n: number; quality: ImageQuality; provider?: ImageProviderName; referenceImageUrl?: string; namespace: string
+  n: number; quality: ImageQuality; provider?: ImageProviderName; providers?: ImageProviderName[]
+  referenceImageUrl?: string; namespace: string
 }): string {
   const shape = {
     namespace: req.namespace,
@@ -101,6 +139,8 @@ export function imageCacheKey(req: {
     negativePrompt: req.negativePrompt || '',
     width: req.width, height: req.height, n: req.n, quality: req.quality,
     provider: req.provider || '*',
+    // A restricted order must not be served an image another provider made; unset keeps old keys.
+    ...(req.providers ? { providers: req.providers.join(',') } : {}),
     ref: req.referenceImageUrl || '',
   }
   return 'ai:image:kv:' + createHash('sha256').update(JSON.stringify(shape)).digest('hex')
