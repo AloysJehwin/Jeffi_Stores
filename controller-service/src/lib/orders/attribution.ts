@@ -1,11 +1,21 @@
 import type { PoolClient } from 'pg'
-import { attributionFromCookieHeader, type Attribution } from '@/lib/shared/attribution'
+import { attributionFromCookieHeader, metaClickIds, type Attribution } from '@/lib/shared/attribution'
 import { CONSENT_COOKIE } from '@/lib/analytics/google-tag'
 import { parseConsent } from '@/lib/client/consent'
 
 /** The buyer's stored click / UTM attribution, read from the request's Cookie header. */
 export function attributionFromRequest(request: Request): Attribution | null {
   return attributionFromCookieHeader(request.headers.get('cookie'))
+}
+
+/** The Meta pixel's browser/click ids for the order (Conversions API matching). */
+export function metaClicksFromRequest(request: Request): { fbp?: string; fbc?: string } | null {
+  const header = request.headers.get('cookie')
+  return metaClickIds(header, attributionFromCookieHeader(header))
+}
+
+export async function attachMetaClickIds(client: Pick<PoolClient, 'query'>, orderId: string, ids: { fbp?: string; fbc?: string } | null): Promise<void> {
+  if (ids) await client.query(`UPDATE orders SET meta_click_ids = $2::jsonb WHERE id = $1`, [orderId, JSON.stringify(ids)])
 }
 
 /** The buyer's advertising-cookie choice from the consent cookie; null when none was made. */

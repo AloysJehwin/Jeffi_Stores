@@ -18,7 +18,7 @@ import { logActivity } from '@/lib/shared/activity'
 import { createAutoTask } from '@/lib/shared/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
 import { parseBody, zNonEmpty, zUuid } from '@/lib/shared/validate'
-import { attributionFromRequest, adsConsentFromRequest } from '@/lib/orders/attribution'
+import { attributionFromRequest, metaClicksFromRequest, adsConsentFromRequest } from '@/lib/orders/attribution'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 import type { Attribution } from '@/lib/shared/attribution'
 import { sendOrderConfirmedSMS } from '@/lib/shared/sms'
@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
         razorpay_signature,
         attribution: attributionFromRequest(request),
         adsConsent: adsConsentFromRequest(request),
+        metaClicks: metaClicksFromRequest(request),
       })
     }
 
@@ -217,6 +218,7 @@ async function commitDraft(args: {
   razorpay_signature: string
   attribution: Attribution | null
   adsConsent: boolean | null
+  metaClicks: { fbp?: string; fbc?: string } | null
 }) {
   const draft = await verifyDraftToken(args.token)
   if (!draft) return NextResponse.json({ error: 'Invalid or expired checkout session' }, { status: 400 })
@@ -328,6 +330,7 @@ async function commitDraft(args: {
           },
           attribution: args.attribution,
           adsConsent: args.adsConsent,
+          metaClicks: args.metaClicks,
         })
       : await commitOrder({
           mode: 'buyNow',
@@ -354,6 +357,7 @@ async function commitDraft(args: {
           },
           attribution: args.attribution,
           adsConsent: args.adsConsent,
+          metaClicks: args.metaClicks,
         })
 
   const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'

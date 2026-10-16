@@ -12,7 +12,7 @@ import { getBusinessDiscountMap } from '@/lib/catalog/business-discount'
 import { parseBody, zUuid } from '@/lib/shared/validate'
 import { verifyIntent } from '@/lib/orders/checkout-intent'
 import { checkPincodeServiceability } from '@/lib/shipping/delhivery'
-import { attributionFromRequest, attachOrderAttribution, adsConsentFromRequest } from '@/lib/orders/attribution'
+import { attributionFromRequest, attachOrderAttribution, attachMetaClickIds, metaClicksFromRequest, adsConsentFromRequest } from '@/lib/orders/attribution'
 
 const DirectItemSchema = z.object({
   productId: zUuid,
@@ -421,6 +421,7 @@ export async function POST(request: NextRequest) {
       }
 
       await attachOrderAttribution(client, createdOrder.id, attribution, adsConsent)
+      await attachMetaClickIds(client, createdOrder.id, metaClicksFromRequest(request))
 
       return createdOrder
     })

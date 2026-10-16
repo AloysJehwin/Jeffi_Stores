@@ -85,8 +85,8 @@
     "semantic_hash": ""
   },
   "database/constraints.sql": {
-    "mtime": 1792143282.4291902,
-    "ast_hash": "2df61015aa548eb2699f078c549db084",
+    "mtime": 1792143848.9031818,
+    "ast_hash": "9bebd9970ad8ab9ebfce1ac3c8537698",
     "semantic_hash": ""
   },
   "database/crm.sql": {
@@ -105,8 +105,8 @@
     "semantic_hash": ""
   },
   "database/indexes.sql": {
-    "mtime": 1792143282.43704,
-    "ast_hash": "e4966e37a5c537a546acf0de6ea4a29a",
+    "mtime": 1792143848.9145901,
+    "ast_hash": "0b5edd12b5665affa462e89f21cb1548",
     "semantic_hash": ""
   },
   "database/inventory.sql": {
@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "database/orders.sql": {
-    "mtime": 1792094674.817975,
-    "ast_hash": "6be637f5da81d43a5ea147a871afac95",
+    "mtime": 1792143764.88394,
+    "ast_hash": "6a8ee82cbaf65f5c48664cb6d1704f41",
     "semantic_hash": ""
   },
   "database/payments.sql": {
@@ -4330,8 +4330,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/platform/cronjobs.yaml": {
-    "mtime": 1792143463.7483444,
-    "ast_hash": "41964ad2e0aad557ef2517f030d35f19",
+    "mtime": 1792144066.2863429,
+    "ast_hash": "836b79b7c56ef83660882bcb44abdc80",
     "semantic_hash": ""
   },
   "deploy/k8s/platform/kustomization.yaml": {
@@ -6865,8 +6865,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/layout.tsx": {
-    "mtime": 1792143480.0645173,
-    "ast_hash": "9065c88406fa4ef30a190ebac0531d06",
+    "mtime": 1792144082.4225383,
+    "ast_hash": "c84457c999c50d3d8fe7c57927e7f03a",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/loading.tsx": {
@@ -11575,13 +11575,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/orders/create-direct/route.ts": {
-    "mtime": 1792095224.4441688,
-    "ast_hash": "49c5545604238592e520bc1475de7e1d",
+    "mtime": 1792143777.965693,
+    "ast_hash": "8934439978988dfa8d6cb615c5db0cb9",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/orders/create/route.ts": {
-    "mtime": 1792095224.4382584,
-    "ast_hash": "5b8207dcaf44a710962e44f11ab1b569",
+    "mtime": 1792143777.9661984,
+    "ast_hash": "f4188cac6029c02fbea72d6ef4b1fc01",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/orders/draft/route.ts": {
@@ -11670,8 +11670,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/razorpay/verify/route.ts": {
-    "mtime": 1792095261.2242122,
-    "ast_hash": "125ecbbee7449344f02e679933d6fdab",
+    "mtime": 1792143800.590008,
+    "ast_hash": "bf94c580e51a334161bea372f62709c1",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(public)/ready/route.ts": {
@@ -13860,8 +13860,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/auth/scopes.ts": {
-    "mtime": 1792143415.2772396,
-    "ast_hash": "1d07f6619611f69609601887e59bcf52",
+    "mtime": 1792144065.101151,
+    "ast_hash": "d1e0589469c104f769642c75dd542fe5",
     "semantic_hash": ""
   },
   "controller-service/src/lib/auth/session-binding-gate.ts": {
@@ -14750,8 +14750,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/orders/order-commit.ts": {
-    "mtime": 1792095249.561597,
-    "ast_hash": "51ddf4b40835482fd40617d2a6d69514",
+    "mtime": 1792143777.9665074,
+    "ast_hash": "98e6baf4fb0bd9749c15350e8fcf4d3c",
     "semantic_hash": ""
   },
   "controller-service/src/lib/orders/order-draft.ts": {
@@ -15080,8 +15080,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/cron-jobs.ts": {
-    "mtime": 1792143462.928657,
-    "ast_hash": "6315fddc0e57cb54eaa92bbd46f4ebda",
+    "mtime": 1792144065.1055217,
+    "ast_hash": "add38b7ea726501b8f87f7bf3b97a76e",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/cron-record.ts": {
@@ -15630,8 +15630,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/tenant-migrations-schema.ts": {
-    "mtime": 1792143282.462424,
-    "ast_hash": "c3608ef3512090220d849e0ef6389e94",
+    "mtime": 1792143848.9545808,
+    "ast_hash": "c63b9dfa01da74dee21a28128d657d0a",
     "semantic_hash": ""
   },
   "controller-service/src/lib/tenant-migrations.ts": {
@@ -15745,8 +15745,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/middleware.ts": {
-    "mtime": 1792143462.8258712,
-    "ast_hash": "078018e43a87d92710681629bf239ba5",
+    "mtime": 1792144065.100731,
+    "ast_hash": "d3085c411c35eca47ac7b8d30cd957cf",
     "semantic_hash": ""
   },
   "controller-service/src/types/google.d.ts": {
@@ -16500,8 +16500,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/integrations/oauth.ts": {
-    "mtime": 1792143415.276279,
-    "ast_hash": "ec76451c449553d35d32f60bfcf6cf5e",
+    "mtime": 1792144065.100152,
+    "ast_hash": "436a613b2442037f7255d35543e3f3e5",
     "semantic_hash": ""
   },
   "controller-service/src/lib/integrations/test-connection.ts": {
@@ -16580,13 +16580,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/orders/attribution.ts": {
-    "mtime": 1792095214.4097793,
-    "ast_hash": "87f8a6ef178ba285bbbb39973d3fa22b",
+    "mtime": 1792143764.883351,
+    "ast_hash": "14d162599c5315fafffd2dbb4dd0de91",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/attribution.ts": {
-    "mtime": 1792090965.3433676,
-    "ast_hash": "347ff76861cde5084f0205630f864b60",
+    "mtime": 1792143764.8825734,
+    "ast_hash": "8390635d3090030f3ba2d521ef5f37f4",
     "semantic_hash": ""
   },
   "database/ads.sql": {
@@ -17465,8 +17465,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/registry.ts": {
-    "mtime": 1792143462.9294639,
-    "ast_hash": "ef200f18af0a6faeea67b873a324e9ad",
+    "mtime": 1792144065.1014967,
+    "ast_hash": "ebd7110dabf48e3c8d4205e94ed8a1f8",
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/report-store.ts": {
@@ -17802,6 +17802,91 @@
   "tests/lib/amazon-ads/amazon-ads.test.ts": {
     "mtime": 1792143646.4874084,
     "ast_hash": "5c80e937f449917b234f8836e337bc9a",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/meta-ads/_components/MetaAdsConsole.tsx": {
+    "mtime": 1792144168.435317,
+    "ast_hash": "a974b7fe24c2f11d53b907aa854e7631",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/meta-ads/page.tsx": {
+    "mtime": 1792144082.3998952,
+    "ast_hash": "d2c46018d65ed94eeca4753450fdd1c7",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/integrations/meta-ads/callback/route.ts": {
+    "mtime": 1792144065.1027815,
+    "ast_hash": "dbc91f8de09d3548bef52cd9cc05082d",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/integrations/meta-ads/connect/route.ts": {
+    "mtime": 1792144065.1023629,
+    "ast_hash": "b14165182d2d6e02f953dff0765facbe",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/meta-ads/connection/route.ts": {
+    "mtime": 1792144065.1033616,
+    "ast_hash": "d87895548c5cc593a4052ba808fb302a",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/meta-ads/console/actions/route.ts": {
+    "mtime": 1792144065.1040828,
+    "ast_hash": "937c01070953ad5f9de1076d298bb9ca",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/meta-ads/console/route.ts": {
+    "mtime": 1792144065.1037164,
+    "ast_hash": "e1ce90a53d111379677aa592ec98c4d7",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/meta-ads/console/sync/route.ts": {
+    "mtime": 1792144065.1044488,
+    "ast_hash": "51344608de26ea8362e8132ed4ab0d63",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/meta-ads-sync/route.ts": {
+    "mtime": 1792144065.104972,
+    "ast_hash": "3275c9d6657167eb8376bc87942045a9",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/meta-capi/route.ts": {
+    "mtime": 1792144065.1051662,
+    "ast_hash": "26eaf8530e40df2ea9cf232f6bc94cba",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/meta-ads/alerts.ts": {
+    "mtime": 1792144168.4522407,
+    "ast_hash": "e607cbbe5c6d812dbc5c988cac8bb383",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/meta-ads/capi.ts": {
+    "mtime": 1792144168.4637182,
+    "ast_hash": "977a2513f905362ac102bef0f8ef41b8",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/meta-ads/client.ts": {
+    "mtime": 1792144168.4743245,
+    "ast_hash": "aebddac3822f481ed213680e352dff6f",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/meta-ads/console.ts": {
+    "mtime": 1792144168.4885306,
+    "ast_hash": "6943ef4db5d8602ff0917888dd085606",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/meta-ads/sync.ts": {
+    "mtime": 1792144168.5000002,
+    "ast_hash": "16d3e7a14db2425e508b55a047c0f064",
+    "semantic_hash": ""
+  },
+  "database/meta-ads.sql": {
+    "mtime": 1792143848.8898618,
+    "ast_hash": "34905289308187218bb8bbf351a92827",
+    "semantic_hash": ""
+  },
+  "tests/lib/meta-ads/meta-ads.test.ts": {
+    "mtime": 1792144174.6154811,
+    "ast_hash": "a1225e653ea9f61884425ac8e32c88b4",
     "semantic_hash": ""
   }
 }
