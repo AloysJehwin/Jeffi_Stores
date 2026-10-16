@@ -156,9 +156,6 @@ export default function AmazonAdsConsole() {
           </p>
         </div>
         <div className="flex items-center gap-1">
-          {status?.connected && canWrite && (
-            <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={sync} />
-          )}
           <ConnectionsGear
             title="Amazon Ads connection"
             scope="amazon_ads"
@@ -189,7 +186,12 @@ export default function AmazonAdsConsole() {
               {status.connectedVia === 'manual' ? 'entered manually' : 'Amazon sign-in'}
             </span>
           </div>
-          <Tabs tabs={TABS} value={tab} onChange={setTab} />
+          <Tabs
+            tabs={TABS}
+            value={tab}
+            onChange={setTab}
+            actions={canWrite && <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={sync} />}
+          />
           {error ? (
             <p className="text-sm text-red-500">{error}</p>
           ) : DATA_TABS.has(tab) && !data ? (

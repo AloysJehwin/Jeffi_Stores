@@ -151,17 +151,6 @@ export default function MetaAdsConsole() {
           </p>
         </div>
         <div className="flex items-center gap-1">
-          {status?.connected && canWrite && (
-            <>
-              <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={() => run('sync')} />
-              <IconButton
-                icon={Send}
-                label="Send purchases to Meta now"
-                busy={busy === 'capi'}
-                onClick={() => run('capi')}
-              />
-            </>
-          )}
           <ConnectionsGear
             title="Meta Ads connection"
             scope="meta_ads"
@@ -193,7 +182,19 @@ export default function MetaAdsConsole() {
               {status.tokenExpiresAt ? ` · sign-in valid until ${when(status.tokenExpiresAt)}` : ''}
             </span>
           </div>
-          <Tabs tabs={TABS} value={tab} onChange={setTab} />
+          <Tabs
+            tabs={TABS}
+            value={tab}
+            onChange={setTab}
+            actions={
+              canWrite && (
+                <>
+                  <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={() => run('sync')} />
+                  <IconButton icon={Send} label="Send purchases to Meta now" busy={busy === 'capi'} onClick={() => run('capi')} />
+                </>
+              )
+            }
+          />
           {error ? (
             <p className="text-sm text-red-500">{error}</p>
           ) : DATA_TABS.has(tab) && !data ? (

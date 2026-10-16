@@ -93,17 +93,21 @@ export default function MerchantConsole({ connected }: { connected: boolean }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        {RANGED.has(tab) ? <RangePresets value={range} onChange={setRange} endOffset={1} /> : <span />}
-        {canWrite && (
-          <div className="flex items-center gap-1">
-            <IconButton icon={RefreshCw} label="Refresh product status from Google" busy={busy === 'status'} onClick={() => refresh('status')} />
-            <IconButton icon={FileBarChart} label="Refresh reports and account from Google" busy={busy === 'reports'} onClick={() => refresh('reports')} />
-          </div>
-        )}
-      </div>
       {banner && <Banner ok={banner.ok}>{banner.text}</Banner>}
-      <Tabs tabs={TABS} value={tab} onChange={setTab} />
+      <Tabs
+        tabs={TABS}
+        value={tab}
+        onChange={setTab}
+        actions={
+          canWrite && (
+            <>
+              <IconButton icon={RefreshCw} label="Refresh product status from Google" busy={busy === 'status'} onClick={() => refresh('status')} />
+              <IconButton icon={FileBarChart} label="Refresh reports and account from Google" busy={busy === 'reports'} onClick={() => refresh('reports')} />
+            </>
+          )
+        }
+      />
+      {RANGED.has(tab) && <RangePresets value={range} onChange={setRange} endOffset={1} />}
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
       ) : DATA_TABS.has(tab) && !data ? (
