@@ -15,7 +15,7 @@ import {
 } from '@/lib/ai/media-features'
 
 interface Props {
-  feature: 'social_image' | 'product_image' | 'ads_image' | 'email_hero' | 'hero_image' | 'offer_image' | 'generate_image'
+  feature: 'social_image' | 'product_image' | 'ads_image' | 'email_hero' | 'hero_image' | 'offer_image' | 'meta_ads_image' | 'generate_image'
   /** Area whose :write scope gates the button; defaults from the feature. */
   scope?: string
   /** Initial prompt (prefilled from context: product name, campaign title). */
@@ -45,6 +45,7 @@ const SCOPE_BY_FEATURE: Record<Props['feature'], string> = {
   email_hero: 'mailer',
   hero_image: 'settings',
   offer_image: 'coupons',
+  meta_ads_image: 'meta_ads_campaigns',
   generate_image: 'settings',
 }
 
