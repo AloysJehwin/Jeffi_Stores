@@ -4,14 +4,24 @@ import { COUNTS, LIMITS, adTextLength, keywordProblem, textListProblems } from '
 // What the campaign wizard sends. Client-safe (types, schema and the cross-field checks the wizard
 // runs before calling the server, which runs them again).
 
-export const CAMPAIGN_TYPES = ['SEARCH', 'SHOPPING', 'PERFORMANCE_MAX'] as const
-export const BID_STRATEGIES = ['MAXIMIZE_CONVERSIONS', 'MAXIMIZE_CONVERSION_VALUE', 'MANUAL_CPC'] as const
+export const CAMPAIGN_TYPES = ['SEARCH', 'SHOPPING', 'PERFORMANCE_MAX', 'DEMAND_GEN', 'DISPLAY'] as const
+export const BID_STRATEGIES = ['MAXIMIZE_CONVERSIONS', 'MAXIMIZE_CONVERSION_VALUE', 'MANUAL_CPC', 'MAXIMIZE_CLICKS'] as const
 export const MATCH_TYPES = ['EXACT', 'PHRASE', 'BROAD'] as const
 export const DAYS = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'] as const
 /** Listing-group dimension: brand, one of our custom labels, or categories (as item ids). */
 export const LISTING_DIMENSIONS = ['ALL', 'BRAND', 'MARGIN', 'VELOCITY', 'STOCK', 'CATEGORY'] as const
 export const PRICE_TYPES = ['PRODUCT_CATEGORIES', 'PRODUCT_TIERS', 'BRANDS'] as const
 export const SNIPPET_HEADERS = ['Brands', 'Types', 'Styles', 'Models', 'Service catalog'] as const
+/** Demand Gen channel strategy: every channel, or Google-owned ones only (no third-party Display). */
+export const DEMAND_GEN_CHANNELS = ['ALL_CHANNELS', 'ALL_OWNED_AND_OPERATED_CHANNELS'] as const
+/** Button texts offered for image ads; empty lets Google choose. */
+export const CALL_TO_ACTIONS = ['Shop now', 'Learn more', 'Sign up', 'Contact us'] as const
+/** Types built from the Merchant Center feed. */
+export const FEED_TYPES: readonly string[] = ['SHOPPING', 'PERFORMANCE_MAX']
+/** Image ad types: Demand Gen multi-asset ads and Display responsive display ads. */
+export const IMAGE_AD_TYPES: readonly string[] = ['DEMAND_GEN', 'DISPLAY']
+/** Fallback Demand Gen daily minimum in INR (Google: 5 USD or local equivalent) when currency_constant can't be read. */
+export const DEMAND_GEN_MIN_DAILY_FALLBACK = 500
 
 export type CampaignType = (typeof CAMPAIGN_TYPES)[number]
 export type BidStrategy = (typeof BID_STRATEGIES)[number]
@@ -24,9 +34,14 @@ export const STRATEGIES_FOR: Record<CampaignType, BidStrategy[]> = {
   SEARCH: ['MAXIMIZE_CONVERSIONS', 'MAXIMIZE_CONVERSION_VALUE', 'MANUAL_CPC'],
   SHOPPING: ['MAXIMIZE_CONVERSION_VALUE', 'MANUAL_CPC'],
   PERFORMANCE_MAX: ['MAXIMIZE_CONVERSIONS', 'MAXIMIZE_CONVERSION_VALUE'],
+  DEMAND_GEN: ['MAXIMIZE_CONVERSIONS', 'MAXIMIZE_CONVERSION_VALUE', 'MAXIMIZE_CLICKS'],
+  DISPLAY: ['MAXIMIZE_CONVERSIONS', 'MAXIMIZE_CONVERSION_VALUE', 'MAXIMIZE_CLICKS', 'MANUAL_CPC'],
 }
 
 export const INDIA = { id: 'geoTargetConstants/2356', name: 'India' }
+
+/** Google stopped accepting language criteria on Search (Sept 2026: ads match the language of their text and landing page). */
+export const usesLanguageCriteria = (type: string) => type !== 'SEARCH' && type !== 'SHOPPING'
 
 /** Google language criterion ids (developers.google.com/google-ads/api/data/codes-formats). */
 export const LANGUAGES: { id: string; name: string }[] = [
@@ -151,10 +166,26 @@ export const CampaignSpecSchema = z.object({
       useStoreLogo: z.boolean().default(true),
     })
     .optional(),
+  /** Demand Gen multi-asset ad or Display responsive display ad, with its single ad group. */
+  imageAd: z
+    .object({
+      adGroupName: z.string().trim().max(LIMITS.name).default(''),
+      finalUrl: url,
+      headlines: z.array(text).max(10).default([]),
+      longHeadline: z.string().max(400).default(''),
+      descriptions: z.array(text).max(10).default([]),
+      businessName: z.string().trim().max(60).default(''),
+      callToAction: z.enum(CALL_TO_ACTIONS).nullable().optional(),
+      imageIds: z.array(z.string().regex(UUID)).max(10).default([]),
+      channels: z.enum(DEMAND_GEN_CHANNELS).default('ALL_CHANNELS'),
+      audiences: z.array(z.string().regex(/^customers\/\d+\/audiences\/\d+$/)).max(10).default([]),
+    })
+    .optional(),
   extensions: ExtensionsSchema.optional(),
 })
 
 export type CampaignSpec = z.infer<typeof CampaignSpecSchema>
+export type ImageAdSpec = NonNullable<CampaignSpec['imageAd']>
 export type AdGroupSpec = z.infer<typeof AdGroupSpecSchema>
 export type ExtensionsSpec = z.infer<typeof ExtensionsSchema>
 export type SitelinkSpec = z.infer<typeof SitelinkSchema>
@@ -215,7 +246,11 @@ export function rsaProblems(label: string, ad: AdGroupSpec['ad']): string[] {
 }
 
 /** Everything wrong with a spec, in words; empty when it can be sent to Google. */
-export function specProblems(spec: CampaignSpec, today = new Date().toISOString().slice(0, 10)): string[] {
+export function specProblems(
+  spec: CampaignSpec,
+  today = new Date().toISOString().slice(0, 10),
+  opts: { demandGenMinimum?: number | null } = {}
+): string[] {
   const out: string[] = []
   if (!STRATEGIES_FOR[spec.type].includes(spec.bidding.strategy)) out.push('That bid strategy is not available for this campaign type')
   if (spec.bidding.strategy !== 'MAXIMIZE_CONVERSIONS' && spec.bidding.targetCpa) out.push('Target CPA only applies to Maximise conversions')
@@ -225,7 +260,7 @@ export function specProblems(spec: CampaignSpec, today = new Date().toISOString(
   if (spec.startDate && spec.startDate < today) out.push('The start date cannot be in the past')
   if (spec.endDate && spec.endDate < (spec.startDate || today)) out.push('The end date must be after the start date')
   if (!spec.locations.length) out.push('Choose at least one location')
-  if (spec.type !== 'SHOPPING' && !spec.languages.length) out.push('Choose at least one language')
+  if (usesLanguageCriteria(spec.type) && !spec.languages.length) out.push('Choose at least one language')
   if (spec.schedule && spec.schedule.endHour <= spec.schedule.startHour) out.push('The ad schedule must end after it starts')
 
   if (spec.type === 'SEARCH') {
@@ -265,6 +300,34 @@ export function specProblems(spec: CampaignSpec, today = new Date().toISOString(
     }
   }
 
+  if (IMAGE_AD_TYPES.includes(spec.type)) out.push(...imageAdProblems(spec, opts.demandGenMinimum))
+
   out.push(...extensionProblems(spec.extensions))
+  return out
+}
+
+/** Demand Gen / Display creative and budget checks (Google's counts, lengths and the Demand Gen daily minimum). */
+export function imageAdProblems(spec: CampaignSpec, demandGenMinimum?: number | null): string[] {
+  const out: string[] = []
+  const dg = spec.type === 'DEMAND_GEN'
+  if (dg) {
+    const min = demandGenMinimum ?? DEMAND_GEN_MIN_DAILY_FALLBACK
+    if (spec.dailyBudget < min) out.push(`Demand Gen needs a daily budget of at least ${min} (Google's minimum)`)
+  }
+  const a = spec.imageAd
+  if (spec.bidding.strategy === 'MANUAL_CPC' && !spec.defaultCpc) out.push('Set a max CPC for manual bidding')
+  if (!a) return [...out, 'Set up the ad']
+  const counts = dg ? COUNTS.demandGenHeadlines : COUNTS.displayHeadlines
+  out.push(...textListProblems('Headline', filled(a.headlines), LIMITS.headline, counts))
+  out.push(...textListProblems('Description', filled(a.descriptions), LIMITS.description, dg ? COUNTS.demandGenDescriptions : COUNTS.displayDescriptions))
+  if (!dg) {
+    if (!a.longHeadline.trim()) out.push('Add a long headline')
+    else if (adTextLength(a.longHeadline.trim()) > LIMITS.longHeadline) out.push(`The long headline is limited to ${LIMITS.longHeadline} characters`)
+  }
+  if (!a.businessName.trim()) out.push('Add the business name')
+  else if (adTextLength(a.businessName.trim()) > LIMITS.businessName) out.push(`Business name is limited to ${LIMITS.businessName} characters`)
+  if (!a.imageIds.length) out.push('Pick at least one product image')
+  if (a.imageIds.length > COUNTS.imageAdImages[1]) out.push(`Use at most ${COUNTS.imageAdImages[1]} product images`)
+  if (!dg && a.audiences.length) out.push('Audiences are only added to Demand Gen campaigns here')
   return out
 }

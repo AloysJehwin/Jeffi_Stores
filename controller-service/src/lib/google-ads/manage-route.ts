@@ -13,13 +13,16 @@ import { AdsMutationError, type ChangeActor } from './mutate'
 
 export const MANAGE_SCOPE = 'google_ads_campaigns:write'
 
-export async function withCampaignPlan(admin: AdminJWTPayload | NextResponse): Promise<AdminJWTPayload | NextResponse> {
+export async function withCampaignPlan(
+  admin: AdminJWTPayload | NextResponse,
+  what = 'Managing Google Ads campaigns'
+): Promise<AdminJWTPayload | NextResponse> {
   if (admin instanceof NextResponse) return admin
   const gate = await currentTenantPlanGate(MANAGE_SCOPE)
   if (!gate.allowed) {
     const plan = gate.upgradeRequired ?? 'pro'
     return NextResponse.json(
-      { error: `Managing Google Ads campaigns needs the ${plan.charAt(0).toUpperCase()}${plan.slice(1)} plan.`, upgradeRequired: plan },
+      { error: `${what} needs the ${plan.charAt(0).toUpperCase()}${plan.slice(1)} plan.`, upgradeRequired: plan },
       { status: 403 }
     )
   }

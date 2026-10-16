@@ -36,6 +36,9 @@ function fakeAds(overrides: Record<string, any[] | Error> = {}) {
     'FROM keyword_view': [],
     'FROM recommendation': [],
     'FROM change_event': [],
+    'FROM billing_setup': [],
+    'FROM experiment_arm': [],
+    'FROM experiment WHERE': [],
     ...overrides,
   }
   return {

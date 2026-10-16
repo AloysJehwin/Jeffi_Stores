@@ -918,6 +918,13 @@ CREATE INDEX idx_ads_ad_groups_campaign ON public.ads_ad_groups USING btree (cam
 
 
 --
+-- Name: idx_ads_experiments_base_campaign; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_experiments_base_campaign ON public.ads_experiments USING btree (base_campaign_id);
+
+
+--
 -- Name: idx_ads_change_events_time; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -971,6 +978,24 @@ CREATE INDEX idx_ads_conversion_requests_due ON public.ads_conversion_requests U
 --
 
 CREATE INDEX idx_ads_conversion_requests_created_at ON public.ads_conversion_requests USING btree (created_at DESC);
+
+--
+-- Name: idx_ads_alerts_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_ads_alerts_active_key ON public.ads_alerts USING btree (dedupe_key) WHERE ((status)::text = ANY ((ARRAY['open'::character varying, 'dismissed'::character varying])::text[]));
+
+--
+-- Name: idx_ads_alerts_key_notified; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_alerts_key_notified ON public.ads_alerts USING btree (dedupe_key, notified_at DESC);
+
+--
+-- Name: idx_ads_alerts_status_seen; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_alerts_status_seen ON public.ads_alerts USING btree (status, last_seen_at DESC);
 
 
 --

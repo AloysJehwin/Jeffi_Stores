@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/auth/jwt'
 import { syncGoogleAds, isAdsSyncRunning, AdsSyncInProgressError } from '@/lib/google-ads/sync'
+import { runAdsAlerts } from '@/lib/google-ads/alerts'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -18,7 +19,9 @@ export async function POST(request: NextRequest) {
   if (admin instanceof NextResponse) return admin
   const mode = request.nextUrl.searchParams.get('mode') === 'today' ? 'today' : 'full'
   try {
-    return NextResponse.json(await syncGoogleAds(mode))
+    const r = await syncGoogleAds(mode)
+    if (r.status !== 'error') await runAdsAlerts()
+    return NextResponse.json(r)
   } catch (e) {
     if (e instanceof AdsSyncInProgressError) return NextResponse.json({ error: e.message }, { status: 409 })
     return NextResponse.json({ error: (e as Error)?.message || 'Sync failed' }, { status: 500 })

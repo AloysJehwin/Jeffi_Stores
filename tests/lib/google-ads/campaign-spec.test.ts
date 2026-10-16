@@ -45,10 +45,10 @@ describe('campaign spec', () => {
         'The start date cannot be in the past',
         'The end date must be after the start date',
         'Choose at least one location',
-        'Choose at least one language',
         'Ad group "Drills": set a max CPC for manual bidding',
       ])
     )
+    expect(p).not.toContain('Choose at least one language')
   })
 
   it('enforces RSA counts and lengths', () => {
@@ -101,5 +101,18 @@ describe('campaign spec', () => {
   it('rejects malformed input at the schema', () => {
     expect(CampaignSpecSchema.safeParse({ ...spec(), locations: [{ id: 'customers/1', name: 'x' }] }).success).toBe(false)
     expect(CampaignSpecSchema.safeParse({ ...spec(), dailyBudget: 0 }).success).toBe(false)
+  })
+})
+
+describe('language criteria', () => {
+  it('are only used where Google still accepts them', async () => {
+    const { usesLanguageCriteria } = await import('@/lib/google-ads/campaign-spec')
+    expect(usesLanguageCriteria('SEARCH')).toBe(false)
+    expect(usesLanguageCriteria('SHOPPING')).toBe(false)
+    expect(usesLanguageCriteria('PERFORMANCE_MAX')).toBe(true)
+    expect(usesLanguageCriteria('DISPLAY')).toBe(true)
+  })
+  it('still requires one for Display', () => {
+    expect(specProblems({ ...spec({ languages: [] }), type: 'DISPLAY' } as CampaignSpec, TODAY)).toContain('Choose at least one language')
   })
 })

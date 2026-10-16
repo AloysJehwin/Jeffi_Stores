@@ -14,6 +14,8 @@ import { AdsManageProvider } from './_components/ManageContext'
 import { NewCampaignButton } from './_components/CampaignWizard'
 import ConnectPanel, { NotConfigured } from './_components/ConnectPanel'
 import ConversionsView from './_components/ConversionsView'
+import ExperimentsView from './_components/ExperimentsView'
+import AudiencesView from './_components/AudiencesView'
 import {
   OverviewView,
   CampaignsView,
@@ -36,6 +38,8 @@ const TABS: { id: AdsTab; label: string }[] = [
   { id: 'recommendations', label: 'Recommendations' },
   { id: 'changes', label: 'Change history' },
   { id: 'conversions', label: 'Conversions' },
+  { id: 'experiments', label: 'Experiments' },
+  { id: 'audiences', label: 'Audiences' },
   { id: 'sync', label: 'Sync status' },
 ]
 
@@ -331,6 +335,10 @@ function TabBody({ tab, data, currency }: { tab: AdsTab; data: any; currency: st
       return <ChangesView rows={data.changes ?? []} />
     case 'conversions':
       return <ConversionsView d={data} currency={currency} />
+    case 'experiments':
+      return <ExperimentsView d={data} currency={currency} />
+    case 'audiences':
+      return <AudiencesView d={data} />
     case 'sync':
       return <SyncView rows={data.log ?? []} />
   }

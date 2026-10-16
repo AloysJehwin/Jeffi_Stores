@@ -19,6 +19,9 @@ export type OperationKey =
   | 'assetGroupOperation'
   | 'assetGroupAssetOperation'
   | 'assetGroupListingGroupFilterOperation'
+  | 'userListOperation'
+  | 'audienceOperation'
+  | 'assetGroupSignalOperation'
 
 export interface OpBody {
   create?: Record<string, any>
@@ -51,8 +54,17 @@ export type AdsAction =
   | 'recommendation.apply'
   | 'recommendation.dismiss'
   | 'merchant.link'
+  | 'experiment.create'
+  | 'experiment.trial'
+  | 'experiment.schedule'
+  | 'experiment.end'
+  | 'experiment.promote'
+  | 'experiment.graduate'
+  | 'experiment.remove'
+  | 'audience.create'
+  | 'audience.attach'
 
-export type AdsEntity = 'campaign' | 'ad_group' | 'ad' | 'keyword' | 'asset' | 'recommendation' | 'merchant_link'
+export type AdsEntity = 'campaign' | 'ad_group' | 'ad' | 'keyword' | 'asset' | 'recommendation' | 'merchant_link' | 'experiment' | 'audience'
 
 /** Negative ids for resources created in the same request (-1, -2, ...), unique across all types. */
 export class TempIds {

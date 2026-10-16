@@ -5,15 +5,16 @@ import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Megaph
 import IconButton from '@/components/ui/IconButton'
 import { useCanUseAi, useCanWrite } from '@/contexts/AdminScopesContext'
 import type { WizardBootstrap } from '@/lib/google-ads/manage-data'
-import { specProblems } from '@/lib/google-ads/campaign-spec'
+import { FEED_TYPES, IMAGE_AD_TYPES, specProblems } from '@/lib/google-ads/campaign-spec'
 import { postJson, errorText } from './ManageContext'
 import { newDraft, toSpec, type Draft } from './wizard/draft'
 import { Modal, btnGhost, btnPrimary } from './wizard/fields'
 import { StepCampaign, StepTargeting } from './wizard/StepBasics'
 import { AssetGroupEditor, MerchantLink, ProductGroups, SearchAds, type LinkState } from './wizard/StepAds'
+import { ImageAdEditor, type CampaignOptions } from './wizard/StepImageAd'
 import ExtensionsEditor, { SuggestionsLoading, emptyExtDraft, fetchExtDraft, type ExtDraft } from './wizard/ExtensionsEditor'
 
-// New campaign wizard: Search, Standard Shopping or Performance Max. "Check with Google" sends the
+// New campaign wizard: Search, Standard Shopping, Performance Max, Demand Gen or Display. "Check with Google" sends the
 // whole campaign with validateOnly; "Create" validates again and creates it (paused by default).
 
 const STEPS = ['Campaign', 'Targeting', 'Ads', 'Assets', 'Review'] as const
@@ -44,6 +45,7 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
   const [ext, setExt] = useState<ExtDraft | null>(null)
   const [extError, setExtError] = useState<string | null>(null)
   const [link, setLink] = useState<LinkState | null>(null)
+  const [options, setOptions] = useState<CampaignOptions | null>(null)
   const [busy, setBusy] = useState<'preview' | 'create' | null>(null)
   const [result, setResult] = useState<{ ok: boolean; text: string; problems?: Problem[]; done?: boolean } | null>(null)
 
@@ -69,6 +71,22 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
       })
   }, [step, ext])
 
+  // Demand Gen's daily minimum and the account's audiences, read from Google once.
+  const wantsOptions = d?.type === 'DEMAND_GEN'
+  useEffect(() => {
+    if (!wantsOptions || options) return
+    fetch('/api/admin/google-ads/manage/campaign-options', { credentials: 'include' })
+      .then(async r => {
+        const data = await r.json().catch(() => ({}))
+        setOptions(
+          r.ok
+            ? data
+            : { currency: 'INR', demandGenMinimum: 0, demandGenMinimumFromGoogle: false, audiences: [], audiencesError: data.error || 'Could not read the account' }
+        )
+      })
+      .catch(() => undefined)
+  }, [wantsOptions, options])
+
   const set = (p: Partial<Draft>) => {
     setResult(null)
     setD(cur => (cur ? { ...cur, ...p } : cur))
@@ -76,11 +94,12 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
   const spec = useMemo(() => (d ? toSpec(d, ext) : null), [d, ext])
   const problems = useMemo(() => {
     if (!spec) return []
-    const list = specProblems(spec)
+    const list = specProblems(spec, undefined, { demandGenMinimum: options?.demandGenMinimum || null })
+    if (spec.type === 'DEMAND_GEN' && !b?.store.logoUrl) list.push('Demand Gen ads need a logo: add a store logo in Site Controls')
     if (spec.assetGroup && !spec.assetGroup.feedOnly && !b?.store.logoUrl) list.push('Add a store logo in Site Controls, or use the product feed only')
     return list
-  }, [spec, b])
-  const needsLink = d && d.type !== 'SEARCH'
+  }, [spec, b, options])
+  const needsLink = !!d && FEED_TYPES.includes(d.type)
   const linkBlocked = !!needsLink && !link?.linked
 
   async function send(preview: boolean) {
@@ -103,7 +122,15 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
   }
 
   const stepLabel = (i: number) =>
-    i === 2 && d ? (d.type === 'SEARCH' ? 'Ads & keywords' : d.type === 'SHOPPING' ? 'Products' : 'Products & assets') : STEPS[i]
+    i === 2 && d
+      ? d.type === 'SEARCH'
+        ? 'Ads & keywords'
+        : d.type === 'SHOPPING'
+          ? 'Products'
+          : IMAGE_AD_TYPES.includes(d.type)
+            ? 'Ad'
+            : 'Products & assets'
+      : STEPS[i]
 
   const footer = (
     <>
@@ -159,17 +186,24 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
             ))}
           </ol>
 
-          {step === 0 && <StepCampaign d={d} set={set} b={b} />}
+          {step === 0 && <StepCampaign d={d} set={set} b={b} demandGenMinimum={options?.demandGenMinimum} />}
           {step === 1 && <StepTargeting d={d} set={set} b={b} />}
           {step === 2 && d.type === 'SEARCH' && <SearchAds d={d} set={set} b={b} canAi={canAi} />}
-          {step === 2 && d.type !== 'SEARCH' && (
+          {step === 2 && IMAGE_AD_TYPES.includes(d.type) && <ImageAdEditor d={d} set={set} b={b} canAi={canAi} options={options} />}
+          {step === 2 && FEED_TYPES.includes(d.type) && (
             <div className="space-y-4">
               <MerchantLink onState={setLink} />
               <ProductGroups d={d} set={set} b={b} />
               {d.type === 'PERFORMANCE_MAX' && <AssetGroupEditor d={d} set={set} b={b} canAi={canAi} />}
             </div>
           )}
+          {step === 3 && IMAGE_AD_TYPES.includes(d.type) && (
+            <p className="text-sm text-foreground-muted">
+              Sitelinks, callouts, promotions and price lists are used by Search, Shopping and Performance Max; this campaign type does not take them.
+            </p>
+          )}
           {step === 3 &&
+            !IMAGE_AD_TYPES.includes(d.type) &&
             (ext ? (
               <>
                 {extError && <p className="text-xs text-red-500">{extError}</p>}
@@ -195,6 +229,12 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
                   </li>
                 )}
                 {spec.listing && <li>Products: {spec.listing.dimension === 'ALL' ? 'all' : `${spec.listing.values.length} ${spec.listing.dimension.toLowerCase()} group(s)`}</li>}
+                {spec.imageAd && (
+                  <li>
+                    Ad: {spec.imageAd.headlines.length} headlines, {spec.imageAd.descriptions.length} descriptions, {spec.imageAd.imageIds.length} product images
+                    {spec.imageAd.audiences.length ? `, ${spec.imageAd.audiences.length} audience(s)` : ''}
+                  </li>
+                )}
                 {spec.extensions && (
                   <li>
                     Assets: {spec.extensions.sitelinks.length} sitelinks, {spec.extensions.callouts.length} callouts, {spec.extensions.promotions.length} promotions,{' '}

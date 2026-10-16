@@ -2,7 +2,7 @@ import { query, queryMany } from '@/lib/shared/db'
 import { hasScope } from '@/lib/auth/scopes'
 
 export type AdminNotificationCategory =
-  'orders' | 'returns' | 'reviews' | 'b2b' | 'support' | 'kyc' | 'inventory' | 'finance'
+  'orders' | 'returns' | 'reviews' | 'b2b' | 'support' | 'kyc' | 'inventory' | 'finance' | 'marketing'
 
 export type AdminNotificationSeverity = 'info' | 'warning' | 'critical'
 

@@ -119,9 +119,9 @@ describe('edit actions', () => {
 
 describe('campaign creation', () => {
   it('rejects a spec with problems before calling Google', async () => {
-    const res = await create(post('/api/admin/google-ads/manage/campaigns', { spec: { ...searchSpec, languages: [] } }))
+    const res = await create(post('/api/admin/google-ads/manage/campaigns', { spec: { ...searchSpec, locations: [] } }))
     expect(res.status).toBe(400)
-    expect((await res.json()).error).toBe('Choose at least one language')
+    expect((await res.json()).error).toBe('Choose at least one location')
     expect(m.createCampaign).not.toHaveBeenCalled()
   })
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, CheckCircle2, Link2, Loader2 } from 'lucide-react'
+import { AlertCircle, CheckCircle2, ExternalLink, Link2, Loader2 } from 'lucide-react'
 import type { AdsConnectionStatus } from '@/lib/google-ads/connection'
 import { formatCid } from '@/lib/google-ads/format'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -22,7 +22,7 @@ const btnPrimary =
 const btnGhost =
   'inline-flex items-center gap-2 rounded-lg border border-border-default px-3 py-2 text-sm text-foreground hover:bg-surface-secondary disabled:opacity-50'
 
-type Method = 'google' | 'manual' | 'manager' | 'platform'
+type Method = 'google' | 'manual' | 'manager' | 'create' | 'platform'
 
 /** Env/setup state shown when the platform side is not ready. */
 export function NotConfigured({ status }: { status: AdsConnectionStatus }) {
@@ -66,6 +66,7 @@ export default function ConnectPanel({
   const [manual, setManual] = useState({ customerId: '', loginCustomerId: '', refreshToken: '' })
   const [managed, setManaged] = useState('')
   const canWrite = useCanWrite('google_ads')
+  const canCreate = useCanWrite('google_ads_campaigns')
 
   useEffect(() => {
     if (!status.pendingAccount) return
@@ -108,6 +109,7 @@ export default function ConnectPanel({
     { id: 'google', label: 'Sign in with Google', show: true },
     { id: 'manual', label: 'Enter manually', show: true },
     { id: 'manager', label: 'Managed by the platform', show: !!status.env.managerId && status.env.managerRefreshToken },
+    { id: 'create', label: 'Create a new account', show: !!status.env.managerId && status.env.managerRefreshToken },
     { id: 'platform', label: 'Platform service account', show: status.flagship },
   ]
 
@@ -279,6 +281,10 @@ export default function ConnectPanel({
         </form>
       )}
 
+      {method === 'create' && (canCreate ? <CreateAccount status={status} onDone={onChanged} /> : (
+        <p className="text-sm text-foreground-secondary">Creating a Google Ads account for your store is part of Google Ads campaign management on the Pro plan.</p>
+      ))}
+
       {method === 'platform' && (
         <div className="space-y-2 text-sm text-foreground-secondary">
           <p>
@@ -314,5 +320,127 @@ export default function ConnectPanel({
         </p>
       )}
     </div>
+  )
+}
+
+interface Created {
+  customerId: string
+  name: string
+  invitation: { email: string; sent: boolean; error: string | null } | null
+  billingUrl: string
+  status: AdsConnectionStatus
+}
+
+const BILLING_TEXT: Record<string, string> = {
+  APPROVED: 'Billing is set up (monthly invoicing).',
+  APPROVED_HELD: 'Billing is approved; the first account budget is waiting for approval.',
+  PENDING: 'Billing setup is waiting for Google to approve it.',
+  CANCELLED: 'The billing setup was cancelled.',
+  NONE: 'No billing found yet. Card payments are not visible to the API, so check Billing in Google Ads if you already added one.',
+}
+
+/** A new account under the platform manager (INR, Asia/Kolkata), then the billing steps the store does in Google Ads. */
+function CreateAccount({ status, onDone }: { status: AdsConnectionStatus; onDone: (s: AdsConnectionStatus | null) => void }) {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [created, setCreated] = useState<Created | null>(null)
+  const [billing, setBilling] = useState<string | null>(null)
+
+  async function create() {
+    setBusy(true)
+    setError(null)
+    try {
+      const r = await fetch('/api/admin/google-ads/account', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, inviteEmail: email.trim() || null }),
+      })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'Could not create the account')
+      setCreated(d)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function checkBilling() {
+    setBusy(true)
+    const r = await fetch('/api/admin/google-ads/billing', { credentials: 'include' })
+    const d = await r.json().catch(() => ({}))
+    setBusy(false)
+    setBilling(r.ok ? BILLING_TEXT[d.status] ?? d.status : d.error || 'Could not read billing')
+  }
+
+  if (created) {
+    return (
+      <div className="space-y-3 text-sm">
+        <p className="flex items-start gap-2 text-green-700 dark:text-green-400">
+          <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> Created {created.name} {formatCid(created.customerId)} (INR, India time), managed by the platform account.
+        </p>
+        {created.invitation?.sent && (
+          <p className="text-foreground-secondary">An Admin invitation went to {created.invitation.email}. Accept it from that inbox to open the account in Google Ads.</p>
+        )}
+        {created.invitation && !created.invitation.sent && (
+          <p className="text-amber-700 dark:text-amber-400">The invitation to {created.invitation.email} failed: {created.invitation.error}</p>
+        )}
+        <div className="rounded-lg border border-border-default p-3 space-y-2">
+          <p className="font-medium text-foreground">Add a payment method before ads can run</p>
+          <ol className="list-decimal pl-5 space-y-1 text-foreground-secondary">
+            <li>Open Google Ads with the invited Google account and switch to {formatCid(created.customerId)}.</li>
+            <li>Go to Billing, then Settings, and add your card or bank details. Charges go to your payment method, not Jeffi.</li>
+          </ol>
+          <div className="flex flex-wrap gap-2">
+            <a href={created.billingUrl} target="_blank" rel="noreferrer" className={btnGhost}>
+              Billing in Google Ads <ExternalLink className="w-4 h-4" />
+            </a>
+            <button type="button" className={btnGhost} disabled={busy} onClick={checkBilling}>
+              {busy && <Loader2 className="w-4 h-4 animate-spin" />} Check billing
+            </button>
+          </div>
+          {billing && <p className="text-xs text-foreground-muted">{billing}</p>}
+        </div>
+        <button type="button" className={btnPrimary} onClick={() => onDone(created.status)}>
+          Continue
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={e => {
+        e.preventDefault()
+        create()
+      }}
+    >
+      <p className="text-sm text-foreground-secondary">
+        No Google Ads account yet? We create one for your store under the platform manager account {formatCid(status.env.managerId)}, in Indian rupees
+        on India time (both are fixed once created). You then add your own payment method in Google Ads.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="text-sm space-y-1">
+          <span className="text-foreground-secondary">Account name</span>
+          <input className={input} value={name} onChange={e => setName(e.target.value)} placeholder="Your store name" />
+        </label>
+        <label className="text-sm space-y-1">
+          <span className="text-foreground-secondary">Your Google account email (gets Admin access, to add billing)</span>
+          <input className={input} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@gmail.com" />
+        </label>
+      </div>
+      <button type="submit" className={btnPrimary} disabled={busy || !name.trim()}>
+        {busy && <Loader2 className="w-4 h-4 animate-spin" />} Create a Google Ads account for this store
+      </button>
+      {error && (
+        <p className="text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> {error}
+        </p>
+      )}
+    </form>
   )
 }

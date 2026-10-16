@@ -765,6 +765,14 @@ ALTER TABLE ONLY public.ads_account
 ALTER TABLE ONLY public.ads_campaigns
     ADD CONSTRAINT ads_campaigns_pkey PRIMARY KEY (campaign_id);
 
+
+--
+-- Name: ads_experiments ads_experiments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_experiments
+    ADD CONSTRAINT ads_experiments_pkey PRIMARY KEY (experiment_id);
+
 --
 -- Name: ads_ad_groups ads_ad_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -873,6 +881,36 @@ ALTER TABLE ONLY public.ads_conversion_requests
 
 ALTER TABLE ONLY public.ads_conversion_requests
     ADD CONSTRAINT ads_conversion_requests_status_check CHECK (((status)::text = ANY ((ARRAY['PROCESSING'::character varying, 'SUCCESS'::character varying, 'PARTIAL_SUCCESS'::character varying, 'FAILED'::character varying, 'UNKNOWN'::character varying, 'TIMED_OUT'::character varying])::text[])));
+
+--
+-- Name: ads_audiences ads_audiences_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_audiences
+    ADD CONSTRAINT ads_audiences_pkey PRIMARY KEY (segment);
+
+ALTER TABLE ONLY public.ads_audiences
+    ADD CONSTRAINT ads_audiences_segment_check CHECK (((segment)::text = ANY ((ARRAY['repeat_buyers'::character varying, 'lapsed'::character varying, 'high_value'::character varying, 'recent_buyers'::character varying, 'b2b'::character varying])::text[])));
+
+--
+-- Name: ads_audience_members ads_audience_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_audience_members
+    ADD CONSTRAINT ads_audience_members_pkey PRIMARY KEY (segment, user_id);
+
+--
+-- Name: ads_alerts ads_alerts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ads_alerts
+    ADD CONSTRAINT ads_alerts_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.ads_alerts
+    ADD CONSTRAINT ads_alerts_status_check CHECK (((status)::text = ANY ((ARRAY['open'::character varying, 'dismissed'::character varying, 'resolved'::character varying])::text[])));
+
+ALTER TABLE ONLY public.ads_alerts
+    ADD CONSTRAINT ads_alerts_severity_check CHECK (((severity)::text = ANY ((ARRAY['info'::character varying, 'warning'::character varying, 'critical'::character varying])::text[])));
 
 
 --

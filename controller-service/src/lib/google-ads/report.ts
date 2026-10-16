@@ -2,6 +2,9 @@ import { queryMany, queryOne } from '@/lib/shared/db'
 import type { DateRange } from './queries'
 import { googleAdsOrderStats, computeReturnMetrics, type AdsOrderStats, type ReturnMetrics } from './attribution'
 import { loadConversionsSummary } from './conversions/console'
+import { loadExperiments } from './experiments-read'
+import { loadAudiences } from './audiences/refresh'
+import { withMarginImpact } from './margin-impact'
 
 // Read-side loaders for the Google Ads console. Everything reads the local ads_* mirror; money is
 // returned in account currency units (micros / 1e6).
@@ -16,6 +19,8 @@ export type AdsTab =
   | 'recommendations'
   | 'changes'
   | 'conversions'
+  | 'experiments'
+  | 'audiences'
   | 'sync'
 
 export const ADS_TABS: AdsTab[] = [
@@ -28,6 +33,8 @@ export const ADS_TABS: AdsTab[] = [
   'recommendations',
   'changes',
   'conversions',
+  'experiments',
+  'audiences',
   'sync',
 ]
 
@@ -114,6 +121,8 @@ export interface AdsAccountRow {
   budget_limit_micros: string | null
   budget_served_micros: string | null
   budget_end: string | null
+  billing_status?: string | null
+  billing_account_name?: string | null
   last_sync_at: string | null
   last_full_sync_at: string | null
 }
@@ -441,11 +450,11 @@ export async function loadLocations(range: DateRange) {
 
 export async function loadRecommendations() {
   const rows = await queryMany(
-    `SELECT r.resource_name, r.type, r.impact, r.dismissed, c.name AS campaign_name
+    `SELECT r.resource_name, r.type, r.impact, r.dismissed, r.campaign_id::text AS campaign_id, c.name AS campaign_name
      FROM ads_recommendations r LEFT JOIN ads_campaigns c ON c.campaign_id = r.campaign_id
      WHERE NOT r.dismissed ORDER BY r.type`
   )
-  return rows.map((r: any) => {
+  return withMarginImpact(rows.map((r: any) => {
     const base = r.impact?.baseMetrics ?? {}
     const pot = r.impact?.potentialMetrics ?? {}
     return {
@@ -455,8 +464,10 @@ export async function loadRecommendations() {
       extraClicks: pot.clicks != null ? n(pot.clicks) - n(base.clicks) : null,
       extraConversions: pot.conversions != null ? n(pot.conversions) - n(base.conversions) : null,
       extraCost: pot.costMicros != null ? (n(pot.costMicros) - n(base.costMicros)) / 1e6 : null,
+      extraValue: pot.conversionsValue != null ? n(pot.conversionsValue) - n(base.conversionsValue) : null,
+      campaignId: r.campaign_id ?? null,
     }
-  })
+  }))
 }
 
 export async function loadChanges() {
@@ -496,6 +507,10 @@ export async function loadTab(tab: AdsTab, range: DateRange): Promise<unknown> {
       return { changes: await loadChanges() }
     case 'conversions':
       return loadConversionsSummary(range)
+    case 'experiments':
+      return loadExperiments()
+    case 'audiences':
+      return loadAudiences()
     case 'sync':
       return { log: await loadSyncLog() }
   }

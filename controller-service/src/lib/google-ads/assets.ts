@@ -102,6 +102,8 @@ export interface PreparedImages {
   square: string[]
   /** base64 PNG, 512x512 (LOGO), or null when the store has none. */
   logo: string | null
+  /** base64 JPEG, 960x1200 (4:5 portrait, Demand Gen), only when asked for. */
+  portrait?: string[]
 }
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024
@@ -128,11 +130,12 @@ async function fit(buf: Buffer, width: number, height: number, png = false): Pro
   return (png ? await img.png().toBuffer() : await img.jpeg({ quality: 86 }).toBuffer()).toString('base64')
 }
 
-/** Product images (by id, from our catalogue) and the store logo, shaped for Performance Max. */
+/** Product images (by id, from our catalogue) and the store logo, shaped for Performance Max, Demand Gen and Display. */
 export async function prepareImages(
   imageIds: string[],
   logoUrl: string | null,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  opts: { portrait?: boolean } = {}
 ): Promise<PreparedImages> {
   const rows = imageIds.length
     ? await queryMany<{ id: string; image_url: string }>(
@@ -141,11 +144,12 @@ export async function prepareImages(
       )
     : []
   const urls = imageIds.map(id => rows.find(r => r.id === id)?.image_url).filter((u): u is string => !!u)
-  const out: PreparedImages = { landscape: [], square: [], logo: null }
+  const out: PreparedImages = { landscape: [], square: [], logo: null, ...(opts.portrait ? { portrait: [] } : {}) }
   for (const u of urls) {
     const buf = await fetchImage(u, fetchImpl)
     out.landscape.push(await fit(buf, 1200, 628))
     out.square.push(await fit(buf, 1200, 1200))
+    out.portrait?.push(await fit(buf, 960, 1200))
   }
   if (logoUrl) out.logo = await fit(await fetchImage(logoUrl, fetchImpl), 512, 512, true)
   return out

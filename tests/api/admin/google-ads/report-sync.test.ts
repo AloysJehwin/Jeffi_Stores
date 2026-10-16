@@ -16,6 +16,7 @@ vi.mock('@/lib/google-ads/credentials', () => ({
   adsTenantKey: vi.fn(async () => 't1'),
 }))
 vi.mock('@/lib/integrations/test-connection', () => ({ testGoogleAds: vi.fn(async () => ({ ok: true, message: 'Reached' })) }))
+vi.mock('@/lib/google-ads/alerts', () => ({ runAdsAlerts: vi.fn(async () => ({ findings: 0, created: 0, resolved: 0, notified: 0 })) }))
 
 import { GET as report } from '@/app/api/(admin)/admin/google-ads/report/route'
 import { POST as syncNow, GET as syncStatus } from '@/app/api/(admin)/admin/google-ads/sync/route'

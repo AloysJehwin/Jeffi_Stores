@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn(), query: vi.fn(), getClient: vi.fn() }))
 vi.mock('@/lib/google-ads/attribution', async () => {
   const actual = await vi.importActual<any>('@/lib/google-ads/attribution')
   return {

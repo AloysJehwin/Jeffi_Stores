@@ -64,6 +64,19 @@ const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
   },
   { test: /\b(similar|recommend|like this|related)\b/i, tools: ['find_similar_products'] },
   { test: /\b(recent|latest|new)\b/i, tools: ['get_recent_customers', 'get_recent_products'] },
+  {
+    test: /\b(google ads|adwords|ads|roas|poas|cpc|ad spend|search terms?|negative keywords?|ad budget|campaign budget)\b/i,
+    tools: [
+      'ads_overview',
+      'ads_top_campaigns',
+      'ads_wasted_search_terms',
+      'ads_products_without_stock',
+      'ads_true_roas',
+      'propose_pause_campaign',
+      'propose_budget_change',
+      'propose_add_negative_keyword',
+    ],
+  },
 ]
 
 // Build the native tools array, selecting a query-relevant subset to keep the

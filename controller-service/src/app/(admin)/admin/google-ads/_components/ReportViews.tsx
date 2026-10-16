@@ -6,6 +6,8 @@ import { TrendChart, DonutSplit, RankedBars, type SeriesDef } from '@/components
 import { money, count, decimal, pct, ratio, change, humanize } from '@/lib/google-ads/format'
 import type { OverviewData, Kpis, ProductRow } from '@/lib/google-ads/report'
 import { useAdsManage } from './ManageContext'
+import AlertsPanel from './AlertsPanel'
+import { MarginBasis, MarginCell, StockBadge } from './RecommendationImpact'
 import {
   actionsCol,
   AdGroupRowActions,
@@ -222,6 +224,8 @@ export function OverviewView({ d, currency }: { d: OverviewData; currency: strin
         />
       </div>
 
+      <AlertsPanel />
+
       <Section title="Our orders from Google Ads">
         {!d.orders.available ? (
           <p className="text-sm text-foreground-muted">
@@ -287,6 +291,23 @@ export function OverviewView({ d, currency }: { d: OverviewData; currency: strin
                   {d.account.budget_limit_micros
                     ? ` · ${money(Number(d.account.budget_served_micros ?? 0) / 1e6, currency)} of ${money(Number(d.account.budget_limit_micros) / 1e6, currency)}`
                     : ''}
+                </span>
+              </li>
+            )}
+            {d.account?.billing_status && (
+              <li className="flex justify-between gap-2">
+                <span className="text-foreground-muted">Billing</span>
+                <span className="text-right">
+                  {d.account.billing_status === 'NONE' ? (
+                    <a href="https://ads.google.com/aw/billing/summary" target="_blank" rel="noreferrer" className="text-accent-600 hover:underline">
+                      Check in Google Ads
+                    </a>
+                  ) : (
+                    <span className={d.account.billing_status === 'APPROVED' ? '' : 'text-amber-600'}>
+                      {humanize(d.account.billing_status)}
+                      {d.account.billing_account_name ? ` · ${d.account.billing_account_name}` : ''}
+                    </span>
+                  )}
                 </span>
               </li>
             )}
@@ -531,12 +552,15 @@ export function RecommendationsView({ rows, currency }: { rows: any[]; currency:
           { key: 'clicks', label: 'Extra clicks', num: true, render: r => (r.extraClicks == null ? '-' : count(r.extraClicks)) },
           { key: 'conv', label: 'Extra conv.', num: true, render: r => (r.extraConversions == null ? '-' : decimal(r.extraConversions)) },
           { key: 'cost', label: 'Extra cost', num: true, render: r => (r.extraCost == null ? '-' : money(r.extraCost, currency)) },
+          { key: 'profit', label: 'Profit effect (ours)', num: true, render: r => <MarginCell m={r.margin} currency={currency} />, sort: r => r.margin?.profitImpact ?? 0 },
+          { key: 'stock', label: 'Stock', render: r => <StockBadge m={r.margin} /> },
           ...actionsCol<any>(manage, r => <RecommendationRowActions row={r} />),
         ]}
       />
       <p className="text-xs text-foreground-muted mt-2">
         {manage ? 'Apply or dismiss with the buttons on each row.' : 'Read-only. Apply or dismiss them in Google Ads.'}
       </p>
+      <MarginBasis rows={rows} />
     </Section>
   )
 }
