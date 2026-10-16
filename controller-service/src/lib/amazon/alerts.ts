@@ -136,7 +136,10 @@ async function loadSnapshot(cfg: AmazonAlertConfig): Promise<AmazonAlertSnapshot
     priceInputs().catch(() => []),
     queryOne<any>(`SELECT status, finished_at FROM amazon_sync_log ORDER BY started_at DESC LIMIT 1`).catch(() => null),
     queryOne<any>(`SELECT status, finished_at FROM channel_sync_log WHERE channel = 'amazon' AND kind = 'orders' AND finished_at IS NOT NULL ORDER BY started_at DESC LIMIT 1`).catch(() => null),
-    queryMany<any>(`SELECT sku, our_available, amazon_quantity FROM amazon_inventory_state WHERE amazon_quantity IS NOT NULL AND our_available IS NOT NULL`).catch(() => []),
+    queryMany<any>(
+      `SELECT sku, pushed_qty AS our_available, amazon_quantity FROM amazon_inventory_state
+       WHERE amazon_quantity IS NOT NULL AND pushed_qty IS NOT NULL AND amazon_checked_at > pushed_at + interval '15 minutes'`
+    ).catch(() => []),
   ])
   return {
     suppressed,

@@ -142,3 +142,72 @@ CREATE SEQUENCE public.amazon_repricer_rules_id_seq
 
 ALTER SEQUENCE public.amazon_repricer_rules_id_seq OWNED BY public.amazon_repricer_rules.id;
 ALTER TABLE ONLY public.amazon_repricer_rules ALTER COLUMN id SET DEFAULT nextval('public.amazon_repricer_rules_id_seq'::regclass);
+
+
+--
+-- Name: amazon_orders; Type: TABLE; Schema: public; Owner: -
+-- Amazon orders imported into orders (lib/amazon/orders.ts), keyed by Amazon's id so a re-import
+-- updates instead of duplicating. fulfillment_channel AFN (FBA) never moves our stock.
+-- stock_state: none, deducted, restored, short (not enough stock to deduct), unmatched (no SKU match).
+--
+
+CREATE TABLE public.amazon_orders (
+    amazon_order_id text NOT NULL,
+    order_id uuid,
+    status character varying(32) NOT NULL,
+    fulfillment_channel character varying(8) NOT NULL,
+    purchase_date timestamp with time zone,
+    last_update_date timestamp with time zone,
+    order_total numeric(12,2),
+    currency character varying(8) DEFAULT 'INR'::character varying NOT NULL,
+    ship_city text,
+    ship_state text,
+    ship_postal_code text,
+    is_prime boolean DEFAULT false NOT NULL,
+    easy_ship boolean DEFAULT false NOT NULL,
+    stock_state character varying(16) DEFAULT 'none'::character varying NOT NULL,
+    stock_note text,
+    raw jsonb DEFAULT '{}'::jsonb NOT NULL,
+    imported_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: amazon_order_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.amazon_order_items (
+    order_item_id text NOT NULL,
+    amazon_order_id text NOT NULL,
+    sku text,
+    asin text,
+    title text,
+    quantity integer DEFAULT 0 NOT NULL,
+    quantity_shipped integer DEFAULT 0 NOT NULL,
+    item_price numeric(12,2),
+    item_tax numeric(12,2),
+    product_id uuid,
+    variant_id uuid
+);
+
+
+--
+-- Name: amazon_inventory_state; Type: TABLE; Schema: public; Owner: -
+-- Merchant-fulfilled stock per listed SKU: what we have, what we last told Amazon, and what Amazon
+-- shows (from the listing status refresh) for drift checks.
+--
+
+CREATE TABLE public.amazon_inventory_state (
+    sku text NOT NULL,
+    product_id uuid,
+    variant_id uuid,
+    our_available numeric(12,3),
+    reserved integer DEFAULT 0 NOT NULL,
+    pushed_qty integer,
+    pushed_at timestamp with time zone,
+    push_error text,
+    amazon_quantity integer,
+    amazon_checked_at timestamp with time zone,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);

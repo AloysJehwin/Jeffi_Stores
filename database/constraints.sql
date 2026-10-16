@@ -3675,3 +3675,10 @@ ALTER TABLE ONLY public.amazon_offers ADD CONSTRAINT amazon_offers_pkey PRIMARY 
 ALTER TABLE ONLY public.amazon_fee_estimates ADD CONSTRAINT amazon_fee_estimates_pkey PRIMARY KEY (sku);
 ALTER TABLE ONLY public.amazon_repricer_rules ADD CONSTRAINT amazon_repricer_rules_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.amazon_repricer_rules ADD CONSTRAINT amazon_repricer_rules_strategy_check CHECK (((strategy)::text = ANY ((ARRAY['match_buybox'::character varying, 'beat_buybox'::character varying, 'hold'::character varying])::text[])));
+
+ALTER TABLE ONLY public.amazon_orders ADD CONSTRAINT amazon_orders_pkey PRIMARY KEY (amazon_order_id);
+ALTER TABLE ONLY public.amazon_orders ADD CONSTRAINT amazon_orders_stock_state_check CHECK (((stock_state)::text = ANY ((ARRAY['none'::character varying, 'deducted'::character varying, 'restored'::character varying, 'short'::character varying, 'unmatched'::character varying])::text[])));
+ALTER TABLE ONLY public.amazon_order_items ADD CONSTRAINT amazon_order_items_pkey PRIMARY KEY (order_item_id);
+ALTER TABLE ONLY public.amazon_inventory_state ADD CONSTRAINT amazon_inventory_state_pkey PRIMARY KEY (sku);
+ALTER TABLE ONLY public.amazon_order_items ADD CONSTRAINT amazon_order_items_order_fkey FOREIGN KEY (amazon_order_id) REFERENCES public.amazon_orders(amazon_order_id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.amazon_orders ADD CONSTRAINT amazon_orders_order_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
