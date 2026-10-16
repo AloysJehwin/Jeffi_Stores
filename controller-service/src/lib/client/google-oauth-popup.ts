@@ -79,7 +79,6 @@ export function openGoogleOAuthPopup({
       redirect_uri: redirectUri,
       response_type: 'token',
       scope,
-      include_granted_scopes: 'true',
       state,
       prompt: 'select_account',
     })

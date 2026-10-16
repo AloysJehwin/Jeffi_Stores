@@ -65,7 +65,8 @@ describe('Google Business Profile', () => {
     expect(u.searchParams.get('access_type')).toBe('offline')
     expect(u.searchParams.get('prompt')).toBe('select_account consent')
     expect(u.searchParams.get('code_challenge')).toBeNull()
-    expect(u.searchParams.get('code_challenge_method')).toBe('S256')
+    // Earlier grants (drive.file) must not be merged in: Google refuses them with the YouTube scopes.
+    expect(u.searchParams.get('include_granted_scopes')).toBeNull()
     expect(u.searchParams.get('state')).toBe('st')
   })
 
