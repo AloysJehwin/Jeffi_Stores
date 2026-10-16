@@ -9,13 +9,24 @@ import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import { getAdminSubscriptionStats, listAdminSubscriptions } from '@/lib/queries/subscriptions'
 import { SUBSCRIPTION_STATUS_LABELS } from '@/lib/subscriptions/intervals'
 import { SUBSCRIPTION_STATUS_BADGE, fmtDate, inr } from './_status'
+import { resolveOverviewTab } from '@/lib/overviews/sales-documents'
+import SubscriptionsTabBar from './_components/SubscriptionsTabBar'
+import SubscriptionsOverview from './_components/SubscriptionsOverview'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 type SP = { [key: string]: string | undefined }
 
-export default function SubscriptionsPage({ searchParams }: { searchParams: Promise<SP> }) {
+// Params the list reads; a link carrying any of them (without ?tab) opens the list.
+const LIST_KEYS = ['status', 'search', 'page'] as const
+
+export default async function SubscriptionsPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const sp = await searchParams
+  const tab = resolveOverviewTab(
+    new URLSearchParams(Object.entries(sp).filter((e): e is [string, string] => typeof e[1] === 'string')),
+    LIST_KEYS
+  )
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
@@ -23,22 +34,32 @@ export default function SubscriptionsPage({ searchParams }: { searchParams: Prom
         <p className="text-foreground-secondary mt-1 text-sm">Recurring orders billed through Razorpay mandates</p>
       </div>
 
-      <Suspense fallback={<AdminStatsSkeleton cards={5} gridClass="grid-cols-2 sm:grid-cols-5" />}>
-        <SubscriptionStats />
-      </Suspense>
+      <SubscriptionsTabBar value={tab} />
 
-      <AdminFilters
-        filters={[
-          {
-            name: 'status',
-            label: 'Status',
-            options: Object.entries(SUBSCRIPTION_STATUS_LABELS).map(([value, label]) => ({ value, label })),
-          },
-        ]}
-        searchPlaceholder="Search by customer, email, product or Razorpay ID..."
-      />
+      {tab === 'overview' ? (
+        <Suspense fallback={<AdminStatsSkeleton cards={5} gridClass="grid-cols-2 sm:grid-cols-5" />}>
+          <SubscriptionsOverview />
+        </Suspense>
+      ) : (
+        <>
+          <Suspense fallback={<AdminStatsSkeleton cards={5} gridClass="grid-cols-2 sm:grid-cols-5" />}>
+            <SubscriptionStats />
+          </Suspense>
 
-      <SubscriptionsListSection searchParams={searchParams} />
+          <AdminFilters
+            filters={[
+              {
+                name: 'status',
+                label: 'Status',
+                options: Object.entries(SUBSCRIPTION_STATUS_LABELS).map(([value, label]) => ({ value, label })),
+              },
+            ]}
+            searchPlaceholder="Search by customer, email, product or Razorpay ID..."
+          />
+
+          <SubscriptionsListSection searchParams={searchParams} />
+        </>
+      )}
     </div>
   )
 }
@@ -79,12 +100,11 @@ async function SubscriptionsListContent({ sp }: { sp: SP }) {
   const { items, total, pageSize } = await listAdminSubscriptions({ status: sp.status, q: sp.search, page })
 
   const buildUrl = (p: number) => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (sp.status) params.set('status', sp.status)
     if (sp.search) params.set('search', sp.search)
     if (p > 1) params.set('page', String(p))
-    const qs = params.toString()
-    return ap(`/admin/subscriptions${qs ? `?${qs}` : ''}`, host)
+    return ap(`/admin/subscriptions?${params}`, host)
   }
 
   const th = 'px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider'
