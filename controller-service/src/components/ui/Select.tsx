@@ -36,8 +36,8 @@ export interface MultiSelectProps<T extends string | number> extends BaseProps {
 }
 
 const SIZE_CLS = {
-  sm: 'px-3 py-1 text-sm',
-  md: 'px-4 py-1.5 text-sm',
+  sm: 'h-control px-3 text-sm',
+  md: 'h-control px-4 text-sm',
 } as const
 
 function defaultTriggerCls(open: boolean, disabled: boolean | undefined, size: 'sm' | 'md') {
