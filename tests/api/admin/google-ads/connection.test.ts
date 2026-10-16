@@ -175,7 +175,7 @@ describe('accounts', () => {
         json([
           {
             results: [
-              { customerClient: { id: '3333333333', descriptiveName: 'Client A', manager: false, currencyCode: 'INR' } },
+              { customerClient: { id: '3333333333', descriptiveName: 'Client A', manager: false, currencyCode: 'INR', status: 'ENABLED' } },
               { customerClient: { id: '2222222222', descriptiveName: 'Agency MCC', manager: true } },
             ],
           },

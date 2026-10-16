@@ -295,7 +295,7 @@ async function runSteps(ctx: StepCtx, mode: AdsSyncMode) {
   await step(ctx, 'change_events', async () => {
     const since = new Date(`${range.to}T00:00:00Z`)
     since.setUTCDate(since.getUTCDate() - (CHANGE_EVENT_DAYS - 1))
-    const rows = (await ads.searchStream(Q.changeEvents(`${since.toISOString().slice(0, 10)} 00:00:00`))).map(mapChangeEvent)
+    const rows = (await ads.searchStream(Q.changeEvents(`${since.toISOString().slice(0, 10)} 00:00:00`, `${range.to} 23:59:59`))).map(mapChangeEvent)
       .filter(r => r.resource_name)
     const cols = ['resource_name', 'change_date_time', 'resource_type', 'changed_resource', 'operation', 'client_type',
       'user_email', 'campaign_id', 'changed_fields']
