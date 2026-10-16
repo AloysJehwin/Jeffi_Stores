@@ -6865,8 +6865,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/layout.tsx": {
-    "mtime": 1792161061.2884386,
-    "ast_hash": "818b98b81e4669e1e49a2aebba328c47",
+    "mtime": 1792162423.2867308,
+    "ast_hash": "cf1e601ffbfe19fe908ecfda6cbef526",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/loading.tsx": {
@@ -14545,8 +14545,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/integrations/resolve.ts": {
-    "mtime": 1792161529.081907,
-    "ast_hash": "ca0ae2dc4202843b618531cc00d216e3",
+    "mtime": 1792161884.6342406,
+    "ast_hash": "1ca8271ab32b7ac41cfe0fe0bfca2897",
     "semantic_hash": ""
   },
   "controller-service/src/lib/k8s/capacity.ts": {
@@ -16630,8 +16630,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/google-ads/connection.ts": {
-    "mtime": 1792092837.4010568,
-    "ast_hash": "351320abc4e076669519fb9670791e59",
+    "mtime": 1792161897.6123593,
+    "ast_hash": "60f6bc70192187ad5c9b0ce46f57fa24",
     "semantic_hash": ""
   },
   "controller-service/src/lib/google-ads/report.ts": {
@@ -16640,13 +16640,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/google-ads/GoogleAdsClient.tsx": {
-    "mtime": 1792123811.1597464,
-    "ast_hash": "0f4fdaf57859559988cbf5976a81b355",
+    "mtime": 1792162273.7125444,
+    "ast_hash": "fa9f831eddfa4000403b563c419086de",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/google-ads/_components/ConnectPanel.tsx": {
-    "mtime": 1792129962.7537766,
-    "ast_hash": "1305a1738db6071bffaed455941dad30",
+    "mtime": 1792162281.3889554,
+    "ast_hash": "17dc1df5a596c698ca37c68dc683111c",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/google-ads/_components/ReportViews.tsx": {
@@ -17170,8 +17170,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/ecom/google-ads/page.tsx": {
-    "mtime": 1792123910.9972053,
-    "ast_hash": "cb4127d688ada12fb708db7320fefbe8",
+    "mtime": 1792162423.2874904,
+    "ast_hash": "087f005c46fc3009bd40ed88993b3eb4",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/google-ads/_components/AlertsPanel.tsx": {
@@ -17715,18 +17715,18 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/amazon-ads/_components/AmazonAdsConsole.tsx": {
-    "mtime": 1792147815.714147,
-    "ast_hash": "7ee30ad959e8212ac6f99b5d400648c6",
+    "mtime": 1792162208.7960606,
+    "ast_hash": "08eb87596d6e97a3effde012a67a878e",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/amazon-ads/page.tsx": {
-    "mtime": 1792143480.0348904,
-    "ast_hash": "8e21cc86736a55bc732a8799f285f647",
+    "mtime": 1792162208.8219233,
+    "ast_hash": "a8cfb6bf513813a13696e18c68aab833",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/amazon-ads/connection/route.ts": {
-    "mtime": 1792143462.8756127,
-    "ast_hash": "16152b0fabe2dc561b1d123e97c17cfd",
+    "mtime": 1792162147.831762,
+    "ast_hash": "0a2a391ac1d4207453234bba1936c0b1",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/amazon-ads/console/actions/route.ts": {
@@ -17755,8 +17755,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/cron/amazon-ads-sync/route.ts": {
-    "mtime": 1792143462.9069178,
-    "ast_hash": "2241905476e97758c707210200aaf1ad",
+    "mtime": 1792162147.8324125,
+    "ast_hash": "de26536787a64f68d979fa300cc8d228",
     "semantic_hash": ""
   },
   "controller-service/src/lib/amazon-ads/alerts.ts": {
@@ -17765,8 +17765,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/amazon-ads/client.ts": {
-    "mtime": 1792143251.9257495,
-    "ast_hash": "ba3809be7bc8a9d4f927a7d5a6def285",
+    "mtime": 1792162128.0780246,
+    "ast_hash": "dc8676606525daae0bc6772c29fb435c",
     "semantic_hash": ""
   },
   "controller-service/src/lib/amazon-ads/console.ts": {
@@ -17790,13 +17790,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/meta-ads/_components/MetaAdsConsole.tsx": {
-    "mtime": 1792147815.7150445,
-    "ast_hash": "0a373f6da75955ad969e1249bc7d5e63",
+    "mtime": 1792162248.2655709,
+    "ast_hash": "cb9869e24f47d0fa1d76af9f5db810e2",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/meta-ads/page.tsx": {
-    "mtime": 1792144082.3998952,
-    "ast_hash": "d2c46018d65ed94eeca4753450fdd1c7",
+    "mtime": 1792162248.305503,
+    "ast_hash": "4a29c5c7f8a021b8aa1984bcd3befc7a",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(admin)/admin/integrations/meta-ads/callback/route.ts": {
@@ -17830,13 +17830,13 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/cron/meta-ads-sync/route.ts": {
-    "mtime": 1792144065.104972,
-    "ast_hash": "3275c9d6657167eb8376bc87942045a9",
+    "mtime": 1792162147.8332849,
+    "ast_hash": "1d1150dbf826b45db44268e246529de5",
     "semantic_hash": ""
   },
   "controller-service/src/app/api/(internal)/cron/meta-capi/route.ts": {
-    "mtime": 1792144065.1051662,
-    "ast_hash": "26eaf8530e40df2ea9cf232f6bc94cba",
+    "mtime": 1792162147.8329473,
+    "ast_hash": "8c656ca183f240077ae760879aae607b",
     "semantic_hash": ""
   },
   "controller-service/src/lib/meta-ads/alerts.ts": {
@@ -19167,6 +19167,26 @@
   "tests/lib/overviews/sales-documents.test.ts": {
     "mtime": 1792151387.2164776,
     "ast_hash": "825bbc105ab0f303131150eb48e61ff4",
+    "semantic_hash": ""
+  },
+  "controller-service/src/components/admin/ConnectionsGear.tsx": {
+    "mtime": 1792162164.32483,
+    "ast_hash": "15bac436517a2bc53d20ad6a40950807",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/amazon-ads/connection.test.ts": {
+    "mtime": 1792162356.6107213,
+    "ast_hash": "5790b301e9de84426bb8d096924a23e0",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/meta-ads/connection.test.ts": {
+    "mtime": 1792162356.6222255,
+    "ast_hash": "10e2392388cb306bea337fe81dbe4352",
+    "semantic_hash": ""
+  },
+  "tests/lib/amazon-ads/own-app.test.ts": {
+    "mtime": 1792162356.5967782,
+    "ast_hash": "42ef9d3a0ca84fe794bd88fdd352901b",
     "semantic_hash": ""
   }
 }
