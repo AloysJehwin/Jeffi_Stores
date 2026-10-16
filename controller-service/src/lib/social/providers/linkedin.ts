@@ -1,7 +1,7 @@
 // LinkedIn company pages (Community Management API): posts with an image or article, social
 // actions as metrics. No inbox.
 import { fetchWithRetry } from '@/lib/channels/ratelimit'
-import { SocialApiError, fitText, type PostMetrics, type SocialProvider, type TokenSet } from './types'
+import { SocialApiError, fitText, ownApp, type PostMetrics, type SocialProvider, type TokenSet } from './types'
 
 const LABEL = 'LinkedIn'
 const REST = 'https://api.linkedin.com/rest'
@@ -32,14 +32,18 @@ async function li(url: string, token: string, init: RequestInit = {}): Promise<R
   return res
 }
 
-async function token(form: Record<string, string>): Promise<TokenSet> {
+type App = { clientId: string; clientSecret: string } | null
+
+async function token(form: Record<string, string>, app: App = null): Promise<TokenSet> {
+  const clientId = app?.clientId ?? process.env.LINKEDIN_CLIENT_ID ?? ''
+  const clientSecret = app?.clientSecret ?? process.env.LINKEDIN_CLIENT_SECRET ?? ''
   const res = await fetchWithRetry('https://www.linkedin.com/oauth/v2/accessToken', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       ...form,
-      client_id: process.env.LINKEDIN_CLIENT_ID ?? '',
-      client_secret: process.env.LINKEDIN_CLIENT_SECRET ?? '',
+      client_id: clientId,
+      client_secret: clientSecret,
     }),
   })
   if (!res.ok) throw await liError(res)
@@ -92,7 +96,7 @@ export const linkedinProvider: SocialProvider = {
     exchange: (code, redirectUri) => token({ grant_type: 'authorization_code', code, redirect_uri: redirectUri }),
     async refresh(auth) {
       if (!auth.refreshToken) throw new SocialApiError('linkedin', 401, `${LABEL}: no refresh token, sign in again`)
-      return token({ grant_type: 'refresh_token', refresh_token: auth.refreshToken })
+      return token({ grant_type: 'refresh_token', refresh_token: auth.refreshToken }, ownApp(auth))
     },
     async listTargets(t) {
       const res = await li(`${REST}/organizationAcls?q=roleAssignee&role=ADMINISTRATOR&state=APPROVED`, t)

@@ -1,7 +1,7 @@
 // X (API v2): posts with an optional image, public metrics. OAuth 2.0 with PKCE; X rotates
 // the refresh token on every refresh. No inbox.
 import { fetchWithRetry } from '@/lib/channels/ratelimit'
-import { SocialApiError, fitText, type PostMetrics, type SocialProvider, type TokenSet } from './types'
+import { SocialApiError, fitText, ownApp, type PostMetrics, type SocialProvider, type TokenSet } from './types'
 
 const LABEL = 'X'
 const API = 'https://api.x.com/2'
@@ -39,12 +39,16 @@ async function x<T>(url: string, token: string, init: RequestInit = {}): Promise
   return (await res.json()) as T
 }
 
-async function token(form: Record<string, string>): Promise<TokenSet> {
-  const basic = Buffer.from(`${process.env.X_CLIENT_ID ?? ''}:${process.env.X_CLIENT_SECRET ?? ''}`).toString('base64')
+type App = { clientId: string; clientSecret: string } | null
+
+async function token(form: Record<string, string>, app: App = null): Promise<TokenSet> {
+  const clientId = app?.clientId ?? process.env.X_CLIENT_ID ?? ''
+  const clientSecret = app?.clientSecret ?? process.env.X_CLIENT_SECRET ?? ''
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString('base64')
   const res = await fetchWithRetry(`${API}/oauth2/token`, {
     method: 'POST',
     headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ ...form, client_id: process.env.X_CLIENT_ID ?? '' }),
+    body: new URLSearchParams({ ...form, client_id: clientId }),
   })
   if (!res.ok) throw await xError(res)
   const t = (await res.json()) as { access_token: string; refresh_token?: string; expires_in?: number }
@@ -95,7 +99,7 @@ export const xProvider: SocialProvider = {
       token({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, code_verifier: verifier }),
     async refresh(auth) {
       if (!auth.refreshToken) throw new SocialApiError('x', 401, `${LABEL}: no refresh token, sign in again`)
-      return token({ grant_type: 'refresh_token', refresh_token: auth.refreshToken })
+      return token({ grant_type: 'refresh_token', refresh_token: auth.refreshToken }, ownApp(auth))
     },
     async listTargets(t) {
       const res = await x<{ data: { id: string; username: string } }>(`${API}/users/me`, t)

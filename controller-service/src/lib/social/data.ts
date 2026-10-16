@@ -1,7 +1,7 @@
 import { controlPlanePool } from '@/lib/tenant-registry/shared'
 import { queryMany } from '@/lib/shared/db'
 import { oauthProviderInfo } from '@/lib/integrations/oauth'
-import { listAccounts } from './accounts'
+import { connectionInfo, listAccounts } from './accounts'
 import { NETWORK_LABEL, socialRedirectUri } from './oauth'
 import { NETWORKS, networkOf, providerFor } from './providers'
 
@@ -125,13 +125,17 @@ export async function listConnections(tenantId: string | null) {
     const p = providerFor(network)
     const row = rows.find(a => a.provider === network)
     const missing = network === 'facebook' || network === 'instagram' ? meta.missing : (p.oauth?.env ?? []).filter(k => !process.env[k])
-    const platformEnv = !tenantId && !row && (network === 'facebook' || network === 'instagram') && !!process.env.META_JEFFI_PAGE_TOKEN
+    const isMeta = network === 'facebook' || network === 'instagram'
+    const platformEnv = !tenantId && !row && isMeta && !!process.env.META_JEFFI_PAGE_TOKEN
+    const info = row && !isMeta ? connectionInfo(row) : null
     return {
       network,
       label: NETWORK_LABEL[network],
       status: platformEnv ? 'connected' : (row?.status ?? 'not_connected'),
       target: platformEnv ? 'Platform page (env)' : row?.page_name ?? row?.page_id ?? null,
       tokenExpiry: row?.token_expiry ?? null,
+      via: info?.via ?? null,
+      ownApp: info?.ownApp ?? false,
       configured: missing.length === 0,
       missing,
       redirectUri: network === 'facebook' || network === 'instagram' ? meta.redirectUri : socialRedirectUri(),

@@ -89,6 +89,16 @@ describe('Google Business Profile', () => {
     expect(formOf(1).get('grant_type')).toBe('refresh_token')
   })
 
+  it('refreshes with the store own app when stored, else the platform app', async () => {
+    on('https://oauth2.googleapis.com/token', () => json({ access_token: 'a3', expires_in: 3600 }))
+    await gbpProvider.oauth!.refresh!(auth('x', { refreshToken: 'r', extra: { via: 'manual', clientId: 'own-id', clientSecret: 'own-secret' } }))
+    expect(formOf(0).get('client_id')).toBe('own-id')
+    expect(formOf(0).get('client_secret')).toBe('own-secret')
+    await youtubeProvider.oauth!.refresh!(auth('x', { refreshToken: 'r', extra: { via: 'manual', clientId: 'own-id' } }))
+    expect(formOf(1).get('client_id')).toBe('gid')
+    expect(formOf(1).get('client_secret')).toBe('test-secret-google')
+  })
+
   it('lists locations across accounts', async () => {
     on('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', () => json({ accounts: [{ name: 'accounts/1' }] }))
     on('https://mybusinessbusinessinformation.googleapis.com/v1/accounts/1/locations', () =>
@@ -249,6 +259,14 @@ describe('Pinterest', () => {
     const r = await pinterestProvider.oauth!.refresh!(auth('b', { refreshToken: 'old' }))
     expect(r.accessToken).toBe('pa')
     expect(formOf(1).get('refresh_token')).toBe('old')
+  })
+
+  it('refreshes with the store own app when stored, else the platform app', async () => {
+    on('https://api.pinterest.com/v5/oauth/token', () => json({ access_token: 'pa', expires_in: 60 }))
+    await pinterestProvider.oauth!.refresh!(auth('b', { refreshToken: 'r', extra: { clientId: 'own', clientSecret: 'own-secret' } }))
+    expect(header(0, 'Authorization')).toBe(`Basic ${Buffer.from('own:own-secret').toString('base64')}`)
+    await pinterestProvider.oauth!.refresh!(auth('b', { refreshToken: 'r' }))
+    expect(header(1, 'Authorization')).toBe(`Basic ${Buffer.from('pid:test-secret-pinterest').toString('base64')}`)
   })
 
   it('creates an image pin', async () => {

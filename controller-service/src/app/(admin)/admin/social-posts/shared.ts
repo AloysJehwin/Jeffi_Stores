@@ -43,6 +43,10 @@ export interface NetworkInfo {
   status: string
   target: string | null
   tokenExpiry: string | null
+  /** How a non-Meta network was connected. */
+  via: 'manual' | 'signin' | null
+  /** A manual connection carries the store's own app for refreshes. */
+  ownApp: boolean
   configured: boolean
   missing: string[]
   redirectUri: string | null
