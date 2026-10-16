@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
+import { Tabs } from '@/components/admin/channels/ui'
 import { formatINR as formatINRBase, formatDate } from '@/lib/shared/format'
 
 const formatINR = (n: number) => formatINRBase(n, 0)
@@ -279,24 +280,16 @@ export default function SupplierDetailClient({ id }: { id: string }) {
 
       {/* Tabs */}
       <div>
-        <div className="flex border-b border-border-default mb-4">
-          {(['pos', 'expenses', 'products'] as Tab[]).map(t => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                tab === t
-                  ? 'border-accent-500 text-accent-500'
-                  : 'border-transparent text-foreground-secondary hover:text-foreground'
-              }`}
-            >
-              {t === 'pos'
-                ? `Purchase Orders (${pos.length})`
-                : t === 'expenses'
-                  ? `Bills / Expenses (${expenses.length})`
-                  : `Products (${linkedProducts.length})`}
-            </button>
-          ))}
+        <div className="mb-4">
+          <Tabs
+            tabs={[
+              { id: 'pos' as Tab, label: `Purchase Orders (${pos.length})` },
+              { id: 'expenses' as Tab, label: `Bills / Expenses (${expenses.length})` },
+              { id: 'products' as Tab, label: `Products (${linkedProducts.length})` },
+            ]}
+            value={tab}
+            onChange={setTab}
+          />
         </div>
 
         {tab === 'pos' && (

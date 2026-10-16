@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import Link from 'next/link'
 import { AlertCircle, CheckCircle2, TrendingDown, TrendingUp } from 'lucide-react'
 
 // Building blocks shared by the channel consoles (Merchant, Amazon, Amazon Ads, Meta Ads, Social),
@@ -86,21 +88,46 @@ export function Banner({ ok, children }: { ok: boolean; children: React.ReactNod
   )
 }
 
+const TabSlotCtx = createContext<{ el: HTMLElement | null; setEl: React.Dispatch<React.SetStateAction<HTMLElement | null>> } | null>(null)
+
+/** Wrap a tab bar and its content so the content can put its actions on the tab line (TabActionsPortal). */
+export function TabActionsHost({ children }: { children: React.ReactNode }) {
+  const [el, setEl] = useState<HTMLElement | null>(null)
+  const value = useMemo(() => ({ el, setEl }), [el])
+  return <TabSlotCtx.Provider value={value}>{children}</TabSlotCtx.Provider>
+}
+
+/** Renders its children on the enclosing host's tab line; inline when there is no host. */
+export function TabActionsPortal({ children }: { children: React.ReactNode }) {
+  const ctx = useContext(TabSlotCtx)
+  if (!ctx) return <>{children}</>
+  return ctx.el ? createPortal(children, ctx.el) : null
+}
+
 /** Tab bar with optional actions on the same line. Tabs scroll sideways when they overflow (no
  * visible scrollbar, edge fades show there is more); actions stay pinned on the right. */
-export function Tabs<T extends string>({
-  tabs,
-  value,
-  onChange,
-  actions,
-}: {
-  tabs: { id: T; label: string; count?: number }[]
-  value: T
-  onChange: (t: T) => void
-  actions?: React.ReactNode
-}) {
+export function TabStrip({ selected, actions, children }: { selected: string; actions?: React.ReactNode; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null)
   const [edges, setEdges] = useState({ left: false, right: false })
+  const n = React.Children.count(children)
+  const slot = useContext(TabSlotCtx)
+  // The first bar inside a host takes the slot; nested bars keep their own actions only.
+  const setSlot = slot?.setEl
+  const ownSlot = useRef<HTMLElement | null>(null)
+  const slotRef = useCallback(
+    (node: HTMLSpanElement | null) => {
+      if (!setSlot) return
+      if (node) {
+        ownSlot.current = node
+        setSlot(prev => prev ?? node)
+      } else {
+        const mine = ownSlot.current
+        ownSlot.current = null
+        setSlot(prev => (prev === mine ? null : prev))
+      }
+    },
+    [setSlot]
+  )
   const measure = () => {
     const el = ref.current
     if (el) setEdges({ left: el.scrollLeft > 2, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 })
@@ -108,14 +135,15 @@ export function Tabs<T extends string>({
   useEffect(() => {
     measure()
     const el = ref.current
-    if (!el) return
+    if (!el || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(measure)
     ro.observe(el)
     return () => ro.disconnect()
-  }, [tabs.length])
+  }, [n])
   useEffect(() => {
-    ref.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-  }, [value])
+    const t = ref.current?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (t && typeof t.scrollIntoView === 'function') t.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [selected])
   return (
     <div className="flex items-end gap-2 border-b border-border-default">
       <div className="relative flex-1 min-w-0">
@@ -125,27 +153,115 @@ export function Tabs<T extends string>({
           className="flex gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           role="tablist"
         >
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={value === t.id}
-              onClick={() => onChange(t.id)}
-              className={`px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 shrink-0 ${
-                value === t.id ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'
-              }`}
-            >
-              {t.label}
-              {t.count ? <span className="ml-1 text-xs text-accent-500">({t.count})</span> : null}
-            </button>
-          ))}
+          {children}
         </div>
         {edges.left && <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-surface-secondary to-transparent" />}
         {edges.right && <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-surface-secondary to-transparent" />}
       </div>
-      {actions && <div className="flex items-center gap-1 shrink-0 pb-1">{actions}</div>}
+      {(actions || slot) && (
+        <div className="flex items-center gap-1 shrink-0 pb-1">
+          {actions}
+          {slot && <span ref={slotRef} className="contents" />}
+        </div>
+      )}
     </div>
+  )
+}
+
+export const tabCls = (active: boolean) =>
+  `inline-flex items-center gap-1.5 px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 shrink-0 transition-colors ${
+    active ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted hover:text-foreground'
+  }`
+
+type TabItem<T> = { id: T; label: React.ReactNode; count?: number; icon?: React.ReactNode }
+
+function TabInner({ t }: { t: { label: React.ReactNode; count?: number; icon?: React.ReactNode } }) {
+  return (
+    <>
+      {t.icon}
+      {t.label}
+      {t.count ? <span className="text-xs text-accent-500">({t.count})</span> : null}
+    </>
+  )
+}
+
+export function Tabs<T extends string>({
+  tabs,
+  value,
+  onChange,
+  actions,
+}: {
+  tabs: readonly TabItem<T>[]
+  value: T
+  onChange: (t: T) => void
+  actions?: React.ReactNode
+}) {
+  return (
+    <TabStrip selected={value} actions={actions}>
+      {tabs.map(t => (
+        <button key={t.id} type="button" role="tab" aria-selected={value === t.id} onClick={() => onChange(t.id)} className={tabCls(value === t.id)}>
+          <TabInner t={t} />
+        </button>
+      ))}
+    </TabStrip>
+  )
+}
+
+/** Same bar as Tabs, for tabs driven by the URL. */
+export function TabLinks<T extends string>({
+  tabs,
+  value,
+  actions,
+  replace,
+  scroll,
+}: {
+  tabs: readonly (TabItem<T> & { href: string })[]
+  value: T
+  actions?: React.ReactNode
+  replace?: boolean
+  scroll?: boolean
+}) {
+  return (
+    <TabStrip selected={value} actions={actions}>
+      {tabs.map(t => (
+        <Link key={t.id} href={t.href} replace={replace} scroll={scroll} role="tab" aria-selected={value === t.id} className={tabCls(value === t.id)}>
+          <TabInner t={t} />
+        </Link>
+      ))}
+    </TabStrip>
+  )
+}
+
+/** Primary text action for the tab line; icon only below sm so it never crowds the tabs. */
+export function TabAction({
+  href,
+  onClick,
+  icon,
+  label,
+  disabled,
+}: {
+  href?: string
+  onClick?: () => void
+  icon: React.ReactNode
+  label: string
+  disabled?: boolean
+}) {
+  const cls =
+    'inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-2 sm:px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-600 disabled:opacity-50 whitespace-nowrap'
+  const inner = (
+    <>
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+    </>
+  )
+  return href ? (
+    <Link href={href} aria-label={label} title={label} className={cls}>
+      {inner}
+    </Link>
+  ) : (
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} title={label} className={cls}>
+      {inner}
+    </button>
   )
 }
 

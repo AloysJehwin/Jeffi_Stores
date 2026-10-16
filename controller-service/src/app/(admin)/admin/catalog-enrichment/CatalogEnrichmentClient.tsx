@@ -200,43 +200,66 @@ export default function CatalogEnrichmentPage() {
           </div>
           <p className="text-foreground-secondary mt-1 text-sm">AI-generated product intelligence for admin review</p>
         </div>
-        {tab === 'list' && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {selected.size > 0 && statusFilter === 'proposed' && (
+      </div>
+
+      <TabLinks
+        base="/admin/catalog-enrichment"
+        active={tab}
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'list', label: 'Suggestions' },
+        ]}
+        actions={
+          tab === 'list' && (
+            <>
+              {selected.size > 0 && statusFilter === 'proposed' && (
+                <RequireWrite scope="catalog_enrichment:write">
+                  <button
+                    onClick={() => bulkAction('approve')}
+                    disabled={bulkBusy}
+                    aria-label={`Approve ${selected.size}`}
+                    className="flex items-center gap-1.5 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold disabled:opacity-50"
+                  >
+                    {bulkBusy ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle className="w-3.5 h-3.5" />
+                    )}
+                    <span className="hidden sm:inline">Approve {selected.size}</span>
+                  </button>
+                  <button
+                    onClick={() => bulkAction('reject')}
+                    disabled={bulkBusy}
+                    aria-label={`Reject ${selected.size}`}
+                    className="flex items-center gap-1.5 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
+                  >
+                    <XCircle className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Reject {selected.size}</span>
+                  </button>
+                  <div className="w-px h-5 bg-border-default" />
+                </RequireWrite>
+              )}
               <RequireWrite scope="catalog_enrichment:write">
                 <button
-                  onClick={() => bulkAction('approve')}
-                  disabled={bulkBusy}
-                  className="flex items-center gap-1.5 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold disabled:opacity-50"
-                >
-                  {bulkBusy ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-3.5 h-3.5" />
-                  )}
-                  Approve {selected.size}
-                </button>
-                <button
-                  onClick={() => bulkAction('reject')}
-                  disabled={bulkBusy}
+                  onClick={runAll}
+                  disabled={runningAll}
+                  aria-label="Run All"
                   className="flex items-center gap-1.5 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
                 >
-                  <XCircle className="w-3.5 h-3.5" />
-                  Reject {selected.size}
+                  {runningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  <span className="hidden sm:inline">Run All</span>
                 </button>
-                <div className="w-px h-5 bg-border-default" />
               </RequireWrite>
-            )}
-            <RequireWrite scope="catalog_enrichment:write">
-              <button
-                onClick={runAll}
-                disabled={runningAll}
-                className="flex items-center gap-1.5 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
-              >
-                {runningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                Run All
-              </button>
-            </RequireWrite>
+            </>
+          )
+        }
+      />
+
+      {tab === 'overview' ? (
+        <EnrichmentOverview />
+      ) : (
+        <>
+          <div className="flex justify-end mb-4">
             <AdminSelect
               sm
               value={statusFilter}
@@ -249,22 +272,6 @@ export default function CatalogEnrichmentPage() {
               ]}
             />
           </div>
-        )}
-      </div>
-
-      <TabLinks
-        base="/admin/catalog-enrichment"
-        active={tab}
-        tabs={[
-          { id: 'overview', label: 'Overview' },
-          { id: 'list', label: 'Suggestions' },
-        ]}
-      />
-
-      {tab === 'overview' ? (
-        <EnrichmentOverview />
-      ) : (
-        <>
           {loading && (
             <div className="flex items-center gap-2 text-sm text-foreground-muted py-16 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading

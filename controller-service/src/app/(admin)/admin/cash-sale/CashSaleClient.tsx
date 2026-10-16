@@ -8,6 +8,8 @@ import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { Plus } from 'lucide-react'
+import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import DatePicker from '@/components/ui/DatePicker'
@@ -823,18 +825,18 @@ export default function CashSaleClient() {
           <p className="text-foreground-secondary mt-1 text-sm">Walk-in sales — no customer details</p>
         </div>
         {canWrite && (
-          <button
-            onClick={() => {
-              resetForm()
-              setView('new')
-            }}
-            className="hidden md:flex items-center gap-2 px-4 h-control bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            New Cash Sale
-          </button>
+          <TabActionsPortal>
+            <span className="hidden md:inline-flex">
+              <TabAction
+                onClick={() => {
+                  resetForm()
+                  setView('new')
+                }}
+                icon={<Plus className="w-4 h-4" />}
+                label="New Cash Sale"
+              />
+            </span>
+          </TabActionsPortal>
         )}
       </div>
 

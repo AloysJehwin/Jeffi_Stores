@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { AlertTriangle, Check, X } from 'lucide-react'
+import { AlertTriangle, Check, Plus, X } from 'lucide-react'
+import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
@@ -1707,15 +1708,9 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
             <p className="text-foreground-secondary mt-1 text-sm">All online and offline invoices</p>
           </div>
           {canWrite && (
-            <button
-              onClick={() => navigateView('create')}
-              className="flex items-center gap-2 px-4 h-control bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              New Offline Invoice
-            </button>
+            <TabActionsPortal>
+              <TabAction onClick={() => navigateView('create')} icon={<Plus className="w-4 h-4" />} label="New Offline Invoice" />
+            </TabActionsPortal>
           )}
         </div>
 

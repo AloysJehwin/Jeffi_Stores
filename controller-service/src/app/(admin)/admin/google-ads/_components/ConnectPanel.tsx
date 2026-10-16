@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, ExternalLink, Link2, Loader2 } from 'lucide-
 import type { AdsConnectionStatus } from '@/lib/google-ads/connection'
 import { formatCid } from '@/lib/google-ads/format'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { Tabs } from '@/components/admin/channels/ui'
 
 interface AccountOption {
   customerId: string
@@ -136,22 +137,7 @@ export default function ConnectPanel({
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-border-default">
-        {tabs
-          .filter(t => t.show)
-          .map(t => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setMethod(t.id)}
-              className={`px-3 py-2 text-sm -mb-px border-b-2 ${
-                method === t.id ? 'border-accent-500 text-foreground font-medium' : 'border-transparent text-foreground-muted'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-      </div>
+      <Tabs tabs={tabs.filter(t => t.show)} value={method} onChange={setMethod} />
 
       {method === 'google' && (
         <div className="space-y-3">

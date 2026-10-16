@@ -20,6 +20,7 @@ import { useToast } from '@/contexts/ToastContext'
 import AdminAgentMessage from '@/components/admin/AdminAgentMessage'
 import AdminAgentBlocks, { type UiBlock } from '@/components/admin/AdminAgentBlocks'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { Tabs } from '@/components/admin/channels/ui'
 import AgentOverview from './_components/AgentOverview'
 
 interface ProposedAction {
@@ -993,47 +994,38 @@ export default function AdminAgentPage() {
             <p className="text-xs text-foreground-muted">Read-only chat + admin-approved actions</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={newChat}
-            className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-            title="New chat"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowHistory(s => !s)}
-            className={`p-1.5 rounded-lg transition-colors ${showHistory ? 'bg-surface-secondary text-foreground' : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
-            title="Chat history"
-          >
-            <History className="w-4 h-4" />
-          </button>
-        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 px-4 border-b border-border-default shrink-0">
-        {(
-          [
-            { id: 'chat', label: 'Chat', icon: MessageSquare },
-            { id: 'overview', label: 'Overview', icon: BarChart3 },
-            { id: 'slash', label: 'Slash', icon: Slash },
-            { id: 'tools', label: 'Tools', icon: LayoutGrid },
-          ] as const
-        ).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors border-b-2 ${
-              tab === id
-                ? 'text-accent-600 dark:text-accent-400 border-accent-500'
-                : 'text-foreground-muted hover:text-foreground border-transparent'
-            }`}
-          >
-            <Icon className="w-3.5 h-3.5" />
-            {label}
-          </button>
-        ))}
+      <div className="px-4 shrink-0">
+        <Tabs
+          tabs={[
+            { id: 'chat' as const, label: 'Chat', icon: <MessageSquare className="w-3.5 h-3.5" /> },
+            { id: 'overview' as const, label: 'Overview', icon: <BarChart3 className="w-3.5 h-3.5" /> },
+            { id: 'slash' as const, label: 'Slash', icon: <Slash className="w-3.5 h-3.5" /> },
+            { id: 'tools' as const, label: 'Tools', icon: <LayoutGrid className="w-3.5 h-3.5" /> },
+          ]}
+          value={tab}
+          onChange={setTab}
+          actions={
+            <>
+              <button
+                onClick={newChat}
+                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
+                title="New chat"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setShowHistory(s => !s)}
+                className={`p-1.5 rounded-lg transition-colors ${showHistory ? 'bg-surface-secondary text-foreground' : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
+                title="Chat history"
+              >
+                <History className="w-4 h-4" />
+              </button>
+            </>
+          }
+        />
       </div>
 
       {/* Chat tab */}

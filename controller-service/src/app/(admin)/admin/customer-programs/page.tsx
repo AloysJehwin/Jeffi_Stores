@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
+import { TabLinks } from '@/components/admin/channels/ui'
 import { cookies } from 'next/headers'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
@@ -71,23 +71,10 @@ export default async function CustomerProgramsPage({
         </p>
       </div>
 
-      <div className="flex gap-1 border-b border-border overflow-x-auto" role="tablist">
-        {TABS.map(t => (
-          <Link
-            key={t.key}
-            href={t.key === 'overview' ? basePath : `${basePath}?tab=${t.key}`}
-            role="tab"
-            aria-selected={tab === t.key}
-            className={`shrink-0 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === t.key
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-foreground-muted hover:text-foreground'
-            }`}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </div>
+      <TabLinks
+        tabs={TABS.map(t => ({ id: t.key, label: t.label, href: t.key === 'overview' ? basePath : `${basePath}?tab=${t.key}` }))}
+        value={tab}
+      />
 
       {tab === 'overview' && (
         <Suspense fallback={null}>

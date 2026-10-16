@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
+import { Plus } from 'lucide-react'
+import { TabAction } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryMany, queryCount } from '@/lib/shared/db'
@@ -57,14 +58,9 @@ async function getFilteredBrands(filters: { is_active?: string; search?: string;
 async function AddBrandButton() {
   const host = await getHost()
   return (
-    <div className="hidden md:block">
-      <Link
-        href={ap('/admin/brands/add', host)}
-        className="inline-flex items-center justify-center h-11 bg-accent-500 hover:bg-accent-600 text-white px-5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-      >
-        Add New Brand
-      </Link>
-    </div>
+    <span className="hidden md:inline-flex">
+      <TabAction href={ap('/admin/brands/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Brand" />
+    </span>
   )
 }
 
@@ -270,18 +266,6 @@ export default async function BrandsPage({
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Brands</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage product brands</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <BrochureButton mode="brand" />
-          <Suspense
-            fallback={
-              <span className="hidden md:inline-flex items-center justify-center h-11 bg-accent-500 text-white px-5 rounded-lg font-semibold text-center text-sm sm:text-base opacity-80">
-                Add New Brand
-              </span>
-            }
-          >
-            <AddBrandButton />
-          </Suspense>
-        </div>
       </div>
 
       <TabLinks
@@ -291,6 +275,14 @@ export default async function BrandsPage({
           { id: 'overview', label: 'Overview' },
           { id: 'list', label: 'Brands' },
         ]}
+        actions={
+          <>
+            <BrochureButton mode="brand" />
+            <Suspense fallback={null}>
+              <AddBrandButton />
+            </Suspense>
+          </>
+        }
       />
       <Suspense fallback={null}>
         <TabMemory storageKey="brand" tab={tab} explicit={typeof sp.tab === 'string'} />

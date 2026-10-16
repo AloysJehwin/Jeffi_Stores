@@ -44,6 +44,8 @@ import {
   Lock,
 } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
+import IconButton from '@/components/ui/IconButton'
+import { Tabs } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
 
 interface AuditEvent {
@@ -699,30 +701,29 @@ export default function AdminAuditClient() {
         <h1 className="text-xl font-bold text-foreground">Admin Audit Log</h1>
       </div>
 
-      <div className="flex items-center gap-1 border-b border-border-default mb-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {[
-          { id: 'audit' as const, label: 'Audit Events', icon: ScrollText, show: true },
-          { id: 'mail_log' as const, label: 'Mail Log', icon: Mail, show: true },
-          { id: 'sms_log' as const, label: 'SMS Log', icon: MessageSquare, show: true },
-          { id: 'whatsapp_log' as const, label: 'WhatsApp Log', icon: MessageCircle, show: true },
-          { id: 'cron' as const, label: 'Cron Jobs', icon: Clock, show: true },
-        ]
-          .filter(t => t.show)
-          .map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setPageTab(id)}
-              className={`flex shrink-0 whitespace-nowrap items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors -mb-px ${
-                pageTab === id
-                  ? 'text-accent-600 dark:text-accent-400 border-accent-500'
-                  : 'text-foreground-muted hover:text-foreground border-transparent'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {label}
-            </button>
-          ))}
+      <div className="mb-5">
+        <Tabs
+          tabs={[
+            { id: 'audit' as const, label: 'Audit Events', icon: <ScrollText className="w-3.5 h-3.5" /> },
+            { id: 'mail_log' as const, label: 'Mail Log', icon: <Mail className="w-3.5 h-3.5" /> },
+            { id: 'sms_log' as const, label: 'SMS Log', icon: <MessageSquare className="w-3.5 h-3.5" /> },
+            { id: 'whatsapp_log' as const, label: 'WhatsApp Log', icon: <MessageCircle className="w-3.5 h-3.5" /> },
+            { id: 'cron' as const, label: 'Cron Jobs', icon: <Clock className="w-3.5 h-3.5" /> },
+          ]}
+          value={pageTab}
+          onChange={setPageTab}
+          actions={
+            pageTab === 'mail_log' ? (
+              <IconButton icon={RefreshCw} label="Refresh" busy={mailLoading} onClick={loadMailLog} />
+            ) : pageTab === 'sms_log' ? (
+              <IconButton icon={RefreshCw} label="Refresh" busy={smsLoading} onClick={loadSmsLog} />
+            ) : pageTab === 'whatsapp_log' ? (
+              <IconButton icon={RefreshCw} label="Refresh" busy={waLoading} onClick={loadWaLog} />
+            ) : pageTab === 'cron' ? (
+              <IconButton icon={RefreshCw} label="Refresh" busy={cronLoading} onClick={loadCronJobs} />
+            ) : null
+          }
+        />
       </div>
 
       {pageTab === 'mail_log' && (
@@ -732,15 +733,6 @@ export default function AdminAuditClient() {
               Every outbound email — transactional, automation, business, and broadcasts. Click a row to see the full
               HTML body.
             </p>
-            <button
-              type="button"
-              onClick={loadMailLog}
-              disabled={mailLoading}
-              className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${mailLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
@@ -970,15 +962,6 @@ export default function AdminAuditClient() {
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <p className="text-sm text-foreground-muted">Every outbound SMS notification (OTP is not logged).</p>
-            <button
-              type="button"
-              onClick={loadSmsLog}
-              disabled={smsLoading}
-              className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${smsLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
@@ -1173,15 +1156,6 @@ export default function AdminAuditClient() {
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <p className="text-sm text-foreground-muted">Every outbound WhatsApp notification (OTP is not logged).</p>
-            <button
-              type="button"
-              onClick={loadWaLog}
-              disabled={waLoading}
-              className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${waLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
@@ -1379,15 +1353,6 @@ export default function AdminAuditClient() {
               Background jobs running in the server process. Toggle to enable/disable; last run status reflects current
               deployment.
             </p>
-            <button
-              type="button"
-              onClick={loadCronJobs}
-              disabled={cronLoading}
-              className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${cronLoading ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
           </div>
           {cronLoading && cronJobs.length === 0 ? (
             <div className="space-y-3">

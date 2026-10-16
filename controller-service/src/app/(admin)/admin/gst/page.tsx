@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import DatePicker from '@/components/ui/DatePicker'
+import { Tabs } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
 import { fmtQty } from '@/lib/shared/number-display'
 
@@ -322,20 +323,8 @@ export default function GSTPage() {
       )}
 
       <div className="bg-surface-elevated rounded-lg border border-border-default shadow-sm overflow-hidden">
-        <div className="flex border-b border-border-default overflow-x-auto">
-          {tabs.map(t => (
-            <button
-              key={t.id}
-              onClick={() => handleTabChange(t.id)}
-              className={`px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
-                tab === t.id
-                  ? 'border-b-2 border-accent-500 text-accent-500'
-                  : 'text-foreground-secondary hover:text-foreground'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="px-2 pt-1">
+          <Tabs tabs={tabs} value={tab} onChange={handleTabChange} />
         </div>
 
         <div className="p-4 sm:p-6">

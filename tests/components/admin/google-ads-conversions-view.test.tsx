@@ -369,7 +369,7 @@ describe('GoogleAdsClient', () => {
         hasData
       />
     )
-    expect(screen.getByRole('button', { name: 'Conversions' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Conversions' })).toBeTruthy()
     expect(await screen.findByText(/Uploading to/)).toBeTruthy()
     expect(String(calls('/report')[0][0])).toMatch(/tab=conversions/)
   })

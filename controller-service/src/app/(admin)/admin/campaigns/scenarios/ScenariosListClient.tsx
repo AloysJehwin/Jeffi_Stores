@@ -7,6 +7,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { Plus } from 'lucide-react'
+import { TabAction, TabLinks } from '@/components/admin/channels/ui'
 import ScenariosMobileList from './_components/ScenariosMobileList'
 
 interface ScenarioCampaign {
@@ -122,30 +124,20 @@ export default function ScenariosListClient() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2 border-b border-border-default">
-        <div className="flex items-center gap-2">
-          <Link
-            href={ap('/admin/campaigns')}
-            className="px-4 py-2 text-sm font-semibold text-foreground-muted hover:text-foreground border-b-2 border-transparent transition-colors"
-          >
-            Campaigns
-          </Link>
-          <Link
-            href={ap('/admin/campaigns/scenarios')}
-            className="px-4 py-2 text-sm font-semibold text-accent-600 dark:text-accent-400 border-b-2 border-accent-500"
-          >
-            Scenarios
-          </Link>
-        </div>
-        <RequireWrite scope="campaigns:write">
-          <Link
-            href={ap('/admin/campaigns/scenarios/new')}
-            className="hidden md:inline-flex items-center mb-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
-          >
-            + New scenario
-          </Link>
-        </RequireWrite>
-      </div>
+      <TabLinks
+        tabs={[
+          { id: 'campaigns', label: 'Campaigns', href: ap('/admin/campaigns') },
+          { id: 'scenarios', label: 'Scenarios', href: ap('/admin/campaigns/scenarios') },
+        ]}
+        value="scenarios"
+        actions={
+          <RequireWrite scope="campaigns:write">
+            <span className="hidden md:inline-flex">
+              <TabAction href={ap('/admin/campaigns/scenarios/new')} icon={<Plus className="w-4 h-4" />} label="New scenario" />
+            </span>
+          </RequireWrite>
+        }
+      />
 
       {loading && scenarios.length === 0 ? (
         <div className="pt-2">

@@ -1,5 +1,6 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
+import { Plus } from 'lucide-react'
+import { TabAction } from '@/components/admin/channels/ui'
 import { headers } from 'next/headers'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
@@ -97,12 +98,19 @@ export default async function CouponsPage({
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Coupons</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage discount coupons</p>
         </div>
-        <Suspense fallback={null}>
-          <AddCouponButton />
-        </Suspense>
       </div>
 
-      <OverviewTabs basePath={ap('/admin/coupons', host)} active={tab} sp={sp} listLabel="Coupons" />
+      <OverviewTabs
+        basePath={ap('/admin/coupons', host)}
+        active={tab}
+        sp={sp}
+        listLabel="Coupons"
+        actions={
+          <Suspense fallback={null}>
+            <AddCouponButton />
+          </Suspense>
+        }
+      />
 
       {tab === 'overview' ? (
         <Suspense fallback={null}>
@@ -153,14 +161,9 @@ async function AddCouponButton() {
   const canWrite = hasScope(role, scopes, 'coupons:write')
   if (!canWrite) return null
   return (
-    <div className="hidden md:block">
-      <Link
-        href={ap('/admin/coupons/add', host)}
-        className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-      >
-        Add New Coupon
-      </Link>
-    </div>
+    <span className="hidden md:inline-flex">
+      <TabAction href={ap('/admin/coupons/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Coupon" />
+    </span>
   )
 }
 

@@ -18,6 +18,7 @@ import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import ResponsiveList from '@/components/admin/ResponsiveList'
+import { Tabs } from '@/components/admin/channels/ui'
 import RowActions from '@/components/admin/RowActions'
 import SuppliersMobileList from './_components/SuppliersMobileList'
 import PurchaseOrdersMobileList from './_components/PurchaseOrdersMobileList'
@@ -2822,20 +2823,17 @@ function StockTab() {
 
   return (
     <div className="space-y-5">
-      <div className="flex gap-1 border-b border-border-default">
-        {(['ledger', 'valuation'] as const).map(v => (
-          <button
-            key={v}
-            onClick={() => {
-              setView(v)
-              syncUrl({ stock_view: v })
-            }}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${view === v ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}
-          >
-            {v === 'ledger' ? 'Stock Ledger' : 'Valuation'}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={[
+          { id: 'ledger' as const, label: 'Stock Ledger' },
+          { id: 'valuation' as const, label: 'Valuation' },
+        ]}
+        value={view}
+        onChange={v => {
+          setView(v)
+          syncUrl({ stock_view: v })
+        }}
+      />
 
       {view === 'ledger' ? (
         <div className="space-y-4">
@@ -3944,17 +3942,7 @@ export default function InventoryClient() {
 
   return (
     <div className="space-y-5">
-      <div className="flex border-b border-border-default gap-1">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => handleTabChange(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === t.key ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs tabs={TABS.map(t => ({ id: t.key, label: t.label }))} value={tab} onChange={handleTabChange} />
       <div>
         {tab === 'overview' && <InventoryOverviewTab />}
         {tab === 'suppliers' && <SuppliersTab />}

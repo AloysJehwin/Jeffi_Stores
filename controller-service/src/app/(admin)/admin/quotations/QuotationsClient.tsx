@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Check } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
+import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
 import { useToast } from '@/contexts/ToastContext'
 import RowActions from '@/components/admin/RowActions'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -848,12 +849,9 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
             <p className="text-foreground-secondary mt-1 text-sm">Create and manage B2B quotations</p>
           </div>
           {canWrite && (
-            <button
-              onClick={newQuotation}
-              className="px-4 h-control bg-secondary-500 hover:bg-secondary-600 text-white font-semibold rounded-lg text-sm transition-colors"
-            >
-              + New Quotation
-            </button>
+            <TabActionsPortal>
+              <TabAction onClick={newQuotation} icon={<Plus className="w-4 h-4" />} label="New Quotation" />
+            </TabActionsPortal>
           )}
         </div>
 

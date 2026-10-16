@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { TabLinks } from '@/components/admin/channels/ui'
 
 // Gradient hero stat card — matches the Orders page house style (gradient panel +
 // backdrop-blur stat tiles). Server component; pass a headline value + up to 4 tiles.
@@ -173,26 +174,18 @@ export function TenantTabNav({
   hidden?: TenantTab[]
 }) {
   return (
-    <div className="border-b border-border-default -mx-6 px-6 overflow-x-auto">
-      <nav className="flex gap-1 min-w-max">
-        {TENANT_TABS.filter(t => !hidden.includes(t.key)).map(({ key, label }) => {
-          const on = key === active
-          return (
-            <Link
-              key={key}
-              href={`/admin/ecom/customers/${tenantId}/view?tab=${key}`}
-              className={`px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
-                on
-                  ? 'border-accent-500 text-foreground'
-                  : 'border-transparent text-foreground-muted hover:text-foreground hover:border-border-default'
-              }`}
-            >
-              {label}
-              {badges?.[key] ? <span className="ml-1.5">{badges[key]}</span> : null}
-            </Link>
-          )
-        })}
-      </nav>
-    </div>
+    <TabLinks
+      tabs={TENANT_TABS.filter(t => !hidden.includes(t.key)).map(({ key, label }) => ({
+        id: key,
+        label: (
+          <>
+            {label}
+            {badges?.[key] ? <span className="ml-0.5">{badges[key]}</span> : null}
+          </>
+        ),
+        href: `/admin/ecom/customers/${tenantId}/view?tab=${key}`,
+      }))}
+      value={active}
+    />
   )
 }

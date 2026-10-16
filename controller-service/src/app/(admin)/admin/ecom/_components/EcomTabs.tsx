@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { TabLinks } from '@/components/admin/channels/ui'
 
 type SP = { [k: string]: string | string[] | undefined }
 
@@ -15,32 +15,20 @@ export default function EcomTabs({
   base,
   active,
   listLabel,
+  actions,
 }: {
   base: string
   active: 'overview' | 'list'
   listLabel: string
+  actions?: React.ReactNode
 }) {
   const tabs = [
-    { id: 'overview', label: 'Overview', href: base },
-    { id: 'list', label: listLabel, href: `${base}?tab=list` },
-  ] as const
+    { id: 'overview' as const, label: 'Overview', href: base },
+    { id: 'list' as const, label: listLabel, href: `${base}?tab=list` },
+  ]
   return (
-    <div className="flex gap-0.5 border-b border-border-default overflow-x-auto mb-6" role="tablist">
-      {tabs.map(t => (
-        <Link
-          key={t.id}
-          href={t.href}
-          role="tab"
-          aria-selected={active === t.id}
-          className={`px-3 py-2 text-sm whitespace-nowrap -mb-px border-b-2 ${
-            active === t.id
-              ? 'border-accent-500 text-foreground font-medium'
-              : 'border-transparent text-foreground-muted hover:text-foreground'
-          }`}
-        >
-          {t.label}
-        </Link>
-      ))}
+    <div className="mb-6">
+      <TabLinks tabs={tabs} value={active} actions={actions} />
     </div>
   )
 }
