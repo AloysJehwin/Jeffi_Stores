@@ -96,6 +96,13 @@ export interface SocialProvider {
   reply?(auth: SocialAuth, item: { externalId: string; kind: 'comment' | 'review' }, text: string): Promise<void>
 }
 
+/** The store's own app (client id and secret saved with a manual connection), used only for its own tokens. */
+export function ownApp(auth: Pick<SocialAuth, 'extra'>): { clientId: string; clientSecret: string } | null {
+  const clientId = auth.extra?.clientId
+  const clientSecret = auth.extra?.clientSecret
+  return clientId && clientSecret ? { clientId, clientSecret } : null
+}
+
 export class SocialApiError extends Error {
   constructor(
     public network: Network,

@@ -1,9 +1,10 @@
 // Google Business Profile: local posts to a location, reviews as the inbox. Also holds the
 // Google OAuth helpers YouTube shares.
-import { fetchWithRetry } from '@/lib/channels/ratelimit'
+import { fetchWithRetry, type RetryOptions } from '@/lib/channels/ratelimit'
 import {
   SocialApiError,
   fitText,
+  ownApp,
   type InboxItem,
   type Network,
   type SocialAuth,
@@ -35,11 +36,12 @@ export async function googleJson<T>(
   label: string,
   url: string,
   token: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  retry?: RetryOptions
 ): Promise<T> {
   const headers: Record<string, string> = { Authorization: `Bearer ${token}`, ...(init.headers as Record<string, string>) }
   if (init.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json'
-  const res = await fetchWithRetry(url, { ...init, headers })
+  const res = await fetchWithRetry(url, { ...init, headers }, retry)
   if (!res.ok) throw await googleError(network, res, label)
   return (res.status === 204 ? {} : await res.json().catch(() => ({}))) as T
 }
@@ -70,13 +72,18 @@ export function expiresAtFrom(expiresIn: number | undefined | null): string | nu
   return expiresIn ? new Date(Date.now() + expiresIn * 1000).toISOString() : null
 }
 
-async function googleToken(network: Network, label: string, form: Record<string, string>): Promise<GoogleToken> {
+async function googleToken(
+  network: Network,
+  label: string,
+  form: Record<string, string>,
+  app?: { clientId: string; clientSecret: string } | null
+): Promise<GoogleToken> {
   const res = await fetchWithRetry(GOOGLE_TOKEN, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
-      client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? '',
+      client_id: app?.clientId ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
+      client_secret: app?.clientSecret ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? '',
       ...form,
     }),
   })
@@ -101,7 +108,7 @@ export async function googleExchange(
 
 export async function googleRefresh(network: Network, label: string, auth: SocialAuth): Promise<TokenSet> {
   if (!auth.refreshToken) throw new SocialApiError(network, 401, `${label}: no refresh token, sign in again`)
-  const t = await googleToken(network, label, { grant_type: 'refresh_token', refresh_token: auth.refreshToken })
+  const t = await googleToken(network, label, { grant_type: 'refresh_token', refresh_token: auth.refreshToken }, ownApp(auth))
   // Google keeps the same refresh token unless it sends a new one.
   return {
     accessToken: t.access_token,
@@ -118,7 +125,17 @@ export function starRating(value: string | null | undefined): number | null {
 }
 
 const LABEL = 'Google Business Profile'
-const gbp = <T>(url: string, token: string, init?: RequestInit) => googleJson<T>('gbp', LABEL, url, token, init)
+const gbp = <T>(url: string, token: string, init?: RequestInit, retry?: RetryOptions) =>
+  googleJson<T>('gbp', LABEL, url, token, init, retry)
+// A 429 here is usually quota 0 (API access not approved), which retrying never fixes.
+const NO_429_RETRY: RetryOptions = { retryOn: s => s >= 500 }
+
+/** Hint for a Business Profile quota error: access is 0 until Google approves the project. */
+export function gbpQuotaHint(message: string | null | undefined): string | null {
+  return message && /\b429\b|quota/i.test(message)
+    ? 'Google has not approved Business Profile API access for this project yet (quota is 0 until it does). Request access at developers.google.com/my-business/content/prereqs.'
+    : null
+}
 
 interface Review {
   name: string
@@ -142,13 +159,17 @@ export const gbpProvider: SocialProvider = {
     async listTargets(token) {
       const accounts = await gbp<{ accounts?: { name: string }[] }>(
         'https://mybusinessaccountmanagement.googleapis.com/v1/accounts',
-        token
+        token,
+        {},
+        NO_429_RETRY
       )
       const out: { id: string; name: string }[] = []
       for (const account of accounts.accounts ?? []) {
         const locs = await gbp<{ locations?: { name: string; title?: string }[] }>(
           `https://mybusinessbusinessinformation.googleapis.com/v1/${account.name}/locations?readMask=name,title&pageSize=100`,
-          token
+          token,
+          {},
+          NO_429_RETRY
         )
         for (const l of locs.locations ?? []) out.push({ id: `${account.name}/${l.name}`, name: l.title || l.name })
       }

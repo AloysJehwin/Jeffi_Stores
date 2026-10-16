@@ -1,6 +1,6 @@
 // Pinterest API v5: image pins to a board, pin analytics as metrics. No inbox.
 import { fetchWithRetry } from '@/lib/channels/ratelimit'
-import { SocialApiError, fitText, type PostMetrics, type SocialProvider, type TokenSet } from './types'
+import { SocialApiError, fitText, ownApp, type PostMetrics, type SocialProvider, type TokenSet } from './types'
 
 const LABEL = 'Pinterest'
 const API = 'https://api.pinterest.com/v5'
@@ -24,8 +24,12 @@ async function pin<T>(url: string, token: string, init: RequestInit = {}): Promi
   return (await res.json()) as T
 }
 
-async function token(form: Record<string, string>): Promise<TokenSet> {
-  const basic = Buffer.from(`${process.env.PINTEREST_APP_ID ?? ''}:${process.env.PINTEREST_APP_SECRET ?? ''}`).toString(
+type App = { clientId: string; clientSecret: string } | null
+
+async function token(form: Record<string, string>, app: App = null): Promise<TokenSet> {
+  const clientId = app?.clientId ?? process.env.PINTEREST_APP_ID ?? ''
+  const clientSecret = app?.clientSecret ?? process.env.PINTEREST_APP_SECRET ?? ''
+  const basic = Buffer.from(`${clientId}:${clientSecret}`).toString(
     'base64'
   )
   const res = await fetchWithRetry(`${API}/oauth/token`, {
@@ -82,7 +86,7 @@ export const pinterestProvider: SocialProvider = {
     exchange: (code, redirectUri) => token({ grant_type: 'authorization_code', code, redirect_uri: redirectUri }),
     async refresh(auth) {
       if (!auth.refreshToken) throw new SocialApiError('pinterest', 401, `${LABEL}: no refresh token, sign in again`)
-      return token({ grant_type: 'refresh_token', refresh_token: auth.refreshToken })
+      return token({ grant_type: 'refresh_token', refresh_token: auth.refreshToken }, ownApp(auth))
     },
     async listTargets(t) {
       const res = await pin<{ items?: { id: string; name: string }[] }>(`${API}/boards?page_size=100`, t)

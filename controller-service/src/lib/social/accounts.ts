@@ -26,7 +26,8 @@ export async function listAccounts(tenantId: string | null): Promise<AccountRow[
   return r.rows as AccountRow[]
 }
 
-interface StoredTokens extends TokenSet {
+export interface StoredTokens extends TokenSet {
+  /** via ('manual' | 'signin') and, for a manual connection, the store's own clientId / clientSecret. */
   extra?: Record<string, string>
 }
 
@@ -37,6 +38,15 @@ function readTokens(row: AccountRow): StoredTokens {
     if (j && typeof j.accessToken === 'string') return j
   } catch {}
   return { accessToken: raw }
+}
+
+/** How a connection was made and whether it carries its own app; never the secrets themselves. */
+export function connectionInfo(row: AccountRow): { via: 'manual' | 'signin'; ownApp: boolean } {
+  let extra: Record<string, string> | undefined
+  try {
+    extra = readTokens(row).extra
+  } catch {}
+  return { via: extra?.via === 'manual' ? 'manual' : 'signin', ownApp: !!(extra?.clientId && extra?.clientSecret) }
 }
 
 /** Save a sign-in (status pending until a target is chosen when `target` is omitted). */
