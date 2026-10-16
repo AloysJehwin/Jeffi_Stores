@@ -49,6 +49,8 @@ export async function listSelectableAccounts(base: GoogleAdsClient): Promise<Ads
       for (const row of await viaManager.searchStream(Q.customerClients())) {
         const c = mapCustomerClient(row)
         if (!c.id || c.manager || c.id === id) continue
+        // Google reports every test account as CLOSED; they still work with a test-access developer token.
+        if (c.status !== 'ENABLED' && !c.testAccount) continue
         const existing = accounts.get(c.id)
         if (existing && existing.loginCustomerId === null) continue
         accounts.set(c.id, {

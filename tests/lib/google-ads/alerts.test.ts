@@ -106,6 +106,11 @@ describe('alert rules', () => {
     expect(f.find(x => x.key === 'account_status')!.severity).toBe('critical')
   })
 
+  it('does not flag a test account, which Google always reports as CLOSED', () => {
+    const f = evaluateRules({ ...base, account: { status: 'CLOSED', testAccount: true, budgetStatus: null, budgetLimit: null, budgetServed: null } }, DEFAULT_ALERT_CONFIG)
+    expect(f.some(x => x.key === 'account_status')).toBe(false)
+  })
+
   it('disabled rules find nothing', () => {
     const cfg = mergeConfig(JSON.stringify({ disapproved_ads: { enabled: false } }))
     expect(keys({ disapprovedAds: [{ adGroupId: '2', adId: '3', name: null, campaignName: null, topics: [] }] }, cfg)).toEqual([])

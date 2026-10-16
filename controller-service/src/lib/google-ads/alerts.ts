@@ -133,7 +133,7 @@ export interface AlertSnapshot {
   disapprovedAds: { adGroupId: string; adId: string; name: string | null; campaignName: string | null; topics: string[] }[]
   merchantDisapproved: { itemId: string; title: string | null; cost: number }[]
   outOfStock: { itemId: string; title: string | null; sku: string | null; cost: number }[]
-  account: { status: string | null; budgetStatus: string | null; budgetLimit: number | null; budgetServed: number | null } | null
+  account: { status: string | null; testAccount?: boolean; budgetStatus: string | null; budgetLimit: number | null; budgetServed: number | null } | null
 }
 
 const money = (v: number, c: string) => `${c === 'INR' ? '₹' : `${c} `}${Math.round(v).toLocaleString('en-IN')}`
@@ -296,7 +296,8 @@ export function evaluateRules(s: AlertSnapshot, cfg: AlertConfig): Finding[] {
 
   if (r.account_problems.enabled && s.account) {
     const a = s.account
-    if (a.status && a.status !== 'ENABLED') {
+    // Google reports test accounts as CLOSED; that is not a problem to alert on.
+    if (a.status && a.status !== 'ENABLED' && !a.testAccount) {
       out.push({ rule: 'account_problems', key: 'account_status', severity: 'critical', title: `Google Ads account is ${a.status.toLowerCase()}`, message: 'Ads are not running. Check the account in Google Ads.' })
     }
     if (a.budgetStatus && !['APPROVED', 'PENDING'].includes(a.budgetStatus)) {
@@ -431,6 +432,7 @@ export async function loadSnapshot(cfg: AlertConfig, now = new Date()): Promise<
     account: acc
       ? {
           status: acc.status ?? null,
+          testAccount: !!acc.test_account,
           budgetStatus: acc.budget_status ?? null,
           budgetLimit: acc.budget_limit_micros == null ? null : n(acc.budget_limit_micros) / 1e6,
           budgetServed: acc.budget_served_micros == null ? null : n(acc.budget_served_micros) / 1e6,

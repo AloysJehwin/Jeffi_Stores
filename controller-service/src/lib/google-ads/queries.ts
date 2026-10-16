@@ -35,7 +35,7 @@ export const Q = {
     `SELECT customer_client.id, customer_client.descriptive_name, customer_client.manager,
        customer_client.level, customer_client.status, customer_client.currency_code, customer_client.test_account
      FROM customer_client
-     WHERE customer_client.hidden = FALSE AND customer_client.status = 'ENABLED'`,
+     WHERE customer_client.hidden = FALSE`,
 
   campaigns: () =>
     `SELECT campaign.id, campaign.name, campaign.status, campaign.serving_status, campaign.primary_status,
@@ -187,6 +187,7 @@ export function mapCustomerClient(r: AdsRow) {
     level: int(c.level),
     currency: c.currencyCode ?? null,
     testAccount: !!c.testAccount,
+    status: (c.status as string | undefined) ?? null,
   }
 }
 
