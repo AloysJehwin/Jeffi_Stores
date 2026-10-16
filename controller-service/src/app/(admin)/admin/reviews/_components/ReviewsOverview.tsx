@@ -4,9 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, Star } from 'lucide-react'
-import { Kpi, KpiGrid, Section, Badge, Banner, Empty, api, count, pct, change, inputCls } from '@/components/admin/channels/ui'
+import { Kpi, KpiGrid, Section, Badge, Banner, Empty, api, count, pct, change } from '@/components/admin/channels/ui'
 import { TrendChart, type ChartPoint, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { ap } from '@/lib/shared/admin-path'
+import DatePicker from '@/components/ui/DatePicker'
 import {
   PERIOD_PRESETS,
   istToday,
@@ -123,24 +124,13 @@ function PeriodPicker({ value, onChange }: { value: Period; onChange: (p: Period
         ))}
       </div>
       <div className="flex items-center gap-1.5">
-        <input
-          type="date"
-          aria-label="From"
-          value={value.from}
-          max={value.to}
-          onChange={e => e.target.value && onChange({ ...value, from: e.target.value })}
-          className={`${inputCls} !w-auto !py-1.5 text-xs`}
-        />
+        <span aria-label="From">
+          <DatePicker aria-label="From" value={value.from} max={value.to} onChange={v => v && onChange({ ...value, from: v })} />
+        </span>
         <span className="text-xs text-foreground-muted">to</span>
-        <input
-          type="date"
-          aria-label="To"
-          value={value.to}
-          min={value.from}
-          max={today}
-          onChange={e => e.target.value && onChange({ ...value, to: e.target.value })}
-          className={`${inputCls} !w-auto !py-1.5 text-xs`}
-        />
+        <span aria-label="To">
+          <DatePicker aria-label="To" value={value.to} min={value.from} max={today} onChange={v => v && onChange({ ...value, to: v })} />
+        </span>
       </div>
     </div>
   )

@@ -5,6 +5,7 @@ import { ExternalLink, Plus, Trash2 } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
+import Select from '@/components/ui/Select'
 import { Badge, Empty, Section, Table, btnGhost, btnPrimary, inputCls, money, when } from '@/components/admin/channels/ui'
 
 const ACTIONS = '/api/admin/merchant/console/actions'
@@ -151,10 +152,16 @@ function PromotionForm({ onSubmit }: { onSubmit: (p: Record<string, unknown>) =>
       </label>
       <label className="text-xs text-foreground-muted">
         Discount
-        <select className={inputCls} value={f.kind} onChange={set('kind')}>
-          <option value="PERCENT_OFF">Percent off</option>
-          <option value="MONEY_OFF">Amount off (₹)</option>
-        </select>
+        <Select
+          className="w-full"
+          aria-label="Discount"
+          value={f.kind}
+          onChange={v => setF(s => ({ ...s, kind: v }))}
+          options={[
+            { value: 'PERCENT_OFF', label: 'Percent off' },
+            { value: 'MONEY_OFF', label: 'Amount off (₹)' },
+          ]}
+        />
       </label>
       <label className="text-xs text-foreground-muted">
         Value

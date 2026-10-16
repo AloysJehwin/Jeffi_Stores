@@ -7,6 +7,7 @@ import { ap } from '@/lib/shared/admin-path'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, api, btnPrimary, count, inputCls, money, pct, when } from '@/components/admin/channels/ui'
+import Select from '@/components/ui/Select'
 
 const PRICE = '/api/admin/amazon/console/price'
 const useCanPrice = () => useCanWrite('amazon_pricing')
@@ -260,13 +261,13 @@ export function RepricerView({ d, onChanged }: { d: any; onChanged: () => void }
             </label>
             <label className="text-xs text-foreground-muted">
               Strategy
-              <select className={inputCls} value={form.strategy} onChange={e => setForm(f => ({ ...f, strategy: e.target.value }))}>
-                {Object.entries(STRATEGY).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </select>
+              <Select
+                className="w-full"
+                value={form.strategy}
+                onChange={v => setForm(f => ({ ...f, strategy: v }))}
+                options={Object.entries(STRATEGY).map(([k, v]) => ({ value: k, label: v }))}
+                aria-label="Strategy"
+              />
             </label>
             <label className="text-xs text-foreground-muted">
               Beat by ₹

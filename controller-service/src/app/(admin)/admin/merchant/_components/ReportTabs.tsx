@@ -5,6 +5,7 @@ import { ExternalLink, Wrench } from 'lucide-react'
 import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
+import Select from '@/components/ui/Select'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, api, change, count, money, pct, when } from '@/components/admin/channels/ui'
 
 const SERIES: SeriesDef[] = [
@@ -267,14 +268,13 @@ export function BestSellersView({ d }: { d: any }) {
     <Section
       title={`Best sellers in India${d?.reportDate ? ` (week of ${String(d.reportDate).slice(0, 10)})` : ''}`}
       action={
-        <select className="text-xs border border-border-default rounded px-2 py-1 bg-surface" value={filter} onChange={e => setFilter(e.target.value)} aria-label="Filter best sellers">
-          <option value="all">All</option>
-          {Object.entries(BS_LABEL).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </select>
+        <Select
+          size="sm"
+          value={filter}
+          onChange={setFilter}
+          aria-label="Filter best sellers"
+          options={[{ value: 'all', label: 'All' }, ...Object.entries(BS_LABEL).map(([k, v]) => ({ value: k, label: String(v) }))]}
+        />
       }
     >
       {!d?.rows?.length ? (

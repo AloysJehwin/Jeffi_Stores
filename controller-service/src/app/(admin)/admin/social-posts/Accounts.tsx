@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Unplug } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
+import Select from '@/components/ui/Select'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, Section, api, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/channels/ui'
@@ -267,13 +268,13 @@ function TargetPicker({ network, label, onDone }: { network: string; label: stri
         <p className="text-sm text-foreground-muted">This sign-in has nothing to post to. Sign in with another account.</p>
       ) : (
         <div className="flex gap-2 flex-wrap">
-          <select className={inputCls + ' max-w-sm'} value={id} onChange={e => setId(e.target.value)}>
-            {targets.map(t => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+          <Select
+            className="w-full max-w-sm"
+            aria-label="Target"
+            value={id}
+            onChange={setId}
+            options={targets.map(t => ({ value: t.id, label: t.name }))}
+          />
           <button type="button" className={btnPrimary} disabled={saving || !id} onClick={() => save({ id })}>
             {saving ? 'Saving...' : 'Use this'}
           </button>

@@ -16,6 +16,7 @@ interface DatePickerProps {
   triggerClassName?: string
   /** Shows Clear (sets '') and Today under the month grid. */
   clearable?: boolean
+  'aria-label'?: string
 }
 
 const MONTHS = [
@@ -69,6 +70,7 @@ export default function DatePicker({
   placeholder = 'Select date',
   triggerClassName,
   clearable,
+  'aria-label': ariaLabel,
 }: DatePickerProps) {
   const parsed = parseDateVal(value)
   const today = new Date()
@@ -198,6 +200,7 @@ export default function DatePicker({
         type="button"
         disabled={disabled}
         onClick={openPicker}
+        aria-label={ariaLabel}
         aria-haspopup="dialog"
         aria-expanded={open}
         data-datepicker-trigger
