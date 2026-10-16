@@ -41,11 +41,10 @@ describe('POST /api/admin/integrations/sync (google_merchant)', () => {
     expect((await res.json()).inProgress).toBe(true)
   })
 
-  it('rejects requests off-tenant', async () => {
+  it('syncs for the flagship too (its creds come from its own connection, else env)', async () => {
     mockResolveTenant.mockResolvedValue(null)
-    const res = await POST(req({ provider: 'google_merchant' }))
-    expect(res.status).toBe(400)
-    expect(mockSyncMerchant).not.toHaveBeenCalled()
+    await POST(req({ provider: 'google_merchant' }))
+    expect(mockSyncMerchant).toHaveBeenCalled()
   })
 
   it('passes through an auth failure', async () => {

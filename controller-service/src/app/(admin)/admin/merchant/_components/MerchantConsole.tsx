@@ -9,7 +9,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, RangePresets, Tabs, api, lastDays } from '@/components/admin/channels/ui'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import type { MerchantTab } from '@/lib/merchant/console-data'
-import GoogleMerchantPanel from '../../merchant-sync/_components/GoogleMerchantPanel'
+import GoogleMerchantPanel from './GoogleMerchantPanel'
 import { BestSellersView, CompetitivenessView, InsightsView, IssuesView, OverviewView, PerformanceView } from './ReportTabs'
 import { AccountView, PromotionsView, ShippingView } from './SettingsTabs'
 

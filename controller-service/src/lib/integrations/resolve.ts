@@ -1,3 +1,4 @@
+import { PLATFORM_TENANT_ID } from '@/lib/import/jobs'
 import { createSign } from 'crypto'
 import { resolveTenant, resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { getIntegrationCredential } from '../tenant-registry'
@@ -9,6 +10,8 @@ import { loadGoogleServiceAccount } from '@/lib/shared/google-credentials'
 // stored+encrypted credentials — and if the tenant has NOT connected the provider, fail loudly.
 // A tenant must NEVER fall through to the platform env creds (Jeffi's own Google/Amazon account),
 // or an unconnected tenant would silently sync into Jeffi's Merchant Center / Seller account.
+// The flagship (no tenant) connects through the same gear; its rows sit under the platform tenant
+// id and are used first, with the env creds only as its fallback.
 // The platform env fallback is reachable only off-tenant (getCurrentTenant() === null), i.e.
 // Jeffi's own single-tenant use. This mirrors social/publisher.ts, which uses jeffiCreds() only
 // when post.tenant_id === null.
@@ -52,11 +55,11 @@ async function tenantConfigFor(tenantId: string, provider: string): Promise<Reco
   }
 }
 
-/** Decrypt + parse the current ALS tenant's stored credential blob for a provider, or null. */
+/** The current store's stored credential blob for a provider (the flagship's under the platform
+ * tenant id), or null. The flagship falls back to env only when it has none stored. */
 async function tenantConfig(provider: string): Promise<Record<string, any> | null> {
   const tenant = await resolveTenant()
-  if (!tenant) return null
-  return tenantConfigFor(tenant.tenantId, provider)
+  return tenantConfigFor(tenant?.tenantId ?? PLATFORM_TENANT_ID, provider)
 }
 
 /** Resolve Google Merchant credentials: the tenant's own if connected. In a tenant context an

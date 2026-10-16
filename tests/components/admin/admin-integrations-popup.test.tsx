@@ -18,7 +18,7 @@ afterEach(() => {
 
 describe('AdminIntegrationsPopup', () => {
   it('opens itself with the OAuth result and clears the params', async () => {
-    window.history.replaceState({}, '', '/admin/merchant-sync?connected=0&provider=amazon&error=bad_state')
+    window.history.replaceState({}, '', '/admin/amazon?connected=0&provider=amazon&error=bad_state')
     render(<AdminIntegrationsPopup scope="merchant" integrations={[]} socialAccounts={[]} oauth={{}} />)
     expect(await screen.findByText(/Could not connect Amazon Seller: the sign-in link expired/)).toBeTruthy()
     expect(window.location.search).toBe('')

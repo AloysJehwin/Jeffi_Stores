@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { credentialOwnerId } from '@/lib/integrations/owner'
 import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
 import { signAdminState } from '@/lib/shared/oauth-state'
 import { oauthProviderInfo, oauthRedirectUri } from '@/lib/integrations/oauth'
@@ -15,10 +15,9 @@ const GMC_OAUTH_SCOPE = 'https://www.googleapis.com/auth/content'
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
-  const tenant = await resolveTenant()
-  if (!tenant) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
+  const tenant = { tenantId: await credentialOwnerId() }
 
-  const back = `${await currentAdminBaseUrlAsync()}/admin/merchant-sync`
+  const back = `${await currentAdminBaseUrlAsync()}/admin/merchant`
   const merchantId = (request.nextUrl.searchParams.get('merchant_id') || '').trim()
   if (!/^\d{5,20}$/.test(merchantId)) {
     return NextResponse.redirect(`${back}?connected=0&provider=google&error=invalid_merchant_id`)
