@@ -2,10 +2,11 @@
 
 import { useCallback, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Kpi, Section, Badge, Table, Empty, api, money, count, pct, change, when, inputCls, type Col } from '@/components/admin/channels/ui'
+import { Kpi, Section, Badge, Table, Empty, api, money, count, pct, change, when, type Col } from '@/components/admin/channels/ui'
 import { TrendChart, type SeriesDef, type ChartPoint } from '@/components/admin/dashboard/Charts'
 import { GroupLabel } from '@/components/admin/dashboard/Primitives'
 import { ap } from '@/lib/shared/admin-path'
+import DatePicker from '@/components/ui/DatePicker'
 import type { CrmInsights as CrmInsightsData } from '@/lib/shared/crm-insights-shared'
 import CrmInsights from './CrmInsights'
 import { PERIOD_PRESETS, insightsRangeFor, matchPreset, periodLabel, presetPeriod, type Period } from './_lib/period'
@@ -54,26 +55,13 @@ function PeriodPicker({
         ))}
       </div>
       <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
-        <input
-          type="date"
-          aria-label="From"
-          value={value.from}
-          max={value.to}
-          disabled={disabled}
-          onChange={e => e.target.value && onChange({ from: e.target.value, to: value.to })}
-          className={`${inputCls} !w-auto !py-1.5 text-xs`}
-        />
+        <span aria-label="From">
+          <DatePicker aria-label="From" value={value.from} max={value.to} disabled={disabled} onChange={v => v && onChange({ from: v, to: value.to })} />
+        </span>
         <span>to</span>
-        <input
-          type="date"
-          aria-label="To"
-          value={value.to}
-          min={value.from}
-          max={today}
-          disabled={disabled}
-          onChange={e => e.target.value && onChange({ from: value.from, to: e.target.value })}
-          className={`${inputCls} !w-auto !py-1.5 text-xs`}
-        />
+        <span aria-label="To">
+          <DatePicker aria-label="To" value={value.to} min={value.from} max={today} disabled={disabled} onChange={v => v && onChange({ from: value.from, to: v })} />
+        </span>
       </div>
     </div>
   )

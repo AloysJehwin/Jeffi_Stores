@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, AlertCircle, Info, CheckCircle2, RefreshCw } from 'lucide-react'
 import { PERIOD_PRESETS, matchPreset, parsePeriod, previousPeriod, type Period, type PeriodPreset } from '@/lib/overview/period'
-import { api, inputCls } from '@/components/admin/channels/ui'
+import { api } from '@/components/admin/channels/ui'
+import DatePicker from '@/components/ui/DatePicker'
 
 // Shared pieces for admin overview tabs: the period bar (presets + custom, kept in ?from&to), a
 // loader that only ever returns data fetched for the current URL, and the needs-attention list.
@@ -46,9 +47,9 @@ export function PeriodBar({ value, onChange, onRefresh, busy }: { value: Period;
         ))}
       </div>
       <div className="flex items-center gap-1 text-xs">
-        <input type="date" aria-label="From" className={`${inputCls} !w-auto !py-1.5`} value={value.from} max={value.to} onChange={e => e.target.value && onChange({ from: e.target.value, to: value.to })} />
+<DatePicker aria-label="From" value={value.from} max={value.to} onChange={v => v && onChange({ from: v, to: value.to })} />
         <span className="text-foreground-muted">to</span>
-        <input type="date" aria-label="To" className={`${inputCls} !w-auto !py-1.5`} value={value.to} min={value.from} onChange={e => e.target.value && onChange({ from: value.from, to: e.target.value })} />
+<DatePicker aria-label="To" value={value.to} min={value.from} onChange={v => v && onChange({ from: value.from, to: v })} />
       </div>
       <span className="text-xs text-foreground-muted">vs {prev.from} to {prev.to}</span>
       {onRefresh && (

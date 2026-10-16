@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
+import DatePicker from '@/components/ui/DatePicker'
 import { rsCompact } from '@/components/admin/dashboard/Primitives'
 import { Badge, Banner, Kpi, KpiGrid, Section, api, count, money, pct, type Tone } from '@/components/admin/channels/ui'
 import {
@@ -80,6 +81,7 @@ type Overview = {
     payouts: Row[]
     cod_stale_days: number
   }
+  ai?: { flagship: boolean; amount: number; previous: number; calls: number }
 }
 
 const METHOD: Record<string, { label: string; color: string }> = {
@@ -158,8 +160,6 @@ export function OverviewTab() {
 
 function PeriodBar({ range, onChange, previous }: { range: Range; onChange: (r: Range) => void; previous: Range | null }) {
   const active = matchPreset(range)
-  const input =
-    'rounded-lg border border-border-default bg-surface px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500/40'
   return (
     <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex flex-wrap gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg w-fit max-w-full">
@@ -177,23 +177,13 @@ function PeriodBar({ range, onChange, previous }: { range: Range; onChange: (r: 
         ))}
       </div>
       <div className="flex flex-wrap items-center gap-2 text-xs text-foreground-secondary">
-        <input
-          type="date"
-          aria-label="From"
-          className={input}
-          value={range.from}
-          max={range.to}
-          onChange={e => onChange({ from: e.target.value, to: range.to })}
-        />
+        <span aria-label="From">
+          <DatePicker aria-label="From" value={range.from} max={range.to} onChange={v => onChange({ from: v, to: range.to })} />
+        </span>
         <span>to</span>
-        <input
-          type="date"
-          aria-label="To"
-          className={input}
-          value={range.to}
-          min={range.from}
-          onChange={e => onChange({ from: range.from, to: e.target.value })}
-        />
+        <span aria-label="To">
+          <DatePicker aria-label="To" value={range.to} min={range.from} onChange={v => onChange({ from: range.from, to: v })} />
+        </span>
         {previous && (
           <span className="text-foreground-muted">
             vs {fmtDay(previous.from)} to {fmtDay(previous.to)}
@@ -258,6 +248,15 @@ function OverviewBody({ d, dim }: { d: Overview; dim: boolean }) {
             delta={changeOf(c.gst_payable, p.gst_payable ?? 0)}
             invert
             sub={`${money(c.gst_output)} output less ${money(c.gst_itc)} ITC`}
+          />
+        )}
+        {d.ai && (
+          <Kpi
+            label={d.ai.flagship ? 'AI cost' : 'AI spend'}
+            value={money(d.ai.amount)}
+            delta={changeOf(d.ai.amount, d.ai.previous)}
+            invert
+            sub={`${count(d.ai.calls)} calls, ${d.ai.flagship ? 'platform cost' : 'charged to wallet'}`}
           />
         )}
         <Kpi

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import Toggle from '@/components/ui/Toggle'
+import Select from '@/components/ui/Select'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, Empty, Section, api, btnGhost, btnPrimary, inputCls } from '@/components/admin/channels/ui'
@@ -257,24 +258,23 @@ function RuleForm({ initial, templates, onDone }: { initial: Rule | null; templa
       <div className="grid gap-3 sm:grid-cols-3">
         <div>
           <label className={lbl}>When</label>
-          <select className={inputCls} value={r.trigger} onChange={e => set({ trigger: e.target.value as Rule['trigger'] })}>
-            {Object.entries(TRIGGER_LABEL).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
+          <Select
+            className="w-full"
+            aria-label="When"
+            value={r.trigger}
+            onChange={v => set({ trigger: v as Rule['trigger'] })}
+            options={Object.entries(TRIGGER_LABEL).map(([k, v]) => ({ value: k, label: v }))}
+          />
         </div>
         <div>
           <label className={lbl}>Template</label>
-          <select className={inputCls} value={r.template_id ?? ''} onChange={e => set({ template_id: e.target.value || null })}>
-            <option value="">Generated caption</option>
-            {templates.map(t => (
-              <option key={t.id} value={t.id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
+          <Select
+            className="w-full"
+            aria-label="Template"
+            value={String(r.template_id ?? '')}
+            onChange={v => set({ template_id: v || null })}
+            options={[{ value: '', label: 'Generated caption' }, ...templates.map(t => ({ value: String(t.id), label: t.name }))]}
+          />
         </div>
         {r.trigger === 'price_drop' && (
           <div>
