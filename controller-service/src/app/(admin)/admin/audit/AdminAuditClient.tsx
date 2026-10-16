@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import {
   ShieldCheck,
   Boxes,
@@ -46,7 +46,6 @@ import {
 import AdminSelect from '@/components/admin/AdminSelect'
 import IconButton from '@/components/ui/IconButton'
 import { Tabs } from '@/components/admin/channels/ui'
-import { ap } from '@/lib/shared/admin-path'
 
 interface AuditEvent {
   id: string
@@ -133,6 +132,7 @@ type PageTab = 'audit' | 'mail_log' | 'sms_log' | 'whatsapp_log' | 'cron'
 export default function AdminAuditClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const pathname = usePathname()
   const [events, setEvents] = useState<AuditEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [entityFilter, setEntityFilter] = useState<string>('all')
@@ -153,7 +153,8 @@ export default function AdminAuditClient() {
 
   function setPageTab(next: PageTab) {
     setPageTabState(next)
-    router.push(ap(`/admin/audit?tab=${next}`), { scroll: false })
+    // Relative to the current route so it stays inside the Settings hub.
+    router.push(`${pathname}?tab=${next}&view=list`, { scroll: false })
   }
 
   const [cronJobs, setCronJobs] = useState<CronJob[]>([])
@@ -696,11 +697,6 @@ export default function AdminAuditClient() {
 
   return (
     <div className="p-4 sm:p-6 w-full">
-      <div className="flex items-center gap-2 mb-4">
-        <ShieldCheck className="w-5 h-5 text-accent-500" />
-        <h1 className="text-xl font-bold text-foreground">Admin Audit Log</h1>
-      </div>
-
       <div className="mb-5">
         <Tabs
           tabs={[

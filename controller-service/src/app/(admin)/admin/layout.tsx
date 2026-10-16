@@ -10,6 +10,7 @@ import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
 import { getSiteControls, getStoreIdentity } from '@/lib/catalog/site-controls'
 import { getHost } from '@/lib/tenancy/get-host'
 import { LogOut } from 'lucide-react'
+import { SETTINGS_HUB_TABS, visibleSettingsHubTabs } from '@/lib/admin/settings-hub'
 
 function managedAdsReady(): boolean {
   const e = process.env
@@ -130,27 +131,38 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       group: 'Ecom Store',
       platformAdminOnly: true,
     },
-    {
-      href: '/admin/ecom/ai-pricing',
-      label: 'AI Pricing',
-      scope: 'ecom_billing:read',
-      group: 'Ecom Store',
-      platformAdminOnly: true,
-    },
-    { href: '/admin/audit', label: 'Audit Log', scope: 'audit:read', group: 'Settings' },
-    { href: '/admin/service-accounts', label: 'Service Accounts', scope: 'service_accounts:read', group: 'Settings' },
-    { href: '/admin/team', label: 'Team Members', scope: 'settings:read', group: 'Settings', ownerOnly: true },
     { href: '/admin/settings/homepage', label: 'Homepage', scope: 'settings:write', group: 'Settings' },
     { href: '/admin/settings/site-controls', label: 'Site Controls', scope: 'settings:write', group: 'Settings' },
+    {
+      href: '/admin/settings/ai-pricing',
+      label: 'AI Pricing',
+      scope: 'ecom_billing:read',
+      group: 'Settings',
+      platformAdminOnly: true,
+    },
+    // The Settings hub: Account, Team, Service accounts and Audit log tabs (lib/admin/settings-hub).
     { href: '/admin/settings', label: 'Settings', scope: 'settings:read', group: 'Settings', exactMatch: true },
   ]
+  const settingsTabs = visibleSettingsHubTabs(role, scopes)
 
-  const filteredNavLinks = navLinks.filter(link => {
-    if ('platformAdminOnly' in link && link.platformAdminOnly && !isPlatformAdmin(role)) return false
-    if ('ownerOnly' in link && link.ownerOnly && !isPlatformOwner(role)) return false
-    if ('requiresManagedAds' in link && link.requiresManagedAds && !managedAdsReady()) return false
-    return hasScope(role, scopes, link.scope)
-  })
+  const filteredNavLinks = navLinks
+    .filter(link => {
+      // Shown when any hub tab is reachable; points at the first one.
+      if (link.href === '/admin/settings') return settingsTabs.length > 0
+      if ('platformAdminOnly' in link && link.platformAdminOnly && !isPlatformAdmin(role)) return false
+      if ('ownerOnly' in link && link.ownerOnly && !isPlatformOwner(role)) return false
+      if ('requiresManagedAds' in link && link.requiresManagedAds && !managedAdsReady()) return false
+      return hasScope(role, scopes, link.scope)
+    })
+    .map(link =>
+      link.href === '/admin/settings'
+        ? {
+            ...link,
+            href: settingsTabs[0].href,
+            matchPaths: SETTINGS_HUB_TABS.map(t => t.href).filter(h => h !== '/admin/settings'),
+          }
+        : link
+    )
   const desktopNavLinks = filteredNavLinks.filter(link => !('mobileOnly' in link && link.mobileOnly))
 
   const displayName =

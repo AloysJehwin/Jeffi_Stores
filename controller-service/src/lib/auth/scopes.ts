@@ -725,7 +725,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'ecom_billing:read',
     label: 'Ecom Billing (Read)',
     description: 'View tenant subscriptions, settlement ledger and payouts',
-    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing'],
+    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing', '/admin/settings/ai-pricing'],
     group: 'Ecom Store',
     platformOnly: true,
   },
@@ -733,7 +733,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'ecom_billing:write',
     label: 'Ecom Billing (Write)',
     description: 'Manage tenant subscriptions, adjust settlements, trigger payouts and edit the AI price list',
-    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing'],
+    routes: ['/admin/ecom/billing', '/admin/ecom/ai-pricing', '/admin/settings/ai-pricing'],
     group: 'Ecom Store',
     platformOnly: true,
   },
@@ -770,6 +770,8 @@ export function isPlatformAdmin(role: string): boolean {
 export function getScopeForPath(pathname: string): string | null {
   if (pathname === '/admin/login') return null
   if (pathname === '/admin') return 'dashboard:read'
+  // Under /admin/settings but gated as the control-plane billing page, not settings:*.
+  if (pathname === '/admin/settings/ai-pricing' || pathname.startsWith('/admin/settings/ai-pricing/')) return 'ecom_billing:read'
 
   for (const scope of ADMIN_SCOPES) {
     for (const route of scope.routes) {
