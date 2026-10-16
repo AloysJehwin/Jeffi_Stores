@@ -127,7 +127,7 @@ export async function merchantApiRequest(
 export function gmcErrorMessage(
   status: number,
   body: string,
-  creds?: { clientEmail?: string; merchantId?: string } | null
+  creds?: { clientEmail?: string; merchantId?: string; refreshToken?: string } | null
 ): string {
   let msg = body
   try {
@@ -136,12 +136,23 @@ export function gmcErrorMessage(
   } catch {}
   msg = String(msg).replace(/\s+/g, ' ').trim().slice(0, 300)
   if (status === 401 || status === 403) {
-    const who = creds?.clientEmail ? `the service account ${creds.clientEmail}` : 'the service account'
     const account = creds?.merchantId ? ` ${creds.merchantId}` : ''
+    if (/not registered with the merchant account/i.test(msg)) {
+      return (
+        `HTTP ${status}: Merchant Center sync is not enabled on the platform yet (its Google Cloud project is not ` +
+        `registered for the Merchant API). This is a platform setup step, not something to change in your account; contact support.`
+      )
+    }
+    if (creds?.refreshToken) {
+      return (
+        `HTTP ${status}: ${msg} — the Google account you connected has no access to Merchant Center account${account}. ` +
+        `Reconnect with a Google account that is an Admin on it (Merchant Center > Settings > People and access).`
+      )
+    }
+    const who = creds?.clientEmail ? `the service account ${creds.clientEmail}` : 'the service account'
     return (
       `HTTP ${status}: ${msg} — ${who} has no access to Merchant Center account${account}. ` +
-      `Add it under Merchant Center > Settings > People and access (Admin), and register the Google Cloud project ` +
-      `with the account (Merchant API developer registration).`
+      `Add it under Merchant Center > Settings > People and access (Admin).`
     )
   }
   if (status === 410) {
