@@ -37,13 +37,13 @@ beforeEach(() => {
     })
   )
   process.env.GOOGLE_OAUTH_CLIENT_ID = 'gid'
-  process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'gsecret'
+  process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'test-secret-google'
   process.env.PINTEREST_APP_ID = 'pid'
-  process.env.PINTEREST_APP_SECRET = 'psecret'
+  process.env.PINTEREST_APP_SECRET = 'test-secret-pinterest'
   process.env.LINKEDIN_CLIENT_ID = 'lid'
-  process.env.LINKEDIN_CLIENT_SECRET = 'lsecret'
+  process.env.LINKEDIN_CLIENT_SECRET = 'test-secret-linkedin'
   process.env.X_CLIENT_ID = 'xid'
-  process.env.X_CLIENT_SECRET = 'xsecret'
+  process.env.X_CLIENT_SECRET = 'test-secret-x'
 })
 afterEach(() => vi.unstubAllGlobals())
 
@@ -78,7 +78,7 @@ describe('Google Business Profile', () => {
     const f = formOf(0)
     expect(f.get('grant_type')).toBe('authorization_code')
     expect(f.get('code_verifier')).toBe('ver')
-    expect(f.get('client_secret')).toBe('gsecret')
+    expect(f.get('client_secret')).toBe('test-secret-google')
 
     routes = []
     on('https://oauth2.googleapis.com/token', () => json({ access_token: 'a2', expires_in: 3600 }))
@@ -243,7 +243,7 @@ describe('Pinterest', () => {
     on('https://api.pinterest.com/v5/oauth/token', () => json({ access_token: 'pa', refresh_token: 'pr', expires_in: 60 }))
     const t = await pinterestProvider.oauth!.exchange('c', 'https://a/cb', '')
     expect(t).toMatchObject({ accessToken: 'pa', refreshToken: 'pr' })
-    expect(header(0, 'Authorization')).toBe(`Basic ${Buffer.from('pid:psecret').toString('base64')}`)
+    expect(header(0, 'Authorization')).toBe(`Basic ${Buffer.from('pid:test-secret-pinterest').toString('base64')}`)
     expect(formOf(0).get('grant_type')).toBe('authorization_code')
     const r = await pinterestProvider.oauth!.refresh!(auth('b', { refreshToken: 'old' }))
     expect(r.accessToken).toBe('pa')
@@ -303,7 +303,7 @@ describe('LinkedIn', () => {
     on('https://www.linkedin.com/oauth/v2/accessToken', () => json({ access_token: 'la', expires_in: 5184000, refresh_token: 'lr' }))
     const t = await linkedinProvider.oauth!.exchange('c', 'https://a/cb', '')
     expect(t).toMatchObject({ accessToken: 'la', refreshToken: 'lr' })
-    expect(formOf(0).get('client_secret')).toBe('lsecret')
+    expect(formOf(0).get('client_secret')).toBe('test-secret-linkedin')
   })
 
   it('lists admin organisations with names', async () => {
@@ -388,7 +388,7 @@ describe('X', () => {
     const t = await xProvider.oauth!.exchange('c', 'https://a/cb', 'ver')
     expect(t.accessToken).toBe('xa')
     expect(formOf(0).get('code_verifier')).toBe('ver')
-    expect(header(0, 'Authorization')).toBe(`Basic ${Buffer.from('xid:xsecret').toString('base64')}`)
+    expect(header(0, 'Authorization')).toBe(`Basic ${Buffer.from('xid:test-secret-x').toString('base64')}`)
     const r = await xProvider.oauth!.refresh!(auth('u', { refreshToken: 'xr1' }))
     expect(r.refreshToken).toBe('xr2')
   })
