@@ -186,7 +186,11 @@ export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
     })())
   const res = await withFallback(
     'chat',
-    () => gatewayPost('/v1/chat', { ...req, cacheNamespace }, '', true) as Promise<AiChatResponse>,
+    async () => {
+      const { getAiRouting } = await import('@/lib/providers/policy')
+      const providers = (await getAiRouting().catch(() => ({}) as { text?: string[] })).text
+      return gatewayPost('/v1/chat', { ...req, cacheNamespace, providers }, '', true) as Promise<AiChatResponse>
+    },
     ms => directChat(req, ms),
   )
   if (req.billing !== false) {

@@ -1,6 +1,7 @@
 // App media client: images and short video through the ai-platform gateway, charged through
 // lib/ai/billing (preauthorize before, settle with the gateway's usage after) and persisted
 // to the store's S3 bucket (gateway URLs are temporary). Contract: docs/plans/AI_MEDIA_PLATFORM_PLAN.md.
+import { getAiRouting, getProviderPolicy } from '@/lib/providers/policy'
 import { preauthorize, settle, AiWalletError } from './billing'
 import { aiGatewayUrl } from '@/lib/shared/ai-client'
 import { uploadGalleryImage, putObjectBuffer, getS3Url, currentBucket } from '@/lib/shared/s3'
@@ -244,6 +245,7 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
     actor: opts.actor ?? null,
   })
   const started = Date.now()
+  const policy = await getProviderPolicy().catch(() => null)
   let gw: GatewayImageResponse
   try {
     gw = await gatewayFetch<GatewayImageResponse>('/v1/images/generate', {
@@ -254,8 +256,9 @@ export async function generateImage(opts: GenerateImageOpts): Promise<GenerateIm
         width: opts.width,
         height: opts.height,
         n,
-        quality: opts.quality ?? 'standard',
+        quality: opts.quality ?? policy?.aiImageDefaultQuality ?? 'standard',
         provider: opts.provider,
+        providers: policy?.aiImageProviders.length ? policy.aiImageProviders : undefined,
         referenceImageUrl: opts.referenceImageUrl,
         seed: opts.seed,
         namespace: await namespace(),
@@ -306,6 +309,7 @@ export async function generateVideo(opts: GenerateVideoOpts): Promise<GenerateVi
         durationSec,
         aspect: opts.aspect === '16:9' ? '16:9' : '9:16',
         provider: opts.provider,
+        providers: (await getAiRouting().catch(() => ({}) as { video?: string[] })).video,
         namespace: await namespace(),
       }),
     })
