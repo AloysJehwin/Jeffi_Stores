@@ -211,7 +211,7 @@ export default function Select<T extends string | number>({
   const selected = options.find(o => o.value === value)
 
   return (
-    <div className={`relative ${className.includes('w-full') ? 'block' : 'inline-block'} ${className}`}>
+    <div className={`relative ${className.includes('w-full') ? 'block' : 'inline-flex align-top'} ${className}`}>
       <button
         ref={triggerRef}
         type="button"
@@ -356,7 +356,7 @@ export function MultiSelect<T extends string | number>({
   const selected = value.map(v => options.find(o => o.value === v)).filter((o): o is Option<T> => !!o)
 
   return (
-    <div className={`relative ${className.includes('w-full') ? 'block' : 'inline-block'} ${className}`}>
+    <div className={`relative ${className.includes('w-full') ? 'block' : 'inline-flex align-top'} ${className}`}>
       <button
         ref={triggerRef}
         type="button"
