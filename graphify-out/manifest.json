@@ -85,8 +85,8 @@
     "semantic_hash": ""
   },
   "database/constraints.sql": {
-    "mtime": 1792141115.0676556,
-    "ast_hash": "ec6879face81f396c0f657c42406808b",
+    "mtime": 1792142257.5829868,
+    "ast_hash": "f77200e8ee448db703b5a3b8f369c84f",
     "semantic_hash": ""
   },
   "database/crm.sql": {
@@ -105,8 +105,8 @@
     "semantic_hash": ""
   },
   "database/indexes.sql": {
-    "mtime": 1792141115.073338,
-    "ast_hash": "54535c389042e4e726edaee21b6b34f5",
+    "mtime": 1792142257.5906167,
+    "ast_hash": "3ca774e62a4d04d950f91700957d15ef",
     "semantic_hash": ""
   },
   "database/inventory.sql": {
@@ -1550,8 +1550,8 @@
     "semantic_hash": ""
   },
   "database/amazon.sql": {
-    "mtime": 1787763971.4144154,
-    "ast_hash": "9c1a358a39402f3b14dd83839df02434",
+    "mtime": 1792142257.575056,
+    "ast_hash": "cd1fc7c7abea3fcebc5d362197795594",
     "semantic_hash": ""
   },
   "docs/amazon-brand-approval-followup.md": {
@@ -4330,8 +4330,8 @@
     "semantic_hash": ""
   },
   "deploy/k8s/platform/cronjobs.yaml": {
-    "mtime": 1792141427.6624448,
-    "ast_hash": "612edd7bef651d53acc28b7376ef5c20",
+    "mtime": 1792142434.7064521,
+    "ast_hash": "13322700a25418315bc5f5f7c9a2f5af",
     "semantic_hash": ""
   },
   "deploy/k8s/platform/kustomization.yaml": {
@@ -4590,8 +4590,8 @@
     "semantic_hash": ""
   },
   "messaging-service/src/server.ts": {
-    "mtime": 1792087335.6998541,
-    "ast_hash": "bf2b26030ab5fb73f0df2bfee827a256",
+    "mtime": 1792142120.473854,
+    "ast_hash": "7c608fae6e5b6a8ef299ecb000da31f9",
     "semantic_hash": ""
   },
   "messaging-service/src/templates.ts": {
@@ -5255,8 +5255,8 @@
     "semantic_hash": ""
   },
   "messaging-service/test/server.test.ts": {
-    "mtime": 1792058268.0478275,
-    "ast_hash": "578d547ffdb337a4c89de51e81eebb03",
+    "mtime": 1792142133.6623945,
+    "ast_hash": "676be95c69043b0c21da77137de148da",
     "semantic_hash": ""
   },
   "messaging-service/test/templates.test.ts": {
@@ -5510,8 +5510,8 @@
     "semantic_hash": ""
   },
   "messaging-service/src/delivery.ts": {
-    "mtime": 1791940288.6355574,
-    "ast_hash": "b1dd5127b634555268a7d60829a89e4b",
+    "mtime": 1792142146.084816,
+    "ast_hash": "c6592f82fa0181badef46d636499e085",
     "semantic_hash": ""
   },
   "tests/lib/shipping/courier-consignee.test.ts": {
@@ -6865,8 +6865,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/layout.tsx": {
-    "mtime": 1792141611.194632,
-    "ast_hash": "40fd4d66ab5cad745af996a8158c55da",
+    "mtime": 1792142531.5274818,
+    "ast_hash": "31030fc0f17a229c419a6c21d73e9f5b",
     "semantic_hash": ""
   },
   "controller-service/src/app/(admin)/admin/loading.tsx": {
@@ -15080,8 +15080,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/cron-jobs.ts": {
-    "mtime": 1792141426.4961848,
-    "ast_hash": "78608e2981378f9c16c0db31dc03142f",
+    "mtime": 1792142433.8369052,
+    "ast_hash": "3d04e129f78f602dbe3a433432daa20a",
     "semantic_hash": ""
   },
   "controller-service/src/lib/shared/cron-record.ts": {
@@ -17465,8 +17465,8 @@
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/registry.ts": {
-    "mtime": 1792141228.3196557,
-    "ast_hash": "ceb83c4c8c18ac4f0813ccb0ed641a8c",
+    "mtime": 1792142417.477971,
+    "ast_hash": "d4b256b32cd0dd6177b24699016464c2",
     "semantic_hash": ""
   },
   "controller-service/src/lib/channels/report-store.ts": {
@@ -17592,6 +17592,81 @@
   "tests/lib/merchant/console.test.ts": {
     "mtime": 1792141689.9499307,
     "ast_hash": "6c46c970ca548eca95bdfc9484311b49",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/amazon/_components/AmazonConsole.tsx": {
+    "mtime": 1792142481.5475047,
+    "ast_hash": "a70b7c927d08adb22c9207e9492a7bb8",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/amazon/_components/AmazonTabs.tsx": {
+    "mtime": 1792142531.5269566,
+    "ast_hash": "0624b812a3ef890c0c652ee3aa4a1681",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/(admin)/admin/amazon/page.tsx": {
+    "mtime": 1792142462.8620842,
+    "ast_hash": "65bae352c4e42777452dc24886de91ac",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/amazon/console/price/route.ts": {
+    "mtime": 1792142417.52968,
+    "ast_hash": "e029dd304aaf2f019711db2051fdd6bc",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/amazon/console/refresh/route.ts": {
+    "mtime": 1792142417.5218837,
+    "ast_hash": "65fdc7c0da5cb1484e6aaf0f29cf7057",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/amazon/console/route.ts": {
+    "mtime": 1792142417.5107796,
+    "ast_hash": "a4731df69451447873a506981a3764ec",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(admin)/admin/amazon/console/rules/route.ts": {
+    "mtime": 1792142417.537415,
+    "ast_hash": "d609804a2b82fcdd8adff6e09d4d0669",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/amazon-fees/route.ts": {
+    "mtime": 1792142433.8361728,
+    "ast_hash": "f5790fe8f4e6710a5f22cca51680d98b",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/amazon-pricing/route.ts": {
+    "mtime": 1792142433.835883,
+    "ast_hash": "bbf0151fc1d0df058f34bfc3913e30b8",
+    "semantic_hash": ""
+  },
+  "controller-service/src/app/api/(internal)/cron/amazon-status/route.ts": {
+    "mtime": 1792142433.8364222,
+    "ast_hash": "8573370221090ba1749f35928167956f",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/amazon/alerts.ts": {
+    "mtime": 1792142379.2575555,
+    "ast_hash": "dfe9ea0b86aee266bee6f0070507ac82",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/amazon/console.ts": {
+    "mtime": 1792142352.7334816,
+    "ast_hash": "6a36f93585e621a8e4b4f0429eb4d0d9",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/amazon/pricing-api.ts": {
+    "mtime": 1792142283.2973645,
+    "ast_hash": "7a97811af4b7bf4b35ca2c328367d53e",
+    "semantic_hash": ""
+  },
+  "controller-service/src/lib/amazon/repricer.ts": {
+    "mtime": 1792142294.4432454,
+    "ast_hash": "478eb3817763b71a1538cc2f207ff63a",
+    "semantic_hash": ""
+  },
+  "tests/lib/amazon/pricing.test.ts": {
+    "mtime": 1792142564.0313723,
+    "ast_hash": "ef7516b88bff4462c58bbf40a0701f24",
     "semantic_hash": ""
   }
 }

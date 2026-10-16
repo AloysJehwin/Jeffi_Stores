@@ -3670,3 +3670,8 @@ ALTER TABLE ONLY public.gmc_account_issues ADD CONSTRAINT gmc_account_issues_pke
 ALTER TABLE ONLY public.gmc_issue_cache ADD CONSTRAINT gmc_issue_cache_pkey PRIMARY KEY (offer_id);
 ALTER TABLE ONLY public.gmc_account_state ADD CONSTRAINT gmc_account_state_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.gmc_account_state ADD CONSTRAINT gmc_account_state_single CHECK ((id = 1));
+
+ALTER TABLE ONLY public.amazon_offers ADD CONSTRAINT amazon_offers_pkey PRIMARY KEY (sku);
+ALTER TABLE ONLY public.amazon_fee_estimates ADD CONSTRAINT amazon_fee_estimates_pkey PRIMARY KEY (sku);
+ALTER TABLE ONLY public.amazon_repricer_rules ADD CONSTRAINT amazon_repricer_rules_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.amazon_repricer_rules ADD CONSTRAINT amazon_repricer_rules_strategy_check CHECK (((strategy)::text = ANY ((ARRAY['match_buybox'::character varying, 'beat_buybox'::character varying, 'hold'::character varying])::text[])));
