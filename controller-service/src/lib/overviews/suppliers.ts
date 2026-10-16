@@ -15,7 +15,7 @@ export const DUE_SOON_DAYS = 7
 export const STALE_DRAFT_DAYS = 7
 
 // Open supplier bills with their supplier and days past due.
-const PAYABLES = `
+export const PAYABLES = `
   SELECT e.id, e.due_date, COALESCE(po.supplier_id, s.id) AS supplier_id, e.supplier_name,
     e.total_amount - COALESCE((SELECT SUM(ep.amount) FROM expense_payments ep WHERE ep.expense_id = e.id AND ${LIVE_PAYOUT}), 0) AS amount,
     COALESCE(${TODAY} - e.due_date, 0)::int AS days
@@ -114,7 +114,7 @@ export function supplierAttention(
       severity: overdue.some(o => o.days_late > 7) ? 'critical' : 'warning',
       title: `${plural(overdue.length, 'purchase order')} past the expected date`,
       sub: `Latest: ${worst.po_number}${worst.supplier_name ? ` (${worst.supplier_name})` : ''}, ${worst.days_late} d late`,
-      href: `/admin/inventory?tab=po&po=${worst.id}`,
+      href: `/admin/purchase-orders?tab=orders&po=${worst.id}`,
     })
   }
   if (payables.due_soon_count)
@@ -130,7 +130,7 @@ export function supplierAttention(
       key: 'drafts',
       severity: 'info',
       title: `${plural(staleDrafts, 'draft PO')} not sent for over ${STALE_DRAFT_DAYS} days`,
-      href: '/admin/inventory?tab=po',
+      href: '/admin/purchase-orders?tab=orders',
     })
   return out
 }

@@ -243,7 +243,7 @@ export default function PayableDetailClient({ id }: { id: string }) {
                 </div>
               )}
               <Link
-                href={ap(`/admin/inventory?po=${e.po_number}`)}
+                href={ap(`/admin/purchase-orders?tab=orders&po=${e.po_number}`)}
                 className="inline-block mt-1 text-xs text-accent-500 hover:underline"
               >
                 View in Inventory →

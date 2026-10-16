@@ -584,7 +584,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
                     Purchase History
                   </p>
-                  <Link href={`/admin/inventory?tab=pos`} className="text-xs text-accent-600 hover:underline">
+                  <Link href={`/admin/purchase-orders?tab=orders`} className="text-xs text-accent-600 hover:underline">
                     View all POs →
                   </Link>
                 </div>
@@ -612,7 +612,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                                 className="hover:bg-surface-secondary transition-colors"
                               >
                                 <td className="py-1.5 pr-3 font-mono text-accent-600">
-                                  <Link href={`/admin/inventory?tab=pos&po=${row.po_id}`} className="hover:underline">
+                                  <Link href={`/admin/purchase-orders?tab=orders&po=${row.po_id}`} className="hover:underline">
                                     {row.po_number}
                                   </Link>
                                 </td>

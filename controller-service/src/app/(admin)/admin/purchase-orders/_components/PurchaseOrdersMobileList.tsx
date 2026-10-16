@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
+import { poDaysLate } from '@/lib/purchasing/po-status'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { formatINR as formatINRBase, formatDate } from '@/lib/shared/format'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
@@ -110,7 +111,10 @@ export default function PurchaseOrdersMobileList({
             </div>
             <div className="text-sm text-foreground truncate">{po.supplier_name}</div>
             <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
-              <span>{formatDate(po.order_date)}</span>
+              <span>
+                {formatDate(po.order_date)}
+                {poDaysLate(po) > 0 && <span className="ml-1.5 text-red-600 dark:text-red-400 font-medium">{poDaysLate(po)}d late</span>}
+              </span>
               <span className="font-semibold text-foreground">{formatINR(parseFloat(po.total_amount))}</span>
             </div>
           </div>

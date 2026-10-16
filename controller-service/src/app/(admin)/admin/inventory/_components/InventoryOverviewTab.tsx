@@ -185,17 +185,17 @@ const when = (v: string) =>
 
 // Inventory tabs read their state once on mount, so tab links use a full navigation.
 const invHref = (q: string) => `${ap('/admin/inventory')}?${q}`
+const poHref = (q: string) => `${ap('/admin/purchase-orders')}?${q}`
 const valuationHref = (search?: string | null, stock?: string) =>
   invHref(
     new URLSearchParams({
-      tab: 'stock',
-      stock_view: 'valuation',
+      tab: 'valuation',
       ...(search ? { val_search: search } : {}),
       ...(stock ? { val_stock: stock } : {}),
     }).toString()
   )
 const newPoHref = (r: { product_id: string; variant_id: string | null }) =>
-  ap(`/admin/inventory/po/new?product=${r.product_id}${r.variant_id ? `&variant=${r.variant_id}` : ''}`)
+  ap(`/admin/purchase-orders/new?product=${r.product_id}${r.variant_id ? `&variant=${r.variant_id}` : ''}`)
 
 function buildCategorySegments(rows: { label: string; value: number }[]): DonutSegment[] {
   const top = rows.slice(0, CATEGORY_PALETTE.length)
@@ -329,13 +329,13 @@ function buildAttention(d: Overview): AttentionItem[] {
       tone: 'red',
       title: `${d.po.overdueCount} purchase orders are past their expected date`,
       detail: `${money(d.po.overdueValue)} not yet fully received. Follow up with the supplier or receive the goods.`,
-      href: invHref('tab=po'),
+      href: poHref('tab=orders'),
       external: true,
       cta: 'Purchase orders',
       items: d.po.overdue.slice(0, 5).map(p => ({
         key: p.id,
         text: `${p.po_number}${p.supplier_name ? ` · ${p.supplier_name}` : ''}`,
-        href: invHref(`tab=po&po=${p.id}`),
+        href: poHref(`tab=orders&po=${p.id}`),
         external: true,
         meta: `${p.days_late} days late, ${money(p.total_amount)}`,
       })),
@@ -346,7 +346,7 @@ function buildAttention(d: Overview): AttentionItem[] {
       tone: 'red',
       title: `${d.stock.negative} SKUs show negative stock`,
       detail: 'More was sold than recorded on hand. Count the shelf and adjust, or receive the pending GRN.',
-      href: invHref('tab=stock&stock_view=ledger'),
+      href: invHref('tab=ledger'),
       external: true,
       cta: 'Stock ledger',
       items: d.negative.slice(0, 5).map(r => ({
@@ -405,7 +405,7 @@ function buildAttention(d: Overview): AttentionItem[] {
       key: 'draft-po',
       tone: 'muted',
       title: `${d.po.draftCount} draft purchase orders not sent`,
-      href: invHref('tab=po'),
+      href: poHref('tab=orders'),
       external: true,
       cta: 'Purchase orders',
     })
@@ -824,7 +824,7 @@ export default function InventoryOverviewTab() {
         title="Recent stock movements"
         action={
           <a
-            href={invHref('tab=stock&stock_view=ledger')}
+            href={invHref('tab=ledger')}
             className="text-xs font-medium text-accent-500 hover:underline"
           >
             Full ledger

@@ -14,6 +14,7 @@ import { formatINR as formatINRBase } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 import { round3 } from '@/lib/shared/number-display'
 import { useEditSession } from '@/hooks/useEditSession'
 import { useAutosaveDraft, type AutosaveStatus } from '@/hooks/useAutosaveDraft'
@@ -139,6 +140,7 @@ export default function NewPOPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState({ supplier_id: '', order_date: '', expected_date: '', notes: '', status: 'draft' })
@@ -274,12 +276,53 @@ export default function NewPOPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ?duplicate=<poId> or ?supplier=&lines= (reorder suggestions) seed the form once the draft
+  // is loaded. A draft already holding lines is only replaced after confirming.
+  const prefillRef = useRef(false)
+  useEffect(() => {
+    if (!draftLoaded || prefillRef.current) return
+    const dup = searchParams.get('duplicate')
+    const lines = searchParams.get('lines')
+    if (!dup && !lines) return
+    prefillRef.current = true
+    const qs = new URLSearchParams()
+    if (dup) qs.set('duplicate', dup)
+    else {
+      qs.set('lines', lines!)
+      const sup = searchParams.get('supplier')
+      if (sup) qs.set('supplier', sup)
+    }
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/admin/purchase-orders/prefill?${qs}`, { credentials: 'include' })
+        const j = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(j.error || 'Could not prefill the PO')
+        const seeded: POLineItem[] = (j.lines || []).map((l: Omit<POLineItem, 'id'>) => ({ ...newPOLineItem(), ...l }))
+        if (!seeded.length) return
+        if (lineItemsRef.current.some(it => it.product_id)) {
+          const ok = await confirm({
+            title: 'Replace the PO in progress?',
+            message: 'Your open PO draft already has lines. Replace them with the prefilled ones?',
+            confirmLabel: 'Replace',
+            cancelLabel: 'Keep draft',
+          })
+          if (!ok) return
+        }
+        setForm(f => ({ ...f, supplier_id: j.supplier_id || f.supplier_id, notes: j.notes ?? f.notes }))
+        setLineItems(seeded)
+      } catch (e: any) {
+        showToast(e.message, 'error')
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftLoaded])
+
   const edit = useEditSession({
     resourceType: 'po_new',
     resourceId: draftId,
     onCancelled: () => {
       // Draft was rolled back by server (deleted on cancel). Go back to the list.
-      router.push(ap('/admin/inventory?tab=po'))
+      router.push(ap('/admin/purchase-orders?tab=orders'))
     },
   })
 
@@ -663,7 +706,7 @@ export default function NewPOPage() {
         }).catch(() => {})
       }
       await edit.save().catch(() => false)
-      router.push(ap('/admin/inventory?tab=po'))
+      router.push(ap('/admin/purchase-orders?tab=orders'))
     } catch {
       showToast('Failed to create purchase order', 'error')
       setSaving(false)
@@ -691,7 +734,7 @@ export default function NewPOPage() {
       <div className="p-4 sm:p-6">
         <div className="flex items-center gap-3 mb-6">
           <Link
-            href={ap('/admin/inventory?tab=po')}
+            href={ap('/admin/purchase-orders?tab=orders')}
             className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
