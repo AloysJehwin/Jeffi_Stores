@@ -57,14 +57,14 @@ describe('Google Business Profile', () => {
     expect(starRating(undefined)).toBeNull()
   })
 
-  it('builds the Google authorize URL with offline access and PKCE', () => {
+  it('builds the Google authorize URL with offline access and no PKCE (same as the Merchant sign-in)', () => {
     const u = new URL(gbpProvider.oauth!.authorizeUrl('https://a/cb', 'st', 'chal'))
     expect(u.origin + u.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth')
     expect(u.searchParams.get('client_id')).toBe('gid')
     expect(u.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/business.manage')
     expect(u.searchParams.get('access_type')).toBe('offline')
     expect(u.searchParams.get('prompt')).toBe('select_account consent')
-    expect(u.searchParams.get('code_challenge')).toBe('chal')
+    expect(u.searchParams.get('code_challenge')).toBeNull()
     expect(u.searchParams.get('code_challenge_method')).toBe('S256')
     expect(u.searchParams.get('state')).toBe('st')
   })
@@ -77,7 +77,7 @@ describe('Google Business Profile', () => {
     expect(Date.parse(t.expiresAt!)).toBeGreaterThan(Date.now())
     const f = formOf(0)
     expect(f.get('grant_type')).toBe('authorization_code')
-    expect(f.get('code_verifier')).toBe('ver')
+    expect(f.get('code_verifier')).toBeNull()
     expect(f.get('client_secret')).toBe('test-secret-google')
 
     routes = []
