@@ -3650,3 +3650,13 @@ ALTER TABLE ONLY public.tenant_service_approvals ADD CONSTRAINT tenant_service_a
 ALTER TABLE ONLY public.template_variant ADD CONSTRAINT template_variant_review_status_check CHECK (((review_status)::text = ANY ((ARRAY['approved'::character varying, 'pending'::character varying, 'rejected'::character varying])::text[])));
 ALTER TABLE ONLY public.messaging_tenant_settings ADD CONSTRAINT messaging_tenant_settings_pkey PRIMARY KEY (tenant_id);
 ALTER TABLE ONLY public.messaging_tenant_settings ADD CONSTRAINT messaging_tenant_settings_mode_check CHECK (((standard_templates)::text = ANY ((ARRAY['all'::character varying, 'selected'::character varying])::text[])));
+
+ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_status_check CHECK (((status)::text = ANY ((ARRAY['running'::character varying, 'success'::character varying, 'partial'::character varying, 'error'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_status_check CHECK (((status)::text = ANY ((ARRAY['open'::character varying, 'dismissed'::character varying, 'resolved'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_severity_check CHECK (((severity)::text = ANY ((ARRAY['info'::character varying, 'warning'::character varying, 'critical'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_change_log ADD CONSTRAINT channel_change_log_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.channel_change_log ADD CONSTRAINT channel_change_log_status_check CHECK (((status)::text = ANY ((ARRAY['applied'::character varying, 'rejected'::character varying, 'failed'::character varying])::text[])));

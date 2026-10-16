@@ -28,6 +28,7 @@ export const APPLY_ORDER = [
   'ai.sql',
   'amazon.sql',
   'ads.sql',
+  'channels.sql',
   // Service tables live in the main DB, but constraints/indexes.sql reference them.
   'documents.sql',
   'bulk.sql',
