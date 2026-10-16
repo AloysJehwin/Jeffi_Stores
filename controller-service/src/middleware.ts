@@ -593,6 +593,7 @@ async function handle(request: NextRequest) {
       '/api/admin/data-source/google/callback',
       '/api/admin/integrations/google/callback',
       '/api/admin/integrations/amazon/callback',
+      '/api/admin/integrations/amazon-ads/callback',
       '/api/admin/social/callback',
     ]
     if (oauthCallbackPaths.some(p => pathname.startsWith(p)) && request.method === 'GET') {

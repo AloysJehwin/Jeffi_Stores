@@ -2295,3 +2295,7 @@ CREATE INDEX IF NOT EXISTS idx_amazon_orders_updated ON public.amazon_orders (la
 CREATE INDEX IF NOT EXISTS idx_amazon_order_items_order ON public.amazon_order_items (amazon_order_id);
 
 CREATE INDEX IF NOT EXISTS idx_amazon_order_items_sku ON public.amazon_order_items (sku);
+
+CREATE INDEX IF NOT EXISTS idx_aads_search_terms_term ON public.aads_search_terms (search_term, date);
+
+CREATE INDEX IF NOT EXISTS idx_aads_keywords_ad_group ON public.aads_keywords (ad_group_id);

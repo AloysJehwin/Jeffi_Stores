@@ -812,6 +812,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/merchant')) return 'merchant_sync:read'
   if (pathname.startsWith('/api/admin/channels')) return null
   if (pathname.startsWith('/api/admin/amazon-ads')) return 'amazon_ads:read'
+  if (pathname.startsWith('/api/admin/integrations/amazon-ads')) return 'amazon_ads:read'
   if (pathname.startsWith('/api/admin/amazon')) return 'amazon:read'
   if (pathname.startsWith('/api/admin/meta-ads')) return 'meta_ads:read'
   if (pathname.startsWith('/api/admin/social')) return 'social:read'
