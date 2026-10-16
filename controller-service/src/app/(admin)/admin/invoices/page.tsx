@@ -4,7 +4,7 @@ import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import InvoicesClient from './InvoicesClient'
+import InvoicesTabs from './InvoicesTabs'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
@@ -37,7 +37,7 @@ export default async function InvoicesPage() {
 
   return (
     <div className="p-4 sm:p-6">
-      <InvoicesClient canWrite={canWrite} />
+      <InvoicesTabs canWrite={canWrite} />
     </div>
   )
 }

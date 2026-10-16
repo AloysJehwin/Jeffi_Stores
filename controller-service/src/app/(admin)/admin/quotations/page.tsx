@@ -4,7 +4,7 @@ import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import QuotationsClient from './QuotationsClient'
+import QuotationsTabs from './QuotationsTabs'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
@@ -37,7 +37,7 @@ export default async function QuotationsPage() {
 
   return (
     <div className="p-4 sm:p-6">
-      <QuotationsClient canWrite={canWrite} />
+      <QuotationsTabs canWrite={canWrite} />
     </div>
   )
 }
