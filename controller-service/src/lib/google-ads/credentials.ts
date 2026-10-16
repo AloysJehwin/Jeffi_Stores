@@ -143,7 +143,13 @@ export function credsFromConfig(cfg: GoogleAdsConfig | null, tenantKey: string):
 export function platformAdsCreds(tenantKey: string): GoogleAdsCreds | null {
   const customerId = normalizeCustomerId(process.env.GOOGLE_ADS_CUSTOMER_ID)
   if (tenantKey !== PLATFORM_TENANT_ID || !customerId) return null
-  const sa = loadGoogleServiceAccount()
+  // No key in this environment: the flagship is simply not connected, like a store.
+  let sa: ReturnType<typeof loadGoogleServiceAccount>
+  try {
+    sa = loadGoogleServiceAccount()
+  } catch {
+    return null
+  }
   return {
     serviceAccount: { clientEmail: sa.client_email, privateKey: sa.private_key },
     customerId,

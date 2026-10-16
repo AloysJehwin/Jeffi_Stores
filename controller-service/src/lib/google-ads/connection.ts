@@ -43,8 +43,9 @@ export async function getAdsConnectionStatus(tenantKey: string): Promise<AdsConn
     serviceAccountEmail: flagship ? serviceAccountEmail() : null,
     pendingAccount: live && !customerId,
   }
-  // Flagship with no account stored: the flagship's own account through the platform service account.
-  if (!customerId && flagship && env.platformCustomerId) {
+  // Flagship with no account stored: its own account through the platform service account, when this
+  // environment has the key. Without it the flagship signs in with Google like a store.
+  if (!customerId && flagship && env.platformCustomerId && base.serviceAccountEmail) {
     return {
       ...base,
       connected: true,
