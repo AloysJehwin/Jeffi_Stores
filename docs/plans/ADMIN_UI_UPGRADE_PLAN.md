@@ -232,7 +232,7 @@ Size: S under half a day, M about a day, L several days. Priority: 1 daily-use p
 | Wave agent | Owns | Notes |
 |---|---|---|
 | A. Orders and fulfilment | `orders`, `returns`, `replacements`, `delhivery`, `packing-slips`, `labels`, `scan`, `cash-sale`, `subscriptions` | `orders/[id]/view` first; most-used view page |
-| B. Catalogue | `products` (list and view), `brands` (done in pilot), `categories`, `offers`, `catalog-enrichment`, `inflation`, `controls`, `shelving` | `ProductForm` is a separate track (B2) split into `FormSection`s with a section nav; plan it for three or four days |
+| B. Catalogue | `products` (list and view), `brands` (done in pilot), `categories`, `offers`, `catalog-enrichment`, `inflation`, `controls`, `shelving` | `ProductForm` is a separate track (B2): UI only, restyled in place with the kit's visual components and a section nav; its logic is not touched; plan it for three or four days |
 | C. Sales documents and B2B | `invoices`, `quotations`, `business/*`, `financial`, `gst`, `wallet` | owns `LineItemsSection` and `LineItemsTable` |
 | D. Customers and marketing | `customers`, `crm`, `customer-programs`, `coupons`, `campaigns`, `marketing/*`, `review-forms`, `reviews`, `social-posts` | |
 | E. Operations and admin | `inventory`, `suppliers`, `tasks`, `team`, `audit`, `service-accounts`, `settings`, `data-source`, `agent` | start only after the current inventory, suppliers and purchase-order work is merged |
@@ -251,7 +251,7 @@ Rough total: phase 0 and 1 about a week; waves A to F about two weeks with six a
 - **URL contracts.** List filters, sort and page parameters, `?tab=` values and `?back=` links are bookmarked and used by the main dashboard and attention lists. `DataTable` server mode must accept the existing parameter names; keep the redirect-only alias routes.
 - **Tenant paths.** Links go through `ap()` with the host; the kit's `Action.href` must take an already-resolved path and never build `/admin/...` itself.
 - **Mobile.** Create/edit stays blocked on mobile (`MobileEditBlock`), except orders and common actions, which get a 390 px pass each.
-- **ProductForm.** Largest and riskiest file; split by extracting sections into files with no behaviour change first, then restyle. Keep `tests/components/admin/mobile-product-pattern.test.tsx` and product action tests green.
+- **ProductForm.** Largest and riskiest file, and it carries a lot of internal logic (state, validation, drafts, variants, pricing, server actions). Change the UI only: restyle markup and layout in place, do not restructure, split or rewrite its logic. Keep `tests/components/admin/mobile-product-pattern.test.tsx` and product action tests green.
 - **Concurrent edits.** Inventory, suppliers, purchase orders, meta-ads, site controls and ecom are being changed now; their waves start from whatever has merged, and agents do not touch folders outside their wave.
 - **Print and PDF views.** Invoice, quotation, packing slip and label views have print styles; check print preview after restyling.
 
