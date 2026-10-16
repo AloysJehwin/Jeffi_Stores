@@ -592,6 +592,7 @@ export async function POST(req: NextRequest) {
   try {
     for (let iter = 0; iter < MAX_ITERATIONS && !done; iter++) {
       const r = await aiChat({
+        feature: 'admin_agent',
         modelHint: 'agent',
         jsonMode: false,
         temperature: 0.2,

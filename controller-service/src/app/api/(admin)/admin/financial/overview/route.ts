@@ -5,6 +5,7 @@ import {
   isValidRange,
   presetRange,
 } from '@/app/(admin)/admin/financial/_components/overview-period'
+import { FLAGSHIP_TENANT_ID } from '@/lib/payments/wallet'
 import { getFinanceOverview } from './summary'
 
 export const dynamic = 'force-dynamic'
@@ -20,7 +21,9 @@ export async function GET(request: NextRequest) {
     const range = asked.from ? asked : presetRange('30d')
     // GST figures follow the GST pages' scope.
     const withGst = hasScope(admin.role, admin.scopes, 'gst:read')
-    return NextResponse.json(await getFinanceOverview(range, { withGst }))
+    const tenantId = request.headers.get('x-tenant-id')
+    const flagship = !tenantId || tenantId === FLAGSHIP_TENANT_ID
+    return NextResponse.json(await getFinanceOverview(range, { withGst, flagship }))
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

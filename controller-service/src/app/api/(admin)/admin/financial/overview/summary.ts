@@ -8,6 +8,7 @@ import {
   type Bucket,
   type Range,
 } from '@/app/(admin)/admin/financial/_components/overview-period'
+import { aiTotals } from '../ai-costs/summary'
 
 // Finance overview in SQL. Revenue, refunds and COGS follow getPLReport; cash in/out follow
 // getCashflow; receivables and payables follow getReceivablesAging / getPayables, with failed,
@@ -311,17 +312,22 @@ async function attention() {
   return { receivables, payables, cod, refunds, returns, adjustments, payouts }
 }
 
-export async function getFinanceOverview(range: Range, opts: { withGst: boolean }) {
+export async function getFinanceOverview(range: Range, opts: { withGst: boolean; flagship?: boolean }) {
   const prev = previousPeriod(range)
   const bucket = bucketFor(range)
-  const [current, previous, trend, mix, snap, att] = await Promise.all([
+  const [current, previous, trend, mix, snap, att, aiCur, aiPrev] = await Promise.all([
     periodTotals(range, opts.withGst),
     periodTotals(prev, opts.withGst),
     series(range, bucket),
     breakdown(range),
     snapshot(),
     attention(),
+    aiTotals(range),
+    aiTotals(prev),
   ])
+  // Flagship: what AI cost the platform. Tenant: what AI was charged to the wallet.
+  const flagship = opts.flagship ?? true
+  const aiAmount = (t: typeof aiCur) => (flagship ? t.cost_inr : t.price_inr)
   return {
     range,
     previous_range: prev,
@@ -333,6 +339,7 @@ export async function getFinanceOverview(range: Range, opts: { withGst: boolean 
     by_channel: group(mix, 'channel'),
     ...snap,
     attention: { ...att, cod_stale_days: COD_STALE_DAYS },
+    ai: { flagship, amount: aiAmount(aiCur), previous: aiAmount(aiPrev), calls: aiCur.calls },
   }
 }
 

@@ -92,6 +92,7 @@ Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai
         .join('\n')
 
       const r = await aiChat({
+        feature: 'product_copy',
         cacheNamespace,
         modelHint: 'copy',
         jsonMode: true,
