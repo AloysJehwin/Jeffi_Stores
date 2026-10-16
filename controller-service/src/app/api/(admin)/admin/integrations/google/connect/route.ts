@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('scope', GMC_OAUTH_SCOPE)
   url.searchParams.set('access_type', 'offline')
-  url.searchParams.set('prompt', 'consent')
+  url.searchParams.set('prompt', 'select_account consent')
   url.searchParams.set('include_granted_scopes', 'true')
   url.searchParams.set('state', state)
   return NextResponse.redirect(url.toString())

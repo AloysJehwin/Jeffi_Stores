@@ -77,7 +77,7 @@ describe('Google Ads connect', () => {
     expect(url.searchParams.get('scope')).toBe(`${ADWORDS} ${DATAMANAGER}`)
     expect(url.searchParams.get('include_granted_scopes')).toBe('true')
     expect(url.searchParams.get('access_type')).toBe('offline')
-    expect(url.searchParams.get('prompt')).toBe('consent')
+    expect(url.searchParams.get('prompt')).toBe('select_account consent')
     expect(url.searchParams.get('redirect_uri')).toBe('https://admin.jeffistores.in/api/admin/integrations/google/callback')
     const state = verifyAdminState(url.searchParams.get('state')!)
     expect(state).toMatchObject({ tenantId: 't-acme', provider: 'google_ads' })
