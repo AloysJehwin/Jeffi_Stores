@@ -16,7 +16,7 @@ export interface BankState {
 const STATE: Record<string, { label: string; tone: string; blurb: string }> = {
   verified: {
     label: 'Verified',
-    tone: 'ecom-accent-bg/10 org-sage-text border-border-default',
+    tone: 'org-sage org-sage-text border-border-default',
     blurb: 'Your payouts settle to this account.',
   },
   unverified: {
@@ -83,7 +83,7 @@ export default function PayoutsClient({ initial }: { initial: BankState | null }
     setBusy(false)
   }
 
-  const inp = 'w-full rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground'
+  const inp = 'w-full rounded-xl border border-border-default bg-surface px-3 py-2 text-sm text-foreground ecom-field'
   const lbl = 'block text-xs font-medium text-foreground-muted mb-1'
 
   return (

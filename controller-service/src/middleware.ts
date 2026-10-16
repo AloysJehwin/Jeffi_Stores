@@ -130,7 +130,7 @@ async function handle(request: NextRequest) {
   // img.<domain>: first-party short links (WhatsApp buttons, SMS) — /<code> redirects to its destination.
   if (hostname === 'img.localhost' || hostname.startsWith('img.')) {
     const code = pathname.slice(1)
-    if (/^[A-Za-z0-9_-]{4,32}$/.test(code)) return NextResponse.rewrite(new URL(`/api/s/${code}`, request.url))
+    if (/^[A-Za-z0-9_-]{4,32}$/.test(code) || /^[A-Za-z0-9_-]{8,1500}\.[A-Za-z0-9_-]{16}$/.test(code)) return NextResponse.rewrite(new URL(`/api/s/${code}`, request.url))
     return new NextResponse('Not found', { status: 404 })
   }
 
@@ -530,12 +530,18 @@ async function handle(request: NextRequest) {
       const isAdminLogin = pathname === '/login'
       if (!isAdminLogin) {
         const token = request.cookies.get(adminCookie)?.value
+        // Back to the same page and tab (e.g. an OAuth return's ?connected=…&tab=…) after signing in.
+        const toLogin = () => {
+          const u = buildRedirectUrl(request, '/login')
+          if (pathname !== '/') u.searchParams.set('callbackUrl', `${pathname}${search}`)
+          return u
+        }
         if (!token) {
-          return NextResponse.redirect(buildRedirectUrl(request, '/login'))
+          return NextResponse.redirect(toLogin())
         }
         const payload = await inTenant(() => verifyToken(token, reqSignals))
         if (!payload) {
-          const res = NextResponse.redirect(buildRedirectUrl(request, '/login'))
+          const res = NextResponse.redirect(toLogin())
           res.cookies.delete(adminCookie)
           return res
         }
@@ -581,9 +587,14 @@ async function handle(request: NextRequest) {
   }
 
   if (isAdminApiPath) {
-    // OAuth callbacks return cross-site from Google; the SameSite=Strict admin cookie is not sent.
-    // These authenticate via the HMAC-signed `state` in the route handler, not the session cookie.
-    const oauthCallbackPaths = ['/api/admin/data-source/google/callback']
+    // OAuth callbacks return cross-site from the provider; the SameSite=Strict admin cookie is not
+    // sent. These authenticate via the HMAC-signed `state` in the route handler, not the session cookie.
+    const oauthCallbackPaths = [
+      '/api/admin/data-source/google/callback',
+      '/api/admin/integrations/google/callback',
+      '/api/admin/integrations/amazon/callback',
+      '/api/admin/social/callback',
+    ]
     if (oauthCallbackPaths.some(p => pathname.startsWith(p)) && request.method === 'GET') {
       return addSecurityHeaders(passThrough())
     }
@@ -654,7 +665,7 @@ async function handle(request: NextRequest) {
 
     if (!token) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
-      loginUrl.searchParams.set('callbackUrl', pathname)
+      loginUrl.searchParams.set('callbackUrl', `${pathname}${request.nextUrl.search}`)
       return NextResponse.redirect(loginUrl)
     }
 
@@ -662,7 +673,7 @@ async function handle(request: NextRequest) {
 
     if (!payload) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
-      loginUrl.searchParams.set('callbackUrl', pathname)
+      loginUrl.searchParams.set('callbackUrl', `${pathname}${request.nextUrl.search}`)
       const response = NextResponse.redirect(loginUrl)
       response.cookies.delete(adminCookie)
       return response
@@ -672,7 +683,7 @@ async function handle(request: NextRequest) {
     const tokenCertCN = payload.authCertCN
     if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
-      loginUrl.searchParams.set('callbackUrl', pathname)
+      loginUrl.searchParams.set('callbackUrl', `${pathname}${request.nextUrl.search}`)
       const response = NextResponse.redirect(loginUrl)
       response.cookies.delete(adminCookie)
       return response

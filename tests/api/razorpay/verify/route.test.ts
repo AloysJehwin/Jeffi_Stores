@@ -59,12 +59,14 @@ vi.mock('@/lib/payments/razorpay', () => ({
 vi.mock('@/lib/orders/variant-change', () => ({
   settleVariantChangePayment: vi.fn(),
 }))
+vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn(async () => ({ action: 'none', reason: 'test' })) }))
 
 import { POST } from '@/app/api/(public)/razorpay/verify/route'
 import * as jwt from '@/lib/auth/jwt'
 import * as db from '@/lib/shared/db'
 import * as orderCommit from '@/lib/orders/order-commit'
 import * as variantChange from '@/lib/orders/variant-change'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 // ------------------------------------------------------------------ helpers
 
@@ -224,6 +226,39 @@ describe('POST /api/razorpay/verify', () => {
     expect(res.status).toBe(200)
     expect(body.success).toBe(true)
     expect(body.order.paymentStatus).toBe('paid')
+  })
+
+  it('queues the Google Ads conversion once a pending order is marked paid', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    const order = { ...MOCK_ORDER, gclid: 'Cj0KCQ', gbraid: null, wbraid: null }
+    vi.mocked(db.queryOne).mockResolvedValueOnce(order).mockResolvedValueOnce(MOCK_USER).mockResolvedValueOnce(order)
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) }))
+    const res = await POST(
+      makeRequest({ razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID, razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID }) as any
+    )
+    expect(res.status).toBe(200)
+    expect(queueAdsConversion).toHaveBeenCalledWith(ORDER_UUID, expect.objectContaining({ gclid: 'Cj0KCQ' }))
+  })
+
+  it('passes the click attribution and ads consent cookies to the draft commit', async () => {
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/orders/order-draft')
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({ userId: AUTH_USER.userId, mode: 'cart', cartHash: 'h', couponId: null, shippingAmount: 0, addressId: 'a', notes: null } as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null).mockResolvedValueOnce(MOCK_USER).mockResolvedValue(MOCK_ORDER)
+    vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
+    vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([] as any)
+    vi.mocked(hashCartItems).mockReturnValue('h')
+    vi.mocked(orderCommit.cartSubtotal).mockReturnValue(500)
+    vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(76)
+    vi.mocked(orderCommit.commitOrder).mockResolvedValue({ id: 'order-new', order_number: 'ORD-NEW', total_amount: '500' } as any)
+    const attr = encodeURIComponent(JSON.stringify({ gclid: 'Cj0KCQ', landing_path: '/', ts: Date.now() - 60_000 }))
+    // happy-dom drops a Cookie header from Request, so hand the route a minimal request.
+    const headers = new Map([['cookie', `jeffi_attr=${attr}; jeffi_consent=v1.0.1`]])
+    const body = { razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID, razorpay_signature: VALID_SIGNATURE, draftToken: 'tok' }
+    await POST({ headers: { get: (k: string) => headers.get(k.toLowerCase()) ?? null }, json: async () => body } as any)
+    expect(orderCommit.commitOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ attribution: expect.objectContaining({ gclid: 'Cj0KCQ' }), adsConsent: true })
+    )
   })
 
   it('returns 200 immediately when order is already paid (idempotent)', async () => {

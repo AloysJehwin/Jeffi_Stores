@@ -158,7 +158,7 @@ export default function AdminLogin() {
     try {
       const { accessToken, error: gErr } = await openGoogleOAuthPopup({
         clientId: GOOGLE_CLIENT_ID,
-        returnTo: '/admin/login',
+        returnTo: ap('/admin/login'),
       })
       if (gErr || !accessToken) {
         if (gErr && gErr !== 'popup_closed') setError(gErr)

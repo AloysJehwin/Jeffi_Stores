@@ -5,9 +5,9 @@ import { ZodError, z } from 'zod'
 import type pg from 'pg'
 import { SendMessageRequest, BatchMessageRequest, BulkMessagesRequest, UpsertTemplateRequest, UpsertLibraryTemplateRequest, UpdateLibraryTemplateRequest, TemplateQuery, Channel } from '@jeffi/api-contracts'
 import { verifyServiceToken, bearer, type ServiceClaims } from '@jeffi/service-auth'
-import { usdToInr } from '@jeffi/pricing'
+import { mediaPriceInr, usdToInr } from '@jeffi/pricing'
 import * as wallet from '@jeffi/wallet'
-import { resolveServiceScope, scopeSql, inScope } from '@jeffi/tenancy'
+import { resolveServiceScope, scopeSql, inScope, verifyLink } from '@jeffi/tenancy'
 import { db, one } from './db.js'
 import { sendMessage, getMessage, resolveTemplate, systemVars, toApi as msgToApi, SendError, type MessageRow } from './send.js'
 import { listTemplates, upsertTemplate, archiveTemplate, toApi as tplToApi } from './templates.js'
@@ -21,6 +21,7 @@ import { applyStatus, startDeliverySync } from './delivery.js'
 import * as gov from './governance.js'
 import { render as renderVars, missingKeys } from './render.js'
 import { wrapEmail } from './mail-shell.js'
+import { hostMedia, hostUrl, MediaError } from './media.js'
 import { randomBytes } from 'node:crypto'
 import { createJob, getJob, listJobs, listItems, cancelJob, retryJob, jobToApi, startWorker, BulkItemError } from '@jeffi/bulk'
 
@@ -93,6 +94,22 @@ app.post('/messages/batch', async req => {
     }
   }
   return { batch_id: batchId, accepted, rejected }
+})
+
+// ── media: host an image/video/PDF (a URL from anywhere, or uploaded base64) on the CDN for WhatsApp headers ──
+app.post<{ Body: { url?: string; data?: string; content_type?: string } }>('/media', { bodyLimit: 22_000_000 }, async req => {
+  const { tenantId, internal } = req.claims
+  const b = req.body ?? {}
+  if (!b.url && !b.data) throw new SendError(422, 'invalid_request', 'Pass url, or data (base64) with content_type')
+  const host = b.url
+    ? hostUrl(b.url).then(h => h.url)
+    : hostMedia(Buffer.from(b.data!, 'base64'), (b.content_type ?? '').toLowerCase()).then(h => h.url)
+  const url = await host.catch(e => { throw e instanceof MediaError ? new SendError(e.status, e.code, e.message) : e })
+  const id = randomUUID()
+  const priceInr = mediaPriceInr(internal)
+  const debit = await wallet.debit({ tenantId, amountInr: priceInr, category: 'media', externalRef: `media:${id}`, note: 'media hosted' })
+  if (!debit.ok) throw new SendError(402, 'insufficient_balance', `Wallet balance ₹${debit.balance.toFixed(2)} is below the ₹${priceInr.toFixed(2)} needed.`)
+  return { id, url, charged_inr: debit.charged ? priceInr : 0 }
 })
 
 // ── bulk (async; worker below) ──
@@ -352,6 +369,8 @@ app.post<{ Body: { destination_url: string; kind?: string; variant_id?: string; 
 )
 
 app.get<{ Params: { code: string } }>('/s/:code', { config: { skipAuth: true } }, async (req, reply) => {
+  const signed = verifyLink(req.params.code)
+  if (signed) return reply.redirect(signed.destination, 302)
   // Public, no auth. onRequest hook skips /s/* via url prefix check — see below.
   const row = (await db.query<{ destination_url: string; tenant_id: string }>(
     `SELECT destination_url, tenant_id FROM short_link WHERE code=$1 AND (expires_at IS NULL OR expires_at > now())`,

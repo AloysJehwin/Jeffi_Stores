@@ -16,6 +16,11 @@ const Phone = z.string().regex(/^\+?[0-9]{10,15}$/, 'E.164 or 10-digit Indian nu
 const Email = z.string().email()
 
 // ── messages ──
+// Host header media for WhatsApp: a link from anywhere (any image format), or a file as base64.
+export const HostMediaRequest = z
+  .object({ url: z.string().url().optional(), data: z.string().optional(), content_type: z.string().optional() })
+  .refine(b => !!b.url !== !!b.data, { message: 'Pass either url, or data with content_type' })
+export const HostedMedia = z.object({ id: z.string(), url: z.string().url(), charged_inr: z.number() })
 export const SendMessageRequest = z
   .object({
     channel: Channel,
@@ -180,7 +185,22 @@ export const LineItem = z.object({
   unit: z.string().optional(),
   unit_price: Money,
   gst_rate: z.number().min(0).max(28).default(18),
-  discount: Money.default(0),
+  discount: Money.default(0).describe('Discount on this line, in rupees'),
+  discount_pct: z.number().min(0).max(100).optional().describe('Discount on this line as a percentage (instead of `discount`)'),
+}).refine(i => !(i.discount > 0 && i.discount_pct != null), { message: 'Use discount or discount_pct, not both', path: ['discount_pct'] })
+  .refine(i => i.discount <= i.unit_price * i.quantity, { message: 'discount is more than the line amount', path: ['discount'] })
+// Document-level discount, applied after line discounts and before GST, spread over the lines by value.
+export const DocumentDiscount = z.object({
+  amount: Money.optional(),
+  percent: z.number().min(0).max(100).optional(),
+  label: z.string().max(60).optional().describe('Shown on the document, e.g. "Festive offer"'),
+}).refine(d => (d.amount != null) !== (d.percent != null), { message: 'Give either amount or percent' })
+// Extra charges (shipping, packing, installation…) taxed at their own rate, priced like the items.
+export const DocumentCharge = z.object({
+  label: z.string().min(1).max(60),
+  amount: Money,
+  gst_rate: z.number().min(0).max(28).default(18),
+  hsn: z.string().optional(),
 })
 export const DocumentFont = z.enum(['modern', 'geometric', 'classic', 'editorial', 'technical', 'system'])
 const HexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a #rrggbb colour')
@@ -196,6 +216,10 @@ export const RenderDocumentRequest = z.object({
   buyer: Party,
   ship_to: Party.optional(),
   items: z.array(LineItem).min(1).max(200),
+  discount: DocumentDiscount.optional(),
+  charges: z.array(DocumentCharge).max(10).optional(),
+  round_off: z.boolean().optional().describe('Round the total to the nearest rupee'),
+  amount_paid: Money.optional().describe('Already paid; the document shows the balance due'),
   prices_include_gst: z.boolean().default(true),
   notes: z.string().max(2000).optional(),
   terms: z.string().max(4000).optional(),
@@ -209,7 +233,11 @@ export const Document = z.object({
   type: DocumentType,
   number: z.string(),
   template: z.string(),
-  totals: z.object({ subtotal: z.number(), cgst: z.number(), sgst: z.number(), igst: z.number(), total: z.number() }),
+  totals: z.object({
+    subtotal: z.number(), discount: z.number(), charges: z.number(), taxable: z.number(),
+    cgst: z.number(), sgst: z.number(), igst: z.number(), round_off: z.number(), total: z.number(),
+    amount_paid: z.number(), balance_due: z.number(),
+  }),
   pdf_url: z.string().url(),
   view_url: z.string().url(),
   price_inr: z.number(),

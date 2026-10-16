@@ -110,12 +110,20 @@ export interface KeyboardShortcuts {
   customShortcuts: string // JSON: [{id,label,path,combo}]
 }
 
+/** Per-store Google tag and Ads conversion ids (validated on save; see lib/analytics/google-tag). */
+export interface MarketingTags {
+  googleTagId: string
+  googleAdsConversionId: string
+  googleAdsConversionLabel: string
+}
+
 export interface SiteControls {
   identity: StoreIdentity
   flags: FeatureFlags
   values: BusinessValues
   storefront: StorefrontContent
   shortcuts: KeyboardShortcuts
+  marketing: MarketingTags
   // Whether the current tenant ships on its own Delhivery account. Platform store / no tenant in
   // scope is treated as true. Drives the COD gate and the admin COD-toggle lock.
   ownDelhivery: boolean
@@ -225,6 +233,7 @@ const DEFAULTS: SiteControls = {
     aiAgent: 'mod+shift+a',
     customShortcuts: '[]',
   },
+  marketing: { googleTagId: '', googleAdsConversionId: '', googleAdsConversionLabel: '' },
   ownDelhivery: true,
 }
 
@@ -291,6 +300,9 @@ const KEYS = [
   'shortcut_custom',
   'meta_tagline',
   'meta_description',
+  'google_tag_id',
+  'google_ads_conversion_id',
+  'google_ads_conversion_label',
 ]
 
 /**
@@ -490,6 +502,11 @@ export async function getSiteControls(): Promise<SiteControls> {
         reviews: str('shortcut_reviews', d.shortcuts.reviews),
         aiAgent: str('shortcut_ai_agent', d.shortcuts.aiAgent),
         customShortcuts: str('shortcut_custom', d.shortcuts.customShortcuts),
+      },
+      marketing: {
+        googleTagId: str('google_tag_id', ''),
+        googleAdsConversionId: str('google_ads_conversion_id', ''),
+        googleAdsConversionLabel: str('google_ads_conversion_label', ''),
       },
       ownDelhivery: d.ownDelhivery,
     }

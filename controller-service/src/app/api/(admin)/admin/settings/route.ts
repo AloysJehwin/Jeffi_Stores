@@ -6,6 +6,7 @@ import { hasScope } from '@/lib/auth/scopes'
 import { query } from '@/lib/shared/db'
 import { invalidateDeliverySettingsCache } from '@/lib/shipping/delivery-settings'
 import { invalidateSiteControlsCache } from '@/lib/catalog/site-controls'
+import { isGoogleTagSettingKey, validateGoogleTagSetting } from '@/lib/analytics/google-tag'
 
 // All keys editable via this endpoint. Grouped for readability.
 const EDITABLE_KEYS = [
@@ -72,6 +73,10 @@ const EDITABLE_KEYS = [
   'storefront_new_arrivals_limit',
   'storefront_stats_json',
   'storefront_about_copy',
+  // Google tag & Ads (validated below)
+  'google_tag_id',
+  'google_ads_conversion_id',
+  'google_ads_conversion_label',
   // Keyboard shortcuts
   'shortcut_new_product',
   'shortcut_cash_sale',
@@ -140,6 +145,17 @@ async function loyaltyFirstPass(updates: Array<{ key: string; value: unknown }>)
   return result
 }
 
+// Normalises Google tag / Ads values in place; returns the first validation error.
+function normaliseTagSettings(updates: Array<{ key: string; value: unknown }>): string | null {
+  for (const u of updates) {
+    if (!isGoogleTagSettingKey(u.key)) continue
+    const r = validateGoogleTagSetting(u.key, u.value)
+    if (!r.ok) return r.error
+    u.value = r.value
+  }
+  return null
+}
+
 function invalidateFor(keys: string[]) {
   if (keys.some(k => k.startsWith('delivery_'))) invalidateDeliverySettingsCache()
   // Any non-delivery key may be part of site-controls; invalidate broadly (cheap).
@@ -165,6 +181,8 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: CUSTOMER_PROGRAM_DENIED }, { status: 403 })
       if (await referralNeedsLoyalty(updates))
         return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
+      const tagError = normaliseTagSettings(updates)
+      if (tagError) return NextResponse.json({ error: tagError }, { status: 400 })
       for (const u of updates) await upsert(u.key, String(u.value))
       invalidateFor(updates.map(u => u.key))
       const firstPass = await loyaltyFirstPass(updates)
@@ -172,7 +190,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Single mode: { key, value }
-    const { key, value } = body
+    const { key } = body
+    let { value } = body
     if (!EDITABLE_SET.has(key)) {
       return NextResponse.json({ error: 'Setting not editable via this endpoint' }, { status: 400 })
     }
@@ -181,6 +200,11 @@ export async function PATCH(request: NextRequest) {
     }
     if (await referralNeedsLoyalty([{ key, value }])) {
       return NextResponse.json({ error: REFERRAL_NEEDS_LOYALTY }, { status: 400 })
+    }
+    if (isGoogleTagSettingKey(key)) {
+      const r = validateGoogleTagSetting(key, value)
+      if (!r.ok) return NextResponse.json({ error: r.error }, { status: 400 })
+      value = r.value
     }
     await upsert(key, String(value))
     invalidateFor([key])

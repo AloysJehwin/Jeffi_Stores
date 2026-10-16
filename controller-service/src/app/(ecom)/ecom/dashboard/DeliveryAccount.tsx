@@ -82,7 +82,7 @@ export default function DeliveryAccount({
                   onChange={e => setToken(e.target.value)}
                   placeholder="Paste your Delhivery API token"
                   disabled={busy}
-                  className="w-full px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  className="w-full px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground text-sm ecom-field"
                 />
                 <p className="text-xs text-foreground-secondary mt-1.5">
                   Use a token from the same Delhivery account. Shipments already created stay tied to the account that

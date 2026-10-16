@@ -183,6 +183,22 @@ describe('middleware', () => {
   // Admin API paths
   // -------------------------------------------------------------------------
   describe('admin API paths', () => {
+    it.each([
+      '/api/admin/data-source/google/callback',
+      '/api/admin/integrations/google/callback',
+      '/api/admin/integrations/amazon/callback',
+      '/api/admin/social/callback',
+    ])('lets the cookieless OAuth callback %s through (state is checked in the route)', async path => {
+      const res = await middleware(makeNextRequest(`http://localhost${path}?code=x&state=y`))
+      expect(res.status).not.toBe(401)
+      expect(mockVerifyToken).not.toHaveBeenCalled()
+    })
+
+    it('still requires a session for the OAuth connect routes', async () => {
+      const res = await middleware(makeNextRequest('http://localhost/api/admin/integrations/amazon/connect'))
+      expect(res.status).toBe(401)
+    })
+
     it('returns 401 JSON when no token provided for /api/admin/orders', async () => {
       const req = makeNextRequest('http://localhost/api/admin/orders', {
         host: 'localhost',

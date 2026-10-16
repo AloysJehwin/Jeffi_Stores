@@ -83,7 +83,7 @@ describe('register', () => {
     expect(hasPubUrl).toBe(true)
   })
 
-  it('schedules 16 cron jobs via setTimeout after full setup', async () => {
+  it('schedules 21 cron jobs via setTimeout after full setup', async () => {
     process.env.NEXT_RUNTIME = 'nodejs'
     process.env.CRON_SECRET = 'test-secret'
     process.env.APP_URL = 'http://localhost:3000'
@@ -100,8 +100,9 @@ describe('register', () => {
     // register() calls setTimeout once per cron job: delhivery_sync, cancel_stale_orders,
     // sweep_auto_tasks, dispatch_mailer, run_campaigns, compute_health, daily_briefing,
     // provisioning_worker, import_worker, provisioning_reconcile, publish_social_posts,
-    // customer_notes_digest, loyalty_reconcile, sweep_idle_sessions, embed_sync, ai_health.
-    expect(setTimeoutSpy).toHaveBeenCalledTimes(16)
+    // customer_notes_digest, loyalty_reconcile, sweep_idle_sessions, embed_sync, google_ads_sync,
+    // google_ads_refresh, google_ads_conversions, google_ads_audiences, google_ads_digest, ai_health.
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(21)
   })
 
   it('calls delhivery_sync cron endpoint after 30s delay', async () => {

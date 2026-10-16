@@ -11,6 +11,7 @@ import { logActivity } from '@/lib/shared/activity'
 import { getBusinessValues } from '@/lib/catalog/site-controls'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 import { refundCapacity } from '@/lib/payments/refund'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const order = await queryOne(
       `
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,
-        o.customer_name, o.customer_email, o.user_id, o.original_order_id,
+        o.customer_name, o.customer_email, o.user_id, o.original_order_id, o.gclid, o.gbraid, o.wbraid,
         json_build_object('email', u.email, 'first_name', u.first_name, 'last_name', u.last_name) AS users
       FROM orders o
       LEFT JOIN users u ON o.user_id = u.id
@@ -327,6 +328,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
                   })
                 }
               })
+              await queueAdsConversion(orderId, order)
 
               let stockWarnings: string[] = []
               if (restock !== false) {
@@ -389,6 +391,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             )
           }
         })
+        await queueAdsConversion(orderId, order)
 
         let stockWarnings: string[] = []
         if (restock !== false) {

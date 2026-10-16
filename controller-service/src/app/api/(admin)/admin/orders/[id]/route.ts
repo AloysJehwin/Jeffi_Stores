@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 import { authenticateAdmin } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryOne, queryMany } from '@/lib/shared/db'
@@ -167,7 +168,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     values.push(id)
-    await queryOne(`UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${values.length}`, values)
+    const updated = await queryOne<{ gclid: string | null; gbraid: string | null; wbraid: string | null }>(
+      `UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${values.length} RETURNING gclid, gbraid, wbraid`,
+      values
+    )
+    if (d.status !== undefined && updated) await queueAdsConversion(id, updated)
 
     if (d.status === 'returned' || d.status === 'return_received') {
       // Only restore stock if the tenant's plan includes inventory management AND the

@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, useEffect, ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 type ToastType = 'success' | 'error' | 'info' | 'warning'
@@ -133,37 +133,39 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog | null>(null)
 
-  function showToast(message: string, type: ToastType = 'info') {
+  // Stable identities: pages list these in effect dependencies, so a new function per render loops.
+  const showToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = Math.random().toString(36).substring(7)
     setToasts(prev => [...prev, { id, message, type }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000)
-  }
+  }, [])
 
   function removeToast(id: string) {
     setToasts(prev => prev.filter(t => t.id !== id))
   }
 
-  function showConfirm(
-    options: Omit<ConfirmDialog, 'onCancel' | 'onConfirm'> & { onConfirm?: () => void }
-  ): Promise<boolean> {
-    return new Promise(resolve => {
-      setConfirmDialog({
-        ...options,
-        onConfirm: () => {
-          options.onConfirm?.()
-          setConfirmDialog(null)
-          resolve(true)
-        },
-        onCancel: () => {
-          setConfirmDialog(null)
-          resolve(false)
-        },
-      })
-    })
-  }
+  const showConfirm = useCallback(
+    (options: Omit<ConfirmDialog, 'onCancel' | 'onConfirm'> & { onConfirm?: () => void }): Promise<boolean> =>
+      new Promise(resolve => {
+        setConfirmDialog({
+          ...options,
+          onConfirm: () => {
+            options.onConfirm?.()
+            setConfirmDialog(null)
+            resolve(true)
+          },
+          onCancel: () => {
+            setConfirmDialog(null)
+            resolve(false)
+          },
+        })
+      }),
+    []
+  )
+  const value = useMemo(() => ({ showToast, showConfirm }), [showToast, showConfirm])
 
   return (
-    <ToastContext.Provider value={{ showToast, showConfirm }}>
+    <ToastContext.Provider value={value}>
       {children}
 
       {confirmDialog &&

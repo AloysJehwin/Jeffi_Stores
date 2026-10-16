@@ -31,6 +31,8 @@ vi.mock('@/lib/shipping/shipping-rate', () => ({
   computeShippingRate: vi.fn(),
 }))
 
+vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn() }))
+
 import {
   loadActiveCart,
   cartLineUnitPrice,
@@ -48,6 +50,7 @@ import {
 } from '@/lib/orders/order-commit'
 import { queryMany, queryOne, withTransaction } from '@/lib/shared/db'
 import { computeShippingRate } from '@/lib/shipping/shipping-rate'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 const mockComputeShippingRate = vi.mocked(computeShippingRate)
 const mockQueryMany = vi.mocked(queryMany)
@@ -888,6 +891,39 @@ describe('commitOrder — cart mode', () => {
     const params = orderItemCall![1] as any[]
     // productName is at index 4
     expect(params[4]).toBe('Widget - Large - Red')
+  })
+
+  const paid = { gatewayOrderId: 'order_1', paymentId: 'pay_1', signature: 's', amountPaise: 20000 }
+  const clicked = { gclid: 'Cj0KCQ', landing_path: '/p/widget', ts: Date.now() - 3_600_000 }
+
+  it('queues a Google Ads conversion for a paid order that came from a click', async () => {
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(makeClient()))
+    await commitOrder(makeCartCommitInput({ paymentRecord: paid, attribution: clicked, adsConsent: true }))
+    expect(queueAdsConversion).toHaveBeenCalledWith('ord-1', clicked)
+  })
+
+  it('passes "no click" for a paid order without attribution, and skips unpaid orders', async () => {
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(makeClient()))
+    await commitOrder(makeCartCommitInput({ paymentRecord: paid }))
+    expect(queueAdsConversion).toHaveBeenCalledWith('ord-1', {})
+    vi.mocked(queueAdsConversion).mockClear()
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(makeClient()))
+    await commitOrder(makeCartCommitInput({ attribution: clicked }))
+    expect(queueAdsConversion).not.toHaveBeenCalled()
+  })
+
+  it('stamps the ads consent choice inside the order transaction', async () => {
+    const client = makeClient()
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
+    await commitOrder(makeCartCommitInput({ attribution: clicked, adsConsent: false }))
+    const stamp = client.query.mock.calls.find((c: any[]) => String(c[0]).includes('SET gclid'))!
+    expect(stamp[1][1]).toBe('Cj0KCQ')
+    expect(stamp[1][11]).toBe(false)
+
+    const bare = makeClient()
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(bare))
+    await commitOrder(makeCartCommitInput({ adsConsent: true }))
+    expect(bare.query.mock.calls.find((c: any[]) => String(c[0]).includes('SET ads_consent'))![1]).toEqual(['ord-1', true])
   })
 })
 

@@ -99,7 +99,7 @@ export async function seedTenantSiteSettings(
     delhivery_pickup_location: wh.pickupLocation ?? '',
     delhivery_seller_name: wh.sellerName || businessName,
     delhivery_seller_address: wh.sellerAddress || businessAddress,
-    delhivery_seller_phone: wh.sellerPhone || businessPhone,
+    delhivery_seller_phone: (wh.sellerPhone || businessPhone).replace(/\D/g, '').slice(-10),
   }
 
   const entries = Object.entries(settings).filter(([, v]) => v != null && String(v).trim() !== '')

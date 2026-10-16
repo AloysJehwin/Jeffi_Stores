@@ -16,7 +16,15 @@ export interface AdminOAuthState {
   // which always lands on the platform OAuth host with no tenant in context — can return the user
   // to their own admin instead of the platform's.
   returnBase?: string
+  // Google Merchant connect: the account id the token is for.
+  merchantId?: string
+  // Google Ads reconnect (to add a scope): keep the chosen account if the new sign-in can reach it.
+  keepAccount?: boolean
+  // Issued-at (unix seconds); stamped by signAdminState and checked by verifyAdminState.
+  iat?: number
 }
+
+const MAX_STATE_AGE_SEC = 30 * 60
 
 function key(): string {
   const k = process.env.CRON_SECRET
@@ -25,7 +33,7 @@ function key(): string {
 }
 
 export function signAdminState(s: AdminOAuthState): string {
-  const payload = Buffer.from(JSON.stringify(s)).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ iat: Math.floor(Date.now() / 1000), ...s })).toString('base64url')
   const sig = crypto.createHmac('sha256', key()).update(payload).digest('base64url')
   return `${payload}.${sig}`
 }
@@ -38,7 +46,9 @@ export function verifyAdminState(state: string): AdminOAuthState | null {
   const b = Buffer.from(expected)
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null
   try {
-    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as AdminOAuthState
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as AdminOAuthState
+    if (typeof parsed.iat === 'number' && Date.now() / 1000 - parsed.iat > MAX_STATE_AGE_SEC) return null
+    return parsed
   } catch {
     return null
   }
@@ -52,7 +62,8 @@ export function safeReturnBase(returnBase: string | undefined, expectedAdminBase
   try {
     const got = new URL(returnBase)
     const want = new URL(expectedAdminBase)
-    if (got.protocol === 'https:' && got.host === want.host) return got.origin
+    const local = got.hostname === 'localhost' || got.hostname.endsWith('.localhost')
+    if ((got.protocol === 'https:' || (local && got.protocol === 'http:')) && got.host === want.host) return got.origin
   } catch {}
   return null
 }

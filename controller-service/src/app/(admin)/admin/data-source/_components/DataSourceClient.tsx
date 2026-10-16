@@ -6,6 +6,10 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import GoogleSheetDisconnect from './GoogleSheetDisconnect'
 
+// Fixed locale and zone so the server render and the browser agree (no hydration mismatch).
+const fmtWhen = (v: string | number | Date) =>
+  new Date(v).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })
+
 interface RowResult {
   row: number
   sku: string | null
@@ -97,9 +101,13 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
   }
 
   // The Google connect flow returns here with ?connected=…; show the outcome once, then drop it.
+  const shownReturn = useRef<string | null>(null)
   useEffect(() => {
     const connected = searchParams.get('connected')
     if (connected === null) return
+    const key = searchParams.toString()
+    if (shownReturn.current === key) return
+    shownReturn.current = key
     const error = searchParams.get('error')
     if (connected === '0') showToast(`Google connection failed${error ? `: ${error}` : '.'}`, 'error')
     else showToast('Google account connected.', 'success')
@@ -372,7 +380,7 @@ export default function DataSourceClient({ initialGsheet }: { initialGsheet?: Gs
                 <span className="text-sm font-medium text-foreground">Last sync</span>
                 <StatusPill status={gsheet.lastSync.status} />
                 <span className="text-xs text-foreground-secondary">
-                  {new Date(gsheet.lastSync.createdAt).toLocaleString()}
+                  {fmtWhen(gsheet.lastSync.createdAt)}
                 </span>
               </div>
               <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
@@ -534,7 +542,7 @@ function RowGroup({
   return (
     <>
       <tr className="border-t border-border-default">
-        <td className="px-3 py-2 text-foreground-secondary">{new Date(job.created_at).toLocaleString()}</td>
+        <td className="px-3 py-2 text-foreground-secondary">{fmtWhen(job.created_at)}</td>
         <td className="px-3 py-2">{job.source === 'google_sheet' ? 'Google Sheet' : 'Upload'}</td>
         <td className="px-3 py-2">
           <StatusPill status={job.status} />

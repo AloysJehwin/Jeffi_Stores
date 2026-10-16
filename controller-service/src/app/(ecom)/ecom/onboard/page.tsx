@@ -1,8 +1,9 @@
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { listPlans, getOwnerTenants, getDraft } from '@/lib/tenant-registry'
+import { listPlans, getOwnerTenants, getDraft, hasService, reopenDraft, getKyc, getOwnerBankAccount } from '@/lib/tenant-registry'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/auth/owner-session'
 import OnboardEntry from './OnboardEntry'
+import OnboardWizard from './OnboardWizard'
 import PaymentTrigger from './PaymentTrigger'
 
 export const dynamic = 'force-dynamic'
@@ -33,16 +34,16 @@ function SidebarLayout({ currentStep, children }: { currentStep: number; childre
             return (
               <div
                 key={s.id}
-                className={`flex items-center gap-3 px-3 py-3 rounded-xl ${active ? 'bg-accent-50' : ''}`}
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl ${active ? 'ecom-current' : ''}`}
               >
                 <span
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${active ? 'bg-accent-600 text-white' : done ? 'org-sage org-sage-text' : 'bg-surface-secondary text-foreground-muted'}`}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${active ? 'ecom-sel' : done ? 'org-sage org-sage-text' : 'bg-surface-secondary text-foreground-muted'}`}
                 >
                   {done ? '✓' : s.id + 1}
                 </span>
                 <div>
                   <div
-                    className={`text-sm font-medium ${active ? 'text-accent-700' : done ? 'text-foreground-secondary' : 'text-foreground-muted'}`}
+                    className={`text-sm font-medium ${active ? 'font-semibold text-foreground' : done ? 'text-foreground-secondary' : 'text-foreground-muted'}`}
                   >
                     {s.label}
                   </div>
@@ -58,7 +59,7 @@ function SidebarLayout({ currentStep, children }: { currentStep: number; childre
   )
 }
 
-export default async function OnboardPage() {
+export default async function OnboardPage({ searchParams }: { searchParams: Promise<{ mode?: string }> }) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const h = await headers()
   const signals = {
@@ -72,6 +73,10 @@ export default async function OnboardPage() {
   const existing = await getOwnerTenants(owner.id)
   if (existing.length > 0) {
     const t = existing[0]
+    if (!hasService(t, 'store') && !t.store_request) {
+      if ((await searchParams).mode !== 'add-store') redirect('/dashboard')
+      return <UpgradeWizard ownerId={owner.id} ownerName={owner.name} tenant={t} />
+    }
     if (t.status === 'active') redirect('/dashboard')
 
     // Approved + awaiting payment → show the payment link (owner completes the subscription here).
@@ -231,6 +236,57 @@ export default async function OnboardPage() {
       initialDraft={draft ? { current_step: submitted ? 0 : draft.current_step, data: carried } : null}
       reusingPreviousDetails={submitted}
       ownerName={owner.name}
+    />
+  )
+}
+
+// A services workspace applying for a store: the full wizard on its existing tenant, prefilled
+// with the business and bank details already on file.
+async function UpgradeWizard({
+  ownerId,
+  ownerName,
+  tenant,
+}: {
+  ownerId: string
+  ownerName: string | null
+  tenant: { id: string; slug: string; display_name: string }
+}) {
+  const draft = await getDraft(ownerId)
+  const reopened = draft?.status === 'submitted'
+  if (reopened) await reopenDraft(ownerId)
+  const [allPlans, kyc, bank] = await Promise.all([
+    listPlans(),
+    getKyc(tenant.id),
+    getOwnerBankAccount(ownerId).catch(() => null),
+  ])
+  const plans = allPlans.filter(p => p.slug !== 'services')
+  const saved = draft?.data ?? {}
+  const bankOk = bank?.verification_status === 'verified' || bank?.verification_status === 'unverified'
+  const data: Record<string, any> = {
+    ...saved,
+    planSlug: plans.some(p => p.slug === saved.planSlug) ? saved.planSlug : plans[0]?.slug,
+    displayName: saved.displayName || tenant.display_name,
+    slug: tenant.slug,
+    bizName: saved.bizName || kyc?.business_name || '',
+    bizType: saved.bizType || kyc?.business_type || '',
+    pan: saved.pan || kyc?.pan || '',
+    bizAddress: saved.bizAddress || kyc?.business_address || '',
+    gstNumber: saved.gstNumber || kyc?.gst_number || '',
+    mobile: saved.mobile || kyc?.mobile || '',
+    ownerName: saved.ownerName || ownerName || '',
+    ...(bank && bankOk
+      ? {
+          bank: { accountNumber: bank.account_number ?? '', ifsc: bank.ifsc ?? '', holderName: bank.holder_name ?? '' },
+          bankVerified: true,
+        }
+      : {}),
+  }
+  return (
+    <OnboardWizard
+      plans={plans}
+      initialDraft={{ current_step: reopened ? 0 : (draft?.current_step ?? 0), data }}
+      ownerName={ownerName}
+      upgrade={{ tenantId: tenant.id, slug: tenant.slug, displayName: tenant.display_name }}
     />
   )
 }

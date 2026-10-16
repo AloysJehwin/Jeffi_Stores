@@ -8,6 +8,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useWishlist } from '@/contexts/WishlistContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import ThemeToggle from '@/components/ThemeToggle'
+import { CookieSettingsLink } from './CookieConsentBanner'
 
 interface MobileDrawerProps {
   isOpen: boolean
@@ -104,7 +105,9 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
             >
               <span className="font-medium">Wishlist</span>
               {wishlistCount > 0 && (
-                <span className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">{wishlistCount}</span>
+                <span className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                  {wishlistCount}
+                </span>
               )}
             </Link>
           </div>
@@ -177,6 +180,7 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
               <span className="text-sm text-foreground-muted">Theme</span>
               <ThemeToggle variant="header" />
             </div>
+            <CookieSettingsLink className="mt-2 px-4 py-2 w-full text-left text-sm text-foreground-muted hover:text-accent-500 transition-colors" />
           </div>
         </div>
       </div>

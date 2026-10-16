@@ -27,6 +27,7 @@ vi.mock('@/lib/tenant-registry', () => ({
   controlPlanePool: () => ({ query: vi.fn().mockResolvedValue({ rows: [] }) }),
 }))
 vi.mock('@/lib/email', () => ({}))
+vi.mock('@/lib/google-ads/conversions/queue', () => ({ queueAdsConversion: vi.fn(async () => ({ action: 'none', reason: 'test' })) }))
 vi.mock('@/lib/catalog/site-controls', () => ({ getFeatureFlags: vi.fn().mockResolvedValue({}) }))
 
 import { POST } from '@/app/api/(public)/webhooks/razorpay/route'
@@ -34,6 +35,7 @@ import * as db from '@/lib/shared/db'
 import { revokeOrderEntitlements } from '@/lib/orders/entitlements'
 import { applyRouteRefund } from '@/lib/payments/route-settlement'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 const SECRET = 'whsec'
 function refundEvent(refund: any) {
@@ -60,6 +62,11 @@ describe('Razorpay refund webhook — vault revocation', () => {
     expect(runWithTenantContext).toHaveBeenCalled()
     expect(revokeOrderEntitlements).toHaveBeenCalledWith(expect.anything(), { orderId: 'ord-1', reason: 'refund' })
     expect(applyRouteRefund).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 't-1', paymentId: 'pay_1', orderRef: 'JS-1' }))
+  })
+
+  it('re-checks the Google Ads conversion for the refunded order inside the tenant', async () => {
+    await POST(refundEvent({ payment_id: 'pay_1', amount: 50000, notes: { tenant_id: 't-1' } }))
+    expect(queueAdsConversion).toHaveBeenCalledWith('ord-1')
   })
 
   it('does not revoke on a partial refund', async () => {

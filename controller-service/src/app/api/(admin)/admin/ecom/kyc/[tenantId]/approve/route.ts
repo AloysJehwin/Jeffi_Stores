@@ -28,9 +28,8 @@ import { hasService, reviewServiceApproval, controlPlanePool } from '@/lib/tenan
 // TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
 import { stateFromPincode } from '@/lib/shipping/india-pincode-state'
 import { isPaymentBypassed, bypassAuditNote } from '@/lib/payments/ecom-payment-bypass'
-import { setSubscriptionStatus } from '@/lib/tenant-registry'
 import { dedicatedCapacityError } from '@/lib/k8s/capacity'
-import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
+import { startStore } from '@/lib/provisioning/start-store'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +48,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!owner) return NextResponse.json({ error: 'Owner not found' }, { status: 404 })
 
   // API-only workspace (Messaging/Documents): approve KYC + its pending services; no plan, no payment.
-  if (!hasService(tenant, 'store')) {
+  // One applying for a store (store_request) goes through the store path below instead.
+  if (!hasService(tenant, 'store') && !tenant.store_request) {
     await controlPlanePool().query(`UPDATE tenant_kyc SET status='approved', reviewed_at=now(), reviewed_by=$2 WHERE tenant_id=$1`, [tenantId, admin.email ?? 'admin'])
     const approved = await reviewServiceApproval(tenantId, 'all-pending', 'approved', admin.email ?? 'admin')
     if (approved.length) sendServicesReviewedEmail({ email: owner.email, name: owner.name }, tenant.display_name, approved, 'approved').catch(() => {})
@@ -222,17 +222,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // Remove this block together with src/lib/ecom-payment-bypass.ts.
   if (isPaymentBypassed(owner.email)) {
     process.stderr.write(`[ecom] ${bypassAuditNote(owner.email)} tenant=${tenantId}\n`)
-    await setSubscriptionStatus(tenantId, 'active', 'provisioning')
-    const restoreFromKey = await resolveRestoreKey(tenantId, tenant.slug)
-    triggerProvisioning({
-      action: 'provision',
-      tenantId,
-      slug: tenant.slug,
-      plan: tenant.plan,
-      ownerId: kyc.owner_id,
-      restoreFromKey,
-      reason: 'first_payment',
-    }).catch(() => {})
+    await startStore({ id: tenantId, store_request: tenant.store_request ? 'awaiting_payment' : null })
     return NextResponse.json({
       ok: true,
       paymentBypassed: true,

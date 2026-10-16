@@ -18,12 +18,12 @@ export function pageWindow(page: number, pages: number): Array<number | '…'> {
 export const pageParam = (v: string | string[] | undefined, pages: number) =>
   Math.min(Math.max(1, parseInt(String(v ?? '1'), 10) || 1), Math.max(1, pages))
 
-const BTN = 'inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors'
+const BTN = 'ecom-focus inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors'
 export const PAGE_CLS = {
   wrap: 'flex flex-wrap items-center justify-between gap-3 pt-4',
   info: 'text-xs text-foreground-muted tabular-nums',
   btn: `${BTN} org-sand org-sand-hover text-foreground`,
-  active: `${BTN} ecom-accent-bg text-white`,
+  active: `${BTN} ecom-sel`,
   disabled: `${BTN} org-sand opacity-40 pointer-events-none`,
 }
 

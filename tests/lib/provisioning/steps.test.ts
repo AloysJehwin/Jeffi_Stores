@@ -24,6 +24,7 @@ const reg = {
   getProvisioningJob: vi.fn(),
   updateProvisioningJob: vi.fn().mockResolvedValue(undefined),
   setTenantStatus: vi.fn().mockResolvedValue(undefined),
+  setStoreRequest: vi.fn().mockResolvedValue(undefined),
   writeTenantInfra: vi.fn().mockResolvedValue(undefined),
   writeTenantEc2: vi.fn().mockResolvedValue(undefined),
   clearTenantInfra: vi.fn().mockResolvedValue(undefined),

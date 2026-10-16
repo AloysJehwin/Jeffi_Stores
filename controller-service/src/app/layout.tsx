@@ -7,6 +7,7 @@ import { getStoreIdentity, getSiteControls, getStorefrontContent } from '@/lib/c
 import { storefrontAiAllowed } from '@/lib/shared/storefront-ai'
 import { appFromHost } from '@/lib/tenant-registry'
 import type { StoreConfig } from '@/contexts/StoreConfigContext'
+import { resolveGoogleTag, gtagBootstrapScript } from '@/lib/analytics/google-tag'
 
 export async function generateMetadata() {
   const identity = await getStoreIdentity()
@@ -58,6 +59,26 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const aiStorefrontEnabled = await storefrontAiAllowed().catch(() => false)
   const { resolveTenant } = await import('@/lib/tenancy/tenant-context')
   const storeSlug = (await resolveTenant().catch(() => null))?.slug ?? null
+  // Each store loads its own tag; tenants without one load nothing (never the flagship's).
+  const googleTag = isVaultSubdomain
+    ? null
+    : resolveGoogleTag({
+        tagId: c.marketing.googleTagId,
+        conversionId: c.marketing.googleAdsConversionId,
+        conversionLabel: c.marketing.googleAdsConversionLabel,
+        isTenant: storeSlug != null,
+      })
+  const hasGoogleTag = !!googleTag && googleTag.tagIds.length > 0
+  // Consent Mode + banner on the storefront host only; staff/marketing hosts keep plain measurement.
+  const isStorefrontHost =
+    !isFormsSubdomain &&
+    !isDocumentSubdomain &&
+    !isBusinessSubdomain &&
+    !isAdminSubdomain &&
+    !isEcomSubdomain &&
+    !isCertPortalSubdomain &&
+    !isVaultSubdomain
+  const cookieConsent = hasGoogleTag && isStorefrontHost
   const initialStoreConfig: StoreConfig = {
     slug: storeSlug,
     identity: {
@@ -102,23 +123,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             __html: `(function(){try{var k='jeffi-theme';var t=sessionStorage.getItem(k)||localStorage.getItem(k);var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})()`,
           }}
         />
+        {/* Consent defaults must reach dataLayer before gtag.js loads, so this runs inline in <head>. */}
+        {hasGoogleTag && (
+          <script id="gtag-init" dangerouslySetInnerHTML={{ __html: gtagBootstrapScript(googleTag!, cookieConsent) }} />
+        )}
       </head>
       <body
         className={`antialiased m-0 p-0 ${isVaultSubdomain ? 'bg-neutral-950 text-neutral-100' : 'bg-surface text-foreground'}`}
       >
         <SessionGuard />
         {/* No third-party analytics on the vault (strict CSP, buyer privacy). */}
-        {!isVaultSubdomain && (
-          <>
-            <Script src="https://www.googletagmanager.com/gtag/js?id=GT-NM2C3M85" strategy="afterInteractive" />
-            <Script
-              id="gtag-init"
-              strategy="afterInteractive"
-              dangerouslySetInnerHTML={{
-                __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','GT-NM2C3M85');`,
-              }}
-            />
-          </>
+        {hasGoogleTag && (
+          <Script
+            src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(googleTag!.tagIds[0])}`}
+            strategy="afterInteractive"
+          />
         )}
         <ConditionalLayout
           initialStoreConfig={initialStoreConfig}
@@ -129,6 +148,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           isEcomSubdomain={isEcomSubdomain}
           isCertPortalSubdomain={isCertPortalSubdomain}
           isVaultSubdomain={isVaultSubdomain}
+          cookieConsent={cookieConsent}
         >
           {children}
         </ConditionalLayout>

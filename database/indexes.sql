@@ -869,6 +869,136 @@ CREATE INDEX idx_amazon_listing_status_title ON public.amazon_listing_status USI
 
 
 --
+-- Name: idx_ads_daily_metrics_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_daily_metrics_date ON public.ads_daily_metrics USING btree (date);
+
+
+--
+-- Name: idx_ads_product_metrics_item; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_product_metrics_item ON public.ads_product_metrics USING btree (item_id, date);
+
+
+--
+-- Name: idx_ads_product_metrics_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_product_metrics_date ON public.ads_product_metrics USING btree (date);
+
+
+--
+-- Name: idx_ads_search_terms_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_search_terms_date ON public.ads_search_terms USING btree (date);
+
+
+--
+-- Name: idx_ads_geo_metrics_date; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_geo_metrics_date ON public.ads_geo_metrics USING btree (date);
+
+
+--
+-- Name: idx_ads_ads_approval; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_ads_approval ON public.ads_ads USING btree (approval_status);
+
+
+--
+-- Name: idx_ads_ad_groups_campaign; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_ad_groups_campaign ON public.ads_ad_groups USING btree (campaign_id);
+
+
+--
+-- Name: idx_ads_experiments_base_campaign; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_experiments_base_campaign ON public.ads_experiments USING btree (base_campaign_id);
+
+
+--
+-- Name: idx_ads_change_events_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_change_events_time ON public.ads_change_events USING btree (change_date_time DESC);
+
+
+--
+-- Name: idx_ads_change_log_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_change_log_created_at ON public.ads_change_log USING btree (created_at DESC);
+
+
+--
+-- Name: idx_ads_sync_log_started_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_sync_log_started_at ON public.ads_sync_log USING btree (started_at DESC);
+
+
+--
+-- Name: idx_ads_conversion_uploads_due; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_conversion_uploads_due ON public.ads_conversion_uploads USING btree (next_attempt_at) WHERE ((status)::text = 'pending'::text);
+
+
+--
+-- Name: idx_ads_conversion_uploads_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_conversion_uploads_created_at ON public.ads_conversion_uploads USING btree (created_at DESC);
+
+
+--
+-- Name: idx_ads_conversion_uploads_request_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_conversion_uploads_request_id ON public.ads_conversion_uploads USING btree (request_id) WHERE (request_id IS NOT NULL);
+
+
+--
+-- Name: idx_ads_conversion_requests_due; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_conversion_requests_due ON public.ads_conversion_requests USING btree (next_check_at) WHERE (finished_at IS NULL);
+
+
+--
+-- Name: idx_ads_conversion_requests_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_conversion_requests_created_at ON public.ads_conversion_requests USING btree (created_at DESC);
+
+--
+-- Name: idx_ads_alerts_active_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_ads_alerts_active_key ON public.ads_alerts USING btree (dedupe_key) WHERE ((status)::text = ANY ((ARRAY['open'::character varying, 'dismissed'::character varying])::text[]));
+
+--
+-- Name: idx_ads_alerts_key_notified; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_alerts_key_notified ON public.ads_alerts USING btree (dedupe_key, notified_at DESC);
+
+--
+-- Name: idx_ads_alerts_status_seen; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ads_alerts_status_seen ON public.ads_alerts USING btree (status, last_seen_at DESC);
+
+
+--
 -- Name: idx_product_variants_asin; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -926,6 +1056,13 @@ CREATE INDEX idx_order_items_sub_variant_id ON public.order_items USING btree (s
 
 CREATE INDEX idx_orders_created_at ON public.orders USING btree (created_at DESC);
 
+
+
+--
+-- Name: idx_orders_gclid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_orders_gclid ON public.orders USING btree (gclid) WHERE (gclid IS NOT NULL);
 
 
 --

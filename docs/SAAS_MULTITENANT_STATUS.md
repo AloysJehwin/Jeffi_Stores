@@ -254,7 +254,7 @@ Each signed-up tenant gets a dedicated `db.t4g.micro` RDS Postgres instance + an
 
 - `tenants.service_types text[]` — `store`, `messaging`, `documents` (default `{store}`). Onboarding now starts with a service picker (`onboard/OnboardEntry.tsx`): store → the existing 8-step wizard (extra services carried on submit); services-only → `ServicesOnboard.tsx` → `POST /api/ecom/onboard/services`, which creates an **active** tenant on the `services` plan (tier 0, product `services`) with the welcome wallet credit, auto-approved KYC, no subscription and **no provisioning**.
 - Dashboard gate (`lib/ecom/owner-context.ts`): only store-only tenants are held in `/onboard` while `pending_approval`/`awaiting_payment`.
-- Console nav is filtered by service type (`dashboard/nav.ts` `navFor`). New pages: Wallet (Razorpay top-up via `/api/ecom/wallet/topup/*`), API keys, Messaging (templates + log), Documents, Add a store (`upgradeTenantToStore` — same tenant id and wallet).
+- Console nav is filtered by service type (`dashboard/nav.ts` `navFor`). New pages: Wallet (Razorpay top-up via `/api/ecom/wallet/topup/*`), API keys, Messaging (templates + log), Documents, Add a store (the full onboarding wizard on the same tenant id and wallet, `/onboard?mode=add-store`; tracked on `tenants.store_request` pending_approval → awaiting_payment → provisioning; `'store'` is added only at the first payment, `startStore`).
 - Public API: `public.jeffistores.in` → `public-api-service/`; keys in control-plane `api_keys` / `api_key_usage_daily`. See `docs/MICROSERVICES_PLAN.md` addendum.
 - Hosts: `public.` is served by the gateway, not the Next app (`deploy/k8s/platform/47-public-api-service.yaml`).
 

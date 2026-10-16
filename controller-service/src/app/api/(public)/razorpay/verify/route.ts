@@ -18,6 +18,9 @@ import { logActivity } from '@/lib/shared/activity'
 import { createAutoTask } from '@/lib/shared/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/shared/ai-feedback'
 import { parseBody, zNonEmpty, zUuid } from '@/lib/shared/validate'
+import { attributionFromRequest, adsConsentFromRequest } from '@/lib/orders/attribution'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
+import type { Attribution } from '@/lib/shared/attribution'
 import { sendOrderConfirmedSMS } from '@/lib/shared/sms'
 import { notifyAccessGranted } from '@/lib/shared/notify'
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
@@ -70,6 +73,8 @@ export async function POST(request: NextRequest) {
         razorpay_order_id,
         razorpay_payment_id,
         razorpay_signature,
+        attribution: attributionFromRequest(request),
+        adsConsent: adsConsentFromRequest(request),
       })
     }
 
@@ -133,9 +138,17 @@ export async function POST(request: NextRequest) {
         /* settle falls back to the adjustment's amount */
       }
       const { settleAdjustmentPayment } = await import('@/lib/orders/adjustments')
-      const result = await settleAdjustmentPayment({ razorpayOrderId: razorpay_order_id, razorpayPaymentId: razorpay_payment_id, amountPaise, tenant })
+      const result = await settleAdjustmentPayment({
+        razorpayOrderId: razorpay_order_id,
+        razorpayPaymentId: razorpay_payment_id,
+        amountPaise,
+        tenant,
+      })
       if (!result.applied && result.reason !== 'already_applied')
-        return NextResponse.json({ error: `Payment received but the change could not be applied: ${result.reason}. Contact support.` }, { status: 409 })
+        return NextResponse.json(
+          { error: `Payment received but the change could not be applied: ${result.reason}. Contact support.` },
+          { status: 409 }
+        )
       return NextResponse.json({ success: true, settlement: 'order_adjustment_applied' })
     }
 
@@ -202,6 +215,8 @@ async function commitDraft(args: {
   razorpay_order_id: string
   razorpay_payment_id: string
   razorpay_signature: string
+  attribution: Attribution | null
+  adsConsent: boolean | null
 }) {
   const draft = await verifyDraftToken(args.token)
   if (!draft) return NextResponse.json({ error: 'Invalid or expired checkout session' }, { status: 400 })
@@ -311,6 +326,8 @@ async function commitDraft(args: {
             signature: args.razorpay_signature,
             amountPaise: expectedAmountPaise,
           },
+          attribution: args.attribution,
+          adsConsent: args.adsConsent,
         })
       : await commitOrder({
           mode: 'buyNow',
@@ -335,6 +352,8 @@ async function commitDraft(args: {
             signature: args.razorpay_signature,
             amountPaise: expectedAmountPaise,
           },
+          attribution: args.attribution,
+          adsConsent: args.adsConsent,
         })
 
   const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
@@ -494,6 +513,7 @@ async function markLegacyOrderPaid(args: {
       args.userId,
     ])
   })
+  await queueAdsConversion(args.orderId, order)
 
   const [user, orderItems] = await Promise.all([
     queryOne('SELECT * FROM users WHERE id = $1', [args.userId]),

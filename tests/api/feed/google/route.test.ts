@@ -12,6 +12,10 @@ vi.mock('@/lib/shared/db', () => ({
   queryCount: vi.fn(),
 }))
 
+vi.mock('@/lib/shared/customer-links', () => ({
+  catalogBaseUrl: vi.fn().mockResolvedValue('https://shop.example.com'),
+}))
+
 vi.mock('@/lib/shared/google-merchant-helpers', () => ({
   getGoogleProductCategory: vi.fn().mockReturnValue('Hardware > Fasteners'),
   buildProductType: vi.fn().mockReturnValue('Bolts > Hex Bolts'),
@@ -233,5 +237,79 @@ describe('GET /api/feed/google', () => {
 
     expect(xml).toContain('&amp;')
     expect(xml).toContain('&lt;')
+  })
+
+  it('links products on the store catalogue base URL', async () => {
+    queryManyMock.mockResolvedValue([simpleProduct, variantProduct])
+    const xml = await (await GET(makeReq() as any)).text()
+
+    expect(xml).toContain('<link>https://shop.example.com/products/hex-bolt-m8</link>')
+    expect(xml).toContain('<link>https://shop.example.com/products/socket-cap-screw?sku=SCS-M6-10</link>')
+  })
+
+  it('sends MRP as price and the selling price as sale price only for a real markdown', async () => {
+    queryManyMock.mockResolvedValue([simpleProduct])
+    const xml = await (await GET(makeReq() as any)).text()
+
+    expect(xml).toContain('<g:price>60.00 INR</g:price>')
+    expect(xml).toContain('<g:sale_price>50.00 INR</g:sale_price>')
+  })
+
+  it('uses the selling price when the MRP is below it (no sale price)', async () => {
+    queryManyMock.mockResolvedValue([{ ...simpleProduct, base_price: '118.00', mrp: '100.00' }])
+    const xml = await (await GET(makeReq() as any)).text()
+
+    expect(xml).toContain('<g:price>118.00 INR</g:price>')
+    expect(xml).not.toContain('<g:sale_price>')
+  })
+
+  it('applies the markdown rule per variant, falling back to the product MRP', async () => {
+    queryManyMock.mockResolvedValue([
+      {
+        ...variantProduct,
+        mrp: '20.00',
+        product_variants: [
+          { ...variantProduct.product_variants[0], price: '12.00', mrp: '10.00' },
+          { ...variantProduct.product_variants[1], price: '18.00', mrp: null },
+        ],
+      },
+    ])
+    const xml = await (await GET(makeReq() as any)).text()
+
+    expect(xml).toContain('<g:price>12.00 INR</g:price>')
+    expect(xml).toContain('<g:price>20.00 INR</g:price>')
+    expect(xml).toContain('<g:sale_price>18.00 INR</g:sale_price>')
+    expect((xml.match(/<g:sale_price>/g) || []).length).toBe(1)
+  })
+
+  it('identifier_exists is no with only a brand, or an MPN without a brand', async () => {
+    queryManyMock.mockResolvedValue([
+      { ...simpleProduct, sku: 'A', mpn: null, gtin: null },
+      { ...simpleProduct, sku: 'B', mpn: 'MPN-1', gtin: null, brands: { id: null, name: null } },
+    ])
+    const xml = await (await GET(makeReq() as any)).text()
+
+    expect(xml).not.toContain('<g:identifier_exists>yes</g:identifier_exists>')
+    expect((xml.match(/<g:identifier_exists>no<\/g:identifier_exists>/g) || []).length).toBe(2)
+  })
+
+  it('identifier_exists is yes with a GTIN, or an MPN plus a brand', async () => {
+    queryManyMock.mockResolvedValue([
+      { ...simpleProduct, sku: 'A', mpn: null, gtin: '8901234567890', brands: { id: null, name: null } },
+      { ...simpleProduct, sku: 'B', mpn: 'MPN-1', gtin: null },
+    ])
+    const xml = await (await GET(makeReq() as any)).text()
+
+    expect((xml.match(/<g:identifier_exists>yes<\/g:identifier_exists>/g) || []).length).toBe(2)
+  })
+
+  it('cuts titles to 150 characters and never sends a tax category', async () => {
+    queryManyMock.mockResolvedValue([{ ...simpleProduct, name: 'X'.repeat(200), hsn_code: '7318' }])
+    const xml = await (await GET(makeReq() as any)).text()
+
+    const title = xml.match(/<title>(X+…)<\/title>/)?.[1] || ''
+    expect(title.length).toBe(150)
+    expect(xml).not.toContain('tax_category')
+    expect(xml).not.toContain('7318')
   })
 })

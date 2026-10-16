@@ -6,6 +6,7 @@ import {
   getProvisioningJob,
   updateProvisioningJob,
   setTenantStatus,
+  setStoreRequest,
   writeTenantInfra,
   writeTenantEc2,
   clearTenantInfra,
@@ -471,6 +472,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           }
         }
         await setTenantStatus(job.tenant_id, 'active')
+        await setStoreRequest(job.tenant_id, null)
         await recordStepEvent(job.id, 'activate', 'ok', 'tenant activated', {})
         await updateProvisioningJob(job.id, { status: 'done', created_resources: res })
         return 'done'

@@ -101,6 +101,8 @@ describe('GET /api/admin/traffic', () => {
     const res = await GET(makeGet())
     expect(res.status).toBe(403)
     expect((await res.json()).error).toMatch(/insufficient/i)
+    // Same scope the Traffic nav entry and middleware use.
+    expect(mockHasScope).toHaveBeenCalledWith(admin.role, admin.scopes, 'traffic:read')
   })
 
   it('returns full traffic dashboard on happy path', async () => {

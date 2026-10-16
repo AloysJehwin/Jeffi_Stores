@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import type { TenantRow } from '@/lib/tenant-registry'
+import { ChoiceCards, Segmented, focusRing } from '../../_ui'
 
 interface Plan {
   slug: string
@@ -158,54 +159,38 @@ export default function BillingClient({
         <h2 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-4">Change plan</h2>
 
         {/* Interval toggle */}
-        <div className="inline-flex items-center rounded-xl border border-border-default bg-surface-secondary p-1 mb-5">
-          {(['monthly', 'yearly'] as Interval[]).map(iv => (
-            <button
-              key={iv}
-              type="button"
-              onClick={() => setInterval(iv)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${interval === iv ? 'bg-surface-elevated text-foreground shadow-sm' : 'text-foreground-muted'}`}
-            >
-              {iv}
-              {iv === 'yearly' && (
-                <span className="ml-1.5 text-xs org-sage-text font-semibold">2 months free</span>
-              )}
-            </button>
-          ))}
-        </div>
+        <Segmented<Interval> ariaLabel="Billing interval" className="mb-5" value={interval} onChange={setInterval}
+          options={[{ value: 'monthly', label: 'Monthly' }, { value: 'yearly', label: 'Yearly', count: '2 months free' }]} />
 
         {/* Plan cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-          {plans.map(p => {
+        <ChoiceCards ariaLabel="Plan" className="mb-6" columns="grid-cols-2 lg:grid-cols-4" cardClassName="p-3" value={selectedPlan} onChange={setSelectedPlan}
+          options={plans.map(p => {
             const monthly = Number(p.monthly_price_inr)
             const price = interval === 'yearly' ? monthly * 10 : monthly
             const isCurrent = p.slug === tenant.plan && interval === (tenant.billing_interval ?? 'monthly')
-            return (
-              <button
-                key={p.slug}
-                type="button"
-                onClick={() => setSelectedPlan(p.slug)}
-                className={`rounded-xl border p-3 text-left transition-colors relative ${selectedPlan === p.slug ? 'border-accent-500 bg-accent-50' : 'border-border-default'}`}
-              >
-                {isCurrent && (
-                  <span className="absolute -top-2 left-3 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-600 text-white">
-                    Current
-                  </span>
-                )}
-                <div className="font-semibold text-foreground">{p.name}</div>
-                <div className="text-sm font-bold text-foreground mt-1">
-                  ₹{price.toLocaleString('en-IN')}
-                  <span className="text-xs text-foreground-muted font-normal">
-                    /{interval === 'yearly' ? 'yr' : 'mo'}
-                  </span>
-                </div>
-                {interval === 'yearly' && (
-                  <div className="text-xs org-sage-text">2 months free</div>
-                )}
-              </button>
-            )
-          })}
-        </div>
+            return {
+              value: p.slug, label: p.name,
+              content: (
+                <>
+                  {isCurrent && (
+                    <span className="absolute -top-2 left-3 px-1.5 py-0.5 rounded text-[10px] font-semibold ecom-accent-bg text-white">
+                      Current
+                    </span>
+                  )}
+                  <div className="pr-6 font-semibold text-foreground">{p.name}</div>
+                  <div className="text-sm font-bold text-foreground mt-1">
+                    ₹{price.toLocaleString('en-IN')}
+                    <span className="text-xs text-foreground-muted font-normal">
+                      /{interval === 'yearly' ? 'yr' : 'mo'}
+                    </span>
+                  </div>
+                  {interval === 'yearly' && (
+                    <div className="text-xs org-sage-text">2 months free</div>
+                  )}
+                </>
+              ),
+            }
+          })} />
 
         {/* Action summary + confirm */}
         {!unchanged && (
@@ -238,7 +223,7 @@ export default function BillingClient({
         <button
           onClick={changePlan}
           disabled={busy || unchanged}
-          className="px-5 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+          className={`px-5 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors ${focusRing}`}
         >
           {busy ? 'Updating…' : isUpgrade ? 'Upgrade now' : 'Schedule change'}
         </button>
@@ -267,7 +252,7 @@ export default function BillingClient({
               <button
                 onClick={cancelSubscription}
                 disabled={cancelBusy}
-                className="px-4 py-2 rounded-xl org-sand hover:org-sand disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+                className="px-4 py-2 rounded-xl bg-[#8a2e1f] hover:bg-[#6f2418] disabled:opacity-40 text-white text-sm font-semibold transition-colors"
               >
                 {cancelBusy ? 'Cancelling…' : 'Yes, cancel'}
               </button>

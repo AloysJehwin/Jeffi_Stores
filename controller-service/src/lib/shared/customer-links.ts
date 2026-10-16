@@ -78,13 +78,8 @@ export async function invoiceUrlForOrder(orderId: string): Promise<string | unde
   return row?.view_token ? documentUrl('invoice', row.view_token) : undefined
 }
 
-/**
- * Base for product links handed to outside catalogues (Google feed, Sheets). A tenant's catalogue
- * points at its own store. On the platform the configured public URL stays first, since Merchant
- * Center checks product links against the site verified there; only an unset env falls through.
- */
+/** Base for product links handed to outside catalogues (Google feed, Sheets, Merchant API sync). */
 export async function catalogBaseUrl(): Promise<string> {
-  const tenant = await resolveCurrentTenant()
-  if (!tenant?.slug && process.env.NEXT_PUBLIC_BASE_URL) return process.env.NEXT_PUBLIC_BASE_URL.replace(/\/+$/, '')
-  return storeBaseUrlAsync()
+  const { storePublicBaseUrl } = await import('@/lib/merchant/store-url')
+  return storePublicBaseUrl()
 }

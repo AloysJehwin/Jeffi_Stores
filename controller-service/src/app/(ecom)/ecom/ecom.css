@@ -30,6 +30,14 @@
   --org-frame: #f8f3ea;
   --org-chrome: #f3ead9;
 
+  /* selection vocabulary: selected = ink, current = sand-deep + terracotta bar, hover = sand */
+  --sel-bg: var(--color-foreground);
+  --sel-fg: var(--color-surface-elevated);
+  --cur-bg: var(--org-sand-deep);
+  --cur-bar: var(--org-terracotta);
+  --hover-bg: var(--org-sand);
+  --focus-halo: 0 0 0 3px rgb(196 106 70 / 0.25);
+
   /* legacy aliases used by the dashboard console */
   --console-terracotta: var(--org-terracotta);
   --console-terracotta-deep: var(--org-terracotta-deep);
@@ -57,16 +65,32 @@
 .org-frame { background-color: var(--org-frame); }
 .org-chrome { background-color: var(--org-chrome); }
 
-.ecom-accent-bg { background-color: var(--org-terracotta) !important; color: #fff; }
-.ecom-accent-bg:hover { background-color: var(--org-terracotta-deep) !important; }
+.ecom-accent-bg { background-color: var(--org-terracotta-deep) !important; color: #fff; }
+.ecom-accent-bg:hover:not(:disabled) { background-color: var(--org-brown) !important; }
 .ecom-accent-text { color: var(--org-terracotta); }
 .ecom-accent-border { border-color: var(--org-terracotta); }
+
+/* Selection / focus vocabulary */
+/* fallbacks so nothing in ecom is left without a keyboard-focus or field-focus style */
+:where(.ecom-scope) :where(a, button, [role='button'], summary):focus-visible { outline: 2px solid var(--org-terracotta); outline-offset: 2px; }
+:where(.ecom-scope) :where(input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='color']), textarea, select):focus { outline: none; border-color: var(--org-terracotta); box-shadow: var(--focus-halo); }
+:where(.ecom-scope) :where(input[type='checkbox'], input[type='radio']):focus-visible { outline: 2px solid var(--org-terracotta); outline-offset: 2px; }
+.ecom-sel { background-color: var(--sel-bg) !important; color: var(--sel-fg) !important; }
+.ecom-hover:hover { background-color: var(--hover-bg); }
+.ecom-current { background-color: var(--cur-bg); box-shadow: inset 3px 0 0 var(--cur-bar); color: var(--color-foreground); }
+.ecom-focus:focus { outline: none; }
+.ecom-focus:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--color-surface-elevated), 0 0 0 4px var(--org-terracotta); }
+.ecom-current.ecom-focus:focus-visible { box-shadow: inset 3px 0 0 var(--cur-bar), 0 0 0 2px var(--color-surface-elevated), 0 0 0 4px var(--org-terracotta); }
+.ecom-field { border-width: 1px; border-color: var(--color-border); transition: border-color .15s, box-shadow .15s; }
+.ecom-field:focus, .ecom-field:focus-within { outline: none; border-color: var(--org-terracotta) !important; box-shadow: var(--focus-halo) !important; }
+.ecom-scroll-x { scrollbar-width: none; }
+.ecom-scroll-x::-webkit-scrollbar { display: none; }
 
 /* accent-* utility remaps (green → terracotta/brown) */
 .ecom-scope .bg-accent-50 { background-color: var(--org-peach) !important; }
 .ecom-scope .bg-accent-100 { background-color: #f0d9cb !important; }
 .ecom-scope .bg-accent-500,
-.ecom-scope .hover\:bg-accent-500:hover { background-color: var(--org-terracotta) !important; }
+.ecom-scope .hover\:bg-accent-500:hover { background-color: var(--org-terracotta-deep) !important; }
 .ecom-scope .bg-accent-600,
 .ecom-scope .hover\:bg-accent-600:hover,
 .ecom-scope .bg-accent-700,
@@ -85,7 +109,23 @@
 .ecom-scope .border-accent-600,
 .ecom-scope .border-accent-700,
 .ecom-scope .border-accent-800 { border-color: var(--org-terracotta) !important; }
-.ecom-scope .ring-accent-500 { --tw-ring-color: var(--org-terracotta) !important; }
+.ecom-scope .ring-accent-500,
+.ecom-scope .focus\:ring-accent-500:focus { --tw-ring-color: var(--org-terracotta) !important; }
+.ecom-scope .hover\:border-accent-300:hover,
+.ecom-scope .hover\:border-accent-400:hover,
+.ecom-scope .hover\:border-accent-500:hover { border-color: var(--org-terracotta) !important; }
+.ecom-scope .focus\:border-accent-400:focus,
+.ecom-scope .focus\:border-accent-500:focus,
+.ecom-scope .focus\:border-accent-600:focus { border-color: var(--org-terracotta) !important; }
+.ecom-scope .accent-accent-500,
+.ecom-scope .accent-accent-600,
+.ecom-scope .accent-accent-700 { accent-color: var(--org-terracotta-deep) !important; }
+.ecom-scope input[type='checkbox'], .ecom-scope input[type='radio'] { accent-color: var(--org-terracotta-deep); }
+/* globals.css darkens text on accent fills for the green theme; terracotta-deep needs white */
+.ecom-scope .bg-accent-500.text-white,
+.ecom-scope .bg-accent-600.text-white,
+.ecom-scope .bg-primary-500.text-white,
+.ecom-scope .bg-primary-600.text-white { color: #fff !important; }
 .ecom-scope .shadow-accent-600 { --tw-shadow-color: var(--org-terracotta-deep) !important; }
 .ecom-scope .from-accent-500,
 .ecom-scope .from-accent-600,
@@ -109,6 +149,12 @@ html:has(.ecom-scope) body {
 
 /* Selects and calendars (portalled into .ecom-scope): rounded organic popovers. */
 .ecom-scope button[role='combobox'] { border-radius: 0.75rem; background-color: var(--color-surface-elevated); }
+.ecom-scope button[role='combobox'][aria-expanded='true'],
+.ecom-scope button[role='combobox']:focus-visible { outline: none; border-color: var(--org-terracotta) !important; box-shadow: var(--focus-halo) !important; }
+.ecom-scope [data-adminselect-dropdown] [role='option'] { color: var(--color-foreground) !important; background-color: transparent !important; }
+.ecom-scope [data-adminselect-dropdown] [role='option'][data-highlighted] { background-color: var(--hover-bg) !important; }
+.ecom-scope [data-adminselect-dropdown] [role='option'][aria-selected='true'] { font-weight: 600; }
+.ecom-scope [data-adminselect-dropdown] [role='option'][aria-selected='true'] svg { color: var(--org-terracotta-deep) !important; }
 .ecom-scope [data-adminselect-dropdown],
 .ecom-scope [data-datepicker-popup] {
   border-radius: 1rem;
@@ -120,3 +166,9 @@ html:has(.ecom-scope) body {
 .ecom-scope [data-adminselect-dropdown] button { border-radius: 0.625rem; }
 .ecom-scope [data-adminselect-dropdown] [class*='uppercase'] { background-color: var(--org-chrome); border-radius: 0.5rem; }
 .ecom-scope [data-datepicker-popup] button { border-radius: 9999px; }
+.ecom-scope [data-datepicker-popup] button:hover:not(:disabled):not([data-selected]) { background-color: var(--hover-bg) !important; }
+.ecom-scope [data-datepicker-popup] button[data-selected],
+.ecom-scope [data-datepicker-popup] .bg-accent-500 { background-color: var(--sel-bg) !important; color: var(--sel-fg) !important; }
+.ecom-scope [data-datepicker-popup] button[data-today]:not([data-selected]) { border-color: var(--org-terracotta) !important; color: var(--org-terracotta-deep) !important; background-color: transparent !important; }
+.ecom-scope [data-datepicker-popup] button:focus-visible { outline: 2px solid var(--org-terracotta); outline-offset: 2px; }
+.ecom-scope [data-datepicker-trigger][aria-expanded='true'] { border-color: var(--org-terracotta) !important; box-shadow: var(--focus-halo) !important; }

@@ -95,8 +95,12 @@ function columns(m: DocModel): Col[] {
     return [idx, desc(0.55), { key: 'h', label: 'HSN', w: 0.14, align: 'left', get: l => l.hsn ?? '—' }, { ...qty, w: 0.14 },
       { key: 'c', label: 'Packed', w: 0.12, align: 'center', get: () => '' }]
   }
-  return [idx, desc(m.showTax ? 0.33 : 0.5), { key: 'h', label: 'HSN', w: 0.1, align: 'left', get: l => l.hsn ?? '—' }, qty,
+  // A Disc. column only when some line is discounted (its own discount plus its share of the document's).
+  const disc = m.lines.some(l => l.discount > 0)
+  const discCol: Col = { key: 'x', label: 'Disc.', w: 0.1, align: 'right', get: l => (l.discount > 0 ? `−${money(l.discount)}` : '—') }
+  return [idx, desc((m.showTax ? 0.33 : 0.5) - (disc ? 0.1 : 0)), { key: 'h', label: 'HSN', w: 0.1, align: 'left', get: l => l.hsn ?? '—' }, qty,
     { key: 'r', label: 'Rate', w: 0.12, align: 'right', get: l => money(l.rate) },
+    ...(disc ? [discCol] : []),
     ...(m.showTax ? [{ key: 'g', label: 'GST', w: 0.08, align: 'right', get: (l: LineView) => `${l.gstRate}%` } as Col,
       { key: 't', label: 'Taxable', w: 0.12, align: 'right', get: (l: LineView) => money(l.taxable) } as Col] : []),
     { key: 'a', label: 'Amount', w: 0.12, align: 'right', get: l => money(l.total) }]
@@ -159,14 +163,21 @@ export function TotalsBlock({ m, t, variant = 'lined', width = 220 }: { m: DocMo
       ...(variant === 'boxed' ? { borderWidth: 0.8, borderColor: t.rule, padding: 8 } : {}),
     }}>
       <TotalRow label="Subtotal" value={money(x.subtotal)} t={t} />
-      {x.discount > 0 && <TotalRow label="Discount" value={`− ${money(x.discount)}`} t={t} />}
+      {x.line_discount > 0 && <TotalRow label={x.doc_discount > 0 ? 'Item discounts' : 'Discount'} value={`− ${money(x.line_discount)}`} t={t} />}
+      {x.doc_discount > 0 && <TotalRow label={x.doc_discount_label ?? 'Discount'} value={`− ${money(x.doc_discount)}`} t={t} />}
+      {x.charges.map((c, i) => <TotalRow key={i} label={c.label} value={money(c.amount)} t={t} />)}
       {m.showTax && <TotalRow label="Taxable value" value={money(x.taxable)} t={t} />}
       {m.showTax && (x.is_igst
         ? <TotalRow label="IGST" value={money(x.igst)} t={t} />
         : <><TotalRow label="CGST" value={money(x.cgst)} t={t} /><TotalRow label="SGST" value={money(x.sgst)} t={t} /></>)}
+      {x.round_off !== 0 && <TotalRow label="Round off" value={`${x.round_off > 0 ? '+ ' : '− '}${money(Math.abs(x.round_off))}`} t={t} />}
       <View style={{ marginTop: 4, ...(grand ? { backgroundColor: t.accent, borderRadius: 4, paddingHorizontal: 8 } : { borderTopWidth: 1, borderTopColor: variant === 'card' ? t.accent : t.ink }) }}>
         <TotalRow label={m.type === 'receipt' ? 'Amount paid' : 'Total'} value={money(x.total)} t={t} strong color={grand ? onColor(t.accent) : undefined} />
       </View>
+      {m.type !== 'receipt' && x.amount_paid > 0 && <>
+        <TotalRow label="Paid" value={`− ${money(x.amount_paid)}`} t={t} />
+        <TotalRow label="Balance due" value={money(x.balance_due)} t={t} strong />
+      </>}
     </View>
   )
 }

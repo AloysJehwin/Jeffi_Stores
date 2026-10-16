@@ -184,7 +184,13 @@ CREATE TABLE public.page_events (
     referrer text,
     ip_address inet,
     user_agent text,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    utm_source text,
+    utm_medium text,
+    utm_campaign text,
+    gclid text,
+    gbraid text,
+    wbraid text
 );
 
 

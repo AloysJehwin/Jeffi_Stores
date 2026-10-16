@@ -10,6 +10,7 @@ import { resolveTenantId } from '@/lib/tenancy/tenant-context'
 import { settleDelhiveryCostToWallet } from '@/lib/payments/wallet'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 import { applyCourierEdd, extractCourierEdd } from '@/lib/shipping/courier-edd'
+import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 
 const STATUS_SYNC: Record<
   string,
@@ -85,13 +86,16 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       payment_mode: string | null
       dest_pin: string | null
       courier_edd: string | null
+      gclid: string | null
+      gbraid: string | null
+      wbraid: string | null
     }>(
       `SELECT o.awb_number, o.status, o.shipment_status, o.order_number,
               o.shipping_amount, o.delhivery_quoted_weight_kg,
               o.delhivery_charged_weight_kg, o.delhivery_extra_charge,
               o.delhivery_billed_amount, o.delhivery_billed_at,
               o.delhivery_freight_charge, o.delhivery_cod_charge, o.delhivery_oda_charge,
-              o.payment_mode,
+              o.payment_mode, o.gclid, o.gbraid, o.wbraid,
               o.shipping_address_snapshot->>'postal_code' AS dest_pin,
               to_char(o.courier_edd, 'YYYY-MM-DD') AS courier_edd,
               COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
@@ -198,6 +202,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }
 
       await query(`UPDATE orders SET ${setClauses.join(', ')} WHERE id = $1`, queryParams).catch(() => {})
+      if (syncRule.orderStatus === 'delivered' || syncRule.orderStatus === 'returned') await queueAdsConversion(id, order)
 
       if (order.customer_email && order.customer_name) {
         sendOrderStatusUpdate(

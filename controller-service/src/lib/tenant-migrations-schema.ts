@@ -6,7 +6,8 @@ import { repoPath } from '@/lib/shared/paths'
 // (tenant-migrations.ts) and the AWS provisioning provider's loadSchema.
 // Ordering matters: extensions → tables → constraints → indexes → functions → triggers.
 
-const APPLY_ORDER = [
+// Every database/*.sql topic file must be listed (tests/lib/tenant-migrations-schema-files.test.ts).
+export const APPLY_ORDER = [
   'extensions.sql',
   'auth.sql',
   'users.sql',
@@ -26,6 +27,7 @@ const APPLY_ORDER = [
   'editor-sessions.sql',
   'ai.sql',
   'amazon.sql',
+  'ads.sql',
   // Service tables live in the main DB, but constraints/indexes.sql reference them.
   'documents.sql',
   'bulk.sql',
