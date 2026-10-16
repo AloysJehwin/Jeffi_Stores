@@ -4,14 +4,10 @@ import { TabAction } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryMany, queryCount } from '@/lib/shared/db'
-import AdminFilters from '@/components/admin/AdminFilters'
-import Pagination from '@/components/admin/Pagination'
-import BrandTableRow from '@/components/admin/BrandTableRow'
-import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
-import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import { DataToolbar, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import BrochureButton from '@/components/admin/BrochureButton'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import BrandsMobileList from './_components/BrandsMobileList'
+import BrandsTable from './_components/BrandsTable'
 import GroupOverview from '../categories/_components/GroupOverview'
 import { TabLinks, TabMemory } from '../products/_components/catalog-overview'
 import { resolveListTab } from '@/lib/overviews/catalog'
@@ -91,26 +87,17 @@ async function BrandsStats() {
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
 
   return (
-    <div className="animate-fade-in">
-      <div className="grid grid-cols-3 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total Brands</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalBrands}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Active</p>
-          <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-2">{activeBrands}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Inactive</p>
-          <p className="text-2xl sm:text-3xl font-bold text-orange-600 mt-2">{inactiveBrands}</p>
-        </div>
-      </div>
+    <div className="animate-fade-in space-y-4">
+      <KpiGrid>
+        <Kpi label="Total brands" value={totalBrands.toLocaleString('en-IN')} highlight />
+        <Kpi label="Active" value={activeBrands.toLocaleString('en-IN')} />
+        <Kpi label="Inactive" value={inactiveBrands.toLocaleString('en-IN')} />
+      </KpiGrid>
 
       {pendingDraftsCount > 0 && (
-        <details className="mb-6 group">
-          <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
-            <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+        <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
+          <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
+            <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
               <svg
                 className="w-4 h-4 transition-transform group-open:rotate-90"
                 fill="none"
@@ -121,10 +108,10 @@ async function BrandsStats() {
               </svg>
               Pending Drafts ({pendingDraftsCount})
             </span>
-            <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
+            <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
           </summary>
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
-            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+          <div className="border-t border-amber-500/30 overflow-hidden">
+            <div className="divide-y divide-amber-500/20">
               {/* Create-drafts: brand-new brands not yet on the live list. Publish activates them. */}
               {createDrafts.map(d => (
                 <DraftRowActions
@@ -168,7 +155,6 @@ async function BrandsListContent({
 }: {
   resolvedSearchParams: { [key: string]: string | undefined }
 }) {
-  const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
 
   const { brands, total } = await getFilteredBrands({
@@ -177,15 +163,6 @@ async function BrandsListContent({
     page,
     limit: PAGE_SIZE,
   })
-
-  const buildUrl = (p: number) => {
-    const params = new URLSearchParams()
-    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (p > 1) params.set('page', String(p))
-    const qs = params.toString()
-    return ap(`/admin/brands${qs ? `?${qs}` : ''}`, host)
-  }
 
   const currentListUrl = (() => {
     const params = new URLSearchParams()
@@ -197,58 +174,15 @@ async function BrandsListContent({
   })()
 
   return (
-    <>
-      <div className="md:hidden space-y-3">
-        {brands && brands.length > 0 ? (
-          <BrandsMobileList brands={brands} backUrl={currentListUrl} />
-        ) : (
-          <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
-            No brands found. Add your first brand to get started.
-          </div>
-        )}
-        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-      </div>
-
-      <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border-default">
-            <thead className="bg-surface-secondary">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Brand
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Slug
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Website
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {brands && brands.length > 0 ? (
-                brands.map((brand: any) => <BrandTableRow key={brand.id} brand={brand} backUrl={currentListUrl} />)
-              ) : (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-foreground-muted">
-                    No brands found. Add your first brand to get started.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      <div className="hidden md:block px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
-        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-      </div>
-    </>
+    <BrandsTable
+      brands={brands as any[]}
+      total={total}
+      page={page}
+      pageSize={PAGE_SIZE}
+      isActive={resolvedSearchParams.is_active}
+      search={resolvedSearchParams.search}
+      backUrl={currentListUrl}
+    />
   )
 }
 
@@ -260,13 +194,8 @@ export default async function BrandsPage({
   const sp = await searchParams
   const tab = resolveListTab(sp)
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Brands</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Manage product brands</p>
-        </div>
-      </div>
+    <PageBody>
+      <PageHeader title="Brands" description="Manage product brands" />
 
       <TabLinks
         base="/admin/brands"
@@ -292,11 +221,12 @@ export default async function BrandsPage({
         <GroupOverview dim="brand" />
       ) : (
         <>
-          <Suspense fallback={<AdminStatsSkeleton cards={3} gridClass="grid-cols-3" />}>
+          <Suspense fallback={<KpiRowSkeleton />}>
             <BrandsStats />
           </Suspense>
 
-          <AdminFilters
+          <DataToolbar
+            search={{ placeholder: 'Search by name...', param: 'search', suggestType: 'brands' }}
             filters={[
               {
                 name: 'is_active',
@@ -307,14 +237,21 @@ export default async function BrandsPage({
                 ],
               },
             ]}
-            searchPlaceholder="Search by name..."
-            suggestType="brands"
-            searchParam="search"
           />
 
           <BrandsListSection searchParams={searchParams} />
         </>
       )}
+    </PageBody>
+  )
+}
+
+function KpiRowSkeleton() {
+  return (
+    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6 animate-pulse">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
+      ))}
     </div>
   )
 }
@@ -326,7 +263,7 @@ async function BrandsListSection({ searchParams }: { searchParams: Promise<{ [ke
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={5} />}>
+    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={5} />}>
       <BrandsListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )
