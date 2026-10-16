@@ -845,6 +845,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/ecom/customers')) return 'ecom_customers:read'
   if (pathname.startsWith('/api/admin/ecom/instances')) return 'ecom_instances:read'
   if (pathname.startsWith('/api/admin/ecom/billing')) return 'ecom_billing:read'
+  if (pathname.startsWith('/api/admin/ecom/store-status')) return 'ecom_customers:read'
   if (pathname.startsWith('/api/internal/cron-record')) return null
   if (pathname.startsWith('/api/admin/business/customers')) return 'business_customers:read'
   if (pathname.startsWith('/api/admin/business/discounts')) return 'business_customers:read'

@@ -1,9 +1,12 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { listTenants, tenantSummary } from '@/lib/tenant-registry'
 import { EcomHero, EcomFilters } from '@/components/admin/ecom/EcomUI'
+import EcomTabs, { ecomTab } from '../_components/EcomTabs'
+import EcomStoreStatusOverview from './_components/EcomStoreStatusOverview'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +26,20 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
   if (!isPlatformAdmin(role)) redirect('/admin')
 
   const sp = await searchParams
+  const tab = ecomTab(sp)
+  if (tab === 'overview')
+    return (
+      <div className="p-6 w-full">
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-foreground">Store Status</h1>
+          <p className="text-sm text-foreground-muted mt-1">Live status of each tenant store</p>
+        </div>
+        <EcomTabs base="/admin/ecom/store-status" active="overview" listLabel="All stores" />
+        <Suspense>
+          <EcomStoreStatusOverview />
+        </Suspense>
+      </div>
+    )
   const [tenants, summary] = await Promise.all([
     listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q'), product: 'store' }),
     tenantSummary(),
@@ -32,10 +49,11 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
 
   return (
     <div className="p-6 w-full">
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-2xl font-bold text-foreground">Store Status</h1>
         <p className="text-sm text-foreground-muted mt-1">Live status of each tenant store</p>
       </div>
+      <EcomTabs base="/admin/ecom/store-status" active="list" listLabel="All stores" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
         <EcomHero
