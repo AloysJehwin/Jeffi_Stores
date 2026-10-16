@@ -11,6 +11,11 @@ import { getSiteControls, getStoreIdentity } from '@/lib/catalog/site-controls'
 import { getHost } from '@/lib/tenancy/get-host'
 import { LogOut } from 'lucide-react'
 
+function managedAdsReady(): boolean {
+  const e = process.env
+  return !!(e.GOOGLE_ADS_DEVELOPER_TOKEN && e.GOOGLE_ADS_LOGIN_CUSTOMER_ID && e.GOOGLE_ADS_MANAGER_REFRESH_TOKEN)
+}
+
 export async function generateMetadata() {
   const { name } = await getStoreIdentity()
   return {
@@ -114,6 +119,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       scope: 'ecom_instances:read',
       group: 'Ecom Store',
       platformAdminOnly: true,
+      // Only for "managed by Jeffi" Ads; hidden until the manager account keys are set.
+      requiresManagedAds: true,
     },
     {
       href: '/admin/ecom/billing',
@@ -133,6 +140,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const filteredNavLinks = navLinks.filter(link => {
     if ('platformAdminOnly' in link && link.platformAdminOnly && !isPlatformAdmin(role)) return false
     if ('ownerOnly' in link && link.ownerOnly && !isPlatformOwner(role)) return false
+    if ('requiresManagedAds' in link && link.requiresManagedAds && !managedAdsReady()) return false
     return hasScope(role, scopes, link.scope)
   })
   const desktopNavLinks = filteredNavLinks.filter(link => !('mobileOnly' in link && link.mobileOnly))
