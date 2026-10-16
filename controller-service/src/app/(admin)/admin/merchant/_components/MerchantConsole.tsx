@@ -42,7 +42,8 @@ export default function MerchantConsole({ connected }: { connected: boolean }) {
   const tabParam = searchParams.get('tab') as MerchantTab | null
   const [tab, setTabState] = useState<MerchantTab>(tabParam && TABS.some(t => t.id === tabParam) ? tabParam : 'overview')
   const [range, setRange] = useState(() => lastDays(30, 1))
-  const [data, setData] = useState<any>(null)
+  const [loaded, setLoaded] = useState<{ tab: string; data: any } | null>(null)
+  const data = loaded?.tab === tab ? loaded.data : null
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'reports' | 'status' | null>(null)
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
@@ -53,9 +54,8 @@ export default function MerchantConsole({ connected }: { connected: boolean }) {
   useEffect(() => {
     if (!connected || !DATA_TABS.has(tab)) return
     setError(null)
-    setData(null)
     const qs = new URLSearchParams({ tab, from: range.from, to: range.to })
-    api(`/api/admin/merchant/console?${qs}`).then(r => (r.ok ? setData(r.data.data) : setError(r.data.error || 'Failed to load')))
+    api(`/api/admin/merchant/console?${qs}`).then(r => (r.ok ? setLoaded({ tab, data: r.data.data }) : setError(r.data.error || 'Failed to load')))
   }, [tab, range, connected, reloadKey])
 
   function setTab(next: MerchantTab) {

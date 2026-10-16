@@ -35,7 +35,8 @@ export default function AmazonConsole({ connected }: { connected: boolean }) {
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab') as Tab | null
   const [tab, setTabState] = useState<Tab>(tabParam && TABS.some(t => t.id === tabParam) ? tabParam : 'overview')
-  const [data, setData] = useState<any>(null)
+  const [loaded, setLoaded] = useState<{ tab: string; data: any } | null>(null)
+  const data = loaded?.tab === tab ? loaded.data : null
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
@@ -45,9 +46,8 @@ export default function AmazonConsole({ connected }: { connected: boolean }) {
 
   useEffect(() => {
     if (!connected || !DATA_TABS.has(tab)) return
-    setData(null)
     setError(null)
-    api(`/api/admin/amazon/console?tab=${tab}`).then(r => (r.ok ? setData(r.data.data) : setError(r.data.error || 'Failed to load')))
+    api(`/api/admin/amazon/console?tab=${tab}`).then(r => (r.ok ? setLoaded({ tab, data: r.data.data }) : setError(r.data.error || 'Failed to load')))
   }, [tab, connected, reloadKey])
 
   function setTab(next: Tab) {

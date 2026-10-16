@@ -63,7 +63,8 @@ export default function MetaAdsConsole() {
   const [tab, setTabState] = useState<MadsTab>(tabParam && TABS.some(t => t.id === tabParam) ? tabParam : 'overview')
   const [status, setStatus] = useState<any>(null)
   const [range, setRange] = useState(() => lastDays(30))
-  const [data, setData] = useState<any>(null)
+  const [loaded, setLoaded] = useState<{ tab: string; data: any } | null>(null)
+  const data = loaded?.tab === tab ? loaded.data : null
   const [error, setError] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -96,10 +97,9 @@ export default function MetaAdsConsole() {
 
   useEffect(() => {
     if (!status?.connected || !DATA_TABS.has(tab)) return
-    setData(null)
     setError(null)
     api(`/api/admin/meta-ads/console?${new URLSearchParams({ tab, ...range })}`).then(r =>
-      r.ok ? setData(r.data.data) : setError(r.data.error || 'Failed to load')
+      r.ok ? setLoaded({ tab, data: r.data.data }) : setError(r.data.error || 'Failed to load')
     )
   }, [tab, range, status?.connected, reloadKey])
 
