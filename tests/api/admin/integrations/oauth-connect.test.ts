@@ -185,7 +185,7 @@ describe('Google Merchant connect + callback', () => {
       await googleConnect(get('https://x/api/admin/integrations/google/connect?merchant_id=5550001'))
     )
     expect(url.origin).toBe('https://accounts.google.com')
-    expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/content')
+    expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/content openid email')
     expect(url.searchParams.get('access_type')).toBe('offline')
     expect(url.searchParams.get('redirect_uri')).toBe(
       'https://admin.jeffistores.in/api/admin/integrations/google/callback'

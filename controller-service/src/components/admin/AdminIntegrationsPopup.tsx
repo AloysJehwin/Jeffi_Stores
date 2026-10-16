@@ -270,20 +270,39 @@ function TestButton({ provider, setToast }: { provider: string; setToast: SetToa
   )
 }
 
-// One-time Merchant API registration of the connected account (also done on every Google sign-in).
+// One-time Merchant API registration of the connected account (also done on every Google sign-in),
+// naming the admin who becomes its API developer.
 function EnableMerchantApiButton({ setToast }: { setToast: SetToast }) {
   const [busy, setBusy] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const [email, setEmail] = useState('')
   async function run() {
     setBusy(true)
     setToast(null)
-    const { ok, data } = await postJson('/api/admin/merchant/register', 'POST')
+    const { ok, data } = await postJson('/api/admin/merchant/register', 'POST', { email })
     setToast({ ok: ok && !!data.ok, text: data.message || data.error || 'Could not enable Merchant API sync' })
     setBusy(false)
+    if (ok && data.ok) setAsking(false)
   }
+  if (!asking)
+    return (
+      <button type="button" onClick={() => setAsking(true)} className={btnSecondary}>
+        Enable Merchant API sync
+      </button>
+    )
   return (
-    <button type="button" onClick={run} disabled={busy} className={btnSecondary}>
-      {busy ? 'Enabling…' : 'Enable Merchant API sync'}
-    </button>
+    <div className="w-full flex flex-wrap items-center gap-2">
+      <input
+        type="email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        placeholder="Email of an admin on this Merchant Center account"
+        className="flex-1 min-w-[16rem] h-control rounded-lg border border-border-default bg-surface px-3 text-sm"
+      />
+      <button type="button" onClick={run} disabled={busy || !email.trim()} className={btnSecondary}>
+        {busy ? 'Enabling…' : 'Enable'}
+      </button>
+    </div>
   )
 }
 
