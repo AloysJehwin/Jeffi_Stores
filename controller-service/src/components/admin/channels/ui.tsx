@@ -202,3 +202,41 @@ export async function api<T = any>(url: string, init?: RequestInit & { json?: un
   const data = await r.json().catch(() => ({}))
   return { ok: r.ok, data }
 }
+
+const isoDay = (d: Date) => d.toISOString().slice(0, 10)
+export function lastDays(n: number, endOffset = 0): { from: string; to: string } {
+  const to = new Date()
+  to.setDate(to.getDate() - endOffset)
+  const from = new Date(to)
+  from.setDate(from.getDate() - (n - 1))
+  return { from: isoDay(from), to: isoDay(to) }
+}
+
+export function RangePresets({ value, onChange, presets = [7, 14, 30, 90], endOffset = 0 }: { value: { from: string; to: string }; onChange: (r: { from: string; to: string }) => void; presets?: number[]; endOffset?: number }) {
+  return (
+    <div className="flex gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg w-fit">
+      {presets.map(n => {
+        const r = lastDays(n, endOffset)
+        const active = r.from === value.from && r.to === value.to
+        return (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(r)}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md ${active ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+          >
+            {n}d
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+export const money = (v: number | null | undefined, digits = 0) =>
+  v == null || !Number.isFinite(v)
+    ? '-'
+    : new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: digits, minimumFractionDigits: digits }).format(v)
+export const count = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? '-' : Math.round(v).toLocaleString('en-IN'))
+export const pct = (v: number | null | undefined, d = 1) => (v == null || !Number.isFinite(v) ? '-' : `${(v * 100).toFixed(d)}%`)
+export const change = (cur: number, prev: number) => (prev ? (cur - prev) / Math.abs(prev) : null)

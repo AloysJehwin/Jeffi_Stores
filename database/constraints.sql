@@ -3660,3 +3660,13 @@ ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_status_chec
 ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_severity_check CHECK (((severity)::text = ANY ((ARRAY['info'::character varying, 'warning'::character varying, 'critical'::character varying])::text[])));
 ALTER TABLE ONLY public.channel_change_log ADD CONSTRAINT channel_change_log_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.channel_change_log ADD CONSTRAINT channel_change_log_status_check CHECK (((status)::text = ANY ((ARRAY['applied'::character varying, 'rejected'::character varying, 'failed'::character varying])::text[])));
+
+ALTER TABLE ONLY public.gmc_product_performance ADD CONSTRAINT gmc_product_performance_pkey PRIMARY KEY (date, offer_id, marketing_method);
+ALTER TABLE ONLY public.gmc_price_competitiveness ADD CONSTRAINT gmc_price_competitiveness_pkey PRIMARY KEY (offer_id);
+ALTER TABLE ONLY public.gmc_price_insights ADD CONSTRAINT gmc_price_insights_pkey PRIMARY KEY (offer_id);
+ALTER TABLE ONLY public.gmc_best_sellers ADD CONSTRAINT gmc_best_sellers_pkey PRIMARY KEY (report_date, category_id, rank);
+ALTER TABLE ONLY public.gmc_best_sellers ADD CONSTRAINT gmc_best_sellers_catalog_status_check CHECK (((catalog_status)::text = ANY ((ARRAY['in_stock'::character varying, 'out_of_stock'::character varying, 'not_listed'::character varying, 'not_carried'::character varying])::text[])));
+ALTER TABLE ONLY public.gmc_account_issues ADD CONSTRAINT gmc_account_issues_pkey PRIMARY KEY (name);
+ALTER TABLE ONLY public.gmc_issue_cache ADD CONSTRAINT gmc_issue_cache_pkey PRIMARY KEY (offer_id);
+ALTER TABLE ONLY public.gmc_account_state ADD CONSTRAINT gmc_account_state_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.gmc_account_state ADD CONSTRAINT gmc_account_state_single CHECK ((id = 1));

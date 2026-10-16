@@ -9,8 +9,8 @@ import type { ChangeActor } from './types'
 // Route helpers shared by the channel consoles: scope + plan gate for admin routes, the cron
 // entry (secret, not-connected and busy handled), and readable errors.
 
-export async function channelAdmin(request: NextRequest, scope: string, what: string): Promise<AdminJWTPayload | NextResponse> {
-  const admin = await requireAdminScope(request, scope)
+/** Plan gate after the scope check: withPlan(await requireAdminScope(req, 'x:write'), 'x:write', 'X'). */
+export async function withPlan(admin: AdminJWTPayload | NextResponse, scope: string, what: string): Promise<AdminJWTPayload | NextResponse> {
   if (admin instanceof NextResponse) return admin
   const gate = await currentTenantPlanGate(scope)
   if (!gate.allowed) {
@@ -21,6 +21,10 @@ export async function channelAdmin(request: NextRequest, scope: string, what: st
     )
   }
   return admin
+}
+
+export async function channelAdmin(request: NextRequest, scope: string, what: string): Promise<AdminJWTPayload | NextResponse> {
+  return withPlan(await requireAdminScope(request, scope), scope, what)
 }
 
 export const actorOf = (admin: AdminJWTPayload): ChangeActor => ({ adminId: admin.adminId || null, email: admin.email ?? null })

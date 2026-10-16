@@ -4,6 +4,8 @@ import { CHANNELS, type Channel } from './types'
 // Lazy rule-set lookup per channel (imports stay inside so a route only loads its own channel).
 export async function ruleSetFor(channel: Channel): Promise<RuleSet<any, any> | null> {
   switch (channel) {
+    case 'gmc':
+      return (await import('@/lib/merchant/alerts')).GMC_RULES
     default:
       return null
   }

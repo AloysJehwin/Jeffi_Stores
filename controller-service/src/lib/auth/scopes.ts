@@ -89,14 +89,14 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'merchant_sync:read',
     label: 'Merchant Sync (Read)',
     description: 'View Google/Amazon merchant feed sync status',
-    routes: ['/admin/merchant-sync'],
+    routes: ['/admin/merchant-sync', '/admin/merchant'],
     group: 'Catalogue',
   },
   {
     key: 'merchant_sync:write',
     label: 'Merchant Sync (Write)',
     description: 'Run and manage Google/Amazon merchant feed synchronization',
-    routes: ['/admin/merchant-sync'],
+    routes: ['/admin/merchant-sync', '/admin/merchant'],
     group: 'Catalogue',
   },
   {
