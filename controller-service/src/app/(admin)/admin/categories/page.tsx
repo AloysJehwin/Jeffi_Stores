@@ -13,6 +13,9 @@ import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBan
 import DraftRowActions from '@/components/admin/DraftRowActions'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import GroupOverview from './_components/GroupOverview'
+import { TabLinks, TabMemory } from '../products/_components/catalog-overview'
+import { resolveListTab } from '@/lib/overviews/catalog'
 
 type SP = { [key: string]: string | undefined }
 
@@ -186,42 +189,62 @@ async function CategoriesListContent({ resolvedSearchParams }: { resolvedSearchP
   )
 }
 
-export default function CategoriesPage({ searchParams }: { searchParams: Promise<SP> }) {
+export default async function CategoriesPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const sp = await searchParams
+  const tab = resolveListTab(sp)
   return (
     <div className="p-4 sm:p-6">
       <Suspense fallback={<CategoriesHeaderFallback />}>
         <CategoriesHeader />
       </Suspense>
 
-      <Suspense fallback={<AdminStatsSkeleton cards={3} banner={false} />}>
-        <CategoriesStatsSection searchParams={searchParams} />
+      <TabLinks
+        base="/admin/categories"
+        active={tab}
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'list', label: 'Categories' },
+        ]}
+      />
+      <Suspense fallback={null}>
+        <TabMemory storageKey="category" tab={tab} explicit={typeof sp.tab === 'string'} />
       </Suspense>
 
-      <AdminFilters
-        filters={[
-          {
-            name: 'is_active',
-            label: 'Status',
-            options: [
-              { value: 'true', label: 'Active' },
-              { value: 'false', label: 'Inactive' },
-            ],
-          },
-          {
-            name: 'type',
-            label: 'Type',
-            options: [
-              { value: 'main', label: 'Main Categories' },
-              { value: 'sub', label: 'Subcategories' },
-            ],
-          },
-        ]}
-        searchPlaceholder="Search by name..."
-        suggestType="categories"
-        searchParam="search"
-      />
+      {tab === 'overview' ? (
+        <GroupOverview dim="category" />
+      ) : (
+        <>
+          <Suspense fallback={<AdminStatsSkeleton cards={3} banner={false} />}>
+            <CategoriesStatsSection searchParams={searchParams} />
+          </Suspense>
 
-      <CategoriesListSection searchParams={searchParams} />
+          <AdminFilters
+            filters={[
+              {
+                name: 'is_active',
+                label: 'Status',
+                options: [
+                  { value: 'true', label: 'Active' },
+                  { value: 'false', label: 'Inactive' },
+                ],
+              },
+              {
+                name: 'type',
+                label: 'Type',
+                options: [
+                  { value: 'main', label: 'Main Categories' },
+                  { value: 'sub', label: 'Subcategories' },
+                ],
+              },
+            ]}
+            searchPlaceholder="Search by name..."
+            suggestType="categories"
+            searchParam="search"
+          />
+
+          <CategoriesListSection searchParams={searchParams} />
+        </>
+      )}
     </div>
   )
 }

@@ -7,6 +7,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
+import EnrichmentOverview from './EnrichmentOverview'
+import { TabLinks, useListTab } from '../products/_components/catalog-overview'
 
 interface Item {
   id: string
@@ -54,6 +56,7 @@ function TagList({ tags, max = 4, className = '' }: { tags: string[] | null; max
 
 export default function CatalogEnrichmentPage() {
   const { showToast } = useToast()
+  const tab = useListTab()
   const [items, setItems] = useState<Item[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -197,305 +200,326 @@ export default function CatalogEnrichmentPage() {
           </div>
           <p className="text-foreground-secondary mt-1 text-sm">AI-generated product intelligence for admin review</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {selected.size > 0 && statusFilter === 'proposed' && (
+        {tab === 'list' && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {selected.size > 0 && statusFilter === 'proposed' && (
+              <RequireWrite scope="catalog_enrichment:write">
+                <button
+                  onClick={() => bulkAction('approve')}
+                  disabled={bulkBusy}
+                  className="flex items-center gap-1.5 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold disabled:opacity-50"
+                >
+                  {bulkBusy ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle className="w-3.5 h-3.5" />
+                  )}
+                  Approve {selected.size}
+                </button>
+                <button
+                  onClick={() => bulkAction('reject')}
+                  disabled={bulkBusy}
+                  className="flex items-center gap-1.5 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
+                >
+                  <XCircle className="w-3.5 h-3.5" />
+                  Reject {selected.size}
+                </button>
+                <div className="w-px h-5 bg-border-default" />
+              </RequireWrite>
+            )}
             <RequireWrite scope="catalog_enrichment:write">
               <button
-                onClick={() => bulkAction('approve')}
-                disabled={bulkBusy}
-                className="flex items-center gap-1.5 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold disabled:opacity-50"
-              >
-                {bulkBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                Approve {selected.size}
-              </button>
-              <button
-                onClick={() => bulkAction('reject')}
-                disabled={bulkBusy}
+                onClick={runAll}
+                disabled={runningAll}
                 className="flex items-center gap-1.5 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
               >
-                <XCircle className="w-3.5 h-3.5" />
-                Reject {selected.size}
+                {runningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                Run All
               </button>
-              <div className="w-px h-5 bg-border-default" />
             </RequireWrite>
-          )}
-          <RequireWrite scope="catalog_enrichment:write">
-            <button
-              onClick={runAll}
-              disabled={runningAll}
-              className="flex items-center gap-1.5 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
-            >
-              {runningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-              Run All
-            </button>
-          </RequireWrite>
-          <AdminSelect
-            sm
-            value={statusFilter}
-            onChange={v => setStatusFilter(v as typeof statusFilter)}
-            options={[
-              { value: 'proposed', label: 'Proposed' },
-              { value: 'approved', label: 'Approved' },
-              { value: 'rejected', label: 'Rejected' },
-              { value: 'all', label: 'All' },
-            ]}
-          />
-        </div>
+            <AdminSelect
+              sm
+              value={statusFilter}
+              onChange={v => setStatusFilter(v as typeof statusFilter)}
+              options={[
+                { value: 'proposed', label: 'Proposed' },
+                { value: 'approved', label: 'Approved' },
+                { value: 'rejected', label: 'Rejected' },
+                { value: 'all', label: 'All' },
+              ]}
+            />
+          </div>
+        )}
       </div>
 
-      {loading && (
-        <div className="flex items-center gap-2 text-sm text-foreground-muted py-16 justify-center">
-          <Loader2 className="w-4 h-4 animate-spin" /> Loading
-        </div>
-      )}
+      <TabLinks
+        base="/admin/catalog-enrichment"
+        active={tab}
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'list', label: 'Suggestions' },
+        ]}
+      />
 
-      {!loading && items.length === 0 && (
-        <div className="bg-surface-elevated border border-border-default rounded-lg p-12 text-center text-sm text-foreground-muted">
-          Nothing in the {statusFilter} queue. Click <strong>Run All</strong> to enrich products.
-        </div>
-      )}
+      {tab === 'overview' ? (
+        <EnrichmentOverview />
+      ) : (
+        <>
+          {loading && (
+            <div className="flex items-center gap-2 text-sm text-foreground-muted py-16 justify-center">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading
+            </div>
+          )}
 
-      {!loading && items.length > 0 && (
-        <div className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-border-default">
-              <thead className="bg-surface-secondary">
-                <tr>
-                  {statusFilter === 'proposed' && (
-                    <th className="pl-4 py-3 w-8">
-                      <input
-                        type="checkbox"
-                        checked={allProposedSelected}
-                        onChange={toggleAll}
-                        className="rounded border-border-default accent-accent-500"
-                      />
-                    </th>
-                  )}
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                    Product
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden md:table-cell">
-                    AI Description
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden lg:table-cell">
-                    Use Cases
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden sm:table-cell">
-                    Status
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden sm:table-cell">
-                    Proposed
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-default">
-                {items.map(item => (
-                  <Fragment key={item.id}>
-                    <tr
-                      className={`hover:bg-surface-secondary/50 transition-colors ${selected.has(item.id) ? 'bg-accent-50/30 dark:bg-accent-900/10' : ''}`}
-                    >
+          {!loading && items.length === 0 && (
+            <div className="bg-surface-elevated border border-border-default rounded-lg p-12 text-center text-sm text-foreground-muted">
+              Nothing in the {statusFilter} queue. Click <strong>Run All</strong> to enrich products.
+            </div>
+          )}
+
+          {!loading && items.length > 0 && (
+            <div className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-border-default">
+                  <thead className="bg-surface-secondary">
+                    <tr>
                       {statusFilter === 'proposed' && (
-                        <td className="pl-4 py-3 w-8">
-                          {item.status === 'proposed' && (
-                            <input
-                              type="checkbox"
-                              checked={selected.has(item.id)}
-                              onChange={() => toggleSelect(item.id)}
-                              className="rounded border-border-default accent-accent-500"
-                            />
-                          )}
-                        </td>
+                        <th className="pl-4 py-3 w-8">
+                          <input
+                            type="checkbox"
+                            checked={allProposedSelected}
+                            onChange={toggleAll}
+                            className="rounded border-border-default accent-accent-500"
+                          />
+                        </th>
                       )}
-                      <td className="px-4 py-3">
-                        <Link
-                          href={ap(`/admin/products/${item.product_id}`)}
-                          className="text-sm font-medium text-foreground hover:text-accent-500 transition-colors"
+                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                        Product
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden md:table-cell">
+                        AI Description
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden lg:table-cell">
+                        Use Cases
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden sm:table-cell">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden sm:table-cell">
+                        Proposed
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-default">
+                    {items.map(item => (
+                      <Fragment key={item.id}>
+                        <tr
+                          className={`hover:bg-surface-secondary/50 transition-colors ${selected.has(item.id) ? 'bg-accent-50/30 dark:bg-accent-900/10' : ''}`}
                         >
-                          {item.product_name}
-                        </Link>
-                        {item.ai_product_type && (
-                          <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium mt-0.5">
-                            {item.ai_product_type}
-                          </p>
-                        )}
-                        <p className="text-[10px] text-foreground-muted mt-0.5">{item.model}</p>
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell max-w-xs">
-                        <p className="text-xs text-foreground line-clamp-2">{item.ai_description}</p>
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <TagList tags={item.ai_use_cases} max={4} />
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <span
-                          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE[item.status] || ''}`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 hidden sm:table-cell text-xs text-foreground-muted whitespace-nowrap">
-                        {new Date(item.proposed_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => toggleExpand(item.id)}
-                            className="p-1 text-foreground-muted hover:text-foreground rounded"
-                            title="Expand"
-                          >
-                            {expanded.has(item.id) ? (
-                              <ChevronUp className="w-3.5 h-3.5" />
-                            ) : (
-                              <ChevronDown className="w-3.5 h-3.5" />
+                          {statusFilter === 'proposed' && (
+                            <td className="pl-4 py-3 w-8">
+                              {item.status === 'proposed' && (
+                                <input
+                                  type="checkbox"
+                                  checked={selected.has(item.id)}
+                                  onChange={() => toggleSelect(item.id)}
+                                  className="rounded border-border-default accent-accent-500"
+                                />
+                              )}
+                            </td>
+                          )}
+                          <td className="px-4 py-3">
+                            <Link
+                              href={ap(`/admin/products/${item.product_id}`)}
+                              className="text-sm font-medium text-foreground hover:text-accent-500 transition-colors"
+                            >
+                              {item.product_name}
+                            </Link>
+                            {item.ai_product_type && (
+                              <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium mt-0.5">
+                                {item.ai_product_type}
+                              </p>
                             )}
-                          </button>
-                          {item.status === 'proposed' && (
-                            <RequireWrite scope="catalog_enrichment:write">
+                            <p className="text-[10px] text-foreground-muted mt-0.5">{item.model}</p>
+                          </td>
+                          <td className="px-4 py-3 hidden md:table-cell max-w-xs">
+                            <p className="text-xs text-foreground line-clamp-2">{item.ai_description}</p>
+                          </td>
+                          <td className="px-4 py-3 hidden lg:table-cell">
+                            <TagList tags={item.ai_use_cases} max={4} />
+                          </td>
+                          <td className="px-4 py-3 hidden sm:table-cell">
+                            <span
+                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE[item.status] || ''}`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 hidden sm:table-cell text-xs text-foreground-muted whitespace-nowrap">
+                            {new Date(item.proposed_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
                               <button
-                                disabled={busyId === item.id}
-                                onClick={() => decide(item.id, 'approve')}
-                                className="p-1 text-accent-500 hover:text-accent-600 disabled:opacity-50"
-                                title="Approve"
+                                onClick={() => toggleExpand(item.id)}
+                                className="p-1 text-foreground-muted hover:text-foreground rounded"
+                                title="Expand"
                               >
-                                {busyId === item.id ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                {expanded.has(item.id) ? (
+                                  <ChevronUp className="w-3.5 h-3.5" />
                                 ) : (
-                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  <ChevronDown className="w-3.5 h-3.5" />
                                 )}
                               </button>
-                              <button
-                                disabled={busyId === item.id}
-                                onClick={() => decide(item.id, 'reject')}
-                                className="p-1 text-red-500 hover:text-red-600 disabled:opacity-50"
-                                title="Reject"
-                              >
-                                <XCircle className="w-3.5 h-3.5" />
-                              </button>
-                            </RequireWrite>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                    {expanded.has(item.id) && (
-                      <tr key={`${item.id}-expanded`} className="bg-surface-secondary/50">
-                        <td colSpan={statusFilter === 'proposed' ? 7 : 6} className="px-4 py-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {item.source_desc && (
-                              <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-                                  Original Description
-                                </p>
-                                <p className="text-xs text-foreground-muted">{item.source_desc}</p>
-                              </div>
-                            )}
-                            <div>
-                              <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-                                AI Description
-                              </p>
-                              <p className="text-xs text-foreground">{item.ai_description}</p>
+                              {item.status === 'proposed' && (
+                                <RequireWrite scope="catalog_enrichment:write">
+                                  <button
+                                    disabled={busyId === item.id}
+                                    onClick={() => decide(item.id, 'approve')}
+                                    className="p-1 text-accent-500 hover:text-accent-600 disabled:opacity-50"
+                                    title="Approve"
+                                  >
+                                    {busyId === item.id ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <CheckCircle className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                  <button
+                                    disabled={busyId === item.id}
+                                    onClick={() => decide(item.id, 'reject')}
+                                    className="p-1 text-red-500 hover:text-red-600 disabled:opacity-50"
+                                    title="Reject"
+                                  >
+                                    <XCircle className="w-3.5 h-3.5" />
+                                  </button>
+                                </RequireWrite>
+                              )}
                             </div>
-                            {item.ai_application && (
-                              <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-                                  Application
-                                </p>
-                                <p className="text-xs text-foreground">{item.ai_application}</p>
+                          </td>
+                        </tr>
+                        {expanded.has(item.id) && (
+                          <tr key={`${item.id}-expanded`} className="bg-surface-secondary/50">
+                            <td colSpan={statusFilter === 'proposed' ? 7 : 6} className="px-4 py-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {item.source_desc && (
+                                  <div>
+                                    <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                      Original Description
+                                    </p>
+                                    <p className="text-xs text-foreground-muted">{item.source_desc}</p>
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                    AI Description
+                                  </p>
+                                  <p className="text-xs text-foreground">{item.ai_description}</p>
+                                </div>
+                                {item.ai_application && (
+                                  <div>
+                                    <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                      Application
+                                    </p>
+                                    <p className="text-xs text-foreground">{item.ai_application}</p>
+                                  </div>
+                                )}
+                                {item.ai_who_uses_it && (
+                                  <div>
+                                    <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                      Who Uses It
+                                    </p>
+                                    <p className="text-xs text-foreground">{item.ai_who_uses_it}</p>
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                    Use Cases ({item.ai_use_cases.length})
+                                  </p>
+                                  <TagList tags={item.ai_use_cases} max={20} />
+                                </div>
+                                {item.ai_keywords && item.ai_keywords.length > 0 && (
+                                  <div>
+                                    <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                      Keywords ({item.ai_keywords.length})
+                                    </p>
+                                    <TagList tags={item.ai_keywords} max={20} />
+                                  </div>
+                                )}
+                                {item.ai_features && item.ai_features.length > 0 && (
+                                  <div>
+                                    <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                      Features ({item.ai_features.length})
+                                    </p>
+                                    <TagList tags={item.ai_features} max={20} />
+                                  </div>
+                                )}
+                                {item.ai_search_tags && item.ai_search_tags.length > 0 && (
+                                  <div>
+                                    <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                                      Search Tags ({item.ai_search_tags.length})
+                                    </p>
+                                    <TagList tags={item.ai_search_tags} max={20} />
+                                  </div>
+                                )}
+                                {item.error && (
+                                  <div>
+                                    <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-1">
+                                      Embed Error
+                                    </p>
+                                    <p className="text-xs text-red-600">{item.error}</p>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                            {item.ai_who_uses_it && (
-                              <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-                                  Who Uses It
-                                </p>
-                                <p className="text-xs text-foreground">{item.ai_who_uses_it}</p>
-                              </div>
-                            )}
-                            <div>
-                              <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-                                Use Cases ({item.ai_use_cases.length})
-                              </p>
-                              <TagList tags={item.ai_use_cases} max={20} />
-                            </div>
-                            {item.ai_keywords && item.ai_keywords.length > 0 && (
-                              <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-                                  Keywords ({item.ai_keywords.length})
-                                </p>
-                                <TagList tags={item.ai_keywords} max={20} />
-                              </div>
-                            )}
-                            {item.ai_features && item.ai_features.length > 0 && (
-                              <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-                                  Features ({item.ai_features.length})
-                                </p>
-                                <TagList tags={item.ai_features} max={20} />
-                              </div>
-                            )}
-                            {item.ai_search_tags && item.ai_search_tags.length > 0 && (
-                              <div>
-                                <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-                                  Search Tags ({item.ai_search_tags.length})
-                                </p>
-                                <TagList tags={item.ai_search_tags} max={20} />
-                              </div>
-                            )}
-                            {item.error && (
-                              <div>
-                                <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-1">
-                                  Embed Error
-                                </p>
-                                <p className="text-xs text-red-600">{item.error}</p>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="px-4 py-3 border-t border-border-default flex items-center justify-between gap-2">
-            <div className="text-xs text-foreground-muted">
-              {total > 0 && (
-                <>
-                  Showing{' '}
-                  <span className="font-medium text-foreground">
-                    {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
-                  </span>{' '}
-                  of <span className="font-medium text-foreground">{total}</span>
-                </>
-              )}
-              {selected.size > 0 ? ` · ${selected.size} selected` : ''}
-            </div>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-1.5">
-                <button
-                  disabled={page <= 1}
-                  onClick={() => load(page - 1)}
-                  className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                >
-                  Prev
-                </button>
-                <span className="text-xs text-foreground-muted whitespace-nowrap">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  disabled={page >= totalPages}
-                  onClick={() => load(page + 1)}
-                  className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                >
-                  Next
-                </button>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-        </div>
+              <div className="px-4 py-3 border-t border-border-default flex items-center justify-between gap-2">
+                <div className="text-xs text-foreground-muted">
+                  {total > 0 && (
+                    <>
+                      Showing{' '}
+                      <span className="font-medium text-foreground">
+                        {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
+                      </span>{' '}
+                      of <span className="font-medium text-foreground">{total}</span>
+                    </>
+                  )}
+                  {selected.size > 0 ? ` · ${selected.size} selected` : ''}
+                </div>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      disabled={page <= 1}
+                      onClick={() => load(page - 1)}
+                      className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                      Prev
+                    </button>
+                    <span className="text-xs text-foreground-muted whitespace-nowrap">
+                      Page {page} of {totalPages}
+                    </span>
+                    <button
+                      disabled={page >= totalPages}
+                      onClick={() => load(page + 1)}
+                      className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

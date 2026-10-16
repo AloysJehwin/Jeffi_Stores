@@ -24,6 +24,9 @@ import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import { ADMIN_PRODUCT_FILTER_FIELDS } from '@/lib/catalog/product-attribute-filters-shared'
 import { getSpecFilterFields } from '@/lib/catalog/product-attribute-filters'
+import { resolveListTab } from '@/lib/overviews/catalog'
+import ProductsOverview from './_components/ProductsOverview'
+import { TabLinks, TabMemory } from './_components/catalog-overview'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -310,6 +313,8 @@ async function ProductsStats() {
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const host = await getHost()
+  const sp = await searchParams
+  const tab = resolveListTab(sp)
 
   // Read admin role for super_admin-only features (e.g. delete product)
   const cookieStore = await cookies()
@@ -327,11 +332,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'products:write')
 
-  const [categories, brands, specFields] = await Promise.all([
-    getAllCategories(),
-    getAllBrands(),
-    getSpecFilterFields(),
-  ])
+  // The overview tab renders no filters.
+  const [categories, brands, specFields] =
+    tab === 'list'
+      ? await Promise.all([getAllCategories(), getAllBrands(), getSpecFilterFields()])
+      : [[], [], []]
 
   const allCats: any[] = categories || []
   const mainCats = allCats.filter((c: any) => !c.parent_category_id)
@@ -362,44 +367,68 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         )}
       </div>
 
-      <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
-        <ProductsStats />
+      <TabLinks
+        base="/admin/products"
+        active={tab}
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'list', label: 'Products' },
+        ]}
+      />
+      <Suspense fallback={null}>
+        <TabMemory storageKey="products" tab={tab} explicit={typeof sp.tab === 'string'} />
       </Suspense>
 
-      <AdminFilters
-        filters={[
-          { name: 'category_id', label: 'Category', options: categoryOptions },
-          {
-            name: 'brand_id',
-            label: 'Brand',
-            options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })),
-          },
-          {
-            name: 'is_active',
-            label: 'Status',
-            options: [
-              { value: 'true', label: 'Active' },
-              { value: 'false', label: 'Inactive' },
-            ],
-          },
-          {
-            name: 'stock',
-            label: 'Stock',
-            options: [
-              { value: 'low', label: 'Low Stock' },
-              { value: 'out', label: 'Out of Stock' },
-            ],
-          },
-        ]}
-        searchPlaceholder="Search by name or SKU..."
-        searchParam="search"
-        suggestType="products"
-        advancedContent={
-          <AdvancedFilterPanel fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]} mode="content" forceExpanded />
-        }
-      />
+      {tab === 'overview' ? (
+        <Suspense fallback={null}>
+          <ProductsOverview />
+        </Suspense>
+      ) : (
+        <>
+          <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
+            <ProductsStats />
+          </Suspense>
 
-      <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
+          <AdminFilters
+            filters={[
+              { name: 'category_id', label: 'Category', options: categoryOptions },
+              {
+                name: 'brand_id',
+                label: 'Brand',
+                options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })),
+              },
+              {
+                name: 'is_active',
+                label: 'Status',
+                options: [
+                  { value: 'true', label: 'Active' },
+                  { value: 'false', label: 'Inactive' },
+                ],
+              },
+              {
+                name: 'stock',
+                label: 'Stock',
+                options: [
+                  { value: 'low', label: 'Low Stock' },
+                  { value: 'out', label: 'Out of Stock' },
+                ],
+              },
+            ]}
+            searchPlaceholder="Search by name or SKU..."
+            searchParam="search"
+            suggestType="products"
+            advancedContent={
+              <AdvancedFilterPanel
+                fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]}
+                mode="content"
+                forceExpanded
+              />
+            }
+          />
+
+          <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
+        </>
+      )}
     </div>
   )
 }

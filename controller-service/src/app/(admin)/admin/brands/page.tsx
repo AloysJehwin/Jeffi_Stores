@@ -11,6 +11,9 @@ import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import BrochureButton from '@/components/admin/BrochureButton'
 import DraftRowActions from '@/components/admin/DraftRowActions'
 import BrandsMobileList from './_components/BrandsMobileList'
+import GroupOverview from '../categories/_components/GroupOverview'
+import { TabLinks, TabMemory } from '../products/_components/catalog-overview'
+import { resolveListTab } from '@/lib/overviews/catalog'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -253,7 +256,13 @@ async function BrandsListContent({
   )
 }
 
-export default function BrandsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default async function BrandsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
+  const sp = await searchParams
+  const tab = resolveListTab(sp)
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -275,27 +284,45 @@ export default function BrandsPage({ searchParams }: { searchParams: Promise<{ [
         </div>
       </div>
 
-      <Suspense fallback={<AdminStatsSkeleton cards={3} gridClass="grid-cols-3" />}>
-        <BrandsStats />
+      <TabLinks
+        base="/admin/brands"
+        active={tab}
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'list', label: 'Brands' },
+        ]}
+      />
+      <Suspense fallback={null}>
+        <TabMemory storageKey="brand" tab={tab} explicit={typeof sp.tab === 'string'} />
       </Suspense>
 
-      <AdminFilters
-        filters={[
-          {
-            name: 'is_active',
-            label: 'Status',
-            options: [
-              { value: 'true', label: 'Active' },
-              { value: 'false', label: 'Inactive' },
-            ],
-          },
-        ]}
-        searchPlaceholder="Search by name..."
-        suggestType="brands"
-        searchParam="search"
-      />
+      {tab === 'overview' ? (
+        <GroupOverview dim="brand" />
+      ) : (
+        <>
+          <Suspense fallback={<AdminStatsSkeleton cards={3} gridClass="grid-cols-3" />}>
+            <BrandsStats />
+          </Suspense>
 
-      <BrandsListSection searchParams={searchParams} />
+          <AdminFilters
+            filters={[
+              {
+                name: 'is_active',
+                label: 'Status',
+                options: [
+                  { value: 'true', label: 'Active' },
+                  { value: 'false', label: 'Inactive' },
+                ],
+              },
+            ]}
+            searchPlaceholder="Search by name..."
+            suggestType="brands"
+            searchParam="search"
+          />
+
+          <BrandsListSection searchParams={searchParams} />
+        </>
+      )}
     </div>
   )
 }
