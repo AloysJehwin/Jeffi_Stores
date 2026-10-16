@@ -10,6 +10,8 @@ export async function ruleSetFor(channel: Channel): Promise<RuleSet<any, any> | 
       return (await import('@/lib/amazon/alerts')).AMAZON_RULES
     case 'amazon_ads':
       return (await import('@/lib/amazon-ads/alerts')).AMAZON_ADS_RULES
+    case 'meta_ads':
+      return (await import('@/lib/meta-ads/alerts')).META_ADS_RULES
     default:
       return null
   }

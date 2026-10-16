@@ -232,6 +232,7 @@ CREATE TABLE public.orders (
     landing_path text,
     attributed_at timestamp with time zone,
     ads_consent boolean,
+    meta_click_ids jsonb,
     CONSTRAINT orders_shipment_status_check CHECK (((shipment_status IS NULL) OR (shipment_status = ANY (ARRAY['created'::text, 'picked_up'::text, 'in_transit'::text, 'out_for_delivery'::text, 'delivery_attempted'::text, 'delivered'::text, 'rto_initiated'::text, 'rto_in_transit'::text, 'rto_out_for_return'::text, 'rto_delivered'::text]))))
 );
 
@@ -242,6 +243,8 @@ COMMENT ON COLUMN public.orders.courier_edd IS 'Latest expected delivery date re
 COMMENT ON COLUMN public.orders.gclid IS 'Google Ads click id from the buyer''s first-party attribution cookie (last non-direct click within 90 days) at order creation.';
 
 COMMENT ON COLUMN public.orders.attributed_at IS 'When the click / UTM landing that this order is attributed to happened.';
+
+COMMENT ON COLUMN public.orders.meta_click_ids IS 'Meta browser and click ids at order creation ({fbp, fbc}) for Conversions API matching.';
 
 COMMENT ON COLUMN public.orders.ads_consent IS 'The buyer''s advertising-cookie choice (jeffi_consent cookie) at order creation; null = no choice recorded. Server-side Google Ads conversions send hashed email/phone only when true.';
 

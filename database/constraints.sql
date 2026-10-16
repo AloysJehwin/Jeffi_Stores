@@ -3698,3 +3698,13 @@ ALTER TABLE ONLY public.aads_daily_metrics ADD CONSTRAINT aads_daily_metrics_pke
 ALTER TABLE ONLY public.aads_search_terms ADD CONSTRAINT aads_search_terms_pkey PRIMARY KEY (date, campaign_id, ad_group_id, keyword_id, search_term);
 ALTER TABLE ONLY public.aads_product_metrics ADD CONSTRAINT aads_product_metrics_pkey PRIMARY KEY (date, campaign_id, ad_group_id, sku);
 ALTER TABLE ONLY public.aads_report_requests ADD CONSTRAINT aads_report_requests_pkey PRIMARY KEY (report_id);
+
+ALTER TABLE ONLY public.mads_account ADD CONSTRAINT mads_account_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.mads_account ADD CONSTRAINT mads_account_single CHECK ((id = 1));
+ALTER TABLE ONLY public.mads_campaigns ADD CONSTRAINT mads_campaigns_pkey PRIMARY KEY (campaign_id);
+ALTER TABLE ONLY public.mads_adsets ADD CONSTRAINT mads_adsets_pkey PRIMARY KEY (adset_id);
+ALTER TABLE ONLY public.mads_ads ADD CONSTRAINT mads_ads_pkey PRIMARY KEY (ad_id);
+ALTER TABLE ONLY public.mads_daily_metrics ADD CONSTRAINT mads_daily_metrics_pkey PRIMARY KEY (date, ad_id);
+ALTER TABLE ONLY public.mads_breakdowns ADD CONSTRAINT mads_breakdowns_pkey PRIMARY KEY (dimension, key);
+ALTER TABLE ONLY public.mads_capi_events ADD CONSTRAINT mads_capi_events_pkey PRIMARY KEY (order_id, event_name);
+ALTER TABLE ONLY public.mads_capi_events ADD CONSTRAINT mads_capi_events_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'sent'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])));

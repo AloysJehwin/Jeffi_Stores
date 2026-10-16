@@ -2299,3 +2299,7 @@ CREATE INDEX IF NOT EXISTS idx_amazon_order_items_sku ON public.amazon_order_ite
 CREATE INDEX IF NOT EXISTS idx_aads_search_terms_term ON public.aads_search_terms (search_term, date);
 
 CREATE INDEX IF NOT EXISTS idx_aads_keywords_ad_group ON public.aads_keywords (ad_group_id);
+
+CREATE INDEX IF NOT EXISTS idx_mads_daily_metrics_campaign ON public.mads_daily_metrics (campaign_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_mads_capi_events_status ON public.mads_capi_events (status, created_at DESC);
