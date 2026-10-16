@@ -62,7 +62,8 @@ export function safeReturnBase(returnBase: string | undefined, expectedAdminBase
   try {
     const got = new URL(returnBase)
     const want = new URL(expectedAdminBase)
-    if (got.protocol === 'https:' && got.host === want.host) return got.origin
+    const local = got.hostname === 'localhost' || got.hostname.endsWith('.localhost')
+    if ((got.protocol === 'https:' || (local && got.protocol === 'http:')) && got.host === want.host) return got.origin
   } catch {}
   return null
 }
