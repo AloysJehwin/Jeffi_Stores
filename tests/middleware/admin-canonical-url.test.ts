@@ -78,6 +78,20 @@ describe('an admin host serves the panel at the root, never under /admin', () =>
     expect(res.headers.get('location')).toBe('https://admin-acme.jeffistores.in/login')
   })
 
+  it('sends a signed-out visitor to login with the page and tab to come back to', async () => {
+    mockResolveTenant.mockResolvedValue(ACTIVE)
+    const res = await middleware(req('https://admin-acme.jeffistores.in/google-ads?connected=google_ads&tab=conversions', 'admin-acme.jeffistores.in'))
+    const loc = new URL(res.headers.get('location')!)
+    expect(loc.pathname).toBe('/login')
+    expect(loc.searchParams.get('callbackUrl')).toBe('/google-ads?connected=google_ads&tab=conversions')
+  })
+
+  it('sends a signed-out visitor at the admin root to plain login', async () => {
+    mockResolveTenant.mockResolvedValue(ACTIVE)
+    const res = await middleware(req('https://admin-acme.jeffistores.in/', 'admin-acme.jeffistores.in'))
+    expect(res.headers.get('location')).toBe('https://admin-acme.jeffistores.in/login')
+  })
+
   it('leaves /api/admin/* alone', async () => {
     const res = await middleware(
       req('https://admin.jeffistores.in/api/admin/products', 'admin.jeffistores.in', { admin: true })
