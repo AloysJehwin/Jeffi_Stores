@@ -530,12 +530,18 @@ async function handle(request: NextRequest) {
       const isAdminLogin = pathname === '/login'
       if (!isAdminLogin) {
         const token = request.cookies.get(adminCookie)?.value
+        // Back to the same page and tab (e.g. an OAuth return's ?connected=…&tab=…) after signing in.
+        const toLogin = () => {
+          const u = buildRedirectUrl(request, '/login')
+          if (pathname !== '/') u.searchParams.set('callbackUrl', `${pathname}${search}`)
+          return u
+        }
         if (!token) {
-          return NextResponse.redirect(buildRedirectUrl(request, '/login'))
+          return NextResponse.redirect(toLogin())
         }
         const payload = await inTenant(() => verifyToken(token, reqSignals))
         if (!payload) {
-          const res = NextResponse.redirect(buildRedirectUrl(request, '/login'))
+          const res = NextResponse.redirect(toLogin())
           res.cookies.delete(adminCookie)
           return res
         }
@@ -659,7 +665,7 @@ async function handle(request: NextRequest) {
 
     if (!token) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
-      loginUrl.searchParams.set('callbackUrl', pathname)
+      loginUrl.searchParams.set('callbackUrl', `${pathname}${request.nextUrl.search}`)
       return NextResponse.redirect(loginUrl)
     }
 
@@ -667,7 +673,7 @@ async function handle(request: NextRequest) {
 
     if (!payload) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
-      loginUrl.searchParams.set('callbackUrl', pathname)
+      loginUrl.searchParams.set('callbackUrl', `${pathname}${request.nextUrl.search}`)
       const response = NextResponse.redirect(loginUrl)
       response.cookies.delete(adminCookie)
       return response
@@ -677,7 +683,7 @@ async function handle(request: NextRequest) {
     const tokenCertCN = payload.authCertCN
     if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
-      loginUrl.searchParams.set('callbackUrl', pathname)
+      loginUrl.searchParams.set('callbackUrl', `${pathname}${request.nextUrl.search}`)
       const response = NextResponse.redirect(loginUrl)
       response.cookies.delete(adminCookie)
       return response
