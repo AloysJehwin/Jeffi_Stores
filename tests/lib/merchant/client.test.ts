@@ -133,11 +133,11 @@ describe('merchant/client', () => {
       )
     })
 
-    it('reports an unregistered platform project as a platform setup issue', async () => {
+    it('tells the admin to enable Merchant API sync for an unregistered project', async () => {
       const { gmcErrorMessage } = await import('@/lib/merchant/client')
       const body = JSON.stringify({ error: { message: 'GCP project with id p and number 1 is not registered with the merchant account.' } })
       const m = gmcErrorMessage(401, body, { refreshToken: 'r', merchantId: '9' })
-      expect(m).toMatch(/platform setup step/)
+      expect(m).toMatch(/Enable Merchant API sync/)
       expect(m).not.toMatch(/service account/)
     })
 
