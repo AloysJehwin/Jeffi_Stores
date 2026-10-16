@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { RefreshCw, Send, Unplug } from 'lucide-react'
+import { Plus, RefreshCw, Send, Unplug } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import ConnectionsGear, { NotConnectedState, type ConnectionState } from '@/components/admin/ConnectionsGear'
 import { ap } from '@/lib/shared/admin-path'
@@ -18,6 +18,7 @@ import {
   KpiGrid,
   RangePresets,
   Section,
+  TabAction,
   Table,
   Tabs,
   api,
@@ -32,6 +33,7 @@ import {
   when,
 } from '@/components/admin/channels/ui'
 import type { MadsTab } from '@/lib/meta-ads/console'
+import { ChangeImageDialog, NewAdDialog } from './AdCreativeDialogs'
 
 const TABS: { id: MadsTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -73,6 +75,8 @@ export default function MetaAdsConsole() {
   const [reloadKey, setReloadKey] = useState(0)
   const reload = useCallback(() => setReloadKey(k => k + 1), [])
   const canWrite = useCanWrite('meta_ads')
+  const canManage = useCanWrite('meta_ads_campaigns')
+  const [newAd, setNewAd] = useState(false)
 
   const loadStatus = useCallback(async () => {
     const r = await api('/api/admin/meta-ads/connection')
@@ -187,14 +191,26 @@ export default function MetaAdsConsole() {
             value={tab}
             onChange={setTab}
             actions={
-              canWrite && (
-                <>
-                  <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={() => run('sync')} />
-                  <IconButton icon={Send} label="Send purchases to Meta now" busy={busy === 'capi'} onClick={() => run('capi')} />
-                </>
-              )
+              <>
+                {canManage && tab === 'ads' && <TabAction icon={<Plus className="w-4 h-4" />} label="New ad" onClick={() => setNewAd(true)} />}
+                {canWrite && (
+                  <>
+                    <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={() => run('sync')} />
+                    <IconButton icon={Send} label="Send purchases to Meta now" busy={busy === 'capi'} onClick={() => run('capi')} />
+                  </>
+                )}
+              </>
             }
           />
+          {newAd && canManage && (
+            <NewAdDialog
+              onClose={() => setNewAd(false)}
+              onDone={() => {
+                setBanner({ ok: true, text: 'Ad created (paused). Activate it from the Ads tab when ready.' })
+                reload()
+              }}
+            />
+          )}
           {error ? (
             <p className="text-sm text-red-500">{error}</p>
           ) : DATA_TABS.has(tab) && !data ? (
@@ -401,6 +417,7 @@ const kpiCols = [
 function Body({ tab, d, status, onChanged }: { tab: MadsTab; d: any; status: any; onChanged: () => void }) {
   const canManage = useCanWrite('meta_ads_campaigns')
   const [pending, setPending] = useState<Record<string, unknown> | null>(null)
+  const [imageAd, setImageAd] = useState<{ id: string; name: string; thumbnail: string | null } | null>(null)
   const dialog = pending && (
     <PreviewApply
       writeScope="meta_ads_campaigns:write"
@@ -508,6 +525,11 @@ function Body({ tab, d, status, onChanged }: { tab: MadsTab; d: any; status: any
                           >
                             {r.status === 'ACTIVE' ? 'Pause' : 'Activate'}
                           </button>
+                          {level === 'ad' && (
+                            <button type="button" className="underline" onClick={() => setImageAd({ id: r.id, name: r.name, thumbnail: r.thumbnail })}>
+                              Change image
+                            </button>
+                          )}
                           {level !== 'ad' && r.dailyBudget != null && (
                             <button
                               type="button"
@@ -529,6 +551,7 @@ function Body({ tab, d, status, onChanged }: { tab: MadsTab; d: any; status: any
             ]}
           />
           {dialog}
+          {imageAd && <ChangeImageDialog ad={imageAd} onClose={() => setImageAd(null)} onDone={onChanged} />}
         </Section>
       )
     }

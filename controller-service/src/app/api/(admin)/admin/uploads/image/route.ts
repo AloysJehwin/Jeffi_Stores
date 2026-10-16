@@ -11,7 +11,7 @@ export const runtime = 'nodejs'
 // WhatsApp headers). Returns a public CDN URL to put in the field.
 const MAX_BYTES = 5 * 1024 * 1024
 const ALLOWED = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/webp', 'image/svg+xml'])
-const EDIT_SCOPES = ['settings:write', 'templates:write', 'mailer:write', 'campaigns:write', 'brands:write', 'products:write'] as const
+const EDIT_SCOPES = ['settings:write', 'templates:write', 'mailer:write', 'campaigns:write', 'brands:write', 'products:write', 'meta_ads_campaigns:write'] as const
 
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)

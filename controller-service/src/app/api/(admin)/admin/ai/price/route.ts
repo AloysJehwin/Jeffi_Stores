@@ -33,6 +33,8 @@ export async function GET(request: NextRequest) {
     : feature === 'product_image' ? await requireAdminScope(request, 'products:write')
     : feature === 'ads_image' ? await requireAdminScope(request, 'google_ads_campaigns:write')
     : feature === 'email_hero' ? await requireAdminScope(request, 'mailer:write')
+    : feature === 'offer_image' ? await requireAdminScope(request, 'coupons:write')
+    : feature === 'meta_ads_image' ? await requireAdminScope(request, 'meta_ads_campaigns:write')
     : await requireAdminScope(request, 'settings:write')
   if (admin instanceof NextResponse) return admin
   const denied = aiDenial(admin.role, admin.scopes, AI_FEATURE_SCOPES[feature])

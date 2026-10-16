@@ -3,7 +3,7 @@ import type { AiImageFeature, AiVideoFeature } from './media-features'
 
 export type AiFeature = AiImageFeature | AiVideoFeature
 
-export type AiFeatureScope = 'social:write' | 'products:write' | 'google_ads_campaigns:write' | 'mailer:write' | 'settings:write' | 'coupons:write'
+export type AiFeatureScope = 'social:write' | 'products:write' | 'google_ads_campaigns:write' | 'mailer:write' | 'settings:write' | 'coupons:write' | 'meta_ads_campaigns:write'
 
 export const AI_FEATURE_SCOPES: Record<AiFeature, AiFeatureScope> = {
   social_image: 'social:write',
@@ -13,6 +13,7 @@ export const AI_FEATURE_SCOPES: Record<AiFeature, AiFeatureScope> = {
   email_hero: 'mailer:write',
   hero_image: 'settings:write',
   offer_image: 'coupons:write',
+  meta_ads_image: 'meta_ads_campaigns:write',
   generate_image: 'settings:write',
 }
 
