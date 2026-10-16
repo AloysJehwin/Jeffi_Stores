@@ -68,3 +68,10 @@ describe('safeReturnBase', () => {
     expect(safeReturnBase('not a url', tenantAdmin)).toBeNull()
   })
 })
+
+describe('safeReturnBase on a local dev host', () => {
+  it('accepts http only for localhost tenant admins', () => {
+    expect(safeReturnBase('http://admin-acme.localhost:3000', 'http://admin-acme.localhost:3000')).toBe('http://admin-acme.localhost:3000')
+    expect(safeReturnBase('http://admin-acme.jeffistores.in', 'http://admin-acme.jeffistores.in')).toBeNull()
+  })
+})

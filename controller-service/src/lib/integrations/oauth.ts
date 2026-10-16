@@ -6,7 +6,6 @@ import type { AdminOAuthState } from '@/lib/shared/oauth-state'
 // registered per provider covers every tenant); the signed state carries the tenant, and the
 // callback sends the user back to that tenant's own admin.
 
-const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
 // Flagship credentials are keyed to this sentinel tenant (see lib/import/jobs.ts); its admin is the platform one.
 const PLATFORM_TENANT_ID = '00000000-0000-0000-0000-000000000000'
 
@@ -44,12 +43,19 @@ export function oauthProviderInfo(provider: OAuthProvider): OAuthProviderInfo {
   return { enabled: missing.length === 0, redirectUri: oauthRedirectUri(provider), missing }
 }
 
+/** admin-{slug} on the same root and scheme as the platform callback host: https://admin-acme.jeffistores.in
+ * in production, http://admin-acme.localhost:3000 when ADMIN_BASE_URL is http://localhost:3000. */
+export function tenantAdminUrl(slug: string): string {
+  const u = new URL(platformOAuthBaseUrl())
+  return `${u.protocol}//admin-${slug}.${u.host.replace(/^admin\./, '')}`
+}
+
 /** Admin base URL of the tenant the verified state belongs to. Callbacks land on the platform host
  * with no tenant in context, so this is derived from the state's tenantId, never the request. */
 export async function tenantAdminBase(state: AdminOAuthState | null): Promise<string> {
   if (state?.tenantId && state.tenantId !== PLATFORM_TENANT_ID) {
     const tenant = await getTenant(state.tenantId).catch(() => null)
-    if (tenant?.slug) return `https://admin-${tenant.slug}.${PLATFORM_DOMAIN}`
+    if (tenant?.slug) return tenantAdminUrl(tenant.slug)
   }
   return currentAdminBaseUrl()
 }
