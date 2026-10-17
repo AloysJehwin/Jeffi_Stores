@@ -1,8 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Badge, Dialog, EditSessionActions, Tabs } from '@/components/admin/kit'
-import Link from 'next/link'
+import { Badge, Dialog, FormFooter, Tabs } from '@/components/admin/kit'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { Star, X } from 'lucide-react'
@@ -43,6 +42,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { gstError, paiseString, priceErrors, publishShippingError } from '@/lib/catalog/product-validation'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
+import AutosaveStatusPill from '@/components/admin/AutosaveStatusPill'
 
 interface Category {
   id: string
@@ -3552,24 +3552,7 @@ export default function ProductForm({
         className="space-y-5"
       >
         {backUrl && <input type="hidden" name="_back" value={backUrl} />}
-        <Tabs
-          tabs={tabItems}
-          value={activeTab}
-          onChange={setTab}
-          actions={
-            edit.sessionId ? (
-              <EditSessionActions
-                autosaveStatus={serverSaveStatus as AutosaveStatus}
-                sessionStatus={edit.status}
-                onCancel={cancelEditSession}
-                cancelHref={ap('/admin/products')}
-                draft={isDraft}
-                restore={hasDraft ? restoreDraft : undefined}
-                discard={hasDraft ? discardDraft : isDraft ? discardServerDraft : undefined}
-              />
-            ) : undefined
-          }
-        />
+        <Tabs tabs={tabItems} value={activeTab} onChange={setTab} />
         {error && (
           <div
             ref={topErrorRef}
@@ -6112,31 +6095,27 @@ export default function ProductForm({
           )}
         </div>
 
-        {/* Form Actions */}
-        <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80">
-          {isDraft && serverSaveStatus !== 'idle' && (
-            <span
-              className={`self-center text-xs mr-auto ${
-                serverSaveStatus === 'saving'
-                  ? 'text-foreground-muted'
-                  : serverSaveStatus === 'saved'
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-red-600 dark:text-red-400'
-              }`}
-            >
-              {serverSaveStatus === 'saving'
-                ? 'Saving…'
-                : serverSaveStatus === 'saved'
-                  ? 'Saved'
-                  : `Autosave failed${autosaveError ? `: ${autosaveError}` : ''}`}
-            </span>
-          )}
-          <Link
-            href={ap('/admin/products')}
-            className="control-md border border-border-secondary text-foreground-secondary hover:bg-surface-secondary"
-          >
-            Cancel
-          </Link>
+        {/* Form Actions — shared editor bottom bar. See docs/plans/EDITOR_SESSION_SEMANTICS.md. */}
+        <FormFooter
+          sticky
+          autosave={
+            isDraft && serverSaveStatus !== 'idle' ? (
+              <AutosaveStatusPill status={serverSaveStatus as AutosaveStatus} />
+            ) : null
+          }
+          banner={hasDraft ? 'A newer local autosave exists.' : null}
+          restore={hasDraft ? restoreDraft : undefined}
+          discard={hasDraft ? discardDraft : isDraft ? discardServerDraft : undefined}
+          cancel={
+            edit.sessionId
+              ? async () => {
+                  const ok = await cancelEditSession()
+                  if (ok) router.push(ap(productId ? `/admin/products/${productId}` : '/admin/products'))
+                }
+              : undefined
+          }
+          cancelHref={edit.sessionId ? undefined : ap('/admin/products')}
+        >
           <RequireWrite scope="products:write">
             <button
               type="submit"
@@ -6159,7 +6138,7 @@ export default function ProductForm({
               {isSubmitting ? 'Saving...' : product ? 'Update & Publish' : 'Save & Publish'}
             </button>
           </RequireWrite>
-        </div>
+        </FormFooter>
       </form>
     </>
   )
