@@ -7,7 +7,8 @@ import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminImage from '@/components/admin/AdminImage'
-import RowActions from '@/components/admin/RowActions'
+import { Plus } from 'lucide-react'
+import { DataTable, StatusBadge, type DataCol } from '@/components/admin/kit'
 
 interface OfferListRow {
   id: string
@@ -73,9 +74,37 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
     } else showToast('Failed to delete', 'error')
   }
 
+  const cols: DataCol<OfferListRow>[] = [
+    {
+      key: 'title',
+      label: 'Offer',
+      sort: o => (o.title || '').toLowerCase(),
+      render: offer => (
+        <Link href={ap(`/admin/offers/${offer.id}/view`)} className="flex items-center gap-3 min-w-0 group" onClick={e => e.stopPropagation()}>
+          <div className="w-14 h-9 rounded-lg bg-surface-secondary border border-border-default overflow-hidden shrink-0">
+            {offer.image_url ? (
+              <AdminImage src={offer.image_url} alt="" blurhash={offer.blurhash} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-foreground-muted text-[10px]">No image</div>
+            )}
+          </div>
+          <span className="min-w-0 truncate font-semibold text-foreground group-hover:text-accent-500 transition-colors">{offer.title || 'Untitled offer'}</span>
+        </Link>
+      ),
+    },
+    { key: 'slug', label: 'Link', hideBelow: 'lg', render: offer => <span className="font-mono text-xs text-foreground-muted">/products?offer={offer.slug}</span> },
+    { key: 'products', label: 'Products', num: true, sort: o => o.product_count, render: offer => offer.product_count },
+    {
+      key: 'status',
+      label: 'Status',
+      sort: o => (o.is_active ? 1 : 0),
+      render: offer => <StatusBadge status={String(offer.is_active)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />,
+    },
+  ]
+
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-border-default bg-surface-secondary p-4">
+      <div className="rounded-xl border border-border-default bg-surface-elevated p-4">
         <p className="text-sm text-foreground">
           An offer groups products under a theme (e.g. a Diwali offer) with its own launch and end dates. Open an offer
           to set its title, dates and the products it holds.
@@ -85,83 +114,57 @@ export default function OffersListClient({ canWrite: canWriteProp }: { canWrite:
         </p>
       </div>
 
-      <div className="space-y-2">
-        {loading && <p className="text-sm text-foreground-muted py-4 text-center">Loading…</p>}
-        {!loading && offers.length === 0 && (
-          <p className="text-sm text-foreground-muted py-4 text-center">No offers yet. Add one to get started.</p>
-        )}
-        {!loading &&
-          offers.map(offer => (
-            <div
-              key={offer.id}
-              className="flex items-center gap-3 rounded-xl border border-border-default bg-surface-elevated px-3 py-2.5"
-            >
-              <Link
-                href={ap(`/admin/offers/${offer.id}/view`)}
-                className="flex items-center gap-3 flex-1 min-w-0 group"
-              >
-                <div className="w-14 h-9 rounded-lg bg-surface-secondary border border-border-default overflow-hidden shrink-0">
-                  {offer.image_url ? (
-                    <AdminImage
-                      src={offer.image_url}
-                      alt=""
-                      blurhash={offer.blurhash}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-foreground-muted/40 text-[10px]">
-                      No image
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-foreground truncate group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
-                    {offer.title || 'Untitled offer'}
-                  </p>
-                  <p className="text-[11px] text-foreground-muted truncate">
-                    /products?offer={offer.slug} · {offer.product_count} product{offer.product_count === 1 ? '' : 's'}
-                  </p>
-                </div>
-              </Link>
-              <span
-                className={`w-2 h-2 rounded-full shrink-0 ${offer.is_active ? 'bg-emerald-500' : 'bg-foreground-muted/40'}`}
-                title={offer.is_active ? 'Active' : 'Paused'}
-              />
-              {canWrite && (
-                <RowActions
-                  size="md"
-                  className="shrink-0"
-                  actions={[
-                    {
-                      key: 'delete',
-                      kind: 'delete',
-                      label: 'Delete offer',
-                      onSelect: () => deleteOffer(offer.id),
-                      confirm: {
-                        title: 'Delete offer?',
-                        message: 'This will permanently remove the offer collection. Products are not deleted.',
-                        confirmLabel: 'Delete',
-                        cancelLabel: 'Cancel',
-                        variant: 'danger',
-                      },
-                    },
-                  ]}
-                />
+      <DataTable<OfferListRow>
+        rows={offers}
+        cols={cols}
+        rowKey={o => o.id}
+        loading={loading}
+        search={{ placeholder: 'Search offers...', match: o => `${o.title} ${o.slug}` }}
+        toolbar={
+          <RequireWrite scope="coupons:write">
+            <button type="button" onClick={addOffer} disabled={creating} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50">
+              <Plus className="w-4 h-4" />
+              {creating ? 'Adding…' : 'Add offer'}
+            </button>
+          </RequireWrite>
+        }
+        onRowClick={o => router.push(ap(`/admin/offers/${o.id}/view`))}
+        mobileCard={offer => (
+          <Link href={ap(`/admin/offers/${offer.id}/view`)} className="flex items-center gap-3 rounded-xl border border-border-default bg-surface-elevated px-3 py-2.5">
+            <div className="w-14 h-9 rounded-lg bg-surface-secondary border border-border-default overflow-hidden shrink-0">
+              {offer.image_url ? (
+                <AdminImage src={offer.image_url} alt="" blurhash={offer.blurhash} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-foreground-muted text-[10px]">No image</div>
               )}
             </div>
-          ))}
-      </div>
-
-      <RequireWrite scope="coupons:write">
-        <button
-          type="button"
-          onClick={addOffer}
-          disabled={creating}
-          className="w-full py-2.5 rounded-xl border-2 border-dashed border-border-default text-sm font-medium text-foreground-secondary hover:border-accent-400 hover:text-accent-600 dark:hover:text-accent-400 transition-colors disabled:opacity-50"
-        >
-          {creating ? 'Adding…' : '+ Add offer'}
-        </button>
-      </RequireWrite>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-foreground truncate">{offer.title || 'Untitled offer'}</p>
+              <p className="text-[11px] text-foreground-muted truncate">
+                {offer.product_count} product{offer.product_count === 1 ? '' : 's'}
+              </p>
+            </div>
+            <StatusBadge status={String(offer.is_active)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />
+          </Link>
+        )}
+        empty={{ title: 'No offers yet.', body: 'Add one to get started.' }}
+        rowActions={offer => [
+          {
+            key: 'delete',
+            kind: 'delete',
+            label: 'Delete offer',
+            hidden: !canWrite,
+            onSelect: () => deleteOffer(offer.id),
+            confirm: {
+              title: 'Delete offer?',
+              message: 'This will permanently remove the offer collection. Products are not deleted.',
+              confirmLabel: 'Delete',
+              cancelLabel: 'Cancel',
+              variant: 'danger',
+            },
+          },
+        ]}
+      />
     </div>
   )
 }

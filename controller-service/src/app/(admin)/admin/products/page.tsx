@@ -8,19 +8,11 @@ import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope, isPlatformOwner } from '@/lib/auth/scopes'
 import { getFilteredProducts, getAllCategories, getAllBrands, getProductBreakdowns } from '@/lib/queries'
 import { queryOne, queryMany } from '@/lib/shared/db'
-import AdminFilters from '@/components/admin/AdminFilters'
-import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
-import Pagination from '@/components/admin/Pagination'
-import ResponsiveList from '@/components/admin/ResponsiveList'
 import CopySku from '@/components/ui/CopySku'
 import ProductsTableClient from './ProductsTableClient'
-import ProductsMobileList from './_components/ProductsMobileList'
-import SortableHeader from '@/components/admin/SortableHeader'
-import { sortOptions } from '@/components/admin/sortOptions'
+import ProductsAdvancedFilters from './_components/ProductsAdvancedFilters'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-
-import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
-import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import { DataToolbar, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import { ADMIN_PRODUCT_FILTER_FIELDS } from '@/lib/catalog/product-attribute-filters-shared'
@@ -82,85 +74,16 @@ async function ProductsListContent({
   const buildUrl = (p: number) => ap(`/admin/products${listParams(p) ? `?${listParams(p)}` : ''}`, host)
 
   return (
-    <ResponsiveList
-      items={products || []}
-      getKey={(product: any) => product.id}
-      minWidth="lg"
-      emptyState={
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
-          No products found.
-        </div>
-      }
-      pagination={<Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />}
-      mobileList={
-        <ProductsMobileList
-          products={products || []}
-          featuredCount={featuredCount}
-          backUrl={currentListUrl}
-          isSuperAdmin={isSuperAdmin}
-          canWrite={canWrite}
-        />
-      }
-      renderCard={() => null}
-      tableHead={
-        <>
-          <SortableHeader
-            label="Product"
-            column="name"
-            options={sortOptions('text')}
-            currentSort={sort}
-            currentDir={dir}
-          />
-          <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-          <SortableHeader
-            label="Category"
-            column="category"
-            options={sortOptions('text')}
-            currentSort={sort}
-            currentDir={dir}
-          />
-          <SortableHeader
-            label="Brand"
-            column="brand"
-            options={sortOptions('text')}
-            currentSort={sort}
-            currentDir={dir}
-          />
-          <SortableHeader
-            label="Price"
-            column="price"
-            options={sortOptions('number')}
-            currentSort={sort}
-            currentDir={dir}
-          />
-          <SortableHeader
-            label="Stock"
-            column="stock"
-            options={sortOptions('number')}
-            currentSort={sort}
-            currentDir={dir}
-          />
-          <SortableHeader
-            label="Status"
-            column="status"
-            options={sortOptions('text')}
-            currentSort={sort}
-            currentDir={dir}
-          />
-          <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
-            Actions
-          </th>
-        </>
-      }
-      tableBody={
-        <ProductsTableClient
-          products={products || []}
-          featuredCount={featuredCount}
-          backUrl={currentListUrl}
-          isSuperAdmin={isSuperAdmin}
-          canWrite={canWrite}
-        />
-      }
+    <ProductsTableClient
+      products={products || []}
+      featuredCount={featuredCount}
+      total={total}
+      page={page}
+      pageSize={PAGE_SIZE}
+      pageHref={buildUrl}
+      backUrl={currentListUrl}
+      isSuperAdmin={isSuperAdmin}
+      canWrite={canWrite}
     />
   )
 }
@@ -196,64 +119,39 @@ async function ProductsStats() {
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
 
   return (
-    <div className="animate-fade-in">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:h-56">
-        {/* Left: Catalog Value + the 4 product stats as tiles */}
-        <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white">
-          <div>
-            <p className="text-white/80 text-sm">Inventory Stock Value</p>
-            <p className="text-3xl sm:text-4xl font-bold mt-1">
-              Rs. {stats.inventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-          </div>
-          <div className="grid grid-cols-4 gap-2 sm:gap-3 mt-4">
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{totalCount}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Total</p>
-            </div>
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{activeCount}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Active</p>
-            </div>
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">
-                {featuredCount}
-                <span className="text-xs font-normal text-white/70">/6</span>
-              </p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Featured</p>
-            </div>
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{categoryCount}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Categories</p>
-            </div>
-          </div>
+    <div className="animate-fade-in space-y-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="xl:col-span-2 space-y-3">
+          <KpiGrid>
+            <Kpi
+              label="Inventory stock value"
+              value={`Rs. ${stats.inventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              highlight
+            />
+            <Kpi label="Total products" value={totalCount.toLocaleString('en-IN')} />
+            <Kpi label="Active" value={activeCount.toLocaleString('en-IN')} />
+          </KpiGrid>
+          <KpiGrid>
+            <Kpi label="Featured" value={`${featuredCount}/6`} sub="Shown on the storefront home" />
+            <Kpi label="Categories" value={categoryCount.toLocaleString('en-IN')} />
+            <Kpi label="Inactive" value={(totalCount - activeCount).toLocaleString('en-IN')} />
+          </KpiGrid>
         </div>
-        {/* Right: product breakdown chart */}
-        <ProductBreakdownChart
-          byCategory={stats.byCategory}
-          byBrand={stats.byBrand}
-          byStock={stats.byStock}
-          byInventoryValue={stats.byInventoryValue}
-        />
+        <ProductBreakdownChart byCategory={stats.byCategory} byBrand={stats.byBrand} byStock={stats.byStock} byInventoryValue={stats.byInventoryValue} />
       </div>
       {pendingDraftsCount > 0 && (
-        <details className="mb-6 group">
-          <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
-            <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
-              <svg
-                className="w-4 h-4 transition-transform group-open:rotate-90"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
+        <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
+          <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
+            <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
+              <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
               Pending Drafts ({pendingDraftsCount})
             </span>
-            <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
+            <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
           </summary>
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
-            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+          <div className="border-t border-amber-500/30 overflow-hidden">
+            <div className="divide-y divide-amber-500/20">
               {/* Create-drafts: brand-new products not yet on the live list. Publish activates them. */}
               {createDrafts.map(d =>
                 canWrite ? (
@@ -272,12 +170,12 @@ async function ProductsStats() {
                   />
                 ) : (
                   <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono inline-flex items-center gap-1">
+                    <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
+                    <p className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">
                       {d.sku}
                       {d.sku && <CopySku sku={d.sku} />}
                     </p>
-                    <span className="text-xs text-amber-600 dark:text-amber-400">new</span>
+                    <span className="text-xs text-foreground-muted">new</span>
                   </div>
                 )
               )}
@@ -296,8 +194,8 @@ async function ProductsStats() {
                   />
                 ) : (
                   <div key={d.product_id} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono inline-flex items-center gap-1">
+                    <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
+                    <p className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">
                       {d.sku}
                       {d.sku && <CopySku sku={d.sku} />}
                     </p>
@@ -344,19 +242,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const categoryOptions = mainCats.flatMap((cat: any) => {
     const subs = allCats.filter((c: any) => c.parent_category_id === cat.id)
     return [
-      { value: cat.id, label: cat.name, group: cat.name },
-      ...subs.map((sub: any) => ({ value: sub.id, label: sub.name, group: cat.name, indent: true })),
+      { value: cat.id, label: cat.name },
+      ...subs.map((sub: any) => ({ value: sub.id, label: `— ${sub.name}` })),
     ]
   })
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Products</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Manage your product inventory</p>
-        </div>
-      </div>
+    <PageBody>
+      <PageHeader title="Products" description="Manage your product inventory" />
 
       <TabLinks
         base="/admin/products"
@@ -383,11 +276,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         </Suspense>
       ) : (
         <>
-          <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
+          <Suspense fallback={<KpiRowSkeleton />}>
             <ProductsStats />
           </Suspense>
 
-          <AdminFilters
+          <DataToolbar
+            search={{ placeholder: 'Search by name or SKU...', param: 'search', suggestType: 'products' }}
             filters={[
               { name: 'category_id', label: 'Category', options: categoryOptions },
               {
@@ -412,21 +306,22 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 ],
               },
             ]}
-            searchPlaceholder="Search by name or SKU..."
-            searchParam="search"
-            suggestType="products"
-            advancedContent={
-              <AdvancedFilterPanel
-                fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]}
-                mode="content"
-                forceExpanded
-              />
-            }
           />
+          <ProductsAdvancedFilters fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]} />
 
           <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
         </>
       )}
+    </PageBody>
+  )
+}
+
+function KpiRowSkeleton() {
+  return (
+    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 animate-pulse">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
+      ))}
     </div>
   )
 }
@@ -446,7 +341,7 @@ async function ProductsListSection({
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
+    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={7} />}>
       <ProductsListContent
         resolvedSearchParams={resolvedSearchParams}
         isSuperAdmin={isSuperAdmin}

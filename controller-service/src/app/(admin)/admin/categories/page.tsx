@@ -7,13 +7,11 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { hasScope } from '@/lib/auth/scopes'
 import { getFilteredCategories } from '@/lib/queries'
 import { queryMany } from '@/lib/shared/db'
-import AdminFilters from '@/components/admin/AdminFilters'
 import CategoriesClient from './CategoriesClient'
 import BrochureButton from '@/components/admin/BrochureButton'
 import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBanner'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
-import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import { DataToolbar, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import GroupOverview from './_components/GroupOverview'
 import { TabLinks, TabMemory } from '../products/_components/catalog-overview'
 import { resolveListTab } from '@/lib/overviews/catalog'
@@ -58,32 +56,17 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
   const pendingDraftsCount = pendingDrafts.length + createDrafts.length
 
   return (
-    <div className="animate-fade-in">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total Categories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
-            {totalCategories}
-          </p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Main Categories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
-            {mainCategoriesCount}
-          </p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Subcategories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
-            {subCategoriesCount}
-          </p>
-        </div>
-      </div>
+    <div className="animate-fade-in space-y-4">
+      <KpiGrid>
+        <Kpi label="Total categories" value={totalCategories.toLocaleString('en-IN')} highlight />
+        <Kpi label="Main categories" value={mainCategoriesCount.toLocaleString('en-IN')} />
+        <Kpi label="Subcategories" value={subCategoriesCount.toLocaleString('en-IN')} />
+      </KpiGrid>
 
       {pendingDraftsCount > 0 && (
-        <details className="mb-6 group">
-          <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
-            <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+        <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
+          <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
+            <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
               <svg
                 className="w-4 h-4 transition-transform group-open:rotate-90"
                 fill="none"
@@ -94,10 +77,10 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
               </svg>
               Pending Drafts ({pendingDraftsCount})
             </span>
-            <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
+            <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
           </summary>
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
-            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+          <div className="border-t border-amber-500/30 overflow-hidden">
+            <div className="divide-y divide-amber-500/20">
               {/* Create-drafts: brand-new categories not yet on the live list. Publish activates them. */}
               {createDrafts.map(d =>
                 canWrite ? (
@@ -118,8 +101,8 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
                   />
                 ) : (
                   <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
-                    <span className="text-xs text-amber-600 dark:text-amber-400">new</span>
+                    <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
+                    <span className="text-xs text-foreground-muted">new</span>
                   </div>
                 )
               )}
@@ -137,7 +120,7 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
                   />
                 ) : (
                   <div key={d.category_id} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
                   </div>
                 )
               )}
@@ -194,8 +177,8 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
   const sp = await searchParams
   const tab = resolveListTab(sp)
   return (
-    <div className="p-4 sm:p-6">
-      <CategoriesHeader />
+    <PageBody>
+      <PageHeader title="Categories" description="Manage product categories and subcategories" />
 
       <TabLinks
         base="/admin/categories"
@@ -221,11 +204,12 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
         <GroupOverview dim="category" />
       ) : (
         <>
-          <Suspense fallback={<AdminStatsSkeleton cards={3} banner={false} />}>
+          <Suspense fallback={<KpiRowSkeleton />}>
             <CategoriesStatsSection searchParams={searchParams} />
           </Suspense>
 
-          <AdminFilters
+          <DataToolbar
+            search={{ placeholder: 'Search by name...', param: 'search', suggestType: 'categories' }}
             filters={[
               {
                 name: 'is_active',
@@ -244,23 +228,21 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
                 ],
               },
             ]}
-            searchPlaceholder="Search by name..."
-            suggestType="categories"
-            searchParam="search"
           />
 
           <CategoriesListSection searchParams={searchParams} />
         </>
       )}
-    </div>
+    </PageBody>
   )
 }
 
-function CategoriesHeader() {
+function KpiRowSkeleton() {
   return (
-    <div className="mb-6">
-      <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Categories</h1>
-      <p className="text-foreground-secondary mt-1 text-sm">Manage product categories and subcategories</p>
+    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6 animate-pulse">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
+      ))}
     </div>
   )
 }
@@ -292,7 +274,7 @@ async function CategoriesListSection({ searchParams }: { searchParams: Promise<S
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={4} />}>
+    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={4} />}>
       <CategoriesListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )

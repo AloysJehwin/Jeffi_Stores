@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import { fieldInputCls } from '@/components/admin/kit'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 
@@ -199,7 +200,7 @@ export default function OfferProductPicker({
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Search products by name or SKU…"
                 disabled={!canWrite || busy}
-                className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60"
+                className={fieldInputCls}
               />
               {(results.length > 0 || searching) && query.trim().length >= 2 && (
                 <div className="absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded-lg border border-border-default bg-surface-elevated shadow-lg">
@@ -285,7 +286,7 @@ export default function OfferProductPicker({
                   onClick={() => remove(m.id)}
                   title="Remove"
                   disabled={busy}
-                  className="w-4 h-4 rounded-full flex items-center justify-center text-foreground-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40"
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-foreground-muted hover:text-red-500 hover:bg-red-500/10 disabled:opacity-40"
                 >
                   <svg viewBox="0 0 16 16" className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path d="M4 4l8 8M12 4l-8 8" strokeLinecap="round" />

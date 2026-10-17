@@ -35,10 +35,8 @@ export default function OffersTabs({ canWrite }: { canWrite: boolean }) {
   }
 
   return (
-    <div>
-      <div className="mb-6">
-        <Tabs tabs={TABS} value={tab} onChange={selectTab} />
-      </div>
+    <div className="space-y-5">
+      <Tabs tabs={TABS} value={tab} onChange={selectTab} />
 
       {tab === 'overview' ? (
         <OffersOverview />

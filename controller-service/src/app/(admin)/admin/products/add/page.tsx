@@ -2,7 +2,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { getAllCategories, getAllBrands } from '@/lib/queries'
 import ProductForm from '@/components/admin/ProductForm'
-import { ChevronLeft } from 'lucide-react'
+import { FormPage, PageHeader } from '@/components/admin/kit'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { createProduct } from './actions'
@@ -19,24 +19,7 @@ export default async function AddProductPage() {
 
   return (
     <MobileEditBlock>
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-2 mb-6 text-sm">
-        <a
-          href={ap('/admin/products', host)}
-          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Products
-        </a>
-        <span className="text-border-default">/</span>
-        <span className="text-foreground font-medium">Add Product</span>
-      </div>
-
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Add New Product</h1>
-        <p className="text-foreground-secondary mt-1">Create a new product in your inventory</p>
-      </div>
-
+    <FormPage header={<PageHeader back={{ href: ap('/admin/products', host), label: 'Products' }} title="Add New Product" description="Create a new product in your inventory" />}>
       <ProductForm
         categories={categories || []}
         brands={brands || []}
@@ -45,7 +28,7 @@ export default async function AddProductPage() {
         subscriptionsEnabled={flags.subscriptionsEnabled}
         digitalProductsEnabled={flags.digitalProductsEnabled}
       />
-    </div>
+    </FormPage>
     </MobileEditBlock>
   )
 }

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import Link from 'next/link'
+import { DetailHeader, PageBody, StatusBadge, fieldInputCls } from '@/components/admin/kit'
 import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { useToast } from '@/contexts/ToastContext'
@@ -28,8 +29,7 @@ function fromDateInput(value: string, endOfDay: boolean): string | null {
   return local.toISOString()
 }
 
-const INPUT_CLASS =
-  'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60'
+const INPUT_CLASS = fieldInputCls
 
 export default function OfferDetailClient({
   offer,
@@ -125,37 +125,29 @@ export default function OfferDetailClient({
   const autosaveStatus = saving ? 'saving' : 'saved'
 
   return (
-    <div className="p-4 sm:p-6 w-full max-w-full min-w-0">
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-2 text-sm min-w-0">
-          <Link
-            href={backHref}
-            className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
-          >
-            <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M12 5l-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Offers
-          </Link>
-          <span className="text-border-default">/</span>
-          <span className="text-foreground font-medium truncate">{title || 'Untitled offer'}</span>
-        </div>
-        {canWrite && (
-          <EditorToolbar
-            autosaveStatus={autosaveStatus}
-            sessionStatus={edit.status}
-            onSave={publish}
-            onCancel={edit.cancel}
-            saveLabel={publishing ? 'Publishing…' : 'Publish'}
-            disabled={publishing}
-          />
-        )}
-      </div>
+    <PageBody>
+      <DetailHeader
+        back={{ href: backHref, label: 'Offers' }}
+        title={title || 'Untitled offer'}
+        status={<StatusBadge status={String(isActive)} map={{ true: { label: 'Active', tone: 'green' }, false: { label: 'Paused', tone: 'muted' } }} />}
+        actions={
+          canWrite ? (
+            <EditorToolbar
+              autosaveStatus={autosaveStatus}
+              sessionStatus={edit.status}
+              onSave={publish}
+              onCancel={edit.cancel}
+              saveLabel={publishing ? 'Publishing…' : 'Publish'}
+              disabled={publishing}
+            />
+          ) : undefined
+        }
+      />
 
       <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)] items-start">
         <div className="space-y-4 min-w-0">
           <div className="space-y-5 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
-            <h2 className="text-sm font-semibold text-foreground">Offer details</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Offer details</h2>
 
             <div>
               <label className="block text-xs font-medium text-foreground-secondary mb-1">Title</label>
@@ -225,12 +217,12 @@ export default function OfferDetailClient({
             </div>
           </div>
 
-          <div className="rounded-xl border border-border-default bg-surface-secondary p-4">
+          <div className="rounded-xl border border-border-default bg-surface-elevated p-4">
             <p className="text-sm text-foreground">
               Set this offer&apos;s card image, badge and colour in{' '}
               <Link
                 href={ap('/admin/settings/homepage')}
-                className="font-medium text-accent-600 dark:text-accent-400 hover:underline"
+                className="font-medium text-accent-500 hover:underline"
               >
                 Homepage &gt; Offer Slider
               </Link>
@@ -249,6 +241,6 @@ export default function OfferDetailClient({
           />
         </div>
       </div>
-    </div>
+    </PageBody>
   )
 }

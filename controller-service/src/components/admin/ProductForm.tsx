@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { createPortal } from 'react-dom'
+import { Dialog } from '@/components/admin/kit'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
@@ -2456,72 +2456,72 @@ export default function ProductForm({
 
   return (
     <>
-      {confirmUnperishable && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-md mx-4 p-6">
-            <h2 className="text-base font-bold text-foreground mb-3">Remove Perishable Flag?</h2>
-            <p className="text-sm text-foreground-secondary mb-1">
+      <Dialog
+        open={confirmUnperishable}
+        onClose={() => setConfirmUnperishable(false)}
+        size="md"
+        title="Remove Perishable Flag?"
+        footer={
+          <>
+            <button type="button" onClick={() => setConfirmUnperishable(false)} className="control-md border border-border-default text-foreground hover:bg-surface-secondary">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmUnperishable(false)
+                setPerishable(false)
+              }}
+              className="control-md bg-red-600 hover:bg-red-700 text-white font-semibold"
+            >
+              Yes, Remove
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-1">
+          <p className="text-sm text-foreground-secondary">
               This product has <span className="font-semibold">{perishableBatchTotal} unit(s)</span> in batches.
             </p>
-            <p className="text-sm text-foreground-secondary mb-5">
+          <p className="text-sm text-foreground-secondary">
               Unmarking as perishable will delete all batch records and convert them to default stock (
               {perishableBatchTotal} units).
             </p>
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmUnperishable(false)}
-                className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmUnperishable(false)
-                  setPerishable(false)
-                }}
-                className="px-4 h-control text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-              >
-                Yes, Remove
-              </button>
-            </div>
-          </div>
         </div>
-      )}
-      {confirmUnSerialized && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-md mx-4 p-6">
-            <h2 className="text-base font-bold text-foreground mb-3">Remove Serialized Flag?</h2>
-            <p className="text-sm text-foreground-secondary mb-1">
+      </Dialog>
+      <Dialog
+        open={confirmUnSerialized}
+        onClose={() => setConfirmUnSerialized(false)}
+        size="md"
+        title="Remove Serialized Flag?"
+        footer={
+          <>
+            <button type="button" onClick={() => setConfirmUnSerialized(false)} className="control-md border border-border-default text-foreground hover:bg-surface-secondary">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmUnSerialized(false)
+                setSerialized(false)
+              }}
+              className="control-md bg-red-600 hover:bg-red-700 text-white font-semibold"
+            >
+              Yes, Remove
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-1">
+          <p className="text-sm text-foreground-secondary">
               This product has <span className="font-semibold">{serializedStockTotal} serial(s)</span> in stock.
             </p>
-            <p className="text-sm text-foreground-secondary mb-5">
+          <p className="text-sm text-foreground-secondary">
               Unmarking as serialized will delete all serial records and convert them to default stock (
               {serializedStockTotal} units).
             </p>
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmUnSerialized(false)}
-                className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmUnSerialized(false)
-                  setSerialized(false)
-                }}
-                className="px-4 h-control text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-              >
-                Yes, Remove
-              </button>
-            </div>
-          </div>
         </div>
-      )}
+      </Dialog>
       <form
         ref={formRef}
         onSubmit={handleSubmit}
@@ -2536,10 +2536,12 @@ export default function ProductForm({
               }
             : undefined
         }
-        className="bg-surface-elevated rounded-lg shadow-sm border border-border-default"
+        className="space-y-5"
       >
         {backUrl && <input type="hidden" name="_back" value={backUrl} />}
-        <div className="p-4 sm:p-6">
+        <FormSectionNav />
+        <section data-pf-nav="Product" id="pf-product" className="scroll-mt-20 rounded-xl border border-border-default bg-surface-elevated p-5">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-foreground">Product</h2>
           {edit.sessionId && (
             <div className="mb-4 flex justify-end">
               <EditorToolbar
@@ -2553,22 +2555,22 @@ export default function ProductForm({
             </div>
           )}
           {hasDraft && (
-            <div className="mb-4 px-4 py-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
-              <span className="text-yellow-800 dark:text-yellow-200">
+            <div className="mb-4 px-4 py-3 bg-amber-500/5 border border-amber-500/40 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+              <span className="text-foreground">
                 You have an auto-saved draft. Click Restore to load it, or Discard to clear it and reload from database.
               </span>
               <div className="flex gap-3 shrink-0">
                 <button
                   type="button"
                   onClick={restoreDraft}
-                  className="text-yellow-800 dark:text-yellow-200 font-semibold hover:underline"
+                  className="text-accent-500 font-semibold hover:underline"
                 >
                   Restore
                 </button>
                 <button
                   type="button"
                   onClick={discardDraft}
-                  className="text-yellow-700 dark:text-yellow-300 font-semibold hover:underline"
+                  className="text-foreground-secondary font-semibold hover:underline"
                 >
                   Discard
                 </button>
@@ -2578,7 +2580,7 @@ export default function ProductForm({
           {error && (
             <div
               ref={topErrorRef}
-              className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300"
+              className="mb-6 p-4 bg-red-500/5 border border-red-500/40 rounded-xl text-red-600 dark:text-red-400"
             >
               <p className="font-medium">{error}</p>
               {errorDetails.length > 1 && (
@@ -2594,7 +2596,7 @@ export default function ProductForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {/* Product Name */}
             <div className="md:col-span-2">
-              <label htmlFor="name" className="block text-sm font-medium text-foreground-secondary mb-2">
+              <label htmlFor="name" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                 Product Name *
               </label>
               <input
@@ -2611,7 +2613,7 @@ export default function ProductForm({
 
             {/* SKU */}
             <div>
-              <label className="block text-sm font-medium text-foreground-secondary mb-2">SKU</label>
+              <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">SKU</label>
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -2636,7 +2638,7 @@ export default function ProductForm({
                       setSkuManuallyEdited(false)
                     }
                   }}
-                  className="px-3 py-2 border border-border-default rounded-lg bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-accent-500 transition-colors"
+                  className="control-md control-icon border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-accent-500"
                 >
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path
@@ -2656,7 +2658,7 @@ export default function ProductForm({
 
             {/* HSN/SAC Code */}
             <div>
-              <label htmlFor="hsn_code" className="block text-sm font-medium text-foreground-secondary mb-2">
+              <label htmlFor="hsn_code" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                 HSN/SAC Code
               </label>
               <input
@@ -2673,7 +2675,7 @@ export default function ProductForm({
             {/* MPN — hidden when has variants */}
             {!hasVariants && (
               <div>
-                <label htmlFor="mpn" className="block text-sm font-medium text-foreground-secondary mb-2">
+                <label htmlFor="mpn" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                   MPN (Manufacturer Part No.)
                 </label>
                 <input
@@ -2691,7 +2693,7 @@ export default function ProductForm({
             {/* GTIN/Barcode — hidden when has variants */}
             {!hasVariants && (
               <div>
-                <label htmlFor="gtin" className="block text-sm font-medium text-foreground-secondary mb-2">
+                <label htmlFor="gtin" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                   GTIN / Barcode
                 </label>
                 <input
@@ -2756,7 +2758,7 @@ export default function ProductForm({
             {!hasVariants && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="mrp_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  <label htmlFor="mrp_ex_gst" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                     MRP (Ex. GST) *
                   </label>
                   <div className="relative">
@@ -2784,13 +2786,13 @@ export default function ProductForm({
                           setBasePrice('')
                         }
                       }}
-                      className="w-full px-4 py-2 bg-surface text-foreground border border-border-secondary rounded-lg placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      className="w-full field-md bg-surface text-foreground border border-border-secondary placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                       placeholder="From price catalog"
                     />
                   </div>
                 </div>
                 <div>
-                  <label htmlFor="mrp" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  <label htmlFor="mrp" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                     MRP (incl. GST)
                   </label>
                   <input
@@ -2801,7 +2803,7 @@ export default function ProductForm({
                     min="0"
                     value={mrp}
                     readOnly
-                    className="w-full px-4 py-2 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
+                    className="w-full field-md bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary"
                     placeholder="Auto-calculated"
                   />
                 </div>
@@ -2811,7 +2813,7 @@ export default function ProductForm({
             {/* Selling Price — hidden when has variants */}
             {!hasVariants && (
               <div>
-                <label htmlFor="base_price" className="block text-sm font-medium text-foreground-secondary mb-2">
+                <label htmlFor="base_price" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                   Selling Price (incl. GST)
                 </label>
                 <input
@@ -2823,7 +2825,7 @@ export default function ProductForm({
                   min="0"
                   value={basePrice}
                   readOnly
-                  className="w-full px-4 py-2 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
+                  className="w-full field-md bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary"
                   placeholder="Auto-calculated"
                 />
                 <p className="text-xs text-foreground-muted mt-1">MRP (Ex. GST) × (1 − Discount%) × (1 + GST%)</p>
@@ -2832,7 +2834,7 @@ export default function ProductForm({
 
             {/* Discount % — product-level, applies to all variants */}
             <div>
-              <label htmlFor="discount_pct" className="block text-sm font-medium text-foreground-secondary mb-2">
+              <label htmlFor="discount_pct" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                 Discount % (off MRP)
               </label>
               <input
@@ -2881,7 +2883,7 @@ export default function ProductForm({
             </div>
 
             <div>
-              <label htmlFor="cost_price" className="block text-sm font-medium text-foreground-secondary mb-2">
+              <label htmlFor="cost_price" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                 Cost Price (Rs.)
               </label>
               <input
@@ -2924,7 +2926,7 @@ export default function ProductForm({
             </div>
 
             <div>
-              <label htmlFor="extra_delivery_days" className="block text-sm font-medium text-foreground-secondary mb-2">
+              <label htmlFor="extra_delivery_days" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                 Extra Delivery Days
               </label>
               <input
@@ -2944,7 +2946,7 @@ export default function ProductForm({
             {/* Ex-GST Price — hidden when has variants */}
             {!hasVariants && (
               <div>
-                <label htmlFor="price_ex_gst" className="block text-sm font-medium text-foreground-secondary mb-2">
+                <label htmlFor="price_ex_gst" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                   Selling Price (Ex. GST)
                 </label>
                 <input
@@ -2955,7 +2957,7 @@ export default function ProductForm({
                   min="0"
                   value={salePrice}
                   readOnly
-                  className="w-full px-4 py-2 bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary rounded-lg"
+                  className="w-full field-md bg-surface-secondary text-foreground-muted cursor-not-allowed border border-border-secondary"
                   placeholder="Auto-calculated"
                 />
               </div>
@@ -2981,7 +2983,7 @@ export default function ProductForm({
                   <div className="mt-2">
                     <label
                       htmlFor="low_stock_threshold_input"
-                      className="block text-sm font-medium text-foreground-secondary mb-1"
+                      className="mb-1.5 block text-xs font-medium text-foreground-secondary"
                     >
                       Low stock threshold
                     </label>
@@ -3004,7 +3006,7 @@ export default function ProductForm({
             {!hasVariants && !inventorySync && (
               <>
                 <div>
-                  <label htmlFor="stock_status" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  <label htmlFor="stock_status" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                     Stock Status *
                   </label>
                   <AdminSelect
@@ -3028,7 +3030,7 @@ export default function ProductForm({
             {/* Shipping Weight — only when no variants; per-variant weight is in the variant table */}
             {!hasVariants && (
               <div>
-                <label htmlFor="weight_grams" className="block text-sm font-medium text-foreground-secondary mb-2">
+                <label htmlFor="weight_grams" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                   Weight per piece (g) *
                 </label>
                 <input
@@ -3053,7 +3055,7 @@ export default function ProductForm({
             {/* Shipping Dimensions — hidden when variants enabled; shown inside variants section instead */}
             {!hasVariants && (
               <div>
-                <label className="block text-sm font-medium text-foreground-secondary mb-2">Package Type</label>
+                <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Package Type</label>
                 <input type="hidden" name="package_type" value={productPackageType} />
                 <AdminSelect
                   value={productPackageType}
@@ -3119,8 +3121,8 @@ export default function ProductForm({
             )}
 
             {/* Description */}
-            <div className="md:col-span-2">
-              <label htmlFor="description" className="block text-sm font-medium text-foreground-secondary mb-2">
+            <div data-pf-nav="Description & images" id="pf-media" className="md:col-span-2 scroll-mt-20">
+              <label htmlFor="description" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                 Description
               </label>
               <AIEnrichButton
@@ -3231,11 +3233,11 @@ export default function ProductForm({
             </div>
 
             {/* Identification & Compliance */}
-            <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <div data-pf-nav="Identification" id="pf-identification" className="md:col-span-2 scroll-mt-20 border border-border-default rounded-xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => setIdentificationExpanded(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
+                className="w-full flex items-center justify-between px-4 h-11 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
               >
                 <span>Identification &amp; Compliance</span>
                 <svg
@@ -3253,7 +3255,7 @@ export default function ProductForm({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {!hasVariants && (
                       <div>
-                        <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                           Barcode (EAN/UPC)
                         </label>
                         <input
@@ -3267,7 +3269,7 @@ export default function ProductForm({
                     )}
                     {!hasVariants && (
                       <div>
-                        <label className="block text-sm font-medium text-foreground-secondary mb-2">ISBN</label>
+                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">ISBN</label>
                         <input
                           type="text"
                           value={isbn}
@@ -3279,7 +3281,7 @@ export default function ProductForm({
                     )}
                     {!hasVariants && (
                       <div>
-                        <label className="block text-sm font-medium text-foreground-secondary mb-2">ASIN</label>
+                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">ASIN</label>
                         <input
                           type="text"
                           value={asin}
@@ -3291,7 +3293,7 @@ export default function ProductForm({
                     )}
                     {!hasVariants && (
                       <div>
-                        <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                        <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                           Brand Part Number
                         </label>
                         <input
@@ -3304,7 +3306,7 @@ export default function ProductForm({
                       </div>
                     )}
                     <div>
-                      <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                         Country of Origin
                       </label>
                       <input
@@ -3318,7 +3320,7 @@ export default function ProductForm({
                       <p className="text-xs text-foreground-muted mt-1">ISO 3166 2-letter code</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                         Shelf Life (days)
                       </label>
                       <input
@@ -3337,11 +3339,11 @@ export default function ProductForm({
             </div>
 
             {/* Digital & Subscription */}
-            <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <div data-pf-nav="Digital" id="pf-digital" className="md:col-span-2 scroll-mt-20 border border-border-default rounded-xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => setDigitalExpanded(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
+                className="w-full flex items-center justify-between px-4 h-11 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
               >
                 <span>Digital &amp; Subscription</span>
                 <svg
@@ -3438,7 +3440,7 @@ export default function ProductForm({
                           {SUBSCRIPTION_INTERVALS.filter(o => subscriptionIntervals.includes(o.value)).map(opt => (
                             <span
                               key={opt.value}
-                              className="inline-flex items-center gap-1 rounded-full bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 px-2.5 py-1 text-xs font-medium"
+                              className="inline-flex items-center gap-1 rounded-full bg-accent-500/10 text-accent-500 px-2.5 py-1 text-xs font-medium"
                             >
                               {opt.label}
                               <button
@@ -3588,11 +3590,11 @@ export default function ProductForm({
             </div>
 
             {/* Tax & Finance */}
-            <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <div data-pf-nav="Tax" id="pf-tax" className="md:col-span-2 scroll-mt-20 border border-border-default rounded-xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => setTaxExpanded(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
+                className="w-full flex items-center justify-between px-4 h-11 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
               >
                 <span>Tax &amp; Finance</span>
                 <svg
@@ -3634,11 +3636,11 @@ export default function ProductForm({
             </div>
 
             {/* Age & Audience */}
-            <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <div data-pf-nav="Audience" id="pf-audience" className="md:col-span-2 scroll-mt-20 border border-border-default rounded-xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => setAgeExpanded(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
+                className="w-full flex items-center justify-between px-4 h-11 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
               >
                 <span>Age &amp; Audience</span>
                 <svg
@@ -3708,11 +3710,11 @@ export default function ProductForm({
             </div>
 
             {/* SEO */}
-            <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <div data-pf-nav="SEO" id="pf-seo" className="md:col-span-2 scroll-mt-20 border border-border-default rounded-xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => setSeoExpanded(v => !v)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
+                className="w-full flex items-center justify-between px-4 h-11 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
               >
                 <span>SEO &amp; Discoverability</span>
                 <svg
@@ -3770,13 +3772,13 @@ export default function ProductForm({
             </div>
 
             {/* Product Details (grouped accordion) — force-open while stock must be assigned */}
-            <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <div data-pf-nav="Details" id="pf-details" className="md:col-span-2 scroll-mt-20 border border-border-default rounded-xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => {
                   if (!showBootstrap) setPhysicalExpanded(v => !v)
                 }}
-                className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
+                className="w-full flex items-center justify-between px-4 h-11 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
               >
                 <span>Product Details{showBootstrap ? ' — stock to assign' : ''}</span>
                 <svg
@@ -3796,7 +3798,7 @@ export default function ProductForm({
                     <button
                       type="button"
                       onClick={() => setCertificationsExpanded(v => !v)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors"
+                      className="w-full flex items-center justify-between px-4 h-10 bg-surface-secondary/30 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors"
                     >
                       <span>Physical Attributes</span>
                       <svg
@@ -3813,7 +3815,7 @@ export default function ProductForm({
                       <div className="p-4 space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">Grade</label>
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Grade</label>
                             <input
                               type="text"
                               value={grade}
@@ -3824,7 +3826,7 @@ export default function ProductForm({
                           </div>
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                          <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                             Technical Specifications
                           </label>
                           <div className="space-y-2">
@@ -3872,7 +3874,7 @@ export default function ProductForm({
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">Color</label>
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Color</label>
                             <input
                               type="text"
                               value={color}
@@ -3882,7 +3884,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Color Hex
                             </label>
                             <div className="flex gap-2 items-center">
@@ -3903,7 +3905,7 @@ export default function ProductForm({
                             </div>
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Volume (ml)
                             </label>
                             <input
@@ -3917,7 +3919,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Net Weight (g)
                             </label>
                             <input
@@ -4023,7 +4025,7 @@ export default function ProductForm({
                               return s + (e.selected === false ? 0 : e.assignQty)
                             }, 0)
                             return (
-                              <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10 p-4 space-y-4">
+                              <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 space-y-4">
                                 <div>
                                   <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
                                     Assign Existing Stock
@@ -4076,8 +4078,8 @@ export default function ProductForm({
                                       </div>
 
                                       {isSelected && _serializedPending && bsWriteOff(g, assignQty) > 0 && (
-                                        <div className="rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-900/10 px-3 py-2">
-                                          <p className="text-xs text-amber-800 dark:text-amber-300">
+                                        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2">
+                                          <p className="text-xs text-foreground">
                                             Sold in steps of {g.qty_step} — only {serialCount * (g.qty_step || 1)} of{' '}
                                             {assignQty} units can be labelled.{' '}
                                             <strong>
@@ -4090,7 +4092,7 @@ export default function ProductForm({
                                       )}
 
                                       {isSelected && _perishablePending && (
-                                        <div className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/60 dark:bg-orange-900/10 p-3">
+                                        <div className="rounded-lg border border-orange-500/40 bg-orange-500/5 p-3">
                                           <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">
                                             Batch Details
                                           </p>
@@ -4154,7 +4156,7 @@ export default function ProductForm({
                                       )}
 
                                       {isSelected && _serializedPending && (
-                                        <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 p-3">
+                                        <div className="rounded-lg border border-blue-500/40 bg-blue-500/5 p-3">
                                           <div className="flex items-center justify-between mb-3">
                                             <div>
                                               <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">
@@ -4223,7 +4225,7 @@ export default function ProductForm({
                                 })}
 
                                 {bootstrapError && (
-                                  <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-xs">
+                                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/40 text-red-600 dark:text-red-400 text-xs">
                                     {bootstrapError}
                                   </div>
                                 )}
@@ -4239,7 +4241,7 @@ export default function ProductForm({
                     <button
                       type="button"
                       onClick={() => setConditionExpanded(v => !v)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors"
+                      className="w-full flex items-center justify-between px-4 h-10 bg-surface-secondary/30 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors"
                     >
                       <span>Certifications &amp; Standards</span>
                       <svg
@@ -4256,7 +4258,7 @@ export default function ProductForm({
                       <div className="p-4 space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="sm:col-span-2">
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Certifications
                             </label>
                             <input
@@ -4268,7 +4270,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Compliance Standard
                             </label>
                             <input
@@ -4280,7 +4282,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Safety Rating
                             </label>
                             <input
@@ -4292,7 +4294,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Warranty (months)
                             </label>
                             <input
@@ -4306,7 +4308,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Warranty Type
                             </label>
                             <AdminSelect
@@ -4330,7 +4332,7 @@ export default function ProductForm({
                     <button
                       type="button"
                       onClick={() => setShippingExpanded(v => !v)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors"
+                      className="w-full flex items-center justify-between px-4 h-10 bg-surface-secondary/30 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors"
                     >
                       <span>Condition &amp; Lifecycle</span>
                       <svg
@@ -4347,7 +4349,7 @@ export default function ProductForm({
                       <div className="p-4 space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Condition
                             </label>
                             <AdminSelect
@@ -4362,7 +4364,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Sort Order
                             </label>
                             <input
@@ -4376,13 +4378,13 @@ export default function ProductForm({
                             <p className="text-xs text-foreground-muted mt-1">Lower = appears first</p>
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Launch Date
                             </label>
                             <DatePicker value={launchDate} onChange={setLaunchDate} />
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Discontinue Date
                             </label>
                             <DatePicker value={discontinueDate} onChange={setDiscontinueDate} />
@@ -4403,7 +4405,7 @@ export default function ProductForm({
                     <button
                       type="button"
                       onClick={() => setIdentificationExpanded(v => !v)}
-                      className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors"
+                      className="w-full flex items-center justify-between px-4 h-10 bg-surface-secondary/30 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors"
                     >
                       <span>Shipping &amp; Logistics</span>
                       <svg
@@ -4420,7 +4422,7 @@ export default function ProductForm({
                       <div className="p-4 space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Handling Days
                             </label>
                             <input
@@ -4435,7 +4437,7 @@ export default function ProductForm({
                             <p className="text-xs text-foreground-muted mt-1">Days to dispatch after order</p>
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                               Shipping Class
                             </label>
                             <AdminSelect
@@ -4465,8 +4467,8 @@ export default function ProductForm({
 
             {/* Variant Management Section */}
             {hasVariants && (
-              <div className="md:col-span-2 border border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-blue-50/50 dark:bg-blue-900/20">
-                <h3 className="text-sm font-semibold text-foreground mb-4">Product Variants</h3>
+              <div data-pf-nav="Variants" id="pf-variants" className="md:col-span-2 scroll-mt-20 border border-border-default rounded-xl p-4 bg-surface-secondary/40">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Product Variants</h3>
 
                 {/* Buying Mode Groups */}
                 <div className="space-y-6">
@@ -4528,7 +4530,7 @@ export default function ProductForm({
                                 </div>
 
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                  <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                     Name *
                                   </label>
                                   <input
@@ -4551,7 +4553,7 @@ export default function ProductForm({
                                         </p>
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                           Stock Status (from sub-variants)
                                         </label>
                                         <input
@@ -4563,7 +4565,7 @@ export default function ProductForm({
                                         />
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                           MPN
                                         </label>
                                         <input
@@ -4578,7 +4580,7 @@ export default function ProductForm({
                                   ) : (
                                     <>
                                       <div>
-                                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                           MRP (Ex. GST) *
                                         </label>
                                         <input
@@ -4612,7 +4614,7 @@ export default function ProductForm({
                                         />
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                           Discount %
                                         </label>
                                         <input
@@ -4626,7 +4628,7 @@ export default function ProductForm({
                                         />
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                           Selling Price (incl. GST) *
                                         </label>
                                         <input
@@ -4640,13 +4642,13 @@ export default function ProductForm({
                                           required
                                         />
                                         {perUnit && (
-                                          <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">
+                                          <p className="text-xs text-accent-500 mt-0.5">
                                             {perUnit}
                                           </p>
                                         )}
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                           MRP (incl. GST)
                                         </label>
                                         <input
@@ -4660,7 +4662,7 @@ export default function ProductForm({
                                         />
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                           Selling Price (Ex. GST)
                                         </label>
                                         <input
@@ -4674,7 +4676,7 @@ export default function ProductForm({
                                         />
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                           {variant.sub_variant_type_on
                                             ? 'Stock Status (from sub-variants)'
                                             : 'Stock Status *'}
@@ -4703,7 +4705,7 @@ export default function ProductForm({
                                         )}
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                           MPN
                                         </label>
                                         <input
@@ -4718,7 +4720,7 @@ export default function ProductForm({
                                   )}
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                  <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                     GTIN / Barcode
                                   </label>
                                   <input
@@ -4730,7 +4732,7 @@ export default function ProductForm({
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                  <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                     Amazon ASIN
                                   </label>
                                   <input
@@ -4742,7 +4744,7 @@ export default function ProductForm({
                                   />
                                 </div>
                                 <div>
-                                  <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                  <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                     ISBN
                                   </label>
                                   <input
@@ -4756,7 +4758,7 @@ export default function ProductForm({
                                 {!variant.sub_variant_type_on && (
                                   <>
                                     <div>
-                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                         Weight per piece (g) *
                                       </label>
                                       <input
@@ -4777,7 +4779,7 @@ export default function ProductForm({
                                         )}
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                         Package Type
                                       </label>
                                       <AdminSelect
@@ -4801,7 +4803,7 @@ export default function ProductForm({
                                       variant.package_type || 'flat_poly_auto'
                                     ) && (
                                       <div>
-                                        <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                                        <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                           Dimensions per piece (L × B × H cm)
                                         </label>
                                         <div className="grid grid-cols-3 gap-1">
@@ -4891,7 +4893,7 @@ export default function ProductForm({
                                     <button
                                       type="button"
                                       onClick={() => openVariantPopup(variant.id!)}
-                                      className="text-xs font-medium text-accent-600 dark:text-accent-400 flex items-center gap-1"
+                                      className="text-xs font-medium text-accent-500 flex items-center gap-1"
                                     >
                                       <svg
                                         className="w-3.5 h-3.5"
@@ -5152,7 +5154,7 @@ export default function ProductForm({
                           <button
                             type="button"
                             onClick={() => addVariantToGroup(group.pricing_type, group.unit)}
-                            className="px-3 h-control-sm text-xs font-medium text-accent-600 dark:text-accent-400 border border-accent-300 rounded-lg hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors"
+                            className="px-3 h-control-sm text-xs font-medium text-accent-500 border border-accent-500/40 rounded-lg hover:bg-accent-500/10 transition-colors"
                           >
                             + Add Variant
                           </button>
@@ -5168,20 +5170,20 @@ export default function ProductForm({
               </div>
             )}
           </div>
-        </div>
+        </section>
 
         {/* Selling Units (product-level — applies to every variant) */}
         {productId && isDigital && (
-          <div className="px-4 sm:px-6 py-4 border-t border-border-default-default">
-            <h3 className="text-sm font-semibold text-foreground mb-1">Selling Units &amp; Conversions</h3>
+          <div data-pf-nav="Selling units" id="pf-units" className="scroll-mt-20 rounded-xl border border-border-default bg-surface-elevated p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-1">Selling Units &amp; Conversions</h3>
             <p className="text-xs text-foreground-muted" data-testid="digital-units-note">
               {DIGITAL_UNIT_MESSAGE}.
             </p>
           </div>
         )}
         {productId && !isDigital && (
-          <div className="px-4 sm:px-6 py-4 border-t border-border-default-default">
-            <h3 className="text-sm font-semibold text-foreground mb-3">Selling Units &amp; Conversions</h3>
+          <div data-pf-nav="Selling units" id="pf-units" className="scroll-mt-20 rounded-xl border border-border-default bg-surface-elevated p-5">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-3">Selling Units &amp; Conversions</h3>
             <p className="text-xs text-foreground-muted mb-4">
               Configure alternate units (e.g. box of 100, sheet of 4&apos;×8&apos;, tin of 5 L). The pricing engine
               multiplies the base price by the factor automatically. Stock always lives in the BASE unit. Units
@@ -5193,7 +5195,7 @@ export default function ProductForm({
         )}
 
         {/* Form Actions */}
-        <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default-default flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+        <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80">
           {isDraft && serverSaveStatus !== 'idle' && (
             <span
               className={`self-center text-xs mr-auto ${
@@ -5201,7 +5203,7 @@ export default function ProductForm({
                   ? 'text-foreground-muted'
                   : serverSaveStatus === 'saved'
                     ? 'text-green-600 dark:text-green-400'
-                    : 'text-red-500'
+                    : 'text-red-600 dark:text-red-400'
               }`}
             >
               {serverSaveStatus === 'saving'
@@ -5213,7 +5215,7 @@ export default function ProductForm({
           )}
           <Link
             href={ap('/admin/products')}
-            className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors text-center"
+            className="control-md border border-border-secondary text-foreground-secondary hover:bg-surface-secondary"
           >
             Cancel
           </Link>
@@ -5225,7 +5227,7 @@ export default function ProductForm({
               // Drafts may be partial: skip native required checks (the server fills placeholders).
               formNoValidate
               disabled={isSubmitting}
-              className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="control-md border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Saving...' : 'Save as Draft'}
             </button>
@@ -5234,7 +5236,7 @@ export default function ProductForm({
               name="intent"
               value="publish"
               disabled={isSubmitting}
-              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? 'Saving...' : product ? 'Update & Publish' : 'Save & Publish'}
             </button>
@@ -5251,11 +5253,11 @@ export default function ProductForm({
             const nextVariant = navIndex < activeVariants.length - 1 ? activeVariants[navIndex + 1] : null
             return (
               <div
-                className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60"
+                className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50"
                 onClick={() => setVariantPopupId(null)}
               >
                 <div
-                  className="bg-surface rounded-xl border border-border-default shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto"
+                  className="bg-surface-elevated rounded-xl border border-border-default shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto"
                   onClick={e => e.stopPropagation()}
                 >
                   {/* Header */}
@@ -5314,7 +5316,7 @@ export default function ProductForm({
                           className={`flex items-center gap-2 flex-wrap mb-3 px-3 py-2 rounded-lg border text-[11px] ${
                             popupUnitInfo.inherited
                               ? 'border-border-default bg-surface-secondary/60 text-foreground-secondary'
-                              : 'border-accent-300/50 bg-accent-50 dark:bg-accent-900/20 text-foreground'
+                              : 'border-accent-300/50 bg-accent-500/5 text-foreground'
                           }`}
                         >
                           <span className="text-[10px] font-bold uppercase tracking-wide text-foreground-muted">
@@ -5330,7 +5332,7 @@ export default function ProductForm({
                               Inherited from product
                             </span>
                           ) : (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent-500/10 border border-accent-300/40 text-accent-700 dark:text-accent-300">
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent-500/10 border border-accent-300/40 text-accent-500">
                               Variant override
                             </span>
                           )}
@@ -5349,7 +5351,7 @@ export default function ProductForm({
                           </p>
                           <div className="grid grid-cols-2 gap-3">
                             <div>
-                              <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                 SKU{' '}
                                 {popupVariant.sku && popupVariant.sku !== variantAutoSku(popupVariant)
                                   ? '(manual)'
@@ -5364,7 +5366,7 @@ export default function ProductForm({
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
+                              <label className="mb-1 block text-xs font-medium text-foreground-secondary">MPN</label>
                               <input
                                 type="text"
                                 value={popupVariant.mpn}
@@ -5374,7 +5376,7 @@ export default function ProductForm({
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                 GTIN / Barcode
                               </label>
                               <input
@@ -5386,7 +5388,7 @@ export default function ProductForm({
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                                 Amazon ASIN
                               </label>
                               <input
@@ -5398,7 +5400,7 @@ export default function ProductForm({
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-foreground-secondary mb-1">ISBN</label>
+                              <label className="mb-1 block text-xs font-medium text-foreground-secondary">ISBN</label>
                               <input
                                 type="text"
                                 value={popupVariant.isbn}
@@ -5505,7 +5507,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                               SKU{' '}
                               {popupVariant.sku && popupVariant.sku !== variantAutoSku(popupVariant)
                                 ? '(manual)'
@@ -5520,7 +5522,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">MPN</label>
                             <input
                               type="text"
                               value={popupVariant.mpn}
@@ -5530,7 +5532,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                               GTIN / Barcode
                             </label>
                             <input
@@ -5542,7 +5544,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                               Amazon ASIN
                             </label>
                             <input
@@ -5554,7 +5556,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1">ISBN</label>
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">ISBN</label>
                             <input
                               type="text"
                               value={popupVariant.isbn}
@@ -5629,7 +5631,7 @@ export default function ProductForm({
                         </p>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                               Ship Wt. (g)
                             </label>
                             <input
@@ -5643,7 +5645,7 @@ export default function ProductForm({
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                               Package Type
                             </label>
                             <AdminSelect
@@ -5656,7 +5658,7 @@ export default function ProductForm({
                         </div>
                         {STORED_DIMS_TYPES.includes(popupVariant.package_type || 'flat_poly_auto') && (
                           <div className="mt-3">
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1">
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
                               Dimensions per piece (L × B × H cm)
                             </label>
                             <div className="grid grid-cols-3 gap-1.5">
@@ -5772,8 +5774,8 @@ export default function ProductForm({
                           </p>
                         </div>
                         {variantPopupId.startsWith('temp-') && (
-                          <div className="mb-3 rounded-lg border border-dashed border-amber-400/60 bg-amber-50 dark:bg-amber-900/20 p-3 flex items-center justify-between gap-3">
-                            <p className="text-xs text-amber-700 dark:text-amber-300">
+                          <div className="mb-3 rounded-lg border border-dashed border-amber-400/60 bg-amber-500/5 p-3 flex items-center justify-between gap-3">
+                            <p className="text-xs text-foreground-secondary">
                               Save the product first to add sub-variants for this variant.
                             </p>
                             <button
@@ -5827,8 +5829,8 @@ export default function ProductForm({
                                       sv.stock_status === 'Out of Stock'
                                         ? 'bg-red-500/10 text-red-600 dark:text-red-400'
                                         : sv.stock_status === 'Low Stock'
-                                          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
-                                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                          : 'bg-green-500/10 text-green-700 dark:text-green-400'
                                     const shippingParts = [
                                       sv.weight_grams != null && sv.weight_grams !== '' ? `${sv.weight_grams} g` : null,
                                       sv.package_type ? PACKAGE_TYPE_LABELS[sv.package_type] || sv.package_type : null,
@@ -6043,5 +6045,34 @@ export default function ProductForm({
           })()}
       </form>
     </>
+  )
+}
+
+/** Jump links to the form's sections; reads [data-pf-nav] blocks so conditional sections appear only when rendered. */
+function FormSectionNav() {
+  const ref = useRef<HTMLElement | null>(null)
+  const [items, setItems] = useState<{ id: string; label: string }[]>([])
+  useEffect(() => {
+    const form = ref.current?.closest('form')
+    if (!form) return
+    const read = () => {
+      const next = Array.from(form.querySelectorAll<HTMLElement>('[data-pf-nav]')).map(el => ({ id: el.id, label: el.dataset.pfNav || '' }))
+      setItems(prev => (prev.length === next.length && prev.every((p, i) => p.id === next[i].id) ? prev : next))
+    }
+    read()
+    const mo = new MutationObserver(read)
+    mo.observe(form, { childList: true, subtree: true })
+    return () => mo.disconnect()
+  }, [])
+  return (
+    <nav ref={ref} aria-label="Form sections" className="sticky top-0 z-20 overflow-x-auto rounded-xl border border-border-default bg-surface-elevated/95 px-1 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80">
+      <div className="flex h-11 items-center gap-1 whitespace-nowrap">
+        {items.map(it => (
+          <a key={it.id} href={`#${it.id}`} className="control-sm text-foreground-secondary hover:bg-surface-secondary hover:text-foreground">
+            {it.label}
+          </a>
+        ))}
+      </div>
+    </nav>
   )
 }

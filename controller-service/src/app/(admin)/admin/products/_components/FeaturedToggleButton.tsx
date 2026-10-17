@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Star } from 'lucide-react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
+import { badgeCls } from '@/components/admin/kit'
 
 interface Props {
   productId: string
@@ -55,11 +56,7 @@ export default function FeaturedToggleButton({ productId, isFeatured, featuredCo
           title={
             optimistic ? 'Remove from featured' : featuredCount >= 6 ? 'Max 6 featured reached' : 'Mark as featured'
           }
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${
-            optimistic
-              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/50'
-              : 'bg-surface-secondary text-foreground-muted hover:bg-yellow-50 hover:text-yellow-700'
-          } ${loading ? 'opacity-60 cursor-wait' : ''}`}
+          className={`${badgeCls(optimistic ? 'amber' : 'muted')} inline-flex items-center gap-1 transition-opacity hover:opacity-75 ${loading ? 'opacity-60 cursor-wait' : ''}`}
         >
           <Star className={`w-3 h-3 ${optimistic ? 'fill-current' : ''}`} />
           <span>{optimistic ? 'Featured' : 'Feature'}</span>

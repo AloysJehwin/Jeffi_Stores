@@ -4,7 +4,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne } from '@/lib/shared/db'
 import ProductForm from '@/components/admin/ProductForm'
-import { ChevronLeft } from 'lucide-react'
+import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { updateProduct } from './actions'
@@ -196,36 +196,21 @@ export default async function EditProductPage({
 
   return (
     <MobileEditBlock>
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-2 mb-6 text-sm">
-        <a
-          href={ap(backUrl, host)}
-          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Products
-        </a>
-        <span className="text-border-default">/</span>
-        <span className="text-foreground font-medium">{isDraft ? 'Edit Draft' : 'Edit Product'}</span>
-      </div>
-
+    <FormPage
+      header={
+        <PageHeader
+          back={{ href: ap(backUrl, host), label: 'Products' }}
+          title={isDraft ? 'Edit Draft' : 'Edit Product'}
+          description={isDraft ? 'Changes are saved to the draft only' : 'Update product information'}
+          badges={isDraft ? <Badge tone="amber">Draft pending</Badge> : undefined}
+        />
+      }
+    >
       {isDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
-          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-            Edits are saved to draft. The live product stays unchanged until you publish.
-          </p>
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-foreground">
+          Edits are saved to draft. The live product stays unchanged until you publish.
         </div>
       )}
-
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
-          {isDraft ? 'Edit Draft' : 'Edit Product'}
-        </h1>
-        <p className="text-foreground-secondary mt-1">
-          {isDraft ? 'Changes are saved to the draft only' : 'Update product information'}
-        </p>
-      </div>
 
       <ProductForm
         categories={categories || []}
@@ -244,7 +229,7 @@ export default async function EditProductPage({
         subscriptionsEnabled={flags.subscriptionsEnabled}
         digitalProductsEnabled={flags.digitalProductsEnabled}
       />
-    </div>
+    </FormPage>
     </MobileEditBlock>
   )
 }
