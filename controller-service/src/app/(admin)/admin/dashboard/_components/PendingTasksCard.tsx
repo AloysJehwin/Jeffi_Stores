@@ -23,7 +23,7 @@ export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]
   const overdueCount = tasks.filter(t => t.overdue).length
 
   return (
-    <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none overflow-hidden">
+    <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
       {/* Header — always visible, click to collapse */}
       <button
         type="button"
@@ -38,7 +38,7 @@ export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]
                 {tasks.length}
               </span>
               {overdueCount > 0 && (
-                <span className="text-xs font-semibold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded-full">
+                <span className="text-xs font-semibold bg-red-500/10 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded-full">
                   {overdueCount} overdue
                 </span>
               )}
@@ -121,14 +121,14 @@ export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]
                     <button
                       onClick={() => setPage(p => p - 1)}
                       disabled={page === 0}
-                      className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors"
+                      className="control-xs border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors"
                     >
                       ‹
                     </button>
                     <button
                       onClick={() => setPage(p => p + 1)}
                       disabled={page >= totalPages - 1}
-                      className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors"
+                      className="control-xs border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors"
                     >
                       ›
                     </button>

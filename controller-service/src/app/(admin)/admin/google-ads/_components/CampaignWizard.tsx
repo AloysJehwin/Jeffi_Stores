@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Megaphone } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, Megaphone } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { useCanUseAi, useCanWrite } from '@/contexts/AdminScopesContext'
 import type { WizardBootstrap } from '@/lib/google-ads/manage-data'
@@ -47,7 +48,12 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
   const [link, setLink] = useState<LinkState | null>(null)
   const [options, setOptions] = useState<CampaignOptions | null>(null)
   const [busy, setBusy] = useState<'preview' | 'create' | null>(null)
-  const [result, setResult] = useState<{ ok: boolean; text: string; problems?: Problem[]; done?: boolean } | null>(null)
+  const [result, setResultState] = useState<{ ok: boolean; text: string; problems?: Problem[]; done?: boolean } | null>(null)
+  const toast = useActionToast()
+  const setResult = (r: { ok: boolean; text: string; problems?: Problem[]; done?: boolean } | null) => {
+    setResultState(r)
+    if (r) toast.result(r)
+  }
 
   useEffect(() => {
     fetch('/api/admin/google-ads/manage', { credentials: 'include' })
@@ -261,19 +267,14 @@ export default function CampaignWizard({ onClose, onCreated }: { onClose: () => 
             </div>
           )}
 
-          {result && (
-            <div className={`rounded-lg border p-3 text-sm ${result.ok ? 'border-green-500/40 bg-green-500/5' : 'border-red-500/40 bg-red-500/5'}`} role="status">
-              <p className="flex items-start gap-2">
-                {result.ok ? <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-600 shrink-0" /> : <AlertTriangle className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />}
-                {result.text}
-              </p>
-              {!result.ok && (result.problems?.length ?? 0) > 1 && (
-                <ul className="list-disc pl-9 mt-1 space-y-0.5 text-xs">
-                  {result.problems!.slice(1, 10).map((p, i) => (
-                    <li key={i}>{p.where ? `${p.where}: ${p.message}` : p.message}</li>
-                  ))}
-                </ul>
-              )}
+          {result && !result.ok && (result.problems?.length ?? 0) > 1 && (
+            <div className="rounded-lg border border-red-500/40 bg-red-500/5 p-3 text-sm" role="status">
+              <p className="font-medium text-red-600 dark:text-red-400 mb-1">Google also reported:</p>
+              <ul className="list-disc pl-5 space-y-0.5 text-xs">
+                {result.problems!.slice(1, 10).map((p, i) => (
+                  <li key={i}>{p.where ? `${p.where}: ${p.message}` : p.message}</li>
+                ))}
+              </ul>
             </div>
           )}
         </>

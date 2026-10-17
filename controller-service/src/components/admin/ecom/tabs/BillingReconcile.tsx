@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 type ReconcileRow = { awb: string; billedAmount: number }
 
@@ -30,7 +31,8 @@ function parseBillingCsv(text: string): ReconcileRow[] {
 export default function BillingReconcile({ tenantId }: { tenantId: string }) {
   const [period, setPeriod] = useState('')
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setMsg = (r: { ok: boolean; text: string } | null) => r && toast.result(r)
   const [summary, setSummary] = useState<Record<string, number> | null>(null)
 
   const reconcile = async (file: File) => {
@@ -100,11 +102,6 @@ export default function BillingReconcile({ tenantId }: { tenantId: string }) {
           />
         </label>
       </div>
-      {msg && (
-        <div className={`text-sm ${msg.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {msg.text}
-        </div>
-      )}
       {summary && (
         <div className="flex flex-wrap gap-3 text-xs text-foreground-secondary">
           {Object.entries(summary).map(([k, v]) => (

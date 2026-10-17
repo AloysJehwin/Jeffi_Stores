@@ -188,7 +188,7 @@ export default function GoogleAdsClient({
     <div className="p-4 sm:p-6 space-y-5">
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Google Ads</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Google Ads</h1>
           <p className="text-sm text-foreground-secondary mt-0.5">
             {connected
               ? `${status.accountName || 'Account'} ${formatCid(status.customerId)}${
@@ -238,7 +238,7 @@ export default function GoogleAdsClient({
                 {confirmDisconnect && (
                   <div className="rounded-lg border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm flex flex-wrap items-center gap-3">
                     <span>Disconnect Google Ads? Syncing stops; reports already synced stay.</span>
-                    <button type="button" onClick={() => action('disconnect')} className="rounded-md bg-red-600 px-3 py-1.5 text-white text-xs">
+                    <button type="button" onClick={() => action('disconnect')} className="control-sm bg-red-600 text-white hover:bg-red-700">
                       Disconnect
                     </button>
                     <button type="button" onClick={() => setConfirmDisconnect(false)} className="text-xs text-foreground-muted">
@@ -288,7 +288,7 @@ export default function GoogleAdsClient({
           />
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg">
+            <div className="flex h-control gap-0.5 p-0.5 bg-surface-elevated border border-border-default rounded-lg">
               {PRESETS.map(n => {
                 const r = lastDays(n)
                 const active = r.from === range.from && r.to === range.to
@@ -297,7 +297,7 @@ export default function GoogleAdsClient({
                     key={n}
                     type="button"
                     onClick={() => setRange(r)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-md ${active ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+                    className={`flex items-center px-3 text-xs font-medium rounded-md ${active ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
                   >
                     {n}d
                   </button>

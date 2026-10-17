@@ -7,6 +7,8 @@ import IconButton from '@/components/ui/IconButton'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, Tabs, api } from '@/components/admin/channels/ui'
+import { ErrorState } from '@/components/admin/kit/states'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import AmazonMerchantPanel from './AmazonMerchantPanel'
 import { BuyboxView, FeesView, OrdersStockView, OverviewView, RepricerView, SalesView, SuppressedView } from './AmazonTabs'
@@ -39,7 +41,8 @@ export default function AmazonConsole({ connected }: { connected: boolean }) {
   const data = loaded?.tab === tab ? loaded.data : null
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setBanner = useCallback((b: { ok: boolean; text: string } | null) => b && toast.result(b), [toast])
   const [reloadKey, setReloadKey] = useState(0)
   const reload = useCallback(() => setReloadKey(k => k + 1), [])
   const canWrite = useCanWrite('amazon')
@@ -75,7 +78,6 @@ export default function AmazonConsole({ connected }: { connected: boolean }) {
 
   return (
     <div className="space-y-4">
-      {banner && <Banner ok={banner.ok}>{banner.text}</Banner>}
       <Tabs
         tabs={TABS}
         value={tab}
@@ -92,7 +94,7 @@ export default function AmazonConsole({ connected }: { connected: boolean }) {
         }
       />
       {error ? (
-        <p className="text-sm text-red-500">{error}</p>
+        <ErrorState body={error} />
       ) : DATA_TABS.has(tab) && !data ? (
         <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
       ) : (

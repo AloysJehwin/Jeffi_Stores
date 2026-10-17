@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Tabs } from '@/components/admin/channels/ui'
+import { Tabs, btnGhost } from '@/components/admin/channels/ui'
+import { PageHeader } from '@/components/admin/kit/layout'
+import { ErrorState } from '@/components/admin/kit/states'
 import { OverviewSkeleton, PeriodBar, useOverviewData, usePeriod } from '@/components/admin/overview/kit'
 import { TRAFFIC_TABS, parseTab, type TrafficTab, type TrafficTabData } from '@/lib/traffic/types'
 import OverviewTab from './_components/OverviewTab'
@@ -67,10 +69,7 @@ export default function TrafficClient() {
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Traffic</h1>
-        <p className="text-sm text-foreground-secondary mt-0.5">Visitors, where they come from and what they do</p>
-      </div>
+      <PageHeader title="Traffic" description="Visitors, where they come from and what they do" />
 
       <Tabs<TrafficTab> tabs={TRAFFIC_TABS.map(id => ({ id, label: LABELS[id] }))} value={tab} onChange={setTab} />
 
@@ -81,7 +80,7 @@ export default function TrafficClient() {
       )}
 
       {error ? (
-        <div className="flex items-center justify-center h-48 text-sm text-red-500">{error}</div>
+        <ErrorState body={error} actionNode={<button type="button" onClick={reload} className={btnGhost}>Try again</button>} />
       ) : !ready ? (
         <OverviewSkeleton />
       ) : (

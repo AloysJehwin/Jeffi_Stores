@@ -68,10 +68,12 @@ export interface DialogProps {
   /** Hide the X in the header (confirmations close through their buttons). */
   hideClose?: boolean
   zIndex?: string
+  /** False keeps it open on backdrop click and Esc (multi-step wizards); the X still closes. */
+  dismissible?: boolean
 }
 
 /** Centred modal: backdrop click and Esc close it, focus is trapped and page scroll locked. */
-export function Dialog({ open, onClose, title, description, size = 'md', footer, children, onKeyDown, hideClose, zIndex = 'z-[1000]' }: DialogProps) {
+export function Dialog({ open, onClose, title, description, size = 'md', footer, children, onKeyDown, hideClose, zIndex = 'z-[1000]', dismissible = true }: DialogProps) {
   const panel = useRef<HTMLDivElement>(null)
   const titleId = useId()
   useScrollLock(open)
@@ -86,13 +88,13 @@ export function Dialog({ open, onClose, title, description, size = 'md', footer,
       onKeyDown={e => {
         if (e.key === 'Escape') {
           e.stopPropagation()
-          onClose()
+          if (dismissible) onClose()
           return
         }
         onKeyDown?.(e)
       }}
     >
-      <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={dismissible ? onClose : undefined} />
       <div
         ref={panel}
         tabIndex={-1}

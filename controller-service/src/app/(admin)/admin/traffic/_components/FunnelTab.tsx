@@ -58,7 +58,7 @@ export default function FunnelTab({ data }: { data: FunnelData }) {
               {i > 0 && (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-1.5 pl-5 text-xs">
                   {s.dropOff > 0 ? (
-                    <span className="text-red-500 dark:text-red-400 font-medium">
+                    <span className="text-red-500 font-medium">
                       {count(s.dropOff)} dropped ({pct(s.stepRate == null ? null : 1 - s.stepRate, 0)})
                     </span>
                   ) : (

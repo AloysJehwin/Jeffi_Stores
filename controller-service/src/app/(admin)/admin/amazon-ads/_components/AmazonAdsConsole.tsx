@@ -7,12 +7,14 @@ import IconButton from '@/components/ui/IconButton'
 import ConnectionsGear, { NotConnectedState, type ConnectionState } from '@/components/admin/ConnectionsGear'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
+import { TrendChart, type SeriesDef } from '@/components/admin/kit/charts'
+import { PageHeader } from '@/components/admin/kit/layout'
+import { ErrorState } from '@/components/admin/kit/states'
+import { useActionToast } from '@/components/admin/kit/toast'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import {
   Badge,
-  Banner,
   Empty,
   Kpi,
   KpiGrid,
@@ -74,7 +76,8 @@ export default function AmazonAdsConsole() {
   const [loaded, setLoaded] = useState<{ tab: string; data: any } | null>(null)
   const data = loaded?.tab === tab ? loaded.data : null
   const [error, setError] = useState<string | null>(null)
-  const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setBanner = useCallback((b: { ok: boolean; text: string } | null) => b && toast.result(b), [toast])
   const [busy, setBusy] = useState<string | null>(null)
   const [gearOpen, setGearOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
@@ -148,33 +151,22 @@ export default function AmazonAdsConsole() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Amazon Ads</h1>
-          <p className="text-sm text-foreground-secondary mt-0.5">
-            Sponsored Products: spend, ACoS and TACoS, campaigns, keywords, search terms and products
-          </p>
-        </div>
-        <div className="flex items-center gap-1">
-          <ConnectionsGear
-            title="Amazon Ads connection"
-            scope="amazon_ads"
-            state={state}
-            open={gearOpen}
-            onOpenChange={setGearOpen}
-          >
+      <PageHeader
+        title="Amazon Ads"
+        description="Sponsored Products: spend, ACoS and TACoS, campaigns, keywords, search terms and products"
+        actions={
+          <ConnectionsGear title="Amazon Ads connection" scope="amazon_ads" state={state} open={gearOpen} onOpenChange={setGearOpen}>
             {status ? (
               <ConnectPanel status={status} canWrite={canWrite} onChanged={onChanged} />
             ) : (
               <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
             )}
           </ConnectionsGear>
-        </div>
-      </div>
+        }
+      />
 
-      {banner && <Banner ok={banner.ok}>{banner.text}</Banner>}
       {!status ? (
-        <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
+        error ? <ErrorState body={error} /> : <p className="text-sm text-foreground-muted">Loading...</p>
       ) : !status.connected ? (
         <NotConnectedState provider="Amazon Ads" onOpen={() => setGearOpen(true)} />
       ) : (
@@ -193,7 +185,7 @@ export default function AmazonAdsConsole() {
             actions={canWrite && <IconButton icon={RefreshCw} label="Sync now" busy={busy === 'sync'} onClick={sync} />}
           />
           {error ? (
-            <p className="text-sm text-red-500">{error}</p>
+            <ErrorState body={error} />
           ) : DATA_TABS.has(tab) && !data ? (
             <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
           ) : (

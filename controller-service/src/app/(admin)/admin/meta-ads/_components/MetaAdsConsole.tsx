@@ -7,12 +7,14 @@ import IconButton from '@/components/ui/IconButton'
 import ConnectionsGear, { NotConnectedState, type ConnectionState } from '@/components/admin/ConnectionsGear'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
+import { TrendChart, type SeriesDef } from '@/components/admin/kit/charts'
+import { PageHeader } from '@/components/admin/kit/layout'
+import { ErrorState } from '@/components/admin/kit/states'
+import { useActionToast } from '@/components/admin/kit/toast'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import {
   Badge,
-  Banner,
   Empty,
   Kpi,
   KpiGrid,
@@ -69,7 +71,8 @@ export default function MetaAdsConsole() {
   const [loaded, setLoaded] = useState<{ tab: string; data: any } | null>(null)
   const data = loaded?.tab === tab ? loaded.data : null
   const [error, setError] = useState<string | null>(null)
-  const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setBanner = useCallback((b: { ok: boolean; text: string } | null) => b && toast.result(b), [toast])
   const [busy, setBusy] = useState<string | null>(null)
   const [gearOpen, setGearOpen] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
@@ -147,33 +150,22 @@ export default function MetaAdsConsole() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Meta Ads</h1>
-          <p className="text-sm text-foreground-secondary mt-0.5">
-            Facebook and Instagram ads: spend, purchases, true ROAS from your orders, and the Conversions API
-          </p>
-        </div>
-        <div className="flex items-center gap-1">
-          <ConnectionsGear
-            title="Meta Ads connection"
-            scope="meta_ads"
-            state={state}
-            open={gearOpen}
-            onOpenChange={setGearOpen}
-          >
+      <PageHeader
+        title="Meta Ads"
+        description="Facebook and Instagram ads: spend, purchases, true ROAS from your orders, and the Conversions API"
+        actions={
+          <ConnectionsGear title="Meta Ads connection" scope="meta_ads" state={state} open={gearOpen} onOpenChange={setGearOpen}>
             {status ? (
               <ConnectPanel status={status} canWrite={canWrite} onChanged={onConnChanged} />
             ) : (
               <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
             )}
           </ConnectionsGear>
-        </div>
-      </div>
+        }
+      />
 
-      {banner && <Banner ok={banner.ok}>{banner.text}</Banner>}
       {!status ? (
-        <p className="text-sm text-foreground-muted">{error ?? 'Loading...'}</p>
+        error ? <ErrorState body={error} /> : <p className="text-sm text-foreground-muted">Loading...</p>
       ) : !status.connected ? (
         <NotConnectedState provider="Meta Ads" onOpen={() => setGearOpen(true)} />
       ) : (
@@ -212,7 +204,7 @@ export default function MetaAdsConsole() {
             />
           )}
           {error ? (
-            <p className="text-sm text-red-500">{error}</p>
+            <ErrorState body={error} />
           ) : DATA_TABS.has(tab) && !data ? (
             <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
           ) : (
@@ -587,7 +579,7 @@ function CapiView({ d, status, onChanged }: { d: any; status: any; onChanged: ()
   const canWrite = useCanWrite('meta_ads')
   const [pixel, setPixel] = useState(status.pixelId ?? '')
   const [token, setToken] = useState('')
-  const [msg, setMsg] = useState<string | null>(null)
+  const toast = useActionToast()
   const c = d.counts ?? {}
   const keys = d.matchedKeys ?? {}
   const sent = Number(c.sent ?? 0)
@@ -633,7 +625,7 @@ function CapiView({ d, status, onChanged }: { d: any; status: any; onChanged: ()
                   method: 'POST',
                   json: { pixelId: pixel || null, ...(token ? { capiToken: token } : {}) },
                 })
-                setMsg(r.ok ? 'Saved.' : r.data.error || 'Could not save')
+                toast.result({ ok: r.ok, text: r.ok ? 'Saved.' : r.data.error || 'Could not save' })
                 if (r.ok) onChanged()
               }}
             >
@@ -643,7 +635,6 @@ function CapiView({ d, status, onChanged }: { d: any; status: any; onChanged: ()
         ) : (
           <p className="text-sm">Pixel: {status.pixelId ?? 'not set'}</p>
         )}
-        {msg && <p className="text-xs text-foreground-muted mt-2">{msg}</p>}
       </Section>
       <Section title="Recent events">
         <Table

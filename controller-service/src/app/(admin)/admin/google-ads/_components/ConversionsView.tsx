@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, Ban, CheckCircle2, KeyRound, Plus, RefreshCw, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { Ban, KeyRound, Plus, RefreshCw, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { money, count, pct, humanize, formatCid } from '@/lib/google-ads/format'
@@ -74,7 +75,8 @@ export default function ConversionsView({ d, currency }: { d: ConversionsSummary
   const [summary, setSummary] = useState(d)
   const [google, setGoogle] = useState<GoogleConversionsData | null>(null)
   const [googleError, setGoogleError] = useState<string | null>(null)
-  const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setBanner = useCallback((b: { ok: boolean; text: string } | null) => b && toast.result(b), [toast])
   const [busy, setBusy] = useState<string | null>(null)
   const [primary, setPrimary] = useState(!d.browserConversion)
   const [logKey, setLogKey] = useState(0)
@@ -193,21 +195,6 @@ export default function ConversionsView({ d, currency }: { d: ConversionsSummary
 
   return (
     <div className="space-y-5">
-      {banner && (
-        <div
-          className={`rounded-lg border px-4 py-3 text-sm flex items-start gap-2 ${
-            banner.ok ? 'border-green-500/40 bg-green-500/5' : 'border-red-500/40 bg-red-500/5'
-          }`}
-        >
-          {banner.ok ? (
-            <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-600 shrink-0" />
-          ) : (
-            <AlertCircle className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />
-          )}
-          <span>{banner.text}</span>
-        </div>
-      )}
-
       <Section
         title="Server-side purchases"
         action={
@@ -261,7 +248,7 @@ export default function ConversionsView({ d, currency }: { d: ConversionsSummary
                 type="button"
                 onClick={create}
                 disabled={busy === 'create'}
-                className="inline-flex items-center gap-1.5 rounded-md bg-accent-500 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                className="control-sm bg-accent-500 font-medium text-white hover:bg-accent-600 disabled:opacity-60"
               >
                 <Plus className="w-3.5 h-3.5" />
                 {busy === 'create' ? 'Creating...' : `Create "${SERVER_ACTION_NAME}"`}
@@ -402,7 +389,7 @@ function AccessNote({ auth, canWrite }: { auth: ConversionAuth; canWrite: boolea
         (canWrite ? (
           <a
             href={RECONNECT_URL}
-            className="inline-flex items-center gap-1.5 rounded-md bg-accent-500 px-3 py-1.5 text-xs font-medium text-white"
+            className="control-sm bg-accent-500 font-medium text-white hover:bg-accent-600"
           >
             Reconnect Google Ads
           </a>
@@ -703,7 +690,7 @@ function UploadLogSection({
               setStatus(s)
               setPage(1)
             }}
-            className={`px-2.5 py-1 text-xs rounded-md border ${
+            className={`control-xs border ${
               status === s ? 'border-accent-500 text-foreground font-medium' : 'border-border-default text-foreground-muted hover:text-foreground'
             }`}
           >

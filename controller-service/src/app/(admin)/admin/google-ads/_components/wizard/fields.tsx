@@ -1,19 +1,14 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { type ReactNode } from 'react'
 import { Loader2, Plus, Sparkles, Trash2, X } from 'lucide-react'
-import { portalRoot } from '@/lib/shared/portal-root'
+import { Dialog } from '@/components/admin/kit/dialog'
 import { adTextLength } from '@/lib/google-ads/limits'
 
 // Small form pieces shared by the campaign wizard and the add-assets dialog.
 
-export const inputCls =
-  'w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500/40'
-export const btnPrimary =
-  'inline-flex items-center gap-2 rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-white hover:bg-accent-600 disabled:opacity-50'
-export const btnGhost =
-  'inline-flex items-center gap-2 rounded-lg border border-border-default px-3 py-2 text-sm text-foreground hover:bg-surface-secondary disabled:opacity-50'
+import { inputCls, btnPrimary, btnGhost } from '@/components/admin/kit/core'
+export { inputCls, btnPrimary, btnGhost }
 
 export function Field({ label, hint, children, className = '' }: { label: string; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
@@ -137,6 +132,7 @@ export function Chip({ label, onRemove }: { label: string; onRemove?: () => void
   )
 }
 
+/** Wizard and editor dialog: the kit Dialog, kept open on backdrop click and Esc so a half-filled form is not lost. */
 export function Modal({
   title,
   onClose,
@@ -150,23 +146,10 @@ export function Modal({
   footer?: ReactNode
   wide?: boolean
 }) {
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-  if (!mounted) return null
-  return createPortal(
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label={title}>
-      <div className={`w-full ${wide ? 'max-w-4xl' : 'max-w-xl'} rounded-xl border border-border-default bg-surface-elevated shadow-xl`}>
-        <div className="flex items-center justify-between border-b border-border-default px-5 py-3">
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
-          <button type="button" aria-label="Close" onClick={onClose} className="p-1 text-foreground-muted hover:text-foreground">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="px-5 py-4 space-y-4">{children}</div>
-        {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border-default px-5 py-3">{footer}</div>}
-      </div>
-    </div>,
-    portalRoot()
+  return (
+    <Dialog open onClose={onClose} title={title} size={wide ? 'xl' : 'lg'} footer={footer} dismissible={false}>
+      <div className="space-y-4">{children}</div>
+    </Dialog>
   )
 }
 

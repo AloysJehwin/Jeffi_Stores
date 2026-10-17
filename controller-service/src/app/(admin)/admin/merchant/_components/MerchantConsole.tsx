@@ -7,6 +7,7 @@ import IconButton from '@/components/ui/IconButton'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Banner, RangePresets, Tabs, api, lastDays } from '@/components/admin/channels/ui'
+import { ErrorState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { ChangeHistory, ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
 import type { MerchantTab } from '@/lib/merchant/console-data'
@@ -106,7 +107,7 @@ export default function MerchantConsole({ connected }: { connected: boolean }) {
       />
       {RANGED.has(tab) && <RangePresets value={range} onChange={setRange} endOffset={1} />}
       {error ? (
-        <p className="text-sm text-red-500">{error}</p>
+        <ErrorState body={error} />
       ) : DATA_TABS.has(tab) && !data ? (
         <div className="h-64 rounded-xl bg-surface-elevated border border-border-default animate-pulse" />
       ) : (

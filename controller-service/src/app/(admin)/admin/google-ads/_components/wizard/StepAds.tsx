@@ -92,7 +92,7 @@ function KeywordPicker({
           <p className="text-xs text-foreground-muted">From your catalogue{ideas.ideas.length ? ' and Keyword Planner' : ''}. Click to add as {MATCH_LABEL[match].toLowerCase()} match.</p>
           <div className="flex flex-wrap gap-1.5">
             {ideas.seeds.map(s => (
-              <button key={`s${s}`} type="button" className="rounded-full border border-border-default px-2.5 py-1 text-xs hover:bg-surface-secondary" onClick={() => addKeywords([{ text: s, matchType: match }])}>
+              <button key={`s${s}`} type="button" className="control-xs rounded-full border border-border-default hover:bg-surface-secondary" onClick={() => addKeywords([{ text: s, matchType: match }])}>
                 + {s}
               </button>
             ))}

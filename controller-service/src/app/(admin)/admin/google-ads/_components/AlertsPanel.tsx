@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { BellRing, Mail, RefreshCw, Settings2, X } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -51,7 +52,7 @@ export default function AlertsPanel() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
+  const toast = useActionToast()
 
   const load = useCallback(async () => {
     const r = await fetch('/api/admin/google-ads/alerts', { credentials: 'include' })
@@ -65,11 +66,10 @@ export default function AlertsPanel() {
 
   async function send(method: 'POST' | 'PUT', body: unknown, key: string, url = '/api/admin/google-ads/alerts') {
     setBusy(key)
-    setNotice(null)
     try {
       const r = await fetch(url, { method, credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const j = await r.json().catch(() => ({}))
-      if (!r.ok) setNotice(j.error || 'Request failed')
+      if (!r.ok) toast.error(j.error || 'Request failed')
       else if (url.endsWith('/alerts') && Array.isArray(j.alerts)) setD(j)
       return { ok: r.ok, data: j }
     } finally {
@@ -95,14 +95,13 @@ export default function AlertsPanel() {
               busy={busy === 'digest'}
               onClick={async () => {
                 const r = await send('POST', { to: 'me' }, 'digest', '/api/admin/google-ads/digest')
-                if (r.ok) setNotice(`Digest sent to ${r.data.sent} address${r.data.sent === 1 ? '' : 'es'}.`)
+                if (r.ok) toast.success(`Digest sent to ${r.data.sent} address${r.data.sent === 1 ? '' : 'es'}.`)
               }}
             />
             <IconButton icon={Settings2} label="Alert settings" onClick={() => setEditing(e => !e)} />
           </div>
         )}
       </div>
-      {notice && <p className="text-xs text-foreground-muted mb-2">{notice}</p>}
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
       ) : !d ? (

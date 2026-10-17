@@ -13,9 +13,9 @@ import { badgeCls, type Tone } from './tones'
 export const inputCls =
   'w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500/40'
 export const btnPrimary =
-  'inline-flex items-center gap-2 rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-white hover:bg-accent-600 disabled:opacity-50'
+  'inline-flex h-control items-center justify-center gap-2 rounded-lg bg-accent-500 px-3 text-sm font-medium text-white hover:bg-accent-600 disabled:opacity-50 whitespace-nowrap'
 export const btnGhost =
-  'inline-flex items-center gap-2 rounded-lg border border-border-default px-3 py-2 text-sm text-foreground hover:bg-surface-secondary disabled:opacity-50'
+  'inline-flex h-control items-center justify-center gap-2 rounded-lg border border-border-default px-3 text-sm text-foreground hover:bg-surface-secondary disabled:opacity-50 whitespace-nowrap'
 
 export function Section({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
@@ -40,6 +40,8 @@ export function Kpi({
   invert,
   sub,
   highlight,
+  href,
+  icon,
 }: {
   label: string
   value: string
@@ -47,11 +49,19 @@ export function Kpi({
   invert?: boolean
   sub?: string
   highlight?: boolean
+  /** Whole card links here (already-resolved path). */
+  href?: string
+  /** Small leading icon chip. */
+  icon?: React.ReactNode
 }) {
   const good = delta == null ? null : invert ? delta < 0 : delta > 0
-  return (
-    <div className={`bg-surface-elevated border rounded-xl p-4 flex flex-col gap-1 ${highlight ? 'border-accent-500/50' : 'border-border-default'}`}>
-      <p className="text-xs text-foreground-muted uppercase tracking-wide font-medium">{label}</p>
+  const cls = `bg-surface-elevated border rounded-xl p-4 flex flex-col gap-1 ${highlight ? 'border-accent-500/50' : 'border-border-default'} ${href ? 'hover:border-accent-400 transition-colors' : ''}`
+  const inner = (
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-foreground-muted uppercase tracking-wide font-medium truncate">{label}</p>
+        {icon && <span className="shrink-0 text-foreground-muted [&_svg]:w-4 [&_svg]:h-4">{icon}</span>}
+      </div>
       <p className={`text-xl font-bold tabular-nums ${highlight ? 'text-accent-500' : 'text-foreground'}`}>{value}</p>
       {delta != null && (
         <p className={`text-xs flex items-center gap-1 ${good ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
@@ -60,7 +70,14 @@ export function Kpi({
         </p>
       )}
       {sub && <p className="text-xs text-foreground-muted">{sub}</p>}
-    </div>
+    </>
+  )
+  return href ? (
+    <Link href={href} className={cls}>
+      {inner}
+    </Link>
+  ) : (
+    <div className={cls}>{inner}</div>
   )
 }
 

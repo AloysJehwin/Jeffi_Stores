@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { AlertCircle, RefreshCw, Unlink } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { formatCid, money } from '@/lib/google-ads/format'
@@ -16,7 +17,8 @@ export default function ManagedAccountsClient({ managerId, configured }: { manag
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const toast = useActionToast()
+  const setNotice = (t: string | null) => t && toast.success(t)
 
   const load = useCallback(async () => {
     setBusy('load')
@@ -67,7 +69,6 @@ export default function ManagedAccountsClient({ managerId, configured }: { manag
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> {error}
         </p>
       )}
-      {notice && <p className="text-sm text-green-700 dark:text-green-400">{notice}</p>}
       {accounts && (
         <div className="overflow-x-auto rounded-xl border border-border-default bg-surface-elevated">
           <table className="w-full text-sm">
@@ -110,7 +111,7 @@ export default function ManagedAccountsClient({ managerId, configured }: { manag
                     {confirm === a.customerId ? (
                       <span className="inline-flex items-center gap-2 text-xs">
                         Unlink{a.stores.length ? ' and disconnect the store' : ''}?
-                        <button type="button" className="rounded-md bg-red-600 px-2 py-1 text-white" disabled={!!busy} onClick={() => unlink(a.customerId)}>
+                        <button type="button" className="control-xs bg-red-600 text-white hover:bg-red-700" disabled={!!busy} onClick={() => unlink(a.customerId)}>
                           Unlink
                         </button>
                         <button type="button" className="text-foreground-muted" onClick={() => setConfirm(null)}>

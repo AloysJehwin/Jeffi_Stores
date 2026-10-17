@@ -74,7 +74,7 @@ export default function EcomCustomersMobileList({ tenants }: { tenants: Customer
           </div>
           <div className="mt-2 text-xs text-foreground-secondary capitalize">
             {isStore(t) ? <>{t.plan || '—'} · {price(t)}</> : 'Messaging / Documents · pay as you go'}
-            {t.store_request && <span className="ml-2 normal-case font-medium text-amber-700 dark:text-amber-300">Store upgrade</span>}
+            {t.store_request && <span className="ml-2 normal-case font-medium text-amber-700 dark:text-amber-400">Store upgrade</span>}
           </div>
         </MobileListCard>
       ))}

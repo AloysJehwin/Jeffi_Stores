@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { groupSyncErrors, countSyncErrorItems, type MerchantSyncError } from '@/lib/merchant/sync-errors'
+import { DataTable, Kpi, StatusBadge, btnGhost, btnPrimary, count, fieldInputCls, type DataCol, type StatusMap } from '@/components/admin/kit'
 
 interface Summary {
   last_refreshed_at: string | null
@@ -32,13 +33,13 @@ const STATUS_POLL_MS = 5000
 function SyncErrors({ errors }: { errors: MerchantSyncError[] }) {
   const groups = groupSyncErrors(errors)
   return (
-    <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/10 p-3 space-y-2">
-      <p className="text-xs font-semibold text-red-700 dark:text-red-300">
+    <div className="rounded-lg border border-red-500/40 bg-red-500/5 p-3 space-y-2">
+      <p className="text-xs font-semibold text-red-600 dark:text-red-400">
         Last push had {countSyncErrorItems(errors).toLocaleString()} error(s) across {groups.length} reason(s).
       </p>
       <ul className="space-y-1.5">
         {groups.map(g => (
-          <li key={g.reason} className="text-xs text-red-700 dark:text-red-300">
+          <li key={g.reason} className="text-xs text-red-600 dark:text-red-400">
             <details>
               <summary className="cursor-pointer">
                 <span className="font-semibold">{g.count.toLocaleString()}</span> {g.reason}
@@ -57,27 +58,22 @@ function SyncErrors({ errors }: { errors: MerchantSyncError[] }) {
 
 const PAGE_SIZE = 50
 
-function StatusBadge({ status }: { status: string | null }) {
-  const s = (status || 'unknown').toLowerCase()
-  const cls =
-    s === 'approved'
-      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-      : s === 'disapproved'
-        ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-        : s === 'pending'
-          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300'
-          : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
-  return <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${cls}`}>{s}</span>
+const ITEM_STATUS: StatusMap = {
+  approved: { label: 'approved', tone: 'green' },
+  disapproved: { label: 'disapproved', tone: 'red' },
+  pending: { label: 'pending', tone: 'amber' },
 }
 
-function StatCard({ label, value, tone }: { label: string; value: number; tone?: string }) {
-  return (
-    <div className="rounded-lg border border-border-default bg-surface p-3">
-      <p className={`text-2xl font-bold ${tone || 'text-foreground'}`}>{value.toLocaleString()}</p>
-      <p className="text-xs text-foreground-muted mt-0.5">{label}</p>
-    </div>
-  )
-}
+const ITEM_COLS: DataCol<Row>[] = [
+  { key: 'offer', label: 'Offer ID', render: r => <span className="font-mono text-xs">{r.offer_id}</span> },
+  { key: 'title', label: 'Title', render: r => <span className="block max-w-md truncate">{r.title || '-'}</span> },
+  { key: 'status', label: 'Status', render: r => <StatusBadge status={(r.status || 'unknown').toLowerCase()} map={ITEM_STATUS} /> },
+  {
+    key: 'issue',
+    label: 'Top issue',
+    render: r => <span className="block max-w-xs truncate text-xs text-foreground-secondary">{r.item_issues?.[0]?.description || (r.status === 'approved' ? '-' : '')}</span>,
+  },
+]
 
 export default function GoogleMerchantPanel() {
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -221,10 +217,10 @@ export default function GoogleMerchantPanel() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const btn =
-    'px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
+    'control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
 
   return (
-    <section className="rounded-lg border border-border-default bg-surface-elevated">
+    <section className="rounded-xl border border-border-default bg-surface-elevated">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-default px-4 py-3">
         <div className="flex items-center gap-2">
           {summary?.last_refreshed_at ? (
@@ -240,14 +236,14 @@ export default function GoogleMerchantPanel() {
             <button
               onClick={syncNow}
               disabled={syncing || syncRunning}
-              className="px-3 h-control-sm text-sm border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50 transition-colors"
+              className={btnGhost}
             >
               {syncing || syncRunning ? 'Syncing…' : 'Sync now (push to Google)'}
             </button>
             <button
               onClick={refresh}
               disabled={refreshing}
-              className="px-3 h-control-sm text-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 transition-colors"
+              className={btnPrimary}
             >
               {refreshing ? 'Refreshing…' : 'Refresh from Google'}
             </button>
@@ -261,12 +257,11 @@ export default function GoogleMerchantPanel() {
         ) : null}
         {syncStatus?.status === 'error' && syncStatus.errors?.length ? <SyncErrors errors={syncStatus.errors} /> : null}
 
-        {/* Summary cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <StatCard label="Total in feed" value={summary?.total ?? 0} />
-          <StatCard label="Approved" value={summary?.approved ?? 0} tone="text-green-600" />
-          <StatCard label="Pending" value={summary?.pending ?? 0} tone="text-amber-600" />
-          <StatCard label="Disapproved" value={summary?.disapproved ?? 0} tone="text-red-600" />
+          <Kpi label="Total in feed" value={count(summary?.total ?? 0)} />
+          <Kpi label="Approved" value={count(summary?.approved ?? 0)} />
+          <Kpi label="Pending" value={count(summary?.pending ?? 0)} />
+          <Kpi label="Disapproved" value={count(summary?.disapproved ?? 0)} />
         </div>
 
         {/* Filters */}
@@ -279,7 +274,7 @@ export default function GoogleMerchantPanel() {
                 if (e.key === 'Enter') doSearch()
               }}
               placeholder="Search SKU or title…"
-              className="px-3 h-control-sm text-sm border border-border-default rounded-lg bg-surface text-foreground w-64 max-w-full"
+              className={`${fieldInputCls} w-64 max-w-full`}
             />
             <button onClick={doSearch} className={btn}>
               Search
@@ -290,7 +285,7 @@ export default function GoogleMerchantPanel() {
               <button
                 key={st}
                 onClick={() => changeStatus(st)}
-                className={`px-2.5 h-control-sm text-xs rounded-lg border transition-colors ${statusFilter === st ? 'bg-accent-500 text-white border-accent-500' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                className={`control-sm text-xs border transition-colors ${statusFilter === st ? 'bg-accent-500 text-white border-accent-500' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
               >
                 {st}
               </button>
@@ -298,47 +293,24 @@ export default function GoogleMerchantPanel() {
           </div>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto rounded-lg border border-border-default">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary text-foreground-muted">
-              <tr>
-                <th className="text-left font-medium px-3 py-2">Offer ID</th>
-                <th className="text-left font-medium px-3 py-2">Title</th>
-                <th className="text-left font-medium px-3 py-2">Status</th>
-                <th className="text-left font-medium px-3 py-2">Top issue</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-foreground-muted">
-                    Loading…
-                  </td>
-                </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-3 py-6 text-center text-foreground-muted">
-                    {summary?.last_refreshed_at ? 'No items match.' : 'No data yet — click “Refresh from Google”.'}
-                  </td>
-                </tr>
-              ) : (
-                rows.map(r => (
-                  <tr key={r.offer_id} className="border-t border-border-default">
-                    <td className="px-3 py-2 font-mono text-xs text-foreground">{r.offer_id}</td>
-                    <td className="px-3 py-2 text-foreground max-w-md truncate">{r.title || '—'}</td>
-                    <td className="px-3 py-2">
-                      <StatusBadge status={r.status} />
-                    </td>
-                    <td className="px-3 py-2 text-xs text-foreground-secondary max-w-xs truncate">
-                      {r.item_issues?.[0]?.description || (r.status === 'approved' ? '—' : '')}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          rows={rows}
+          cols={ITEM_COLS}
+          rowKey={r => r.offer_id}
+          pageSize={PAGE_SIZE}
+          loading={loading}
+          empty={summary?.last_refreshed_at ? 'No items match.' : 'No data yet. Click "Refresh from Google".'}
+          mobileCard={r => (
+            <div className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-xs text-foreground truncate">{r.offer_id}</span>
+                <StatusBadge status={(r.status || 'unknown').toLowerCase()} map={ITEM_STATUS} />
+              </div>
+              <p className="text-sm text-foreground truncate">{r.title || '-'}</p>
+              {r.item_issues?.[0]?.description && <p className="text-xs text-foreground-muted">{r.item_issues[0].description}</p>}
+            </div>
+          )}
+        />
 
         {/* Pagination */}
         {total > PAGE_SIZE && (
