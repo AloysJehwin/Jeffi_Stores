@@ -7,6 +7,10 @@ name: Database
 on:
   workflow_call:
     inputs:
+      sha:
+        description: Commit to deploy (the one the checks ran on)
+        type: string
+        required: true
       run-schema:
         description: Apply the schema diff (database/ changed, or forced)
         type: boolean
@@ -30,6 +34,8 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: ./.github/actions/release-setup
         with:
           role-arn: ${{ secrets.AWS_ROLE_ARN }}
@@ -50,6 +56,8 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: ./.github/actions/release-setup
         with:
           role-arn: ${{ secrets.AWS_ROLE_ARN }}

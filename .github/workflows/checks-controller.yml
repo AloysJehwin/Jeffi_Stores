@@ -79,3 +79,11 @@ jobs:
           NEXT_PUBLIC_ENABLE_GST: ${{ secrets.NEXT_PUBLIC_ENABLE_GST }}
           NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
           NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+
+  passed:
+    name: Passed
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, unit, integration, build]
+    if: always()
+    steps:
+      - run: '[ "${{ needs.lint.result }}${{ needs.typecheck.result }}${{ needs.unit.result }}${{ needs.integration.result }}${{ needs.build.result }}" = successsuccesssuccesssuccesssuccess ] || { echo "::error::Lint ${{ needs.lint.result }}, Type check ${{ needs.typecheck.result }}, Unit ${{ needs.unit.result }}, Integration ${{ needs.integration.result }}, Build ${{ needs.build.result }}"; exit 1; }'
