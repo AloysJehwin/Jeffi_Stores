@@ -26,7 +26,7 @@ export default async function StoreStatusDetailPage({ params }: { params: Promis
   ])
 
   return (
-    <div className="p-6 w-full max-w-full min-w-0 overflow-x-hidden">
+    <div className="p-4 sm:p-6 space-y-5 w-full max-w-full min-w-0 overflow-x-hidden">
       <TenantObjectHeader
         tenant={t}
         backHref="/admin/ecom/store-status"

@@ -5,7 +5,9 @@ import { Trash2 } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
-import { TrendChart, type SeriesDef } from '@/components/admin/dashboard/Charts'
+import { TrendChart, type SeriesDef } from '@/components/admin/kit/charts'
+import { ErrorState } from '@/components/admin/kit/states'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { Badge, Empty, Kpi, KpiGrid, Section, Table, api, btnPrimary, count, inputCls, money, pct, when } from '@/components/admin/channels/ui'
 import Select from '@/components/ui/Select'
 
@@ -167,9 +169,8 @@ export function RepricerView({ d, onChanged }: { d: any; onChanged: () => void }
   const canPrice = useCanPrice()
   const [pending, setPending] = useState<Record<string, unknown> | null>(null)
   const [form, setForm] = useState({ sku: '', strategy: 'match_buybox', beatBy: '1', minPrice: '', maxPrice: '', minMarginPct: '5', autoApply: false })
-  const [notice, setNotice] = useState<string | null>(null)
+  const toast = useActionToast()
   const saveRule = async () => {
-    setNotice(null)
     const r = await api('/api/admin/amazon/console/rules', {
       method: 'PUT',
       json: {
@@ -183,7 +184,7 @@ export function RepricerView({ d, onChanged }: { d: any; onChanged: () => void }
       },
     })
     if (r.ok) onChanged()
-    else setNotice(r.data.problems?.[0] || r.data.error || 'Could not save the rule')
+    else toast.error(r.data.problems?.[0] || r.data.error || 'Could not save the rule')
   }
   return (
     <div className="space-y-5">
@@ -293,7 +294,6 @@ export function RepricerView({ d, onChanged }: { d: any; onChanged: () => void }
                 Save rule
               </button>
             </div>
-            {notice && <p className="text-xs text-red-500 md:col-span-7">{notice}</p>}
           </div>
         )}
       </Section>
@@ -309,6 +309,7 @@ export function OrdersStockView({ onChanged }: { onChanged: () => void }) {
   const [d, setD] = useState<any>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const toast = useActionToast()
   const [form, setForm] = useState<{ importOrders: boolean; pushStock: boolean; buffer: number } | null>(null)
   const load = async () => {
     const r = await api('/api/admin/amazon/orders')
@@ -323,14 +324,13 @@ export function OrdersStockView({ onChanged }: { onChanged: () => void }) {
   }, [])
   const run = async (key: string, url: string, method = 'POST', json?: unknown) => {
     setBusy(key)
-    setNotice(null)
     const r = await api(url, { method, json })
     setBusy(null)
-    setNotice(r.ok ? (r.data.status ? `Done (${r.data.status}).` : 'Saved.') : r.data.error || r.data.problems?.[0] || 'Failed')
+    toast.result({ ok: r.ok, text: r.ok ? (r.data.status ? `Done (${r.data.status}).` : 'Saved.') : r.data.error || r.data.problems?.[0] || 'Failed' })
     await load()
     onChanged()
   }
-  if (!d || !form) return <p className="text-sm text-foreground-muted">{notice ?? 'Loading...'}</p>
+  if (!d || !form) return notice ? <ErrorState body={notice} /> : <p className="text-sm text-foreground-muted">Loading...</p>
   const s = d.orders.summary ?? {}
   return (
     <div className="space-y-5">
@@ -370,7 +370,6 @@ export function OrdersStockView({ onChanged }: { onChanged: () => void }) {
               </button>
             </div>
           )}
-          {notice && <p className="text-xs text-foreground-muted">{notice}</p>}
         </div>
       </Section>
       <Section title="Amazon orders">

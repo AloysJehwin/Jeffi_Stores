@@ -283,19 +283,12 @@ export default function AdminLogin() {
   if (checkingSession) return null
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500 flex items-center justify-center px-4 py-10">
-      {/* Fixed dark layer behind the card fills the whole viewport incl. overscroll, so the
-            light body background never shows as a white band above/below. Sits at z-0 (not
-            negative, which would fall behind the body's own background and disappear). */}
-      <div
-        aria-hidden
-        className="fixed inset-0 z-0 bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500"
-      />
-      <div className="relative z-10 w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-white mb-3">{storeName}</h1>
-          <h2 className="text-2xl font-semibold text-white mb-2">Admin Panel</h2>
-          <p className="text-gray-300">
+    <div className="min-h-screen bg-surface-secondary flex items-center justify-center px-4 py-10">
+      <div className="w-full max-w-md rounded-xl border border-border-default bg-surface-elevated p-6 sm:p-8 shadow-sm">
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold text-foreground mb-2">{storeName}</h1>
+          <h2 className="text-lg font-semibold text-foreground mb-1">Admin Panel</h2>
+          <p className="text-sm text-foreground-muted">
             {step === 'identity' && 'Sign in to access the dashboard'}
             {step === 'verify' && 'Enter the 6-digit code from your authenticator app'}
             {step === 'enroll' && !recoveryCodes && 'Set up two-factor authentication'}
@@ -306,15 +299,15 @@ export default function AdminLogin() {
         <div className="mb-6">
           <div
             className={`
-                p-4 rounded-lg flex items-center gap-3 text-sm backdrop-blur-sm border
+                px-4 py-3 rounded-lg flex items-center gap-3 text-sm border
                 ${
                   certStatus === 'verified'
-                    ? 'bg-green-500/20 text-green-100 border-green-400/50'
+                    ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/40'
                     : certStatus === 'development'
-                      ? 'bg-yellow-500/20 text-yellow-100 border-yellow-400/50'
+                      ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/40'
                       : certStatus === 'not_found'
-                        ? 'bg-red-500/20 text-red-100 border-red-400/50'
-                        : 'bg-gray-500/20 text-gray-100 border-gray-400/50'
+                        ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/40'
+                        : 'bg-surface-secondary text-foreground-muted border-border-default'
                 }
               `}
           >
@@ -356,7 +349,7 @@ export default function AdminLogin() {
             )}
             {certStatus === 'checking' && (
               <>
-                <div className="w-5 h-5 flex-shrink-0 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-5 h-5 flex-shrink-0 border-2 border-foreground-muted border-t-transparent rounded-full animate-spin"></div>
                 <span className="font-medium">Checking certificate...</span>
               </>
             )}
@@ -365,10 +358,10 @@ export default function AdminLogin() {
 
         {error && (
           <div
-            className={`mb-4 backdrop-blur-sm border rounded-lg p-4 flex items-start gap-3 ${
+            className={`mb-4 border rounded-lg px-4 py-3 flex items-start gap-3 ${
               isCertError
-                ? 'bg-orange-500/20 border-orange-400/50 text-orange-100'
-                : 'bg-red-500/20 border-red-400/50 text-red-100'
+                ? 'bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-400'
+                : 'bg-red-500/10 border-red-500/40 text-red-600 dark:text-red-400'
             }`}
           >
             <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
@@ -390,10 +383,10 @@ export default function AdminLogin() {
                   type="button"
                   onClick={handleGoogle}
                   disabled={googleLoading || loading}
-                  className="w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-lg border border-white/15 bg-black/30 hover:bg-black/40 transition-colors text-sm font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="control-md w-full gap-3 border border-border-default bg-surface-elevated hover:bg-surface-secondary transition-colors font-medium text-foreground disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {googleLoading ? (
-                    <div className="w-5 h-5 border-2 border-white/40 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-foreground-muted border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                       <path
@@ -416,10 +409,10 @@ export default function AdminLogin() {
                   )}
                   {googleLoading ? 'Signing in…' : 'Continue with Google'}
                 </button>
-                <div className="flex items-center gap-3 text-gray-400 text-sm">
-                  <div className="flex-1 h-px bg-white/20" />
+                <div className="flex items-center gap-3 text-foreground-muted text-sm">
+                  <div className="flex-1 h-px bg-border-default" />
                   <span>or</span>
-                  <div className="flex-1 h-px bg-white/20" />
+                  <div className="flex-1 h-px bg-border-default" />
                 </div>
               </>
             )}
@@ -427,7 +420,7 @@ export default function AdminLogin() {
             {!otpSent ? (
               <form onSubmit={handleSendOtp} className="space-y-6">
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-white mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
                     Admin email
                   </label>
                   <input
@@ -439,14 +432,14 @@ export default function AdminLogin() {
                     required
                     autoFocus
                     autoComplete="email"
-                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
+                    className="field-md w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors"
                     placeholder={`you@${storeWeb || 'example.com'}`}
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg"
+                  className="control-md w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
                 >
                   {loading ? 'Sending code…' : 'Send verification code'}
                 </button>
@@ -454,8 +447,8 @@ export default function AdminLogin() {
             ) : (
               <form onSubmit={handleVerifyOtp} className="space-y-6">
                 <div>
-                  <label htmlFor="otp" className="block text-sm font-medium text-white mb-2">
-                    Enter the 6-digit code sent to <span className="text-white font-semibold">{email}</span>
+                  <label htmlFor="otp" className="block text-sm font-medium text-foreground mb-1.5">
+                    Enter the 6-digit code sent to <span className="text-foreground font-semibold">{email}</span>
                   </label>
                   <input
                     type="text"
@@ -467,14 +460,14 @@ export default function AdminLogin() {
                     autoFocus
                     inputMode="numeric"
                     autoComplete="one-time-code"
-                    className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all tracking-widest text-center text-xl"
+                    className="field-md w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors tracking-widest text-center text-xl"
                     placeholder="000000"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={loading || otp.length !== 6}
-                  className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg"
+                  className="control-md w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
                 >
                   {loading ? 'Verifying…' : 'Continue'}
                 </button>
@@ -486,7 +479,7 @@ export default function AdminLogin() {
                       setOtp('')
                       setError('')
                     }}
-                    className="text-gray-300 hover:text-white"
+                    className="text-foreground-muted hover:text-foreground"
                   >
                     ← Use a different email
                   </button>
@@ -494,12 +487,12 @@ export default function AdminLogin() {
                     type="button"
                     onClick={handleResendOtp}
                     disabled={resendCooldown > 0 || loading}
-                    className="text-gray-300 hover:text-white disabled:text-gray-500 disabled:cursor-not-allowed"
+                    className="text-foreground-muted hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
                   </button>
                 </div>
-                <p className="text-center text-xs text-gray-400">
+                <p className="text-center text-xs text-foreground-muted">
                   Didn&apos;t get the email? Check spam, or wait a moment and resend.
                 </p>
               </form>
@@ -510,7 +503,7 @@ export default function AdminLogin() {
         {step === 'verify' && (
           <form onSubmit={handleVerify} className="space-y-6">
             <div>
-              <label htmlFor="code" className="block text-sm font-medium text-white mb-2">
+              <label htmlFor="code" className="block text-sm font-medium text-foreground mb-1.5">
                 {useRecovery ? 'Enter a recovery code' : 'Enter the 6-digit code from your authenticator app'}
               </label>
               <input
@@ -523,14 +516,14 @@ export default function AdminLogin() {
                 autoFocus
                 autoComplete="one-time-code"
                 inputMode={useRecovery ? 'text' : 'numeric'}
-                className={`w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all text-center text-xl ${useRecovery ? 'font-mono' : 'tracking-widest'}`}
+                className={`field-md w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors text-center text-xl ${useRecovery ? 'font-mono' : 'tracking-widest'}`}
                 placeholder={useRecovery ? 'xxxx-xxxx' : '000000'}
               />
             </div>
             <button
               type="submit"
               disabled={loading || (!useRecovery && code.length !== 6)}
-              className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg"
+              className="control-md w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
             >
               {loading ? 'Verifying...' : 'Verify and Continue'}
             </button>
@@ -544,7 +537,7 @@ export default function AdminLogin() {
                   setCode('')
                   setError('')
                 }}
-                className="text-gray-300 hover:text-white"
+                className="text-foreground-muted hover:text-foreground"
               >
                 ← Use a different account
               </button>
@@ -555,7 +548,7 @@ export default function AdminLogin() {
                   setCode('')
                   setError('')
                 }}
-                className="text-gray-300 hover:text-white"
+                className="text-foreground-muted hover:text-foreground"
               >
                 {useRecovery ? 'Use authenticator code' : 'Lost your device? Use a recovery code'}
               </button>
@@ -565,7 +558,7 @@ export default function AdminLogin() {
 
         {step === 'enroll' && enrollData && !recoveryCodes && (
           <div className="space-y-5">
-            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4 text-sm text-gray-100 space-y-3">
+            <div className="bg-surface-secondary border border-border-default rounded-lg p-4 text-sm text-foreground-secondary space-y-3">
               <p>
                 Two-factor authentication is required for all admins. Open your authenticator app (Google Authenticator,
                 1Password, Authy, etc.) and scan this QR code:
@@ -573,14 +566,14 @@ export default function AdminLogin() {
               <div className="bg-white p-3 rounded-lg w-fit mx-auto">
                 <img src={enrollData.qr_data_url} alt="Scan to add to your authenticator" className="w-48 h-48" />
               </div>
-              <p className="text-xs text-gray-300">
+              <p className="text-xs text-foreground-muted">
                 Can&apos;t scan? Enter this secret manually:{' '}
-                <span className="font-mono text-white break-all">{enrollData.secret}</span>
+                <span className="font-mono text-foreground break-all">{enrollData.secret}</span>
               </p>
             </div>
             <form onSubmit={handleEnrollConfirm} className="space-y-4">
               <div>
-                <label htmlFor="enroll_code" className="block text-sm font-medium text-white mb-2">
+                <label htmlFor="enroll_code" className="block text-sm font-medium text-foreground mb-1.5">
                   Enter the 6-digit code shown by your app
                 </label>
                 <input
@@ -593,14 +586,14 @@ export default function AdminLogin() {
                   autoFocus
                   inputMode="numeric"
                   autoComplete="one-time-code"
-                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all tracking-widest text-center text-xl"
+                  className="field-md w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors tracking-widest text-center text-xl"
                   placeholder="000000"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || code.length !== 6}
-                className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg"
+                className="control-md w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
               >
                 {loading ? 'Confirming...' : 'Confirm and Finish Setup'}
               </button>
@@ -610,13 +603,13 @@ export default function AdminLogin() {
 
         {step === 'enroll' && recoveryCodes && (
           <div className="space-y-5">
-            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4 text-sm text-gray-100 space-y-3">
-              <p className="font-semibold text-white">Save these recovery codes now — they will not be shown again.</p>
+            <div className="bg-surface-secondary border border-border-default rounded-lg p-4 text-sm text-foreground-secondary space-y-3">
+              <p className="font-semibold text-foreground">Save these recovery codes now — they will not be shown again.</p>
               <p>
                 Use any one of these codes if you lose access to your authenticator. Each code works only once. Store
                 them in a password manager or print them.
               </p>
-              <div className="grid grid-cols-2 gap-2 font-mono text-white text-sm bg-black/40 p-3 rounded">
+              <div className="grid grid-cols-2 gap-2 font-mono text-foreground text-sm bg-surface border border-border-default p-3 rounded">
                 {recoveryCodes.map(c => (
                   <div key={c}>{c}</div>
                 ))}
@@ -624,7 +617,7 @@ export default function AdminLogin() {
               <button
                 type="button"
                 onClick={() => navigator.clipboard.writeText(recoveryCodes.join('\n'))}
-                className="text-xs text-accent-300 hover:text-accent-200 underline"
+                className="text-xs text-accent-600 hover:text-accent-500 underline"
               >
                 Copy all codes
               </button>
@@ -634,15 +627,15 @@ export default function AdminLogin() {
               onClick={() => {
                 window.location.href = callbackUrl
               }}
-              className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 text-white font-semibold py-4 px-6 rounded-lg transition-all shadow-lg text-lg"
+              className="control-md w-full bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
             >
               I&apos;ve saved them — continue to dashboard
             </button>
           </div>
         )}
 
-        <div className="mt-8 space-y-3">
-          <div className="flex items-center gap-2 text-sm text-gray-300 justify-center">
+        <div className="mt-6 space-y-2">
+          <div className="flex items-center gap-2 text-xs text-foreground-muted justify-center">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
@@ -652,7 +645,7 @@ export default function AdminLogin() {
             </svg>
             <span>Authorized Personnel Only</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-gray-300 justify-center">
+          <div className="flex items-center gap-2 text-xs text-foreground-muted justify-center">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
               <path

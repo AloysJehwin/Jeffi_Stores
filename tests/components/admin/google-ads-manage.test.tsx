@@ -74,7 +74,12 @@ describe('New campaign wizard', () => {
       }
       return ok({})
     })
-    render(<NewCampaignButton onCreated={onCreated} />)
+    // Check and create results are toasts.
+    render(
+      <ToastProvider>
+        <NewCampaignButton onCreated={onCreated} />
+      </ToastProvider>
+    )
     fireEvent.click(screen.getByLabelText('New campaign'))
 
     // Budget suggested from the last 30 days of revenue.

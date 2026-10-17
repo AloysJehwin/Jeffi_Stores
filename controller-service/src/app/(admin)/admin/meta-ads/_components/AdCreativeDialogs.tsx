@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Upload, X } from 'lucide-react'
+import { Loader2, Upload } from 'lucide-react'
 import Select from '@/components/ui/Select'
 import AiMediaButton from '@/components/admin/ai/AiMediaButton'
 import PreviewApply from '@/components/admin/channels/PreviewApply'
 import { uploadImage } from '@/components/admin/ImageUrlInput'
 import { api, btnGhost, btnPrimary, inputCls } from '@/components/admin/channels/ui'
+import { Dialog } from '@/components/admin/kit/dialog'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import { productUrl } from '@/lib/social/product-url'
@@ -24,20 +26,12 @@ interface Product {
   images: string[]
 }
 
+/** Kit dialog kept open on backdrop click and Esc so a half-built ad is not lost; the X closes. */
 function Shell({ title, onClose, children, footer }: { title: string; onClose: () => void; children: React.ReactNode; footer: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="bg-surface-elevated border border-border-default rounded-xl w-full max-w-2xl max-h-[90vh] overflow-auto p-5 space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-semibold text-foreground">{title}</h3>
-          <button type="button" aria-label="Close" onClick={onClose} className="text-foreground-muted hover:text-foreground">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        {children}
-        <div className="flex justify-end gap-2">{footer}</div>
-      </div>
-    </div>
+    <Dialog open onClose={onClose} title={title} size="lg" footer={footer} dismissible={false}>
+      <div className="space-y-4">{children}</div>
+    </Dialog>
   )
 }
 
@@ -117,16 +111,15 @@ function ProductSearch({ onPick }: { onPick: (p: Product) => void }) {
 function ImageChoice({ photos, value, onChange, prompt }: { photos: string[]; value: string; onChange: (url: string) => void; prompt: string }) {
   const file = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState<string | null>(null)
+  const toast = useActionToast()
   const reference = photos.includes(value) ? value : photos[0]
   async function upload(f: File | undefined) {
     if (!f) return
     setBusy(true)
-    setErr(null)
     try {
       onChange(await uploadImage(f))
     } catch (e: any) {
-      setErr(e.message)
+      toast.error(e.message)
     } finally {
       setBusy(false)
       if (file.current) file.current.value = ''
@@ -166,7 +159,6 @@ function ImageChoice({ photos, value, onChange, prompt }: { photos: string[]; va
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {value && !photos.includes(value) && <img src={value} alt="Chosen image" className="w-16 h-16 rounded object-cover border border-border-default" />}
       </div>
-      {err && <p className="text-xs text-red-600">{err}</p>}
     </div>
   )
 }

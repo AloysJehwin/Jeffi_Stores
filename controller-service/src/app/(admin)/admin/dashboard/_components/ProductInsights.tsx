@@ -4,24 +4,14 @@ import Link from 'next/link'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
 import type { DashboardAnalytics } from '@/lib/queries'
-import { RankedBars } from '@/components/admin/dashboard/Charts'
-import {
-  SectionCard,
-  SectionHeader,
-  CompactStat,
-  MiniStat,
-  Chip,
-  rs,
-  rsCompact,
-  pctStr,
-  numStr,
-} from '@/components/admin/dashboard/Primitives'
+import { Section, RankedBars, CompactStat, MiniStat, rs, rsCompact, pctStr, numStr, Badge } from '@/components/admin/kit'
+import { SectionLink } from './SectionLink'
 
-function convTone(v: number | null): 'neutral' | 'good' | 'warn' | 'bad' {
-  if (v == null) return 'neutral'
-  if (v >= 5) return 'good'
-  if (v >= 1) return 'warn'
-  return 'bad'
+function convTone(v: number | null): 'muted' | 'green' | 'amber' | 'red' {
+  if (v == null) return 'muted'
+  if (v >= 5) return 'green'
+  if (v >= 1) return 'amber'
+  return 'red'
 }
 
 export default function ProductInsights({ data, host }: { data: DashboardAnalytics; host: string }) {
@@ -32,9 +22,8 @@ export default function ProductInsights({ data, host }: { data: DashboardAnalyti
   const soldShare = c.activeProducts > 0 ? Math.round((c.productsSold / c.activeProducts) * 100) : 0
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-      <SectionCard>
-        <SectionHeader title="Catalog Health" actionLabel="Products" href={ap('/admin/products', host)} />
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <Section title="Catalog Health" action={<SectionLink href={ap('/admin/products', host)} label="Products" />}>
         <div className="grid grid-cols-2 gap-2">
           <CompactStat label="Active products" value={numStr(c.activeProducts)} href={ap('/admin/products', host)} />
           <CompactStat label="Sold in range" value={numStr(c.productsSold)} sub={`${soldShare}% of catalog`} />
@@ -60,13 +49,13 @@ export default function ProductInsights({ data, host }: { data: DashboardAnalyti
               label="Restock within 7 days"
               value={numStr(a.restockSoon)}
               sub="at current sell rate"
-              tone={a.restockSoon ? 'text-red-500 dark:text-red-400' : undefined}
+              tone={a.restockSoon ? 'text-red-500' : undefined}
               href={ap('/admin/inventory', host)}
             />
             <MiniStat
               label="Selling but out of stock"
               value={numStr(a.sellingButOut)}
-              tone={a.sellingButOut ? 'text-red-500 dark:text-red-400' : undefined}
+              tone={a.sellingButOut ? 'text-red-500' : undefined}
               href={ap('/admin/inventory', host)}
             />
             <MiniStat
@@ -79,19 +68,14 @@ export default function ProductInsights({ data, host }: { data: DashboardAnalyti
             <MiniStat
               label="Expired batches on hand"
               value={numStr(a.expiredBatches)}
-              tone={a.expiredBatches ? 'text-red-500 dark:text-red-400' : undefined}
+              tone={a.expiredBatches ? 'text-red-500' : undefined}
               href={ap('/admin/inventory', host)}
             />
           </div>
         )}
-      </SectionCard>
+      </Section>
 
-      <SectionCard>
-        <SectionHeader
-          title="Most Viewed vs Bought"
-          actionLabel={canTraffic ? 'Traffic' : undefined}
-          href={canTraffic ? ap('/admin/traffic', host) : undefined}
-        />
+      <Section title="Most Viewed vs Bought" action={<SectionLink href={canTraffic ? ap('/admin/traffic', host) : undefined} label={canTraffic ? 'Traffic' : undefined} />}>
         {topViewed.length === 0 ? (
           <p className="text-xs text-foreground-muted py-4 text-center">No product views recorded in this range.</p>
         ) : (
@@ -110,19 +94,14 @@ export default function ProductInsights({ data, host }: { data: DashboardAnalyti
                     {numStr(p.views)} views, {numStr(Math.round(p.units))} sold, {rs(p.revenue)}
                   </p>
                 </div>
-                <Chip tone={convTone(p.conversion)}>{p.conversion == null ? 'n/a' : `${p.conversion}% conv`}</Chip>
+                <Badge tone={convTone(p.conversion)}>{p.conversion == null ? 'n/a' : `${p.conversion}% conv`}</Badge>
               </Link>
             ))}
           </div>
         )}
-      </SectionCard>
+      </Section>
 
-      <SectionCard>
-        <SectionHeader
-          title={canFinancial ? 'Margin by Top Product' : 'Top Sellers by Revenue'}
-          actionLabel="Products"
-          href={ap('/admin/products', host)}
-        />
+      <Section title={canFinancial ? 'Margin by Top Product' : 'Top Sellers by Revenue'} action={<SectionLink href={ap('/admin/products', host)} label="Products" />}>
         <RankedBars
           barClass="bg-emerald-500"
           items={marginByProduct.map(m => ({
@@ -138,10 +117,9 @@ export default function ProductInsights({ data, host }: { data: DashboardAnalyti
               : `Cost price is set on ${money.costCoveragePct}% of units sold. Add cost prices to complete the picture.`}
           </p>
         )}
-      </SectionCard>
+      </Section>
 
-      <SectionCard>
-        <SectionHeader title="Demand Signals" />
+      <Section title="Demand Signals">
         <div className="space-y-0.5">
           <MiniStat label="Wishlist adds" value={numStr(e.wishlistAdds)} sub="in range" />
           <MiniStat
@@ -156,7 +134,7 @@ export default function ProductInsights({ data, host }: { data: DashboardAnalyti
             label="Searches with no results"
             value={numStr(e.zeroResultSearches)}
             sub={e.searches ? `${pctStr((e.zeroResultSearches / e.searches) * 100, 0)} of searches` : undefined}
-            tone={e.zeroResultSearches ? 'text-red-500 dark:text-red-400' : undefined}
+            tone={e.zeroResultSearches ? 'text-red-500' : undefined}
           />
         </div>
         {e.topZeroSearches.length > 0 && (
@@ -166,14 +144,14 @@ export default function ProductInsights({ data, host }: { data: DashboardAnalyti
             </p>
             <div className="flex flex-wrap gap-1.5">
               {e.topZeroSearches.map(z => (
-                <Chip key={z.query}>
+                <Badge key={z.query}>
                   {z.query} x{z.count}
-                </Chip>
+                </Badge>
               ))}
             </div>
           </div>
         )}
-      </SectionCard>
+      </Section>
     </div>
   )
 }

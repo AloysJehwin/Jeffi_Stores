@@ -3,12 +3,11 @@ import { queryMany } from '@/lib/shared/db'
 import { headers, cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
-import Link from 'next/link'
 import SupportRequestsAlert from '@/components/admin/SupportRequestsAlert'
 import AnalyticsDashboardClient from './_components/AnalyticsDashboardClient'
 import QuickActionBar from './_components/QuickActionBar'
 import PendingTasksCard from './_components/PendingTasksCard'
-import CollapsibleSection from '@/components/admin/CollapsibleSection'
+import { AttentionList, type AttentionItem } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
@@ -52,24 +51,6 @@ interface Alert {
   path: string
   scope?: string
   group: string
-}
-
-function AlertChip({ label, count, tone, href }: { label: string; count: number; tone: Tone; href: string }) {
-  const tones = {
-    amber: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/15',
-    red: 'bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-500/15',
-  }
-  const dots = { amber: 'bg-amber-500', red: 'bg-red-500' }
-  return (
-    <Link
-      href={href}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium shrink-0 transition-colors ${tones[tone]}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full ${dots[tone]}`} />
-      <span className="tabular-nums font-semibold">{count}</span>
-      <span>{label}</span>
-    </Link>
-  )
 }
 
 interface PendingTask {
@@ -301,7 +282,13 @@ export default async function AdminDashboard() {
     },
   ]
   const alerts = candidates.filter(x => x.count > 0 && (!x.scope || can(x.scope)))
-  const groups = Array.from(new Set(alerts.map(x => x.group)))
+  const attention: AttentionItem[] = alerts.map(x => ({
+    key: `${x.group}:${x.label}`,
+    severity: x.tone === 'red' ? 'critical' : 'warning',
+    title: `${x.count} ${x.label}`,
+    sub: x.group,
+    href: ap(x.path, host),
+  }))
 
   const opsBlock = (
     <div className="space-y-4">
@@ -313,43 +300,12 @@ export default async function AdminDashboard() {
   const footerBlock = (
     <div className="space-y-4">
       {canSeeTasks && <PendingTasksCard tasks={myTasks} viewAllHref={ap('/admin/tasks', host)} />}
-
-      <CollapsibleSection
-        title="Needs Attention"
-        count={alerts.length}
-        className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5"
-      >
-        {alerts.length > 0 ? (
-          <div className="space-y-3">
-            {groups.map(g => (
-              <div key={g} className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted w-20 shrink-0">
-                  {g}
-                </span>
-                {alerts
-                  .filter(x => x.group === g)
-                  .map(x => (
-                    <AlertChip key={x.label} label={x.label} count={x.count} tone={x.tone} href={ap(x.path, host)} />
-                  ))}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2.5 py-1 text-foreground-muted">
-            <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-500/10 text-green-600 dark:text-green-400 shrink-0">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </span>
-            <span className="text-sm">All clear. Nothing needs your attention right now.</span>
-          </div>
-        )}
-      </CollapsibleSection>
+      <AttentionList items={attention} title={`Needs attention${alerts.length ? ` (${alerts.length})` : ''}`} empty="All clear. Nothing needs your attention right now." />
     </div>
   )
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="p-4 sm:p-6">
       <AnalyticsDashboardClient
         initial={analytics}
         metrics={metrics}

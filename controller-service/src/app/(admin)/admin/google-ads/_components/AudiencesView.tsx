@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Loader2, RefreshCw, Target } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -10,6 +10,7 @@ import { useAdsManage } from './ManageContext'
 import { Section } from './ReportViews'
 import { Modal, btnGhost, btnPrimary, inputCls } from './wizard/fields'
 import Select from '@/components/ui/Select'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 // Audiences tab: Customer Match lists built from the store's own customers.
 
@@ -39,7 +40,8 @@ export default function AudiencesView({ d: initial }: { d: AudiencesData }) {
   const manage = useAdsManage()
   const [d, setD] = useState<AudiencesData>(initial)
   const [busy, setBusy] = useState<string | null>(null)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setMsg = useCallback((b: { ok: boolean; text: string } | null) => b && toast.result(b), [toast])
   const [attach, setAttach] = useState<AudienceView | null>(null)
   const [agree, setAgree] = useState(false)
   useEffect(() => setD(initial), [initial])
@@ -113,7 +115,6 @@ export default function AudiencesView({ d: initial }: { d: AudiencesData }) {
           </div>
         )}
 
-        {msg && <p className={`text-sm mb-3 ${msg.ok ? 'text-green-700 dark:text-green-400' : 'text-red-500'}`}>{msg.text}</p>}
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

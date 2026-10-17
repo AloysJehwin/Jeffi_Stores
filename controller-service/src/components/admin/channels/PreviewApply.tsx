@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { X } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { api, btnGhost, btnPrimary } from './ui'
+import { api, btnGhost, btnPrimary } from '@/components/admin/kit/core'
+import { Dialog } from '@/components/admin/kit/dialog'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 // Every console change: preview first (validation problems and before/after), then Apply.
 
@@ -42,6 +43,7 @@ export default function PreviewApply({
   const [result, setResult] = useState<Outcome | null>(null)
   const [busy, setBusy] = useState(true)
   const canWrite = useCanWrite(writeScope)
+  const toast = useActionToast()
 
   useEffect(() => {
     let live = true
@@ -61,19 +63,32 @@ export default function PreviewApply({
     setBusy(false)
     const out = r.data.summary ? r.data : { ok: false, preview: false, summary: '', problems: [r.data.error || 'Request failed'] }
     setResult(out)
+    if (out.ok) toast.success(out.summary ? `${out.summary}. Saved to the change history.` : 'Done. The change is in the change history.')
+    else toast.error(out.problems[0] || 'Request failed')
     if (out.ok) onDone?.(out.summary)
   }
 
   const shown = result ?? preview
   return (
-    <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="bg-surface-elevated border border-border-default rounded-xl w-full max-w-2xl max-h-[85vh] overflow-auto p-5 space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <h3 className="font-semibold text-foreground">{shown?.summary || 'Checking the change...'}</h3>
-          <button type="button" aria-label="Close" onClick={onClose} className="text-foreground-muted hover:text-foreground">
-            <X className="w-4 h-4" />
+    <Dialog
+      open
+      onClose={onClose}
+      size="lg"
+      title={shown?.summary || 'Checking the change...'}
+      footer={
+        <>
+          <button type="button" className={btnGhost} onClick={onClose}>
+            {result?.ok ? 'Close' : 'Cancel'}
           </button>
-        </div>
+          {!result?.ok && (
+            <button type="button" className={btnPrimary} disabled={busy || !preview?.ok || !canWrite} onClick={apply}>
+              {busy ? 'Working...' : applyLabel}
+            </button>
+          )}
+        </>
+      }
+    >
+      <div className="space-y-4">
         {shown?.problems?.length ? (
           <ul className="rounded-lg border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm list-disc pl-6 space-y-1">
             {shown.problems.map(p => (
@@ -81,7 +96,7 @@ export default function PreviewApply({
             ))}
           </ul>
         ) : null}
-        {result?.ok && <p className="rounded-lg border border-green-500/40 bg-green-500/5 px-4 py-3 text-sm">Done. The change is in the change history.</p>}
+        {result?.ok && <p className="text-sm text-foreground-muted">Applied. The change is in the change history.</p>}
         {shown && (shown.before !== undefined || shown.after !== undefined) && (
           <div className="grid gap-3 md:grid-cols-2 text-sm">
             <div>
@@ -94,17 +109,8 @@ export default function PreviewApply({
             </div>
           </div>
         )}
-        <div className="flex justify-end gap-2">
-          <button type="button" className={btnGhost} onClick={onClose}>
-            {result?.ok ? 'Close' : 'Cancel'}
-          </button>
-          {!result?.ok && (
-            <button type="button" className={btnPrimary} disabled={busy || !preview?.ok || !canWrite} onClick={apply}>
-              {busy ? 'Working...' : applyLabel}
-            </button>
-          )}
-        </div>
+        {!shown && <p className="text-sm text-foreground-muted">Asking the channel to validate the change...</p>}
       </div>
-    </div>
+    </Dialog>
   )
 }

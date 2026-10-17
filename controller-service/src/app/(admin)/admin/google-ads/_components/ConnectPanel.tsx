@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { inputCls, btnPrimary, btnGhost } from '@/components/admin/kit/core'
 import { AlertCircle, CheckCircle2, ExternalLink, Link2, Loader2 } from 'lucide-react'
 import type { AdsConnectionStatus } from '@/lib/google-ads/connection'
 import { formatCid } from '@/lib/google-ads/format'
@@ -16,12 +18,7 @@ interface AccountOption {
   managerName: string | null
 }
 
-const input =
-  'w-full rounded-lg border border-border-default bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500/40'
-const btnPrimary =
-  'inline-flex items-center gap-2 rounded-lg bg-accent-500 px-3 py-2 text-sm font-medium text-white hover:bg-accent-600 disabled:opacity-50'
-const btnGhost =
-  'inline-flex items-center gap-2 rounded-lg border border-border-default px-3 py-2 text-sm text-foreground hover:bg-surface-secondary disabled:opacity-50'
+const input = inputCls
 
 type Method = 'google' | 'manual' | 'manager' | 'create' | 'platform'
 
@@ -63,7 +60,7 @@ export default function ConnectPanel({
   const [skipped, setSkipped] = useState<{ customerId: string; reason: string }[]>([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const toast = useActionToast()
   const [manual, setManual] = useState({ customerId: '', loginCustomerId: '', refreshToken: '' })
   const [managed, setManaged] = useState('')
   const canWrite = useCanWrite('google_ads')
@@ -86,7 +83,6 @@ export default function ConnectPanel({
   async function post(body: Record<string, unknown>) {
     setBusy(true)
     setError(null)
-    setNotice(null)
     try {
       const r = await fetch('/api/admin/google-ads/connection', {
         method: 'POST',
@@ -96,7 +92,7 @@ export default function ConnectPanel({
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(d.error || 'Could not connect')
-      if (d.invited) setNotice(d.message)
+      if (d.invited) toast.success(d.message)
       else onChanged(d.status ?? null)
     } catch (e: any) {
       setError(e.message)
@@ -322,11 +318,6 @@ export default function ConnectPanel({
       {error && (
         <p className="text-sm text-red-600 dark:text-red-400 flex items-start gap-2">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> {error}
-        </p>
-      )}
-      {notice && (
-        <p className="text-sm text-green-700 dark:text-green-400 flex items-start gap-2">
-          <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> {notice}
         </p>
       )}
     </div>

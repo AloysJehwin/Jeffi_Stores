@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { useRouter } from 'next/navigation'
 
 export default function KycActionButtons({
@@ -16,7 +17,8 @@ export default function KycActionButtons({
   const [showReject, setShowReject] = useState(false)
   const [note, setNote] = useState('')
   const [err, setErr] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
+  const toast = useActionToast()
+  const setSuccess = (t: string | null) => t && toast.success(t)
 
   async function approve() {
     setBusy(true)
@@ -76,7 +78,6 @@ export default function KycActionButtons({
     return (
       <div className="flex flex-col items-end gap-1">
         {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
-        {success && <p className="text-xs text-green-600 dark:text-green-400">{success}</p>}
         <button
           onClick={retrySubscription}
           disabled={busy}
@@ -91,7 +92,6 @@ export default function KycActionButtons({
   return (
     <div className="flex flex-col gap-2 items-end">
       {err && <p className="text-xs text-red-600 dark:text-red-400">{err}</p>}
-      {success && <p className="text-xs text-green-600 dark:text-green-400">{success}</p>}
       {showReject ? (
         <div className="flex flex-col gap-2 w-72">
           <textarea
@@ -122,7 +122,7 @@ export default function KycActionButtons({
           <button
             onClick={() => setShowReject(true)}
             disabled={busy}
-            className="px-4 h-control rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition-colors"
+            className="px-4 h-control rounded-lg border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition-colors"
           >
             Reject
           </button>

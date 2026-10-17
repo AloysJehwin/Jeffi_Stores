@@ -27,8 +27,6 @@ export default function EcomTabs({
     { id: 'list' as const, label: listLabel, href: `${base}?tab=list` },
   ]
   return (
-    <div className="mb-6">
-      <TabLinks tabs={tabs} value={active} actions={actions} />
-    </div>
+    <TabLinks tabs={tabs} value={active} actions={actions} />
   )
 }
