@@ -9,7 +9,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import FormsPreview from './FormsPreview'
 import Toggle from '@/components/ui/Toggle'
 import AIFillForm from '@/components/admin/AIFillForm'
-import EditorToolbar from '@/components/admin/EditorToolbar'
+import { EditSessionActions } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { formsHostForHost } from '@/lib/tenancy/forms-host'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
@@ -308,15 +308,12 @@ export default function ReviewFormForm({
     <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
       {edit.sessionId && (
         <div className="xl:col-span-2 flex justify-end">
-          <EditorToolbar
+          <EditSessionActions
             autosaveStatus={'idle' as AutosaveStatus}
             sessionStatus={edit.status}
-            onSave={async () => {
-              await edit.save()
-            }}
             onCancel={edit.cancel}
             cancelHref={ap('/admin/review-forms')}
-            hideSave={true}
+            draft={isDraft || isCreateDraft}
           />
         </div>
       )}

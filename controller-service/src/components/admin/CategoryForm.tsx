@@ -7,7 +7,7 @@ import * as Icons from 'lucide-react'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
 import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
-import EditorToolbar from '@/components/admin/EditorToolbar'
+import { EditSessionActions } from '@/components/admin/kit'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import { FormButton, FormFooter, FormSection, fieldInputCls, useActionToast } from '@/components/admin/kit'
@@ -302,13 +302,12 @@ export default function CategoryForm({
       <FormSection title="Category" description="Name, icon, parent, ordering and description.">
         {edit.sessionId && (
           <div className="flex justify-end">
-            <EditorToolbar
+            <EditSessionActions
               autosaveStatus={'idle' as AutosaveStatus}
               sessionStatus={edit.status}
-              onSave={async () => { await edit.save() }}
               onCancel={edit.cancel}
               cancelHref={ap('/admin/categories')}
-              hideSave
+              draft={isDraft}
             />
           </div>
         )}
