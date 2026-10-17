@@ -6,6 +6,10 @@ name: Stores
 on:
   workflow_call:
     inputs:
+      sha:
+        description: Commit to deploy (the one the checks ran on)
+        type: string
+        required: true
       tag:
         type: string
         required: true
@@ -27,6 +31,8 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: ./.github/actions/release-setup
         with:
           role-arn: ${{ secrets.AWS_ROLE_ARN }}
@@ -44,6 +50,8 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
       - uses: ./.github/actions/release-setup
         with:
           role-arn: ${{ secrets.AWS_ROLE_ARN }}

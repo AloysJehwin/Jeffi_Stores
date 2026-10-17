@@ -1,6 +1,7 @@
 name: Service checks
 
-# One service's checks as their own nodes: Lint, Type check, Tests. Called from ci.yml once per service.
+# One service's checks as their own nodes (Lint, Type check, Tests) feeding its Passed node, so
+# each app gets its own lane in the graph. Called from ci.yml once per service.
 
 on:
   workflow_call:
@@ -59,3 +60,11 @@ jobs:
         with:
           install: ${{ inputs.install }}
       - run: ${{ inputs.test }}
+
+  passed:
+    name: Passed
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    if: always()
+    steps:
+      - run: '[ "${{ needs.lint.result }}${{ needs.typecheck.result }}${{ needs.test.result }}" = successsuccesssuccess ] || { echo "::error::Lint ${{ needs.lint.result }}, Type check ${{ needs.typecheck.result }}, Tests ${{ needs.test.result }}"; exit 1; }'

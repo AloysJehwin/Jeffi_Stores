@@ -1,20 +1,11 @@
 name: Jeffi Stores Pipeline
 
-# Checks (every PR and every release), one group per app, each check its own node:
+# Checks, on every PR and every push to main. One lane per app, each check its own node:
 #   Preflight
-#   Controller   Lint · Type check · Unit tests · Integration tests · Build (after Lint and Type check)
-#   Messaging    Lint · Type check · Tests        (same for Documents, Public API, AI gateway)
-#   → Checks passed (the one required status)
-#
-# Release (push to main, or workflow_dispatch with deploy=true), overlapping where it can:
-#   Release notes + Images (4, arm) run alongside the checks
-#   Checks passed + Release notes → Approve (production) → Database (Schema → Migrations)
-#   Database + Images → Platform → Stores (Tenant databases → Roll out) ─┬→ Verify
-#                                  └→ CloudFront ──────────────────────────┘
-# The schema is additive, so it lands while the old code runs; stores need the new controller first.
-# After the one approval every stage runs in `production-release` (no reviewer) over an SSM tunnel and a
-# failure stops the rest. dry_run (default on for workflow_dispatch) builds the images and shows each
-# stage's SQL, kubectl diff and targets without changing production; schema=true forces the schema stage.
+#   Controller   Lint · Type check · Unit tests · Integration tests · Build (after Lint and Type check) → Passed
+#   Messaging    Lint · Type check · Tests → Passed      (same for Documents, Public API, AI gateway)
+#   → Checks passed (the required status)
+# A green run on main starts the release (deploy.yml).
 
 on:
   pull_request:
@@ -22,20 +13,7 @@ on:
     types: [opened, synchronize, reopened]
   push:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      deploy:
-        description: Run the release path for this ref (pauses for approval)
-        type: boolean
-        default: false
-      dry_run:
-        description: Dry run — build images and show the database SQL, change nothing in production
-        type: boolean
-        default: true
-      schema:
-        description: Run the jeffi_stores schema step even if database/ is unchanged since the live commit
-        type: boolean
-        default: false
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -44,12 +22,7 @@ concurrency:
   group: pipeline-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  AWS_REGION: us-east-1
-
 jobs:
-  # ── Checks ────────────────────────────────────────────────────────────────────────────────────
-
   preflight:
     name: Preflight
     runs-on: ubuntu-latest
@@ -122,180 +95,3 @@ jobs:
           echo "AI gateway:  ${{ needs.ai-gateway.result }}"
           [ "${{ needs.preflight.result }}${{ needs.controller.result }}${{ needs.messaging.result }}${{ needs.documents.result }}${{ needs.public-api.result }}${{ needs.ai-gateway.result }}" = \
             "successsuccesssuccesssuccesssuccesssuccess" ] || { echo "::error::Checks failed"; exit 1; }
-
-  # ── Release (push to main, or workflow_dispatch with deploy=true) ──────────────────────────────
-
-  images:
-    name: Image ${{ matrix.service }}
-    runs-on: ubuntu-24.04-arm
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy)
-    permissions:
-      id-token: write
-      contents: read
-    strategy:
-      fail-fast: true
-      matrix:
-        service: [controller, messaging, documents, public-api]
-    outputs:
-      tag: ${{ steps.tag.outputs.tag }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # image_sha is the last commit that changed the image contents
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_BUILD_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-      - uses: docker/setup-buildx-action@v3
-      - uses: crazy-max/ghaction-github-runtime@v3 # exposes the cache endpoint buildx's gha cache needs
-      - id: tag
-        run: echo "tag=$(bash deploy/k8s/bootstrap/image-tag.sh)" >> "$GITHUB_OUTPUT"
-      - name: Build and push (skipped when the tag already exists)
-        env:
-          BUILDX_CACHE_ARGS: --cache-from type=gha,scope=${{ matrix.service }} --cache-to type=gha,mode=max,scope=${{ matrix.service }}
-          NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY: ${{ vars.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
-          NEXT_PUBLIC_ONDEVICE_MODEL_BASE: ${{ vars.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
-        run: bash deploy/k8s/bootstrap/build-push-ecr.sh "${{ matrix.service }}" "${{ steps.tag.outputs.tag }}"
-
-  release-notes:
-    name: Release notes
-    runs-on: ubuntu-latest
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy)
-    outputs:
-      tag: ${{ steps.notes.outputs.tag }}
-      schema: ${{ steps.notes.outputs.schema }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - id: notes
-        name: What this release changes
-        run: |
-          set -euo pipefail
-          tag=$(bash deploy/k8s/bootstrap/image-tag.sh)
-          live=$(curl -fsS --max-time 15 https://jeffistores.in/api/health | sed -nE 's/.*"commit":"([0-9a-f]+)".*/\1/p' || true)
-          {
-            echo "## Release $tag (HEAD ${GITHUB_SHA::8})"; echo
-            if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null; then
-              schema=$(git diff --name-only "$live..HEAD" -- database deploy/schema-diff.sh deploy/k8s/db/manual.sql ':(exclude)database/migrations')
-              migrations=$(git diff --name-only "$live..HEAD" -- database/migrations)
-              echo "Live: \`$live\`. Commits since:"; echo
-              git log --max-count=60 --format='- %h %s' "$live..HEAD" # no pipe: head would SIGPIPE git log under pipefail
-            else
-              # Unknown live commit: run both steps (each is idempotent and applies only what is missing).
-              schema="(live commit ${live:-unknown} not in this clone)"; migrations=$schema
-              echo "Live commit \`${live:-unknown}\` is not in this clone; the database steps will run in full."
-            fi
-            echo
-            if [ -n "$schema" ]; then echo "**Schema:** the deploy job applies the \`database/\` diff to jeffi_stores first:"; echo "$schema" | sed 's/^/- /'; else echo "**Schema:** unchanged."; fi
-            echo
-            if [ -n "$migrations" ]; then echo "**Migrations:** new \`database/migrations\` files:"; echo "$migrations" | sed 's/^/- /'; else echo "**Migrations:** no new files; the deploy job still runs any not yet recorded."; fi
-            echo; echo "Store tenant databases are updated during the rollout. Approve the \`production\` environment to proceed."
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "schema=$([ -n "$schema" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
-  approve:
-    name: Approve release
-    runs-on: ubuntu-latest
-    needs: [checks, release-notes]
-    if: needs.checks.result == 'success' && needs.release-notes.result == 'success'
-    environment:
-      name: production
-      url: https://jeffistores.in
-    steps:
-      - run: echo "Approved ${{ needs.release-notes.outputs.tag }}, dry_run=${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}"
-
-  database:
-    name: Database
-    needs: [release-notes, approve]
-    uses: ./.github/workflows/deploy-database.yml
-    secrets: inherit
-    permissions:
-      id-token: write
-      contents: read
-    with:
-      run-schema: ${{ needs.release-notes.outputs.schema == 'true' || (github.event_name == 'workflow_dispatch' && (inputs.dry_run || inputs.schema)) }}
-      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-
-  platform:
-    name: Platform
-    runs-on: ubuntu-latest
-    needs: [images, database]
-    environment: production-release
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/release-setup
-        with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
-      - name: Controller, messaging, documents, public-api and CronJobs at ${{ needs.images.outputs.tag }}
-        run: bash deploy/k8s/bootstrap/rollout.sh ${{ needs.images.outputs.tag }} platform ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '' }}
-
-  cdn:
-    name: CloudFront
-    runs-on: ubuntu-latest
-    needs: platform
-    if: success() && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
-    environment: production-release
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/release-setup
-        with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
-      - name: Invalidate CloudFront
-        env:
-          DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
-        run: |
-          set -euo pipefail
-          id=$(aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/*' --query 'Invalidation.Id' --output text)
-          aws cloudfront wait invalidation-completed --distribution-id "$DIST_ID" --id "$id"
-          echo "Invalidation $id complete"
-
-  stores:
-    name: Stores
-    needs: [images, platform]
-    uses: ./.github/workflows/deploy-stores.yml
-    secrets: inherit
-    permissions:
-      id-token: write
-      contents: read
-    with:
-      tag: ${{ needs.images.outputs.tag }}
-      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
-
-  verify:
-    name: Verify
-    runs-on: ubuntu-latest
-    needs: [images, stores, cdn]
-    if: ${{ !failure() && !cancelled() && needs.stores.result == 'success' }}
-    environment: production-release
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/release-setup
-        with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
-      - name: Smoke test (live commit and every host)
-        run: |
-          tag=${{ needs.images.outputs.tag }}
-          bash deploy/k8s/bootstrap/smoke.sh "${tag#local-}" ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '' }}
