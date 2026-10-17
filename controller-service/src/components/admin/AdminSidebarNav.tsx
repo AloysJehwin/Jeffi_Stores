@@ -586,7 +586,7 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
   if (collapsed) {
     return (
       <aside
-        className={`hidden md:flex flex-col w-12 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-full overflow-hidden`}
+        className={`hidden lg:flex flex-col w-12 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-full overflow-hidden`}
       >
         <nav className="flex flex-col items-center gap-0 p-1.5 flex-1 overflow-y-auto pt-2">
           {ungrouped.map(link => {
@@ -633,7 +633,7 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
   }
 
   return (
-    <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-full overflow-hidden">
+    <aside className="hidden lg:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-full overflow-hidden">
       <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
         {ungrouped.map(link => (
           <a

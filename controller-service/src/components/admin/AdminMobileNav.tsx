@@ -64,7 +64,7 @@ export default function AdminMobileNav({ navLinks, username, role }: AdminMobile
     <>
       <button
         type="button"
-        className="md:hidden p-2 text-gray-300 hover:text-white transition-colors"
+        className="lg:hidden p-2 text-gray-300 hover:text-white transition-colors"
         onClick={() => setIsOpen(true)}
         aria-label="Open navigation"
       >

@@ -74,13 +74,13 @@ export default function AdminShell({
         {/* Top bar — full width, spans above sidebar + content */}
         <div className="flex items-center px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0 gap-3">
           {/* Mobile hamburger */}
-          <div className="md:hidden flex items-center gap-2">
+          <div className="lg:hidden flex items-center gap-2">
             <AdminMobileNav navLinks={allNavLinks} username={displayName} role={role} />
             <span className="font-bold text-white text-sm truncate max-w-[9rem]">{brandName}</span>
           </div>
 
           {/* Brand title + collapse toggle — desktop; pinned to the far left */}
-          <div className="hidden md:flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-2">
             <button
               type="button"
               onClick={toggle}
