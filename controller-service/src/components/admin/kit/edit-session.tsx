@@ -47,7 +47,7 @@ export function EditSessionActions({
 
   return (
     <div className="flex items-center gap-2">
-      <AutosaveStatusPill status={autosaveStatus} />
+      {autosaveStatus !== 'idle' && <AutosaveStatusPill status={autosaveStatus} />}
       {draft && <Badge tone="amber">Draft</Badge>}
       <button
         type="button"
