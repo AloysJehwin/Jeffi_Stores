@@ -1,0 +1,18 @@
+name: Database report
+description: Puts the SQL a database stage applied (or would apply) in the job summary and uploads it.
+runs:
+  using: composite
+  steps:
+    - name: SQL (summary)
+      shell: bash
+      run: |
+        shopt -s nullglob
+        for f in "$OUT_DIR"/applied-schema-platform.sql "$OUT_DIR"/schema-*.sql; do
+          [ -s "$f" ] || continue
+          { echo "<details><summary>$(basename "$f") ($(grep -c ';' "$f") statements)</summary>"; echo; echo '```sql'; head -c 60000 "$f"; echo '```'; echo '</details>'; } >> "$GITHUB_STEP_SUMMARY"
+        done
+    - uses: actions/upload-artifact@v4
+      with:
+        name: db-${{ github.job }}
+        path: ${{ runner.temp }}/db
+        if-no-files-found: ignore
