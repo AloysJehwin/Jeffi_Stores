@@ -59,7 +59,6 @@ export function EditSessionActions({
   return (
     <div className="flex items-center gap-2">
       {autosaveStatus !== 'idle' && <AutosaveStatusPill status={autosaveStatus} />}
-      {draft && <Badge tone="amber">Draft</Badge>}
       {localNewer && (
         <button
           type="button"
