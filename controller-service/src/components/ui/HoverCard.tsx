@@ -97,7 +97,7 @@ export default function HoverCard({
       : null
 
   return (
-    <span ref={triggerRef} className="relative inline-flex" onMouseEnter={show} onMouseLeave={hide}>
+    <span ref={triggerRef} className="relative inline-flex max-w-full min-w-0" onMouseEnter={show} onMouseLeave={hide}>
       {trigger}
       {card}
     </span>
