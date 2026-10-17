@@ -474,7 +474,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
           </div>
 
           {preview && preview.length > 0 && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+            <div className="bg-surface-elevated rounded-xl border border-border-default">
               <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center justify-between">
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Preview — {selectedCategory?.name}</h2>
                 <span className="text-xs text-foreground-muted bg-surface px-2.5 py-1 rounded-full border border-border-default">

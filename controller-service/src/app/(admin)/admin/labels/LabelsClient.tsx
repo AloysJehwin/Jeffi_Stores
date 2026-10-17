@@ -276,7 +276,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
       {labelTab === 'serial' && <BatchSerialLabels mode="serial" labelSizes={labelSizes} />}
 
       {labelTab === 'product' && (
-        <div className="flex flex-col xl:flex-row gap-6 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
           {/* ── Left panel ── */}
           <div className="flex-1 min-w-0 space-y-4">
             {/* Size selector */}
@@ -324,51 +324,53 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
             </div>
 
             {/* Output + copies */}
-            <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-wrap items-center gap-4">
-              <div className="flex items-center gap-2">
-                {(['thermal', 'sheet'] as const).map(m => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setOutputMode(m)}
-                    className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-amber-500 bg-amber-500/5 text-amber-600 dark:text-amber-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
-                  >
-                    {m === 'thermal' ? 'Thermal (1/page)' : 'A4 sheet'}
-                  </button>
-                ))}
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  {(['thermal', 'sheet'] as const).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setOutputMode(m)}
+                      className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-amber-500 bg-amber-500/5 text-amber-600 dark:text-amber-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                    >
+                      {m === 'thermal' ? 'Thermal (1/page)' : 'A4 sheet'}
+                    </button>
+                  ))}
+                </div>
+                <label className="flex items-center gap-2 text-sm text-foreground-secondary">
+                  Copies
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={copies}
+                    onChange={e => setCopies(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+                    className="w-16 px-2 py-1 rounded-lg border border-border-default bg-surface text-sm"
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowPrice(v => !v)}
+                  title="Print price on label"
+                  className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-amber-500 bg-amber-500/5 text-amber-600 dark:text-amber-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                >
+                  Print Price: {showPrice ? 'On' : 'Off'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQrAction(v => !v)}
+                  title="QR opens quick actions when scanned"
+                  className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-amber-500 bg-amber-500/5 text-amber-600 dark:text-amber-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                >
+                  QR Action: {qrAction ? 'On' : 'Off'}
+                </button>
               </div>
-              <label className="flex items-center gap-2 text-sm text-foreground-secondary">
-                Copies
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={copies}
-                  onChange={e => setCopies(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
-                  className="w-16 px-2 py-1 rounded-lg border border-border-default bg-surface text-sm"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowPrice(v => !v)}
-                title="Print price on label"
-                className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-amber-500 bg-amber-500/5 text-amber-600 dark:text-amber-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
-              >
-                Print Price: {showPrice ? 'On' : 'Off'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setQrAction(v => !v)}
-                title="QR opens quick actions when scanned"
-                className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-amber-500 bg-amber-500/5 text-amber-600 dark:text-amber-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
-              >
-                QR Action: {qrAction ? 'On' : 'Off'}
-              </button>
               <button
                 type="button"
                 onClick={handleDownload}
                 disabled={selectedProducts.length === 0 || downloading}
-                className="ml-auto px-4 h-control rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 h-control rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {downloading
                   ? 'Generating…'
@@ -630,7 +632,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
           </div>
 
           {/* ── Right panel — preview ── */}
-          <div className="w-full xl:w-72 shrink-0">
+          <div className="w-full lg:w-72 shrink-0">
             <div className="bg-surface-elevated border border-border-default rounded-xl p-4 sticky top-4">
               <div className="flex items-center justify-between mb-1">
                 <h2 className="text-sm font-semibold text-foreground">Preview</h2>

@@ -732,7 +732,7 @@ export default function InventoryOverviewTab() {
         </Section>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {segments.length ? (
           <StockValueDonutCard segments={segments} total={money(stock.valueCost)} />
         ) : (
@@ -749,7 +749,7 @@ export default function InventoryOverviewTab() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-3">
           <MovementTrendCard data={mv.daily} hint="Units per day" />
           {mv.byType.length > 0 && (
@@ -783,7 +783,7 @@ export default function InventoryOverviewTab() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div id="dead-stock" className="scroll-mt-20">
           <Section
             title="Dead stock"

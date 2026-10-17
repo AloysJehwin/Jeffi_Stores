@@ -138,7 +138,7 @@ export function CashflowTab({ initialData }: { initialData: any }) {
       ) : (
         <>
           {selectedMonth && <CashflowMonthModal m={selectedMonth} all={data.monthly} onClose={() => setSelectedMonth(null)} />}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             <SummaryCard label="Total Cash In" value={formatINR(totals.cash_in)} />
             <SummaryCard label="PO Payments" value={formatINR(totals.po_payments)} />
             <SummaryCard label="Refunds Issued" value={formatINR(totals.refunds_out)} />

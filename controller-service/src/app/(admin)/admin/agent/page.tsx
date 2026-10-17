@@ -1034,7 +1034,7 @@ export default function AdminAgentPage() {
         <div className="flex flex-1 min-h-0">
           {/* History sidebar */}
           {showHistory && (
-            <aside className="w-64 border-r border-border-default bg-surface-secondary/50 flex flex-col shrink-0">
+            <aside className="hidden md:flex md:w-56 lg:w-64 border-r border-border-default bg-surface-secondary/50 flex-col shrink-0">
               <div className="px-3 py-2 border-b border-border-default flex items-center justify-between">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Chat history</p>
                 <button
@@ -1073,7 +1073,7 @@ export default function AdminAgentPage() {
 
           {/* Main chat area */}
           <div className="flex-1 flex flex-col min-w-0">
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3 min-h-0">
               {turns.length === 0 && !loading && (
                 <div className="text-center py-16">
                   <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent-500 to-secondary-500 flex items-center justify-center mx-auto mb-4">
@@ -1237,7 +1237,7 @@ export default function AdminAgentPage() {
             </div>
 
             {/* Input bar */}
-            <div className="border-t border-border-default p-3 flex flex-col gap-2 shrink-0">
+            <div className="border-t border-border-default p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex flex-col gap-2 shrink-0">
               {pendingFile && (
                 <div className="flex items-center gap-2 px-2 py-1.5 bg-surface-secondary rounded-lg text-xs">
                   <Paperclip className="w-3.5 h-3.5 text-foreground-muted shrink-0" />

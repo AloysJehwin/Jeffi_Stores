@@ -889,7 +889,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
                       {it.perishable && (
                         <tr className="bg-amber-500/5 border-t border-amber-500/20">
                           <td colSpan={7} className="px-4 py-3">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 items-start">
                               <div>
                                 <label className={labelCls}>
                                   Expiry Date <span className="text-red-500">*</span>
@@ -1433,6 +1433,21 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             options={[{ value: '', label: 'All suppliers' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
           />
         </div>
+        {(search || statusFilter || supplierFilter) && (
+          <div className="flex flex-col">
+            <span className={labelCls}>&nbsp;</span>
+            <button
+              onClick={() => {
+                setSearch('')
+                setStatusFilter('')
+                setSupplierFilter('')
+              }}
+              className="px-3 h-9 rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
       </div>
 
       {poDrafts.length > 0 && (

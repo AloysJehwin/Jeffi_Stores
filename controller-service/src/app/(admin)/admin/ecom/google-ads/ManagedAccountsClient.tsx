@@ -48,7 +48,7 @@ export default function ManagedAccountsClient({ managerId, configured }: { manag
 
   const total = (accounts ?? []).reduce((s, a) => s + (a.spend30d ?? 0), 0)
   return (
-    <div className="p-6 w-full space-y-5">
+    <div className="p-4 sm:p-6 w-full space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Google Ads accounts</h1>
@@ -69,8 +69,52 @@ export default function ManagedAccountsClient({ managerId, configured }: { manag
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" /> {error}
         </p>
       )}
+      {accounts && !accounts.length && (
+        <div className="md:hidden rounded-xl border border-border-default bg-surface-elevated p-6 text-center text-sm text-foreground-muted">
+          No client accounts under the manager yet.
+        </div>
+      )}
+      {accounts && !!accounts.length && (
+        <div className="md:hidden space-y-2">
+          {accounts.map(a => (
+            <div key={a.customerId} className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-foreground truncate">{a.name || 'Unnamed'}</span>
+                <span className="text-xs text-foreground-muted shrink-0">{formatCid(a.customerId)}</span>
+              </div>
+              <div className="text-xs text-foreground-muted truncate">
+                {a.stores.length ? a.stores.map(s => s.name).join(', ') : 'Not connected to a store'}
+              </div>
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="capitalize text-foreground-muted">
+                  {humanize(a.status)}
+                  {a.linkStatus && a.linkStatus !== 'ACTIVE' ? ` · link ${humanize(a.linkStatus)}` : ''}
+                </span>
+                <span className="font-semibold text-foreground tabular-nums">
+                  {a.spend30d == null ? (a.spendError ? 'error' : '-') : money(a.spend30d, a.currency || 'INR')}
+                </span>
+              </div>
+              <div className="flex justify-end pt-1">
+                {confirm === a.customerId ? (
+                  <span className="inline-flex items-center gap-2 text-xs">
+                    Unlink{a.stores.length ? ' and disconnect the store' : ''}?
+                    <button type="button" className="control-xs bg-red-600 text-white hover:bg-red-700" disabled={!!busy} onClick={() => unlink(a.customerId)}>
+                      Unlink
+                    </button>
+                    <button type="button" className="text-foreground-muted" onClick={() => setConfirm(null)}>
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <IconButton icon={Unlink} label="Unlink from the manager" variant="danger" busy={busy === a.customerId} onClick={() => setConfirm(a.customerId)} />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {accounts && (
-        <div className="overflow-x-auto rounded-xl border border-border-default bg-surface-elevated">
+        <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default bg-surface-elevated">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-foreground-muted border-b border-border-default">

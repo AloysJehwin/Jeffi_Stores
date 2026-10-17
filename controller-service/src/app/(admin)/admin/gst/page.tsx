@@ -415,7 +415,25 @@ export default function GSTPage() {
           hint={allInvoices.length > 0 ? `${allInvoices.filter(r => r.irn).length} generated · ${allInvoices.filter(r => !r.irn).length} pending` : undefined}
           flush
         >
-          <DataTable bare rows={keyed(allInvoices)} cols={irnCols} rowKey={kk} empty="No invoices in this period." />
+          <DataTable
+            bare
+            rows={keyed(allInvoices)}
+            cols={irnCols}
+            rowKey={kk}
+            empty="No invoices in this period."
+            mobileCard={r => (
+              <div className="space-y-1 rounded-xl border border-border-default bg-surface-elevated px-4 py-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="font-medium text-foreground">{r.invoice_number}</span>
+                  <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-foreground">{money(r.total_amount)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-foreground-secondary">
+                  <span>{fmtDate(r.invoice_date)}</span>
+                  <StatusBadge status={r.irn_status} map={IRN_STATUS} label={r.irn_status && IRN_STATUS[r.irn_status] ? undefined : 'No IRN'} />
+                </div>
+              </div>
+            )}
+          />
         </Card>
       )}
 
@@ -434,7 +452,25 @@ export default function GSTPage() {
                 <DataTable bare rows={keyed(itcData.supplierSummary)} cols={supplierCols} rowKey={kk} empty="No suppliers in this period." />
               </Card>
               <Card title="Line-level Detail" flush>
-                <DataTable bare rows={keyed(itcData.rows)} cols={itcCols} rowKey={kk} empty="No received purchase orders in this period." />
+                <DataTable
+                  bare
+                  rows={keyed(itcData.rows)}
+                  cols={itcCols}
+                  rowKey={kk}
+                  empty="No received purchase orders in this period."
+                  mobileCard={r => (
+                    <div className="space-y-1 rounded-xl border border-border-default bg-surface-elevated px-4 py-3 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-medium text-foreground">{r.po_number}</div>
+                          <div className="truncate text-xs text-foreground-secondary">{r.supplier_name}</div>
+                        </div>
+                        <span className="shrink-0 whitespace-nowrap font-semibold tabular-nums text-green-700 dark:text-green-400">{money(r.tax_amount)}</span>
+                      </div>
+                      <div className="text-xs text-foreground-muted">{r.product_name}</div>
+                    </div>
+                  )}
+                />
               </Card>
               <Note>
                 <span className="font-semibold">Note: </span>

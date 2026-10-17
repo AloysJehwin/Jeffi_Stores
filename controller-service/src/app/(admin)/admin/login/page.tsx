@@ -609,7 +609,7 @@ export default function AdminLogin() {
                 Use any one of these codes if you lose access to your authenticator. Each code works only once. Store
                 them in a password manager or print them.
               </p>
-              <div className="grid grid-cols-2 gap-2 font-mono text-foreground text-sm bg-surface border border-border-default p-3 rounded">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-foreground text-sm bg-surface border border-border-default p-3 rounded">
                 {recoveryCodes.map(c => (
                   <div key={c}>{c}</div>
                 ))}
@@ -617,7 +617,7 @@ export default function AdminLogin() {
               <button
                 type="button"
                 onClick={() => navigator.clipboard.writeText(recoveryCodes.join('\n'))}
-                className="text-xs text-accent-600 hover:text-accent-500 underline"
+                className="control-md w-full bg-surface-secondary hover:bg-surface text-foreground border border-border-default font-medium"
               >
                 Copy all codes
               </button>

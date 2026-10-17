@@ -278,56 +278,94 @@ export default async function CustomerDetailPage({
         }
       >
         {customer.recent_orders && customer.recent_orders.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
-                  <th className="px-5 py-2.5 text-left font-medium">Order #</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Date</th>
-                  <th className="px-3 py-2.5 text-right font-medium">Total</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Payment</th>
-                  <th className="px-3 py-2.5 text-left font-medium">Status</th>
-                  <th className="px-5 py-2.5 text-right font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {customer.recent_orders.map((order: any) => (
-                  <tr
-                    key={order.id}
-                    className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40"
-                  >
-                    <td className="whitespace-nowrap px-5 py-2.5 font-mono text-xs font-semibold text-foreground">
-                      #{order.order_number || order.id.slice(0, 8)}
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-foreground-secondary">{day(order.created_at)}</td>
-                    <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-foreground">
+          <>
+            {/* Mobile card list */}
+            <div className="md:hidden px-4 pb-4 pt-3 space-y-3">
+              {customer.recent_orders.map((order: any) => (
+                <Link
+                  key={order.id}
+                  href={ap(`/admin/orders/${order.id}`, host)}
+                  className="block rounded-lg border border-border-default bg-surface-elevated p-4"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs font-semibold text-foreground truncate">
+                        #{order.order_number || order.id.slice(0, 8)}
+                      </p>
+                      <p className="text-xs text-foreground-muted">{day(order.created_at)}</p>
+                    </div>
+                    <p className="font-semibold tabular-nums text-foreground whitespace-nowrap">
                       ₹
                       {Number(order.total_amount).toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
-                    </td>
-                    <td className="px-3 py-2.5">
+                    </p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className={badgeCls(paymentTone(order.payment_status))}>
                         {formatPaymentStatus(order.payment_status)}
                       </span>
-                    </td>
-                    <td className="px-3 py-2.5">
                       <span className={badgeCls(orderTone(order.status))}>{formatOrderStatus(order.status)}</span>
-                    </td>
-                    <td className="px-5 py-2.5 text-right">
-                      <Link
-                        href={ap(`/admin/orders/${order.id}`, host)}
-                        className="text-xs font-medium text-accent-500 hover:text-accent-600"
-                      >
-                        View →
-                      </Link>
-                    </td>
+                    </div>
+                    <span className="text-xs font-medium text-accent-500">View →</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
+                    <th className="px-5 py-2.5 text-left font-medium">Order #</th>
+                    <th className="px-3 py-2.5 text-left font-medium">Date</th>
+                    <th className="px-3 py-2.5 text-right font-medium">Total</th>
+                    <th className="px-3 py-2.5 text-left font-medium">Payment</th>
+                    <th className="px-3 py-2.5 text-left font-medium">Status</th>
+                    <th className="px-5 py-2.5 text-right font-medium" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {customer.recent_orders.map((order: any) => (
+                    <tr
+                      key={order.id}
+                      className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40"
+                    >
+                      <td className="whitespace-nowrap px-5 py-2.5 font-mono text-xs font-semibold text-foreground">
+                        #{order.order_number || order.id.slice(0, 8)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-foreground-secondary">{day(order.created_at)}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-foreground">
+                        ₹
+                        {Number(order.total_amount).toLocaleString('en-IN', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className={badgeCls(paymentTone(order.payment_status))}>
+                          {formatPaymentStatus(order.payment_status)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className={badgeCls(orderTone(order.status))}>{formatOrderStatus(order.status)}</span>
+                      </td>
+                      <td className="px-5 py-2.5 text-right">
+                        <Link
+                          href={ap(`/admin/orders/${order.id}`, host)}
+                          className="text-xs font-medium text-accent-500 hover:text-accent-600"
+                        >
+                          View →
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         ) : (
           <EmptyState bare title="No orders yet." />
         )}

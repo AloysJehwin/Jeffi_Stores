@@ -113,8 +113,8 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
   return (
     <div className="bg-surface border border-border-default rounded-xl overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-default bg-surface-secondary">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-border-default bg-surface-secondary">
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href={ap(`/admin/orders/${row.order_id}/view`)}
             className="text-sm font-semibold text-accent-500 hover:text-accent-600 underline"
@@ -130,7 +130,7 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
             {row.type}
           </span>
         </div>
-        <span className="text-xs text-foreground-muted">{new Date(row.created_at).toLocaleDateString('en-IN')}</span>
+        <span className="text-xs text-foreground-muted shrink-0">{new Date(row.created_at).toLocaleDateString('en-IN')}</span>
       </div>
 
       <div className="p-4 space-y-4">
@@ -182,11 +182,11 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
             <div className="divide-y divide-border-default border border-border-default rounded-lg overflow-hidden">
               {row.items.map(item => (
                 <div key={item.id} className="flex items-center justify-between px-3 py-2 bg-surface text-sm">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium text-foreground truncate">{item.product_name}</p>
                     {item.variant_name && <p className="text-xs text-foreground-secondary">{item.variant_name}</p>}
                   </div>
-                  <div className="text-right flex-shrink-0 ml-4">
+                  <div className="text-right flex-shrink-0 ml-4 max-w-[45%]">
                     <p className="text-foreground-secondary text-xs">
                       Qty {fmtQty(item.quantity)} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}
                     </p>

@@ -217,7 +217,7 @@ export default function SupplierDetailClient({
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
         <Card title="Contact">
           <Fields cols={1}>
             <Field label="Contact" value={s.contact_name} />

@@ -237,8 +237,8 @@ export default async function OrderDetailsPage({
       actions={
         <>
           {canPackingSlips && !isAllDigital && (
-            <span className="inline-flex items-center gap-1">
-              <a href={`/api/admin/packing-slips/${order.id}`} download title="Download Packing Slip" className={pill}>
+            <span className="inline-flex w-full sm:w-auto items-center gap-1">
+              <a href={`/api/admin/packing-slips/${order.id}`} download title="Download Packing Slip" className={`${pill} flex-1 sm:flex-none`}>
                 <Download className="h-4 w-4" /> Packing Slip
               </a>
               <a href={`/api/admin/packing-slips/${order.id}?inline=1`} target="_blank" rel="noopener noreferrer" title="Print Packing Slip" aria-label="Print Packing Slip" className={pillIcon}>
@@ -247,8 +247,8 @@ export default async function OrderDetailsPage({
             </span>
           )}
           {order.awb_number && (
-            <span className="inline-flex items-center gap-1">
-              <a href={`/api/admin/orders/${order.id}/shipping-label?size=4R`} download title="Download Shipping Label" className={pill}>
+            <span className="inline-flex w-full sm:w-auto items-center gap-1">
+              <a href={`/api/admin/orders/${order.id}/shipping-label?size=4R`} download title="Download Shipping Label" className={`${pill} flex-1 sm:flex-none`}>
                 <Truck className="h-4 w-4" /> Shipping Label
               </a>
               <a href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`} target="_blank" rel="noopener noreferrer" title="Print Shipping Label" aria-label="Print Shipping Label" className={pillIcon}>
@@ -258,13 +258,13 @@ export default async function OrderDetailsPage({
           )}
           {!order.original_order_id &&
             (order.invoice_number ? (
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex w-full sm:w-auto items-center gap-1">
                 <a
                   href={order.view_token ? `/invoice/${order.view_token}` : `/api/orders/${order.id}/invoice`}
                   target="_blank"
                   rel="noopener noreferrer"
                   title={`View Invoice ${order.invoice_number}`}
-                  className={pill}
+                  className={`${pill} flex-1 sm:flex-none`}
                 >
                   <Eye className="h-4 w-4" /> Invoice
                 </a>

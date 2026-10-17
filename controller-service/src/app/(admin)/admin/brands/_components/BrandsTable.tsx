@@ -169,7 +169,7 @@ export default function BrandsTable({
     {
       key: 'website',
       label: 'Website',
-      hideBelow: 'lg',
+      hideBelow: 'md',
       render: b =>
         b.website ? (
           <a href={b.website} target="_blank" rel="noopener noreferrer" className="text-accent-500 hover:underline" onClick={e => e.stopPropagation()}>

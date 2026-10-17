@@ -436,7 +436,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         </RequireAi>
       </RequireWrite>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
@@ -761,8 +761,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             <iframe
               title="Email preview"
               srcDoc={previewDoc}
-              className="w-full rounded-b-lg border-0 bg-white"
-              style={{ height: 520 }}
+              className="w-full rounded-b-lg border-0 bg-white h-[380px] md:h-[520px]"
               sandbox=""
             />
           </div>
@@ -942,13 +941,13 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               </button>
             </div>
           )}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex sm:ml-0 items-center gap-2 flex-wrap">
             <input
               type="email"
               value={testEmail}
               onChange={e => setTestEmail(e.target.value)}
               placeholder="your@email.com for test send"
-              className="h-control flex-1 min-w-[180px] max-w-xs px-3 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="h-control w-full sm:w-auto flex-1 sm:min-w-[180px] max-w-xs px-3 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             <button
               type="button"
@@ -972,7 +971,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                 if (edit.sessionId) await edit.cancel()
                 router.push(ap('/admin/campaigns'))
               }}
-              className="h-control ml-auto inline-flex items-center justify-center px-4 rounded-lg text-sm font-semibold border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+              className="h-control sm:ml-auto inline-flex items-center justify-center px-4 rounded-lg text-sm font-semibold border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
             >
               Cancel
             </button>

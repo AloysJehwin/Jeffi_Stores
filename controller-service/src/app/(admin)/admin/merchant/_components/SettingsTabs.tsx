@@ -246,7 +246,7 @@ export function ShippingView({ d, onChanged }: { d: any; onChanged: () => void }
         {!rows.length && <Empty msg="No shipping services on Google. Add one below or set them in Merchant Center." />}
         <div className="space-y-2">
           {rows.map((r, i) => (
-            <div key={i} className="grid gap-2 grid-cols-2 md:grid-cols-8 items-end rounded-lg border border-border-default p-2">
+            <div key={i} className="grid gap-2 grid-cols-2 md:grid-cols-4 xl:grid-cols-8 items-end rounded-lg border border-border-default p-2">
               <label className="text-xs text-foreground-muted md:col-span-2">
                 Service
                 <input className={inputCls} value={r.name} disabled={!canEdit} onChange={num(i, 'name')} />
@@ -311,7 +311,7 @@ export function ShippingView({ d, onChanged }: { d: any; onChanged: () => void }
           />
         )}
         {canEdit && (
-          <div className="grid gap-2 md:grid-cols-5 items-end mt-4 rounded-lg border border-border-default p-3">
+          <div className="grid gap-2 grid-cols-1 md:grid-cols-2 xl:grid-cols-5 items-end mt-4 rounded-lg border border-border-default p-3">
             <label className="text-xs text-foreground-muted">
               Label
               <input className={inputCls} value={policy.label} onChange={e => setPolicy(p => ({ ...p, label: e.target.value }))} />
@@ -320,14 +320,14 @@ export function ShippingView({ d, onChanged }: { d: any; onChanged: () => void }
               Days to return
               <input className={inputCls} type="number" min={1} value={policy.days} onChange={e => setPolicy(p => ({ ...p, days: e.target.value }))} />
             </label>
-            <label className="text-xs text-foreground-muted md:col-span-2">
+            <label className="text-xs text-foreground-muted col-span-full xl:col-span-2">
               Returns page URL
               <input className={inputCls} value={policy.uri} onChange={e => setPolicy(p => ({ ...p, uri: e.target.value }))} placeholder="https://yourstore.in/returns" />
             </label>
             <label className="text-xs flex items-center gap-1">
               <input type="checkbox" checked={policy.freeReturns} onChange={e => setPolicy(p => ({ ...p, freeReturns: e.target.checked }))} /> Free returns
             </label>
-            <div className="md:col-span-5 flex justify-end">
+            <div className="col-span-full flex justify-end">
               <button
                 type="button"
                 className={btnPrimary}

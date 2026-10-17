@@ -254,11 +254,7 @@ async function AddCategoryButton() {
   const role = h.get('x-user-role') || ''
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   if (!hasScope(role, scopes, 'categories:write')) return null
-  return (
-    <span className="hidden md:inline-flex">
-      <TabAction href={ap('/admin/categories/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Category" />
-    </span>
-  )
+  return <TabAction href={ap('/admin/categories/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Category" />
 }
 
 // Resolves searchParams (no DB — near-instant) then runs the stats/aggregate

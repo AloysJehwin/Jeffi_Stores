@@ -144,7 +144,7 @@ export default function OfferDetailClient({
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)] items-start">
+      <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)] items-start">
         <div className="space-y-4 min-w-0">
           <div className="space-y-5 rounded-xl border border-border-default bg-surface-elevated p-4 sm:p-5">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Offer details</h2>

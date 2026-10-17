@@ -173,7 +173,7 @@ export default function AmazonAdsConsole() {
         <>
           <div className="flex items-center gap-3 flex-wrap">
             <RangePresets value={range} onChange={setRange} endOffset={1} />
-            <span className="text-xs text-foreground-muted">
+            <span className="flex-1 min-w-0 truncate text-xs text-foreground-muted">
               {status.profileName} ({status.countryCode}) ·{' '}
               {status.connectedVia === 'manual' ? 'entered manually' : 'Amazon sign-in'}
             </span>

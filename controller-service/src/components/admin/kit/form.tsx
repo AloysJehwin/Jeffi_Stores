@@ -41,7 +41,12 @@ export function FormPage({ header, children, footer, onDirtyChange, guardUnload 
   }, [guardUnload, dirty])
   const mark = () => setDirty(true)
   return (
-    <div className="p-4 sm:p-6 space-y-5" onInput={mark} onChange={mark} onSubmit={() => setDirty(false)}>
+    <div
+      className="p-4 sm:p-6 pb-28 lg:pb-6 space-y-5"
+      onInput={mark}
+      onChange={mark}
+      onSubmit={() => setDirty(false)}
+    >
       {header}
       {children}
       {footer}
@@ -234,7 +239,7 @@ export function FormFooter({
 
   return (
     <div
-      className={`${sticky ? 'sticky bottom-0 z-10' : ''} flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80`}
+      className={`${sticky ? 'sticky bottom-0 z-10' : ''} flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-default bg-surface-elevated/95 px-4 py-3 pb-[max(env(safe-area-inset-bottom),0.75rem)] backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80`}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-foreground-muted">
         {autosaveNode}

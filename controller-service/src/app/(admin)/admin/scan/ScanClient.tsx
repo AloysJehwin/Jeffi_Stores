@@ -285,7 +285,7 @@ export default function ScanClient() {
     product && product.mrp > 0 ? Number((product.mrp * (1 + (product.gst_percentage || 0) / 100)).toFixed(2)) : null
 
   return (
-    <div className="min-h-screen bg-surface text-foreground flex flex-col">
+    <div className="h-full bg-surface text-foreground flex flex-col">
       {stage === 'idle' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-6 p-8">
           <div className="w-20 h-20 rounded-2xl bg-secondary-500/20 flex items-center justify-center">

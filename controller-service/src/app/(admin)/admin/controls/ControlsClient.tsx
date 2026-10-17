@@ -1046,7 +1046,7 @@ export default function ControlsClient({
                     </div>
 
                     {/* Row 2: Min / Max / Qty step */}
-                    <div className="grid grid-cols-3 gap-3 items-end">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                       <div>
                         <label className="block text-[10px] text-foreground-muted mb-0.5">Min qty *</label>
                         <input
@@ -1100,7 +1100,7 @@ export default function ControlsClient({
                     {suIsCustom && suDimension !== 'count' && (
                       <div className="border border-dashed border-border-secondary rounded p-2 space-y-1">
                         <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Measurements</p>
-                        <div className="grid grid-cols-4 gap-2 items-end">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
                           <div>
                             <label className="block text-[10px] text-foreground-muted mb-0.5">Unit</label>
                             <AdminSelect
@@ -1480,10 +1480,18 @@ export default function ControlsClient({
                       .join(', ')
                     return (
                       <div key={log.id} className={log.rolled_back_at ? 'opacity-50' : ''}>
-                        <button
-                          type="button"
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={isExpanded}
                           onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-surface transition-colors"
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              setExpandedLogId(isExpanded ? null : log.id)
+                            }
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-surface transition-colors cursor-pointer"
                         >
                           <svg
                             className={`w-3.5 h-3.5 shrink-0 text-foreground-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`}
@@ -1509,18 +1517,18 @@ export default function ControlsClient({
                             </p>
                           </div>
                           {!log.rolled_back_at && canWrite && (
-                            <span
-                              role="button"
+                            <button
+                              type="button"
                               onClick={e => {
                                 e.stopPropagation()
                                 handleRollback(log.id, opLabel)
                               }}
-                              className="shrink-0 px-2.5 py-1 rounded border border-border-secondary text-xs text-foreground-secondary hover:border-red-500/40 hover:text-red-600 transition-colors cursor-pointer"
+                              className="shrink-0 px-2.5 py-1 rounded border border-border-secondary text-xs text-foreground-secondary hover:border-red-500/40 hover:text-red-600 transition-colors"
                             >
                               Rollback
-                            </span>
+                            </button>
                           )}
-                        </button>
+                        </div>
 
                         {isExpanded && productRows.length > 0 && (
                           <div className="px-4 pb-3 space-y-1 bg-surface">

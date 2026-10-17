@@ -19,6 +19,7 @@ import {
   thCenter,
   theadCls,
   tableWrapCls,
+  tableWrapClippedCls,
   payoutBadge,
   inputCls,
 } from './shared'
@@ -165,7 +166,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
             <EmptyState title="No transactions found" />
           ) : (
             <>
-              <div className={`hidden md:block overflow-x-auto ${tableWrapCls}`}>
+              <div className={`hidden md:block overflow-x-auto ${tableWrapClippedCls}`}>
                 <table className="w-full text-sm">
                   <thead className={theadCls}>
                     <tr>

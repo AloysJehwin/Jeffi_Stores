@@ -114,7 +114,48 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
         </div>
       )}
 
-      <div className="overflow-x-auto">
+      {/* Mobile card list */}
+      <div className="md:hidden px-4 pb-3 pt-2 space-y-3">
+        {users.length === 0 ? (
+          <p className="py-6 text-center text-sm text-foreground-muted">No users found</p>
+        ) : (
+          users.map(u => (
+            <div key={u.id} className="rounded-lg border border-border-default bg-surface-elevated p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground truncate">
+                    {u.first_name || u.last_name ? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() : '—'}
+                  </p>
+                  <p className="text-xs text-foreground-muted truncate">{u.email}</p>
+                </div>
+                {u.times_used > 0 ? (
+                  <span className="shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
+                    {u.times_used}x used
+                  </span>
+                ) : (
+                  <span className="shrink-0 px-2 py-0.5 text-xs font-medium rounded-full bg-surface-secondary text-foreground-muted">
+                    Not used
+                  </span>
+                )}
+              </div>
+              {showRemove && (
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    disabled={removing === u.id}
+                    onClick={() => handleRemove(u.id)}
+                    className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40 transition-colors font-medium"
+                  >
+                    {removing === u.id ? '…' : 'Remove'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-secondary">
             <tr>
