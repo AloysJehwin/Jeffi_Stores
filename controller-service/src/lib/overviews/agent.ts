@@ -1,6 +1,6 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { ratio, type Period } from '@/lib/overview/period'
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { kpi, n, periodSql, plural, snapshot, type OverviewKpi } from './ops-kpi'
 
 // AI agent strip. Conversations and tool calls come from admin_agent_messages, actions from

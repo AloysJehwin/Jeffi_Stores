@@ -1,6 +1,6 @@
 import { queryOne } from '@/lib/shared/db'
 import { ratio, type Period } from '@/lib/overview/period'
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { kpi, n, periodSql, plural, snapshot, type OverviewKpi } from './ops-kpi'
 
 // Team strip. Sign-ins are admin sessions opened (auth_sessions); an admin is active in the

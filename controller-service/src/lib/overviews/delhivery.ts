@@ -1,4 +1,4 @@
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { EDD_ZONE_LABELS, eddZone, zoneTransitDays, type EddSettings, type EddZone } from '@/lib/shipping/edd'
 
 export const IN_TRANSIT_STATUSES = [

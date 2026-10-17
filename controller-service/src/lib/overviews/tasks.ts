@@ -1,6 +1,6 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import type { Period } from '@/lib/overview/period'
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { kpi, n, nn, periodSql, plural, snapshot, type OverviewKpi } from './ops-kpi'
 
 // Tasks strip over customer_tasks (the only task table). Open is pending or in progress;

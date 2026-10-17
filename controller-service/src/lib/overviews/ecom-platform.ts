@@ -1,6 +1,6 @@
 import type { Pool } from 'pg'
 import type { Period } from '@/lib/overview/period'
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 
 // Shared SQL and maths for the platform (control-plane) overviews: ecom customers, billing,
 // instances and store status. All of it reads the control-plane tables via controlPlanePool().

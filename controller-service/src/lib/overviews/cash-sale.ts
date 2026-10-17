@@ -1,5 +1,5 @@
 import type { Bucket, Period } from '@/lib/overview/period'
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import {
   BOUNDS,

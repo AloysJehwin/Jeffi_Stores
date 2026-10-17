@@ -1,4 +1,4 @@
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import type { Bucket } from '@/lib/overview/period'
 import { ratio } from '@/lib/overview/period'
 import { BOUNDS, bucketsCte, inBucket, num, numOrNull, periodCase, realized, str } from './marketing'

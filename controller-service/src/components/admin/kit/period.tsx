@@ -81,13 +81,8 @@ export function useOverviewData<T = any>(url: string | null): { data: T | null; 
   return { data: (mine?.data as T) ?? null, error: mine?.error ?? null, loading: !!url && !mine, reload: () => setKey(k => k + 1) }
 }
 
-export interface AttentionItem {
-  key: string
-  severity: 'critical' | 'warning' | 'info'
-  title: string
-  sub?: string
-  href?: string
-}
+import type { AttentionItem } from '@/lib/overview/attention'
+export type { AttentionItem }
 
 const SEV = {
   critical: { Icon: AlertCircle, cls: 'text-red-500' },

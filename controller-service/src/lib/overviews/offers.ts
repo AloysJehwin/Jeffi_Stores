@@ -1,4 +1,4 @@
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { SOLD_LINES, num } from './catalog'
 
 // Product offers (home-page slider offers in product_offers). Revenue with an offer = sales of

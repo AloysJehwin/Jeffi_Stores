@@ -1,4 +1,4 @@
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { inIst, num, numOrNull } from './catalog'
 
 // Bulk price runs (price_inflation_log). A run is a row with is_rollback = false; a rollback adds
