@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Star, X, GripVertical } from 'lucide-react'
 
 export interface EditorImage {
@@ -23,6 +23,8 @@ interface Props {
   onSetPrimary: (imageId: string) => void
   onReorder: (fromIndex: number, toIndex: number) => void
   onOpenGallery?: () => void
+  /** Extra buttons beside "Choose from Gallery", shown while slots remain. */
+  extraActions?: ReactNode
 }
 
 const SPINNER = (cls: string) => (
@@ -45,6 +47,7 @@ export default function ImageGalleryEditor({
   onSetPrimary,
   onReorder,
   onOpenGallery,
+  extraActions,
 }: Props) {
   const dragIndex = useRef<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
@@ -251,6 +254,7 @@ export default function ImageGalleryEditor({
             Choose from Gallery
           </button>
         )}
+        {slotsLeft > 0 && extraActions}
         <span className="text-[11px] text-foreground-muted">
           {used} of {maxImages} used
         </span>
