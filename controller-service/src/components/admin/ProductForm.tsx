@@ -3062,29 +3062,15 @@ export default function ProductForm({
     <>
     {popupVariant.sub_variant_type_on && (
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
-              Sub-Variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''}
-            </p>
-            {popupUnitKey && (
-              <span
-                className="text-[10px] font-semibold uppercase tracking-wide bg-accent-500/10 text-accent-600 px-1.5 py-0.5 rounded border border-accent-500/30"
-                title={`All sub-variant prices are per this base unit${popupUnitInfo?.inherited ? ' (inherited from product)' : ''}. Configure other units in Variant Units below.`}
-              >
-                per {popupUnitInfo?.displayLabel || popupUnitKey}
-                {popupUnitInfo?.inherited && (
-                  <span className="ml-1 normal-case font-normal text-foreground-muted">
-                    (inherited)
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
+        {popupUnitKey && (
           <p className="text-[11px] text-foreground-muted">
-            Pricing, stock and shipping are set per sub-variant.
+            Prices are per base unit{' '}
+            <span className="font-semibold text-foreground-secondary">
+              {popupUnitInfo?.displayLabel || popupUnitKey}
+            </span>
+            {popupUnitInfo?.inherited ? ' (inherited from product)' : ''}. Pricing, stock and shipping are set per sub-variant.
           </p>
-        </div>
+        )}
         {variantPopupId.startsWith('temp-') && (
           <div className="rounded-lg border border-dashed border-amber-400/60 bg-amber-500/5 p-3 flex items-center justify-between gap-3">
             <p className="text-xs text-foreground-secondary">
@@ -3103,25 +3089,6 @@ export default function ProductForm({
             >
               {isSubmitting ? 'Saving...' : 'Save (draft)'}
             </button>
-          </div>
-        )}
-        {svs.length > 1 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-xs text-foreground-muted">Jump to</span>
-            {svs.map((sv: any) => (
-              <button
-                key={sv.id}
-                type="button"
-                onClick={() =>
-                  document
-                    .querySelector(`[data-sub-variant-card="${sv.id}"]`)
-                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }
-                className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground"
-              >
-                {sv.sub_variant_name || sv.sku || 'Untitled sub-variant'}
-              </button>
-            ))}
           </div>
         )}
         {svs.length > 0 && (
@@ -3329,7 +3296,10 @@ export default function ProductForm({
             })}
           </div>
         )}
-        <div className="rounded-xl border border-dashed border-border-secondary p-4">
+        <div
+          data-add-subvariant-form={variantPopupId}
+          className="scroll-mt-24 rounded-xl border border-dashed border-border-secondary p-4"
+        >
           <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
             Add Sub-Variant
           </p>
@@ -5220,67 +5190,70 @@ export default function ProductForm({
               onConfirm={addVariantImagesFromGallery}
             />
           )}
-          {activeVariants.length > 1 && (
-            <div className="mb-3 flex flex-wrap items-center gap-1.5">
-              <span className="mr-1 text-xs text-foreground-muted">Jump to</span>
-              {activeVariants.map(v => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => {
-                    focusVariant(v.id)
-                    document.querySelector(`[data-variant-card="${v.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                  }}
-                  className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground"
-                >
-                  {v.variant_name || v.sku || 'Untitled variant'}
-                </button>
-              ))}
-            </div>
-          )}
-          {/* Variant Management Section */}
           {hasVariants && (
-            <div className="md:col-span-2 border border-border-default rounded-xl p-4 bg-surface-secondary/40">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Product Variants</h3>
-
-              {/* Buying Mode Groups */}
-              <div className="space-y-6">
-                {groups.length === 0 && (
-                  <div className="rounded-lg border border-dashed border-border-secondary p-6 text-center">
-                    <p className="text-sm text-foreground-muted mb-3">No variants yet.</p>
-                    <button
-                      type="button"
-                      onClick={() => addGroup('unit')}
-                      className="px-4 h-control text-sm font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface-secondary transition-colors"
-                    >
-                      + Add Variants
-                    </button>
+            <div className="space-y-4">
+              {/* Toolbar: differentiator + jump-to + add variant (flat row, not a card) */}
+              <div className="flex flex-wrap items-center gap-2">
+                {groups[0] && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-foreground-muted">Differentiator:</span>
+                    <input
+                      type="text"
+                      value={groups[0].variant_type}
+                      onChange={e => updateGroupVariantType(groups[0].pricing_type, e.target.value)}
+                      className="field-compact h-control-sm border border-border-secondary bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 focus:border-transparent w-36"
+                      placeholder="e.g. Size, Pack, Colour"
+                    />
                   </div>
                 )}
-                {groups.map(group => {
-                  const groupVariants = variants.filter(v => v.pricing_type === group.pricing_type && !v._isDeleted)
-                  const allGroupVariants = variants.filter(v => v.pricing_type === group.pricing_type)
+                {activeVariants.length > 1 && (
+                  <>
+                    <span className="ml-2 mr-0.5 text-xs text-foreground-muted">Jump to</span>
+                    {activeVariants.map(v => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => {
+                          focusVariant(v.id)
+                          document
+                            .querySelector(`[data-variant-card="${v.id}"]`)
+                            ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                        }}
+                        className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground"
+                      >
+                        {v.variant_name || v.sku || 'Untitled variant'}
+                      </button>
+                    ))}
+                  </>
+                )}
+                <div className="ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const g = groups[0]
+                      if (g) addVariantToGroup(g.pricing_type, g.unit)
+                      else addGroup('unit')
+                    }}
+                    className="control-sm border border-accent-500/40 text-accent-500 hover:bg-accent-500/10 font-medium"
+                  >
+                    + Add variant
+                  </button>
+                </div>
+              </div>
 
-                  return (
-                    <div key={group.pricing_type} className="border border-border-default rounded-lg">
-                      {/* Group header */}
-                      <div className="flex items-center justify-between px-4 py-3 bg-surface-secondary border-b border-border-default">
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs text-foreground-muted">Differentiator:</span>
-                            <input
-                              type="text"
-                              value={group.variant_type}
-                              onChange={e => updateGroupVariantType(group.pricing_type, e.target.value)}
-                              className="field-compact border border-border-secondary bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 focus:border-transparent w-36"
-                              placeholder="e.g. Size, Pack, Colour"
-                            />
-                          </div>
-                        </div>
-                      </div>
+              {groups.length === 0 && (
+                <div className="rounded-xl border border-dashed border-border-secondary p-6 text-center">
+                  <p className="text-sm text-foreground-muted">No variants yet. Click Add variant above to get started.</p>
+                </div>
+              )}
+              {groups.map(group => {
+                const groupVariants = variants.filter(v => v.pricing_type === group.pricing_type && !v._isDeleted)
+                const allGroupVariants = variants.filter(v => v.pricing_type === group.pricing_type)
 
+                return (
+                  <React.Fragment key={group.pricing_type}>
                       {/* Mobile cards */}
-                      <div className="md:hidden p-3 space-y-3">
+                      <div className="md:hidden space-y-3">
                         {groupVariants.map(variant => {
                           const index = variants.indexOf(variant)
                           const perUnit = null
@@ -5667,7 +5640,7 @@ export default function ProductForm({
                       </div>
 
                       {/* Desktop: one card per variant, details inline */}
-                      <div className="hidden md:block space-y-4 p-4">
+                      <div className="hidden md:block space-y-4">
                         {groupVariants.map(variant => {
                           const index = variants.indexOf(variant)
                           const pos = activeVariants.indexOf(variant)
@@ -5874,58 +5847,87 @@ export default function ProductForm({
                         })}
                       </div>
 
-                      {/* Add variant to group */}
-                      <div className="px-4 py-3 border-t border-border-default-default bg-surface">
-                        <button
-                          type="button"
-                          onClick={() => addVariantToGroup(group.pricing_type, group.unit)}
-                          className="px-3 h-control-sm text-xs font-medium text-accent-500 border border-accent-500/40 rounded-lg hover:bg-accent-500/10 transition-colors"
-                        >
-                          + Add Variant
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                  </React.Fragment>
+                )
+              })}
 
-              <p className="text-xs text-foreground-muted mt-4">
+              <p className="text-xs text-foreground-muted">
                 Stock is managed per variant. Product-level stock is not used when variants are enabled.
               </p>
             </div>
           )}
         </div>
         <div data-pf-tab="subvariants" role="tabpanel" hidden={activeTab !== 'subvariants'}>
-          {svParent && (
-            <section className="space-y-5 rounded-xl border border-border-default bg-surface-elevated p-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-foreground-secondary">Variant</span>
-                {subVariantParents.map(v => (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => setSvVariantId(v.id ?? null)}
-                    aria-pressed={v.id === svParent.id}
-                    className={`control-sm border ${
-                      v.id === svParent.id
-                        ? 'border-accent-500 bg-accent-500/10 text-foreground font-medium'
-                        : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'
-                    }`}
-                  >
-                    {v.variant_name || v.sku || 'Untitled variant'}
-                    <span className="ml-1 tabular-nums text-foreground-muted">({(subVariantsMap[v.id || ''] || []).length})</span>
-                  </button>
-                ))}
+          {svParent && (() => {
+            const svList = (svParent.id && subVariantsMap[svParent.id]) || []
+            return (
+              <div className="space-y-4">
+                {/* Toolbar: variant selector + jump-to + add sub-variant (flat row, not a card) */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-foreground-muted">Variant:</span>
+                  {subVariantParents.map(v => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => setSvVariantId(v.id ?? null)}
+                      aria-pressed={v.id === svParent.id}
+                      className={`control-sm border ${
+                        v.id === svParent.id
+                          ? 'border-accent-500 bg-accent-500/10 text-foreground font-medium'
+                          : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                      }`}
+                    >
+                      {v.variant_name || v.sku || 'Untitled variant'}
+                      <span className="ml-1 tabular-nums text-foreground-muted">
+                        ({(subVariantsMap[v.id || ''] || []).length})
+                      </span>
+                    </button>
+                  ))}
+                  {svList.length > 1 && (
+                    <>
+                      <span className="ml-2 mr-0.5 text-xs text-foreground-muted">Jump to</span>
+                      {svList.map((sv: any) => (
+                        <button
+                          key={sv.id}
+                          type="button"
+                          onClick={() =>
+                            document
+                              .querySelector(`[data-sub-variant-card="${sv.id}"]`)
+                              ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                          }
+                          className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground"
+                        >
+                          {sv.sub_variant_name || sv.sku || 'Untitled sub-variant'}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                  <div className="ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!svParent.id) return
+                        document
+                          .querySelector(`[data-add-subvariant-form="${svParent.id}"]`)
+                          ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                      }}
+                      disabled={!svParent.id || svParent.id.startsWith('temp-')}
+                      className="control-sm border border-accent-500/40 text-accent-500 hover:bg-accent-500/10 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      + Add sub-variant
+                    </button>
+                  </div>
+                </div>
+                {svParent.id &&
+                  renderSubVariants(
+                    svParent.id,
+                    svParent,
+                    variantUnitInfo[svParent.id]?.unitKey || '',
+                    variantUnitInfo[svParent.id] || null
+                  )}
               </div>
-              {svParent.id &&
-                renderSubVariants(
-                  svParent.id,
-                  svParent,
-                  variantUnitInfo[svParent.id]?.unitKey || '',
-                  variantUnitInfo[svParent.id] || null
-                )}
-            </section>
-          )}
+            )
+          })()}
         </div>
         <div data-pf-tab="units" role="tabpanel" hidden={activeTab !== 'units'}>
           {/* Selling Units (product-level — applies to every variant) */}
