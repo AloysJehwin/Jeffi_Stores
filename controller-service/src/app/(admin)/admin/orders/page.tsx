@@ -101,35 +101,17 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
     dir,
   })
 
-  const buildUrl = (p: number) => {
+  // Clone every param except `page` so advancing a page never drops ?tab=list or any filter.
+  const listParams = (p: number) => {
     const params = new URLSearchParams()
-    if (sp(resolvedSearchParams, 'status')) params.set('status', sp(resolvedSearchParams, 'status')!)
-    if (sp(resolvedSearchParams, 'payment_status'))
-      params.set('payment_status', sp(resolvedSearchParams, 'payment_status')!)
-    if (sp(resolvedSearchParams, 'source')) params.set('source', sp(resolvedSearchParams, 'source')!)
-    if (sp(resolvedSearchParams, 'search')) params.set('search', sp(resolvedSearchParams, 'search')!)
-    if (sort) params.set('sort', sort)
-    if (dir) params.set('dir', dir)
+    for (const [k, v] of Object.entries(resolvedSearchParams)) {
+      if (k !== 'page' && typeof v === 'string' && v) params.set(k, v)
+    }
     if (p > 1) params.set('page', String(p))
-    params.set('tab', 'list')
-    const qs = params.toString()
-    return ap(`/admin/orders${qs ? `?${qs}` : ''}`, host)
+    return params.toString()
   }
-
-  const currentListUrl = (() => {
-    const params = new URLSearchParams()
-    if (sp(resolvedSearchParams, 'status')) params.set('status', sp(resolvedSearchParams, 'status')!)
-    if (sp(resolvedSearchParams, 'payment_status'))
-      params.set('payment_status', sp(resolvedSearchParams, 'payment_status')!)
-    if (sp(resolvedSearchParams, 'source')) params.set('source', sp(resolvedSearchParams, 'source')!)
-    if (sp(resolvedSearchParams, 'search')) params.set('search', sp(resolvedSearchParams, 'search')!)
-    if (sort) params.set('sort', sort)
-    if (dir) params.set('dir', dir)
-    if (page > 1) params.set('page', String(page))
-    params.set('tab', 'list')
-    const qs = params.toString()
-    return `/admin/orders${qs ? `?${qs}` : ''}`
-  })()
+  const buildUrl = (p: number) => ap(`/admin/orders${listParams(p) ? `?${listParams(p)}` : ''}`, host)
+  const currentListUrl = `/admin/orders${listParams(page) ? `?${listParams(page)}` : ''}`
 
   return <OrdersTable orders={orders ?? []} total={total} page={page} pageSize={PAGE_SIZE} backUrl={currentListUrl} pageUrls={pageUrls(buildUrl)} />
 }

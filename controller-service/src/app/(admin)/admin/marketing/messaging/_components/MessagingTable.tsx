@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import MailerRowActions from '@/components/admin/MailerRowActions'
 import { ap } from '@/lib/shared/admin-path'
@@ -65,11 +66,14 @@ export default function MessagingTable({
 }) {
   const viewHref = (c: Campaign) =>
     ap(`/admin/marketing/messaging/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)
+  // Clone every param so advancing page keeps tab/filters; otherwise the parent Suspense re-keys.
+  const sp = useSearchParams()
   const pageHref = (p: number) => {
-    const qs = new URLSearchParams({ tab: 'list' })
-    if (search) qs.set('search', search)
+    const qs = new URLSearchParams(sp.toString())
     if (p > 1) qs.set('page', String(p))
-    return ap(`/admin/marketing/messaging?${qs}`, host)
+    else qs.delete('page')
+    const s = qs.toString()
+    return ap(`/admin/marketing/messaging${s ? `?${s}` : ''}`, host)
   }
 
   const cols: DataCol<Campaign>[] = [

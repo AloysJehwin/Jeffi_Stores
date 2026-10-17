@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Star, MessageSquare, FileText } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
@@ -74,10 +74,12 @@ export default function ReviewFormsTable({
   const editHref = (f: FormRow) => ap(`/admin/review-forms/${f.id}/edit?back=${encodeURIComponent(backUrl)}`)
   const url = (f: FormRow) => `${formsBase}/${f.slug}`
 
+  // Clone every param so advancing page keeps tab/filters; otherwise the parent Suspense re-keys.
+  const sp = useSearchParams()
   const pageHref = (p: number) => {
-    const params = new URLSearchParams({ tab: 'list' })
-    if (search) params.set('search', search)
+    const params = new URLSearchParams(sp.toString())
     if (p > 1) params.set('page', String(p))
+    else params.delete('page')
     const qs = params.toString()
     return ap(`/admin/review-forms${qs ? `?${qs}` : ''}`)
   }
