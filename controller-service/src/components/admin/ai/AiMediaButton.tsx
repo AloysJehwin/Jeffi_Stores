@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { Loader2, Sparkles, X } from 'lucide-react'
+import { Loader2, Sparkles } from 'lucide-react'
+import { Dialog } from '@/components/admin/kit'
 import { useCanUseAi, useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import Select from '@/components/ui/Select'
@@ -163,18 +163,30 @@ function AiMediaDialog({
   }
 
   if (!mounted) return null
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-label="AI image">
-      <div className="w-full max-w-2xl rounded-xl bg-surface-primary border border-border-default shadow-xl">
-        <div className="flex items-center justify-between border-b border-border-default px-4 py-3">
-          <div className="flex items-center gap-2 font-semibold">
-            <Sparkles className="w-4 h-4 text-accent-500" /> Generate image
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 hover:bg-surface-secondary">
-            <X className="w-4 h-4" />
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      size="lg"
+      title={(<span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-accent-500" />Generate image</span>) as unknown as string}
+      footer={(
+        <div className="flex items-center justify-end gap-2">
+          <button type="button" onClick={onClose} className="control-md rounded-lg border border-border-default px-3 text-xs font-semibold hover:bg-surface-secondary">
+            Close
+          </button>
+          <button
+            type="button"
+            onClick={generate}
+            disabled={busy || prompt.trim().length < 3}
+            className="control-md inline-flex items-center gap-1.5 rounded-lg bg-accent-500 px-3 text-xs font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+            {busy ? 'Generating…' : results ? 'Regenerate' : 'Generate'}
           </button>
         </div>
-        <div className="space-y-3 p-4">
+      )}
+    >
+      <div className="space-y-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-foreground-secondary">What to draw</label>
             <textarea
@@ -236,23 +248,7 @@ function AiMediaDialog({
               )}
             </>
           )}
-        </div>
-        <div className="flex items-center justify-end gap-2 border-t border-border-default px-4 py-3">
-          <button type="button" onClick={onClose} className="h-control rounded-lg border border-border-default px-3 text-xs font-semibold hover:bg-surface-secondary">
-            Close
-          </button>
-          <button
-            type="button"
-            onClick={generate}
-            disabled={busy || prompt.trim().length < 3}
-            className="inline-flex h-control items-center gap-1.5 rounded-lg bg-accent-500 px-3 text-xs font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
-          >
-            {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            {busy ? 'Generating…' : results ? 'Regenerate' : 'Generate'}
-          </button>
-        </div>
       </div>
-    </div>,
-    document.body
+    </Dialog>
   )
 }
