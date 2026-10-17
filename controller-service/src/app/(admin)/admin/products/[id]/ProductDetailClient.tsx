@@ -265,11 +265,19 @@ function Field({ label, value, mono }: { label: string; value?: any; mono?: bool
   )
 }
 
+// Sub-variants belong to a variant only while its "Has sub-variants" is on (an active
+// sub-variant also counts: rows added outside a publish do not set the flag). Rows left
+// behind by a turned-off toggle are not shown.
+function variantSubsShown(v: any): any[] {
+  const subs: any[] = Array.isArray(v?.sub_variants) ? v.sub_variants : []
+  return v?.sub_variant_type_on || subs.some(sv => sv?.is_active !== false) ? subs : []
+}
+
 function SubscriptionDetails({ p, variants }: { p: any; variants: any[] }) {
   const intervals: string[] = Array.isArray(p.subscription_intervals) ? p.subscription_intervals : []
   const offered = SUBSCRIPTION_INTERVALS.filter(i => intervals.includes(i))
   const subsByVariant: Record<string, any[]> = {}
-  for (const v of variants) subsByVariant[String(v.id)] = v.sub_variants || []
+  for (const v of variants) subsByVariant[String(v.id)] = variantSubsShown(v)
   const items = deriveSellableItems({
     hasVariants: !!p.has_variants,
     product: {
@@ -281,7 +289,7 @@ function SubscriptionDetails({ p, variants }: { p: any; variants: any[] }) {
     },
     variants: variants.map(v => ({
       ...v,
-      sub_variant_type_on: !!v.sub_variant_type_on || (v.sub_variants || []).length > 0,
+      sub_variant_type_on: variantSubsShown(v).length > 0,
     })),
     subVariantsByVariant: subsByVariant,
   })
@@ -1424,7 +1432,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
               </thead>
               <tbody className="divide-y divide-border-default">
                 {variants.map((v: any) => {
-                  const subVariants: any[] = v.sub_variants || []
+                  const subVariants: any[] = variantSubsShown(v)
                   const hasSubs = subVariants.length > 0
                   const vInventory = hasSubs
                     ? Number(v.sub_variant_inventory_total || 0)

@@ -160,6 +160,10 @@ describe('publishProductDraft — variant_images reconcile', () => {
       variant_images: [], // nothing staged, but the variant is active
     }
     mockQueryOne.mockResolvedValueOnce(draft as any)
+    // Active before publish too (a variant revived by this publish keeps its live images).
+    mockQueryMany.mockImplementation((sql: string) =>
+      Promise.resolve(typeof sql === 'string' && sql.includes('AS has_subs') ? [{ id: V_ID, has_subs: false }] : [])
+    )
     mockClientQuery.mockImplementation((sql: string) => {
       if (
         typeof sql === 'string' &&
