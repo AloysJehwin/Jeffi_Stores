@@ -4,13 +4,13 @@ name: Jeffi Stores Pipeline
 #
 #   Init ─┬→ Lint (5) ────────┬→ Build ───────────┐
 #         ├→ Type check (5) ──┘                    │
-#         ├→ Security                              ├→ Checks passed (required status)
+#         ├→ Security                              ├→ Checks passed (required status; on a release, the approval)
 #         ├→ Unit tests (5) ───────────────────────┤
 #         ├→ Integration tests ────────────────────┘
 #         └→ Images (4, release only, after Lint and Type check)
 #
-# Release (push to main, or workflow_dispatch with deploy=true), one approval then:
-#   Approve → DB · flagship (schema, migrations) → Deploy · flagship ─┬→ Smoke · flagship ─→ DB · tenant (schema,
+# Release (push to main, or workflow_dispatch with deploy=true): Checks passed waits for the one approval, then:
+#   Checks passed (approval) → DB · flagship (schema, migrations) → Deploy · flagship ─┬→ Smoke · flagship ─→ DB · tenant (schema,
 #                                                                    └→ CloudFront        migrations) → Deploy · tenants
 #           → Smoke · tenants → Post
 # Schema and migrations share one card (a matrix run one at a time, in order); CloudFront runs beside the smoke
@@ -254,31 +254,29 @@ jobs:
   checks:
     name: Checks passed
     runs-on: ubuntu-latest
-    needs: [init, lint, typecheck, security, test, integration, build]
-    if: always()
+    needs: [init, lint, typecheck, security, test, integration, build, images]
+    # A PR (or a release whose checks all passed) runs this; a release with a failed check skips it, so nobody is
+    # asked to approve a broken build. On a release it is also the approval: the `production` environment.
+    if: ${{ always() && (needs.init.outputs.release != 'true' || (needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.test.result == 'success' && needs.integration.result == 'success' && needs.build.result == 'success' && needs.images.result == 'success')) }}
+    environment:
+      name: ${{ needs.init.outputs.release == 'true' && 'production' || '' }}
+      url: ${{ needs.init.outputs.release == 'true' && 'https://jeffistores.in' || '' }}
     steps:
       - name: Every check succeeded
         run: |
           r="${{ needs.init.result }} ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.security.result }} ${{ needs.test.result }} ${{ needs.integration.result }} ${{ needs.build.result }}"
           echo "Init, Lint, Type check, Security, Unit tests, Integration tests, Build: $r"
           [ "$r" = "success success success success success success success" ] || { echo "::error::Checks failed"; exit 1; }
+      - name: Approved for release
+        if: needs.init.outputs.release == 'true'
+        run: echo "Approved ${GITHUB_SHA::8} ${{ env.DRY_FLAG }}"
 
   # ── Release: one approval, then flagship before tenants ──────────────────────────────────────
-
-  approve:
-    name: Approve release
-    runs-on: ubuntu-latest
-    needs: [checks, images] # images only exist on a release, so a PR never reaches the approval
-    environment:
-      name: production
-      url: https://jeffistores.in
-    steps:
-      - run: echo "Approved ${{ github.sha }} ${{ env.DRY_FLAG }}"
 
   db-flagship:
     name: DB · flagship ${{ matrix.step }}
     runs-on: ubuntu-latest
-    needs: approve
+    needs: checks
     strategy:
       max-parallel: 1 # one card, run in order: both alter jeffi_stores and migrations expect the schema
       fail-fast: true
