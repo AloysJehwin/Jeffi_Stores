@@ -183,9 +183,8 @@ export default function ProductsTableClient({
       key: 'name',
       label: 'Product',
       sortParam: 'name',
-      className: 'max-w-[320px]',
       render: product => (
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 max-w-[320px]">
           <div className="flex-shrink-0 h-10 w-10">
             <ProductImage thumbnailUrl={thumb(product)} altText={product.name} />
           </div>

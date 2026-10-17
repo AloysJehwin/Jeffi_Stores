@@ -82,7 +82,7 @@ export function Kpi({
 }
 
 export function KpiGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6">{children}</div>
+  return <div className="grid gap-3 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(150px,1fr))]">{children}</div>
 }
 
 export type { Tone }
@@ -333,7 +333,7 @@ export function Table<T>({ rows, cols, rowKey, empty, pageSize = PAGE }: { rows:
             {shown.map(r => (
               <tr key={rowKey(r)} className="border-b border-border-default/60 last:border-0">
                 {cols.map(c => (
-                  <td key={c.key} className={`py-2 px-2 align-top ${c.num ? 'text-right tabular-nums whitespace-nowrap' : ''}`}>
+                  <td key={c.key} className={`whitespace-nowrap py-2 px-2 align-top ${c.num ? 'text-right tabular-nums' : ''}`}>
                     {c.render(r)}
                   </td>
                 ))}
