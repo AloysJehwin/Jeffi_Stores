@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { pageUrls } from '@/lib/admin/page-urls'
 import { getFilteredOrders, getRevenueTrendBySource } from '@/lib/queries'
 import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
 import { ap } from '@/lib/shared/admin-path'
@@ -129,7 +130,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
     return `/admin/orders${qs ? `?${qs}` : ''}`
   })()
 
-  return <OrdersTable orders={orders ?? []} total={total} page={page} pageSize={PAGE_SIZE} backUrl={currentListUrl} pageHref={buildUrl} />
+  return <OrdersTable orders={orders ?? []} total={total} page={page} pageSize={PAGE_SIZE} backUrl={currentListUrl} pageUrls={pageUrls(buildUrl)} />
 }
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {

@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { pageUrls } from '@/lib/admin/page-urls'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
 import { cookies, headers } from 'next/headers'
@@ -80,7 +81,7 @@ async function ProductsListContent({
       total={total}
       page={page}
       pageSize={PAGE_SIZE}
-      pageHref={buildUrl}
+      pageUrls={pageUrls(buildUrl)}
       backUrl={currentListUrl}
       isSuperAdmin={isSuperAdmin}
       canWrite={canWrite}

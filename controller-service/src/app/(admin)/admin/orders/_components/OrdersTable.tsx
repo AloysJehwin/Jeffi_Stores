@@ -1,5 +1,6 @@
 'use client'
 
+import { pageHrefFrom, type PageUrls } from '@/lib/admin/page-urls'
 import { useState } from 'react'
 import Link from 'next/link'
 import { Mail, Phone } from 'lucide-react'
@@ -58,7 +59,7 @@ function CustomerPopover({ order }: { order: any }) {
   )
 }
 
-export default function OrdersTable({ orders, total, page, pageSize, backUrl, pageHref }: { orders: any[]; total: number; page: number; pageSize: number; backUrl: string; pageHref: (p: number) => string }) {
+export default function OrdersTable({ orders, total, page, pageSize, backUrl, pageUrls }: { orders: any[]; total: number; page: number; pageSize: number; backUrl: string; pageUrls: PageUrls }) {
   const canPackingSlips = useHasScope('packing_slips:read')
   const [selected, setSelected] = useState<any>(null)
   const viewHref = (o: any) => ap(`/admin/orders/${o.id}/view?back=${encodeURIComponent(backUrl)}`)
@@ -151,7 +152,7 @@ export default function OrdersTable({ orders, total, page, pageSize, backUrl, pa
         total={total}
         page={page}
         pageSize={pageSize}
-        pageHref={pageHref}
+        pageHref={pageHrefFrom(pageUrls)}
         onRowClick={setSelected}
         mobile={<OrdersMobileList orders={orders} backUrl={backUrl} />}
         empty="No orders found."
