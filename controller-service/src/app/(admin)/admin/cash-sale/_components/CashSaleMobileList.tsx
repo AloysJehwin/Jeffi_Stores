@@ -1,5 +1,7 @@
 'use client'
 
+import { badgeCls } from '@/components/admin/kit/tones'
+
 import { useState } from 'react'
 import { ap } from '@/lib/shared/admin-path'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
@@ -102,12 +104,12 @@ export default function CashSaleMobileList({ sales, canWrite, cancellingId, paym
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`px-2 py-0.5 rounded-full text-xs font-medium ${paymentColors[sale.payment_status] || ''}`}
+                className={paymentColors[sale.payment_status] || ''}
               >
                 {sale.payment_status}
               </span>
               {sale.status === 'cancelled' && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                <span className={badgeCls('red')}>
                   Cancelled
                 </span>
               )}
@@ -137,12 +139,12 @@ export default function CashSaleMobileList({ sales, canWrite, cancellingId, paym
           <div className="px-5 py-4 space-y-3 text-sm">
             <div className="flex flex-wrap gap-2">
               <span
-                className={`px-2 py-0.5 rounded-full text-xs font-medium ${paymentColors[active.payment_status] || ''}`}
+                className={paymentColors[active.payment_status] || ''}
               >
                 {active.payment_status}
               </span>
               {active.status === 'cancelled' && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                <span className={badgeCls('red')}>
                   Cancelled
                 </span>
               )}

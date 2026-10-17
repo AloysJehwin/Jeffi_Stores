@@ -16,7 +16,7 @@ import { createDraftInvoice } from '@/lib/documents/invoice'
 import { parseBody, zNonEmpty } from '@/lib/shared/validate'
 import { sendOrderConfirmedSMS } from '@/lib/shared/sms'
 import { checkPincodeServiceability } from '@/lib/shipping/delhivery'
-import { attributionFromRequest, attachOrderAttribution, adsConsentFromRequest } from '@/lib/orders/attribution'
+import { attributionFromRequest, attachOrderAttribution, attachMetaClickIds, metaClicksFromRequest, adsConsentFromRequest } from '@/lib/orders/attribution'
 
 const CreateOrderSchema = z.object({
   // 'manual' is accepted only from the business (B2B) portal — a server check below
@@ -517,6 +517,7 @@ export async function POST(request: NextRequest) {
       }
 
       await attachOrderAttribution(client, createdOrder.id, attribution, adsConsent)
+      await attachMetaClickIds(client, createdOrder.id, metaClicksFromRequest(request))
 
       return createdOrder
     })

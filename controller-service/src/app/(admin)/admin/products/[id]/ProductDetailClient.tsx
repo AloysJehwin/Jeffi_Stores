@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useEffect, useState, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import { Star, Sparkles, CheckCircle, XCircle, Loader2, X, ChevronDown } from 'lucide-react'
@@ -13,6 +12,7 @@ import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite, useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
+import { Dialog, DetailHeader, DetailSkeleton, ErrorState, badgeCls, useActionToast } from '@/components/admin/kit'
 import { formatINR, formatDate } from '@/lib/shared/format'
 import {
   deriveSellableItems,
@@ -25,7 +25,7 @@ import { SUBSCRIPTION_INTERVALS, SUBSCRIPTION_INTERVAL_LABELS, isSubscriptionInt
 function TagBadge({ tag, accent }: { tag: string; accent?: boolean }) {
   return (
     <span
-      className={`text-[10px] px-1.5 py-0.5 rounded ${accent ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300' : 'bg-surface-secondary text-foreground-secondary'}`}
+      className={`text-[10px] px-1.5 py-0.5 rounded ${accent ? 'bg-accent-500/5 text-accent-500' : 'bg-surface-secondary text-foreground-secondary'}`}
     >
       {tag}
     </span>
@@ -61,6 +61,7 @@ function AiPanel({
 }) {
   const [item, setItem] = useState<EnrichmentItem | null | undefined>(undefined)
   const [busy, setBusy] = useState(false)
+  const toast = useActionToast()
 
   useEffect(() => {
     fetch(`/api/admin/catalog-enrichment/by-product/${productId}`, { credentials: 'include' })
@@ -77,7 +78,11 @@ function AiPanel({
         method: 'POST',
         credentials: 'include',
       })
-      if (!res.ok) throw new Error('Failed')
+      if (!res.ok) {
+        toast.error(`Failed to ${action} enrichment`)
+        throw new Error('Failed')
+      }
+      toast.success(action === 'approve' ? 'Enrichment approved' : 'Enrichment rejected')
       if (action === 'approve') onApproved()
       else setItem(prev => (prev ? { ...prev, status: 'rejected' } : prev))
     } finally {
@@ -85,35 +90,45 @@ function AiPanel({
     }
   }
 
-  const STATUS_COLOR: Record<string, string> = {
-    proposed: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
-    approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
-    rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200',
-  }
+  const STATUS_TONE: Record<string, 'amber' | 'green' | 'red'> = { proposed: 'amber', approved: 'green', rejected: 'red' }
 
-  if (typeof document === 'undefined') return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-[400] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div
-        className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-lg max-h-[85vh] flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-default flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent-500" />
-            <span className="font-semibold text-foreground">AI Enrichment</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-surface-secondary text-foreground-muted hover:text-foreground"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      zIndex="z-[400]"
+      size="md"
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-accent-500" />
+          AI Enrichment
+        </span>
+      }
+      footer={
+        item?.status === 'proposed' ? (
+          <RequireWrite scope="products:write">
+            <div className="flex w-full gap-2">
+              <button
+                onClick={() => decide('approve')}
+                disabled={busy}
+                className="control-md flex-1 bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                Approve
+              </button>
+              <button
+                onClick={() => decide('reject')}
+                disabled={busy}
+                className="control-md flex-1 border border-border-default text-foreground hover:bg-surface-secondary font-semibold disabled:opacity-50"
+              >
+                <XCircle className="w-3.5 h-3.5" />
+                Reject
+              </button>
+            </div>
+          </RequireWrite>
+        ) : undefined
+      }
+    >
           {item === undefined && (
             <div className="flex items-center gap-2 text-sm text-foreground-muted py-12 justify-center">
               <Loader2 className="w-4 h-4 animate-spin" /> Loading
@@ -128,7 +143,7 @@ function AiPanel({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span
-                  className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[item.status] || ''}`}
+                  className={badgeCls(STATUS_TONE[item.status] ?? 'muted')}
                 >
                   {item.status}
                 </span>
@@ -140,7 +155,7 @@ function AiPanel({
               {item.ai_product_type && (
                 <div>
                   <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Type</p>
-                  <span className="text-xs font-medium text-accent-600 dark:text-accent-400">
+                  <span className="text-xs font-medium text-accent-500">
                     {item.ai_product_type}
                   </span>
                 </div>
@@ -230,39 +245,13 @@ function AiPanel({
 
               {item.error && (
                 <div>
-                  <p className="text-[10px] text-red-600 uppercase tracking-wide mb-0.5">Embed Error</p>
-                  <p className="text-xs text-red-600">{item.error}</p>
+                  <p className="text-[10px] text-red-600 dark:text-red-400 uppercase tracking-wide mb-0.5">Embed Error</p>
+                  <p className="text-xs text-red-600 dark:text-red-400">{item.error}</p>
                 </div>
               )}
             </div>
           )}
-        </div>
-
-        {item?.status === 'proposed' && (
-          <RequireWrite scope="products:write">
-            <div className="px-5 py-4 border-t border-border-default flex gap-2 flex-shrink-0">
-              <button
-                onClick={() => decide('approve')}
-                disabled={busy}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 h-control bg-accent-500 hover:bg-accent-600 text-white rounded text-sm font-semibold disabled:opacity-50"
-              >
-                {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                Approve
-              </button>
-              <button
-                onClick={() => decide('reject')}
-                disabled={busy}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 h-control border border-border-default text-foreground hover:bg-surface-secondary rounded text-sm font-semibold disabled:opacity-50"
-              >
-                <XCircle className="w-3.5 h-3.5" />
-                Reject
-              </button>
-            </div>
-          </RequireWrite>
-        )}
-      </div>
-    </div>,
-    document.body
+    </Dialog>
   )
 }
 
@@ -276,11 +265,19 @@ function Field({ label, value, mono }: { label: string; value?: any; mono?: bool
   )
 }
 
+// Sub-variants belong to a variant only while its "Has sub-variants" is on (an active
+// sub-variant also counts: rows added outside a publish do not set the flag). Rows left
+// behind by a turned-off toggle are not shown.
+function variantSubsShown(v: any): any[] {
+  const subs: any[] = Array.isArray(v?.sub_variants) ? v.sub_variants : []
+  return v?.sub_variant_type_on || subs.some(sv => sv?.is_active !== false) ? subs : []
+}
+
 function SubscriptionDetails({ p, variants }: { p: any; variants: any[] }) {
   const intervals: string[] = Array.isArray(p.subscription_intervals) ? p.subscription_intervals : []
   const offered = SUBSCRIPTION_INTERVALS.filter(i => intervals.includes(i))
   const subsByVariant: Record<string, any[]> = {}
-  for (const v of variants) subsByVariant[String(v.id)] = v.sub_variants || []
+  for (const v of variants) subsByVariant[String(v.id)] = variantSubsShown(v)
   const items = deriveSellableItems({
     hasVariants: !!p.has_variants,
     product: {
@@ -292,7 +289,7 @@ function SubscriptionDetails({ p, variants }: { p: any; variants: any[] }) {
     },
     variants: variants.map(v => ({
       ...v,
-      sub_variant_type_on: !!v.sub_variant_type_on || (v.sub_variants || []).length > 0,
+      sub_variant_type_on: variantSubsShown(v).length > 0,
     })),
     subVariantsByVariant: subsByVariant,
   })
@@ -362,7 +359,7 @@ function CollapsibleCard({ title, children }: { title: string; children: React.R
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors"
       >
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">{title}</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-foreground">{title}</p>
         <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && <div className="px-4 pb-4 pt-1 space-y-2.5">{children}</div>}
@@ -402,7 +399,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
         onClick={toggle}
         className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors focus:outline-none"
       >
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Supplier Details</p>
+        <p className="text-sm font-semibold uppercase tracking-wide text-foreground">Supplier Details</p>
         <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
@@ -500,7 +497,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                                         key={row.id}
                                         className={
                                           isBest
-                                            ? 'bg-accent-50 dark:bg-accent-900/20'
+                                            ? 'bg-accent-500/5'
                                             : 'hover:bg-surface-secondary transition-colors'
                                         }
                                       >
@@ -512,7 +509,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                                             {row.supplier_name}
                                           </Link>
                                           {isBest && (
-                                            <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-300">
+                                            <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-accent-500">
                                               Best
                                             </span>
                                           )}
@@ -548,11 +545,11 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                                   </div>
                                 )}
                                 {leafLast && (
-                                  <div className="flex-1 min-w-[130px] bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-700 rounded-lg px-3 py-2">
-                                    <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium uppercase tracking-wide">
+                                  <div className="flex-1 min-w-[130px] bg-accent-500/5 border border-accent-500/30 rounded-lg px-3 py-2">
+                                    <p className="text-[10px] text-accent-500 font-medium uppercase tracking-wide">
                                       Last Purchase Price
                                     </p>
-                                    <p className="text-sm font-bold text-accent-700 dark:text-accent-300">
+                                    <p className="text-sm font-bold text-accent-500">
                                       {fmt(leafLast.price)}
                                     </p>
                                     <p className="text-[10px] text-foreground-muted">
@@ -584,7 +581,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">
                     Purchase History
                   </p>
-                  <Link href={`/admin/inventory?tab=pos`} className="text-xs text-accent-600 hover:underline">
+                  <Link href={`/admin/purchase-orders?tab=orders`} className="text-xs text-accent-600 hover:underline">
                     View all POs →
                   </Link>
                 </div>
@@ -612,7 +609,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                                 className="hover:bg-surface-secondary transition-colors"
                               >
                                 <td className="py-1.5 pr-3 font-mono text-accent-600">
-                                  <Link href={`/admin/inventory?tab=pos&po=${row.po_id}`} className="hover:underline">
+                                  <Link href={`/admin/purchase-orders?tab=orders&po=${row.po_id}`} className="hover:underline">
                                     {row.po_number}
                                   </Link>
                                 </td>
@@ -752,7 +749,7 @@ function StatusToggle({
             ? `Set to ${active ? 'Active' : 'Inactive'}, but hidden because the ${blockedBy} is inactive`
             : undefined
         }
-        className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium transition-opacity ${canWrite ? 'hover:opacity-75 cursor-pointer' : 'cursor-default'} ${busy ? 'opacity-50' : ''} ${shownActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface-secondary text-foreground-secondary'}`}
+        className={`${badgeCls(shownActive ? 'green' : 'muted')} transition-opacity ${canWrite ? 'hover:opacity-75 cursor-pointer' : 'cursor-default'} ${busy ? 'opacity-50' : ''}`}
       >
         {shownActive ? 'Active' : 'Inactive'}
       </button>
@@ -798,7 +795,12 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
   const [showDraftModal, setShowDraftModal] = useState(false)
   // Surface a stock-assignment failure stashed by the edit form during publish
   // (the publish redirected here, so the error couldn't be shown on the form).
-  const [bootstrapStockError, setBootstrapStockError] = useState<string | null>(null)
+  const toast = useActionToast()
+  const setBootstrapStockError = useCallback(
+    (msg: string) =>
+      toast.warning(`Product published, but existing stock was not assigned: ${msg} You can re-open the product edit form and assign the stock again.`),
+    [toast]
+  )
   useEffect(() => {
     try {
       const msg = sessionStorage.getItem('bootstrap_stock_error')
@@ -836,34 +838,16 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
 
   if (!loading && (!product || product.error)) {
     return (
-      <div className="p-6 space-y-3">
-        <p className="text-foreground-secondary">Product not found.</p>
-        <Link href={ap('/admin/products')} className="text-accent-500 hover:underline text-sm">
-          ← Back to Products
-        </Link>
+      <div className="p-4 sm:p-6">
+        <ErrorState title="Product not found." actionNode={<Link href={ap('/admin/products')} className="text-sm text-accent-500 hover:underline">Back to Products</Link>} />
       </div>
     )
   }
 
   if (loading || !product) {
     return (
-      <div className="p-4 sm:p-6 space-y-5">
-        <div className="animate-pulse space-y-3">
-          <div className="h-7 w-56 bg-surface-secondary rounded" />
-          <div className="h-4 w-40 bg-surface-secondary rounded" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="h-64 bg-surface-secondary rounded-xl animate-pulse" />
-          <div className="lg:col-span-2 space-y-3">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="h-4 bg-surface-secondary rounded animate-pulse"
-                style={{ animationDelay: `${i * 50}ms` }}
-              />
-            ))}
-          </div>
-        </div>
+      <div className="p-4 sm:p-6">
+        <DetailSkeleton />
       </div>
     )
   }
@@ -895,100 +879,69 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
   const hasVariantShelf = shelfStock.some(r => r.variant_id !== null)
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      {bootstrapStockError && (
-        <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm">
-          <div>
-            <span className="font-semibold">Product published, but existing stock was not assigned:</span>{' '}
-            {bootstrapStockError} You can re-open the product edit form and assign the stock again.
-          </div>
-          <button
-            type="button"
-            onClick={() => setBootstrapStockError(null)}
-            className="shrink-0 text-amber-700 dark:text-amber-400 hover:opacity-70"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <Link href={ap('/admin/products')} className="text-accent-500 hover:text-accent-600 transition-colors">
-          Products
-        </Link>
-        <span>/</span>
-        <span className="text-foreground truncate">{p.name}</span>
-      </div>
-
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Link
-            href={ap('/admin/products')}
-            className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">{p.name}</h1>
-            <p className="text-xs text-foreground-muted font-mono mt-0.5 inline-flex items-center gap-1">
+    <div className="p-4 sm:p-6 space-y-5">
+      <DetailHeader
+        back={{ href: ap('/admin/products'), label: 'Products' }}
+        title={p.name}
+        status={
+          <>
+            <span className={badgeCls(p.is_active ? 'green' : 'muted')}>{p.is_active ? 'Active' : 'Inactive'}</span>
+            {p.is_featured && (
+              <span className={`${badgeCls('amber')} inline-flex items-center gap-1`}>
+                <Star className="w-3 h-3 fill-current" /> Featured
+              </span>
+            )}
+            <ProductWarningBadges fragile={p.fragile} hazardous={p.hazardous} flammable={p.flammable} />
+          </>
+        }
+        subtitle={
+          p.sku ? (
+            <span className="font-mono text-xs inline-flex items-center gap-1">
               {p.sku}
-              {p.sku && <CopySku sku={p.sku} />}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {p.is_active ? (
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-              Active
+              <CopySku sku={p.sku} />
             </span>
-          ) : (
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-surface-secondary text-foreground-secondary">
-              Inactive
-            </span>
-          )}
-          {p.is_featured && (
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 inline-flex items-center gap-1">
-              <Star className="w-3 h-3 fill-current" /> Featured
-            </span>
-          )}
-          <ProductWarningBadges fragile={p.fragile} hazardous={p.hazardous} flammable={p.flammable} />
-          {canEnrich && (
-            <button
-              onClick={() => setAiOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
+          ) : undefined
+        }
+        actions={
+          <>
+            {canEnrich && (
+              <button
+                type="button"
+                onClick={() => setAiOpen(true)}
+                className="control-md border border-border-default bg-surface-elevated text-foreground hover:bg-surface-secondary"
+              >
+                <Sparkles className="w-4 h-4 text-accent-500" />
+                AI
+              </button>
+            )}
+            <Link
+              href={ap(`/admin/products/${p.id}/analytics`)}
+              className="control-md border border-border-default bg-surface-elevated text-foreground hover:bg-surface-secondary"
             >
-              <Sparkles className="w-4 h-4 text-accent-500" />
-              AI
-            </button>
-          )}
-          <Link
-            href={ap(`/admin/products/${p.id}/analytics`)}
-            className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
-          >
-            Analytics
-          </Link>
-          <RequireWrite scope="products:write">
-            <button
-              onClick={() => setShowDraftModal(true)}
-              className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
-            >
-              Edit
-            </button>
-          </RequireWrite>
-          {showDraftModal && (
-            <DraftConfirmModal
-              productId={p.id}
-              productName={p.name}
-              productSku={p.sku || null}
-              existingDraftId={null}
-              backUrl={`/admin/products/${p.id}`}
-              onClose={() => setShowDraftModal(false)}
-            />
-          )}
-        </div>
-      </div>
+              Analytics
+            </Link>
+            <RequireWrite scope="products:write">
+              <button
+                type="button"
+                onClick={() => setShowDraftModal(true)}
+                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+              >
+                Edit
+              </button>
+            </RequireWrite>
+          </>
+        }
+      />
+      {showDraftModal && (
+        <DraftConfirmModal
+          productId={p.id}
+          productName={p.name}
+          productSku={p.sku || null}
+          existingDraftId={null}
+          backUrl={`/admin/products/${p.id}`}
+          onClose={() => setShowDraftModal(false)}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="space-y-3">
@@ -1018,7 +971,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
                 <button
                   key={img.id}
                   onClick={() => setSelectedImage(idx)}
-                  className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors ${idx === selectedImage ? 'border-secondary-500' : 'border-border-default hover:border-border-secondary'}`}
+                  className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors ${idx === selectedImage ? 'border-accent-500' : 'border-border-default hover:border-border-secondary'}`}
                 >
                   <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover" />
                 </button>
@@ -1029,7 +982,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
 
         <div className="lg:col-span-2 space-y-4">
           <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Pricing</p>
+            <p className="text-sm font-semibold uppercase tracking-wide text-foreground">Pricing</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { label: 'MRP', val: p.mrp },
@@ -1200,27 +1153,27 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
                   />
                   <div className="flex flex-wrap gap-2 pt-1">
                     {p.fragile && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
+                      <span className={badgeCls('amber')}>
                         Fragile
                       </span>
                     )}
                     {p.hazardous && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                      <span className={badgeCls('red')}>
                         Hazardous
                       </span>
                     )}
                     {p.flammable && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
+                      <span className={badgeCls('amber')}>
                         Flammable
                       </span>
                     )}
                     {p.perishable && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+                      <span className={badgeCls('green')}>
                         Perishable
                       </span>
                     )}
                     {p.serialized && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                      <span className={badgeCls('blue')}>
                         Serialized
                       </span>
                     )}
@@ -1313,14 +1266,14 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             p.ai_who_uses_it ||
             p.ai_application) && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">
+              <p className="text-sm font-semibold uppercase tracking-wide text-foreground mb-3">
                 AI Intelligence
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {p.ai_product_type && (
                   <div>
                     <p className="text-[11px] text-foreground-muted uppercase tracking-wide mb-0.5">Type</p>
-                    <span className="text-xs font-medium text-accent-600 dark:text-accent-400">
+                    <span className="text-xs font-medium text-accent-500">
                       {p.ai_product_type}
                     </span>
                   </div>
@@ -1352,7 +1305,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
                       {p.ai_use_cases.map((t: string) => (
                         <span
                           key={t}
-                          className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded"
+                          className="text-[10px] px-1.5 py-0.5 bg-accent-500/5 text-accent-500 rounded"
                         >
                           {t}
                         </span>
@@ -1437,49 +1390,49 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
             <table className="w-full text-sm">
               <thead className="bg-surface-secondary border-b border-border-default">
                 <tr>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold uppercase tracking-wide text-foreground">
                     Image
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold uppercase tracking-wide text-foreground">
                     Variant
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden sm:table-cell">
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold uppercase tracking-wide text-foreground hidden sm:table-cell">
                     SKU
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden lg:table-cell">
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold uppercase tracking-wide text-foreground hidden lg:table-cell">
                     Amazon ASIN
                   </th>
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden xl:table-cell">
+                  <th className="px-4 py-2.5 text-left text-sm font-semibold uppercase tracking-wide text-foreground hidden xl:table-cell">
                     ISBN
                   </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  <th className="px-4 py-2.5 text-right text-sm font-semibold uppercase tracking-wide text-foreground">
                     Price (incl. GST)
                   </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">
+                  <th className="px-4 py-2.5 text-right text-sm font-semibold uppercase tracking-wide text-foreground hidden md:table-cell">
                     Ex-GST
                   </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">
+                  <th className="px-4 py-2.5 text-right text-sm font-semibold uppercase tracking-wide text-foreground hidden md:table-cell">
                     MRP
                   </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  <th className="px-4 py-2.5 text-right text-sm font-semibold uppercase tracking-wide text-foreground">
                     Inventory
                   </th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden lg:table-cell">
+                  <th className="px-4 py-2.5 text-right text-sm font-semibold uppercase tracking-wide text-foreground hidden lg:table-cell">
                     Stock Status
                   </th>
                   {hasVariantShelf && (
-                    <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden xl:table-cell">
+                    <th className="px-4 py-2.5 text-left text-sm font-semibold uppercase tracking-wide text-foreground hidden xl:table-cell">
                       Shelf
                     </th>
                   )}
-                  <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">
+                  <th className="px-4 py-2.5 text-center text-sm font-semibold uppercase tracking-wide text-foreground">
                     Status
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
                 {variants.map((v: any) => {
-                  const subVariants: any[] = v.sub_variants || []
+                  const subVariants: any[] = variantSubsShown(v)
                   const hasSubs = subVariants.length > 0
                   const vInventory = hasSubs
                     ? Number(v.sub_variant_inventory_total || 0)

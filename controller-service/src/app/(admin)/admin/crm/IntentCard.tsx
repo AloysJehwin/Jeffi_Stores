@@ -13,7 +13,7 @@ export default function IntentCard({ intent, topSearches }: { intent: Intent; to
 
   return (
     <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-      <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Purchase Intent</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Purchase Intent</h2>
 
       <p className="text-[11px] uppercase tracking-wide text-foreground-muted font-medium mb-2">Abandoned carts</p>
       <div className="grid grid-cols-3 gap-2 mb-4">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   ShoppingCart,
@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { categoryFor, type ActivityCategory } from '@/lib/shared/activity-shared'
+import { InfiniteFooter } from '@/components/admin/kit/infinite'
 import { ap } from '@/lib/shared/admin-path'
 
 interface ActivityEvent {
@@ -54,37 +55,37 @@ const KIND_META: Record<string, { Icon: LucideIcon; color: string; label: string
   return_status: { Icon: Undo2, color: 'bg-purple-500', label: 'Return status' },
   cart_abandoned: { Icon: ShoppingCart, color: 'bg-orange-500', label: 'Cart abandoned' },
   cart_item_added: { Icon: ShoppingBag, color: 'bg-blue-400', label: 'Cart add' },
-  cart_item_removed: { Icon: ShoppingBag, color: 'bg-zinc-400', label: 'Cart remove' },
-  product_viewed: { Icon: Eye, color: 'bg-zinc-400', label: 'Viewed' },
+  cart_item_removed: { Icon: ShoppingBag, color: 'bg-border-default', label: 'Cart remove' },
+  product_viewed: { Icon: Eye, color: 'bg-border-default', label: 'Viewed' },
   tag_added: { Icon: Tag, color: 'bg-cyan-500', label: 'Tag added' },
-  tag_removed: { Icon: Tag, color: 'bg-zinc-500', label: 'Tag removed' },
+  tag_removed: { Icon: Tag, color: 'bg-foreground-muted', label: 'Tag removed' },
   note_added: { Icon: StickyNote, color: 'bg-amber-500', label: 'Note' },
   support_message: { Icon: MessageSquare, color: 'bg-sky-500', label: 'Support' },
   support_session_started: { Icon: MessagesSquare, color: 'bg-sky-600', label: 'Support chat' },
-  login: { Icon: Unlock, color: 'bg-zinc-500', label: 'Login' },
-  logout: { Icon: Lock, color: 'bg-zinc-400', label: 'Logout' },
+  login: { Icon: Unlock, color: 'bg-foreground-muted', label: 'Login' },
+  logout: { Icon: Lock, color: 'bg-border-default', label: 'Logout' },
   signup: { Icon: Sparkles, color: 'bg-pink-500', label: 'Signup' },
-  address_added: { Icon: MapPin, color: 'bg-zinc-500', label: 'Address added' },
-  address_updated: { Icon: MapPin, color: 'bg-zinc-500', label: 'Address updated' },
-  address_removed: { Icon: MapPin, color: 'bg-zinc-400', label: 'Address removed' },
-  profile_updated: { Icon: User, color: 'bg-zinc-500', label: 'Profile' },
-  password_changed: { Icon: KeyRound, color: 'bg-zinc-600', label: 'Password' },
+  address_added: { Icon: MapPin, color: 'bg-foreground-muted', label: 'Address added' },
+  address_updated: { Icon: MapPin, color: 'bg-foreground-muted', label: 'Address updated' },
+  address_removed: { Icon: MapPin, color: 'bg-border-default', label: 'Address removed' },
+  profile_updated: { Icon: User, color: 'bg-foreground-muted', label: 'Profile' },
+  password_changed: { Icon: KeyRound, color: 'bg-foreground-muted', label: 'Password' },
   wishlist_added: { Icon: Heart, color: 'bg-rose-500', label: 'Wishlist' },
-  wishlist_removed: { Icon: Heart, color: 'bg-zinc-400', label: 'Wishlist removed' },
-  review_submitted: { Icon: Star, color: 'bg-yellow-500', label: 'Review' },
+  wishlist_removed: { Icon: Heart, color: 'bg-border-default', label: 'Wishlist removed' },
+  review_submitted: { Icon: Star, color: 'bg-amber-500', label: 'Review' },
   flagged: { Icon: Flag, color: 'bg-red-500', label: 'Flagged' },
   unflagged: { Icon: CheckCircle, color: 'bg-green-500', label: 'Reactivated' },
   task_created: { Icon: Check, color: 'bg-violet-500', label: 'Task' },
   task_completed: { Icon: Check, color: 'bg-green-500', label: 'Task done' },
   marketing_opted_in: { Icon: BellRing, color: 'bg-emerald-500', label: 'Marketing on' },
-  marketing_opted_out: { Icon: BellOff, color: 'bg-zinc-400', label: 'Marketing off' },
+  marketing_opted_out: { Icon: BellOff, color: 'bg-border-default', label: 'Marketing off' },
 }
 
 type FilterKey = ActivityCategory | 'all'
 
 const FILTERS: { key: FilterKey; label: string; ringColor: string }[] = [
   { key: 'all', label: 'All', ringColor: 'ring-foreground' },
-  { key: 'auth', label: 'Auth', ringColor: 'ring-zinc-500' },
+  { key: 'auth', label: 'Auth', ringColor: 'ring-foreground-muted' },
   { key: 'orders', label: 'Orders', ringColor: 'ring-blue-500' },
   { key: 'support', label: 'Support', ringColor: 'ring-sky-500' },
   { key: 'account', label: 'Account', ringColor: 'ring-rose-500' },
@@ -120,6 +121,7 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(true)
   const [filter, setFilter] = useState<FilterKey>('all')
+  const [loadingMore, setLoadingMore] = useState(false)
   const loadingMoreRef = useRef(false)
 
   async function load(before?: string) {
@@ -136,9 +138,16 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
       }
     } finally {
       setLoading(false)
+      setLoadingMore(false)
       loadingMoreRef.current = false
     }
   }
+
+  const loadMore = useCallback(() => {
+    if (!hasMore || loadingMoreRef.current || !events.length) return
+    load(events[events.length - 1].created_at)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, events])
 
   useEffect(() => {
     load()
@@ -188,7 +197,7 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Activity Timeline</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Activity Timeline</h2>
       </div>
 
       {!loading && events.length > 0 && (
@@ -242,7 +251,7 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
               <div className="relative space-y-3">
                 <div className="absolute left-[15px] top-1 bottom-1 w-px bg-border-default" aria-hidden />
                 {items.map(e => {
-                  const meta = KIND_META[e.kind] || { Icon: Circle, color: 'bg-zinc-500', label: e.kind }
+                  const meta = KIND_META[e.kind] || { Icon: Circle, color: 'bg-foreground-muted', label: e.kind }
                   const Icon = meta.Icon
                   const link = refLink(e)
                   const content = (
@@ -278,16 +287,12 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
             </div>
           ))}
 
-          {hasMore && events.length > 0 && (
-            <button
-              type="button"
-              onClick={() => load(events[events.length - 1].created_at)}
-              disabled={loadingMoreRef.current}
-              className="w-full py-2 text-xs font-medium text-accent-500 hover:text-accent-600 transition-colors disabled:opacity-50"
-            >
-              Load older events
-            </button>
-          )}
+          <InfiniteFooter
+            shown={events.length}
+            control={{ hasMore, loadingMore, loadMore }}
+            noun="events"
+            className="mt-2"
+          />
         </div>
       )}
     </div>

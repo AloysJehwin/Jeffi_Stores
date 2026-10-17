@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext } from 'react'
 import ImageUrlInput from '@/components/admin/ImageUrlInput'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import AiMediaButton from '@/components/admin/ai/AiMediaButton'
+import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import {
   DndContext,
   closestCenter,
@@ -124,6 +126,15 @@ function BlockRow({
 
       {(block.type === 'hero_image' || block.type === 'image') && (
         <div className="space-y-2">
+          <div className="flex items-center justify-end">
+            <AiMediaButton
+              feature="email_hero"
+              compact
+              sizes={[AI_SIZE_PRESETS.landscape, AI_SIZE_PRESETS.square]}
+              defaultPrompt={block.alt || 'Marketing hero image for an email campaign'}
+              onPick={img => onPatch({ ...block, url: img.url })}
+            />
+          </div>
           <ImageUrlInput className={inputCls} value={block.url} onChange={url => onPatch({ ...block, url })} placeholder="Image URL (https://…) or upload" preview={false} />
           <input
             className={inputCls}

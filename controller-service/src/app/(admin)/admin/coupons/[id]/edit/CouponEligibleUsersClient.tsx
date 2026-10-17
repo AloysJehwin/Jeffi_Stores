@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import CouponUserPicker from './CouponUserPicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { InfiniteFooter, useServerPages } from '@/components/admin/kit/infinite'
 
 interface EligibleUser {
   id: string
@@ -18,11 +19,18 @@ interface Props {
   canRemove: boolean
   canAdd: boolean
   allUsersMode: boolean
+  /** ?usersPage the server rendered and the full count; pages accumulate on scroll. */
+  page: number
+  total: number
 }
 
-export default function CouponEligibleUsersClient({ couponId, initialUsers, canRemove, canAdd, allUsersMode }: Props) {
+export default function CouponEligibleUsersClient({ couponId, initialUsers, canRemove, canAdd, allUsersMode, page, total }: Props) {
   const canWrite = useCanWrite('coupons:write')
-  const [users, setUsers] = useState<EligibleUser[]>(initialUsers)
+  const pages = useServerPages({ rows: initialUsers, page, total, rowKey: u => u.id, param: 'usersPage' })
+  const [added, setAdded] = useState<EligibleUser[]>([])
+  const [removed, setRemoved] = useState<Set<string>>(new Set())
+  const addedIds = new Set(added.map(u => u.id))
+  const users = [...added, ...pages.rows.filter(u => !addedIds.has(u.id))].filter(u => !removed.has(u.id))
   const [removing, setRemoving] = useState<string | null>(null)
   const [showPicker, setShowPicker] = useState(false)
   const existingIds = new Set(users.map(u => u.id))
@@ -37,7 +45,7 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId }),
       })
-      if (res.ok) setUsers(prev => prev.filter(u => u.id !== userId))
+      if (res.ok) setRemoved(prev => new Set(prev).add(userId))
     } finally {
       setRemoving(null)
     }
@@ -51,7 +59,12 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
     })
     if (res.ok) {
       const nameParts = (user.full_name || '').trim().split(' ')
-      setUsers(prev => [
+      setRemoved(prev => {
+        const n = new Set(prev)
+        n.delete(user.id)
+        return n
+      })
+      setAdded(prev => [
         {
           id: user.id,
           email: user.email,
@@ -126,7 +139,7 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
                 <td className="px-4 py-3 text-foreground-secondary">{u.email}</td>
                 <td className="px-4 py-3">
                   {u.times_used > 0 ? (
-                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
                       {u.times_used}x used
                     </span>
                   ) : (
@@ -159,6 +172,7 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
           </tbody>
         </table>
       </div>
+      {!pages.resetting && <InfiniteFooter shown={users.length} control={pages.control} noun="users" className="px-4 pb-3" />}
     </div>
   )
 }

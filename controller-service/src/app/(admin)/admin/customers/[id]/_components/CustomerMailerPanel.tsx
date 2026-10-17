@@ -536,7 +536,7 @@ export default function CustomerMailerPanel({
   if (sendResult) {
     return (
       <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
-        <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
           <Mail className="w-5 h-5 text-green-600 dark:text-green-400" />
         </div>
         <p className="text-sm font-semibold text-foreground">Message sent!</p>

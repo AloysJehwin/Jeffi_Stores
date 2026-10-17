@@ -1,7 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Bot, RefreshCw, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
+import { Bot, RefreshCw, CheckCircle2, XCircle } from 'lucide-react'
+import { PageHeader } from '@/components/admin/kit/layout'
+import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 
 interface ToolLogMessage {
   id: string
@@ -23,46 +25,32 @@ function relTime(iso: string) {
 }
 
 export default function AgentLogsPage() {
-  const [toolLogs, setToolLogs] = useState<ToolLogMessage[]>([])
-  const [loading, setLoading] = useState(false)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-
-  async function load(p = page) {
-    setLoading(true)
-    try {
+  const list = useInfiniteList<ToolLogMessage>({
+    key: 'tool-logs',
+    pageSize: 50,
+    getKey: m => m.id,
+    fetchPage: async (p, signal) => {
       const qs = new URLSearchParams({ page: String(p), pageSize: '50' })
-      const res = await fetch(`/api/admin/agent/tool-logs?${qs.toString()}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setToolLogs(data.messages || [])
-        setTotal(data.total || 0)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load(page)
-  }, [page])
+      const data = await fetchJson(`/api/admin/agent/tool-logs?${qs.toString()}`, signal)
+      return { rows: data.messages || [], total: data.total || 0 }
+    },
+  })
+  const toolLogs = list.rows
+  const loading = list.loading || list.loadingMore
 
   return (
-    <div className="p-4 sm:p-6 w-full">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">Agent Tool Logs</h1>
-          <p className="text-sm text-foreground-muted mt-0.5">
-            Tool calls made by the AI admin assistant. Each row is one assistant response that invoked one or more
-            tools.
-          </p>
-        </div>
+    <div className="p-4 sm:p-6 w-full space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <PageHeader
+          title="Agent Tool Logs"
+          description="Tool calls made by the AI admin assistant. Each row is one assistant response that invoked one or more tools."
+        />
         <button
           type="button"
-          onClick={() => load(page)}
+          onClick={list.reload}
           disabled={loading}
-          className="flex items-center gap-1.5 text-xs px-3 h-control-sm rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50"
+          className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
@@ -119,7 +107,7 @@ export default function AgentLogsPage() {
                           {msg.tool_calls.length} tool call{msg.tool_calls.length !== 1 ? 's' : ''}
                         </span>
                         {errorCount > 0 && (
-                          <span className="flex items-center gap-0.5 text-[10px] text-red-600 dark:text-red-400">
+                          <span className="flex items-center gap-0.5 text-[10px] text-red-500">
                             <XCircle className="w-3 h-3" /> {errorCount} error{errorCount !== 1 ? 's' : ''}
                           </span>
                         )}
@@ -138,7 +126,7 @@ export default function AgentLogsPage() {
                         const outputStr = typeof tc.output === 'string' ? tc.output : JSON.stringify(tc.output, null, 2)
                         const inputStr = JSON.stringify(tc.input, null, 2)
                         return (
-                          <div key={i} className={`px-4 py-3 ${tc.isError ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}>
+                          <div key={i} className={`px-4 py-3 ${tc.isError ? 'bg-red-500/5' : ''}`}>
                             <div className="flex items-center gap-2 mb-2">
                               {tc.isError ? (
                                 <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
@@ -157,7 +145,7 @@ export default function AgentLogsPage() {
                               <div>
                                 <p className="text-[10px] uppercase tracking-wide text-foreground-muted mb-1">Output</p>
                                 <pre
-                                  className={`rounded p-2 overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed ${tc.isError ? 'bg-red-100/50 dark:bg-red-900/20 text-red-800 dark:text-red-300' : 'bg-surface-secondary text-foreground'}`}
+                                  className={`rounded p-2 overflow-x-auto whitespace-pre-wrap break-all font-mono leading-relaxed ${tc.isError ? 'bg-red-500/10/50 text-red-600 dark:text-red-400' : 'bg-surface-secondary text-foreground'}`}
                                 >
                                   {outputStr}
                                 </pre>
@@ -173,32 +161,7 @@ export default function AgentLogsPage() {
             })}
           </div>
 
-          {total > 50 && (
-            <div className="mt-4 flex items-center justify-between border-t border-border-default pt-4">
-              <p className="text-xs text-foreground-muted">
-                Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, total)} of {total}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <span className="text-xs px-2 text-foreground">Page {page}</span>
-                <button
-                  type="button"
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={page * 50 >= total}
-                  className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
+          <InfiniteFooter shown={toolLogs.length} control={list} noun="responses" />
         </>
       )}
     </div>

@@ -136,7 +136,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-foreground">{scenario.name}</h1>
-              <span className="px-2 py-0.5 text-xs font-mono rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              <span className="px-2 py-0.5 text-xs font-mono rounded bg-surface-secondary text-foreground">
                 {scenario.kind}
               </span>
             </div>
@@ -164,7 +164,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
               const def = scenario.param_schema[k]
               return (
                 <div key={k}>
-                  <span className="text-accent-600 dark:text-accent-400">{k}</span>
+                  <span className="text-accent-500">{k}</span>
                   <span className="text-foreground-muted"> = </span>
                   <span className="text-foreground">{String(v)}</span>
                   {def?.label && <span className="text-foreground-muted"> &nbsp;// {def.label}</span>}
@@ -204,14 +204,14 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                         <span
                           className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
                             c.enabled
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                              : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                              ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                              : 'bg-surface-secondary text-foreground-muted'
                           }`}
                         >
                           {c.enabled ? 'Active' : 'Paused'}
                         </span>
                         {c.discount_percent > 0 && (
-                          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
                             {c.discount_percent}% off
                           </span>
                         )}

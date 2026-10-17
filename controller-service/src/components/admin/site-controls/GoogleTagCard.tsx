@@ -94,7 +94,7 @@ function TagField({ field, initial }: { field: Field; initial: string }) {
         aria-invalid={!!error}
         className={`w-full px-3 h-control text-sm border rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60 ${error ? 'border-red-500' : 'border-border-secondary'}`}
       />
-      {error && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>}
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   )
 }

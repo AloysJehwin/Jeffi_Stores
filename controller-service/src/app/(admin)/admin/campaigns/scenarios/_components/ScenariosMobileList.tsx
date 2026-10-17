@@ -81,13 +81,13 @@ export default function ScenariosMobileList({ scenarios, busy, onToggle, onRemov
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-foreground truncate">{s.name}</span>
                 <span
-                  className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${s.type === 'custom' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'}`}
+                  className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${s.type === 'custom' ? 'bg-purple-500/10 text-purple-700 dark:text-purple-400' : 'bg-blue-500/10 text-blue-700 dark:text-blue-400'}`}
                 >
                   {s.type === 'custom' ? 'Custom' : 'Built-in'}
                 </span>
                 {s.type === 'custom' && (
                   <span
-                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${s.enabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${s.enabled ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-surface-secondary text-foreground-muted '}`}
                   >
                     {s.enabled ? 'Active' : 'Paused'}
                   </span>
@@ -111,7 +111,7 @@ export default function ScenariosMobileList({ scenarios, busy, onToggle, onRemov
           <button
             type="button"
             onClick={() => setActionsOpen(true)}
-            className="w-full bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+            className="control-md w-full bg-accent-500 font-semibold text-white hover:bg-accent-600"
           >
             Actions
           </button>
@@ -120,7 +120,7 @@ export default function ScenariosMobileList({ scenarios, busy, onToggle, onRemov
         {selected && (
           <div className="px-5 py-4 space-y-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-surface-secondary text-foreground">
                 {selected.kind}
               </span>
               <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-secondary-100 text-secondary-700 dark:bg-secondary-900/40 dark:text-secondary-300">

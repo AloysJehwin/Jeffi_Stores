@@ -14,7 +14,7 @@ import {
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { bp } from '@/lib/shared/business-path'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
-import Pagination from '@/components/ui/Pagination'
+import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import ProductCard from '@/components/business/ProductCard'
 import { round2 } from '@/lib/catalog/gst'
 
@@ -162,8 +162,8 @@ export default async function BusinessCategoryDetailPage({
 
           {products.length > 0 ? (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-                {products.map(product => {
+              {(() => {
+                const items = products.map(product => {
                   const primaryImage =
                     product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
                   const hasVariants = product.has_variants
@@ -192,35 +192,40 @@ export default async function BusinessCategoryDetailPage({
                     !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
                   const mrpDiscount = mrpDiscountPct(mrp, displayPrice)
 
-                  return (
-                    <ProductCard
-                      key={product.id}
-                      id={product.id}
-                      name={product.name}
-                      slug={product.slug}
-                      hasVariants={hasVariants}
-                      displayPrice={Number(displayPrice)}
-                      mrp={mrp}
-                      mrpDiscount={mrpDiscount}
-                      effectiveStock={effectiveStock}
-                      isDigital={!!product.is_digital}
-                      primaryImage={primaryImage || null}
-                      brandName={product.brands?.name || null}
-                      categoryName={product.categories?.name || null}
-                      categoryId={product.categories?.id || null}
-                      extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
-                      handlingDays={Number(product.handling_days ?? 2)}
-                    />
-                  )
-                })}
-              </div>
-              <Pagination
-                page={page}
-                totalPages={totalPages}
-                buildHref={p =>
-                  p > 1 ? bp(`/business/categories/${slug}?page=${p}`, host) : bp(`/business/categories/${slug}`, host)
-                }
-              />
+                  return {
+                    key: String(product.id),
+                    node: (
+                      <ProductCard
+                        id={product.id}
+                        name={product.name}
+                        slug={product.slug}
+                        hasVariants={hasVariants}
+                        displayPrice={Number(displayPrice)}
+                        mrp={mrp}
+                        mrpDiscount={mrpDiscount}
+                        effectiveStock={effectiveStock}
+                        isDigital={!!product.is_digital}
+                        primaryImage={primaryImage || null}
+                        brandName={product.brands?.name || null}
+                        categoryName={product.categories?.name || null}
+                        categoryId={product.categories?.id || null}
+                        extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
+                        handlingDays={Number(product.handling_days ?? 2)}
+                      />
+                    ),
+                  }
+                })
+                return (
+                  <ServerPagedItems
+                    items={items}
+                    page={page}
+                    total={total}
+                    noun="products"
+                    wrap="div"
+                    wrapClassName="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
+                  />
+                )
+              })()}
             </>
           ) : (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">

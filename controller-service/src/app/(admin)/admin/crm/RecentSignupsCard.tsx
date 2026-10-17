@@ -1,6 +1,6 @@
 'use client'
 
-import { createPortal } from 'react-dom'
+import { Dialog } from '@/components/admin/kit'
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -45,7 +45,7 @@ export default function RecentSignupsCard({ items }: { items: SignupEntry[] }) {
     <>
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Recent Signups</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Recent Signups</h2>
           <div className="flex items-center gap-3">
             {hasMore && (
               <button
@@ -84,50 +84,29 @@ export default function RecentSignupsCard({ items }: { items: SignupEntry[] }) {
         )}
       </div>
 
-      {open &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Recent Signups"
+        description={<>{items.length} new customers</>}
+        size="md"
+        zIndex="z-[300]"
+      >
+        <div className="divide-y divide-border-default">
+          {items.map(s => (
+            <SignupRow key={s.id} s={s} />
+          ))}
+        </div>
+        <div className="pt-4 shrink-0 border-t border-border-default mt-2">
+          <Link
+            href={ap('/admin/customers?segment=lead')}
+            className="block text-center text-xs text-accent-500 hover:text-accent-600 font-medium"
             onClick={() => setOpen(false)}
           >
-            <div
-              className="bg-surface-elevated rounded-2xl border border-border-default p-6 w-full max-w-lg shadow-2xl max-h-[80vh] flex flex-col"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-4 shrink-0">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Recent Signups</h2>
-                  <p className="text-xs text-foreground-muted mt-0.5">{items.length} new customers</p>
-                </div>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-                  aria-label="Close"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="overflow-y-auto divide-y divide-border-default">
-                {items.map(s => (
-                  <SignupRow key={s.id} s={s} />
-                ))}
-              </div>
-              <div className="pt-4 shrink-0 border-t border-border-default mt-2">
-                <Link
-                  href={ap('/admin/customers?segment=lead')}
-                  className="block text-center text-xs text-accent-500 hover:text-accent-600 font-medium"
-                  onClick={() => setOpen(false)}
-                >
-                  View all leads in Customers →
-                </Link>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
+            View all leads in Customers →
+          </Link>
+        </div>
+      </Dialog>
     </>
   )
 }

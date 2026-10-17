@@ -103,12 +103,14 @@ export {
   getTenantSocialAccounts,
   enqueueSocialPost,
   dueSocialPosts,
+  claimDueSocialPosts,
   listJeffiSocialPosts,
   listSocialPostsForScope,
   getSocialPost,
   updateSocialPost,
   type TenantSocialAccount,
   type ScheduledSocialPost,
+  type SocialPlatform,
 } from './social'
 export {
   saveIntegrationCredential,

@@ -9,6 +9,11 @@ export async function GET(request: NextRequest) {
   if (!hasScope(admin.role, admin.scopes, 'controls:read'))
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
+  // Optional limit/offset pages the log (the client loads 10 at a time); no params = latest 50.
+  const sp = request.nextUrl.searchParams
+  const paged = sp.has('limit')
+  const limit = paged ? Math.min(50, Math.max(1, Number(sp.get('limit')) || 10)) : 50
+  const offset = paged ? Math.max(0, Number(sp.get('offset')) || 0) : 0
   const logs = await queryMany<{
     id: string
     operation: string
@@ -24,11 +29,13 @@ export async function GET(request: NextRequest) {
      FROM controls_operation_log
      WHERE is_rollback = false
      ORDER BY applied_at DESC
-     LIMIT 50`,
-    []
+     LIMIT $1 OFFSET $2`,
+    [paged ? limit + 1 : limit, offset]
   )
 
-  return NextResponse.json({ logs: logs ?? [] })
+  const rows = logs ?? []
+  if (!paged) return NextResponse.json({ logs: rows })
+  return NextResponse.json({ logs: rows.slice(0, limit), hasMore: rows.length > limit })
 }
 
 export async function POST(request: NextRequest) {

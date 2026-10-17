@@ -13,7 +13,12 @@ const API = '/api/admin/messaging-templates'
  * so an edit here and an edit on the Templates page are the same edit.
  */
 export default function LinkedTemplateEditor({
-  channel, slug, currentKind, campaignKind, variableNames, onMirror,
+  channel,
+  slug,
+  currentKind,
+  campaignKind,
+  variableNames,
+  onMirror,
 }: {
   channel: 'email' | 'sms' | 'whatsapp'
   slug: string
@@ -35,19 +40,35 @@ export default function LinkedTemplateEditor({
 
   useEffect(() => {
     let live = true
-    setValue(null); setMissing(false)
-    fetch(`${API}/${channel}/${encodeURIComponent(slug)}`).then(r => (r.ok ? r.json() : null)).then(a => {
-      if (!live) return
-      if (!a) { setMissing(true); return }
-      const t = toEditorTemplate(a)
-      setValue(t); onMirror?.(t)
-    }).catch(() => live && setMissing(true))
-    fetch('/api/admin/campaigns?limit=500').then(r => (r.ok ? r.json() : { campaigns: [] })).then(d => {
-      if (!live) return
-      const col = channel === 'email' ? 'email_template_slug' : channel === 'sms' ? 'sms_template_slug' : 'wa_template_slug'
-      setUsedBy((d.campaigns ?? []).filter((c: any) => c[col] === slug && c.kind !== currentKind).map((c: any) => c.name))
-    }).catch(() => {})
-    return () => { live = false }
+    setValue(null)
+    setMissing(false)
+    fetch(`${API}/${channel}/${encodeURIComponent(slug)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(a => {
+        if (!live) return
+        if (!a) {
+          setMissing(true)
+          return
+        }
+        const t = toEditorTemplate(a)
+        setValue(t)
+        onMirror?.(t)
+      })
+      .catch(() => live && setMissing(true))
+    fetch('/api/admin/campaigns?limit=500')
+      .then(r => (r.ok ? r.json() : { campaigns: [] }))
+      .then(d => {
+        if (!live) return
+        const col =
+          channel === 'email' ? 'email_template_slug' : channel === 'sms' ? 'sms_template_slug' : 'wa_template_slug'
+        setUsedBy(
+          (d.campaigns ?? []).filter((c: any) => c[col] === slug && c.kind !== currentKind).map((c: any) => c.name)
+        )
+      })
+      .catch(() => {})
+    return () => {
+      live = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel, slug, currentKind])
 
@@ -55,28 +76,42 @@ export default function LinkedTemplateEditor({
     if (!value?.id) return null
     setSaving(true)
     try {
-      const r = await fetch(`${API}/${value.id}`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ...value, publish: true }) })
+      const r = await fetch(`${API}/${value.id}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...value, publish: true }),
+      })
       if (!r.ok) {
         const err = await r.json().catch(() => ({}))
         showToast(`Template not saved: ${err?.message || err?.error || r.status}`, 'error')
         return null
       }
       const saved = toEditorTemplate(await r.json())
-      setValue(saved); onMirror?.(saved)
+      setValue(saved)
+      onMirror?.(saved)
       showToast('Template saved to the library.', 'success')
       return saved
-    } finally { setSaving(false) }
+    } finally {
+      setSaving(false)
+    }
   }
 
-  if (missing) return <p className="text-xs text-red-600">This template no longer exists in the library — pick another one.</p>
+  if (missing)
+    return <p className="text-xs text-red-600">This template no longer exists in the library — pick another one.</p>
   if (!value) return <div className="h-40 rounded-lg bg-surface-secondary animate-pulse" />
-  if (!canWrite) return <p className="text-xs text-foreground-muted">You have read-only access to templates; the library version is used as-is.</p>
+  if (!canWrite)
+    return (
+      <p className="text-xs text-foreground-muted">
+        You have read-only access to templates; the library version is used as-is.
+      </p>
+    )
 
   return (
     <div className="space-y-2">
       {usedBy.length > 0 && (
-        <p className="text-[11px] text-yellow-700 dark:text-yellow-300">
-          Also used by {usedBy.slice(0, 3).join(', ')}{usedBy.length > 3 ? ` and ${usedBy.length - 3} more` : ''} — saving changes them too.
+        <p className="text-[11px] text-amber-700 dark:text-amber-400">
+          Also used by {usedBy.slice(0, 3).join(', ')}
+          {usedBy.length > 3 ? ` and ${usedBy.length - 3} more` : ''} — saving changes them too.
         </p>
       )}
       <TemplateEditor
@@ -85,7 +120,10 @@ export default function LinkedTemplateEditor({
         variableNames={variableNames}
         value={value}
         apiBase={API}
-        onChange={t => { setValue(t); onMirror?.(t) }}
+        onChange={t => {
+          setValue(t)
+          onMirror?.(t)
+        }}
         onSave={save}
         saving={saving}
       />

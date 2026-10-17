@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { ChevronDown, Loader2, Mail } from 'lucide-react'
+import { Badge } from '@/components/admin/kit/core'
 
 interface MailLog {
   id: string
@@ -20,21 +22,7 @@ interface Props {
 }
 
 function StatusBadge({ status }: { status: 'sent' | 'failed' }) {
-  return status === 'sent' ? (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-      <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 8 8">
-        <circle cx="4" cy="4" r="3" />
-      </svg>
-      Sent
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
-      <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 8 8">
-        <circle cx="4" cy="4" r="3" />
-      </svg>
-      Failed
-    </span>
-  )
+  return status === 'sent' ? <Badge tone="green">Sent</Badge> : <Badge tone="red">Failed</Badge>
 }
 
 function formatDate(iso: string) {
@@ -98,47 +86,22 @@ export default function MailLogsPanel({ orderId }: Props) {
   }
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-      <button
-        type="button"
-        onClick={handleToggle}
-        className="w-full px-6 py-4 flex items-center justify-between text-left"
-      >
+    <section className="rounded-xl border border-border-default bg-surface-elevated">
+      <button type="button" onClick={handleToggle} className="flex w-full items-center justify-between px-5 py-4 text-left" aria-expanded={open}>
         <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-accent-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-          </svg>
-          <h2 className="text-lg font-semibold text-foreground">Mail Logs</h2>
-          {logs !== null && (
-            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-surface-secondary text-foreground-muted">
-              {logs.length}
-            </span>
-          )}
+          <Mail className="h-4 w-4 shrink-0 text-accent-500" />
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Mail Logs</h2>
+          {logs !== null && <Badge>{logs.length}</Badge>}
         </div>
-        <svg
-          className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <ChevronDown className={`h-4 w-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="px-6 pb-6 border-t border-border-default pt-4">
+        <div className="border-t border-border-default px-5 pb-5 pt-4">
           {loading && (
-            <div className="flex items-center gap-2 text-sm text-foreground-muted py-4">
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Loading…
+            <div className="flex items-center gap-2 py-4 text-sm text-foreground-muted">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading...
             </div>
           )}
 
@@ -183,25 +146,11 @@ export default function MailLogsPanel({ orderId }: Props) {
                   {log.kind === 'otp'
                     ? null
                     : expandedId === log.id && (
-                        <div className="border-t border-border-default bg-white dark:bg-gray-950">
+                        <div className="border-t border-border-default bg-surface">
                           {bodyLoading === log.id ? (
-                            <div className="flex items-center gap-2 text-xs text-foreground-muted p-4">
-                              <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle
-                                  className="opacity-25"
-                                  cx="12"
-                                  cy="12"
-                                  r="10"
-                                  stroke="currentColor"
-                                  strokeWidth="4"
-                                />
-                                <path
-                                  className="opacity-75"
-                                  fill="currentColor"
-                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                                />
-                              </svg>
-                              Loading preview…
+                            <div className="flex items-center gap-2 p-4 text-xs text-foreground-muted">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              Loading preview...
                             </div>
                           ) : bodyHtml[log.id] ? (
                             <iframe
@@ -222,6 +171,6 @@ export default function MailLogsPanel({ orderId }: Props) {
           )}
         </div>
       )}
-    </div>
+    </section>
   )
 }

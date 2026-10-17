@@ -24,14 +24,14 @@ interface CustomerTagsProps {
 }
 
 const COLOR_CLASSES: Record<string, { badge: string; pill: string }> = {
-  blue: { badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300', pill: 'bg-blue-500' },
-  purple: { badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300', pill: 'bg-purple-500' },
-  green: { badge: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300', pill: 'bg-green-500' },
-  orange: { badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300', pill: 'bg-orange-500' },
-  gold: { badge: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300', pill: 'bg-yellow-500' },
-  red: { badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300', pill: 'bg-red-500' },
-  gray: { badge: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300', pill: 'bg-zinc-400' },
-  teal: { badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300', pill: 'bg-teal-500' },
+  blue: { badge: 'bg-blue-500/10 text-blue-700 dark:text-blue-400', pill: 'bg-blue-500' },
+  purple: { badge: 'bg-purple-500/10 text-purple-700 dark:text-purple-400', pill: 'bg-purple-500' },
+  green: { badge: 'bg-green-500/10 text-green-700 dark:text-green-400', pill: 'bg-green-500' },
+  orange: { badge: 'bg-orange-500/10 text-orange-700 dark:text-orange-400', pill: 'bg-orange-500' },
+  gold: { badge: 'bg-amber-500/10 text-amber-700 dark:text-amber-400', pill: 'bg-amber-500' },
+  red: { badge: 'bg-red-500/10 text-red-700 dark:text-red-400', pill: 'bg-red-500' },
+  gray: { badge: 'bg-surface-secondary text-foreground-muted', pill: 'bg-border-default' },
+  teal: { badge: 'bg-teal-500/10 text-teal-700 dark:text-teal-400', pill: 'bg-teal-500' },
   accent: { badge: 'bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300', pill: 'bg-accent-500' },
 }
 
@@ -106,7 +106,7 @@ export default function CustomerTags({ customerId, initialTags, canWrite: canWri
 
   return (
     <div>
-      <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">Tags</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-3">Tags</h2>
 
       {/* Assigned tags */}
       <div className="flex flex-wrap gap-1.5 mb-3">

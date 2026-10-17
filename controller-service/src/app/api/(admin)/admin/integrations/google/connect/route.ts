@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { credentialOwnerId } from '@/lib/integrations/owner'
 import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
 import { signAdminState } from '@/lib/shared/oauth-state'
 import { oauthProviderInfo, oauthRedirectUri } from '@/lib/integrations/oauth'
 
 export const dynamic = 'force-dynamic'
 
-const GMC_OAUTH_SCOPE = 'https://www.googleapis.com/auth/content'
+// openid email: the signed-in address becomes the account's API developer at registration.
+const GMC_OAUTH_SCOPE = 'https://www.googleapis.com/auth/content openid email'
 
 // Store-admin "Connect Google Merchant Center" with Google sign-in. The merchant id is chosen
 // before consent and carried in the signed state; the callback stores a refresh token for it.
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
-  const tenant = await resolveTenant()
-  if (!tenant) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
+  const tenant = { tenantId: await credentialOwnerId() }
 
-  const back = `${await currentAdminBaseUrlAsync()}/admin/merchant-sync`
+  const back = `${await currentAdminBaseUrlAsync()}/admin/merchant`
   const merchantId = (request.nextUrl.searchParams.get('merchant_id') || '').trim()
   if (!/^\d{5,20}$/.test(merchantId)) {
     return NextResponse.redirect(`${back}?connected=0&provider=google&error=invalid_merchant_id`)
@@ -41,7 +41,6 @@ export async function GET(request: NextRequest) {
   url.searchParams.set('scope', GMC_OAUTH_SCOPE)
   url.searchParams.set('access_type', 'offline')
   url.searchParams.set('prompt', 'select_account consent')
-  url.searchParams.set('include_granted_scopes', 'true')
   url.searchParams.set('state', state)
   return NextResponse.redirect(url.toString())
 }

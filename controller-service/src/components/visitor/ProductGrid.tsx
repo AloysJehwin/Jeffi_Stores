@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, Fragment } from 'react'
+import { useState, Fragment, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ProductCard from './ProductCard'
@@ -8,6 +8,7 @@ import SortDropdown from './SortDropdown'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import { bp } from '@/lib/shared/business-path'
 import { round2 } from '@/lib/catalog/gst'
+import { ServerPagedItems } from '@/components/admin/kit/infinite'
 
 interface ProductItem {
   is_digital?: boolean
@@ -65,6 +66,11 @@ interface Props {
   filterSlot?: React.ReactNode
   promoSlot?: React.ReactNode
   portal?: 'storefront' | 'business'
+  // When provided, grid-view + non-grouped renders ServerPagedItems so pages 2..N
+  // accumulate client-side instead of needing a page-number pager. Each item is a
+  // server-rendered node; the page itself has already applied GST / discount maths.
+  pagedItems?: { key: string; node: ReactNode }[]
+  page?: number
 }
 
 type ViewMode = 'grid' | 'table'
@@ -315,6 +321,9 @@ export default function ProductGrid({
   filterSlot,
   promoSlot,
   portal = 'storefront',
+  pagedItems,
+  page,
+  total,
 }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const router = useRouter()
@@ -445,6 +454,17 @@ export default function ProductGrid({
             />
           ))}
         </div>
+      ) : pagedItems && !grouped && page != null && total != null ? (
+        // Infinite-scroll grid: items are pre-rendered server-side; pages 2..N accumulate.
+        // Table view and the grouped view fall back to the current-page products[] above.
+        <ServerPagedItems
+          items={pagedItems}
+          page={page}
+          total={total}
+          noun="products"
+          wrap="div"
+          wrapClassName="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6"
+        />
       ) : (
         <div className="space-y-8">
           {groups.map((group, gi) => (

@@ -1,8 +1,9 @@
 import { headers } from 'next/headers'
 import { hasScope } from '@/lib/auth/scopes'
 import SocialPostsClient from './SocialPostsClient'
+import { PageBody, PageHeader } from '@/components/admin/kit'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
-import { resolveTenantId } from '@/lib/tenancy/tenant-context'
+import { credentialOwnerId } from '@/lib/integrations/owner'
 import { getTenantSocialAccounts } from '@/lib/tenant-registry'
 import { oauthProviderInfo } from '@/lib/integrations/oauth'
 
@@ -13,29 +14,33 @@ export default async function SocialPostsPage() {
   const h = await headers()
   const role = h.get('x-user-role') || ''
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
-  const canWrite = hasScope(role, scopes, 'products:write')
+  const canWrite = hasScope(role, scopes, 'social:write')
+  const canApprove = hasScope(role, scopes, 'social:approve')
 
-  const tenantId = await resolveTenantId()
-  const socialAccounts = tenantId ? await getTenantSocialAccounts(tenantId) : []
+  // Same Meta connect flow for stores and the flagship (whose accounts sit under the platform id).
+  const socialAccounts = canWrite ? await getTenantSocialAccounts(await credentialOwnerId()) : []
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
-      {tenantId && hasScope(role, scopes, 'campaigns:write') && (
-        <div className="flex justify-end">
-          <AdminIntegrationsPopup
-            scope="social"
-            integrations={[]}
-            socialAccounts={socialAccounts.map(s => ({
-              provider: s.provider,
-              page_name: s.page_name,
-              page_id: s.page_id,
-              status: s.status,
-            }))}
-            oauth={{ meta: oauthProviderInfo('meta') }}
-          />
-        </div>
-      )}
-      <SocialPostsClient canWrite={canWrite} />
-    </div>
+    <PageBody>
+      <PageHeader
+        title="Social"
+        description="Plan, publish and measure posts across Facebook, Instagram, Business Profile, YouTube, Pinterest, LinkedIn and X"
+        actions={
+          canWrite && (
+            <AdminIntegrationsPopup
+              scope="social"
+              integrations={[]}
+              socialAccounts={socialAccounts.flatMap(s =>
+                s.provider === 'facebook' || s.provider === 'instagram'
+                  ? [{ provider: s.provider, page_name: s.page_name, page_id: s.page_id, status: s.status }]
+                  : []
+              )}
+              oauth={{ meta: oauthProviderInfo('meta') }}
+            />
+          )
+        }
+      />
+      <SocialPostsClient canWrite={canWrite} canApprove={canApprove} />
+    </PageBody>
   )
 }

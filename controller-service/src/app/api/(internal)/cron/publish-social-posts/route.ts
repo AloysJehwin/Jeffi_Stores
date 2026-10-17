@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { dueSocialPosts, lookupTenantContextById, updateSocialPost } from '@/lib/tenant-registry'
+import { claimDueSocialPosts, lookupTenantContextById, updateSocialPost } from '@/lib/tenant-registry'
 import { runWithTenantContext } from '@/lib/tenancy/tenant-context'
 import { publishScheduledPost } from '@/lib/social/publisher'
 import { verifyCronRequest } from '@/lib/shared/cron-auth'
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const due = await dueSocialPosts(20)
+  const due = await claimDueSocialPosts(20)
   const results: Array<{ id: string; ok: boolean; error?: string }> = []
   for (const post of due) {
     // Due posts span every tenant: product DB, caption plan gate and AI cache must be the post's own.

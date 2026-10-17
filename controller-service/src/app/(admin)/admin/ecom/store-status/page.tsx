@@ -1,9 +1,13 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { Suspense } from 'react'
+import { PageHeader } from '@/components/admin/kit/layout'
 import { isPlatformAdmin } from '@/lib/auth/scopes'
 import { listTenants, tenantSummary } from '@/lib/tenant-registry'
 import { EcomHero, EcomFilters } from '@/components/admin/ecom/EcomUI'
+import EcomTabs, { ecomTab } from '../_components/EcomTabs'
+import EcomStoreStatusOverview from './_components/EcomStoreStatusOverview'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +27,17 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
   if (!isPlatformAdmin(role)) redirect('/admin')
 
   const sp = await searchParams
+  const tab = ecomTab(sp)
+  if (tab === 'overview')
+    return (
+      <div className="p-4 sm:p-6 space-y-5">
+        <PageHeader title="Store Status" description={'Live status of each tenant store'} />
+        <EcomTabs base="/admin/ecom/store-status" active="overview" listLabel="All stores" />
+        <Suspense>
+          <EcomStoreStatusOverview />
+        </Suspense>
+      </div>
+    )
   const [tenants, summary] = await Promise.all([
     listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q'), product: 'store' }),
     tenantSummary(),
@@ -31,13 +46,11 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
   const suspended = tenants.filter(t => t.status === 'suspended').length
 
   return (
-    <div className="p-6 w-full">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Store Status</h1>
-        <p className="text-sm text-foreground-muted mt-1">Live status of each tenant store</p>
-      </div>
+    <div className="p-4 sm:p-6 space-y-5">
+      <PageHeader title="Store Status" description={'Live status of each tenant store'} />
+      <EcomTabs base="/admin/ecom/store-status" active="list" listLabel="All stores" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <EcomHero
           label="Fleet health"
           value={`${summary.active} / ${summary.total} active`}
@@ -47,7 +60,7 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
             { value: suspended, label: 'Suspended' },
           ]}
         />
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 lg:h-56 flex items-center justify-center">
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5 lg:h-56 flex items-center justify-center">
           <p className="text-sm text-foreground-muted text-center">
             Uptime &amp; last-deploy status wire in once the tenant fleet + /api/ready probes are live.
           </p>

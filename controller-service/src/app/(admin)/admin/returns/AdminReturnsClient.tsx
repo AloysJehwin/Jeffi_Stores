@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { CheckCircle2 } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { Dialog, EmptyState, ErrorState, TextArea, TableSkeleton, badgeCls, type Tone } from '@/components/admin/kit'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -50,11 +53,7 @@ const STATUS_LABELS: Record<string, string> = {
   received: 'Received',
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  pending_approval: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
-  approved: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300',
-  received: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300',
-}
+const STATUS_TONE: Record<string, Tone> = { pending_approval: 'amber', approved: 'blue', received: 'blue' }
 
 const REASON_LABELS: Record<string, string> = {
   defective: 'Defective',
@@ -79,6 +78,7 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
   const canWrite = useCanWrite('returns:write')
   const [condition, setCondition] = useState<string>('')
   const [notes, setNotes] = useState('')
+  const toast = useActionToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
@@ -98,9 +98,10 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
+      toast.success('Valuation saved.')
       onValuated()
     } catch (err: any) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setIsSubmitting(false)
     }
@@ -121,11 +122,11 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
             #{row.order_number}
           </Link>
           <span
-            className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[row.status] || 'bg-gray-100 text-gray-700'}`}
+            className={badgeCls(STATUS_TONE[row.status] ?? 'muted')}
           >
             {STATUS_LABELS[row.status] || row.status}
           </span>
-          <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-surface border border-border-default text-foreground-secondary capitalize">
+          <span className={`${badgeCls()} capitalize`}>
             {row.type}
           </span>
         </div>
@@ -231,25 +232,13 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
         {isReceived && (
           <div className="pt-3 border-t border-border-default">
             {alreadyValuated ? (
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm">
-                <svg
-                  className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span className="text-green-800 dark:text-green-300">
+              <div className="flex items-center gap-2 rounded-lg border border-green-500/40 bg-green-500/5 px-3 py-2 text-sm">
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-green-600" />
+                <span className="text-foreground">
                   Valuation complete — <strong className="capitalize">{row.valuation_condition}</strong>
                   {row.valuation_condition === 'good' ? ' (will restock)' : ' (no restock)'}
                   {row.valuated_at && (
-                    <span className="text-green-700 dark:text-green-400 ml-1">
+                    <span className="ml-1 text-foreground-muted">
                       · {new Date(row.valuated_at).toLocaleDateString('en-IN')}
                     </span>
                   )}
@@ -270,9 +259,9 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
                       className={`px-3 py-2.5 rounded-lg text-sm font-medium border text-left transition-colors ${
                         condition === opt.value
                           ? opt.color === 'green'
-                            ? 'bg-green-600 text-white border-green-600'
-                            : 'bg-red-600 text-white border-red-600'
-                          : 'bg-surface text-foreground-secondary border-border-secondary hover:border-accent-400'
+                            ? 'border-green-600 bg-green-600 text-white'
+                            : 'border-red-600 bg-red-600 text-white'
+                          : 'border-border-secondary bg-surface text-foreground-secondary hover:border-accent-500'
                       }`}
                     >
                       <span className="block">{opt.label}</span>
@@ -285,20 +274,20 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
                   <label className="block text-xs font-medium text-foreground-secondary mb-1">
                     Valuation notes (optional)
                   </label>
-                  <textarea
+                  <TextArea
                     value={notes}
                     onChange={e => setNotes(e.target.value)}
                     rows={2}
                     placeholder="e.g. screen cracked, packaging torn..."
-                    className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm resize-none"
-                  />
+                    className="resize-none"
+                    />
                 </div>
 
                 <button
                   type="button"
                   onClick={handleValuate}
                   disabled={isSubmitting || !condition}
-                  className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                  className="control-md w-full justify-center bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
                 >
                   {isSubmitting ? 'Saving...' : 'Complete Valuation'}
                 </button>
@@ -309,29 +298,12 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
       </div>
 
       {/* Lightbox */}
-      {lightboxUrl && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
-          onClick={() => setLightboxUrl(null)}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightboxUrl}
-            alt="Return photo"
-            className="max-w-[90vw] max-h-[90vh] rounded-lg object-contain"
-            onClick={e => e.stopPropagation()}
-          />
-          <button
-            type="button"
-            className="absolute top-4 right-4 text-white/80 hover:text-white"
-            onClick={() => setLightboxUrl(null)}
-          >
-            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      )}
+      <Dialog open={!!lightboxUrl} onClose={() => setLightboxUrl(null)} title="Return photo" size="xl">
+        {lightboxUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={lightboxUrl} alt="Return photo" className="mx-auto max-h-[70vh] rounded-lg object-contain" />
+        )}
+      </Dialog>
     </div>
   )
 }
@@ -376,15 +348,15 @@ export default function AdminReturnsClient() {
     <div className="space-y-4">
       {/* Tabs */}
       <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex gap-1 bg-surface-secondary border border-border-default rounded-lg p-1">
+        <div className="flex h-control items-stretch gap-1 rounded-lg border border-border-default bg-surface-secondary p-0.5">
           {STATUS_TABS.map(tab => (
             <button
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              className={`rounded-md px-3 text-sm font-medium transition-colors ${
                 activeTab === tab.key
-                  ? 'bg-surface text-foreground shadow-sm'
+                  ? 'bg-surface-elevated text-foreground shadow-sm'
                   : 'text-foreground-secondary hover:text-foreground'
               }`}
             >
@@ -394,7 +366,7 @@ export default function AdminReturnsClient() {
         </div>
 
         {activeTab === 'history' && (
-          <div className="flex gap-1 bg-surface-secondary border border-border-default rounded-lg p-1">
+          <div className="flex h-control items-stretch gap-1 rounded-lg border border-border-default bg-surface-secondary p-0.5">
             {[
               { key: 'all', label: 'All' },
               { key: 'approved', label: 'Approved' },
@@ -404,9 +376,9 @@ export default function AdminReturnsClient() {
                 key={f.key}
                 type="button"
                 onClick={() => setHistoryFilter(f.key)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`rounded-md px-3 text-sm font-medium transition-colors ${
                   historyFilter === f.key
-                    ? 'bg-surface text-foreground shadow-sm'
+                    ? 'bg-surface-elevated text-foreground shadow-sm'
                     : 'text-foreground-secondary hover:text-foreground'
                 }`}
               >
@@ -417,28 +389,21 @@ export default function AdminReturnsClient() {
         )}
       </div>
 
-      {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
-          {error}
-        </div>
-      )}
 
       {loading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-40 bg-surface border border-border-default rounded-xl animate-pulse" />
-          ))}
-        </div>
+        <TableSkeleton rows={3} cols={4} />
+      ) : error ? (
+        <ErrorState body={error} />
       ) : returns.length === 0 ? (
-        <div className="py-16 text-center text-foreground-muted text-sm">
-          {activeTab === 'history'
+        <EmptyState
+          title={activeTab === 'history'
             ? historyFilter === 'approved'
               ? 'No approved returns'
               : historyFilter === 'rejected'
                 ? 'No rejected returns'
                 : 'No completed or rejected returns'
             : 'No active return requests'}
-        </div>
+        />
       ) : (
         <div className="space-y-3">
           {returns.map(row => (

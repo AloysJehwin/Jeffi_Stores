@@ -1,11 +1,11 @@
 'use client'
 
 import { use, useState, useEffect } from 'react'
-import Link from 'next/link'
 import Image from 'next/image'
 import { Star } from 'lucide-react'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { PageBody, PageHeader } from '@/components/admin/kit'
 
 interface CustomField {
   id: string
@@ -33,7 +33,10 @@ function StarDisplay({ value }: { value: number }) {
   return (
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map(s => (
-        <Star key={s} className={`w-3.5 h-3.5 ${s <= value ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`} />
+        <Star
+          key={s}
+          className={`w-3.5 h-3.5 ${s <= value ? 'text-amber-400 fill-amber-400' : 'text-border-default'}`}
+        />
       ))}
     </div>
   )
@@ -91,36 +94,25 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
 
   const statusColor = (s: string) =>
     s === 'approved'
-      ? 'bg-green-100 text-green-700'
+      ? 'bg-green-500/10 text-green-700'
       : s === 'rejected'
-        ? 'bg-red-100 text-red-600'
-        : 'bg-yellow-100 text-yellow-700'
+        ? 'bg-red-500/10 text-red-600'
+        : 'bg-amber-500/10 text-amber-700'
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Link
-          href={ap('/admin/review-forms')}
-          className="text-foreground-muted hover:text-foreground transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">
-            {formMeta?.title ? `${formMeta.title} — Submissions` : 'Submissions'}
-          </h1>
-          <p className="text-sm text-foreground-secondary mt-0.5">{total} total</p>
-        </div>
-      </div>
+    <PageBody>
+      <PageHeader
+        back={{ href: ap('/admin/review-forms'), label: 'Review Forms' }}
+        title={formMeta?.title ? `${formMeta.title} — Submissions` : 'Submissions'}
+        description={`${total} total`}
+      />
 
-      <div className="flex gap-2 mb-4">
+      <div className="flex h-control w-fit max-w-full gap-1 overflow-x-auto rounded-lg border border-border-default bg-surface-elevated p-0.5">
         {['', 'pending', 'approved', 'rejected'].map(s => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1.5 text-sm rounded-lg font-medium transition-colors ${statusFilter === s ? 'bg-accent-500 text-white' : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+            className={`h-full rounded-md px-3 text-xs font-medium transition-colors ${statusFilter === s ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
           >
             {s === '' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
           </button>
@@ -132,7 +124,7 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
           {[...Array(6)].map((_, i) => (
             <div
               key={i}
-              className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden"
+              className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden"
               style={{ animationDelay: `${i * 60}ms` }}
             >
               <div className="aspect-video bg-surface-secondary" />
@@ -148,13 +140,13 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
           ))}
         </div>
       ) : submissions.length === 0 ? (
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center text-foreground-muted">
           No submissions yet
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {submissions.map(s => (
-            <div key={s.id} className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
+            <div key={s.id} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
               <a
                 href={s.screenshot_url}
                 target="_blank"
@@ -239,6 +231,6 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
           ))}
         </div>
       )}
-    </div>
+    </PageBody>
   )
 }

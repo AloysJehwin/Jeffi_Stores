@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import AdminSelect from '@/components/admin/AdminSelect'
 import Toggle from '@/components/ui/Toggle'
@@ -9,9 +8,9 @@ import DateTimePicker from '@/components/ui/DateTimePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import AIFillForm from '@/components/admin/AIFillForm'
 import CouponUserSelector from '@/components/admin/CouponUserSelector'
-import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
+import { EditSessionActions, FormButton, FormField, FormFooter, FormSection, fieldInputCls } from '@/components/admin/kit'
 
 interface CouponFormProps {
   action: (formData: FormData) => Promise<void>
@@ -20,6 +19,8 @@ interface CouponFormProps {
   showUserSelector?: boolean
   backUrl?: string
   couponId?: string
+  /** Server action to discard the draft (receives FormData with intent=discard). */
+  discardAction?: (formData: FormData) => Promise<void>
   defaultValues?: {
     code?: string
     discount_type?: string
@@ -40,9 +41,7 @@ const DISCOUNT_TYPE_OPTIONS = [
   { value: 'fixed', label: 'Fixed Amount (₹)' },
 ]
 
-const inputClass =
-  'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent'
-const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
+const inputClass = fieldInputCls
 
 export default function CouponForm({
   action,
@@ -51,6 +50,7 @@ export default function CouponForm({
   showUserSelector = false,
   backUrl,
   couponId,
+  discardAction,
   defaultValues: d = {},
 }: CouponFormProps) {
   const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
@@ -81,17 +81,25 @@ export default function CouponForm({
   }
 
   return (
-    <form ref={formRef} action={action} className="space-y-5">
+    <form ref={formRef} action={action} className="space-y-4">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       {edit.sessionId && (
         <div className="flex justify-end">
-          <EditorToolbar
+          <EditSessionActions
             autosaveStatus={'idle' as AutosaveStatus}
             sessionStatus={edit.status}
-            onSave={async () => { await edit.save() }}
             onCancel={edit.cancel}
             cancelHref={ap('/admin/coupons')}
-            hideSave
+            draft={isDraft}
+            discard={
+              isDraft && discardAction
+                ? () => {
+                    const fd = new FormData()
+                    fd.set('intent', 'discard')
+                    void discardAction(fd)
+                  }
+                : undefined
+            }
           />
         </div>
       )}
@@ -111,13 +119,11 @@ export default function CouponForm({
         scope="coupons:write"
         context="Discount coupon for this store"
       />
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-2 space-y-5">
-          <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5">
-            <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Code & Discount</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <label className={labelClass}>Coupon Code *</label>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2 space-y-4">
+          <FormSection title="Code & Discount">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField label="Coupon Code" required>
                 <input
                   name="code"
                   required
@@ -126,7 +132,7 @@ export default function CouponForm({
                   placeholder="e.g. REVIEW10"
                   style={{ textTransform: 'uppercase' }}
                 />
-              </div>
+              </FormField>
               <AdminSelect
                 name="discount_type"
                 label="Discount Type *"
@@ -137,9 +143,8 @@ export default function CouponForm({
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <div>
-                <label className={labelClass}>Discount Value *</label>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FormField label="Discount Value" required>
                 <input
                   name="discount_value"
                   type="number"
@@ -150,9 +155,8 @@ export default function CouponForm({
                   className={inputClass}
                   placeholder="e.g. 10"
                 />
-              </div>
-              <div>
-                <label className={labelClass}>Max Discount (₹)</label>
+              </FormField>
+              <FormField label="Max Discount (₹)">
                 <input
                   name="max_discount_amount"
                   type="number"
@@ -162,15 +166,13 @@ export default function CouponForm({
                   className={inputClass}
                   placeholder="Optional cap"
                 />
-              </div>
+              </FormField>
             </div>
-          </div>
+          </FormSection>
 
-          <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5">
-            <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Limits</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <div>
-                <label className={labelClass}>Min Purchase (₹)</label>
+          <FormSection title="Limits">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <FormField label="Min Purchase (₹)">
                 <input
                   name="min_purchase_amount"
                   type="number"
@@ -180,9 +182,8 @@ export default function CouponForm({
                   className={inputClass}
                   placeholder="Optional"
                 />
-              </div>
-              <div>
-                <label className={labelClass}>Total Usage Limit</label>
+              </FormField>
+              <FormField label="Total Usage Limit">
                 <input
                   name="usage_limit"
                   type="number"
@@ -191,9 +192,8 @@ export default function CouponForm({
                   className={inputClass}
                   placeholder="Unlimited"
                 />
-              </div>
-              <div>
-                <label className={labelClass}>Per-User Limit</label>
+              </FormField>
+              <FormField label="Per-User Limit">
                 <input
                   name="usage_limit_per_user"
                   type="number"
@@ -202,12 +202,11 @@ export default function CouponForm({
                   className={inputClass}
                   placeholder="Unlimited"
                 />
-              </div>
+              </FormField>
             </div>
-          </div>
+          </FormSection>
 
-          <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-3">
-            <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Description</h2>
+          <FormSection title="Description">
             <AIEnrichButton
               fieldLabel="Coupon Description"
               value={couponDescription}
@@ -225,81 +224,53 @@ export default function CouponForm({
                 placeholder="e.g. 10% off for Google review submission"
               />
             </AIEnrichButton>
-          </div>
+          </FormSection>
         </div>
 
-        <aside className="space-y-5">
-          <div className="bg-surface-elevated rounded-lg border border-border-default p-6">
-            <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-4">Status</h2>
+        <aside className="space-y-4">
+          <FormSection title="Status">
             <input type="hidden" name="is_active" value={isActive ? 'true' : 'false'} />
             <Toggle id="is_active" checked={isActive} onChange={setIsActive} label="Active" />
             <p className="text-xs text-foreground-muted mt-2">
               {isActive ? 'Customers can apply this coupon at checkout.' : 'Coupon is paused — cannot be redeemed.'}
             </p>
-          </div>
+          </FormSection>
 
-          <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-4">
-            <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Validity</h2>
-            <div>
-              <label className={labelClass}>Valid From</label>
+          <FormSection title="Validity">
+            <FormField label="Valid From">
               <DateTimePicker name="valid_from" value={validFrom} onChange={setValidFrom} className="w-full" />
-            </div>
-            <div>
-              <label className={labelClass}>Valid Until</label>
+            </FormField>
+            <FormField label="Valid Until">
               <DateTimePicker name="valid_until" value={validUntil} onChange={setValidUntil} className="w-full" />
-            </div>
+            </FormField>
             <p className="text-xs text-foreground-muted">Leave blank for no time limit.</p>
-          </div>
+          </FormSection>
         </aside>
       </div>
 
       {showUserSelector && (
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-4">
-          <div>
-            <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Eligible Users</h2>
-            <p className="text-xs text-foreground-muted mt-1">
-              Optional — restrict this coupon to specific customers. Leave empty to allow all users.
-            </p>
-          </div>
+        <FormSection
+          title="Eligible Users"
+          description="Optional — restrict this coupon to specific customers. Leave empty to allow all users."
+        >
           <CouponUserSelector name="eligible_user_ids" />
-        </div>
+        </FormSection>
       )}
 
-      <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-border-default">
-        <Link
-          href={ap(backUrl ?? '/admin/coupons')}
-          className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
-        >
-          Cancel
-        </Link>
+      <FormFooter cancelHref={ap(backUrl ?? '/admin/coupons')}>
         {isDraft ? (
           <>
-            <button
-              type="submit"
-              name="intent"
-              value="draft"
-              className="px-5 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm"
-            >
+            <FormButton variant="secondary" name="intent" value="draft">
               Save Draft
-            </button>
-            <button
-              type="submit"
-              name="intent"
-              value="publish"
-              className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm"
-            >
+            </FormButton>
+            <FormButton name="intent" value="publish">
               Publish
-            </button>
+            </FormButton>
           </>
         ) : (
-          <button
-            type="submit"
-            className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm"
-          >
-            {submitLabel || 'Save Changes'}
-          </button>
+          <FormButton>{submitLabel || 'Save Changes'}</FormButton>
         )}
-      </div>
+      </FormFooter>
     </form>
   )
 }

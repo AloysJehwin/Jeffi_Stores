@@ -6,8 +6,10 @@ export const ATTRIBUTION_MAX_AGE_DAYS = 90
 const MAX_AGE_MS = ATTRIBUTION_MAX_AGE_DAYS * 24 * 60 * 60 * 1000
 
 export const CLICK_ID_KEYS = ['gclid', 'gbraid', 'wbraid'] as const
+/** Meta's click id; kept with the attribution so a Meta ad click becomes the order's fbc. */
+export const META_CLICK_KEYS = ['fbclid'] as const
 export const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'] as const
-const PARAM_KEYS = [...CLICK_ID_KEYS, ...UTM_KEYS] as const
+const PARAM_KEYS = [...CLICK_ID_KEYS, ...META_CLICK_KEYS, ...UTM_KEYS] as const
 
 export type AttributionKey = (typeof PARAM_KEYS)[number]
 
@@ -54,6 +56,19 @@ export function mergeAttribution(
   if (incoming) return incoming
   if (existing && !isExpired(existing, now)) return existing
   return null
+}
+
+/** Meta browser and click ids for the Conversions API: the _fbp/_fbc cookies the Meta pixel sets,
+ * with fbc rebuilt from a stored fbclid when the cookie is missing. */
+export function metaClickIds(cookieHeader: string | null | undefined, a: Attribution | null): { fbp?: string; fbc?: string } | null {
+  const cookies: Record<string, string> = {}
+  for (const part of (cookieHeader ?? '').split(';')) {
+    const i = part.indexOf('=')
+    if (i > 0) cookies[part.slice(0, i).trim()] = part.slice(i + 1).trim()
+  }
+  const fbp = clean(cookies._fbp)
+  const fbc = clean(cookies._fbc) ?? (a?.fbclid ? `fb.1.${a.ts}.${a.fbclid}` : undefined)
+  return fbp || fbc ? { ...(fbp ? { fbp } : {}), ...(fbc ? { fbc } : {}) } : null
 }
 
 export function hasClickId(a: Partial<Attribution> | null | undefined): boolean {

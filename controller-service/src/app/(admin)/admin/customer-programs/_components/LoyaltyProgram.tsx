@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
-import Pagination from '@/components/admin/Pagination'
+import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import { getLoyaltyStats, listLoyaltyMembers, type LoyaltyStats } from '@/lib/loyalty/queries'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { TIER_KEYS, TIER_NAMES, tierName } from '@/lib/loyalty/tiers'
@@ -13,10 +13,10 @@ const PAGE_SIZE = 25
 const NO_STATS: LoyaltyStats = { members: 0, outstandingPoints: 0, redeemedPoints: 0, byTier: {} }
 
 const TIER_BADGE: Record<string, string> = {
-  bronze: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
-  silver: 'bg-slate-200 text-slate-700 dark:bg-slate-700/50 dark:text-slate-200',
-  gold: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  platinum: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+  bronze: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  silver: 'bg-surface-secondary text-foreground',
+  gold: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  platinum: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
 }
 
 export interface LoyaltyQuery {
@@ -37,13 +37,6 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
   ])
 
   const basePath = ap(PROGRAMS_PATH, host)
-  const buildUrl = (target: number) => {
-    const params = new URLSearchParams({ tab: 'loyalty' })
-    if (tier) params.set('tier', tier)
-    if (search) params.set('search', search)
-    if (target > 1) params.set('page', String(target))
-    return `${basePath}?${params}`
-  }
   const number = (value: number) => value.toLocaleString('en-IN')
   const outstandingValue = Math.max(0, stats.outstandingPoints) * settings.pointValue
 
@@ -71,14 +64,14 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
       </div>
 
       {settings.enabled && !campaign?.enabled ? (
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
           <span className="flex-1">
             Tier-upgrade emails are off, so customers who move up a tier aren&apos;t told. They&apos;re sent by the
             Loyalty Tier Upgrade campaign.
           </span>
           <Link
             href={ap('/admin/campaigns/loyalty_tier_upgrade', host)}
-            className="font-medium text-amber-900 underline hover:no-underline dark:text-amber-200"
+            className="font-medium text-amber-700 underline hover:no-underline dark:text-amber-400"
           >
             Turn it on
           </Link>
@@ -89,7 +82,7 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
           <span className="font-medium text-foreground">{campaign?.enabled ? 'on' : 'off'}</span>.{' '}
           <Link
             href={ap('/admin/campaigns/loyalty_tier_upgrade', host)}
-            className="text-accent-600 hover:text-accent-700 dark:text-accent-400"
+            className="text-accent-600 hover:text-accent-700"
           >
             Open the campaign
           </Link>
@@ -98,9 +91,9 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
 
       <LoyaltySettingsForm initial={settings} />
 
-      <div className="bg-surface-elevated rounded-lg border border-border-default">
+      <div className="bg-surface-elevated rounded-xl border border-border-default">
         <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border-default">
-          <h3 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Members</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Members</h3>
           <form method="get" action={basePath} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="tab" value="loyalty" />
             <input
@@ -142,8 +135,14 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
                   <th className="px-4 py-3 font-medium">Updated</th>
                 </tr>
               </thead>
-              <tbody>
-                {list.members.map(member => (
+              <ServerPagedItems
+                wrap="tbody"
+                page={page}
+                total={list.total}
+                noun="members"
+                items={list.members.map(member => ({
+                  key: String(member.userId),
+                  node: (
                   <tr key={member.userId} className="border-t border-border-default">
                     <td className="px-4 py-3">
                       <Link
@@ -171,14 +170,12 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
                       })}
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                  ),
+                }))}
+              />
             </table>
           </div>
         )}
-        <div className="p-4">
-          <Pagination page={page} total={list.total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-        </div>
       </div>
     </ProgramSection>
   )

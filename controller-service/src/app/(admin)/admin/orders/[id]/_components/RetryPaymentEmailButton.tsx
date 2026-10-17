@@ -2,8 +2,12 @@
 
 import { useState } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { Mail } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { Badge } from '@/components/admin/kit/core'
 
 export default function RetryPaymentEmailButton({ orderId }: { orderId: string }) {
+  const toast = useActionToast()
   const [state, setState] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle')
 
   async function handleClick() {
@@ -11,16 +15,17 @@ export default function RetryPaymentEmailButton({ orderId }: { orderId: string }
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/retry-email`, { method: 'POST' })
       setState(res.ok ? 'sent' : 'error')
+      if (res.ok) toast.success('Re-order email sent.')
+      else toast.error('Could not send the re-order email.')
     } catch {
       setState('error')
+      toast.error('Could not send the re-order email.')
     }
   }
 
   if (state === 'sent') {
     return (
-      <span className="px-4 py-2 text-sm font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-        Email sent
-      </span>
+      <Badge tone="green">Email sent</Badge>
     )
   }
 
@@ -29,8 +34,9 @@ export default function RetryPaymentEmailButton({ orderId }: { orderId: string }
       <button
         onClick={handleClick}
         disabled={state === 'loading'}
-        className="px-4 py-2 text-sm font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        className="control-md border border-red-500/40 text-red-600 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400"
       >
+        <Mail className="h-4 w-4" />
         {state === 'loading' ? 'Sending…' : state === 'error' ? 'Retry failed — try again' : 'Send re-order email'}
       </button>
     </RequireWrite>

@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
   const rawState = params.get('state')
   const state = rawState ? verifyAdminState(rawState) : null
-  const backTo = `${await tenantAdminBase(state)}/admin/merchant-sync`
+  const backTo = `${await tenantAdminBase(state)}/admin/amazon`
   const fail = (reason: string) => returnToAdmin(`${backTo}?connected=0&provider=amazon&error=${reason}`)
 
   const err = params.get('error_description') || params.get('error')

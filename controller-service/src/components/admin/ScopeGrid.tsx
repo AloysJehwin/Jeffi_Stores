@@ -19,7 +19,8 @@ function buildScopeGrid(SCOPES: ScopeDefinition[]) {
     const base = s.key.replace(/:read$|:write$/, '')
     byBase[base] = byBase[base] || {}
     if (s.key.endsWith(':read')) byBase[base].read = s
-    else if (s.key.endsWith(':write')) byBase[base].write = s
+    // Write and any other action scope (e.g. social:approve) sit in the write column.
+    else byBase[base].write = s
   }
 
   const groups: Record<string, { read?: (typeof ADMIN_SCOPES)[0]; write?: (typeof ADMIN_SCOPES)[0] }[]> = {}

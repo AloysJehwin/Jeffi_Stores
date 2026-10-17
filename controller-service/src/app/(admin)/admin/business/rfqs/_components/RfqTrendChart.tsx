@@ -1,3 +1,5 @@
+import { ChartCard } from '@/components/admin/kit/charts'
+
 export interface RfqTrendPoint {
   month: string
   count: number
@@ -30,19 +32,14 @@ export default function RfqTrendChart({ data }: { data: RfqTrendPoint[] }) {
   const xStep = points.length <= 8 ? 1 : Math.ceil(points.length / 7)
 
   return (
-    <div className="bg-surface-elevated border border-border-default rounded-lg shadow-sm p-4 h-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
-        <p className="text-sm font-semibold text-foreground">RFQs Received</p>
-        <span className="text-xs text-foreground-muted">last 12 months</span>
-      </div>
-
+    <ChartCard title="RFQs Received" hint="last 12 months">
       {!hasData ? (
-        <div className="flex-1 flex items-center justify-center text-sm text-foreground-muted">No RFQs yet</div>
+        <div className="flex h-40 items-center justify-center text-sm text-foreground-muted">No RFQs yet</div>
       ) : (
-        <div className="flex-1 min-h-0 overflow-x-auto">
+        <div className="overflow-x-auto">
           <svg
             viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-            className="w-full h-full min-w-[320px]"
+            className="h-40 w-full min-w-[320px]"
             preserveAspectRatio="none"
             role="img"
             aria-label="RFQs received per month"
@@ -98,6 +95,6 @@ export default function RfqTrendChart({ data }: { data: RfqTrendPoint[] }) {
           </svg>
         </div>
       )}
-    </div>
+    </ChartCard>
   )
 }

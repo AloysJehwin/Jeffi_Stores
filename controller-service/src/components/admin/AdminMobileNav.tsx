@@ -11,12 +11,14 @@ interface NavLink {
   mobileOnly?: boolean
   group?: string
   exactMatch?: boolean
+  matchPaths?: string[]
 }
 
 function isMobileNavActive(link: NavLink, currentPath: string | null, host: string): boolean {
   if (!currentPath) return false
   const href = ap(link.href, host)
   if (currentPath === href) return true
+  if (link.matchPaths?.some(m => currentPath === ap(m, host) || currentPath.startsWith(ap(m, host) + '/'))) return true
   if (link.exactMatch || link.href === '/admin/dashboard') return false
   return currentPath.startsWith(href + '/')
 }

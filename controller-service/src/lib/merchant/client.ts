@@ -137,10 +137,17 @@ export function gmcErrorMessage(
   msg = String(msg).replace(/\s+/g, ' ').trim().slice(0, 300)
   if (status === 401 || status === 403) {
     const account = creds?.merchantId ? ` ${creds.merchantId}` : ''
+    if (/API_DEVELOPER/.test(msg)) {
+      return (
+        `HTTP ${status}: Merchant API sync needs an API developer on Merchant Center account${account}. Open the gear ` +
+        `(top right), then "Enable Merchant API sync" with the email of an admin on that account.`
+      )
+    }
     if (/not registered with the merchant account/i.test(msg)) {
       return (
-        `HTTP ${status}: Merchant Center sync is not enabled on the platform yet (its Google Cloud project is not ` +
-        `registered for the Merchant API). This is a platform setup step, not something to change in your account; contact support.`
+        `HTTP ${status}: Merchant API sync is not enabled for this Merchant Center account yet. Open the gear ` +
+        `(top right), then "Enable Merchant API sync" (or reconnect with Google, which enables it). Google only allows ` +
+        `this for an account with a verified website, by a Google account that is an admin on it.`
       )
     }
     if (creds?.refreshToken) {

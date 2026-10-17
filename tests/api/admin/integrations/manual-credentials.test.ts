@@ -141,9 +141,9 @@ describe('POST /api/admin/integrations/test', () => {
     expect(vi.mocked(requireAdminScope).mock.calls[0][1]).toBe('campaigns:write')
   })
 
-  it('400s an unknown provider and off-tenant requests', async () => {
+  it('400s an unknown provider, and tests the flagship like a store', async () => {
     expect((await TEST(req('POST', { provider: 'x' }, '/api/admin/integrations/test'))).status).toBe(400)
     vi.mocked(resolveTenant).mockResolvedValue(null)
-    expect((await TEST(req('POST', { provider: 'meta' }, '/api/admin/integrations/test'))).status).toBe(400)
+    expect((await TEST(req('POST', { provider: 'meta' }, '/api/admin/integrations/test'))).status).toBe(200)
   })
 })

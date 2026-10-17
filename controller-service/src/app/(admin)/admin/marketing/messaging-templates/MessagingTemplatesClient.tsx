@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
-import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
+import { Plus } from 'lucide-react'
+import { Tabs, TabAction } from '@/components/admin/channels/ui'
+import TemplateEditor, {
+  toEditorTemplate,
+  type Channel,
+  type EditorTemplate,
+} from '@/components/admin/messaging-templates/TemplateEditor'
+import { PageHeader, fieldInputCls } from '@/components/admin/kit'
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp']
 const CHANNEL_LABEL: Record<Channel, string> = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' }
@@ -40,13 +47,17 @@ export default function MessagingTemplatesClient() {
   const [query, setQuery] = useState(q)
   const { showToast } = useToast()
 
-  const updateUrl = useCallback((patch: Record<string, string | null>) => {
-    const next = new URLSearchParams(sp.toString())
-    for (const [k, v] of Object.entries(patch)) {
-      if (v === null || v === '') next.delete(k); else next.set(k, v)
-    }
-    router.replace(`?${next.toString()}`, { scroll: false })
-  }, [router, sp])
+  const updateUrl = useCallback(
+    (patch: Record<string, string | null>) => {
+      const next = new URLSearchParams(sp.toString())
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === null || v === '') next.delete(k)
+        else next.set(k, v)
+      }
+      router.replace(`?${next.toString()}`, { scroll: false })
+    },
+    [router, sp]
+  )
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -61,15 +72,19 @@ export default function MessagingTemplatesClient() {
     }
   }, [channel])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   // Deep-link: when a slug is in the URL, auto-open the matching template.
   useEffect(() => {
     if (!slug) return
     if (selected?.slug === slug && selected.channel === channel) return
     fetch(`${API}/${channel}/${encodeURIComponent(slug)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(t => { if (t) setSelected(toEditorTemplate(t)) })
+      .then(r => (r.ok ? r.json() : null))
+      .then(t => {
+        if (t) setSelected(toEditorTemplate(t))
+      })
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, channel])
@@ -79,7 +94,14 @@ export default function MessagingTemplatesClient() {
   }
 
   function createNew() {
-    setSelected({ slug: '', channel, name: '', subject: '', body: '', blocks_format: channel === 'email' ? 'tiptap' : channel === 'sms' ? 'sms-text' : 'wa-content' })
+    setSelected({
+      slug: '',
+      channel,
+      name: '',
+      subject: '',
+      body: '',
+      blocks_format: channel === 'email' ? 'tiptap' : channel === 'sms' ? 'sms-text' : 'wa-content',
+    })
     updateUrl({ slug: null })
   }
 
@@ -95,7 +117,11 @@ export default function MessagingTemplatesClient() {
       const body = { ...selected, publish }
       const url = selected.id ? `${API}/${selected.id}` : API
       const method = selected.id ? 'PUT' : 'POST'
-      const res = await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      const res = await fetch(url, {
+        method,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
       if (res.ok) {
         const saved = toEditorTemplate(await res.json())
         setSelected(saved)
@@ -116,10 +142,12 @@ export default function MessagingTemplatesClient() {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return items
-    return items.filter(i =>
-      (i.name || '').toLowerCase().includes(needle)
-      || i.slug.toLowerCase().includes(needle)
-      || (i.category || '').toLowerCase().includes(needle))
+    return items.filter(
+      i =>
+        (i.name || '').toLowerCase().includes(needle) ||
+        i.slug.toLowerCase().includes(needle) ||
+        (i.category || '').toLowerCase().includes(needle)
+    )
   }, [items, query])
 
   const grouped = useMemo(() => {
@@ -132,41 +160,53 @@ export default function MessagingTemplatesClient() {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
   }, [filtered])
 
-  const INPUT = 'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
-  const counts = useMemo(() => ({ tenant: items.filter(i => i.source === 'tenant').length, platform: items.filter(i => i.source !== 'tenant').length }), [items])
+  const INPUT = fieldInputCls
+  const counts = useMemo(
+    () => ({
+      tenant: items.filter(i => i.source === 'tenant').length,
+      platform: items.filter(i => i.source !== 'tenant').length,
+    }),
+    [items]
+  )
 
   return (
     <div className="p-4 sm:p-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Templates</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">
-            Standard email / SMS / WhatsApp bodies ship with every store. Edit one to customise it for this tenant, or add your own.
-          </p>
-        </div>
-        <button onClick={createNew} className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm whitespace-nowrap">
-          + New template
-        </button>
+      <div className="mb-5">
+        <PageHeader
+          title="Templates"
+          description="Standard email / SMS / WhatsApp bodies ship with every store. Edit one to customise it for this tenant, or add your own."
+        />
       </div>
 
-      <div className="flex items-center gap-1 border-b border-border-default mb-5 overflow-x-auto">
-        {CHANNELS.map(c => (
-          <button
-            key={c}
-            onClick={() => { updateUrl({ channel: c, slug: null }); setSelected(null) }}
-            className={`px-4 py-2.5 -mb-px border-b-2 text-sm font-medium whitespace-nowrap transition-colors ${
-              channel === c ? 'border-accent-500 text-foreground' : 'border-transparent text-foreground-secondary hover:text-foreground'
-            }`}
-          >
-            {CHANNEL_LABEL[c]}
-            {channel === c && !loading && <span className="ml-2 text-xs text-foreground-muted tabular-nums">{items.length}</span>}
-          </button>
-        ))}
-        {!loading && items.length > 0 && (
-          <span className="ml-auto pb-2 text-xs text-foreground-muted whitespace-nowrap">
-            {counts.tenant} customised · {counts.platform} standard
-          </span>
-        )}
+      <div className="mb-5">
+        <Tabs
+          tabs={CHANNELS.map(c => ({
+            id: c,
+            label: (
+              <>
+                {CHANNEL_LABEL[c]}
+                {channel === c && !loading && (
+                  <span className="ml-1 text-xs text-foreground-muted tabular-nums">{items.length}</span>
+                )}
+              </>
+            ),
+          }))}
+          value={channel}
+          onChange={c => {
+            updateUrl({ channel: c, slug: null })
+            setSelected(null)
+          }}
+          actions={
+            <>
+              {!loading && items.length > 0 && (
+                <span className="hidden sm:inline mr-2 text-xs text-foreground-muted whitespace-nowrap">
+                  {counts.tenant} customised · {counts.platform} standard
+                </span>
+              )}
+              <TabAction onClick={createNew} icon={<Plus className="w-4 h-4" />} label="New template" />
+            </>
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 items-start">
@@ -176,59 +216,86 @@ export default function MessagingTemplatesClient() {
               className={INPUT}
               placeholder="Filter by name, slug, or category"
               value={query}
-              onChange={e => { setQuery(e.target.value); updateUrl({ q: e.target.value || null }) }}
+              onChange={e => {
+                setQuery(e.target.value)
+                updateUrl({ q: e.target.value || null })
+              }}
             />
           </div>
           <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
-            {loading && Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="px-4 py-3 border-b border-border-default animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
-                <div className="h-3.5 w-2/3 bg-surface-secondary rounded mb-2" />
-                <div className="h-3 w-1/3 bg-surface-secondary rounded opacity-60" />
-              </div>
-            ))}
+            {loading &&
+              Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="px-4 py-3 border-b border-border-default animate-pulse"
+                  style={{ animationDelay: `${i * 50}ms` }}
+                >
+                  <div className="h-3.5 w-2/3 bg-surface-secondary rounded mb-2" />
+                  <div className="h-3 w-1/3 bg-surface-secondary rounded opacity-60" />
+                </div>
+              ))}
             {!loading && filtered.length === 0 && (
               <div className="p-8 text-center">
                 <p className="text-sm font-medium text-foreground">No templates match</p>
-                <p className="text-xs text-foreground-muted mt-1">{query ? 'Try a different filter.' : 'Create one with “New template”.'}</p>
+                <p className="text-xs text-foreground-muted mt-1">
+                  {query ? 'Try a different filter.' : 'Create one with “New template”.'}
+                </p>
               </div>
             )}
-            {!loading && grouped.map(([cat, list]) => (
-              <div key={cat}>
-                <div className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground-muted bg-surface-secondary border-y border-border-default">{cat}</div>
-                <ul>
-                  {list.map(it => {
-                    const active = selected?.slug === it.slug && selected.channel === channel
-                    return (
-                      <li key={it.id}>
-                        <button
-                          onClick={() => open(it)}
-                          className={`w-full text-left px-4 py-3 border-l-2 border-b border-b-border-default transition-colors ${
-                            active ? 'border-l-accent-500 bg-surface-secondary' : 'border-l-transparent hover:bg-surface-secondary/60'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-sm text-foreground truncate">{it.name || it.slug}</span>
-                            {it.source === 'tenant'
-                              ? <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-500/10 text-accent-600">Customised</span>
-                              : <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-secondary text-foreground-muted">Standard</span>}
-                          </div>
-                          <div className="mt-0.5 flex gap-2 items-center text-xs text-foreground-muted">
-                            <code className="truncate">{it.slug}</code>
-                            {it.channel === 'whatsapp' && it.approval_status && (
-                              <span className={`px-1.5 rounded text-[10px] font-medium ${
-                                it.approval_status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                                : it.approval_status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                                : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
-                              }`}>{it.approval_status}</span>
-                            )}
-                          </div>
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </div>
-            ))}
+            {!loading &&
+              grouped.map(([cat, list]) => (
+                <div key={cat}>
+                  <div className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground-muted bg-surface-secondary border-y border-border-default">
+                    {cat}
+                  </div>
+                  <ul>
+                    {list.map(it => {
+                      const active = selected?.slug === it.slug && selected.channel === channel
+                      return (
+                        <li key={it.id}>
+                          <button
+                            onClick={() => open(it)}
+                            className={`w-full text-left px-4 py-3 border-l-2 border-b border-b-border-default transition-colors ${
+                              active
+                                ? 'border-l-accent-500 bg-surface-secondary'
+                                : 'border-l-transparent hover:bg-surface-secondary/60'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-medium text-sm text-foreground truncate">{it.name || it.slug}</span>
+                              {it.source === 'tenant' ? (
+                                <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-accent-500/10 text-accent-600">
+                                  Customised
+                                </span>
+                              ) : (
+                                <span className="shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-secondary text-foreground-muted">
+                                  Standard
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-0.5 flex gap-2 items-center text-xs text-foreground-muted">
+                              <code className="truncate">{it.slug}</code>
+                              {it.channel === 'whatsapp' && it.approval_status && (
+                                <span
+                                  className={`px-1.5 rounded text-[10px] font-medium ${
+                                    it.approval_status === 'approved'
+                                      ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                                      : it.approval_status === 'rejected'
+                                        ? 'bg-red-500/10 text-red-700 dark:text-red-400'
+                                        : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                  }`}
+                                >
+                                  {it.approval_status}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              ))}
           </div>
         </aside>
 
@@ -236,28 +303,53 @@ export default function MessagingTemplatesClient() {
           {!selected && (
             <div className="py-16 text-center">
               <p className="text-sm font-medium text-foreground">Select a template to edit</p>
-              <p className="text-xs text-foreground-muted mt-1">Standard templates are shared by every store; saving creates this tenant’s own copy.</p>
+              <p className="text-xs text-foreground-muted mt-1">
+                Standard templates are shared by every store; saving creates this tenant’s own copy.
+              </p>
             </div>
           )}
           {selected && (
             <>
               <div className="flex items-start justify-between gap-4 mb-5">
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">{CHANNEL_LABEL[selected.channel]}</div>
-                  <div className="font-semibold text-lg text-foreground truncate">{selected.name || selected.slug || 'New template'}</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">
+                    {CHANNEL_LABEL[selected.channel]}
+                  </div>
+                  <div className="font-semibold text-lg text-foreground truncate">
+                    {selected.name || selected.slug || 'New template'}
+                  </div>
                 </div>
-                <button onClick={closeEditor} className="px-4 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">
+                <button
+                  onClick={closeEditor}
+                  className="px-4 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
+                >
                   Close
                 </button>
               </div>
               {!selected.id && (
                 <div className="mb-5">
-                  <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Slug</label>
-                  <input className={INPUT} placeholder="e.g. order/confirmed" value={selected.slug} onChange={e => setSelected({ ...selected, slug: e.target.value })} />
-                  <p className="text-xs text-foreground-muted mt-1">Stable key the store code sends by. Lowercase, use / to group.</p>
+                  <label className="block text-sm font-semibold uppercase tracking-wide text-foreground mb-1.5">
+                    Slug
+                  </label>
+                  <input
+                    className={INPUT}
+                    placeholder="e.g. order/confirmed"
+                    value={selected.slug}
+                    onChange={e => setSelected({ ...selected, slug: e.target.value })}
+                  />
+                  <p className="text-xs text-foreground-muted mt-1">
+                    Stable key the store code sends by. Lowercase, use / to group.
+                  </p>
                 </div>
               )}
-              <TemplateEditor value={selected} apiBase={API} onChange={setSelected} onSave={save} saving={saving} apiNote="API sends use the Messaging-API copy of this template (ecom console → Messaging), so edits to the store copy here do not change them." />
+              <TemplateEditor
+                value={selected}
+                apiBase={API}
+                onChange={setSelected}
+                onSave={save}
+                saving={saving}
+                apiNote="API sends use the Messaging-API copy of this template (ecom console → Messaging), so edits to the store copy here do not change them."
+              />
             </>
           )}
         </section>

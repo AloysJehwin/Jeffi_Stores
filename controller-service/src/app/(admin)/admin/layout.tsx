@@ -10,6 +10,12 @@ import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
 import { getSiteControls, getStoreIdentity } from '@/lib/catalog/site-controls'
 import { getHost } from '@/lib/tenancy/get-host'
 import { LogOut } from 'lucide-react'
+import { SETTINGS_HUB_TABS, visibleSettingsHubTabs } from '@/lib/admin/settings-hub'
+
+function managedAdsReady(): boolean {
+  const e = process.env
+  return !!(e.GOOGLE_ADS_DEVELOPER_TOKEN && e.GOOGLE_ADS_LOGIN_CUSTOMER_ID && e.GOOGLE_ADS_MANAGER_REFRESH_TOKEN)
+}
 
 export async function generateMetadata() {
   const { name } = await getStoreIdentity()
@@ -40,9 +46,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/categories', label: 'Categories', scope: 'categories:read', group: 'Catalogue' },
     { href: '/admin/brands', label: 'Brands', scope: 'brands:read', group: 'Catalogue' },
     { href: '/admin/catalog-enrichment', label: 'AI Enrichment', scope: 'catalog_enrichment:read', group: 'Catalogue' },
-    { href: '/admin/merchant-sync', label: 'Merchant Sync', scope: 'merchant_sync:read', group: 'Catalogue' },
+    { href: '/admin/merchant', label: 'Google Merchant', scope: 'merchant_sync:read', group: 'Catalogue' },
+    { href: '/admin/amazon', label: 'Amazon', scope: 'amazon:read', group: 'Catalogue' },
     { href: '/admin/data-source', label: 'Data Source', scope: 'products:read', group: 'Catalogue' },
-    { href: '/admin/social-posts', label: 'Social Posts', scope: 'campaigns:read', group: 'Catalogue' },
+    { href: '/admin/social-posts', label: 'Social Posts', scope: 'social:read', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders:read', group: 'Sales' },
     { href: '/admin/subscriptions', label: 'Subscriptions', scope: 'subscriptions:read', group: 'Sales' },
     { href: '/admin/quotations', label: 'Quotations', scope: 'quotations:read', group: 'Sales' },
@@ -60,12 +67,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: '/admin/scan', label: 'QuickScan', scope: 'quick_scan:read', group: 'Fulfilment', mobileOnly: true },
     { href: '/admin/financial', label: 'Financial', scope: 'financial:read', group: 'Finance' },
     { href: '/admin/inventory', label: 'Inventory', scope: 'inventory:read', group: 'Finance' },
+    { href: '/admin/suppliers', label: 'Suppliers', scope: 'inventory:read', group: 'Finance' },
+    { href: '/admin/purchase-orders', label: 'Purchase Orders', scope: 'inventory:read', group: 'Finance' },
     { href: '/admin/shelving', label: 'Shelving', scope: 'shelving:read', group: 'Finance' },
     { href: '/admin/gst', label: 'GST Compliance', scope: 'gst:read', group: 'Finance' },
     { href: '/admin/traffic', label: 'Traffic', scope: 'traffic:read', group: 'Marketing' },
     { href: '/admin/google-ads', label: 'Google Ads', scope: 'google_ads:read', group: 'Marketing' },
+    { href: '/admin/amazon-ads', label: 'Amazon Ads', scope: 'amazon_ads:read', group: 'Marketing' },
+    { href: '/admin/meta-ads', label: 'Meta Ads', scope: 'meta_ads:read', group: 'Marketing' },
     { href: '/admin/coupons', label: 'Coupons', scope: 'coupons:read', group: 'Marketing' },
-    { href: '/admin/offers', label: 'Bank Offers', scope: 'coupons:read', group: 'Marketing' },
+    { href: '/admin/offers', label: 'Offers', scope: 'coupons:read', group: 'Marketing' },
     { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms:read', group: 'Marketing' },
     { href: '/admin/marketing/messaging', label: 'Messaging', scope: 'mailer:read', group: 'Marketing' },
     { href: '/admin/marketing/messaging-templates', label: 'Templates', scope: 'templates:read', group: 'Marketing' },
@@ -110,6 +121,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       scope: 'ecom_instances:read',
       group: 'Ecom Store',
       platformAdminOnly: true,
+      // Only for "managed by Jeffi" Ads; hidden until the manager account keys are set.
+      requiresManagedAds: true,
     },
     {
       href: '/admin/ecom/billing',
@@ -118,19 +131,38 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       group: 'Ecom Store',
       platformAdminOnly: true,
     },
-    { href: '/admin/audit', label: 'Audit Log', scope: 'audit:read', group: 'Settings' },
-    { href: '/admin/service-accounts', label: 'Service Accounts', scope: 'service_accounts:read', group: 'Settings' },
-    { href: '/admin/team', label: 'Team Members', scope: 'settings:read', group: 'Settings', ownerOnly: true },
     { href: '/admin/settings/homepage', label: 'Homepage', scope: 'settings:write', group: 'Settings' },
     { href: '/admin/settings/site-controls', label: 'Site Controls', scope: 'settings:write', group: 'Settings' },
+    {
+      href: '/admin/settings/ai-pricing',
+      label: 'AI Pricing',
+      scope: 'ecom_billing:read',
+      group: 'Settings',
+      platformAdminOnly: true,
+    },
+    // The Settings hub: Account, Team, Service accounts and Audit log tabs (lib/admin/settings-hub).
     { href: '/admin/settings', label: 'Settings', scope: 'settings:read', group: 'Settings', exactMatch: true },
   ]
+  const settingsTabs = visibleSettingsHubTabs(role, scopes)
 
-  const filteredNavLinks = navLinks.filter(link => {
-    if ('platformAdminOnly' in link && link.platformAdminOnly && !isPlatformAdmin(role)) return false
-    if ('ownerOnly' in link && link.ownerOnly && !isPlatformOwner(role)) return false
-    return hasScope(role, scopes, link.scope)
-  })
+  const filteredNavLinks = navLinks
+    .filter(link => {
+      // Shown when any hub tab is reachable; points at the first one.
+      if (link.href === '/admin/settings') return settingsTabs.length > 0
+      if ('platformAdminOnly' in link && link.platformAdminOnly && !isPlatformAdmin(role)) return false
+      if ('ownerOnly' in link && link.ownerOnly && !isPlatformOwner(role)) return false
+      if ('requiresManagedAds' in link && link.requiresManagedAds && !managedAdsReady()) return false
+      return hasScope(role, scopes, link.scope)
+    })
+    .map(link =>
+      link.href === '/admin/settings'
+        ? {
+            ...link,
+            href: settingsTabs[0].href,
+            matchPaths: SETTINGS_HUB_TABS.map(t => t.href).filter(h => h !== '/admin/settings'),
+          }
+        : link
+    )
   const desktopNavLinks = filteredNavLinks.filter(link => !('mobileOnly' in link && link.mobileOnly))
 
   const displayName =
@@ -158,11 +190,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   // The shipping wallet pays for Delhivery on the platform account, for EVERY plan — so gate the
   // badge + Wallet nav on platform-Delhivery + delhivery:read (which every plan has), NOT on
   // financial:* (Pro+ only). getSiteControls already resolved ownDelhivery (flagship reads as own).
-  const showWallet = !controls.ownDelhivery && hasScope(role, scopes, 'delhivery:read')
+  // AI usage is charged to the wallet too, so every tenant sees it; the flagship has no wallet.
+  const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
+  const walletTenantId = await resolveTenantId().catch(() => null)
+  const showWallet = !!walletTenantId && hasScope(role, scopes, 'delhivery:read')
   let wallet: { balance: number; minBalance: number } | null = null
   if (showWallet) {
-    const { resolveTenantId } = await import('@/lib/tenancy/tenant-context')
-    const tenantId = await resolveTenantId().catch(() => null)
+    const tenantId = walletTenantId
     if (tenantId) {
       const { getWalletBalance } = await import('@/lib/payments/wallet')
       const w = await getWalletBalance(tenantId).catch(() => null)

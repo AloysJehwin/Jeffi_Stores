@@ -18,6 +18,9 @@ export interface AiToolDef {
   }
 }
 
+/** Text providers the gateway can route chat to ('razer' = the Ollama pool). */
+export type TextProviderName = 'razer'
+
 export type ModelHint = 'sql' | 'copy' | 'agent' | 'fast' | 'enrich' | 'email'
 
 export interface AiChatRequest {
@@ -27,6 +30,8 @@ export interface AiChatRequest {
   jsonMode?: boolean
   modelHint?: ModelHint
   forceProvider?: 'openai' | 'ollama'
+  /** Allowed text providers in order; overrides the gateway default. forceProvider still wins. */
+  providers?: TextProviderName[]
   tools?: AiToolDef[]
   /** Bypass the LLM cache (both KV and semantic) for this request. */
   noCache?: boolean
@@ -39,6 +44,12 @@ export interface AiToolCall {
   arguments: Record<string, unknown>
 }
 
+export interface TokenUsage {
+  promptTokens: number
+  completionTokens: number
+  costInr: number
+}
+
 export interface AiChatResponse {
   content: string
   toolCalls?: AiToolCall[]
@@ -48,6 +59,7 @@ export interface AiChatResponse {
   fallbackUsed: boolean
   /** Which cache tier served this, when any. */
   cache?: 'kv' | 'semantic' | null
+  usage?: TokenUsage
 }
 
 export interface EmbedRequest {
@@ -58,6 +70,116 @@ export interface EmbedRequest {
 export interface EmbedResponse {
   embeddings: number[][]
   model: string
+  usage?: TokenUsage
+}
+
+// ── Image generation ────────────────────────────────────────────────────────
+export type ImageProviderName = 'razer' | 'google' | 'replicate'
+export type ImageQuality = 'draft' | 'standard' | 'premium'
+
+export interface ImageGenerateRequest {
+  prompt: string
+  negativePrompt?: string
+  /** Default 1024, clamped 256..1536, snapped to a multiple of 64. */
+  width?: number
+  height?: number
+  /** 1..4, default 1. */
+  n?: number
+  quality?: ImageQuality
+  provider?: ImageProviderName
+  /** Allowed providers in order; overrides the gateway's AI_IMAGE_PROVIDERS. `provider` still wins. */
+  providers?: ImageProviderName[]
+  /** Image-to-image / edit when the provider supports it. */
+  referenceImageUrl?: string
+  seed?: number
+  /** Cache partition (tenant id); hits only ever come from the same namespace. */
+  namespace?: string
+}
+
+export interface GeneratedImageRef {
+  /** Short-lived gateway URL (/v1/files/<id>); the app persists to its own storage. */
+  url: string
+  width: number
+  height: number
+  mime: string
+}
+
+export interface ImageUsage {
+  units: number
+  unitType: 'image'
+  costInr: number
+}
+
+export interface ImageGenerateResponse {
+  images: GeneratedImageRef[]
+  provider: ImageProviderName
+  model: string
+  usage: ImageUsage
+  latencyMs: number
+  cache?: 'kv' | null
+}
+
+// ── Video generation (async) ────────────────────────────────────────────────
+export type VideoProviderName = 'google' | 'replicate'
+export type VideoAspect = '9:16' | '16:9' | '1:1'
+
+export interface VideoGenerateRequest {
+  prompt: string
+  imageUrl?: string
+  /** 2..8, default 5. */
+  durationSec?: number
+  aspect?: VideoAspect
+  provider?: VideoProviderName
+  /** Allowed providers in order; overrides the gateway's AI_VIDEO_PROVIDERS. `provider` still wins. */
+  providers?: VideoProviderName[]
+  namespace?: string
+}
+
+export interface VideoStartResponse {
+  jobId: string
+  provider: VideoProviderName
+  model: string
+  estimatedCostInr: number
+}
+
+export type VideoJobStatus = 'queued' | 'running' | 'done' | 'failed'
+
+export interface VideoJobResult {
+  videoUrl: string
+  durationSec: number
+  width: number
+  height: number
+  mime: string
+}
+
+export interface VideoUsage {
+  units: number
+  unitType: 'video_second'
+  costInr: number
+}
+
+export interface VideoJobResponse {
+  status: VideoJobStatus
+  result?: VideoJobResult
+  usage?: VideoUsage
+  provider?: VideoProviderName
+  model?: string
+  error?: string
+}
+
+// ── Provider status (GET /v1/providers) ─────────────────────────────────────
+export interface ProviderStatus<N extends string = string> {
+  name: N
+  /** Credentials/endpoint present (text: the Ollama pool answered its last probe). */
+  configured: boolean
+}
+
+export interface ProvidersResponse {
+  text: ProviderStatus<TextProviderName>[]
+  image: ProviderStatus<ImageProviderName>[]
+  video: ProviderStatus<VideoProviderName>[]
+  /** The gateway's own default order per capability. */
+  defaults: { text: TextProviderName[]; image: ImageProviderName[]; video: VideoProviderName[] }
 }
 
 export interface VisionRequest {

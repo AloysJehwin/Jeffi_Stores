@@ -1,5 +1,6 @@
 import { query, queryMany, queryOne } from '@/lib/shared/db'
 import { searchListingsItems } from './client'
+import { recordAmazonQuantities } from './stock'
 
 // Amazon listing-status snapshot — analog of src/lib/merchant/gmc-status.ts.
 // Advisory lock so two refreshes can't run concurrently (distinct from the sync lock and
@@ -66,6 +67,7 @@ export async function refreshAmazonStatusSnapshot(): Promise<AmazonSummary | { l
     do {
       const res = await searchListingsItems(pageToken)
       const items = res.items || []
+      await recordAmazonQuantities(items).catch(() => {})
       for (const item of items) {
         const sku = item.sku
         if (!sku) continue

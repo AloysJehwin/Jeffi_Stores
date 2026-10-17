@@ -58,8 +58,8 @@ const config: Config = {
       },
       // Admin control heights — the vertical standard for buttons, inputs and select triggers.
       height: {
-        control: '38px',
-        'control-sm': '34px',
+        control: '32px',
+        'control-sm': '32px',
       },
       fontFamily: {
         bebas: ['"Bebas Neue"', 'cursive'],

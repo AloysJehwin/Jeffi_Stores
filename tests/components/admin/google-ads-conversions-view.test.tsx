@@ -2,10 +2,12 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 
 let canWrite = true
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams(window.location.search) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(window.location.search), usePathname: () => '/admin/google-ads' }))
 vi.mock('@/contexts/AdminScopesContext', () => ({ useCanWrite: () => canWrite }))
 
 import ConversionsView from '@/app/(admin)/admin/google-ads/_components/ConversionsView'
+import { ToastProvider } from '@/contexts/ToastContext'
+import type { ReactElement } from 'react'
 import GoogleAdsClient from '@/app/(admin)/admin/google-ads/GoogleAdsClient'
 import type { ConversionsSummary, DataManagerRequest, GoogleConversionsData, UploadLog } from '@/lib/google-ads/conversions/types'
 
@@ -203,6 +205,9 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock)
   routeFetch()
 })
+// Action results are toasts, so tests that read them render inside a ToastProvider.
+const withToasts = (ui: ReactElement) => render(<ToastProvider>{ui}</ToastProvider>)
+
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
@@ -211,7 +216,7 @@ afterEach(() => {
 
 describe('ConversionsView', () => {
   it('offers to create the server action, secondary by default when the tag already sends purchases', async () => {
-    render(<ConversionsView d={summary()} currency="INR" />)
+    withToasts(<ConversionsView d={summary()} currency="INR" />)
     expect(screen.getByText(/No conversion action yet/)).toBeTruthy()
     expect(screen.getByText('Count each purchase once')).toBeTruthy()
     const box = screen.getByRole('checkbox') as HTMLInputElement
@@ -239,7 +244,7 @@ describe('ConversionsView', () => {
   })
 
   it('shows where purchases go, the last run error, and runs and retries uploads', async () => {
-    render(<ConversionsView d={configured} currency="INR" />)
+    withToasts(<ConversionsView d={configured} currency="INR" />)
     expect(screen.getByText(/Uploading to/)).toBeTruthy()
     expect(screen.getByText(/CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE/)).toBeTruthy()
     expect(await screen.findByText('Uploading here')).toBeTruthy()
@@ -308,7 +313,7 @@ describe('ConversionsView', () => {
 
   it('switches the upload API and checks the setup without sending data', async () => {
     routeFetch({ '/report': { data: configured } })
-    render(<ConversionsView d={configured} currency="INR" />)
+    withToasts(<ConversionsView d={configured} currency="INR" />)
     const radios = screen.getAllByRole('radio') as HTMLInputElement[]
     expect(radios.map(r => r.checked)).toEqual([true, false])
     fireEvent.click(screen.getByLabelText('Google Ads API'))
@@ -369,7 +374,7 @@ describe('GoogleAdsClient', () => {
         hasData
       />
     )
-    expect(screen.getByRole('button', { name: 'Conversions' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Conversions' })).toBeTruthy()
     expect(await screen.findByText(/Uploading to/)).toBeTruthy()
     expect(String(calls('/report')[0][0])).toMatch(/tab=conversions/)
   })

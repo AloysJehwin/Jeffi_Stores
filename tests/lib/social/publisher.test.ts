@@ -1,43 +1,39 @@
 /**
- * Tests for src/lib/social/publisher.ts — turning one queued scheduled_social_posts row into a
- * live FB/IG post.
+ * Tests for src/lib/social/publisher.ts: one claimed scheduled_social_posts row to a live post.
  *
- * Pins the money/correctness behaviours:
- *   - the row is flipped to 'publishing' BEFORE the network call (idempotency: a concurrent
- *     tick won't double-post)
- *   - an FB post dispatches to publishFacebookPost and marks the row 'posted'
- *   - an IG post with no connected IG account fails (never posts to the wrong place)
- *   - a per-tenant token is decrypted before use
- *   - a Jeffi platform post (tenant_id null) uses env META_JEFFI_PAGE_TOKEN, not the tenant table
+ * Pins:
+ *   - the post goes to the provider for its network with the store's credentials
+ *   - the link carries UTM tags (source = network, campaign = social_<group or post>)
+ *   - captions are fitted to the network (X 280) and Instagram gets the link in the text
+ *   - not connected or missing media fails without calling the network
+ *   - a failure is retried with backoff and marked failed after the fifth attempt
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { ScheduledSocialPost, TenantSocialAccount } from '@/lib/tenant-registry'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { ScheduledSocialPost } from '@/lib/tenant-registry'
 
-// Persistence seam.
-const reg = {
-  getTenantSocialAccounts: vi.fn(),
-  updateSocialPost: vi.fn().mockResolvedValue(undefined),
-}
+const reg = { updateSocialPost: vi.fn().mockResolvedValue(undefined) }
 vi.mock('@/lib/tenant-registry', () => reg)
 
-// Meta network seam.
-const meta = {
-  publishFacebookPost: vi.fn(),
-  publishFacebookCarousel: vi.fn(),
-  publishInstagramImage: vi.fn(),
-  publishInstagramCarousel: vi.fn(),
-  publishInstagramReel: vi.fn(),
-}
-vi.mock('@/lib/catalog/meta', () => meta)
+const accounts = { authFor: vi.fn() }
+vi.mock('@/lib/social/accounts', () => accounts)
 
-// Cipher seam — passthrough so we can assert the encrypted token was decrypted.
-const cipher = { decryptToken: vi.fn((s: string) => `dec:${s}`) }
-vi.mock('@/lib/crypto/token-cipher', () => cipher)
+const publish = vi.fn()
+vi.mock('@/lib/social/providers', async () => {
+  const types = await vi.importActual<any>('@/lib/social/providers/types')
+  const limits: Record<string, any> = { facebook: { caption: 63206 }, instagram: { caption: 2200, hashtags: 30 }, x: { caption: 280 }, youtube: { caption: 5000 } }
+  const requires: Record<string, any> = { instagram: { image: true }, youtube: { video: true } }
+  return {
+    ...types,
+    networkOf: (p: string) => types.PLATFORM_NETWORK[p],
+    providerFor: (n: string) => ({ network: n, label: n, limits: limits[n] ?? { caption: 1000 }, requires: requires[n] ?? {}, publish }),
+  }
+})
 
-// DB/caption seams — the fixtures always carry a non-empty caption, so ensureCaption never
-// reaches these, but they're mocked anyway to keep the suite hermetic (no real pg.Pool/Ollama).
-vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn() }))
-vi.mock('@/lib/social/caption', () => ({ generateSocialCaption: vi.fn() }))
+vi.mock('@/lib/shared/db', () => ({ queryOne: vi.fn().mockResolvedValue({ name: 'Drill', slug: 'drill', description: null }) }))
+vi.mock('@/lib/catalog/brand', () => ({ resolveCurrentTenant: vi.fn().mockResolvedValue({ slug: 'acme' }), storeBaseUrlAsync: vi.fn().mockResolvedValue('https://acme.example') }))
+vi.mock('@/lib/social/caption', () => ({ generateSocialCaption: vi.fn().mockResolvedValue('AI caption') }))
+
+const { publishScheduledPost, withUtm, composeCaption, retryDelayMs, MAX_ATTEMPTS } = await import('@/lib/social/publisher')
 
 function post(over: Partial<ScheduledSocialPost> = {}): ScheduledSocialPost {
   return {
@@ -51,190 +47,79 @@ function post(over: Partial<ScheduledSocialPost> = {}): ScheduledSocialPost {
     image_urls: null,
     video_url: null,
     scheduled_at: '2026-08-22T00:00:00Z',
-    status: 'pending',
+    status: 'publishing',
     posted_id: null,
     last_error: null,
-    attempts: 0,
+    attempts: 1,
     ...over,
   }
 }
 
-function account(over: Partial<TenantSocialAccount> = {}): TenantSocialAccount {
-  return {
-    id: 'acc-1',
-    tenant_id: 't-1',
-    provider: 'facebook',
-    page_id: 'PAGE_1',
-    page_name: 'Acme',
-    ig_user_id: null,
-    access_token_enc: 'ENC_TOK',
-    token_expiry: null,
-    status: 'active',
-    ...over,
-  }
-}
+beforeEach(() => {
+  vi.clearAllMocks()
+  accounts.authFor.mockResolvedValue({ accessToken: 'tok', targetId: 'page-1' })
+  publish.mockResolvedValue({ externalId: 'ext-1', url: 'https://net/ext-1' })
+})
 
-/** All status values the publisher wrote, in order. */
-function statuses() {
-  return reg.updateSocialPost.mock.calls.map((c: any[]) => c[1]?.status)
-}
+describe('withUtm', () => {
+  it('tags the link and keeps the existing query', () => {
+    const u = new URL(withUtm('https://acme.example/p/drill?ref=1', 'pinterest', 'g1'))
+    expect(u.searchParams.get('ref')).toBe('1')
+    expect(u.searchParams.get('utm_source')).toBe('pinterest')
+    expect(u.searchParams.get('utm_medium')).toBe('social')
+    expect(u.searchParams.get('utm_campaign')).toBe('social_g1')
+  })
+})
 
-describe('social/publisher — publishScheduledPost', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    reg.updateSocialPost.mockResolvedValue(undefined)
-    cipher.decryptToken.mockImplementation((s: string) => `dec:${s}`)
-    delete process.env.META_JEFFI_PAGE_TOKEN
-    delete process.env.META_JEFFI_PAGE_ID
-    delete process.env.META_JEFFI_IG_USER_ID
+describe('composeCaption', () => {
+  it('fits X to 280 characters', () => {
+    expect(composeCaption('x', 'word '.repeat(100), '#a', null).length).toBeLessThanOrEqual(280)
+  })
+  it('puts the link in the text for Instagram, where links are not clickable fields', () => {
+    expect(composeCaption('instagram', 'hello', null, 'https://l')).toContain('https://l')
+    expect(composeCaption('facebook', 'hello', null, 'https://l', false)).not.toContain('https://l')
+  })
+})
+
+describe('publishScheduledPost', () => {
+  it('publishes through the provider and marks the post posted with its permalink', async () => {
+    const r = await publishScheduledPost(post({ group_id: 'g1' }))
+    expect(r).toEqual({ ok: true, postedId: 'ext-1' })
+    expect(accounts.authFor).toHaveBeenCalledWith('t-1', 'facebook')
+    const input = publish.mock.calls[0][1]
+    expect(new URL(input.link).searchParams.get('utm_campaign')).toBe('social_g1')
+    expect(input.imageUrls).toEqual(['https://cdn/x.png'])
+    expect(reg.updateSocialPost).toHaveBeenCalledWith('post-1', expect.objectContaining({ status: 'posted', postedId: 'ext-1', permalink: 'https://net/ext-1' }))
   })
 
-  afterEach(() => {
-    delete process.env.META_JEFFI_PAGE_TOKEN
-    delete process.env.META_JEFFI_PAGE_ID
-    delete process.env.META_JEFFI_IG_USER_ID
-  })
-
-  it('flips the row to publishing BEFORE the network call (idempotency)', async () => {
-    reg.getTenantSocialAccounts.mockResolvedValue([account()])
-    meta.publishFacebookPost.mockImplementation(async () => {
-      // At the moment of the network call the row must already be 'publishing'.
-      expect(statuses()).toEqual(['publishing'])
-      return { id: 'fb_1' }
-    })
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
-    await publishScheduledPost(post())
-    expect(reg.updateSocialPost.mock.calls[0]).toEqual(['post-1', { status: 'publishing', bumpAttempts: true }])
-  })
-
-  it('publishes an FB post and marks the row posted', async () => {
-    reg.getTenantSocialAccounts.mockResolvedValue([account()])
-    meta.publishFacebookPost.mockResolvedValue({ id: 'fb_123' })
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
-    const r = await publishScheduledPost(post())
-    expect(meta.publishFacebookPost).toHaveBeenCalledTimes(1)
-    expect(r).toEqual({ ok: true, postedId: 'fb_123' })
-    expect(reg.updateSocialPost).toHaveBeenLastCalledWith('post-1', {
-      status: 'posted',
-      postedId: 'fb_123',
-    })
-    expect(statuses()).toEqual(['publishing', 'posted'])
-  })
-
-  it('decrypts the tenant token before publishing', async () => {
-    reg.getTenantSocialAccounts.mockResolvedValue([account({ access_token_enc: 'ENC_TOK' })])
-    meta.publishFacebookPost.mockResolvedValue({ id: 'fb_1' })
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
-    await publishScheduledPost(post())
-    expect(cipher.decryptToken).toHaveBeenCalledWith('ENC_TOK')
-    expect(meta.publishFacebookPost).toHaveBeenCalledWith(
-      expect.objectContaining({ accessToken: 'dec:ENC_TOK', pageId: 'PAGE_1' })
-    )
-  })
-
-  it('fails an IG post when no IG account is connected', async () => {
-    // An instagram-provider row exists but carries no ig_user_id, so creds resolve
-    // yet the IG target is missing — the publisher must reject before calling Meta.
-    reg.getTenantSocialAccounts.mockResolvedValue([account({ provider: 'instagram', ig_user_id: null })])
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
-    const r = await publishScheduledPost(post({ platform: 'ig' }))
-    expect(r.ok).toBe(false)
-    expect(meta.publishInstagramImage).not.toHaveBeenCalled()
-    expect(reg.updateSocialPost).toHaveBeenLastCalledWith('post-1', {
-      status: 'failed',
-      lastError: expect.stringMatching(/Instagram/),
-    })
-    expect(statuses()).toEqual(['publishing', 'failed'])
-  })
-
-  it('fails (not throws) when the tenant has no connected account at all', async () => {
-    reg.getTenantSocialAccounts.mockResolvedValue([])
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
+  it('fails without calling the network when the store is not connected', async () => {
+    accounts.authFor.mockResolvedValue(null)
     const r = await publishScheduledPost(post())
     expect(r.ok).toBe(false)
-    expect(statuses()).toEqual(['publishing', 'failed'])
+    expect(publish).not.toHaveBeenCalled()
   })
 
-  it('uses env META_JEFFI_PAGE_TOKEN for a Jeffi platform post (tenant_id null)', async () => {
-    process.env.META_JEFFI_PAGE_TOKEN = 'JEFFI_TOK'
-    process.env.META_JEFFI_PAGE_ID = 'JEFFI_PAGE'
-    meta.publishFacebookPost.mockResolvedValue({ id: 'fb_j' })
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
-    const r = await publishScheduledPost(post({ tenant_id: null }))
-    expect(r.ok).toBe(true)
-    // Jeffi creds come from env, never the tenant table.
-    expect(reg.getTenantSocialAccounts).not.toHaveBeenCalled()
-    expect(cipher.decryptToken).not.toHaveBeenCalled()
-    expect(meta.publishFacebookPost).toHaveBeenCalledWith(
-      expect.objectContaining({ accessToken: 'JEFFI_TOK', pageId: 'JEFFI_PAGE' })
-    )
+  it('refuses a YouTube post with no video', async () => {
+    const r = await publishScheduledPost(post({ platform: 'youtube' }))
+    expect(r.error).toMatch(/video/)
+    expect(publish).not.toHaveBeenCalled()
   })
 
-  it('fails a Jeffi platform post when META_JEFFI_PAGE_TOKEN is unset', async () => {
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
-    const r = await publishScheduledPost(post({ tenant_id: null }))
-    expect(r.ok).toBe(false)
-    expect(meta.publishFacebookPost).not.toHaveBeenCalled()
-    expect(statuses()).toEqual(['publishing', 'failed'])
+  it('retries with backoff before the last attempt', async () => {
+    publish.mockRejectedValue(new Error('rate limited'))
+    await publishScheduledPost(post({ attempts: 2 }))
+    const patch = reg.updateSocialPost.mock.calls.at(-1)![1]
+    expect(patch.status).toBe('pending')
+    expect(patch.nextAttemptAt.getTime() - Date.now()).toBeGreaterThan(retryDelayMs(2) - 5000)
   })
 
-  it('dispatches to publishFacebookCarousel when image_urls has extra images', async () => {
-    reg.getTenantSocialAccounts.mockResolvedValue([account()])
-    meta.publishFacebookCarousel.mockResolvedValue({ id: 'fb_carousel' })
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
-    const r = await publishScheduledPost(post({ image_urls: ['https://cdn/y.png'] }))
-    expect(r).toEqual({ ok: true, postedId: 'fb_carousel' })
-    expect(meta.publishFacebookCarousel).toHaveBeenCalledWith(
-      expect.objectContaining({ imageUrls: ['https://cdn/x.png', 'https://cdn/y.png'] })
-    )
-    expect(meta.publishFacebookPost).not.toHaveBeenCalled()
+  it('marks the post failed after the last attempt', async () => {
+    publish.mockRejectedValue(new Error('bad token'))
+    await publishScheduledPost(post({ attempts: MAX_ATTEMPTS }))
+    expect(reg.updateSocialPost).toHaveBeenLastCalledWith('post-1', { status: 'failed', lastError: 'bad token' })
   })
 
-  it('dispatches to publishInstagramCarousel when image_urls has extra images', async () => {
-    reg.getTenantSocialAccounts.mockResolvedValue([account({ provider: 'instagram', ig_user_id: 'IG_1' })])
-    meta.publishInstagramCarousel.mockResolvedValue({ id: 'ig_carousel' })
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
-    const r = await publishScheduledPost(post({ platform: 'ig', image_urls: ['https://cdn/y.png'] }))
-    expect(r).toEqual({ ok: true, postedId: 'ig_carousel' })
-    expect(meta.publishInstagramCarousel).toHaveBeenCalledWith(
-      expect.objectContaining({ imageUrls: ['https://cdn/x.png', 'https://cdn/y.png'], igUserId: 'IG_1' })
-    )
-    expect(meta.publishInstagramImage).not.toHaveBeenCalled()
-  })
-
-  it('generates a caption from the linked product when the post caption is blank', async () => {
-    reg.getTenantSocialAccounts.mockResolvedValue([account()])
-    meta.publishFacebookPost.mockResolvedValue({ id: 'fb_1' })
-    const dbMod = await import('@/lib/shared/db')
-    const captionMod = await import('@/lib/social/caption')
-    vi.mocked(dbMod.queryOne).mockResolvedValue({ name: 'Widget', description: 'A fine widget' })
-    vi.mocked(captionMod.generateSocialCaption).mockResolvedValue('Introducing the Widget!')
-
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
-    await publishScheduledPost(post({ caption: '' }))
-
-    expect(captionMod.generateSocialCaption).toHaveBeenCalledWith({
-      productName: 'Widget',
-      productDescription: 'A fine widget',
-    })
-    expect(meta.publishFacebookPost).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('Introducing the Widget!') })
-    )
-    // Persisted back to the row so a retry doesn't regenerate a different caption.
-    expect(reg.updateSocialPost).toHaveBeenCalledWith('post-1', { caption: 'Introducing the Widget!' })
-  })
-
-  it('does not call AI generation when the post already has a caption', async () => {
-    reg.getTenantSocialAccounts.mockResolvedValue([account()])
-    meta.publishFacebookPost.mockResolvedValue({ id: 'fb_1' })
-    const captionMod = await import('@/lib/social/caption')
-
-    const { publishScheduledPost } = await import('@/lib/social/publisher')
-    await publishScheduledPost(post({ caption: 'Already written' }))
-
-    expect(captionMod.generateSocialCaption).not.toHaveBeenCalled()
-    expect(meta.publishFacebookPost).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('Already written') })
-    )
+  it('backs off 5, 10, 20, 40 minutes', () => {
+    expect([1, 2, 3, 4].map(n => retryDelayMs(n) / 60_000)).toEqual([5, 10, 20, 40])
   })
 })

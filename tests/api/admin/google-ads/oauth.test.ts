@@ -70,12 +70,12 @@ describe('Google Ads connect', () => {
     expect(requireAdminScope).toHaveBeenCalledWith(expect.anything(), 'google_ads:write')
   })
 
-  it('asks Google for the adwords and datamanager scopes, incrementally and offline, with a signed tenant state', async () => {
+  it('asks Google for the adwords and datamanager scopes, offline, without merging earlier grants, with a signed tenant state', async () => {
     const res = await adsConnect(get('https://admin-acme.jeffistores.in/api/admin/integrations/google-ads/connect'))
     const url = new URL(res.headers.get('location')!)
     expect(url.origin + url.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth')
     expect(url.searchParams.get('scope')).toBe(`${ADWORDS} ${DATAMANAGER}`)
-    expect(url.searchParams.get('include_granted_scopes')).toBe('true')
+    expect(url.searchParams.get('include_granted_scopes')).toBeNull()
     expect(url.searchParams.get('access_type')).toBe('offline')
     expect(url.searchParams.get('prompt')).toBe('select_account consent')
     expect(url.searchParams.get('redirect_uri')).toBe('https://admin.jeffistores.in/api/admin/integrations/google/callback')

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
+import { Tabs } from '@/components/admin/kit'
 import type { Tab } from './_components/shared'
 import { OverviewTab } from './_components/OverviewTab'
 import { ReceivablesTab } from './_components/ReceivablesTab'
@@ -12,6 +13,7 @@ import { PLTab } from './_components/PLTab'
 import { CashflowTab } from './_components/CashflowTab'
 import { CodRemittanceTab } from './_components/CodRemittanceTab'
 import { MessagingTab } from './_components/MessagingTab'
+import { AiCostsTab } from './_components/AiCostsTab'
 
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: 'Overview' },
@@ -22,6 +24,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'cashflow', label: 'Cashflow' },
   { key: 'cod_remittance', label: 'COD Remittance' },
   { key: 'messaging', label: 'Messaging' },
+  { key: 'ai_costs', label: 'AI costs' },
 ]
 
 export default function FinancialClient() {
@@ -37,6 +40,7 @@ export default function FinancialClient() {
     'cashflow',
     'cod_remittance',
     'messaging',
+    'ai_costs',
   ]
   const [tab, setTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'overview')
 
@@ -77,22 +81,8 @@ export default function FinancialClient() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex border-b border-border-default gap-1 overflow-x-auto">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => handleTabChange(t.key as Tab)}
-            className={`shrink-0 whitespace-nowrap px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              tab === t.key
-                ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400'
-                : 'border-transparent text-foreground-secondary hover:text-foreground'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+    <div className="space-y-5">
+      <Tabs tabs={TABS.map(t => ({ id: t.key, label: t.label }))} value={tab} onChange={handleTabChange} />
 
       <div>
         {tab === 'overview' && <OverviewTab />}
@@ -103,6 +93,7 @@ export default function FinancialClient() {
         {tab === 'cashflow' && <CashflowTab initialData={allData.cashflow ?? null} />}
         {tab === 'cod_remittance' && <CodRemittanceTab />}
         {tab === 'messaging' && <MessagingTab />}
+        {tab === 'ai_costs' && <AiCostsTab />}
       </div>
     </div>
   )

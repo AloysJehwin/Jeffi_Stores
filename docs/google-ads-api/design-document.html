@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Jeffi Stores - Google Ads API Tool Design Document</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; font-size: 10pt; line-height: 1.45; color: #1a1a1a; }
+  h1 { font-size: 20pt; margin: 0 0 4px; }
+  h2 { font-size: 13pt; margin: 22px 0 6px; padding-bottom: 3px; border-bottom: 1px solid #ccc; }
+  h3 { font-size: 11pt; margin: 14px 0 4px; }
+  .meta { color: #555; margin-bottom: 18px; }
+  table { border-collapse: collapse; width: 100%; margin: 6px 0 10px; font-size: 9.5pt; }
+  th, td { border: 1px solid #ccc; padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: #f2f2f2; }
+  th:nth-child(1) { width: 17%; } th:nth-child(2) { width: 43%; }
+  code { font-family: Menlo, Consolas, monospace; font-size: 9pt; }
+  ul { margin: 4px 0 8px 18px; padding: 0; }
+  li { margin: 2px 0; }
+</style>
+</head>
+<body>
+
+<h1>Jeffi Stores: Google Ads API Tool</h1>
+<div class="meta">
+  Design document for the Google Ads API developer token application<br>
+  Company: Jeffi Stores, <code>https://jeffistores.in</code> &middot; API contact: <code>admin@jeffistores.in</code><br>
+  Google Ads manager account (MCC): 587-534-7299 &middot; Google Cloud project number: 658812117189
+</div>
+
+<h2>1. Company and product</h2>
+<p>Jeffi Stores is an e-commerce platform for small and medium retailers in India. Each retailer ("store") gets an online shop and a private admin panel for catalogue, orders, payments, shipping, finance and marketing. Jeffi Stores also runs its own flagship store on the same platform.</p>
+<p>The Google Ads tool is the "Google Ads" section of the store admin panel. It lets a store owner manage and measure their own Google Ads account without leaving the platform, and connect their ad spend to the orders the store actually receives.</p>
+
+<h2>2. Users and access</h2>
+<ul>
+  <li><b>External users:</b> store owners and their staff on the platform. Each store connects <b>its own</b> Google Ads account and only ever sees and changes that account.</li>
+  <li><b>Internal users:</b> the Jeffi Stores team, for the flagship store's own account and for support.</li>
+  <li>Inside a store, access is role-based: viewing reports needs a read permission; any change needs a separate write permission. Every change is logged with the admin who made it.</li>
+</ul>
+
+<h2>3. How an account is connected (authentication)</h2>
+<ul>
+  <li><b>Google sign-in (OAuth 2.0, web server flow).</b> The store owner clicks "Connect with Google", signs in with a Google account that has access to their Ads account, and grants the <code>https://www.googleapis.com/auth/adwords</code> scope (and <code>datamanager</code> for conversion uploads). The request uses <code>access_type=offline</code> and a signed, time-limited <code>state</code> parameter. The refresh token is encrypted (AES-256-GCM) and stored per store; it is never shown in the UI or logs.</li>
+  <li><b>Account picker.</b> After sign-in the tool lists the accounts the user can reach (<code>CustomerService.ListAccessibleCustomers</code> and <code>customer_client</code> under any manager account) and the owner chooses one.</li>
+  <li><b>Optional "managed by Jeffi Stores".</b> A store may instead have its account linked under the Jeffi Stores manager account (587-534-7299) through a standard manager link invitation (<code>CustomerClientLinkService</code>) that the store owner accepts in Google Ads. The tool then uses the manager's credentials with <code>login-customer-id</code>. The store can unlink at any time.</li>
+  <li>Disconnecting deletes the stored token. The developer token is held only on our servers and is never exposed to stores or browsers.</li>
+</ul>
+
+<h2>4. Features and screens</h2>
+<table>
+  <tr><th>Screen</th><th>What it does</th><th>Main API usage</th></tr>
+  <tr><td>Overview</td><td>Spend, clicks, conversions, CPA and ROAS for a chosen period vs the previous period; "true ROAS" from the store's own orders that came from Google Ads (matched by gclid/gbraid/wbraid); daily trend.</td><td><code>GoogleAdsService.SearchStream</code> (GAQL) on <code>customer</code>, <code>campaign</code> metrics segmented by date</td></tr>
+  <tr><td>Campaigns, ad groups, ads, keywords, search terms</td><td>Performance tables; pause or enable; edit daily budgets, bids and keyword match types; add negative keywords from search terms.</td><td><code>SearchStream</code> on <code>campaign</code>, <code>ad_group</code>, <code>ad_group_ad</code>, <code>keyword_view</code>, <code>search_term_view</code>; <code>GoogleAdsService.Mutate</code> for changes</td></tr>
+  <tr><td>Campaign wizard</td><td>Creates Search, Shopping (linked to the store's Merchant Center) and Performance Max campaigns with budget, bidding, locations, keywords, ads and asset groups.</td><td><code>GoogleAdsService.Mutate</code> (budget, campaign, ad group, criteria, ads, assets, asset groups) in one request with temporary resource names; <code>ProductLinkService</code> for the Merchant Center link; <code>KeywordPlanIdeaService.GenerateKeywordIdeas</code> for keyword suggestions</td></tr>
+  <tr><td>Recommendations</td><td>Shows Google's recommendations with an estimated margin impact from the store's own product costs; apply or dismiss.</td><td><code>SearchStream</code> on <code>recommendation</code>; <code>RecommendationService.ApplyRecommendation</code> / <code>DismissRecommendation</code></td></tr>
+  <tr><td>Experiments</td><td>Creates and ends campaign experiments (A/B tests) and shows their results.</td><td><code>ExperimentService</code>, <code>ExperimentArmService</code>, <code>SearchStream</code> on <code>experiment</code></td></tr>
+  <tr><td>Conversions</td><td>Sets up a purchase conversion action and uploads the store's paid orders as offline conversions, with enhanced conversions data when the buyer consented to ad cookies.</td><td><code>ConversionActionService</code> via <code>Mutate</code>; conversion ingestion through the Data Manager API (<code>datamanager.googleapis.com/v1 events:ingest</code>); results checked with <code>SearchStream</code></td></tr>
+  <tr><td>Audiences</td><td>Creates customer lists (for example "past buyers", "lapsed customers") from the store's own customers and keeps them in sync; attaches them to campaigns.</td><td><code>UserListService</code>, <code>AudienceService</code>, Customer Match uploads with SHA-256 hashed data; checks <code>customer_match_terms_of_service</code> acceptance</td></tr>
+  <tr><td>Alerts and weekly digest</td><td>Notifies the owner about spend without conversions, budget-limited campaigns, disapproved ads and similar; a weekly email summary.</td><td>Read-only <code>SearchStream</code></td></tr>
+  <tr><td>Change history</td><td>Lists every change made through the tool, with who made it and before/after values.</td><td>Stored in our database; no extra API calls</td></tr>
+</table>
+<p>Every write is validated first (Google's <code>validate_only</code> where supported, plus our own limits such as a maximum budget step) and shown to the user as a preview before it is applied.</p>
+
+<h2>5. Data flow and schedule</h2>
+<ul>
+  <li><b>Reporting sync:</b> full structure and 30-day metrics every 24 hours; a lighter refresh of recent metrics every 3 hours; on-demand "Sync now". Results are stored per store and the screens read from our database, so viewing a report does not call the API.</li>
+  <li><b>Conversion uploads:</b> every 30 minutes, only newly paid orders, each sent once (order id as the deduplication key).</li>
+  <li><b>Audiences:</b> refreshed once every 24 hours with only additions and removals.</li>
+  <li><b>Digest:</b> weekly, from stored data.</li>
+  <li>Jobs run per store with a lock so the same account is never synced twice at once.</li>
+</ul>
+
+<h2>6. API usage and rate limits</h2>
+<ul>
+  <li>API version: Google Ads API <code>v26</code> (REST). Reports use <code>SearchStream</code> to minimise request counts.</li>
+  <li>Expected volume per store: about 10 to 30 read requests per sync, a handful of mutate requests per day when the owner makes changes, and up to 48 small conversion uploads per day. At our current scale this is well under 2,000 operations per day across all stores.</li>
+  <li>Requests retry with exponential backoff and honour <code>RESOURCE_EXHAUSTED</code> / quota errors; a failed job is retried on the next schedule rather than in a tight loop.</li>
+</ul>
+
+<h2>7. Data handling and privacy</h2>
+<ul>
+  <li>Each store's Google Ads data is stored in that store's own database and is never shown to another store.</li>
+  <li>OAuth refresh tokens are encrypted at rest; the developer token and client secret are server-side secrets.</li>
+  <li>Conversion and Customer Match data are normalised and SHA-256 hashed before upload. Email and phone are sent only when the buyer accepted ad cookies at checkout; otherwise only the click identifier is used.</li>
+  <li>We do not sell, share or resell Google Ads data, and we do not use one store's data for another store.</li>
+  <li>Disconnecting the account stops all API calls for that store and removes its stored credentials.</li>
+</ul>
+
+<h2>8. Compliance</h2>
+<ul>
+  <li>Changes are made only on explicit user action (or on schedules the owner turned on) and are logged with the acting user.</li>
+  <li>Store owners agree to Google's Customer Match terms in their own Google Ads account before audiences are uploaded; the tool checks the acceptance status first.</li>
+  <li>The tool is built and operated by Jeffi Stores; no third-party tool uses our developer token.</li>
+</ul>
+
+</body>
+</html>

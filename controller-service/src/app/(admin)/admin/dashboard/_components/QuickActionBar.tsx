@@ -51,7 +51,7 @@ export default function QuickActionBar({ primary, more, host }: { primary: Actio
   const actions = expanded ? [...primary, ...more] : primary
 
   return (
-    <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-2">
+    <div className="bg-surface-elevated rounded-xl border border-border-default p-2">
       <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1">
         {actions.map(a => (
           <Tile key={a.label} {...a} host={host} />

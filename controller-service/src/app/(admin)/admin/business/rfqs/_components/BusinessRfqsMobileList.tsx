@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import { StatusBadge } from '@/components/admin/kit/status'
+import { RFQ_STATUS, fmtDay } from '../../_status'
 
 interface RfqItem {
   id: string
@@ -19,34 +21,6 @@ interface RfqItem {
   href: string
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  reviewed: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  negotiating: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  offer_accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  converted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pending',
-  reviewed: 'Reviewed',
-  negotiating: 'Negotiating',
-  offer_accepted: 'Offer Accepted',
-  converted: 'Converted',
-  rejected: 'Rejected',
-}
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span
-      className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[status] || 'bg-surface-secondary text-foreground-secondary'}`}
-    >
-      {STATUS_LABELS[status] ?? status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  )
-}
-
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-2 border-b border-border-default last:border-b-0">
@@ -56,9 +30,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-const submitted = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-
 export default function BusinessRfqsMobileList({ rfqs }: { rfqs: RfqItem[] }) {
   const router = useRouter()
   const [selected, setSelected] = useState<RfqItem | null>(null)
@@ -66,9 +37,7 @@ export default function BusinessRfqsMobileList({ rfqs }: { rfqs: RfqItem[] }) {
 
   if (rfqs.length === 0) {
     return (
-      <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
-        No RFQs found.
-      </div>
+      <div className="rounded-xl border border-border-default bg-surface-elevated p-8 text-center text-sm text-foreground-muted">No RFQs found.</div>
     )
   }
 
@@ -85,10 +54,10 @@ export default function BusinessRfqsMobileList({ rfqs }: { rfqs: RfqItem[] }) {
               <p className="font-mono text-xs font-semibold text-foreground truncate">{r.rfq_number}</p>
               <p className="text-sm text-foreground truncate mt-0.5">{r.company_name || '—'}</p>
             </div>
-            <StatusBadge status={r.status} />
+            <StatusBadge status={r.status} map={RFQ_STATUS} />
           </div>
           <div className="mt-2 text-xs text-foreground-secondary">
-            {r.item_count} items · {submitted(r.created_at)}
+            {r.item_count} items · {fmtDay(r.created_at)}
           </div>
         </MobileListCard>
       ))}
@@ -102,7 +71,7 @@ export default function BusinessRfqsMobileList({ rfqs }: { rfqs: RfqItem[] }) {
           <button
             type="button"
             onClick={() => setActionsOpen(true)}
-            className="w-full bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+            className="control-md w-full bg-accent-500 font-semibold text-white hover:bg-accent-600"
           >
             Actions
           </button>
@@ -114,8 +83,8 @@ export default function BusinessRfqsMobileList({ rfqs }: { rfqs: RfqItem[] }) {
             <Field label="Contact" value={`${selected.first_name} ${selected.last_name || ''}`.trim()} />
             <Field label="Email" value={selected.email} />
             <Field label="Items" value={selected.item_count} />
-            <Field label="Status" value={<StatusBadge status={selected.status} />} />
-            <Field label="Submitted" value={submitted(selected.created_at)} />
+            <Field label="Status" value={<StatusBadge status={selected.status} map={RFQ_STATUS} />} />
+            <Field label="Submitted" value={fmtDay(selected.created_at)} />
           </div>
         )}
       </MobileDetailSheet>

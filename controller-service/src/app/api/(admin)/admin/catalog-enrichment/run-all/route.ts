@@ -153,6 +153,7 @@ export async function POST(req: NextRequest) {
         lastAt = Date.now()
 
         const r = await aiChat({
+          feature: 'enrichment',
           cacheNamespace,
           modelHint: 'copy',
           jsonMode: true,

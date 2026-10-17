@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
@@ -27,7 +28,8 @@ export default function TenantActions({
   const router = useRouter()
   const confirm = useConfirm()
   const [busy, setBusy] = useState<string | null>(null)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setMsg = (r: { ok: boolean; text: string } | null) => r && toast.result(r)
 
   async function call(path: string, body?: object, label?: string) {
     setBusy(label || path)
@@ -137,11 +139,6 @@ export default function TenantActions({
         </button>
       )}
 
-      {msg && (
-        <span className={`text-sm ${msg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {msg.text}
-        </span>
-      )}
     </div>
   )
 }

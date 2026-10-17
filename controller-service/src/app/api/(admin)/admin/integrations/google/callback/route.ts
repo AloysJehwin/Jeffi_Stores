@@ -4,6 +4,7 @@ import { encryptToken } from '@/lib/crypto/token-cipher'
 import { verifyAdminState, returnToAdmin } from '@/lib/shared/oauth-state'
 import { oauthRedirectUri, tenantAdminBase, errorParam } from '@/lib/integrations/oauth'
 import { completeGoogleAdsOAuth } from '@/lib/google-ads/oauth-callback'
+import { emailFromIdToken, registerMerchantApi } from '@/lib/merchant/registration'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export async function GET(request: NextRequest) {
   const state = rawState ? verifyAdminState(rawState) : null
   // One Google redirect URI serves Merchant Center and Google Ads; the signed state says which.
   if (state?.provider === 'google_ads') return completeGoogleAdsOAuth(params, state)
-  const backTo = `${await tenantAdminBase(state)}/admin/merchant-sync`
+  const backTo = `${await tenantAdminBase(state)}/admin/merchant`
   const fail = (reason: string) => returnToAdmin(`${backTo}?connected=0&provider=google&error=${reason}`)
 
   const err = params.get('error')
@@ -56,7 +57,13 @@ export async function GET(request: NextRequest) {
       ),
       meta: { merchant_id: state.merchantId, connected_via: 'oauth' },
     })
-    return returnToAdmin(`${backTo}?connected=google`)
+    // The Merchant API needs our Cloud project registered with the account once; the admin who just
+    // signed in can do it, so do it now. A failure does not undo the connection.
+    const reg = data.access_token
+      ? await registerMerchantApi(data.access_token, state.merchantId, emailFromIdToken(data.id_token)).catch(() => null)
+      : null
+    const regParam = reg && !reg.ok ? `&register_error=${encodeURIComponent(reg.message.slice(0, 200))}` : ''
+    return returnToAdmin(`${backTo}?connected=google${regParam}`)
   } catch (e) {
     return fail(errorParam(e))
   }

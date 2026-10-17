@@ -3,17 +3,8 @@
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
 import type { DashboardAnalytics } from '@/lib/queries'
-import {
-  SectionCard,
-  SectionHeader,
-  CompactStat,
-  MiniStat,
-  pctStr,
-  hoursStr,
-  daysStr,
-  delta,
-  numStr,
-} from '@/components/admin/dashboard/Primitives'
+import { Section, CompactStat, MiniStat, pctStr, hoursStr, daysStr, delta, numStr } from '@/components/admin/kit'
+import { SectionLink } from './SectionLink'
 
 export default function OpsInsights({ data, host }: { data: DashboardAnalytics; host: string }) {
   const { fulfilment: f, attention: a, engagement: e, cash } = data.insights
@@ -23,13 +14,8 @@ export default function OpsInsights({ data, host }: { data: DashboardAnalytics; 
   const canCrm = useHasScope('crm:read')
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
-      <SectionCard>
-        <SectionHeader
-          title="Fulfilment Speed"
-          actionLabel="Processing"
-          href={ap('/admin/orders?status=processing', host)}
-        />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Section title="Fulfilment Speed" action={<SectionLink href={ap('/admin/orders?status=processing', host)} label="Processing" />}>
         <div className="grid grid-cols-2 gap-2">
           <CompactStat
             label="Time to ship"
@@ -61,7 +47,7 @@ export default function OpsInsights({ data, host }: { data: DashboardAnalytics; 
           <MiniStat
             label="Unshipped over 48 h"
             value={numStr(a.unshippedOver48h)}
-            tone={a.unshippedOver48h ? 'text-red-500 dark:text-red-400' : undefined}
+            tone={a.unshippedOver48h ? 'text-red-500' : undefined}
             href={ap('/admin/orders?status=processing', host)}
           />
           <MiniStat
@@ -71,14 +57,9 @@ export default function OpsInsights({ data, host }: { data: DashboardAnalytics; 
             href={ap('/admin/orders?status=out_for_delivery', host)}
           />
         </div>
-      </SectionCard>
+      </Section>
 
-      <SectionCard>
-        <SectionHeader
-          title="Order Quality"
-          actionLabel={canReturns ? 'Returns' : undefined}
-          href={canReturns ? ap('/admin/returns', host) : undefined}
-        />
+      <Section title="Order Quality" action={<SectionLink href={canReturns ? ap('/admin/returns', host) : undefined} label={canReturns ? 'Returns' : undefined} />}>
         <div className="grid grid-cols-2 gap-2">
           <CompactStat
             label="Cancellation rate"
@@ -115,7 +96,7 @@ export default function OpsInsights({ data, host }: { data: DashboardAnalytics; 
           <MiniStat
             label="RTO in transit"
             value={numStr(data.returns.rtoInTransit)}
-            tone={data.returns.rtoInTransit ? 'text-orange-600 dark:text-orange-400' : undefined}
+            tone={data.returns.rtoInTransit ? 'text-amber-600 dark:text-amber-400' : undefined}
             href={canReturns ? ap('/admin/returns', host) : undefined}
           />
           <MiniStat
@@ -126,18 +107,13 @@ export default function OpsInsights({ data, host }: { data: DashboardAnalytics; 
                 ? `Rs ${Math.round(a.unpaidOnlineAmount).toLocaleString('en-IN')} awaiting payment`
                 : undefined
             }
-            tone={a.unpaidOnline ? 'text-red-500 dark:text-red-400' : undefined}
+            tone={a.unpaidOnline ? 'text-red-500' : undefined}
             href={ap('/admin/orders', host)}
           />
         </div>
-      </SectionCard>
+      </Section>
 
-      <SectionCard>
-        <SectionHeader
-          title="Service & Reviews"
-          actionLabel={canReviews ? 'Reviews' : undefined}
-          href={canReviews ? ap('/admin/reviews', host) : undefined}
-        />
+      <Section title="Service & Reviews" action={<SectionLink href={canReviews ? ap('/admin/reviews', host) : undefined} label={canReviews ? 'Reviews' : undefined} />}>
         <div className="space-y-0.5">
           <MiniStat
             label="Open support chats"
@@ -164,7 +140,7 @@ export default function OpsInsights({ data, host }: { data: DashboardAnalytics; 
           <MiniStat
             label="Low ratings (2 or less)"
             value={numStr(e.lowRatingReviews)}
-            tone={e.lowRatingReviews ? 'text-red-500 dark:text-red-400' : undefined}
+            tone={e.lowRatingReviews ? 'text-red-500' : undefined}
             href={canReviews ? ap('/admin/reviews', host) : undefined}
           />
           {canReviews && (
@@ -180,12 +156,12 @@ export default function OpsInsights({ data, host }: { data: DashboardAnalytics; 
               label="Open tasks"
               value={numStr(a.openTasks)}
               sub={a.overdueTasks ? `${numStr(a.overdueTasks)} overdue` : undefined}
-              tone={a.overdueTasks ? 'text-red-500 dark:text-red-400' : undefined}
+              tone={a.overdueTasks ? 'text-red-500' : undefined}
               href={ap('/admin/tasks', host)}
             />
           )}
         </div>
-      </SectionCard>
+      </Section>
     </div>
   )
 }

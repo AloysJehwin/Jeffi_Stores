@@ -99,7 +99,7 @@ describe('Amazon SP-API connect', () => {
     expect(location(res).searchParams.get('version')).toBe('beta')
   })
 
-  it('returns the admin to merchant-sync with not_configured when the platform app is missing', async () => {
+  it('returns the admin to the Amazon console with not_configured when the platform app is missing', async () => {
     delete process.env.AMAZON_SP_APP_ID
     const res = await amazonConnect(get('https://x/api/admin/integrations/amazon/connect'))
     const url = location(res)
@@ -121,7 +121,7 @@ describe('Amazon SP-API callback', () => {
     const state = signAdminState({ tenantId: 't-acme', provider: 'amazon_seller', nonce: 'n' })
     const res = await amazonCallback(cb(`state=${state}&spapi_oauth_code=code1&selling_partner_id=A1SELLER`))
     const back = await landing(res)
-    expect(back.toString()).toBe('https://admin-acme.jeffistores.in/admin/merchant-sync?connected=amazon')
+    expect(back.toString()).toBe('https://admin-acme.jeffistores.in/admin/amazon?connected=amazon')
     const body = String(fetchMock.mock.calls[0][1].body)
     expect(body).toContain('grant_type=authorization_code')
     expect(body).toContain(encodeURIComponent('https://admin.jeffistores.in/api/admin/integrations/amazon/callback'))
@@ -185,7 +185,7 @@ describe('Google Merchant connect + callback', () => {
       await googleConnect(get('https://x/api/admin/integrations/google/connect?merchant_id=5550001'))
     )
     expect(url.origin).toBe('https://accounts.google.com')
-    expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/content')
+    expect(url.searchParams.get('scope')).toBe('https://www.googleapis.com/auth/content openid email')
     expect(url.searchParams.get('access_type')).toBe('offline')
     expect(url.searchParams.get('redirect_uri')).toBe(
       'https://admin.jeffistores.in/api/admin/integrations/google/callback'
@@ -205,7 +205,7 @@ describe('Google Merchant connect + callback', () => {
         get(`https://admin.jeffistores.in/api/admin/integrations/google/callback?state=${state}&code=c`)
       )
     )
-    expect(back.toString()).toBe('https://admin-acme.jeffistores.in/admin/merchant-sync?connected=google')
+    expect(back.toString()).toBe('https://admin-acme.jeffistores.in/admin/merchant?connected=google')
     const saved = vi.mocked(saveIntegrationCredential).mock.calls[0][0]
     expect(JSON.parse(saved.configEnc.replace(/^enc:/, ''))).toEqual({
       oauth_refresh_token: 'g-rt',

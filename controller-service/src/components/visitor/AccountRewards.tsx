@@ -1,12 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
-import Pagination from '@/components/visitor/ListPagination'
+import { useInfiniteList, InfiniteFooter, fetchJson, type InfiniteList } from '@/components/admin/kit/infinite'
 
 interface Tier {
   key: string
@@ -233,17 +233,9 @@ function RedeemCard({ data, onRedeemed }: { data: RewardsData; onRedeemed: () =>
   )
 }
 
-function CouponList({
-  coupons,
-  onPage,
-  busy,
-}: {
-  coupons: Page<RewardCoupon>
-  onPage: (page: number) => void
-  busy: boolean
-}) {
+function CouponList({ list }: { list: InfiniteList<RewardCoupon> }) {
   const { showToast } = useToast()
-  if (coupons.total === 0) return null
+  if ((list.total ?? 0) === 0 && !list.loading) return null
 
   const copy = async (code: string) => {
     try {
@@ -259,7 +251,7 @@ function CouponList({
       <h2 className="font-semibold text-foreground">Your reward coupons</h2>
       <p className="mt-1 text-sm text-foreground-secondary">Enter the code in the coupon box at checkout.</p>
       <ul className="mt-4 space-y-3">
-        {coupons.items.map(coupon => (
+        {list.rows.map(coupon => (
           <li
             key={coupon.code}
             className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border-default px-4 py-3"
@@ -280,13 +272,7 @@ function CouponList({
           </li>
         ))}
       </ul>
-      <Pagination
-        page={coupons.page}
-        total={coupons.total}
-        pageSize={coupons.pageSize}
-        onChange={onPage}
-        busy={busy}
-      />
+      <InfiniteFooter shown={list.rows.length} control={list} noun="coupons" />
     </div>
   )
 }
@@ -333,26 +319,18 @@ function HowItWorks({ program }: { program: RewardsData['program'] }) {
   )
 }
 
-function History({
-  history,
-  onPage,
-  busy,
-}: {
-  history: Page<HistoryEntry>
-  onPage: (page: number) => void
-  busy: boolean
-}) {
+function History({ list }: { list: InfiniteList<HistoryEntry> }) {
   return (
     <div className={CARD}>
       <h2 className="font-semibold text-foreground">Points history</h2>
-      {history.total === 0 ? (
+      {(list.total ?? 0) === 0 && !list.loading ? (
         <p className="mt-3 text-sm text-foreground-muted">
           No points yet. They appear here after your first delivered order.
         </p>
       ) : (
         <>
           <ul className="mt-3 divide-y divide-border-default">
-            {history.items.map(entry => (
+            {list.rows.map(entry => (
               <li key={entry.id} className="flex items-center justify-between gap-4 py-3">
                 <div>
                   <p className="text-sm text-foreground">{historyLabel(entry)}</p>
@@ -369,13 +347,7 @@ function History({
               </li>
             ))}
           </ul>
-          <Pagination
-            page={history.page}
-            total={history.total}
-            pageSize={history.pageSize}
-            onChange={onPage}
-            busy={busy}
-          />
+          <InfiniteFooter shown={list.rows.length} control={list} noun="entries" />
         </>
       )}
     </div>
@@ -386,50 +358,57 @@ export default function AccountRewards() {
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const [data, setData] = useState<RewardsData | null>(null)
-  const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
-  const [historyPage, setHistoryPage] = useState(1)
-  const [couponPage, setCouponPage] = useState(1)
-  const [paging, setPaging] = useState(false)
 
-  const load = useCallback(
-    async (opts: { historyPage?: number; couponPage?: number; silent?: boolean } = {}) => {
-      const hp = opts.historyPage ?? 1
-      const cp = opts.couponPage ?? 1
-      if (opts.silent) setPaging(true)
+  // Both lists paginate independently; each uses the same endpoint but drives
+  // its own page param. Page 1 of history also seeds the surrounding tier / stats
+  // so the shell renders without a separate initial fetch.
+  const history = useInfiniteList<HistoryEntry>({
+    key: user ? `rewards-history-${user.id}` : null,
+    pageSize: 20,
+    fetchPage: async (page, signal) => {
       try {
-        const res = await fetch(`/api/user/loyalty?historyPage=${hp}&couponPage=${cp}`)
-        if (!res.ok) throw new Error('load failed')
-        setData(await res.json())
-        setHistoryPage(hp)
-        setCouponPage(cp)
-        setFailed(false)
-      } catch {
-        setFailed(true)
-      } finally {
-        setLoading(false)
-        setPaging(false)
+        const d = await fetchJson<RewardsData>(`/api/user/loyalty?historyPage=${page}&couponPage=1`, signal)
+        if (page === 1) {
+          setData(d)
+          setFailed(false)
+        }
+        return { rows: d.history.items, total: d.history.total }
+      } catch (e) {
+        if (page === 1) setFailed(true)
+        throw e
       }
     },
-    []
-  )
+    getKey: e => e.id,
+  })
+
+  const coupons = useInfiniteList<RewardCoupon>({
+    key: user ? `rewards-coupons-${user.id}` : null,
+    pageSize: 20,
+    fetchPage: async (page, signal) => {
+      const d = await fetchJson<RewardsData>(`/api/user/loyalty?historyPage=1&couponPage=${page}`, signal)
+      return { rows: d.coupons.items, total: d.coupons.total }
+    },
+    getKey: c => c.code,
+  })
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
-      router.push('/login?redirect=/account/rewards')
-      return
-    }
-    load()
-  }, [user, authLoading, router, load])
+    if (!user) router.push('/login?redirect=/account/rewards')
+  }, [user, authLoading, router])
 
+  const loading = authLoading || (history.loading && !data)
   const unavailable = !loading && (failed || !data || !data.enabled || data.eligible === false)
+  const reload = () => {
+    history.reload()
+    coupons.reload()
+  }
 
   return (
     <div className="bg-surface min-h-screen">
       <AccountMobileHeader />
       <div className="container mx-auto px-4 pt-4 pb-10">
-        {authLoading || loading ? (
+        {loading ? (
           <div className="grid gap-4 lg:grid-cols-3 lg:items-start animate-pulse">
             <div className="space-y-4 lg:col-span-2">
               <div className="h-44 rounded-xl bg-surface-elevated border border-border-default" />
@@ -451,17 +430,9 @@ export default function AccountRewards() {
           <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
             <div className="min-w-0 space-y-4 lg:col-span-2">
               <TierCard data={data} />
-              <RedeemCard data={data} onRedeemed={() => load({ historyPage, couponPage })} />
-              <CouponList
-                coupons={data.coupons}
-                busy={paging}
-                onPage={cp => load({ historyPage, couponPage: cp, silent: true })}
-              />
-              <History
-                history={data.history}
-                busy={paging}
-                onPage={hp => load({ historyPage: hp, couponPage, silent: true })}
-              />
+              <RedeemCard data={data} onRedeemed={reload} />
+              <CouponList list={coupons} />
+              <History list={history} />
             </div>
             <div className="min-w-0 lg:sticky lg:top-4">
               <HowItWorks program={data.program} />

@@ -57,6 +57,7 @@ ${schema}`
 
   try {
     const r = await aiChat({
+      feature: 'form_fill',
       modelHint: 'enrich',
       jsonMode: true,
       temperature: 0.3,

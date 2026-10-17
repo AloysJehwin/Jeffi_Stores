@@ -1,4 +1,5 @@
-import ScanClient from './ScanClient'
+import { Suspense } from 'react'
+import ScanTabs from './_components/ScanTabs'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
 export async function generateMetadata() {
@@ -7,5 +8,9 @@ export async function generateMetadata() {
 }
 
 export default function ScanPage() {
-  return <ScanClient />
+  return (
+    <Suspense fallback={null}>
+      <ScanTabs />
+    </Suspense>
+  )
 }

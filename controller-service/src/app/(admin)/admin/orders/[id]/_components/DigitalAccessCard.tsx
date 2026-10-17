@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { Card } from '@/components/admin/kit/layout'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 export interface DigitalAccessLine {
   order_item_id: string
@@ -18,13 +20,12 @@ const fmt = (d: string | null) =>
 
 export default function DigitalAccessCard({ orderId, initial }: { orderId: string; initial: DigitalAccessLine[] }) {
   const [lines, setLines] = useState(initial)
+  const toast = useActionToast()
   const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   const act = async (action: 'revoke' | 'grant', orderItemIds?: string[]) => {
     const key = action + (orderItemIds?.[0] ?? '')
     setBusy(key)
-    setError(null)
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/entitlements`, {
         method: 'POST',
@@ -33,12 +34,13 @@ export default function DigitalAccessCard({ orderId, initial }: { orderId: strin
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || 'Failed to update access')
+        toast.error(data.error || 'Failed to update access')
         return
       }
       setLines(data.entitlements)
+      toast.success(action === 'grant' ? 'Access granted.' : 'Access revoked.')
     } catch {
-      setError('Failed to update access')
+      toast.error('Failed to update access')
     } finally {
       setBusy(null)
     }
@@ -47,22 +49,20 @@ export default function DigitalAccessCard({ orderId, initial }: { orderId: strin
   const anyInactive = lines.some(l => l.status !== 'active')
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-      <div className="px-6 py-4 border-b border-border-default flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-foreground">Digital Access</h2>
-        {anyInactive && (
+    <Card
+      title="Digital Access"
+      flush
+      action={
+        anyInactive && (
           <RequireWrite scope="orders:write">
-            <button
-              onClick={() => act('grant')}
-              disabled={busy !== null}
-              className="px-3 py-1.5 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-200 disabled:opacity-50"
-            >
-              {busy === 'grant' ? 'Granting…' : 'Re-grant access'}
+            <button type="button" onClick={() => act('grant')} disabled={busy !== null} className="control-sm border border-green-500/40 font-semibold text-green-700 hover:bg-green-500/10 disabled:opacity-50 dark:text-green-400">
+              {busy === 'grant' ? 'Granting...' : 'Re-grant access'}
             </button>
           </RequireWrite>
-        )}
-      </div>
-      <div className="divide-y divide-border-default">
+        )
+      }
+    >
+      <div className="divide-y divide-border-default border-t border-border-default">
         {lines.map(l => (
           <div key={l.order_item_id} className="px-6 py-3 flex items-start justify-between gap-3 text-sm">
             <div className="min-w-0">
@@ -88,7 +88,8 @@ export default function DigitalAccessCard({ orderId, initial }: { orderId: strin
                 <button
                   onClick={() => act('revoke', [l.order_item_id])}
                   disabled={busy !== null}
-                  className="shrink-0 px-3 py-1.5 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 disabled:opacity-50"
+                  type="button"
+                  className="control-sm shrink-0 border border-red-500/40 font-semibold text-red-600 hover:bg-red-500/10 disabled:opacity-50 dark:text-red-400"
                 >
                   {busy === 'revoke' + l.order_item_id ? 'Revoking…' : 'Revoke'}
                 </button>
@@ -97,7 +98,6 @@ export default function DigitalAccessCard({ orderId, initial }: { orderId: strin
           </div>
         ))}
       </div>
-      {error && <p className="px-6 pb-3 text-xs text-red-600">{error}</p>}
-    </div>
+    </Card>
   )
 }

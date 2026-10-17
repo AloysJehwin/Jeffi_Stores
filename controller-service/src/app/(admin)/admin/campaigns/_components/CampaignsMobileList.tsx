@@ -83,12 +83,12 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-semibold text-foreground truncate">{c.name}</span>
                 <span
-                  className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${c.enabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}
+                  className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${c.enabled ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-surface-secondary text-foreground-muted '}`}
                 >
                   {c.enabled ? 'Active' : 'Paused'}
                 </span>
                 {c.draft_fields != null && (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
                     Draft pending
                   </span>
                 )}
@@ -98,7 +98,7 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
                   <ChannelChip key={ch} channel={ch} />
                 ))}
                 {c.discount_percent > 0 && (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
                     {c.discount_percent}% off
                   </span>
                 )}
@@ -120,7 +120,7 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
               <button
                 type="button"
                 onClick={() => setActionsOpen(true)}
-                className="flex-1 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+                className="control-md flex-1 bg-accent-500 font-semibold text-white hover:bg-accent-600"
               >
                 Actions
               </button>
@@ -128,7 +128,7 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
             {selected && (
               <Link
                 href={ap(`/admin/campaigns/${selected.kind}/view`)}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+                className="control-md flex-1 border border-border-default bg-surface-elevated font-semibold text-foreground hover:bg-surface-secondary"
               >
                 <Eye className="w-4 h-4" /> View
               </Link>
@@ -143,7 +143,7 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
                 <ChannelChip key={ch} channel={ch} />
               ))}
               {selected.discount_percent > 0 && (
-                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
                   {selected.discount_percent}% off
                 </span>
               )}
@@ -160,15 +160,26 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
 
             <div className="grid grid-cols-2 gap-3">
               <StatTile label="Sent" value={num(selected.total_sent)} />
-              <StatTile label="Opened" value={num(selected.total_opened)} sub={rate(Number(selected.total_opened), Number(selected.total_sent))} />
-              <StatTile label="Clicked" value={num(selected.total_clicked)} sub={rate(Number(selected.total_clicked), Number(selected.total_sent))} />
+              <StatTile
+                label="Opened"
+                value={num(selected.total_opened)}
+                sub={rate(Number(selected.total_opened), Number(selected.total_sent))}
+              />
+              <StatTile
+                label="Clicked"
+                value={num(selected.total_clicked)}
+                sub={rate(Number(selected.total_clicked), Number(selected.total_sent))}
+              />
               <StatTile
                 label="Converted"
                 value={num(selected.total_converted)}
                 sub={rate(Number(selected.total_converted), Number(selected.total_sent))}
                 accent="green"
               />
-              <StatTile label="Revenue" value={`₹${Math.round(Number(selected.revenue_attributed)).toLocaleString('en-IN')}`} />
+              <StatTile
+                label="Revenue"
+                value={`₹${Math.round(Number(selected.revenue_attributed)).toLocaleString('en-IN')}`}
+              />
               <StatTile
                 label="Unsub"
                 value={num(selected.total_unsubscribed)}

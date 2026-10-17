@@ -1,4 +1,5 @@
-import Link from 'next/link'
+import { Suspense } from 'react'
+import { TabLinks } from '@/components/admin/channels/ui'
 import { cookies } from 'next/headers'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
@@ -9,7 +10,9 @@ import AccessDenied from '@/components/admin/AccessDenied'
 import LoyaltyProgram from './_components/LoyaltyProgram'
 import ReferralProgram from './_components/ReferralProgram'
 import BirthdayProgram from './_components/BirthdayProgram'
+import ProgramsOverview from './_components/ProgramsOverview'
 import { PROGRAMS_PATH } from './_components/ProgramSection'
+import { PageBody, PageHeader } from '@/components/admin/kit'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -17,6 +20,7 @@ export const revalidate = 0
 // Each program is switched on or off in Site Controls; one that is off still shows here, greyed out.
 // New programs get a tab here.
 const TABS = [
+  { key: 'overview', label: 'Overview' },
   { key: 'loyalty', label: 'Loyalty' },
   { key: 'referrals', label: 'Refer & Earn' },
   { key: 'birthday', label: 'Birthday rewards' },
@@ -52,41 +56,37 @@ export default async function CustomerProgramsPage({
     return <AccessDenied scopeKey="campaigns" scopeLabel="Programs" />
   }
 
-  const tab: TabKey = TABS.find(t => t.key === params.tab)?.key ?? 'loyalty'
+  // Overview is the default; an old link carrying loyalty list params (page, tier, search) still opens Loyalty.
+  const tab: TabKey =
+    TABS.find(t => t.key === params.tab)?.key ?? (params.page || params.tier || params.search ? 'loyalty' : 'overview')
   const basePath = ap(PROGRAMS_PATH, host)
   const search = params.search || ''
   const page = pageNumber(params.page)
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Programs</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">
-          Rewards that keep customers coming back. Switch each one on or off in Site Controls.
-        </p>
-      </div>
+    <PageBody>
+      <PageHeader
+        title="Programs"
+        description="Rewards that keep customers coming back. Switch each one on or off in Site Controls."
+      />
 
-      <div className="flex gap-1 border-b border-border overflow-x-auto" role="tablist">
-        {TABS.map(t => (
-          <Link
-            key={t.key}
-            href={t.key === 'loyalty' ? basePath : `${basePath}?tab=${t.key}`}
-            role="tab"
-            aria-selected={tab === t.key}
-            className={`shrink-0 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              tab === t.key
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-foreground-muted hover:text-foreground'
-            }`}
-          >
-            {t.label}
-          </Link>
-        ))}
-      </div>
+      <TabLinks
+        tabs={TABS.map(t => ({
+          id: t.key,
+          label: t.label,
+          href: t.key === 'overview' ? basePath : `${basePath}?tab=${t.key}`,
+        }))}
+        value={tab}
+      />
 
+      {tab === 'overview' && (
+        <Suspense fallback={null}>
+          <ProgramsOverview />
+        </Suspense>
+      )}
       {tab === 'loyalty' && <LoyaltyProgram host={host} query={{ page, tier: params.tier || '', search }} />}
       {tab === 'referrals' && <ReferralProgram host={host} query={{ page, status: params.status || '', search }} />}
       {tab === 'birthday' && <BirthdayProgram host={host} />}
-    </div>
+    </PageBody>
   )
 }

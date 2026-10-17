@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, FlaskConical, Loader2, RefreshCw } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { FlaskConical, Loader2, RefreshCw } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
 import IconButton from '@/components/ui/IconButton'
@@ -46,7 +47,8 @@ export default function ExperimentsView({ d, currency }: { d: Data; currency: st
   const canManage = useCanWrite('google_ads_campaigns')
   const [data, setData] = useState<Data>({ experiments: d?.experiments ?? [], campaigns: d?.campaigns ?? [] })
   const [busy, setBusy] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
+  const toastN = useActionToast()
+  const setNotice = (r: { ok: boolean; text: string } | null) => r && toastN.result(r)
 
   async function refresh() {
     setBusy('refresh')
@@ -72,12 +74,6 @@ export default function ExperimentsView({ d, currency }: { d: Data; currency: st
         title={`Experiments (${data.experiments.length})`}
         action={<IconButton icon={RefreshCw} label="Refresh from Google Ads" busy={busy === 'refresh'} onClick={refresh} />}
       >
-        {notice && (
-          <p className={`mb-3 text-sm flex items-start gap-2 ${notice.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} role="status">
-            {notice.ok ? <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
-            {notice.text}
-          </p>
-        )}
         {!data.experiments.length ? (
           <Empty msg="No experiments yet. A trial runs another bid strategy on part of a campaign's traffic and compares the two." />
         ) : (
@@ -229,7 +225,8 @@ function NewExperiment({ campaigns, onCreated }: { campaigns: CampaignOption[]; 
   const [strategy, setStrategy] = useState<BidStrategy>('MAXIMIZE_CONVERSIONS')
   const [target, setTarget] = useState('')
   const [busy, setBusy] = useState<'preview' | 'create' | null>(null)
-  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setResult = (r: { ok: boolean; text: string } | null) => r && toast.result(r)
   const today = new Date().toISOString().slice(0, 10)
   const base = campaigns.find(c => c.campaignId === campaignId)
   const strategies = base ? STRATEGIES_FOR[(base.channelType ?? 'SEARCH') as CampaignType] ?? [] : []
@@ -329,11 +326,6 @@ function NewExperiment({ campaigns, onCreated }: { campaigns: CampaignOption[]; 
             {busy === 'create' && <Loader2 className="w-4 h-4 animate-spin" />} Create and schedule
           </button>
         </div>
-        {result && (
-          <p className={`text-sm ${result.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} role="status">
-            {result.text}
-          </p>
-        )}
       </div>
     </Section>
   )

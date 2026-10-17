@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { AlertCircle, Ban, CheckCircle2, KeyRound, Plus, RefreshCw, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { Ban, KeyRound, Plus, RefreshCw, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { money, count, pct, humanize, formatCid } from '@/lib/google-ads/format'
@@ -22,6 +23,8 @@ import {
   type UploadStatus,
 } from '@/lib/google-ads/conversions/types'
 import { Section, Empty, Table } from './ReportViews'
+import { DataTable } from '@/components/admin/kit/data-table'
+import { fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 
 // Server-side purchase conversions: where they upload, Google's view of the account, and the queue.
 
@@ -74,7 +77,8 @@ export default function ConversionsView({ d, currency }: { d: ConversionsSummary
   const [summary, setSummary] = useState(d)
   const [google, setGoogle] = useState<GoogleConversionsData | null>(null)
   const [googleError, setGoogleError] = useState<string | null>(null)
-  const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setBanner = useCallback((b: { ok: boolean; text: string } | null) => b && toast.result(b), [toast])
   const [busy, setBusy] = useState<string | null>(null)
   const [primary, setPrimary] = useState(!d.browserConversion)
   const [logKey, setLogKey] = useState(0)
@@ -193,21 +197,6 @@ export default function ConversionsView({ d, currency }: { d: ConversionsSummary
 
   return (
     <div className="space-y-5">
-      {banner && (
-        <div
-          className={`rounded-lg border px-4 py-3 text-sm flex items-start gap-2 ${
-            banner.ok ? 'border-green-500/40 bg-green-500/5' : 'border-red-500/40 bg-red-500/5'
-          }`}
-        >
-          {banner.ok ? (
-            <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-600 shrink-0" />
-          ) : (
-            <AlertCircle className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />
-          )}
-          <span>{banner.text}</span>
-        </div>
-      )}
-
       <Section
         title="Server-side purchases"
         action={
@@ -261,7 +250,7 @@ export default function ConversionsView({ d, currency }: { d: ConversionsSummary
                 type="button"
                 onClick={create}
                 disabled={busy === 'create'}
-                className="inline-flex items-center gap-1.5 rounded-md bg-accent-500 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                className="control-sm bg-accent-500 font-medium text-white hover:bg-accent-600 disabled:opacity-60"
               >
                 <Plus className="w-3.5 h-3.5" />
                 {busy === 'create' ? 'Creating...' : `Create "${SERVER_ACTION_NAME}"`}
@@ -402,7 +391,7 @@ function AccessNote({ auth, canWrite }: { auth: ConversionAuth; canWrite: boolea
         (canWrite ? (
           <a
             href={RECONNECT_URL}
-            className="inline-flex items-center gap-1.5 rounded-md bg-accent-500 px-3 py-1.5 text-xs font-medium text-white"
+            className="control-sm bg-accent-500 font-medium text-white hover:bg-accent-600"
           >
             Reconnect Google Ads
           </a>
@@ -667,24 +656,19 @@ function UploadLogSection({
   onRetry: (ids?: number[]) => void
 }) {
   const [status, setStatus] = useState<UploadStatus | ''>('')
-  const [page, setPage] = useState(1)
-  const [log, setLog] = useState<UploadLog | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const list = useInfiniteList<UploadRow>({
+    key: `${status}|${reloadKey}`,
+    pageSize: 25,
+    getKey: r => r.id,
+    fetchPage: async (page, signal) => {
+      const qs = new URLSearchParams({ page: String(page) })
+      if (status) qs.set('status', status)
+      const j = await fetchJson<UploadLog>(`/api/admin/google-ads/conversions?${qs}`, signal)
+      return { rows: j.rows, total: j.total }
+    },
+  })
+  const error = list.rows.length ? null : list.error
 
-  useEffect(() => {
-    const qs = new URLSearchParams({ page: String(page) })
-    if (status) qs.set('status', status)
-    fetch(`/api/admin/google-ads/conversions?${qs}`, { credentials: 'include' })
-      .then(async r => {
-        const j = await r.json().catch(() => ({}))
-        if (!r.ok) throw new Error(j.error || 'Could not load the upload log')
-        setError(null)
-        setLog(j)
-      })
-      .catch(e => setError(e.message))
-  }, [status, page, reloadKey])
-
-  const pages = log ? Math.max(1, Math.ceil(log.total / log.pageSize)) : 1
   return (
     <Section
       title="Upload log"
@@ -699,11 +683,8 @@ function UploadLogSection({
           <button
             key={s || 'all'}
             type="button"
-            onClick={() => {
-              setStatus(s)
-              setPage(1)
-            }}
-            className={`px-2.5 py-1 text-xs rounded-md border ${
+            onClick={() => setStatus(s)}
+            className={`control-xs border ${
               status === s ? 'border-accent-500 text-foreground font-medium' : 'border-border-default text-foreground-muted hover:text-foreground'
             }`}
           >
@@ -713,12 +694,15 @@ function UploadLogSection({
       </div>
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
-      ) : !log ? (
+      ) : list.loading ? (
         <div className="h-24 rounded-lg bg-surface-secondary animate-pulse" />
       ) : (
         <>
-          <Table<UploadRow>
-            rows={log.rows}
+          <DataTable<UploadRow>
+            bare
+            rows={list.rows}
+            infinite={list}
+            noun="uploads"
             rowKey={r => String(r.id)}
             empty="Nothing queued yet. Orders from Google Ads clicks appear here once paid (COD: once delivered)."
             cols={[
@@ -771,19 +755,6 @@ function UploadLogSection({
               },
             ]}
           />
-          {pages > 1 && (
-            <div className="flex items-center justify-end gap-2 pt-3 text-xs text-foreground-muted">
-              <button type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="disabled:opacity-40">
-                Previous
-              </button>
-              <span>
-                Page {page} of {pages} ({count(log.total)})
-              </span>
-              <button type="button" disabled={page >= pages} onClick={() => setPage(p => p + 1)} className="disabled:opacity-40">
-                Next
-              </button>
-            </div>
-          )}
         </>
       )}
     </Section>

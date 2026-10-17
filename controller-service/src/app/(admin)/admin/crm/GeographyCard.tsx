@@ -24,7 +24,7 @@ export default function GeographyCard({ states, cities }: { states: GeoRow[]; ci
 
   return (
     <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-      <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Geography</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Geography</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {stateRows.length > 0 && (
           <div>

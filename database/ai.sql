@@ -135,6 +135,34 @@ CREATE TABLE public.ai_queries (
 
 
 --
+-- Name: ai_usage; Type: TABLE; Schema: public; Owner: -
+--
+-- One row per AI call (text, embed, vision, image, video). cost_inr is what the platform paid the
+-- provider (gateway usage); price_inr is what the store was charged to its wallet (0 on the
+-- flagship). wallet_ref = 'ai:' || id matches wallet_ledger.external_ref. Written by
+-- lib/ai/billing.ts; read by Finance AI costs and the wallet page.
+
+CREATE TABLE public.ai_usage (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    feature character varying(64) NOT NULL,
+    capability character varying(16) NOT NULL,
+    provider character varying(32) NOT NULL,
+    model character varying(128) DEFAULT ''::character varying NOT NULL,
+    units jsonb DEFAULT '[]'::jsonb NOT NULL,
+    cost_inr numeric(10,4) DEFAULT 0 NOT NULL,
+    price_inr numeric(10,4) DEFAULT 0 NOT NULL,
+    wallet_ref character varying(80),
+    status character varying(16) DEFAULT 'pending'::character varying NOT NULL,
+    error text,
+    ref character varying(128),
+    actor character varying(255),
+    latency_ms integer,
+    cache character varying(16),
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: embeddings; Type: TABLE; Schema: public; Owner: -
 --
 

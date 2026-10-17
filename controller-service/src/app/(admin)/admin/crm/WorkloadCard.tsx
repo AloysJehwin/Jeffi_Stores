@@ -46,7 +46,7 @@ export default function WorkloadCard({
 
   return (
     <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-      <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Team Workload</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Team Workload</h2>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <CompactStat label="Open tasks" value={numStr(workload.open)} />

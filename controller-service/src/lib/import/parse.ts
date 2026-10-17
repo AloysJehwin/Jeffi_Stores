@@ -6,6 +6,8 @@ import {
   keyColumnsFor,
   ALL_COLUMNS,
   ATTRIBUTE_SHEETS,
+  TEMPLATE_EXAMPLE,
+  sheetFor,
   type RowType,
   type SheetName,
 } from './columns'
@@ -25,6 +27,21 @@ export interface ParsedRow {
 export interface ParseResult {
   rows: ParsedRow[]
   fatal?: string // whole-file problem (bad headers, empty, unreadable)
+  warnings?: string[] // file-level notes (unknown columns that were ignored)
+}
+
+// Headers a sheet cannot work without; a missing one means the header row was edited.
+const REQUIRED_HEADERS: Partial<Record<SheetName, string[]>> = {
+  Products: ['sku', 'name'],
+  Variants: ['parent_sku', 'variant.sku', 'variant.variant_name'],
+  'Sub-variants': ['parent_sku', 'variant_sku', 'sub_variant.sub_variant_name'],
+}
+
+const headerFix = 'The header row (row 1) was changed; copy it back from a freshly downloaded template.'
+
+function missingHeaderFatal(sheet: string, missing: string[]): string {
+  const list = missing.map(h => `"${h}"`).join(', ')
+  return `The ${sheet ? `${sheet} ` : ''}sheet is missing the column${missing.length > 1 ? 's' : ''} ${list}. ${headerFix}`
 }
 
 const MAX_ROWS = 5000
@@ -40,7 +57,7 @@ type Cell = (header: string) => unknown
  *  - the legacy flat grid (one sheet, a row_type column deciding each row's level).
  * Coercion errors are captured per-row, not thrown — a bad cell is a row error, not a file failure.
  */
-export function parseWorkbook(buf: Buffer): ParseResult {
+export function parseWorkbook(buf: Buffer, opts: { keepTemplateExample?: boolean } = {}): ParseResult {
   let wb: XLSX.WorkBook
   try {
     wb = XLSX.read(buf, { type: 'buffer' })
@@ -52,7 +69,7 @@ export function parseWorkbook(buf: Buffer): ParseResult {
   const products = wb.Sheets['Products']
   if (products) {
     const { headers } = readSheet(products)
-    if (!headers.includes('row_type')) return parseTemplate(wb)
+    if (!headers.includes('row_type')) return parseTemplate(wb, !!opts.keepTemplateExample)
     return parseFlat(products)
   }
   return parseFlat(wb.Sheets[wb.SheetNames[0]])
@@ -113,21 +130,42 @@ function coerceRow(
   return { values, errors }
 }
 
-function parseTemplate(wb: XLSX.WorkBook): ParseResult {
+function parseTemplate(wb: XLSX.WorkBook, keepExample: boolean): ParseResult {
   const rows: ParsedRow[] = []
   const productBySku = new Map<string, ParsedRow>()
 
+  let fatal: string | undefined
+  const warnings: string[] = []
+
   const eachRow = (sheet: SheetName, fn: (rowNumber: number, cell: Cell) => void) => {
     const ws = wb.Sheets[sheet]
-    if (!ws) return
+    if (!ws || fatal) return
     const { headers, aoa } = readSheet(ws)
     if (!headers.some(Boolean)) return
     const helpOf = helpLookup(sheet)
+    const data: number[] = []
     for (let i = 1; i < aoa.length; i++) {
       const raw = aoa[i] as unknown[]
-      if (isBlank(raw) || isHelpRow(headers, raw, helpOf)) continue
-      fn(i + 1, cellReader(headers, raw))
+      if (!isBlank(raw) && !isHelpRow(headers, raw, helpOf)) data.push(i)
     }
+    if (data.length === 0) return
+    const required = REQUIRED_HEADERS[sheet] ?? ['sku']
+    const missing = required.filter(h => !headers.includes(h))
+    if (missing.length) {
+      fatal = missingHeaderFatal(sheet, missing)
+      return
+    }
+    const known = new Set([...keyColumnsFor(sheet).map(k => k.header), ...columnsForSheet(sheet).map(c => c.header)])
+    for (const h of headers.filter(h => h && !known.has(h))) {
+      const col = columnByHeader(h)
+      const home = col ? sheetFor(col) : null
+      warnings.push(
+        home && home !== sheet
+          ? `${sheet}: column "${h}" belongs on the ${home} sheet and was ignored here`
+          : `${sheet}: unknown column "${h}" ignored`
+      )
+    }
+    for (const i of data) fn(i + 1, cellReader(headers, aoa[i] as unknown[]))
   }
 
   eachRow('Products', (rowNumber, cell) => {
@@ -211,11 +249,26 @@ function parseTemplate(wb: XLSX.WorkBook): ParseResult {
     })
   })
 
+  if (fatal) return { rows: [], fatal }
+  const example = productBySku.get(TEMPLATE_EXAMPLE.sku)
+  if (!keepExample && example && example.values.name === TEMPLATE_EXAMPLE.name) {
+    const kept = rows.filter(r => r !== example && r.parentSku !== TEMPLATE_EXAMPLE.sku)
+    if (kept.length !== rows.length) {
+      warnings.push(`Skipped the template's example rows (${TEMPLATE_EXAMPLE.sku}). Delete them from your sheet.`)
+      rows.splice(0, rows.length, ...kept)
+    }
+  }
   if (rows.length === 0)
-    return { rows: [], fatal: 'No data rows found under the headers. Fill the Products sheet first.' }
+    return {
+      rows: [],
+      fatal: example && !keepExample
+        ? "Only the template's example rows were found. Replace them with your products."
+        : 'No data rows found under the headers. Fill the Products sheet first.',
+      ...(warnings.length ? { warnings } : {}),
+    }
   if (rows.length > MAX_ROWS)
     return { rows: rows.slice(0, MAX_ROWS), fatal: `Too many rows (max ${MAX_ROWS}). Split the file.` }
-  return { rows }
+  return warnings.length ? { rows, warnings } : { rows }
 }
 
 function parseFlat(ws: XLSX.WorkSheet): ParseResult {
@@ -226,6 +279,9 @@ function parseFlat(ws: XLSX.WorkSheet): ParseResult {
   if (!known.includes('row_type')) {
     return { rows: [], fatal: 'Missing the "row_type" column — download and use the template.' }
   }
+  if (!known.includes('sku')) return { rows: [], fatal: missingHeaderFatal('', ['sku']) }
+  const unknown = headers.filter(h => h && !columnByHeader(h))
+  const warnings = unknown.length ? [`unknown column(s) ${unknown.map(h => `"${h}"`).join(', ')} ignored`] : undefined
 
   const rows: ParsedRow[] = []
   for (let i = 1; i < aoa.length; i++) {
@@ -274,7 +330,7 @@ function parseFlat(ws: XLSX.WorkSheet): ParseResult {
   }
 
   if (rows.length === 0) return { rows: [], fatal: 'No data rows found under the header.' }
-  return { rows }
+  return warnings ? { rows, warnings } : { rows }
 }
 
 function str(v: unknown): string | null {

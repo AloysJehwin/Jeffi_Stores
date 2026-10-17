@@ -1,7 +1,5 @@
-import { cookies, headers } from 'next/headers'
-import { verifyToken } from '@/lib/auth/jwt'
-import { queryMany } from '@/lib/shared/db'
-import PackingSlipsClient from './PackingSlipsClient'
+import { Suspense } from 'react'
+import PackingSlipsTabs from './_components/PackingSlipsTabs'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
 export const dynamic = 'force-dynamic'
@@ -12,23 +10,11 @@ export async function generateMetadata() {
   return { title: `Packing Slips — ${name} Admin` }
 }
 
-async function getInitialOrders() {
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-  const from = thirtyDaysAgo.toISOString().slice(0, 10)
-
-  const orders = await queryMany(
-    `SELECT o.id, o.order_number, o.customer_name, o.created_at, o.status, o.total_amount
-     FROM orders o
-     WHERE o.created_at >= $1::date
-     ORDER BY o.created_at DESC
-     LIMIT 500`,
-    [from]
-  )
-  return orders || []
-}
-
+// The slips list fetches page by page from /api/admin/packing-slips/list.
 export default async function PackingSlipsPage() {
-  const orders = await getInitialOrders()
-  return <PackingSlipsClient initialOrders={orders} />
+  return (
+    <Suspense fallback={null}>
+      <PackingSlipsTabs />
+    </Suspense>
+  )
 }

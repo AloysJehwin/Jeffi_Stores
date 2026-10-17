@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
     ].join('\n')
     // 'email' hint = the fast model: the large copy model truncates the HTML mid-JSON.
     const r = await aiChat({
+      feature: 'email_copy',
       modelHint: 'email',
       jsonMode: true,
       temperature: 0.3,

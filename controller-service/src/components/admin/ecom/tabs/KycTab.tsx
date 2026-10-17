@@ -4,15 +4,15 @@ import { Field, Mono, Section } from '../EcomUI'
 import KycActionButtons from './KycActionButtons'
 
 const BORDER: Record<string, string> = {
-  pending: 'border-yellow-300 dark:border-yellow-700',
-  approved: 'border-green-300 dark:border-green-700',
-  rejected: 'border-red-300 dark:border-red-700',
+  pending: 'border-yellow-500/40',
+  approved: 'border-green-500/40',
+  rejected: 'border-red-500/40',
 }
 
 const BADGE: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  pending: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
+  approved: 'bg-green-500/10 text-green-700 dark:text-green-400',
+  rejected: 'bg-red-500/10 text-red-700 dark:text-red-400',
 }
 
 export default function KycTab({ tenant: t, kyc, approvals = [] }: { tenant: TenantDetail; kyc: TenantKyc | null; approvals?: ServiceApproval[] }) {
@@ -42,7 +42,7 @@ export default function KycTab({ tenant: t, kyc, approvals = [] }: { tenant: Ten
             {kyc.status}
           </span>
           {t.store_request && (
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400">
               Store upgrade
             </span>
           )}
@@ -81,7 +81,7 @@ export default function KycTab({ tenant: t, kyc, approvals = [] }: { tenant: Ten
                 href={`/api/admin/ecom/kyc/${t.id}/cert`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-accent-600 dark:text-accent-400 hover:underline text-xs"
+                className="text-accent-600 hover:underline text-xs"
               >
                 View certificate ↗
               </a>

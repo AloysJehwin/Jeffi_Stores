@@ -433,7 +433,7 @@ app.post<{ Querystring: { m?: string }; Body: Record<string, string> }>('/webhoo
   if (!m) return { ok: true }
   await applyStatus(id, status, { code: req.body?.ErrorCode, message: req.body?.ErrorMessage, payload: req.body })
   const usd = priceUsd(req.body?.Price)
-  if (usd !== null) {
+  if (usd !== null && status !== 'failed' && status !== 'undelivered') {
     const { withMargin } = await import('@jeffi/pricing')
     const exact = (m.metadata as any)?.internal ? usdToInr(usd) : withMargin(usdToInr(usd))
     await wallet.trueUp({ tenantId: m.tenant_id, amountInr: exact, externalRef: `pub:${id}`, note: `${m.channel} → ${m.to_address} (exact)` })

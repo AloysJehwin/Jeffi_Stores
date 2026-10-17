@@ -54,7 +54,7 @@ export default function CommerceTab({
         action={
           <Link
             href={`/admin/ecom/billing/${t.id}/view`}
-            className="text-sm text-accent-600 dark:text-accent-400 hover:underline"
+            className="text-sm text-accent-600 hover:underline"
           >
             Full billing →
           </Link>
@@ -187,7 +187,7 @@ export default function CommerceTab({
               Showing 15 of {txns.length}.{' '}
               <Link
                 href={`/admin/ecom/billing/${t.id}/view`}
-                className="text-accent-600 dark:text-accent-400 hover:underline"
+                className="text-accent-600 hover:underline"
               >
                 See all →
               </Link>

@@ -11,21 +11,49 @@ import { missingRequired } from '@/lib/campaigns/kind-variables'
 
 export type PickerChannel = 'email' | 'sms' | 'whatsapp'
 
-type ListItem = { id: string; slug: string; name: string; category: string | null; channel: PickerChannel; approval_status?: string | null; source?: 'tenant' | 'platform' }
+type ListItem = {
+  id: string
+  slug: string
+  name: string
+  category: string | null
+  channel: PickerChannel
+  approval_status?: string | null
+  source?: 'tenant' | 'platform'
+}
 
 export type PickedTemplate = {
-  id: string; slug: string; name: string; channel: PickerChannel
-  subject: string | null; body: string; blocks: any; blocks_format: string | null
-  variables: string[]; approval_status: string | null; media_type: string | null
+  id: string
+  slug: string
+  name: string
+  channel: PickerChannel
+  subject: string | null
+  body: string
+  blocks: any
+  blocks_format: string | null
+  variables: string[]
+  approval_status: string | null
+  media_type: string | null
 }
 
 const API = '/api/admin/messaging-templates'
 const CHANNEL_NOUN: Record<PickerChannel, string> = { email: 'email', sms: 'SMS', whatsapp: 'WhatsApp' }
-const strip = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+const strip = (s: string) =>
+  s
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 
 /** Picks a template from the messaging-templates library (linked by slug). */
 export default function LibraryTemplatePicker({
-  channel, value, onChange, kind, allowNone = true, noneLabel, supplied, onLoaded,
+  channel,
+  value,
+  onChange,
+  kind,
+  allowNone = true,
+  noneLabel,
+  supplied,
+  onLoaded,
 }: {
   channel: PickerChannel
   value: string | null
@@ -44,25 +72,49 @@ export default function LibraryTemplatePicker({
 
   useEffect(() => {
     let live = true
-    fetch(`${API}?channel=${channel}`).then(r => (r.ok ? r.json() : { items: [] })).then(d => live && setItems(d.items ?? []))
+    fetch(`${API}?channel=${channel}`)
+      .then(r => (r.ok ? r.json() : { items: [] }))
+      .then(d => live && setItems(d.items ?? []))
       .catch(() => live && setItems([]))
-    return () => { live = false }
+    return () => {
+      live = false
+    }
   }, [channel])
 
   useEffect(() => {
     let live = true
-    if (!value) { setPicked(null); onLoaded?.(null); return }
-    fetch(`${API}/${channel}/${encodeURIComponent(value)}`).then(r => (r.ok ? r.json() : null)).then(a => {
-      if (!live) return
-      const v = a?.current_version ?? {}
-      const t: PickedTemplate | null = a ? {
-        id: a.id, slug: a.slug, name: a.name, channel: a.channel, subject: v.subject ?? null, body: v.body ?? '',
-        blocks: v.blocks ?? null, blocks_format: v.blocks_format ?? null, variables: v.variables ?? [],
-        approval_status: a.approval_status ?? null, media_type: a.media_type ?? null,
-      } : null
-      setPicked(t); onLoaded?.(t)
-    }).catch(() => live && setPicked(null))
-    return () => { live = false }
+    if (!value) {
+      setPicked(null)
+      onLoaded?.(null)
+      return
+    }
+    fetch(`${API}/${channel}/${encodeURIComponent(value)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(a => {
+        if (!live) return
+        const v = a?.current_version ?? {}
+        const t: PickedTemplate | null = a
+          ? {
+              id: a.id,
+              slug: a.slug,
+              name: a.name,
+              channel: a.channel,
+              subject: v.subject ?? null,
+              body: v.body ?? '',
+              blocks: v.blocks ?? null,
+              blocks_format: v.blocks_format ?? null,
+              variables: v.variables ?? [],
+              approval_status: a.approval_status ?? null,
+              media_type: a.media_type ?? null,
+            }
+          : null
+        setPicked(t)
+        onLoaded?.(t)
+      })
+      .catch(() => live && setPicked(null))
+    return () => {
+      live = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel, value])
 
@@ -70,20 +122,38 @@ export default function LibraryTemplatePicker({
     const list = items ?? []
     const blocked = (i: ListItem) =>
       channel === 'whatsapp' && i.approval_status !== 'approved'
-        ? (i.approval_status === 'pending' || i.approval_status === 'received' ? 'Waiting for Meta approval' : 'Not approved by Meta yet')
+        ? i.approval_status === 'pending' || i.approval_status === 'received'
+          ? 'Waiting for Meta approval'
+          : 'Not approved by Meta yet'
         : undefined
     const opt = (i: ListItem, group: string): SelectOption => {
       const reason = blocked(i)
-      return { value: i.slug, label: `${i.name}${i.source === 'tenant' ? ' · customised' : ''}`, group, disabled: !!reason, hint: reason ?? i.slug }
+      return {
+        value: i.slug,
+        label: `${i.name}${i.source === 'tenant' ? ' · customised' : ''}`,
+        group,
+        disabled: !!reason,
+        hint: reason ?? i.slug,
+      }
     }
     const scored = list.map(i => ({ i, s: recommendScore(kind, channel, i.slug) }))
-    const rec = scored.filter(x => x.s > 0).sort((a, b) => b.s - a.s || a.i.name.localeCompare(b.i.name)).map(x => opt(x.i, 'Recommended'))
-    const rest = scored.filter(x => x.s === 0)
+    const rec = scored
+      .filter(x => x.s > 0)
+      .sort((a, b) => b.s - a.s || a.i.name.localeCompare(b.i.name))
+      .map(x => opt(x.i, 'Recommended'))
+    const rest = scored
+      .filter(x => x.s === 0)
       .sort((a, b) => (a.i.category ?? '').localeCompare(b.i.category ?? '') || a.i.name.localeCompare(b.i.name))
-      .map(x => opt(x.i, (x.i.category ?? 'other').replace(/^\w/, c => c.toUpperCase())))
+      .map(x =>
+        opt(
+          x.i,
+          (x.i.category ?? 'other').replace(/^\w/, c => c.toUpperCase())
+        )
+      )
     return [
       ...(allowNone ? [{ value: '', label: noneLabel ?? `No ${CHANNEL_NOUN[channel]} template` }] : []),
-      ...rec, ...rest,
+      ...rec,
+      ...rest,
     ]
   }, [items, kind, channel, allowNone, noneLabel])
 
@@ -93,7 +163,8 @@ export default function LibraryTemplatePicker({
     return picked.variables.filter(v => !/^\d+$/.test(v) && !ok(v))
   }, [picked, supplied])
 
-  const lacking = picked && channel !== 'whatsapp' ? missingRequired(kind, channel, `${picked.subject ?? ''}\n${picked.body}`) : []
+  const lacking =
+    picked && channel !== 'whatsapp' ? missingRequired(kind, channel, `${picked.subject ?? ''}\n${picked.body}`) : []
 
   if (items === null) return <div className="h-10 rounded-lg bg-surface-secondary animate-pulse" />
 
@@ -112,16 +183,22 @@ export default function LibraryTemplatePicker({
               Edit in Templates <ExternalLink className="w-3 h-3" />
             </Link>
           </div>
-          {picked.subject && <p className="text-foreground-secondary"><span className="text-foreground-muted">Subject:</span> {picked.subject}</p>}
+          {picked.subject && (
+            <p className="text-foreground-secondary">
+              <span className="text-foreground-muted">Subject:</span> {picked.subject}
+            </p>
+          )}
           <p className="text-foreground-secondary line-clamp-3">{strip(picked.body).slice(0, 320) || '—'}</p>
           {lacking.length > 0 && (
             <p className="text-red-600 dark:text-red-400">
-              This template doesn&apos;t use {lacking.map(v => `{${v}}`).join(', ')}, which this campaign needs — add {lacking.length === 1 ? 'it' : 'them'} in the editor below or pick another template.
+              This template doesn&apos;t use {lacking.map(v => `{${v}}`).join(', ')}, which this campaign needs — add{' '}
+              {lacking.length === 1 ? 'it' : 'them'} in the editor below or pick another template.
             </p>
           )}
           {unfilled.length > 0 && (
-            <p className="text-yellow-700 dark:text-yellow-300">
-              This campaign doesn&apos;t provide {unfilled.map(v => `{{${v}}}`).join(', ')} — {unfilled.length === 1 ? 'it' : 'they'} will be left blank.
+            <p className="text-amber-700 dark:text-amber-400">
+              This campaign doesn&apos;t provide {unfilled.map(v => `{{${v}}}`).join(', ')} —{' '}
+              {unfilled.length === 1 ? 'it' : 'they'} will be left blank.
             </p>
           )}
         </div>

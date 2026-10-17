@@ -1,4 +1,5 @@
 import CategoryIcon from '@/components/visitor/CategoryIcon'
+import { badgeCls } from '@/components/admin/kit'
 
 interface CardCategory {
   name: string
@@ -21,13 +22,13 @@ export default function CategoryMobileCardBody({ category, isSubcat, subCount }:
         <div className="flex items-center gap-2 min-w-0">
           <div
             className={`rounded-md flex items-center justify-center shrink-0 ${
-              isSubcat ? 'w-6 h-6 bg-surface-secondary' : 'w-7 h-7 bg-accent-100 dark:bg-accent-900/30'
+              isSubcat ? 'w-6 h-6 bg-surface-secondary' : 'w-7 h-7 bg-accent-500/10'
             }`}
           >
             <CategoryIcon
               iconName={category.icon_name}
               categoryName={category.name}
-              className={isSubcat ? 'w-3.5 h-3.5 text-foreground-muted' : 'w-4 h-4 text-accent-600 dark:text-accent-400'}
+              className={isSubcat ? 'w-3.5 h-3.5 text-foreground-muted' : 'w-4 h-4 text-accent-500'}
             />
           </div>
           {isSubcat && <span className="text-foreground-muted">&#9492;</span>}
@@ -41,11 +42,7 @@ export default function CategoryMobileCardBody({ category, isSubcat, subCount }:
           )}
         </div>
         <span
-          className={`flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${
-            category.is_active
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-              : 'bg-surface-secondary text-foreground'
-          }`}
+          className={`flex-shrink-0 ${badgeCls(category.is_active ? 'green' : 'muted')}`}
         >
           {category.is_active ? 'Active' : 'Inactive'}
         </span>

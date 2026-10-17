@@ -1,13 +1,16 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { Tabs } from '@/components/admin/channels/ui'
+import { Dialog, EmptyState, InfiniteFooter, PageBody, PageHeader, badgeCls, fetchJson, fieldInputCls, useInfiniteList } from '@/components/admin/kit'
+import { Check, MessageSquare, Search, ExternalLink, Trash2, AlertTriangle } from 'lucide-react'
+import ReviewsOverview from './_components/ReviewsOverview'
 
 interface Review {
   id: string
@@ -36,7 +39,7 @@ function Stars({ rating }: { rating: number }) {
       {[1, 2, 3, 4, 5].map(star => (
         <svg
           key={star}
-          className={`w-4 h-4 ${star <= rating ? 'text-yellow-400' : 'text-gray-300 dark:text-gray-600'}`}
+          className={`w-4 h-4 ${star <= rating ? 'text-amber-400' : 'text-border-default'}`}
           viewBox="0 0 24 24"
           fill={star <= rating ? 'currentColor' : 'none'}
           stroke="currentColor"
@@ -53,20 +56,61 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-export default function ReviewsClient({ canWrite: canWriteProp = false }: { canWrite?: boolean }) {
+type View = 'overview' | 'reviews'
+
+export default function ReviewsClient({ canWrite = false }: { canWrite?: boolean }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  // Old links (?filter / ?q without ?view) still open the list.
+  const initial: View =
+    searchParams.get('view') === 'reviews' ||
+    (!searchParams.get('view') && (searchParams.has('filter') || searchParams.has('q')))
+      ? 'reviews'
+      : 'overview'
+  const [view, setView] = useState<View>(initial)
+
+  useEffect(() => {
+    const v = searchParams.get('view')
+    if (v === 'reviews' || v === 'overview') setView(v)
+  }, [searchParams])
+
+  function switchView(v: View) {
+    setView(v)
+    const p = new URLSearchParams(window.location.search)
+    p.set('view', v)
+    router.replace(ap(`/admin/reviews?${p.toString()}`), { scroll: false })
+  }
+
+  return (
+    <PageBody>
+      <PageHeader
+        title="Reviews"
+        description="Ratings, review requests and moderation of customer reviews before they appear on product pages"
+      />
+      <Tabs
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'reviews', label: 'Reviews' },
+        ]}
+        value={view}
+        onChange={switchView}
+      />
+      {view === 'overview' ? <ReviewsOverview /> : <ReviewsList canWrite={canWrite} />}
+    </PageBody>
+  )
+}
+
+function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const hasWriteScope = useCanWrite('reviews:write')
   const canWrite = canWriteProp && hasWriteScope
 
-  const [reviews, setReviews] = useState<Review[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>(
     (searchParams.get('filter') as 'all' | 'pending' | 'approved') || 'pending'
   )
   const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [query, setQuery] = useState(search.trim())
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const { showToast } = useToast()
@@ -74,7 +118,21 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const PAGE_SIZE = 25
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const list = useInfiniteList<Review>({
+    key: `${filter}|${query}`,
+    pageSize: PAGE_SIZE,
+    getKey: r => r.id,
+    fetchPage: async (p, signal) => {
+      const params = new URLSearchParams({ filter })
+      if (query) params.set('q', query)
+      params.set('page', String(p))
+      params.set('pageSize', String(PAGE_SIZE))
+      const data = await fetchJson(`/api/admin/reviews?${params}`, signal)
+      return { rows: data.reviews || [], total: data.total || 0 }
+    },
+  })
+  const reviews = list.rows
+  const isLoading = list.loading
 
   useEffect(() => {
     if (!lightboxUrl) return
@@ -94,35 +152,11 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
     router.replace(ap(`/admin/reviews?${p.toString()}`), { scroll: false })
   }
 
-  useEffect(() => {
-    fetchReviews(search, 1)
-  }, [filter])
-
-  const fetchReviews = async (q = search, p = page) => {
-    setIsLoading(true)
-    try {
-      const params = new URLSearchParams({ filter })
-      if (q.trim()) params.set('q', q.trim())
-      params.set('page', String(p))
-      params.set('pageSize', String(PAGE_SIZE))
-      const response = await fetch(`/api/admin/reviews?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setReviews(data.reviews || [])
-        setTotal(data.total || 0)
-        setPage(p)
-      }
-    } catch {
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   function handleSearchChange(val: string) {
     setSearch(val)
     syncUrl({ q: val })
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => fetchReviews(val, 1), 300)
+    searchTimer.current = setTimeout(() => setQuery(val.trim()), 300)
   }
 
   const handleApprove = async (reviewId: string) => {
@@ -133,7 +167,7 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
         body: JSON.stringify({ reviewId, action: 'approve' }),
       })
       if (response.ok) {
-        fetchReviews(search, page)
+        list.setRows(rows => (filter === 'pending' ? rows.filter(r => r.id !== reviewId) : rows.map(r => (r.id === reviewId ? { ...r, is_approved: true } : r))))
         showToast('Review approved', 'success')
       } else {
         showToast('Failed to approve review', 'error')
@@ -159,7 +193,7 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
         body: JSON.stringify({ reviewId, action: 'reject' }),
       })
       if (response.ok) {
-        fetchReviews(search, page)
+        list.setRows(rows => rows.filter(r => r.id !== reviewId))
         showToast('Review deleted', 'success')
       } else {
         showToast('Failed to delete review', 'error')
@@ -178,75 +212,42 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
   const pendingCount = reviews.filter(r => !r.is_approved).length
 
   return (
-    <div className="p-4 sm:p-6">
-      {/* Header */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Reviews</h1>
-          <p className="text-sm text-foreground-muted mt-0.5">
-            Moderate customer reviews before they appear on product pages
-          </p>
-        </div>
-        {filter === 'pending' && !isLoading && pendingCount > 0 && (
-          <span className="inline-flex items-center gap-1.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-sm font-semibold px-3 py-1.5 rounded-full">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 9v2m0 4h.01M5.07 19H19a2 2 0 001.75-2.96L13.75 4a2 2 0 00-3.5 0L3.25 16.04A2 2 0 005.07 19z"
-              />
-            </svg>
+    <div>
+      {filter === 'pending' && !isLoading && pendingCount > 0 && (
+        <div className="mb-3 flex justify-end">
+          <span className={`${badgeCls('amber')} inline-flex items-center gap-1.5 text-xs`}>
+            <AlertTriangle className="h-3.5 w-3.5" />
             {pendingCount} awaiting approval
           </span>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Toolbar */}
-      <div className="bg-surface-elevated rounded-xl border border-border-default mb-5 overflow-hidden">
-        <div className="flex items-center border-b border-border-default px-1">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="flex h-control rounded-lg border border-border-default bg-surface-elevated p-0.5">
           {TABS.map(tab => (
             <button
               key={tab.key}
+              type="button"
               onClick={() => {
                 setFilter(tab.key)
                 syncUrl({ filter: tab.key })
               }}
-              className={`relative px-4 py-3 text-sm font-medium transition-colors ${
-                filter === tab.key
-                  ? 'text-accent-600 dark:text-accent-400'
-                  : 'text-foreground-muted hover:text-foreground'
-              }`}
+              className={`h-full rounded-md px-3 text-xs font-medium transition-colors ${filter === tab.key ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
             >
               {tab.label}
-              {filter === tab.key && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent-500 rounded-t-full" />
-              )}
             </button>
           ))}
         </div>
-        <div className="px-4 py-3">
-          <div className="relative max-w-sm">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              value={search}
-              onChange={e => handleSearchChange(e.target.value)}
-              placeholder="Search by product or reviewer…"
-              className="w-full pl-9 pr-3 h-control-sm bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
-            />
-          </div>
+        <div className="relative min-w-[200px] max-w-sm flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+            placeholder="Search by product or reviewer…"
+            aria-label="Search"
+            className={`${fieldInputCls} pl-9`}
+          />
         </div>
       </div>
 
@@ -268,25 +269,13 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
           ))}
         </div>
       ) : reviews.length === 0 ? (
-        <div className="bg-surface-elevated rounded-xl border border-border-default py-16 flex flex-col items-center gap-3">
-          <svg
-            className="w-14 h-14 text-foreground-muted"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-            />
-          </svg>
-          <p className="font-semibold text-foreground">No reviews found</p>
-          <p className="text-sm text-foreground-muted">
-            {filter === 'pending' ? 'All caught up — no reviews awaiting approval.' : 'No reviews match your filters.'}
-          </p>
-        </div>
+        <EmptyState
+          icon={<MessageSquare className="h-5 w-5" />}
+          title="No reviews found"
+          body={
+            filter === 'pending' ? 'All caught up — no reviews awaiting approval.' : 'No reviews match your filters.'
+          }
+        />
       ) : (
         <div className="space-y-3">
           {reviews.map(review => {
@@ -302,7 +291,7 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                 <div className="px-4 pt-4 pb-3">
                   <div className="flex items-start gap-3">
                     {/* Avatar */}
-                    <div className="w-9 h-9 rounded-full bg-accent-100 dark:bg-accent-900/40 flex items-center justify-center text-sm font-bold text-accent-700 dark:text-accent-300 shrink-0 mt-0.5">
+                    <div className="w-9 h-9 rounded-full bg-accent-500/10 flex items-center justify-center text-sm font-bold text-accent-500 shrink-0 mt-0.5">
                       {initials}
                     </div>
 
@@ -315,41 +304,15 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                         </span>
                         <span className="text-xs text-foreground-muted hidden sm:inline">{review.users.email}</span>
                         {review.is_verified_purchase && (
-                          <span className="inline-flex items-center gap-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs px-1.5 py-0.5 rounded-full font-medium">
-                            <svg
-                              className="w-3 h-3"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth={2.5}
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
+                          <span className={`${badgeCls('green')} inline-flex items-center gap-1`}>
+                            <Check className="h-3 w-3" />
                             Verified
                           </span>
                         )}
                         {review.is_approved ? (
-                          <span className="inline-flex items-center gap-1 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs px-1.5 py-0.5 rounded-full font-medium">
-                            <svg
-                              className="w-3 h-3"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth={2.5}
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                            Approved
-                          </span>
+                          <span className={badgeCls('blue')}>Approved</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs px-1.5 py-0.5 rounded-full font-medium">
-                            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                              <circle cx="12" cy="12" r="2" />
-                              <circle cx="6" cy="12" r="2" />
-                              <circle cx="18" cy="12" r="2" />
-                            </svg>
-                            Pending
-                          </span>
+                          <span className={badgeCls('amber')}>Pending</span>
                         )}
                         <span className="text-xs text-foreground-muted ml-auto">
                           {new Date(review.created_at).toLocaleDateString('en-IN', {
@@ -367,21 +330,9 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                           href={`/products/${review.products.slug}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-accent-600 dark:text-accent-400 hover:underline font-medium truncate max-w-[200px]"
+                          className="inline-flex items-center gap-1 text-xs text-accent-500 hover:underline font-medium truncate max-w-[200px]"
                         >
-                          <svg
-                            className="w-3 h-3 shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                            />
-                          </svg>
+                          <ExternalLink className="h-3 w-3 shrink-0" />
                           {review.products.name}
                         </a>
                       </div>
@@ -397,7 +348,7 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
                         <button
                           type="button"
                           onClick={() => setExpandedId(isExpanded ? null : review.id)}
-                          className="text-xs text-accent-600 dark:text-accent-400 hover:underline mt-0.5"
+                          className="text-xs text-accent-500 hover:underline mt-0.5"
                         >
                           {isExpanded ? 'Show less' : 'Read more'}
                         </button>
@@ -428,29 +379,21 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
 
                 {/* Action bar */}
                 {!review.is_approved && canWrite && (
-                  <div className="flex items-center gap-2 px-4 py-2.5 bg-surface border-t border-border-default">
+                  <div className="flex flex-wrap items-center gap-2 border-t border-border-default bg-surface-secondary/40 px-4 py-2.5">
                     <button
                       type="button"
                       onClick={() => handleApprove(review.id)}
-                      className="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-3.5 h-control-sm rounded-lg font-medium text-sm transition-colors"
+                      className="control-md bg-green-600 font-medium text-white hover:bg-green-700"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
+                      <Check className="h-4 w-4" />
                       Approve
                     </button>
                     <button
                       type="button"
                       onClick={() => handleReject(review.id)}
-                      className="inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-700 px-3 h-control-sm rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
+                      className="control-md border border-red-500/40 font-medium text-red-600 hover:bg-red-500/10 dark:text-red-400"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
+                      <Trash2 className="h-4 w-4" />
                       Delete
                     </button>
                   </div>
@@ -461,61 +404,14 @@ export default function ReviewsClient({ canWrite: canWriteProp = false }: { canW
         </div>
       )}
 
-      {!isLoading && reviews.length > 0 && totalPages > 1 && (
-        <div className="mt-4 px-1 flex items-center justify-between gap-2">
-          <p className="text-xs text-foreground-muted whitespace-nowrap">
-            <span className="font-medium text-foreground">
-              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
-            </span>{' '}
-            of <span className="font-medium text-foreground">{total}</span> reviews
-          </p>
-          <div className="flex items-center gap-1.5">
-            <button
-              disabled={page <= 1}
-              onClick={() => fetchReviews(search, page - 1)}
-              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-            >
-              Prev
-            </button>
-            <span className="text-xs text-foreground-muted whitespace-nowrap">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => fetchReviews(search, page + 1)}
-              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      {!isLoading && <InfiniteFooter shown={reviews.length} control={list} noun="reviews" />}
 
-      {/* Lightbox */}
-      {lightboxUrl &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 p-4"
-            onClick={() => setLightboxUrl(null)}
-          >
-            <img
-              src={lightboxUrl}
-              alt=""
-              className="max-w-full max-h-[90vh] rounded-lg object-contain shadow-2xl"
-              onClick={e => e.stopPropagation()}
-            />
-            <button
-              type="button"
-              onClick={() => setLightboxUrl(null)}
-              className="absolute top-4 right-4 w-9 h-9 flex items-center justify-center bg-black/60 text-white rounded-full hover:bg-black/80 text-xl leading-none"
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>,
-          document.body
+      <Dialog open={!!lightboxUrl} onClose={() => setLightboxUrl(null)} title="Review photo" size="xl" zIndex="z-[300]">
+        {lightboxUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={lightboxUrl} alt="" className="mx-auto max-h-[75vh] max-w-full rounded-lg object-contain" />
         )}
+      </Dialog>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { credentialOwnerId } from '@/lib/integrations/owner'
 import { saveTenantSocialAccount, deleteTenantSocialAccount } from '@/lib/tenant-registry'
 import { getPageInfo } from '@/lib/catalog/meta'
 import { encryptToken } from '@/lib/crypto/token-cipher'
@@ -29,9 +29,7 @@ const Body = z.object({
 async function gate(request: NextRequest) {
   const admin = await requireAdminScope(request, 'campaigns:write')
   if (admin instanceof NextResponse) return { error: admin }
-  const tenant = await resolveTenant()
-  if (!tenant) return { error: NextResponse.json({ error: 'No tenant context' }, { status: 400 }) }
-  return { tenantId: tenant.tenantId }
+  return { tenantId: await credentialOwnerId() }
 }
 
 export async function POST(request: NextRequest) {

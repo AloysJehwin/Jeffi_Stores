@@ -1,12 +1,11 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import { query, queryOne, queryMany, queryCount } from '@/lib/shared/db'
-import Link from 'next/link'
+import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
 import CouponForm from '../../CouponForm'
-import Pagination from '@/components/admin/Pagination'
 import CouponEligibleUsersClient from './CouponEligibleUsersClient'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
+import { Badge, Card, FormPage, PageHeader } from '@/components/admin/kit'
 import { updateCoupon } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -142,139 +141,86 @@ export default async function EditCouponPage({
             ),
           ])
 
-  // Draft system — auto-create on first edit
-  let draftRow = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
+  // Editing ALWAYS goes through a draft. Direct navigation to the edit URL for a
+  // coupon with no draft redirects to the detail page, where the Edit button
+  // creates a draft first. The live coupon is never edited directly.
+  const draftRow = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
     `SELECT coupon_id, fields FROM coupon_drafts WHERE coupon_id = $1`,
     [coupon.id]
   )
-  if (!draftRow) {
-    await query(
-      `INSERT INTO coupon_drafts (coupon_id, fields)
-       SELECT id, to_jsonb(c) - 'id' - 'created_at' - 'updated_at'
-       FROM coupons c WHERE c.id = $1
-       ON CONFLICT (coupon_id) DO NOTHING`,
-      [coupon.id]
-    )
-    draftRow = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
-      `SELECT coupon_id, fields FROM coupon_drafts WHERE coupon_id = $1`,
-      [coupon.id]
-    )
-  }
   const isDraft = !!draftRow
+  if (!isDraft) {
+    redirect(ap(`/admin/coupons/${id}/view${back ? `?back=${encodeURIComponent(backUrl)}` : ''}`, host))
+  }
   const df = (draftRow?.fields || {}) as any
 
   return (
     <MobileEditBlock>
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">
-            {isDraft ? 'Edit Draft' : 'Edit Coupon'}
-          </h1>
-          <p className="text-sm text-foreground-secondary mt-0.5 font-mono">{coupon.code}</p>
-        </div>
-      </div>
-
-      {isDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-              Changes are saved to draft. The live coupon stays unchanged until you publish.
-            </p>
-          </div>
-          <form action={updateCoupon.bind(null, id)}>
-            <input type="hidden" name="intent" value="discard" />
-            <button type="submit" className="text-xs text-amber-600 hover:underline ml-4">
-              Discard draft
-            </button>
-          </form>
-        </div>
-      )}
-
-      <CouponForm
-        action={updateCoupon.bind(null, id)}
-        couponId={id}
-        submitLabel={isDraft ? undefined : 'Save Changes'}
-        isDraft={isDraft}
-        backUrl={backUrl}
-        defaultValues={{
-          code: df.code ?? coupon.code,
-          discount_type: df.discount_type ?? coupon.discount_type,
-          discount_value: df.discount_value ?? coupon.discount_value,
-          min_purchase_amount: df.min_purchase_amount ?? coupon.min_purchase_amount,
-          max_discount_amount: df.max_discount_amount ?? coupon.max_discount_amount,
-          usage_limit: df.usage_limit ?? coupon.usage_limit,
-          usage_limit_per_user: df.usage_limit_per_user ?? coupon.usage_limit_per_user,
-          valid_from: toDatetimeLocal(df.valid_from ?? coupon.valid_from),
-          valid_until: toDatetimeLocal(df.valid_until ?? coupon.valid_until),
-          description: df.description ?? coupon.description,
-          is_active: df.is_active ?? coupon.is_active,
-        }}
-      />
-
-      {/* Eligible Users */}
-      <div className="mt-8 bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">Eligible Users</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              {isPersonal
-                ? 'This coupon is personal — only the user below can redeem it'
-                : isCampaign
-                  ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} received this campaign — only they have this code`
-                  : hasMailerEligible
-                    ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} were granted this coupon via mailer — only they can redeem it`
-                    : `${usersTotal} active app users can redeem this coupon`}
-            </p>
-          </div>
-          {!coupon.auto_generated && !hasMailerEligible && (
-            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-              All Users
-            </span>
-          )}
-          {hasMailerEligible && !coupon.auto_generated && (
-            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              Mailer-assigned
-            </span>
-          )}
-          {coupon.generated_for_campaign && (
-            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-              {coupon.generated_for_campaign}
-            </span>
-          )}
-        </div>
-
-        {/* Interactive remove/add table — client component */}
-        <CouponEligibleUsersClient
-          couponId={coupon.id}
-          initialUsers={eligibleUsers}
-          canRemove={!isPersonal && !isCampaign}
-          canAdd={!isPersonal && !isCampaign}
-          allUsersMode={!isPersonal && !isCampaign && !hasMailerEligible}
+      <FormPage
+        header={
+          <PageHeader
+            back={{ href: ap(backUrl, host), label: 'Coupons' }}
+            title={isDraft ? 'Edit Draft' : 'Edit Coupon'}
+            description={<span className="font-mono">{coupon.code}</span>}
+            badges={isDraft && <Badge tone="amber">Draft</Badge>}
+          />
+        }
+      >
+        <CouponForm
+          action={updateCoupon.bind(null, id)}
+          couponId={id}
+          submitLabel={isDraft ? undefined : 'Save Changes'}
+          isDraft={isDraft}
+          backUrl={backUrl}
+          discardAction={isDraft ? updateCoupon.bind(null, id) : undefined}
+          defaultValues={{
+            code: df.code ?? coupon.code,
+            discount_type: df.discount_type ?? coupon.discount_type,
+            discount_value: df.discount_value ?? coupon.discount_value,
+            min_purchase_amount: df.min_purchase_amount ?? coupon.min_purchase_amount,
+            max_discount_amount: df.max_discount_amount ?? coupon.max_discount_amount,
+            usage_limit: df.usage_limit ?? coupon.usage_limit,
+            usage_limit_per_user: df.usage_limit_per_user ?? coupon.usage_limit_per_user,
+            valid_from: toDatetimeLocal(df.valid_from ?? coupon.valid_from),
+            valid_until: toDatetimeLocal(df.valid_until ?? coupon.valid_until),
+            description: df.description ?? coupon.description,
+            is_active: df.is_active ?? coupon.is_active,
+          }}
         />
 
-        {!isPersonal && usersTotal > USERS_PAGE_SIZE && (
-          <div className="border-t border-border-default px-4 py-2">
-            <Pagination
-              page={usersPage}
-              total={usersTotal}
-              pageSize={USERS_PAGE_SIZE}
-              buildUrl={p => {
-                const sp = new URLSearchParams()
-                if (p > 1) sp.set('usersPage', String(p))
-                return ap(`/admin/coupons/${id}/edit${sp.toString() ? `?${sp.toString()}` : ''}`, host)
-              }}
-            />
-          </div>
-        )}
-      </div>
-    </div>
+        <Card
+          title="Eligible Users"
+          hint={
+            isPersonal
+              ? 'This coupon is personal — only the user below can redeem it'
+              : isCampaign
+                ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} received this campaign — only they have this code`
+                : hasMailerEligible
+                  ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} were granted this coupon via mailer — only they can redeem it`
+                  : `${usersTotal} active app users can redeem this coupon`
+          }
+          action={
+            <div className="flex flex-wrap gap-1.5">
+              {!coupon.auto_generated && !hasMailerEligible && <Badge tone="blue">All Users</Badge>}
+              {hasMailerEligible && !coupon.auto_generated && <Badge tone="amber">Mailer-assigned</Badge>}
+              {coupon.generated_for_campaign && <Badge tone="blue">{coupon.generated_for_campaign}</Badge>}
+            </div>
+          }
+          flush
+        >
+          {/* Interactive remove/add table — client component */}
+          <CouponEligibleUsersClient
+            couponId={coupon.id}
+            initialUsers={eligibleUsers}
+            canRemove={!isPersonal && !isCampaign}
+            canAdd={!isPersonal && !isCampaign}
+            allUsersMode={!isPersonal && !isCampaign && !hasMailerEligible}
+            page={usersPage}
+            total={isPersonal ? eligibleUsers.length : usersTotal}
+          />
+
+        </Card>
+      </FormPage>
     </MobileEditBlock>
   )
 }

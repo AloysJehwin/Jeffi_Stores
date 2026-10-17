@@ -13,7 +13,13 @@ interface Params {
 
 // Live base unit at a scope, or null. Used to detect a real base-unit CHANGE so
 // the block only fires when load-bearing fields differ from what stock was recorded under.
+// Draft-only variants/sub-variants carry non-UUID ids (draft-sv-..., temp-...); they have no
+// live product_units rows, and casting them to uuid would throw.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const liveId = (v: string | null) => !v || UUID_RE.test(v)
+
 async function liveBaseUnit(productId: string, variantId: string | null, subVariantId: string | null) {
+  if (!liveId(variantId) || !liveId(subVariantId)) return null
   return queryOne<{ unit: string; factor: string; dimension: string; qty_step: string; display_label: string | null }>(
     `SELECT unit, factor::text, dimension, qty_step::text, display_label
        FROM product_units
@@ -70,7 +76,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const wasCleared = all.some((u: any) => u._cleared && scopeMatch(u, variantId, subVariantId))
 
   // Only fall back to live product_units if this scope was never touched in the draft
-  if (units.length === 0 && !wasCleared) {
+  if (units.length === 0 && !wasCleared && liveId(variantId) && liveId(subVariantId)) {
     const liveUnits = await queryMany(
       `SELECT * FROM product_units WHERE product_id = $1
        AND ($2::uuid IS NULL OR variant_id = $2::uuid)

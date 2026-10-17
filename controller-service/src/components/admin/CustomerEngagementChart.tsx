@@ -27,7 +27,7 @@ export default function CustomerEngagementChart({
   const total = rows.reduce((s, d) => s + d.value, 0)
 
   return (
-    <div className="bg-surface-elevated border border-border-default rounded-lg shadow-sm p-4 h-full flex flex-col overflow-hidden">
+    <div className="bg-surface-elevated border border-border-default rounded-xl p-4 h-full min-h-[220px] flex flex-col overflow-hidden">
       <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
         <p className="text-sm font-semibold text-foreground">Customer Engagement</p>
         <AdminSelect xs value={view} options={VIEWS} onChange={setView} className="w-32" />

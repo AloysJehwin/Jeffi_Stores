@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { LABEL_SIZES, LabelSpec, LabelSize } from '@/lib/documents/label-sizes'
 import { round2 } from '@/lib/catalog/gst'
 import CopySku from '@/components/ui/CopySku'
 import { useToast } from '@/contexts/ToastContext'
+import { Download } from 'lucide-react'
+import { Dialog } from '@/components/admin/kit'
+import Toggle from '@/components/ui/Toggle'
 
 interface LabelEntry {
   id: string
@@ -686,48 +688,60 @@ export default function ProductLabelModal({ product, onClose }: Props) {
 
   const totalLabels = selected.size * copies
 
-  if (typeof document === 'undefined') return null
+  const sizeToggle = (
+    <div className="flex border border-border-default rounded-lg overflow-hidden">
+      {(['sm', 'md', 'lg'] as const).map((s, i) => (
+        <button
+          key={s}
+          type="button"
+          onClick={() => setModalSize(s)}
+          title={s === 'sm' ? 'Compact' : s === 'md' ? 'Normal' : 'Wide'}
+          className={`px-2 h-6 text-[10px] font-medium transition-colors ${i > 0 ? 'border-l border-border-default' : ''} ${
+            modalSize === s ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:bg-surface-secondary'
+          }`}
+        >
+          {s === 'sm' ? 'S' : s === 'md' ? 'M' : 'L'}
+        </button>
+      ))}
+    </div>
+  )
 
-  return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div
-        className={`relative bg-surface-elevated w-full sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] flex flex-col transition-all ${
-          modalSize === 'sm' ? 'sm:max-w-lg' : modalSize === 'lg' ? 'sm:max-w-4xl' : 'sm:max-w-2xl'
-        }`}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between px-5 pt-5 pb-4 border-b border-border-default shrink-0">
-          <div className="min-w-0 pr-4">
-            <h2 className="text-base font-bold text-foreground leading-tight">Print Labels</h2>
-            <p className="text-sm text-foreground-muted truncate mt-0.5">{product.name}</p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex border border-border-default rounded-lg overflow-hidden">
-              {(['sm', 'md', 'lg'] as const).map((s, i) => (
-                <button
-                  key={s}
-                  onClick={() => setModalSize(s)}
-                  title={s === 'sm' ? 'Compact' : s === 'md' ? 'Normal' : 'Wide'}
-                  className={`px-2 py-1 text-[10px] font-medium transition-colors ${i > 0 ? 'border-l border-border-default' : ''} ${
-                    modalSize === s ? 'bg-orange-500 text-white' : 'text-foreground-muted hover:bg-surface-secondary'
-                  }`}
-                >
-                  {s === 'sm' ? 'S' : s === 'md' ? 'M' : 'L'}
-                </button>
-              ))}
-            </div>
+  return (
+    <Dialog
+      open={!!product}
+      onClose={onClose}
+      zIndex="z-[300]"
+      size={modalSize === 'sm' ? 'md' : modalSize === 'lg' ? 'xl' : 'lg'}
+      title={
+        <span className="flex items-center gap-3">
+          Print Labels
+          {sizeToggle}
+        </span>
+      }
+      description={product.name}
+      footer={
+        <div className="flex w-full items-center justify-between gap-3">
+          <p className="text-xs text-foreground-muted">
+            {selected.size} item{selected.size !== 1 ? 's' : ''} · {totalLabels} label{totalLabels !== 1 ? 's' : ''}
+          </p>
+          <div className="flex gap-2">
+            <button type="button" onClick={onClose} className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary">
+              Cancel
+            </button>
             <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+              type="button"
+              onClick={handleDownload}
+              disabled={selected.size === 0 || downloading || loading}
+              className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <Download className="w-4 h-4" />
+              {downloading ? 'Generating…' : 'Download PDF'}
             </button>
           </div>
         </div>
-
+      }
+    >
+      <div className="-m-5">
         <div className="overflow-y-auto flex-1 p-5 space-y-5">
           <div>
             <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Label Size</p>
@@ -738,8 +752,8 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                   onClick={() => setSize(s.size)}
                   className={`flex flex-col items-center gap-1.5 py-2 px-1 rounded-lg border-2 transition-all text-center ${
                     size === s.size
-                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
-                      : 'border-border-default hover:border-orange-300 bg-surface-secondary'
+                      ? 'border-accent-500 bg-accent-500/5'
+                      : 'border-border-default hover:border-accent-300 bg-surface-secondary'
                   }`}
                 >
                   {(() => {
@@ -750,13 +764,13 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                       <div className="flex items-center justify-center h-7 w-full">
                         <div
                           style={{ width: rW, height: rH }}
-                          className={`border-2 rounded-sm ${size === s.size ? 'border-orange-500 bg-orange-100 dark:bg-orange-800/30' : 'border-border-strong'}`}
+                          className={`border-2 rounded-sm ${size === s.size ? 'border-accent-500 bg-accent-500/15' : 'border-border-strong'}`}
                         />
                       </div>
                     )
                   })()}
                   <span
-                    className={`text-[9px] font-semibold leading-tight ${size === s.size ? 'text-orange-600 dark:text-orange-400' : 'text-foreground-muted'}`}
+                    className={`text-[9px] font-semibold leading-tight ${size === s.size ? 'text-accent-500' : 'text-foreground-muted'}`}
                   >
                     {s.label}
                   </span>
@@ -775,8 +789,8 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                     onClick={() => setOutputMode(m)}
                     className={`flex-1 h-control-sm px-2 rounded-lg border text-xs font-medium transition-colors ${
                       outputMode === m
-                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
-                        : 'border-border-default text-foreground-secondary hover:border-orange-300'
+                        ? 'border-accent-500 bg-accent-500/5 text-accent-500'
+                        : 'border-border-default text-foreground-secondary hover:border-accent-300'
                     }`}
                   >
                     {m === 'thermal' ? 'Thermal' : 'A4 Sheet'}
@@ -801,17 +815,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
                 Print Price
               </p>
-              <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
-                <div
-                  onClick={() => setShowPrice(v => !v)}
-                  className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${showPrice ? 'bg-orange-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
-                >
-                  <div
-                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm border border-gray-300 dark:border-zinc-500 transition-transform ${showPrice ? 'translate-x-4 border-orange-300' : 'translate-x-0.5'}`}
-                  />
-                </div>
-                <span className="text-xs text-foreground-secondary">{showPrice ? 'On' : 'Off'}</span>
-              </label>
+              <Toggle id="label-show-price" size="sm" checked={showPrice} onChange={setShowPrice} label={showPrice ? 'On' : 'Off'} />
             </div>
           </div>
 
@@ -846,7 +850,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                       onClick={() => setPreviewId(e.id)}
                       className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
                         previewId === e.id
-                          ? 'bg-orange-50 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700'
+                          ? 'bg-accent-500/5 border border-accent-500/40'
                           : 'hover:bg-surface-secondary border border-transparent'
                       }`}
                     >
@@ -855,7 +859,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                         checked={selected.has(e.id)}
                         onChange={() => toggleEntry(e.id)}
                         onClick={ev => ev.stopPropagation()}
-                        className="w-3.5 h-3.5 flex-shrink-0 accent-orange-500"
+                        className="w-3.5 h-3.5 flex-shrink-0 accent-accent-500"
                       />
                       <div className="flex-1 min-w-0">
                         {e.variant_name ? (
@@ -883,7 +887,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide self-start">
                 Preview
               </p>
-              <div className="bg-[#f0f0f0] dark:bg-zinc-800 rounded-xl p-2 flex items-center justify-center min-w-[140px] min-h-[100px]">
+              <div className="bg-surface-secondary rounded-xl p-2 flex items-center justify-center min-w-[140px] min-h-[100px]">
                 {spec && <LabelPreview spec={spec} entry={previewEntry} scale={previewScale} showPrice={showPrice} />}
               </div>
               <p className="text-[10px] text-foreground-muted text-center">
@@ -898,42 +902,13 @@ export default function ProductLabelModal({ product, onClose }: Props) {
           </div>
 
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2 text-xs text-red-700 dark:text-red-400">
+            <div className="bg-red-500/5 border border-red-500/40 rounded-lg px-3 py-2 text-xs text-red-700 dark:text-red-400">
               {error}
             </div>
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-border-default shrink-0 flex items-center justify-between gap-3">
-          <p className="text-xs text-foreground-muted">
-            {selected.size} item{selected.size !== 1 ? 's' : ''} · {totalLabels} label{totalLabels !== 1 ? 's' : ''}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 h-control text-sm font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDownload}
-              disabled={selected.size === 0 || downloading || loading}
-              className="flex items-center gap-2 px-4 h-control bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors text-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              {downloading ? 'Generating…' : 'Download PDF'}
-            </button>
-          </div>
-        </div>
       </div>
-    </div>,
-    document.body
+    </Dialog>
   )
 }

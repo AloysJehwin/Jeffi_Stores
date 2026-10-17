@@ -1,6 +1,6 @@
 'use client'
 
-import { createPortal } from 'react-dom'
+import { Dialog } from '@/components/admin/kit'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 
 import { useState } from 'react'
@@ -50,9 +50,7 @@ export default function DormantCard({ items }: { items: DormantEntry[] }) {
     <>
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">
-            Dormant — Top by LTV
-          </h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Dormant — Top by LTV</h2>
           <div className="flex items-center gap-3">
             {items.length > 0 && (
               <button
@@ -83,36 +81,11 @@ export default function DormantCard({ items }: { items: DormantEntry[] }) {
         )}
       </div>
 
-      {open &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-            onClick={() => setOpen(false)}
-          >
-            <div
-              className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-[95vw] max-w-[1400px] h-[90vh] flex flex-col"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-border-default">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Dormant — Top by LTV</h2>
-                  <p className="text-xs text-foreground-muted mt-0.5">{items.length} high-value dormant customers</p>
-                </div>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-                  aria-label="Close"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="flex flex-1 min-h-0 divide-x divide-border-default">
-                <div className={`flex flex-col bg-surface-secondary/30 ${canMail ? 'w-2/5 shrink-0' : 'flex-1'}`}>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Dormant — Top by LTV" description={<>{items.length} high-value dormant customers</>} size="full" zIndex="z-[300]">
+              <div className="flex flex-1 min-h-0 flex-col overflow-y-auto divide-y divide-border-default md:flex-row md:overflow-hidden md:divide-y-0 md:divide-x">
+                <div className={`flex flex-col bg-surface-secondary/30 ${canMail ? 'shrink-0 md:w-2/5' : 'flex-1'}`}>
                   <div className="px-6 pt-4 pb-2 shrink-0 border-b border-border-default">
-                    <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Customers</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Customers</h3>
                   </div>
                   <div className="overflow-y-auto flex-1 px-6 py-4 divide-y divide-border-default">
                     {items.map(c => (
@@ -123,9 +96,7 @@ export default function DormantCard({ items }: { items: DormantEntry[] }) {
                 {canMail && (
                   <div className="flex flex-col flex-1 min-w-0">
                     <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
-                      <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">
-                        Send message
-                      </h3>
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Send message</h3>
                       <Link
                         href={ap('/admin/customers?segment=dormant')}
                         className="text-xs text-accent-500 hover:text-accent-600 font-medium"
@@ -145,10 +116,7 @@ export default function DormantCard({ items }: { items: DormantEntry[] }) {
                   </div>
                 )}
               </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      </Dialog>
     </>
   )
 }

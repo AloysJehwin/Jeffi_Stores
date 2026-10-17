@@ -10,6 +10,7 @@ vi.mock('@/contexts/AdminScopesContext', () => ({
 }))
 
 import { ConfirmProvider } from '@/contexts/ConfirmContext'
+import { ToastProvider } from '@/contexts/ToastContext'
 import { AdsManageProvider } from '@/app/(admin)/admin/google-ads/_components/ManageContext'
 import { NewCampaignButton } from '@/app/(admin)/admin/google-ads/_components/CampaignWizard'
 import { CampaignRowActions, SearchTermRowActions } from '@/app/(admin)/admin/google-ads/_components/ManageActions'
@@ -45,11 +46,13 @@ afterEach(() => {
 
 const wrap = (ui: React.ReactNode, onChanged = vi.fn()) =>
   render(
-    <ConfirmProvider>
-      <AdsManageProvider currency="INR" onChanged={onChanged}>
-        {ui}
-      </AdsManageProvider>
-    </ConfirmProvider>
+    <ToastProvider>
+      <ConfirmProvider>
+        <AdsManageProvider currency="INR" onChanged={onChanged}>
+          {ui}
+        </AdsManageProvider>
+      </ConfirmProvider>
+    </ToastProvider>
   )
 
 describe('New campaign wizard', () => {
@@ -71,7 +74,12 @@ describe('New campaign wizard', () => {
       }
       return ok({})
     })
-    render(<NewCampaignButton onCreated={onCreated} />)
+    // Check and create results are toasts.
+    render(
+      <ToastProvider>
+        <NewCampaignButton onCreated={onCreated} />
+      </ToastProvider>
+    )
     fireEvent.click(screen.getByLabelText('New campaign'))
 
     // Budget suggested from the last 30 days of revenue.

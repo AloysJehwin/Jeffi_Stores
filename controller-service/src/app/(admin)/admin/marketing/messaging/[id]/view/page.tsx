@@ -1,11 +1,12 @@
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
-import Pagination from '@/components/admin/Pagination'
+import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import AutoRefresh from '@/components/admin/AutoRefresh'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
+import { TONE_CLS } from '@/components/admin/kit/tones'
+import { Card, DetailHeader, Field, Fields, Kpi, KpiGrid, PageBody, badgeCls } from '@/components/admin/kit'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -18,17 +19,22 @@ const TEMPLATE_LABELS: Record<string, string> = {
   custom: 'Custom',
 }
 
-const channelLabel = (c: { template_key: string; channels?: Record<string, { slug: string }> | null }, labels: Record<string, string>) =>
+const channelLabel = (
+  c: { template_key: string; channels?: Record<string, { slug: string }> | null },
+  labels: Record<string, string>
+) =>
   c.template_key === 'library'
-    ? Object.entries(c.channels ?? {}).map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`).join(' · ') || 'No channels'
+    ? Object.entries(c.channels ?? {})
+        .map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`)
+        .join(' · ') || 'No channels'
     : labels[c.template_key] || c.template_key
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  scheduled: 'bg-blue-100 text-blue-700',
-  sending: 'bg-yellow-100 text-yellow-700',
-  sent: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-600',
+  draft: TONE_CLS.muted,
+  scheduled: TONE_CLS.blue,
+  sending: TONE_CLS.amber,
+  sent: TONE_CLS.green,
+  failed: TONE_CLS.red,
 }
 
 interface Campaign {
@@ -83,42 +89,41 @@ export default async function CampaignDetailPage({
     queryCount('SELECT COUNT(*) FROM email_campaign_logs WHERE campaign_id = $1', [id]),
   ])
 
-  const buildUrl = (p: number) => ap(`/admin/marketing/messaging/${id}${p > 1 ? `?logPage=${p}` : ''}`, host)
 
   const sentCount = logs.filter(l => l.status === 'sent').length
   const failedCount = logs.filter(l => l.status === 'failed').length
   // SMS/WhatsApp outcomes land after the send — keep refreshing for 10 minutes.
-  const awaiting = campaign.status === 'sending' || logs.some(l =>
-    l.status === 'sent' && l.channel !== 'email' && Date.now() - new Date(l.sent_at).getTime() < 600_000)
+  const awaiting =
+    campaign.status === 'sending' ||
+    logs.some(l => l.status === 'sent' && l.channel !== 'email' && Date.now() - new Date(l.sent_at).getTime() < 600_000)
 
   return (
-    <div className="p-4 sm:p-6">
+    <PageBody>
       <AutoRefresh active={awaiting} />
-      <div className="flex items-center gap-3 mb-6">
-        <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </Link>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground truncate">{campaign.title}</h1>
-          <p className="text-sm text-foreground-secondary mt-0.5">{campaign.subject}</p>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
+      <DetailHeader
+        back={{ href: ap(backUrl, host), label: 'Messaging' }}
+        title={campaign.title}
+        subtitle={campaign.subject}
+        status={
           <span
-            className={`text-xs px-2.5 py-1 rounded-full font-medium capitalize ${STATUS_STYLES[campaign.status] || 'bg-gray-100 text-gray-600'}`}
+            className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium capitalize ${STATUS_STYLES[campaign.status] || 'bg-surface-secondary text-foreground-muted'}`}
           >
             {campaign.status}
           </span>
-          {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+        }
+        actions={
+          (campaign.status === 'draft' || campaign.status === 'scheduled') && (
             <DispatchCampaignButton id={campaign.id} />
-          )}
-        </div>
-      </div>
+          )
+        }
+      />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <KpiGrid>
         {[
-          { label: campaign.template_key === 'library' ? 'Channels' : 'Template', value: channelLabel(campaign, TEMPLATE_LABELS) },
+          {
+            label: campaign.template_key === 'library' ? 'Channels' : 'Template',
+            value: channelLabel(campaign, TEMPLATE_LABELS),
+          },
           { label: 'Audience', value: campaign.audience_type.replace(/_/g, ' ') },
           { label: 'Recipients', value: campaign.recipient_count ?? '—' },
           {
@@ -138,81 +143,86 @@ export default async function CampaignDetailPage({
                 : new Date(campaign.created_at).toLocaleDateString('en-IN'),
           },
         ].map(stat => (
-          <div key={stat.label} className="bg-surface-elevated rounded-lg border border-border-default p-4">
-            <p className="text-xs text-foreground-secondary">{stat.label}</p>
-            <p className="font-semibold text-foreground mt-1 capitalize">{String(stat.value)}</p>
-          </div>
+          <Kpi key={stat.label} label={stat.label} value={String(stat.value)} />
         ))}
-      </div>
+      </KpiGrid>
 
       {Object.keys(campaign.template_data).length > 0 && (
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-5 mb-6">
-          <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wider mb-3">
-            Template Data
-          </h2>
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Card title="Template data">
+          <Fields>
             {Object.entries(campaign.template_data).map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-xs text-foreground-muted capitalize">{k.replace(/([A-Z])/g, ' $1')}</dt>
-                <dd className="text-sm text-foreground mt-0.5 break-all">{v}</dd>
-              </div>
+              <Field
+                key={k}
+                label={<span className="capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>}
+                value={<span className="break-all">{v}</span>}
+              />
             ))}
-          </dl>
-        </div>
+          </Fields>
+        </Card>
       )}
 
       {logs.length > 0 && (
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-foreground">Delivery Log</h2>
-            <div className="flex gap-4 text-sm">
-              <span className="text-green-600 font-medium">{sentCount} sent</span>
-              {failedCount > 0 && <span className="text-red-500 font-medium">{failedCount} failed</span>}
-            </div>
-          </div>
-          <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
+          <Card
+            title="Delivery log"
+            flush
+            action={
+              <div className="flex gap-4 text-sm">
+                <span className="font-medium text-green-600 dark:text-green-400">{sentCount} sent</span>
+                {failedCount > 0 && <span className="font-medium text-red-500">{failedCount} failed</span>}
+              </div>
+            }
+          >
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-surface-secondary">
-                  <tr>
+                <thead>
+                  <tr className="border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
                     {['Email', 'Status', 'Sent At', 'Error'].map(h => (
-                      <th
-                        key={h}
-                        className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider"
-                      >
+                      <th key={h} className="px-5 py-2.5 text-left font-medium">
                         {h}
                       </th>
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border-default">
-                  {logs.map((l, i) => (
-                    <tr key={i} className="hover:bg-surface-secondary/50 transition-colors">
-                      <td className="px-4 py-2.5 text-foreground-secondary">{l.to_address || l.email}{l.channel !== 'email' && <span className="ml-1.5 text-[10px] uppercase text-foreground-muted">{l.channel}</span>}</td>
-                      <td className="px-4 py-2.5">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${l.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}
-                        >
-                          {l.status}
-                        </span>
+                <ServerPagedItems
+                  wrap="tbody"
+                  param="logPage"
+                  page={logPage}
+                  total={logTotal}
+                  noun="deliveries"
+                  items={logs.map((l, i) => ({
+                    key: String((logPage - 1) * logPageSize + i),
+                    node: (
+                    <tr
+                      key={i}
+                      className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40"
+                    >
+                      <td className="px-5 py-2.5 text-foreground-secondary">
+                        {l.to_address || l.email}
+                        {l.channel !== 'email' && (
+                          <span className="ml-1.5 text-[10px] uppercase text-foreground-muted">{l.channel}</span>
+                        )}
                       </td>
-                      <td className="px-4 py-2.5 text-foreground-secondary text-xs">
+                      <td className="px-5 py-2.5">
+                        <span className={badgeCls(l.status === 'sent' ? 'green' : 'red')}>{l.status}</span>
+                      </td>
+                      <td className="px-5 py-2.5 text-xs text-foreground-secondary">
                         {new Date(l.sent_at).toLocaleString('en-IN', {
                           dateStyle: 'short',
                           timeStyle: 'short',
                           timeZone: 'Asia/Kolkata',
                         })}
                       </td>
-                      <td className="px-4 py-2.5 text-red-500 text-xs">{l.error || '—'}</td>
+                      <td className="px-5 py-2.5 text-xs text-red-500">{l.error || '—'}</td>
                     </tr>
-                  ))}
-                </tbody>
+                    ),
+                  }))}
+                />
               </table>
             </div>
-          </div>
-          <Pagination page={logPage} total={logTotal} pageSize={logPageSize} buildUrl={buildUrl} />
+          </Card>
         </div>
       )}
-    </div>
+    </PageBody>
   )
 }

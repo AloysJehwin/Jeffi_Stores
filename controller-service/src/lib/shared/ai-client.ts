@@ -28,6 +28,10 @@ export interface AiChatRequest {
   noCache?: boolean
   /** Cache partition. Defaults to the current tenant; background jobs must pass it explicitly. */
   cacheNamespace?: string
+  /** Billing feature key (lib/ai/billing). Omit to log under 'text'. */
+  feature?: string
+  /** Set false to skip usage logging + wallet charge (health checks, probes). Default true. */
+  billing?: boolean
 }
 
 export interface AiToolCall {
@@ -43,6 +47,8 @@ export interface AiChatResponse {
   latencyMs: number
   fallbackUsed: boolean
   cache?: 'kv' | 'semantic' | null
+  /** Gateway usage block (ai-platform/gateway). May be absent until stream A lands; treat as zero. */
+  usage?: { promptTokens?: number; completionTokens?: number; costInr?: number }
 }
 
 export class AiClientError extends Error {
@@ -178,11 +184,50 @@ export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
         return 'platform'
       }
     })())
-  return withFallback(
+  const res = await withFallback(
     'chat',
-    () => gatewayPost('/v1/chat', { ...req, cacheNamespace }, '', true) as Promise<AiChatResponse>,
+    async () => {
+      const { getAiRouting } = await import('@/lib/providers/policy')
+      const providers = (await getAiRouting().catch(() => ({}) as { text?: string[] })).text
+      return gatewayPost('/v1/chat', { ...req, cacheNamespace, providers }, '', true) as Promise<AiChatResponse>
+    },
     ms => directChat(req, ms),
   )
+  if (req.billing !== false) {
+    void logChatUsage(req, res).catch(err => console.warn('[ai-client] usage log failed:', (err as Error).message))
+  }
+  return res
+}
+
+/** Fire-and-forget: record and charge for a completed chat call. Text charging runs AFTER the
+ *  call because the token counts are only known then; a shortfall still returns the result and
+ *  logs the row with status 'unpaid'. Opt out with `billing: false`. */
+async function logChatUsage(req: AiChatRequest, res: AiChatResponse): Promise<void> {
+  const { recordUsage } = await import('@/lib/ai/billing')
+  const pt = Number(res.usage?.promptTokens ?? 0)
+  const ct = Number(res.usage?.completionTokens ?? 0)
+  const units = [
+    { type: 'token_1k_in' as const, qty: pt / 1000 },
+    { type: 'token_1k_out' as const, qty: ct / 1000 },
+  ]
+  const costInr = Number(res.usage?.costInr ?? 0)
+  try {
+    await recordUsage({
+      feature: req.feature ?? 'text',
+      capability: 'text',
+      provider: res.provider || 'ollama',
+      model: res.model || '',
+      units,
+      costInr,
+      latencyMs: res.latencyMs,
+      cache: res.cache ?? null,
+    })
+  } catch (err) {
+    // AiWalletError already left an 'unpaid' row; the call succeeded, so swallow.
+    const { AiWalletError } = await import('@/lib/ai/billing')
+    if (!(err instanceof AiWalletError)) throw err
+    console.warn('[ai-client] text call succeeded but wallet could not pay; usage marked unpaid')
+  }
 }
 
 export function getAiProvider(): 'openai' | 'ollama' {
@@ -190,12 +235,41 @@ export function getAiProvider(): 'openai' | 'ollama' {
 }
 
 /** Embeddings via the gateway (used by RAG). Returns one vector per input. */
-export async function aiEmbed(input: string | string[], model?: string): Promise<number[][]> {
-  return withFallback(
+export async function aiEmbed(
+  input: string | string[],
+  model?: string,
+  opts: { feature?: string; billing?: boolean } = {}
+): Promise<number[][]> {
+  let usage: AiChatResponse['usage']
+  let usedModel = model || ''
+  const started = Date.now()
+  const out = await withFallback(
     'embed',
-    async () => (await gatewayPost('/v1/embed', { input, model }, 'embed ', false)).embeddings as number[][],
+    async () => {
+      const r = await gatewayPost('/v1/embed', { input, model }, 'embed ', false)
+      usage = r.usage
+      usedModel = r.model || usedModel
+      return r.embeddings as number[][]
+    },
     ms => directEmbed(input, model, ms),
   )
+  if (opts.billing !== false) {
+    void (async () => {
+      const { recordUsage, AiWalletError } = await import('@/lib/ai/billing')
+      await recordUsage({
+        feature: opts.feature ?? 'embed',
+        capability: 'embed',
+        provider: 'ollama',
+        model: usedModel,
+        units: [{ type: 'token_1k_in', qty: Number(usage?.promptTokens ?? 0) / 1000 }],
+        costInr: Number(usage?.costInr ?? 0),
+        latencyMs: Date.now() - started,
+      }).catch(err => {
+        if (!(err instanceof AiWalletError)) throw err
+      })
+    })().catch(err => console.warn('[ai-client] embed usage log failed:', (err as Error).message))
+  }
+  return out
 }
 
 export interface AiVisionResult {

@@ -33,19 +33,19 @@ const DEFAULT_OPTS: JobsOptions = {
   removeOnFail: { age: 86_400 },
 }
 
-export type JobKind = 'chat' | 'embed' | 'vision'
+export type JobKind = 'chat' | 'embed' | 'vision' | 'image'
 export interface JobData { kind: JobKind; payload: unknown }
 
 /**
  * Enqueue a job and resolve with its result when the worker finishes. Rejects if the job
  * exhausts its retries, or after jobWaitTimeoutMs (the job itself keeps running).
  */
-export async function runJob<T>(data: JobData): Promise<T> {
+export async function runJob<T>(data: JobData, opts: JobsOptions = {}): Promise<T> {
   await events.waitUntilReady()
   const jobId = randomUUID()
   const result = waiters.wait<T>(jobId, CONFIG.jobWaitTimeoutMs)
   try {
-    await queue.add(data.kind, data, { ...DEFAULT_OPTS, jobId })
+    await queue.add(data.kind, data, { ...DEFAULT_OPTS, ...opts, jobId })
   } catch (err) {
     waiters.cancel(jobId, err as Error)
   }

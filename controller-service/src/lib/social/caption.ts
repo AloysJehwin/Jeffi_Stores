@@ -33,6 +33,7 @@ export async function generateSocialCaption(opts: {
     if (!(await currentTenantPlanGate(AI_ADMIN_SCOPE)).allowed) return ''
     const { storeDescriptorForPrompt } = await import('@/lib/catalog/brand')
     const r = await aiChat({
+      feature: 'social_caption',
       modelHint: 'email',
       jsonMode: true,
       temperature: 0.4,

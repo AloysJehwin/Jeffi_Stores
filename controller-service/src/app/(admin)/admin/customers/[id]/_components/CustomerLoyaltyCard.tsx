@@ -100,7 +100,7 @@ export default function CustomerLoyaltyCard({ customerId }: { customerId: string
 
   return (
     <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-      <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Loyalty</h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Loyalty</h2>
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-2xl font-bold text-foreground">{view.account.points.toLocaleString('en-IN')}</p>
         <span className="text-sm font-medium text-foreground-secondary">{view.account.tierName}</span>

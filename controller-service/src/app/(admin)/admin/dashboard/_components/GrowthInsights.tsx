@@ -3,25 +3,15 @@
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
 import type { DashboardAnalytics } from '@/lib/queries'
-import { DonutSplit, RankedBars } from '@/components/admin/dashboard/Charts'
-import {
-  SectionCard,
-  SectionHeader,
-  CompactStat,
-  MiniStat,
-  HourBars,
-  rs,
-  rsCompact,
-  pctStr,
-  numStr,
-  delta,
-} from '@/components/admin/dashboard/Primitives'
+import { Section, DonutSplit, RankedBars, HourBars, CompactStat, MiniStat, rs, rsCompact, pctStr, numStr, delta } from '@/components/admin/kit'
+import { SectionLink } from './SectionLink'
 
 const SOURCE_LABELS: Record<string, string> = {
   online: 'Online store',
   offline: 'Counter / offline',
   pos: 'Point of sale',
   business: 'Business portal',
+  amazon: 'Amazon',
 }
 const sourceLabel = (s: string) => SOURCE_LABELS[s] || s.replace(/_/g, ' ')
 
@@ -52,14 +42,9 @@ export default function GrowthInsights({ data, host }: { data: DashboardAnalytic
   const shippingRecovery = cash.shippingCost > 0 ? Math.round((cash.shippingCharged / cash.shippingCost) * 100) : null
 
   return (
-    <div className="space-y-3 sm:space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
-        <SectionCard>
-          <SectionHeader
-            title="Acquisition & Traffic"
-            actionLabel={canTraffic ? 'Traffic' : undefined}
-            href={canTraffic ? ap('/admin/traffic', host) : undefined}
-          />
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <Section title="Acquisition & Traffic" action={<SectionLink href={canTraffic ? ap('/admin/traffic', host) : undefined} label={canTraffic ? 'Traffic' : undefined} />}>
           <div className="grid grid-cols-2 gap-2">
             <CompactStat
               label="Sessions"
@@ -100,14 +85,9 @@ export default function GrowthInsights({ data, host }: { data: DashboardAnalytic
               href={canCustomers ? ap('/admin/customers', host) : undefined}
             />
           </div>
-        </SectionCard>
+        </Section>
 
-        <SectionCard>
-          <SectionHeader
-            title="Promotions"
-            actionLabel={canCoupons ? 'Coupons' : undefined}
-            href={canCoupons ? ap('/admin/coupons', host) : undefined}
-          />
+        <Section title="Promotions" action={<SectionLink href={canCoupons ? ap('/admin/coupons', host) : undefined} label={canCoupons ? 'Coupons' : undefined} />}>
           <div className="space-y-0.5">
             <MiniStat
               label="Discounts given"
@@ -134,14 +114,9 @@ export default function GrowthInsights({ data, host }: { data: DashboardAnalytic
               />
             </div>
           )}
-        </SectionCard>
+        </Section>
 
-        <SectionCard>
-          <SectionHeader
-            title="Carts"
-            actionLabel={canCustomers ? 'Customers' : undefined}
-            href={canCustomers ? ap('/admin/customers', host) : undefined}
-          />
+        <Section title="Carts" action={<SectionLink href={canCustomers ? ap('/admin/customers', host) : undefined} label={canCustomers ? 'Customers' : undefined} />}>
           <div className="grid grid-cols-2 gap-2">
             <CompactStat label="Active carts" value={numStr(k.activeCarts)} sub={rsCompact(k.cartValue)} />
             <CompactStat
@@ -163,14 +138,9 @@ export default function GrowthInsights({ data, host }: { data: DashboardAnalytic
               sub="paid orders vs open carts"
             />
           </div>
-        </SectionCard>
+        </Section>
 
-        <SectionCard>
-          <SectionHeader
-            title="Customer Health"
-            actionLabel={canCrm ? 'CRM' : undefined}
-            href={canCrm ? ap('/admin/crm', host) : undefined}
-          />
+        <Section title="Customer Health" action={<SectionLink href={canCrm ? ap('/admin/crm', host) : undefined} label={canCrm ? 'CRM' : undefined} />}>
           {healthTotal === 0 ? (
             <p className="text-xs text-foreground-muted py-4 text-center">
               Health scores appear after the first nightly computation.
@@ -187,12 +157,11 @@ export default function GrowthInsights({ data, host }: { data: DashboardAnalytic
               ]}
             />
           )}
-        </SectionCard>
+        </Section>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
-        <SectionCard>
-          <SectionHeader title="Peak Hours" actionLabel="Orders" href={ap('/admin/orders', host)} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Section title="Peak Hours" action={<SectionLink href={ap('/admin/orders', host)} label="Orders" />}>
           <div className="space-y-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted mb-1.5">
@@ -207,10 +176,9 @@ export default function GrowthInsights({ data, host }: { data: DashboardAnalytic
               <HourBars counts={trafficByHour} tone="sky" unit="visits" />
             </div>
           </div>
-        </SectionCard>
+        </Section>
 
-        <SectionCard>
-          <SectionHeader title="Channels & Regions" />
+        <Section title="Channels & Regions">
           <div className="space-y-0.5">
             {bySource.length === 0 && <p className="text-xs text-foreground-muted py-2">No orders in this range.</p>}
             {bySource.map(s => (
@@ -232,14 +200,9 @@ export default function GrowthInsights({ data, host }: { data: DashboardAnalytic
               />
             </div>
           )}
-        </SectionCard>
+        </Section>
 
-        <SectionCard>
-          <SectionHeader
-            title={canFinancial ? 'Cash & Costs' : 'Pipeline'}
-            actionLabel={canFinancial ? 'Financial' : undefined}
-            href={canFinancial ? ap('/admin/financial', host) : undefined}
-          />
+        <Section title={canFinancial ? 'Cash & Costs' : 'Pipeline'} action={<SectionLink href={canFinancial ? ap('/admin/financial', host) : undefined} label={canFinancial ? 'Financial' : undefined} />}>
           <div className="space-y-0.5">
             {canFinancial && (
               <>
@@ -268,7 +231,7 @@ export default function GrowthInsights({ data, host }: { data: DashboardAnalytic
                   label="Overdue bills"
                   value={numStr(a.overdueBills)}
                   sub={a.overdueBills ? rs(cash.overdueBillsAmount) : undefined}
-                  tone={a.overdueBills ? 'text-red-500 dark:text-red-400' : undefined}
+                  tone={a.overdueBills ? 'text-red-500' : undefined}
                   href={ap('/admin/financial', host)}
                 />
               </>
@@ -298,7 +261,7 @@ export default function GrowthInsights({ data, host }: { data: DashboardAnalytic
               />
             )}
           </div>
-        </SectionCard>
+        </Section>
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { InfiniteFooter, PageHeader, TONE_CLS, fetchJson, useActionToast, useInfiniteList } from '@/components/admin/kit'
 import { useSearchParams, useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
@@ -17,13 +18,13 @@ interface Order {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  shipped: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
-  delivered: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  granted: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  pending: TONE_CLS.amber,
+  confirmed: TONE_CLS.blue,
+  processing: TONE_CLS.blue,
+  shipped: TONE_CLS.blue,
+  delivered: TONE_CLS.green,
+  granted: TONE_CLS.green,
+  cancelled: TONE_CLS.red,
 }
 
 const STATUS_OPTIONS = [
@@ -40,19 +41,19 @@ function statusLabel(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-export default function PackingSlipsClient({ initialOrders }: { initialOrders: Order[] }) {
+export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode }) {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
   const [toDate, setToDate] = useState(searchParams.get('to') || '')
+  // Dates apply on Search; customer and status filter live (server-side now).
+  const [range, setRange] = useState({ from: searchParams.get('from') || '', to: searchParams.get('to') || '' })
   const [customerSearch, setCustomerSearch] = useState(searchParams.get('customer') || '')
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [filtering, setFiltering] = useState(false)
   const [downloading, setDownloading] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useActionToast()
   const [showSuggestions, setShowSuggestions] = useState(false)
   const customerRef = useRef<HTMLDivElement>(null)
 
@@ -75,6 +76,24 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+
+  const PAGE_SIZE = 25
+  const list = useInfiniteList<Order>({
+    key: `${range.from}|${range.to}|${customerSearch.trim()}|${statusFilter}`,
+    pageSize: PAGE_SIZE,
+    getKey: o => o.id,
+    fetchPage: async (page, signal) => {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) })
+      if (range.from) params.set('from', range.from)
+      if (range.to) params.set('to', range.to)
+      if (customerSearch.trim()) params.set('customer', customerSearch.trim())
+      if (statusFilter) params.set('status', statusFilter)
+      const data = await fetchJson(`/api/admin/packing-slips/list?${params}`, signal)
+      return { rows: data.orders || [], total: data.total ?? null }
+    },
+  })
+  const orders = list.rows
+
   const customerSuggestions = useMemo(() => {
     if (!customerSearch.trim()) return []
     const q = customerSearch.toLowerCase()
@@ -90,42 +109,20 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
       })
       .slice(0, 8)
   }, [orders, customerSearch])
+  const filtered = orders
+  const paged = orders
+  const filtering = list.loading
+  const error = orders.length ? '' : list.error || ''
 
-  const filtered = useMemo(() => {
-    return orders.filter(o => {
-      if (customerSearch && !o.customer_name?.toLowerCase().includes(customerSearch.toLowerCase())) return false
-      if (statusFilter && o.status !== statusFilter) return false
-      return true
-    })
-  }, [orders, customerSearch, statusFilter])
-
-  const PAGE_SIZE = 25
-  const [page, setPage] = useState(1)
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  useEffect(() => {
-    setPage(1)
-  }, [customerSearch, statusFilter, fromDate, toDate])
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages)
-  }, [page, totalPages])
-  const paged = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page])
-
-  const allSelected = filtered.length > 0 && filtered.every(o => selectedIds.has(o.id))
+  // Select-all covers the loaded rows only.
+  const allSelected = orders.length > 0 && orders.every(o => selectedIds.has(o.id))
 
   function toggleAll() {
-    if (allSelected) {
-      setSelectedIds(prev => {
-        const next = new Set(prev)
-        filtered.forEach(o => next.delete(o.id))
-        return next
-      })
-    } else {
-      setSelectedIds(prev => {
-        const next = new Set(prev)
-        filtered.forEach(o => next.add(o.id))
-        return next
-      })
-    }
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      orders.forEach(o => (allSelected ? next.delete(o.id) : next.add(o.id)))
+      return next
+    })
   }
 
   function toggleOne(id: string) {
@@ -137,30 +134,16 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
     })
   }
 
-  const selectedVisible = filtered.filter(o => selectedIds.has(o.id)).length
 
-  async function applyDateFilter() {
-    setFiltering(true)
-    setError('')
-    try {
-      const params = new URLSearchParams()
-      if (fromDate) params.set('from', fromDate)
-      if (toDate) params.set('to', toDate)
-      const res = await fetch(`/api/admin/packing-slips/list?${params}`)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to load orders')
-      setOrders(data.orders)
-      setSelectedIds(new Set())
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setFiltering(false)
-    }
+  function applyDateFilter() {
+    setRange({ from: fromDate, to: toDate })
+    setSelectedIds(new Set())
   }
 
   function clearAll() {
     setFromDate('')
     setToDate('')
+    setRange({ from: '', to: '' })
     setCustomerSearch('')
     setStatusFilter('')
     syncUrl({ from: '', to: '', customer: '', status: '' })
@@ -170,7 +153,6 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
     setDownloading(true)
-    setError('')
     try {
       const res = await fetch('/api/admin/packing-slips/bulk', {
         method: 'POST',
@@ -191,7 +173,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
       a.remove()
       URL.revokeObjectURL(url)
     } catch (e: any) {
-      setError(e.message)
+      toast.error(e.message)
     } finally {
       setDownloading(false)
     }
@@ -201,10 +183,11 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Packing Slips</h1>
-        <p className="text-sm text-foreground-muted mt-1">Download packing slips to attach to parcels</p>
+      <div className="mb-5">
+        <PageHeader title="Packing Slips" description="Download packing slips to attach to parcels" />
       </div>
+
+      {tabs}
 
       <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3 mb-6">
         <div className="flex flex-wrap gap-2 items-center">
@@ -220,7 +203,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                   syncUrl({ customer: e.target.value })
                 }}
                 onFocus={() => setShowSuggestions(true)}
-                className="w-full px-2 h-control-sm pr-9 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 placeholder:text-foreground-muted"
+                className="field-md w-full border border-border-secondary bg-surface pr-9 text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -304,17 +287,17 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+        <div className="mb-4 bg-red-500/5 border border-red-500/40 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
           {error}
         </div>
       )}
 
-      <div className="bg-surface-elevated rounded-lg border border-border-default shadow-sm">
+      <div className="bg-surface-elevated rounded-xl border border-border-default">
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
           <h2 className="text-base font-semibold text-foreground">
             Orders
             <span className="ml-2 text-sm font-normal text-foreground-muted">
-              {filtered.length !== orders.length ? `${filtered.length} of ${orders.length}` : orders.length}
+              {list.total != null && list.total > orders.length ? `${orders.length} of ${list.total}` : orders.length}
             </span>
           </h2>
           {selectedIds.size > 0 && (
@@ -338,9 +321,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
 
         {filtered.length === 0 ? (
           <div className="px-6 py-12 text-center text-foreground-muted text-sm">
-            {orders.length === 0
-              ? 'No orders found for the selected date range.'
-              : 'No orders match the current filters.'}
+            {list.loading ? 'Loading…' : customerSearch || statusFilter ? 'No orders match the current filters.' : 'No orders found for the selected date range.'}
           </div>
         ) : (
           <>
@@ -362,6 +343,8 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                         type="checkbox"
                         checked={allSelected}
                         onChange={toggleAll}
+                        aria-label="Select all loaded orders"
+                        title="Select all loaded orders"
                         className="rounded border-border-default"
                       />
                     </th>
@@ -370,7 +353,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                       <div className="flex items-center gap-1">
                         Customer
                         {customerSearch && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary-100 dark:bg-secondary-900/40 text-secondary-700 dark:text-secondary-300">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-secondary text-foreground-secondary">
                             {customerSearch}
                             <button onClick={() => setCustomerSearch('')} className="ml-1 hover:text-red-500">
                               ×
@@ -384,7 +367,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                       <div className="flex items-center gap-1">
                         Status
                         {statusFilter && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary-100 dark:bg-secondary-900/40 text-secondary-700 dark:text-secondary-300">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-secondary text-foreground-secondary">
                             {statusLabel(statusFilter)}
                             <button onClick={() => setStatusFilter('')} className="ml-1 hover:text-red-500">
                               ×
@@ -426,7 +409,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-surface-secondary text-foreground-secondary'}`}
                         >
                           {statusLabel(order.status)}
                         </span>
@@ -443,7 +426,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
                           href={`/api/admin/packing-slips/${order.id}`}
                           download
                           title="Download Packing Slip"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-secondary-50 dark:bg-secondary-900/30 text-secondary-600 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-800/50 transition-colors"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path
@@ -463,36 +446,9 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
           </>
         )}
 
-        {filtered.length > 0 && (
-          <div className="flex items-center justify-between gap-2 mt-4 px-1 text-sm">
-            <span className="text-foreground-secondary text-xs">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
-            </span>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  className="px-3 h-control-sm rounded-lg border border-border-default text-xs font-medium hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-xs text-foreground-secondary">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  className="px-3 h-control-sm rounded-lg border border-border-default text-xs font-medium hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="px-4 pb-4">
+          <InfiniteFooter shown={orders.length} control={list} noun="orders" />
+        </div>
       </div>
     </div>
   )

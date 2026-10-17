@@ -26,7 +26,10 @@ import { app } from '../src/server'
 const auth = (claims = {}) => ({ authorization: `Bearer ${signServiceToken({ service: 'gateway', tenantId: 't1', ...claims })}` })
 
 describe('server', () => {
-  beforeEach(() => rows.clear())
+  beforeEach(() => {
+    rows.clear()
+    vi.mocked(wallet.trueUp).mockClear()
+  })
 
   it('healthz is open; everything else needs a service token', async () => {
     expect((await app.inject({ url: '/healthz' })).statusCode).toBe(200)
@@ -45,5 +48,16 @@ describe('server', () => {
     expect(int).toBeCloseTo(0.05 * 88, 5)
     expect(pub).toBeCloseTo(0.05 * 88 * 1.4, 5)
     expect(rows.get('m1').status).toBe('delivered')
+  })
+
+  it('refunds a send that was never delivered (Meta marketing cap) and does not re-charge its price', async () => {
+    rows.set('m3', { id: 'm3', tenant_id: 't1', channel: 'whatsapp', to_address: '+91', metadata: {}, charged_inr: '1.4', status: 'sent' })
+    const h = { 'content-type': 'application/x-www-form-urlencoded' }
+    const body = 'MessageStatus=undelivered&ErrorCode=63049&Price=-0.01'
+    expect((await app.inject({ method: 'POST', url: '/webhooks/twilio/status?m=m3', headers: h, payload: body })).statusCode).toBe(200)
+    expect(vi.mocked(wallet.trueUp).mock.calls.map(c => c[0])).toEqual([
+      { tenantId: 't1', amountInr: 0, externalRef: 'pub:m3', note: 'refund: whatsapp not delivered' },
+    ])
+    expect(rows.get('m3')).toMatchObject({ status: 'failed', charged_inr: 0 })
   })
 })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
@@ -11,7 +12,8 @@ export default function PurgeCustomerButton({ tenantId, slug }: { tenantId: stri
   const router = useRouter()
   const confirm = useConfirm()
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setMsg = (r: { ok: boolean; text: string } | null) => r && toast.result(r)
 
   return (
     <div className="flex items-center gap-2">
@@ -52,11 +54,6 @@ export default function PurgeCustomerButton({ tenantId, slug }: { tenantId: stri
       >
         {busy ? 'Deleting…' : 'Delete'}
       </button>
-      {msg && (
-        <span className={`text-xs ${msg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-          {msg.text}
-        </span>
-      )}
     </div>
   )
 }

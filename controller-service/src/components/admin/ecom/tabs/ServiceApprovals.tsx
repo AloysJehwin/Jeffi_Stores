@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { useRouter } from 'next/navigation'
 import type { ServiceApproval } from '@/lib/tenant-registry'
 
 const BADGE: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  pending: 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400',
+  approved: 'bg-green-500/10 text-green-700 dark:text-green-400',
+  rejected: 'bg-red-500/10 text-red-700 dark:text-red-400',
 }
 const LABEL: Record<string, string> = { messaging: 'Messaging API', documents: 'Documents API' }
 
@@ -17,7 +18,8 @@ export default function ServiceApprovals({ tenantId, services, approvals }: { te
   const [busy, setBusy] = useState<string | null>(null)
   const [rejecting, setRejecting] = useState<string | null>(null)
   const [note, setNote] = useState('')
-  const [err, setErr] = useState<string | null>(null)
+  const toast = useActionToast()
+  const setErr = (t: string | null) => t && toast.error(t)
   const rows = services.filter(s => s === 'messaging' || s === 'documents').map(s => approvals.find(a => a.service === s) ?? { service: s, status: 'approved', requested_at: '', reviewed_at: null, note: 'Approved before reviews existed' })
   if (!rows.length) return null
 
@@ -45,21 +47,20 @@ export default function ServiceApprovals({ tenantId, services, approvals }: { te
               </span>
               {a.status === 'pending' && (
                 <div className="ml-auto flex gap-2">
-                  <button disabled={!!busy} onClick={() => decide(a.service, 'approved')} className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-50">{busy === a.service ? 'Saving…' : 'Approve'}</button>
-                  <button disabled={!!busy} onClick={() => setRejecting(rejecting === a.service ? null : a.service)} className="rounded-lg border border-red-300 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
+                  <button disabled={!!busy} onClick={() => decide(a.service, 'approved')} className="control-sm text-xs font-semibold bg-green-600 text-white hover:bg-green-700 disabled:opacity-50">{busy === a.service ? 'Saving…' : 'Approve'}</button>
+                  <button disabled={!!busy} onClick={() => setRejecting(rejecting === a.service ? null : a.service)} className="control-sm text-xs font-semibold border border-red-500/40 text-red-600 hover:bg-red-500/10 disabled:opacity-50">Reject</button>
                 </div>
               )}
             </div>
             {rejecting === a.service && (
               <div className="mt-3 flex gap-2">
-                <input value={note} onChange={e => setNote(e.target.value)} placeholder="Reason (sent to the owner)" className="h-9 flex-1 rounded-lg border border-border-default bg-surface px-3 text-sm" />
-                <button disabled={!note.trim() || !!busy} onClick={() => decide(a.service, 'rejected')} className="rounded-lg bg-red-600 px-3 text-xs font-semibold text-white disabled:opacity-50">Send rejection</button>
+                <input value={note} onChange={e => setNote(e.target.value)} placeholder="Reason (sent to the owner)" className="field-md flex-1 border border-border-default bg-surface text-foreground" />
+                <button disabled={!note.trim() || !!busy} onClick={() => decide(a.service, 'rejected')} className="control-sm text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50">Send rejection</button>
               </div>
             )}
           </div>
         ))}
       </div>
-      {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
     </section>
   )
 }

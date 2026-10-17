@@ -1,7 +1,10 @@
 import Link from 'next/link'
+import { TabLinks } from '@/components/admin/channels/ui'
+import { badgeCls, type Tone } from '@/components/admin/kit/tones'
 
-// Gradient hero stat card — matches the Orders page house style (gradient panel +
-// backdrop-blur stat tiles). Server component; pass a headline value + up to 4 tiles.
+const TILE_COLS: Record<number, string> = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3', 4: 'grid-cols-4' }
+
+// Headline stat card: one highlighted value and up to 4 tiles. Server component.
 export function EcomHero({
   label,
   value,
@@ -12,16 +15,16 @@ export function EcomHero({
   tiles: { value: string | number; label: string }[]
 }) {
   return (
-    <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white lg:h-56">
+    <div className="bg-surface-elevated rounded-xl border border-accent-500/50 p-4 sm:p-5 flex flex-col justify-between lg:h-56">
       <div>
-        <p className="text-white/80 text-sm">{label}</p>
-        <p className="text-3xl sm:text-4xl font-bold mt-1">{value}</p>
+        <p className="text-xs text-foreground-muted uppercase tracking-wide font-medium">{label}</p>
+        <p className="text-3xl font-bold text-accent-500 tabular-nums mt-1">{value}</p>
       </div>
-      <div className={`grid grid-cols-${Math.min(tiles.length, 4)} gap-2 sm:gap-3 mt-4`}>
+      <div className={`grid ${TILE_COLS[Math.min(tiles.length, 4)] ?? 'grid-cols-4'} gap-2 sm:gap-3 mt-4`}>
         {tiles.map((t, i) => (
-          <div key={i} className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-            <p className="text-lg sm:text-2xl font-bold leading-none">{t.value}</p>
-            <p className="text-[10px] sm:text-xs text-white/80 mt-1">{t.label}</p>
+          <div key={i} className="rounded-lg bg-surface-secondary/60 px-2 py-2 sm:px-3 sm:py-2.5">
+            <p className="text-lg sm:text-xl font-bold leading-none tabular-nums text-foreground">{t.value}</p>
+            <p className="text-[10px] sm:text-xs text-foreground-muted mt-1">{t.label}</p>
           </div>
         ))}
       </div>
@@ -39,8 +42,8 @@ export function PlanMixChart({ mix }: { mix: { plan: string; count: number }[] }
     enterprise: 'bg-amber-500',
   }
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 lg:h-56 flex flex-col">
-      <p className="font-semibold text-foreground mb-4">Plan mix</p>
+    <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-5 lg:h-56 flex flex-col">
+      <p className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Plan mix</p>
       <div className="flex-1 flex flex-col justify-center gap-3">
         {mix.length === 0 && <p className="text-sm text-foreground-muted">No tenants yet.</p>}
         {mix.map(m => (
@@ -65,31 +68,28 @@ export function PlanMixChart({ mix }: { mix: { plan: string; count: number }[] }
 // Status/plan/search filter bar (client, URL-param driven).
 export { default as EcomFilters } from './EcomFilters'
 
+const PILL_TONE: Record<string, Tone> = {
+  active: 'green',
+  provisioning: 'amber',
+  suspended: 'red',
+  terminated: 'muted',
+  pending_approval: 'amber',
+  awaiting_payment: 'blue',
+  rejected: 'red',
+  settled: 'green',
+  captured: 'blue',
+  split: 'blue',
+  refunded: 'red',
+}
+
 // Small pill for statuses reused across pages.
 export function StatusPill({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    active: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-    provisioning: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-    suspended: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
-    terminated: 'bg-surface-secondary text-foreground-secondary',
-    pending_approval: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300',
-    awaiting_payment: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300',
-    rejected: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
-    settled: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-    captured: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300',
-    split: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',
-    refunded: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
-  }
-  return (
-    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${map[status] || map.terminated}`}>
-      {status}
-    </span>
-  )
+  return <span className={badgeCls(PILL_TONE[status] ?? 'muted')}>{status}</span>
 }
 
 export function DetailLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="text-accent-600 dark:text-accent-400 hover:underline">
+    <Link href={href} className="text-accent-600 hover:underline">
       {children}
     </Link>
   )
@@ -99,8 +99,8 @@ export function DetailLink({ href, children }: { href: string; children: React.R
 export function Field({ label, value, wide }: { label: string; value: React.ReactNode; wide?: boolean }) {
   return (
     <div className={wide ? 'col-span-2' : undefined}>
-      <dt className="text-xs uppercase tracking-wide text-foreground-muted">{label}</dt>
-      <dd className="text-sm text-foreground mt-0.5 min-w-0 break-words">{value ?? '—'}</dd>
+      <dt className="text-xs text-foreground-muted">{label}</dt>
+      <dd className="text-sm text-foreground mt-0.5 min-w-0 break-words">{value ?? '-'}</dd>
     </div>
   )
 }
@@ -125,7 +125,7 @@ export function Section({
   return (
     <section className={`rounded-xl border border-border-default p-5 bg-surface-elevated min-w-0 ${className}`}>
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="font-semibold text-foreground">{title}</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">{title}</h2>
         {action}
       </div>
       {children}
@@ -173,26 +173,18 @@ export function TenantTabNav({
   hidden?: TenantTab[]
 }) {
   return (
-    <div className="border-b border-border-default -mx-6 px-6 overflow-x-auto">
-      <nav className="flex gap-1 min-w-max">
-        {TENANT_TABS.filter(t => !hidden.includes(t.key)).map(({ key, label }) => {
-          const on = key === active
-          return (
-            <Link
-              key={key}
-              href={`/admin/ecom/customers/${tenantId}/view?tab=${key}`}
-              className={`px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
-                on
-                  ? 'border-accent-500 text-foreground'
-                  : 'border-transparent text-foreground-muted hover:text-foreground hover:border-border-default'
-              }`}
-            >
-              {label}
-              {badges?.[key] ? <span className="ml-1.5">{badges[key]}</span> : null}
-            </Link>
-          )
-        })}
-      </nav>
-    </div>
+    <TabLinks
+      tabs={TENANT_TABS.filter(t => !hidden.includes(t.key)).map(({ key, label }) => ({
+        id: key,
+        label: (
+          <>
+            {label}
+            {badges?.[key] ? <span className="ml-0.5">{badges[key]}</span> : null}
+          </>
+        ),
+        href: `/admin/ecom/customers/${tenantId}/view?tab=${key}`,
+      }))}
+      value={active}
+    />
   )
 }

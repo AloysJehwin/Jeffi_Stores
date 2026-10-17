@@ -7,6 +7,7 @@ import { CALL_TO_ACTIONS, type ImageAdSpec } from '@/lib/google-ads/campaign-spe
 import { COUNTS, LIMITS } from '@/lib/google-ads/limits'
 import { postJson, errorText } from '../ManageContext'
 import type { Draft } from './draft'
+import { AiAssetImage } from './AiAssetImage'
 import { AiButton, Field, LimitedInput, TextList, inputCls } from './fields'
 
 // The Demand Gen multi-asset ad / Display responsive display ad: copy, catalogue images, logo,
@@ -63,7 +64,8 @@ export function ImageAdEditor({
     })
   }
 
-  const images = b.images.filter(i => !filter || i.productName.toLowerCase().includes(filter.toLowerCase())).slice(0, 48)
+  const [aiImages, setAiImages] = useState<WizardBootstrap['images']>([])
+  const images = [...aiImages, ...b.images].filter(i => !filter || i.productName.toLowerCase().includes(filter.toLowerCase())).slice(0, 48)
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
@@ -112,6 +114,16 @@ export function ImageAdEditor({
           Product images ({a.imageIds.length}/{maxImages}): each is fitted on white to 1.91:1 and 1:1{dg ? ' and 4:5 portrait' : ''}
         </span>
         <input className={inputCls} value={filter} onChange={e => setFilter(e.target.value)} placeholder="Filter by product name" />
+        {canAi && a.imageIds.length < maxImages && (
+          <AiAssetImage
+            images={[...aiImages, ...b.images]}
+            selected={a.imageIds}
+            onAdd={img => {
+              setAiImages(list => [img, ...list])
+              upd({ imageIds: [...a.imageIds, img.id] })
+            }}
+          />
+        )}
         <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-72 overflow-y-auto">
           {images.map(img => {
             const on = a.imageIds.includes(img.id)
