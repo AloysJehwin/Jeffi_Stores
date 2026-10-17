@@ -5,7 +5,7 @@
 // Video model picked: wan-video/wan-2.2-t2v-fast — currently available and cheap (480p, ~5 s).
 
 import type { ImageGenInput, ImageGenOutput, MediaProvider, VideoGenInput, VideoPoll, VideoStart } from './types'
-import { ProviderError, fetchBytes, fetchJson, loadImage, toImage } from './types'
+import { ProviderError, fetchBytes, fetchJson, loadImage, nearestAspect, toImage } from './types'
 
 const BASE = 'https://api.replicate.com/v1'
 const IMAGE_MODELS: Record<string, string> = {
@@ -24,6 +24,8 @@ interface PredictionResponse {
   urls?: { get?: string }
 }
 
+const FLUX_ASPECTS = ['1:1', '16:9', '21:9', '3:2', '2:3', '4:5', '5:4', '3:4', '4:3', '9:16', '9:21']
+
 export class ReplicateProvider implements MediaProvider {
   readonly name = 'replicate' as const
   constructor(
@@ -38,10 +40,9 @@ export class ReplicateProvider implements MediaProvider {
     const model = IMAGE_MODELS[req.quality] ?? IMAGE_MODELS.standard
     const input: Record<string, unknown> = {
       prompt: req.prompt,
-      width: req.width,
-      height: req.height,
       num_outputs: req.n,
-      aspect_ratio: 'custom',
+      // Flux on Replicate takes an aspect label, not custom pixel sizes.
+      aspect_ratio: nearestAspect(req.width, req.height, FLUX_ASPECTS),
       output_format: 'png',
     }
     if (req.negativePrompt && model.includes('dev')) input.negative_prompt = req.negativePrompt

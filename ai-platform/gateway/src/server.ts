@@ -60,7 +60,15 @@ async function processJob(data: JobData): Promise<unknown> {
     return out
   }
   if (data.kind === 'image') {
-    return handleImageGenerate(data.payload as ImageGenerateRequest, imageDeps)
+    try {
+      return await handleImageGenerate(data.payload as ImageGenerateRequest, imageDeps)
+    } catch (err) {
+      // The queue keeps only the message, so carry each provider's reason in it.
+      if (err instanceof UpstreamError && err.tried.length) {
+        throw new Error(`${err.message}: ${err.tried.map(t => `${t.provider}: ${t.error}`.slice(0, 300)).join('; ')}`)
+      }
+      throw err
+    }
   }
   if (data.kind === 'vision') {
     const { images, prompt, model } = data.payload as VisionRequest

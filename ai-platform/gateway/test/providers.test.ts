@@ -110,7 +110,7 @@ describe('replicate', () => {
     expect(out.model).toBe('black-forest-labs/flux-schnell')
     expect(out.images).toHaveLength(2)
     expect(calls[0].url).toBe('https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions')
-    expect(body(calls[0]).input).toMatchObject({ prompt: 'red shoe', width: 1024, height: 576, num_outputs: 2 })
+    expect(body(calls[0]).input).toMatchObject({ prompt: 'red shoe', aspect_ratio: '16:9', num_outputs: 2 })
     expect(gets).toBe(1)
   })
 
