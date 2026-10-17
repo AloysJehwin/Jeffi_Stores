@@ -82,12 +82,15 @@ export default function ReviewFormsTable({
     return ap(`/admin/review-forms${qs ? `?${qs}` : ''}`)
   }
 
+  const [gone, setGone] = useState<Set<string>>(new Set())
+
   async function deleteForm(f: FormRow) {
     const res = await fetch(`/api/admin/review-forms/${f.id}`, { method: 'DELETE' })
     if (!res.ok) {
       showToast((await res.json().catch(() => ({})))?.error || 'Failed to delete form', 'error')
       return
     }
+    setGone(g => new Set(g).add(String(f.id)))
     router.refresh()
   }
 
@@ -179,6 +182,7 @@ export default function ReviewFormsTable({
     <>
       <DataTable<FormRow>
         mode="server"
+        hide={r => gone.has(String(r.id))}
         rows={forms}
         cols={cols}
         rowKey={f => f.id}
@@ -187,7 +191,7 @@ export default function ReviewFormsTable({
         pageSize={pageSize}
         pageHref={pageHref}
         onRowClick={setOpen}
-        mobile={<ReviewFormsMobileList forms={forms} backUrl={backUrl} formsBase={formsBase} />}
+        mobile={rows => <ReviewFormsMobileList forms={rows} backUrl={backUrl} formsBase={formsBase} />}
         empty={{ title: 'No review forms yet.', body: 'Create your first one!' }}
         rowActions={f => [
           { key: 'edit', kind: 'edit', label: 'Edit Form', href: editHref(f), scope: 'review_forms:write' },

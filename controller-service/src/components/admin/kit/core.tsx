@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { AlertCircle, CheckCircle2, TrendingDown, TrendingUp } from 'lucide-react'
 import { badgeCls, type Tone } from './tones'
+import { InfiniteFooter, useReveal } from './infinite'
 
 // Core admin kit: cards, KPIs, badges, tabs, the client table, fetch and number helpers.
 // Originally the channel consoles' building blocks (channels/ui re-exports this),
@@ -290,7 +291,6 @@ const PAGE = 25
 export function Table<T>({ rows, cols, rowKey, empty, pageSize = PAGE }: { rows: T[]; cols: Col<T>[]; rowKey: (r: T) => string; empty?: string; pageSize?: number }) {
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [desc, setDesc] = useState(true)
-  const [page, setPage] = useState(1)
   const sorted = useMemo(() => {
     const c = cols.find(c => c.key === sortKey)
     if (!c?.sort) return rows
@@ -301,9 +301,8 @@ export function Table<T>({ rows, cols, rowKey, empty, pageSize = PAGE }: { rows:
     })
     return desc ? s.reverse() : s
   }, [rows, cols, sortKey, desc])
+  const { shown, control } = useReveal(sorted, pageSize, `${sortKey}|${desc}`)
   if (!rows.length) return <Empty msg={empty} />
-  const pages = Math.ceil(sorted.length / pageSize)
-  const shown = sorted.slice((page - 1) * pageSize, page * pageSize)
   return (
     <div>
       <div className="overflow-x-auto">
@@ -342,17 +341,7 @@ export function Table<T>({ rows, cols, rowKey, empty, pageSize = PAGE }: { rows:
           </tbody>
         </table>
       </div>
-      {pages > 1 && (
-        <div className="flex items-center justify-end gap-2 pt-3 text-xs text-foreground-muted">
-          <button type="button" disabled={page === 1} onClick={() => setPage(p => p - 1)} className="control-sm border border-border-default disabled:opacity-40">
-            Prev
-          </button>
-          {page} / {pages}
-          <button type="button" disabled={page >= pages} onClick={() => setPage(p => p + 1)} className="control-sm border border-border-default disabled:opacity-40">
-            Next
-          </button>
-        </div>
-      )}
+      <InfiniteFooter shown={shown.length} control={control} />
     </div>
   )
 }

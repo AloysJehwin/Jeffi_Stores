@@ -8,7 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { FileText, ExternalLink, Plus, X } from 'lucide-react'
-import { Badge, Dialog, EmptyState, Field, Fields, PageHeader, TableSkeleton, badgeCls, useActionToast, type StatusMap } from '@/components/admin/kit'
+import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, PageHeader, TableSkeleton, badgeCls, fetchJson, useActionToast, useInfiniteList, type StatusMap } from '@/components/admin/kit'
 import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
@@ -113,10 +113,6 @@ export default function CashSaleClient() {
   const router = useRouter()
   const [view, setView] = useState<View>('list')
 
-  const [sales, setSales] = useState<CashSale[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
   const [selectedSale, setSelectedSale] = useState<CashSale | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
@@ -179,8 +175,6 @@ export default function CashSaleClient() {
     })
   }, [items])
 
-  const totalPages = Math.ceil(total / 25)
-
   const SORT_KEYS: Record<string, keyof CashSale> = {
     invoice_number: 'invoice_number',
     date: 'invoice_date',
@@ -188,41 +182,31 @@ export default function CashSaleClient() {
     payment: 'payment_status',
   }
 
-  // Ordered server-side across all sales via sort/dir params.
-  const sortedSales = sales
 
-  const fetchSales = useCallback(
-    async (p = 1) => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        if (paymentFilter) params.set('payment', paymentFilter)
-        if (fromDate) params.set('from', fromDate)
-        if (toDate) params.set('to', toDate)
-        if (searchQ) params.set('search', searchQ)
-        if (sortCol && SORT_KEYS[sortCol]) {
-          params.set('sort', SORT_KEYS[sortCol])
-          params.set('dir', sortDir || 'desc')
-        }
-        params.set('page', String(p))
-        const res = await fetch(`/api/admin/cash-sale?${params}`, { credentials: 'include' })
-        if (!res.ok) throw new Error('Failed')
-        const data = await res.json()
-        setSales(data.sales || [])
-        setTotal(data.total || 0)
-        setPage(p)
-      } catch {
-        showToast('Failed to load cash sales', 'error')
-      } finally {
-        setLoading(false)
+  // Ordered server-side across all sales via sort/dir params; 25 per page.
+  const list = useInfiniteList<CashSale>({
+    key: `${paymentFilter}|${fromDate}|${toDate}|${searchQ}|${sortCol}|${sortDir}`,
+    pageSize: 25,
+    getKey: s => s.id,
+    fetchPage: async (p, signal) => {
+      const params = new URLSearchParams()
+      if (paymentFilter) params.set('payment', paymentFilter)
+      if (fromDate) params.set('from', fromDate)
+      if (toDate) params.set('to', toDate)
+      if (searchQ) params.set('search', searchQ)
+      if (sortCol && SORT_KEYS[sortCol]) {
+        params.set('sort', SORT_KEYS[sortCol])
+        params.set('dir', sortDir || 'desc')
       }
+      params.set('page', String(p))
+      const data = await fetchJson(`/api/admin/cash-sale?${params}`, signal)
+      return { rows: data.sales || [], total: data.total || 0 }
     },
-    [paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir, showToast]
-  )
-
-  useEffect(() => {
-    fetchSales(1)
-  }, [paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir])
+  })
+  const sales = list.rows
+  const sortedSales = sales
+  const loading = list.loading
+  const fetchSales = list.reload
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -267,7 +251,7 @@ export default function CashSaleClient() {
         return
       }
       showToast('Cash sale cancelled and stock restored', 'success')
-      fetchSales(page)
+      fetchSales()
     } catch {
       showToast('Failed to cancel sale', 'error')
     } finally {
@@ -452,7 +436,7 @@ export default function CashSaleClient() {
       showToast(data.invoiceNumber ? `Receipt ${data.invoiceNumber} created` : 'Cash sale recorded', 'success')
       resetForm()
       setView('receipt')
-      fetchSales(1)
+      fetchSales()
     } catch (err: any) {
       setFormError(err.message || 'Failed')
     } finally {
@@ -1094,35 +1078,7 @@ export default function CashSaleClient() {
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 px-1 text-xs text-foreground-muted">
-          <p className="text-xs text-foreground-muted whitespace-nowrap">
-            <span className="font-medium text-foreground">
-              {(page - 1) * 25 + 1}–{Math.min(page * 25, total)}
-            </span>{' '}
-            of <span className="font-medium text-foreground">{total}</span> sales
-          </p>
-          <div className="flex items-center gap-1.5">
-            <button
-              disabled={page <= 1}
-              onClick={() => fetchSales(page - 1)}
-              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:pointer-events-none disabled:opacity-40"
-            >
-              Prev
-            </button>
-            <span className="text-xs text-foreground-muted whitespace-nowrap">
-              {page}/{totalPages}
-            </span>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => fetchSales(page + 1)}
-              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:pointer-events-none disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <InfiniteFooter shown={sales.length} control={list} noun="sales" />
 
       {selectedSale && (
         <SaleDetailModal
@@ -1130,7 +1086,7 @@ export default function CashSaleClient() {
           onClose={() => setSelectedSale(null)}
           onCancelled={() => {
             setSelectedSale(null)
-            fetchSales(page)
+            fetchSales()
           }}
         />
       )}

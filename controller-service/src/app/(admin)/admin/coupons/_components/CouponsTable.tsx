@@ -66,12 +66,15 @@ export default function CouponsTable({
     return ap(`/admin/coupons?${params}`)
   }
 
+  const [gone, setGone] = useState<Set<string>>(new Set())
+
   async function deleteCoupon(c: CouponRow) {
     const res = await fetch(`/api/admin/coupons/${c.id}`, { method: 'DELETE' })
     if (!res.ok) {
       showToast((await res.json().catch(() => ({})))?.error || 'Failed to delete coupon', 'error')
       return
     }
+    setGone(g => new Set(g).add(String(c.id)))
     router.refresh()
   }
 
@@ -194,6 +197,7 @@ export default function CouponsTable({
     <>
       <DataTable<CouponRow>
         mode="server"
+        hide={r => gone.has(String(r.id))}
         rows={coupons}
         cols={cols}
         rowKey={c => c.id}
@@ -202,7 +206,7 @@ export default function CouponsTable({
         pageSize={pageSize}
         pageHref={pageHref}
         onRowClick={setOpen}
-        mobile={<CouponsMobileList coupons={coupons} backUrl={backUrl} />}
+        mobile={rows => <CouponsMobileList coupons={rows} backUrl={backUrl} />}
         empty={{ title: 'No coupons found', body: 'Try a different search or clear the filters.' }}
         rowActions={c => [
           {

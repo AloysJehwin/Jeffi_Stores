@@ -58,7 +58,7 @@ export default function BusinessRfqsTable({ rfqs, total, page, pageSize }: { rfq
       total={total}
       page={page}
       pageSize={pageSize}
-      mobile={<BusinessRfqsMobileList rfqs={rfqs} />}
+      mobile={rows => <BusinessRfqsMobileList rfqs={rows} />}
       empty={{ title: 'No RFQs found.' }}
       rowActions={r => [{ key: 'view', kind: 'view', label: 'View RFQ', href: r.href }]}
     />

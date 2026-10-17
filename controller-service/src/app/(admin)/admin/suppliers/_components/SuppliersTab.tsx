@@ -1,56 +1,45 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { DataTable, type DataCol } from '@/components/admin/kit/data-table'
+import { fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { StatusBadge, ACTIVE_STATUS } from '@/components/admin/kit/status'
 import SuppliersMobileList from './SuppliersMobileList'
-import { labelCls, PAGE_SIZE, ClientPagination, type Supplier } from '@/components/admin/purchasing/shared'
+import { labelCls, PAGE_SIZE, type Supplier } from '@/components/admin/purchasing/shared'
 
 export default function SuppliersTab() {
   const canWriteSuppliers = useCanWrite('inventory')
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [showAll, setShowAll] = useState(false)
 
-  const load = useCallback(
-    async (pg = page) => {
-      setLoading(true)
+  const list = useInfiniteList<Supplier>({
+    key: `${search}|${showAll}`,
+    pageSize: PAGE_SIZE,
+    getKey: s => s.id,
+    fetchPage: async (pg, signal) => {
       const params = new URLSearchParams({ page: String(pg), limit: String(PAGE_SIZE) })
       if (search) params.set('search', search)
       if (showAll) params.set('all', 'true')
-      const res = await fetch(`/api/admin/inventory/suppliers?${params}`)
-      const json = await res.json()
-      setSuppliers(json?.suppliers || [])
-      setTotal(json?.total || 0)
-      setLoading(false)
+      const json = await fetchJson(`/api/admin/inventory/suppliers?${params}`, signal)
+      return { rows: json?.suppliers || [], total: json?.total || 0 }
     },
-    [search, showAll, page]
-  )
-
-  useEffect(() => {
-    load(page)
-  }, [load, page])
-
-  function handleSearchChange(v: string) {
-    setSearch(v)
-    setPage(1)
-  }
+  })
+  const suppliers = list.rows
 
   async function toggleActive(s: Supplier) {
-    await fetch(`/api/admin/inventory/suppliers/${s.id}`, {
+    const res = await fetch(`/api/admin/inventory/suppliers/${s.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: !s.is_active }),
     })
-    load(page)
+    if (!res.ok) return
+    if (!showAll && s.is_active) list.setRows(rows => rows.filter(r => r.id !== s.id))
+    else list.setRows(rows => rows.map(r => (r.id === s.id ? { ...r, is_active: !s.is_active } : r)))
   }
 
   const text = (v: unknown) => String(v ?? '').toLowerCase()
@@ -81,7 +70,7 @@ export default function SuppliersTab() {
           <AdminTypeahead
             type="suppliers"
             value={search}
-            onChange={handleSearchChange}
+            onChange={setSearch}
             placeholder="Name, GSTIN, contact..."
             inputClassName="w-full field-sm pr-9 bg-surface border border-border-secondary text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
           />
@@ -90,10 +79,7 @@ export default function SuppliersTab() {
           <AdminSelect
             label="Status"
             value={showAll ? 'all' : 'active'}
-            onChange={v => {
-              setShowAll(v === 'all')
-              setPage(1)
-            }}
+            onChange={v => setShowAll(v === 'all')}
             options={[
               { value: 'active', label: 'Active only' },
               { value: 'all', label: 'Show inactive' },
@@ -103,16 +89,14 @@ export default function SuppliersTab() {
         </div>
       </div>
 
-      {/* The API pages at PAGE_SIZE; the table sorts only the current page, as before. */}
+      {/* Pages of PAGE_SIZE load on scroll; column sort applies to the loaded rows. */}
       <DataTable<Supplier>
         rows={suppliers}
         cols={cols}
         rowKey={s => s.id}
-        mode="client"
-        pageSize={Math.max(PAGE_SIZE, suppliers.length)}
-        loading={loading}
+        infinite={list}
         empty={search ? `No suppliers matching "${search}"` : 'No suppliers yet'}
-        mobile={<SuppliersMobileList suppliers={suppliers} canWrite={canWriteSuppliers} onToggleActive={toggleActive} />}
+        mobile={rows => <SuppliersMobileList suppliers={rows} canWrite={canWriteSuppliers} onToggleActive={toggleActive} />}
         rowActions={s => [
           { key: 'edit', kind: 'edit', label: 'Edit supplier', href: ap(`/admin/suppliers/${s.id}/edit`), scope: 'inventory' },
           {
@@ -124,17 +108,6 @@ export default function SuppliersTab() {
           },
         ]}
       />
-      {!loading && (
-        <ClientPagination
-          page={page}
-          total={total}
-          pageSize={PAGE_SIZE}
-          onChange={p => {
-            setPage(p)
-            setLoading(true)
-          }}
-        />
-      )}
     </div>
   )
 }

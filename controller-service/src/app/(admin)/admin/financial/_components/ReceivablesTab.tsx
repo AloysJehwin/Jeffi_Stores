@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { ap } from '@/lib/shared/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { EmptyState, useActionToast } from '@/components/admin/kit'
+import { EmptyState, useActionToast, InfiniteFooter } from '@/components/admin/kit'
 import {
   labelCls,
   btnPrimary,
@@ -22,7 +22,6 @@ import {
   thCenter,
   theadCls,
   tableWrapCls,
-  pagerBtn,
 } from './shared'
 
 export function ReceivablesTab({ initialData }: { initialData: any }) {
@@ -33,7 +32,9 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
   const [loading, setLoading] = useState(false)
   const [markingPaid, setMarkingPaid] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  const PAGE_SIZE = 50
+  const [more, setMore] = useState<{ loading: boolean; error: string | null }>({ loading: false, error: null })
+  const applied = useRef('')
+  const inflight = useRef(false)
   const canWrite = useCanWrite('financial:write')
   const toast = useActionToast()
 
@@ -44,27 +45,43 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
     }
   }, [initialData])
 
+  // Page 1 replaces (with the current filters); later pages append with the filters page 1 used.
   const load = useCallback(
-    async (p = page) => {
-      setLoading(true)
-      const params = new URLSearchParams()
-      if (from) params.set('from', from)
-      if (to) params.set('to', to)
-      if (search) params.set('search', search)
+    async (p = 1) => {
+      if (p > 1 && inflight.current) return
+      inflight.current = true
+      let params: URLSearchParams
+      if (p === 1) {
+        setLoading(true)
+        params = new URLSearchParams()
+        if (from) params.set('from', from)
+        if (to) params.set('to', to)
+        if (search) params.set('search', search)
+        applied.current = params.toString()
+      } else {
+        setMore({ loading: true, error: null })
+        params = new URLSearchParams(applied.current)
+      }
       params.set('page', String(p))
-      const res = await fetch(`/api/admin/financial/receivables?${params}`)
-      const json = await res.json()
-      setData(json?.error ? null : json)
-      setPage(p)
-      setLoading(false)
+      try {
+        const res = await fetch(`/api/admin/financial/receivables?${params}`)
+        const json = await res.json()
+        if (p === 1) setData(json?.error ? null : json)
+        else if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load')
+        else setData((prev: any) => ({ ...prev, rows: [...(prev?.rows ?? []), ...(json.rows ?? [])], total: json.total }))
+        setPage(p)
+        setMore({ loading: false, error: null })
+      } catch (e) {
+        if (p > 1) setMore({ loading: false, error: e instanceof Error ? e.message : 'Failed to load' })
+      } finally {
+        inflight.current = false
+        if (p === 1) setLoading(false)
+      }
     },
-    [from, to, search, page]
+    [from, to, search]
   )
 
-  const handleRefresh = () => {
-    setPage(1)
-    load(1)
-  }
+  const handleRefresh = () => load(1)
 
   const markPaid = async (orderId: string) => {
     setMarkingPaid(orderId)
@@ -74,7 +91,7 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
       body: JSON.stringify({ payment_status: 'paid' }),
     })
     toast.result({ ok: res.ok }, { success: 'Marked as paid.', error: 'Could not mark as paid.' })
-    await load(page)
+    await load(1)
     setMarkingPaid(null)
   }
 
@@ -97,7 +114,6 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
     a.click()
   }
 
-  const totalPages = data?.total ? Math.ceil(data.total / PAGE_SIZE) : 1
 
   return (
     <div className="space-y-5">
@@ -314,29 +330,11 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                 ))}
               </div>
 
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-2">
-                  <p className="text-xs text-foreground-muted tabular-nums">
-                    Page {page} of {totalPages} · {data.total} total
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => load(page - 1)}
-                      disabled={page === 1 || loading}
-                      className={pagerBtn}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => load(page + 1)}
-                      disabled={page === totalPages || loading}
-                      className={pagerBtn}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
+              <InfiniteFooter
+                shown={data.rows.length}
+                noun="rows"
+                control={{ total: data.total, hasMore: data.rows.length < (data.total ?? 0), loadingMore: more.loading, error: more.error, loadMore: () => load(page + 1) }}
+              />
             </>
           )}
         </>

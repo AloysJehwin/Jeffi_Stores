@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback, Fragment } from 'react'
+import { useEffect, useState, Fragment } from 'react'
 import { CheckCircle, XCircle, Loader2, Sparkles, Play, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
-import { EmptyState, PageBody, PageHeader, TableSkeleton, badgeCls } from '@/components/admin/kit'
+import { EmptyState, ErrorState, InfiniteFooter, PageBody, PageHeader, TableSkeleton, badgeCls, fetchJson, useInfiniteList } from '@/components/admin/kit'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
@@ -58,10 +58,6 @@ function TagList({ tags, max = 4, className = '' }: { tags: string[] | null; max
 export default function CatalogEnrichmentPage() {
   const { showToast } = useToast()
   const tab = useListTab()
-  const [items, setItems] = useState<Item[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
   const [runningAll, setRunningAll] = useState(false)
@@ -70,34 +66,26 @@ export default function CatalogEnrichmentPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const PAGE_SIZE = 25
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  const load = useCallback(
-    async (p = 1) => {
-      setLoading(true)
-      setSelected(new Set())
-      try {
-        const res = await fetch(
-          `/api/admin/catalog-enrichment?status=${statusFilter}&page=${p}&pageSize=${PAGE_SIZE}`,
-          { credentials: 'include' }
-        )
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error || 'Load failed')
-        setItems(data.items || [])
-        setTotal(data.total || 0)
-        setPage(p)
-      } catch (err: any) {
-        showToast(err?.message || 'Load failed', 'error')
-      } finally {
-        setLoading(false)
-      }
+  const list = useInfiniteList<Item>({
+    key: statusFilter,
+    pageSize: PAGE_SIZE,
+    getKey: i => i.id,
+    fetchPage: async (p, signal) => {
+      const data = await fetchJson(`/api/admin/catalog-enrichment?status=${statusFilter}&page=${p}&pageSize=${PAGE_SIZE}`, signal)
+      return { rows: data.items || [], total: data.total || 0 }
     },
-    [statusFilter]
-  )
+  })
+  const items = list.rows
+  const loading = list.loading
+  useEffect(() => setSelected(new Set()), [statusFilter])
 
-  useEffect(() => {
-    load(1)
-  }, [load])
+  // A decided item leaves a filtered list; under "all" it just changes status.
+  const applyDecision = (ids: string[], decision: 'approve' | 'reject') => {
+    const set = new Set(ids)
+    const status = decision === 'approve' ? 'approved' : 'rejected'
+    list.setRows(rows => (statusFilter === 'all' ? rows.map(r => (set.has(r.id) ? { ...r, status } : r)) : rows.filter(r => !set.has(r.id))))
+  }
 
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -151,7 +139,7 @@ export default function CatalogEnrichmentPage() {
         decision === 'approve' ? (data.reEmbedded ? 'Approved + re-embedded' : 'Approved') : 'Rejected',
         'success'
       )
-      load(page)
+      applyDecision([id], decision)
       setSelected(prev => {
         const n = new Set(prev)
         n.delete(id)
@@ -177,7 +165,7 @@ export default function CatalogEnrichmentPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Bulk action failed')
       showToast(`${action === 'approve' ? 'Approved' : 'Rejected'} ${data.processed} items`, 'success')
-      load(page)
+      applyDecision([...selected], action)
       setSelected(new Set())
     } catch (err: any) {
       showToast(err?.message || 'Bulk action failed', 'error')
@@ -271,7 +259,10 @@ export default function CatalogEnrichmentPage() {
             <TableSkeleton rows={8} cols={6} />
           )}
 
-          {!loading && items.length === 0 && (
+          {!loading && items.length === 0 && list.error && (
+            <ErrorState body={list.error} actionNode={<button type="button" onClick={list.retry} className="control-sm border border-border-default text-foreground hover:bg-surface-secondary">Retry</button>} />
+          )}
+          {!loading && items.length === 0 && !list.error && (
             <EmptyState title={`Nothing in the ${statusFilter} queue.`} body={<>Click <strong>Run All</strong> to enrich products.</>} />
           )}
 
@@ -287,6 +278,8 @@ export default function CatalogEnrichmentPage() {
                             type="checkbox"
                             checked={allProposedSelected}
                             onChange={toggleAll}
+                            aria-label="Select all loaded rows"
+                            title="Select all loaded rows"
                             className="rounded border-border-default accent-accent-500"
                           />
                         </th>
@@ -480,41 +473,7 @@ export default function CatalogEnrichmentPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="px-4 py-3 border-t border-border-default flex items-center justify-between gap-2">
-                <div className="text-xs text-foreground-muted">
-                  {total > 0 && (
-                    <>
-                      Showing{' '}
-                      <span className="font-medium text-foreground">
-                        {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
-                      </span>{' '}
-                      of <span className="font-medium text-foreground">{total}</span>
-                    </>
-                  )}
-                  {selected.size > 0 ? ` · ${selected.size} selected` : ''}
-                </div>
-                {totalPages > 1 && (
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      disabled={page <= 1}
-                      onClick={() => load(page - 1)}
-                      className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
-                    >
-                      Prev
-                    </button>
-                    <span className="text-xs text-foreground-muted whitespace-nowrap">
-                      Page {page} of {totalPages}
-                    </span>
-                    <button
-                      disabled={page >= totalPages}
-                      onClick={() => load(page + 1)}
-                      className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
-              </div>
+              <InfiniteFooter className="px-4 pb-3" shown={items.length} control={list} noun={selected.size > 0 ? `items · ${selected.size} selected` : 'items'} />
             </div>
           )}
         </>

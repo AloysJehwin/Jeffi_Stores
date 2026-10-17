@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   ShoppingCart,
@@ -30,6 +30,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { categoryFor, type ActivityCategory } from '@/lib/shared/activity-shared'
+import { InfiniteFooter } from '@/components/admin/kit/infinite'
 import { ap } from '@/lib/shared/admin-path'
 
 interface ActivityEvent {
@@ -120,6 +121,7 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(true)
   const [filter, setFilter] = useState<FilterKey>('all')
+  const [loadingMore, setLoadingMore] = useState(false)
   const loadingMoreRef = useRef(false)
 
   async function load(before?: string) {
@@ -136,9 +138,16 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
       }
     } finally {
       setLoading(false)
+      setLoadingMore(false)
       loadingMoreRef.current = false
     }
   }
+
+  const loadMore = useCallback(() => {
+    if (!hasMore || loadingMoreRef.current || !events.length) return
+    load(events[events.length - 1].created_at)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, events])
 
   useEffect(() => {
     load()
@@ -278,16 +287,12 @@ export default function CustomerTimeline({ customerId }: { customerId: string })
             </div>
           ))}
 
-          {hasMore && events.length > 0 && (
-            <button
-              type="button"
-              onClick={() => load(events[events.length - 1].created_at)}
-              disabled={loadingMoreRef.current}
-              className="w-full py-2 text-xs font-medium text-accent-500 hover:text-accent-600 transition-colors disabled:opacity-50"
-            >
-              Load older events
-            </button>
-          )}
+          <InfiniteFooter
+            shown={events.length}
+            control={{ hasMore, loadingMore, loadMore }}
+            noun="events"
+            className="mt-2"
+          />
         </div>
       )}
     </div>

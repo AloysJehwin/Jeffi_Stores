@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useCallback, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -8,6 +8,7 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
 import { EmptyState, ListSkeleton } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
+import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 
 interface AdminOption {
   id: string
@@ -210,12 +211,7 @@ export default function AdminTasksClient() {
   const [priority, setPriority] = useState<string>('all')
   const [segment, setSegment] = useState<string>('all')
   const [search, setSearch] = useState('')
-  const [page, setPage] = useState(1)
-
-  const [tasks, setTasks] = useState<TaskRow[]>([])
-  const [total, setTotal] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
   const [busy, setBusy] = useState(false)
   const toast = useActionToast()
 
@@ -236,51 +232,28 @@ export default function AdminTasksClient() {
       .catch(() => {})
   }, [])
 
-  const load = useCallback(
-    async (pg = page) => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams({
-          scope,
-          status,
-          priority,
-          segment,
-          page: String(pg),
-          ...(search.trim() ? { search: search.trim() } : {}),
-        })
-        const res = await fetch(`/api/admin/tasks?${params}`, { credentials: 'include' })
-        if (res.ok) {
-          const data = await res.json()
-          setTasks(data.tasks || [])
-          setTotal(data.total || 0)
-          setTotalPages(data.totalPages || 1)
-        }
-      } finally {
-        setLoading(false)
-      }
+  // API pages at 25 (?page); next page appends on scroll, filters start over.
+  const list = useInfiniteList<TaskRow>({
+    key: [scope, status, priority, segment, query].join('|'),
+    pageSize: 25,
+    getKey: t => t.id,
+    fetchPage: async (pg, signal) => {
+      const params = new URLSearchParams({ scope, status, priority, segment, page: String(pg), ...(query ? { search: query } : {}) })
+      const data = await fetchJson(`/api/admin/tasks?${params}`, signal)
+      return { rows: data.tasks || [], total: data.total || 0, hasMore: pg < (data.totalPages || 1) }
     },
-    [scope, status, priority, segment, search, page]
-  )
-
-  useEffect(() => {
-    setPage(1)
-    load(1)
-  }, [scope, status, priority, segment])
+  })
+  const tasks = list.rows
+  const loading = list.loading
+  const total = list.total ?? 0
 
   useEffect(() => {
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => {
-      setPage(1)
-      load(1)
-    }, 350)
+    searchTimer.current = setTimeout(() => setQuery(search.trim()), 350)
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current)
     }
   }, [search])
-
-  useEffect(() => {
-    load(page)
-  }, [page])
 
   useEffect(() => {
     setSuggestions(buildSuggestions(search, tasks))
@@ -317,9 +290,11 @@ export default function AdminTasksClient() {
         credentials: 'include',
         body: JSON.stringify({ status: t.status === 'completed' ? 'pending' : 'completed' }),
       })
-      if (res.ok) toast.success(t.status === 'completed' ? 'Task reopened' : 'Task completed')
-      else toast.error('Could not update the task')
-      await load(page)
+      if (res.ok) {
+        toast.success(t.status === 'completed' ? 'Task reopened' : 'Task completed')
+        // Toggling always moves the task out of the current status filter.
+        list.setRows(rows => rows.filter(r => r.id !== t.id))
+      } else toast.error('Could not update the task')
       router.refresh()
     } finally {
       setBusy(false)
@@ -365,9 +340,6 @@ export default function AdminTasksClient() {
     acc[b].push(t)
     return acc
   }, {})
-
-  const start = (page - 1) * 25 + 1
-  const end = Math.min(page * 25, total)
 
   return (
     <div className="space-y-4">
@@ -429,10 +401,7 @@ export default function AdminTasksClient() {
           <AdminSelect
             value={priority}
             options={PRIORITY_OPTIONS}
-            onChange={v => {
-              setPriority(v)
-              setPage(1)
-            }}
+            onChange={v => setPriority(v)}
             sm
           />
 
@@ -520,7 +489,7 @@ export default function AdminTasksClient() {
 
       {!loading && total > 0 && (
         <p className="text-xs text-foreground-muted">
-          Showing {start}–{end} of {total.toLocaleString()} task{total !== 1 ? 's' : ''}
+          {total.toLocaleString()} task{total !== 1 ? 's' : ''}
         </p>
       )}
 
@@ -657,7 +626,7 @@ export default function AdminTasksClient() {
                                 {customerName(t)}
                               </Link>
                               <span className="text-[10px] text-foreground-muted">·</span>
-                              <AssignSelect task={t} admins={admins} onReassigned={() => load(page)} />
+                              <AssignSelect task={t} admins={admins} onReassigned={list.reload} />
                             </div>
                           </div>
                         </div>
@@ -670,60 +639,7 @@ export default function AdminTasksClient() {
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-2">
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1 || loading}
-            className="flex items-center gap-1.5 px-3 h-control-sm rounded-lg text-xs font-semibold border border-border-default bg-surface-elevated text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Previous
-          </button>
-
-          <div className="flex items-center gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 2)
-              .reduce<(number | '…')[]>((acc, p, i, arr) => {
-                if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('…')
-                acc.push(p)
-                return acc
-              }, [])
-              .map((p, i) =>
-                p === '…' ? (
-                  <span key={`ellipsis-${i}`} className="px-1 text-xs text-foreground-muted">
-                    …
-                  </span>
-                ) : (
-                  <button
-                    key={p}
-                    onClick={() => setPage(p as number)}
-                    className={`w-7 h-7 rounded-lg text-xs font-semibold transition-all ${
-                      page === p
-                        ? 'bg-accent-500 text-white shadow-sm'
-                        : 'text-foreground-secondary hover:bg-surface-secondary'
-                    }`}
-                  >
-                    {p}
-                  </button>
-                )
-              )}
-          </div>
-
-          <button
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages || loading}
-            className="flex items-center gap-1.5 px-3 h-control-sm rounded-lg text-xs font-semibold border border-border-default bg-surface-elevated text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          >
-            Next
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
-      )}
+      {!loading && <InfiniteFooter shown={tasks.length} control={list} noun="tasks" />}
     </div>
   )
 }

@@ -1,9 +1,9 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useState } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
 import { Badge, Section, when } from '@/components/admin/kit/core'
-import { useOverviewData } from '@/components/admin/overview/kit'
+import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import JobDetail from './JobDetail'
 import { JobBadge, duration, sheetUrl, sourceLabel, type ImportJob } from './shared'
 
@@ -26,24 +26,31 @@ const SOURCE: { id: SourceFilter; label: string }[] = [
 
 const PAGE = 20
 
-/** Every import this store has run, paged and filterable. */
+/** Every import this store has run, loaded on scroll and filterable. */
 export default function HistoryTab({ refreshKey }: { refreshKey: number }) {
   const [status, setStatus] = useState<StatusFilter>('all')
   const [source, setSource] = useState<SourceFilter>('all')
-  const [page, setPage] = useState(1)
   const [open, setOpen] = useState<string | null>(null)
 
-  const url = `/api/admin/data-source/jobs?status=${status}&source=${source}&limit=${PAGE}&offset=${(page - 1) * PAGE}&k=${refreshKey}`
-  const { data, loading, error } = useOverviewData<{ jobs: ImportJob[]; total: number }>(url)
-  const jobs = data?.jobs ?? []
-  const total = data?.total ?? 0
-  const pages = useMemo(() => Math.max(1, Math.ceil(total / PAGE)), [total])
+  const list = useInfiniteList<ImportJob>({
+    key: `${status}|${source}|${refreshKey}`,
+    pageSize: PAGE,
+    getKey: j => j.id,
+    fetchPage: async (p, signal) => {
+      const data = await fetchJson<{ jobs: ImportJob[]; total: number }>(`/api/admin/data-source/jobs?status=${status}&source=${source}&limit=${PAGE}&offset=${(p - 1) * PAGE}`, signal)
+      return { rows: data.jobs ?? [], total: data.total ?? 0 }
+    },
+  })
+  const jobs = list.rows
+  const total = list.total ?? 0
+  const loading = list.loading
+  const error = jobs.length ? null : list.error
 
   return (
     <Section title={`Imports (${total.toLocaleString('en-IN')})`}>
       <div className="flex flex-wrap gap-2 mb-3">
-        <Filter options={STATUS} value={status} onChange={v => (setPage(1), setStatus(v))} label="Status" />
-        <Filter options={SOURCE} value={source} onChange={v => (setPage(1), setSource(v))} label="Source" />
+        <Filter options={STATUS} value={status} onChange={setStatus} label="Status" />
+        <Filter options={SOURCE} value={source} onChange={setSource} label="Source" />
       </div>
 
       {error ? (
@@ -132,17 +139,7 @@ export default function HistoryTab({ refreshKey }: { refreshKey: number }) {
         </div>
       )}
 
-      {pages > 1 && (
-        <div className="flex items-center justify-end gap-2 pt-3 text-xs text-foreground-muted">
-          <button type="button" disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-2 py-1 border border-border-default rounded disabled:opacity-40">
-            Prev
-          </button>
-          {page} / {pages}
-          <button type="button" disabled={page >= pages} onClick={() => setPage(p => p + 1)} className="px-2 py-1 border border-border-default rounded disabled:opacity-40">
-            Next
-          </button>
-        </div>
-      )}
+      {!loading && !error && <InfiniteFooter shown={jobs.length} control={list} noun="imports" />}
     </Section>
   )
 }

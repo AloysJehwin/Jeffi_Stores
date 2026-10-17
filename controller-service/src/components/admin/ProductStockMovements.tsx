@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
+import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 
@@ -36,31 +37,18 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function ProductStockMovements({ productId }: { productId: string }) {
   const [open, setOpen] = useState(false)
-  const [rows, setRows] = useState<Transaction[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
   const PAGE_SIZE = 20
-
-  useEffect(() => {
-    if (!open) return
-    setLoading(true)
-    const params = new URLSearchParams({
-      view: 'ledger',
-      product_id: productId,
-      page: String(page),
-      limit: String(PAGE_SIZE),
-    })
-    fetch(`/api/admin/inventory/stock?${params}`)
-      .then(r => r.json())
-      .then(d => {
-        setRows(d.transactions || [])
-        setTotal(d.total || 0)
-      })
-      .finally(() => setLoading(false))
-  }, [open, productId, page])
-
-  const pages = Math.ceil(total / PAGE_SIZE)
+  const list = useInfiniteList<Transaction>({
+    key: open ? productId : null,
+    pageSize: PAGE_SIZE,
+    getKey: t => t.id,
+    fetchPage: async (page, signal) => {
+      const params = new URLSearchParams({ view: 'ledger', product_id: productId, page: String(page), limit: String(PAGE_SIZE) })
+      const d = await fetchJson(`/api/admin/inventory/stock?${params}`, signal)
+      return { rows: d.transactions || [], total: d.total || 0 }
+    },
+  })
+  const { rows, loading } = list
 
   return (
     <div className="mt-6 border border-border-default rounded-xl overflow-hidden">
@@ -77,6 +65,10 @@ export default function ProductStockMovements({ productId }: { productId: string
         <div className="overflow-x-auto">
           {loading ? (
             <div className="px-4 py-6 text-center text-sm text-foreground-muted">Loading…</div>
+          ) : rows.length === 0 && list.error ? (
+            <div className="px-4 pb-3">
+              <InfiniteFooter shown={0} control={list} />
+            </div>
           ) : rows.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm text-foreground-muted">No stock movements recorded.</div>
           ) : (
@@ -177,30 +169,9 @@ export default function ProductStockMovements({ productId }: { productId: string
                 </tbody>
               </table>
 
-              {pages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-border-default bg-surface text-sm">
-                  <span className="text-foreground-secondary">{total} movements</span>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="px-3 h-control-sm rounded border border-border-secondary text-foreground-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
-                    >
-                      Prev
-                    </button>
-                    <span className="px-2 py-1 text-foreground-secondary">
-                      {page} / {pages}
-                    </span>
-                    <button
-                      onClick={() => setPage(p => Math.min(pages, p + 1))}
-                      disabled={page === pages}
-                      className="px-3 h-control-sm rounded border border-border-secondary text-foreground-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div className="px-4 pb-3 border-t border-border-default bg-surface">
+                <InfiniteFooter shown={rows.length} control={list} noun="movements" />
+              </div>
             </>
           )}
         </div>

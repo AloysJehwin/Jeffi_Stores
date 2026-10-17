@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { PageHeader, TONE_CLS, useActionToast } from '@/components/admin/kit'
+import { InfiniteFooter, PageHeader, TONE_CLS, fetchJson, useActionToast, useInfiniteList } from '@/components/admin/kit'
 import { useSearchParams, useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
@@ -41,20 +41,19 @@ function statusLabel(s: string) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrders: Order[]; tabs?: React.ReactNode }) {
+export default function PackingSlipsClient({ tabs }: { tabs?: React.ReactNode }) {
   const searchParams = useSearchParams()
   const router = useRouter()
 
-  const [orders, setOrders] = useState<Order[]>(initialOrders)
   const [fromDate, setFromDate] = useState(searchParams.get('from') || '')
   const [toDate, setToDate] = useState(searchParams.get('to') || '')
+  // Dates apply on Search; customer and status filter live (server-side now).
+  const [range, setRange] = useState({ from: searchParams.get('from') || '', to: searchParams.get('to') || '' })
   const [customerSearch, setCustomerSearch] = useState(searchParams.get('customer') || '')
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [filtering, setFiltering] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const toast = useActionToast()
-  const [error, setError] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const customerRef = useRef<HTMLDivElement>(null)
 
@@ -77,6 +76,24 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+
+  const PAGE_SIZE = 25
+  const list = useInfiniteList<Order>({
+    key: `${range.from}|${range.to}|${customerSearch.trim()}|${statusFilter}`,
+    pageSize: PAGE_SIZE,
+    getKey: o => o.id,
+    fetchPage: async (page, signal) => {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) })
+      if (range.from) params.set('from', range.from)
+      if (range.to) params.set('to', range.to)
+      if (customerSearch.trim()) params.set('customer', customerSearch.trim())
+      if (statusFilter) params.set('status', statusFilter)
+      const data = await fetchJson(`/api/admin/packing-slips/list?${params}`, signal)
+      return { rows: data.orders || [], total: data.total ?? null }
+    },
+  })
+  const orders = list.rows
+
   const customerSuggestions = useMemo(() => {
     if (!customerSearch.trim()) return []
     const q = customerSearch.toLowerCase()
@@ -92,42 +109,20 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
       })
       .slice(0, 8)
   }, [orders, customerSearch])
+  const filtered = orders
+  const paged = orders
+  const filtering = list.loading
+  const error = orders.length ? '' : list.error || ''
 
-  const filtered = useMemo(() => {
-    return orders.filter(o => {
-      if (customerSearch && !o.customer_name?.toLowerCase().includes(customerSearch.toLowerCase())) return false
-      if (statusFilter && o.status !== statusFilter) return false
-      return true
-    })
-  }, [orders, customerSearch, statusFilter])
-
-  const PAGE_SIZE = 25
-  const [page, setPage] = useState(1)
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  useEffect(() => {
-    setPage(1)
-  }, [customerSearch, statusFilter, fromDate, toDate])
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages)
-  }, [page, totalPages])
-  const paged = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page])
-
-  const allSelected = filtered.length > 0 && filtered.every(o => selectedIds.has(o.id))
+  // Select-all covers the loaded rows only.
+  const allSelected = orders.length > 0 && orders.every(o => selectedIds.has(o.id))
 
   function toggleAll() {
-    if (allSelected) {
-      setSelectedIds(prev => {
-        const next = new Set(prev)
-        filtered.forEach(o => next.delete(o.id))
-        return next
-      })
-    } else {
-      setSelectedIds(prev => {
-        const next = new Set(prev)
-        filtered.forEach(o => next.add(o.id))
-        return next
-      })
-    }
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      orders.forEach(o => (allSelected ? next.delete(o.id) : next.add(o.id)))
+      return next
+    })
   }
 
   function toggleOne(id: string) {
@@ -139,30 +134,16 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
     })
   }
 
-  const selectedVisible = filtered.filter(o => selectedIds.has(o.id)).length
 
-  async function applyDateFilter() {
-    setFiltering(true)
-    setError('')
-    try {
-      const params = new URLSearchParams()
-      if (fromDate) params.set('from', fromDate)
-      if (toDate) params.set('to', toDate)
-      const res = await fetch(`/api/admin/packing-slips/list?${params}`)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to load orders')
-      setOrders(data.orders)
-      setSelectedIds(new Set())
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setFiltering(false)
-    }
+  function applyDateFilter() {
+    setRange({ from: fromDate, to: toDate })
+    setSelectedIds(new Set())
   }
 
   function clearAll() {
     setFromDate('')
     setToDate('')
+    setRange({ from: '', to: '' })
     setCustomerSearch('')
     setStatusFilter('')
     syncUrl({ from: '', to: '', customer: '', status: '' })
@@ -172,7 +153,6 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
     setDownloading(true)
-    setError('')
     try {
       const res = await fetch('/api/admin/packing-slips/bulk', {
         method: 'POST',
@@ -317,7 +297,7 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
           <h2 className="text-base font-semibold text-foreground">
             Orders
             <span className="ml-2 text-sm font-normal text-foreground-muted">
-              {filtered.length !== orders.length ? `${filtered.length} of ${orders.length}` : orders.length}
+              {list.total != null && list.total > orders.length ? `${orders.length} of ${list.total}` : orders.length}
             </span>
           </h2>
           {selectedIds.size > 0 && (
@@ -341,9 +321,7 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
 
         {filtered.length === 0 ? (
           <div className="px-6 py-12 text-center text-foreground-muted text-sm">
-            {orders.length === 0
-              ? 'No orders found for the selected date range.'
-              : 'No orders match the current filters.'}
+            {list.loading ? 'Loading…' : customerSearch || statusFilter ? 'No orders match the current filters.' : 'No orders found for the selected date range.'}
           </div>
         ) : (
           <>
@@ -365,6 +343,8 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
                         type="checkbox"
                         checked={allSelected}
                         onChange={toggleAll}
+                        aria-label="Select all loaded orders"
+                        title="Select all loaded orders"
                         className="rounded border-border-default"
                       />
                     </th>
@@ -466,36 +446,9 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
           </>
         )}
 
-        {filtered.length > 0 && (
-          <div className="flex items-center justify-between gap-2 mt-4 px-1 text-sm">
-            <span className="text-foreground-secondary text-xs">
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
-            </span>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  className="px-3 h-control-sm rounded-lg border border-border-default text-xs font-medium hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-xs text-foreground-secondary">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={page >= totalPages}
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  className="px-3 h-control-sm rounded-lg border border-border-default text-xs font-medium hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="px-4 pb-4">
+          <InfiniteFooter shown={orders.length} control={list} noun="orders" />
+        </div>
       </div>
     </div>
   )

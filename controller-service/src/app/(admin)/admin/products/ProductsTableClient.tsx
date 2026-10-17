@@ -301,7 +301,7 @@ export default function ProductsTableClient({
         pageSize={pageSize}
         pageHref={pageHrefFrom(pageUrls)}
         onRowClick={setSelected}
-        mobile={<ProductsMobileList products={products} featuredCount={featuredCount} backUrl={backUrl} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />}
+        mobile={rows => <ProductsMobileList products={rows} featuredCount={featuredCount} backUrl={backUrl} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />}
         empty={{ title: 'No products found.', body: 'Try clearing a filter or add a new product.' }}
         rowActions={product => [
           {

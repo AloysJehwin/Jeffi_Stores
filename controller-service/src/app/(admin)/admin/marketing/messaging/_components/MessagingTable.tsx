@@ -144,15 +144,15 @@ export default function MessagingTable({
       page={page}
       pageSize={pageSize}
       pageHref={pageHref}
-      mobile={
+      mobile={rows => (
         <MailerMobileList
-          campaigns={campaigns}
+          campaigns={rows}
           templateLabels={templateLabels}
           statusStyles={statusStyles}
           currentListUrl={currentListUrl}
           host={host}
         />
-      }
+      )}
       empty={{
         title: 'No campaigns yet.',
         actionNode: (

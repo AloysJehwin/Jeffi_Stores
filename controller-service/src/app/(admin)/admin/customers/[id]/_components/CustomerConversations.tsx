@@ -15,6 +15,7 @@ import {
   Send,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { InfiniteFooter } from '@/components/admin/kit/infinite'
 import NoteAttachments from '@/components/admin/NoteAttachments'
 import type { NoteAttachment } from '@/lib/shared/customer-notes-shared'
 import {
@@ -414,16 +415,12 @@ export default function CustomerConversations({
             </div>
           ))}
 
-          {nextBefore && (
-            <button
-              type="button"
-              onClick={() => load(nextBefore)}
-              disabled={loadingMore}
-              className="w-full py-2 text-xs font-medium text-accent-500 hover:text-accent-600 transition-colors disabled:opacity-50"
-            >
-              {loadingMore ? 'Loading…' : 'Load more'}
-            </button>
-          )}
+          <InfiniteFooter
+            shown={items.length}
+            control={{ hasMore: !!nextBefore, loadingMore, loadMore: () => nextBefore && load(nextBefore) }}
+            noun="messages"
+            className="mt-2"
+          />
         </div>
       )}
     </div>

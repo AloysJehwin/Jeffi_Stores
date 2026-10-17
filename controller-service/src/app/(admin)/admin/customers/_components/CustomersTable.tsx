@@ -239,7 +239,7 @@ export default function CustomersTable({
         pageSize={pageSize}
         pageHref={pageHref}
         onRowClick={setOpen}
-        mobile={<CustomersMobileList customers={customers} backUrl={backUrl} />}
+        mobile={rows => <CustomersMobileList customers={rows} backUrl={backUrl} />}
         empty={{ title: 'No customers found.', body: 'Try a different search or clear the filters.' }}
         rowActions={c => [{ key: 'view', kind: 'view', label: 'View Customer', href: viewHref(c) }]}
       />

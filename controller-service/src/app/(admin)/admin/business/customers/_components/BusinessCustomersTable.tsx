@@ -57,7 +57,7 @@ export default function BusinessCustomersTable({ customers, total, page, pageSiz
       total={total}
       page={page}
       pageSize={pageSize}
-      mobile={<BusinessCustomersMobileList customers={customers} />}
+      mobile={rows => <BusinessCustomersMobileList customers={rows} />}
       empty={{ title: 'No business customers found.' }}
       rowActions={c => [{ key: 'view', kind: 'view', label: 'View customer', href: c.href }]}
     />

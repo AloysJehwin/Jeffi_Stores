@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { CampaignCardListSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import { useToast } from '@/contexts/ToastContext'
@@ -18,39 +18,30 @@ import {
 } from './_components/campaign-presentation'
 import CampaignsMobileList from './_components/CampaignsMobileList'
 import RowActions from '@/components/admin/RowActions'
-import { EmptyState } from '@/components/admin/kit'
+import { EmptyState, InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit'
 
 export default function CampaignsListClient() {
   const { showToast } = useToast()
   const confirm = useConfirm()
-  const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
-  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
-  const [offset, setOffset] = useState(0)
-  const [total, setTotal] = useState(0)
   const LIMIT = 20
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused'>('all')
   const [channelFilter, setChannelFilter] = useState<'all' | 'email' | 'whatsapp'>('all')
 
-  async function load(off = offset) {
-    setLoading(true)
-    try {
-      const res = await fetch(`/api/admin/campaigns?limit=${LIMIT}&offset=${off}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setCampaigns(data.campaigns || [])
-        setTotal(data.total || 0)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load(0)
-  }, [])
+  const list = useInfiniteList<CampaignRow>({
+    key: 'campaigns',
+    pageSize: LIMIT,
+    getKey: c => c.kind,
+    fetchPage: async (p, signal) => {
+      const data = await fetchJson(`/api/admin/campaigns?limit=${LIMIT}&offset=${(p - 1) * LIMIT}`, signal)
+      return { rows: data.campaigns || [], total: data.total || 0 }
+    },
+  })
+  const campaigns = list.rows
+  const loading = list.loading
+  const load = () => list.reload()
 
   const filtered = useMemo(() => {
     return campaigns.filter(c => {
@@ -83,7 +74,7 @@ export default function CampaignsListClient() {
     setBusy(c.kind)
     try {
       await fetch(`/api/admin/campaigns/${c.kind}/draft`, { method: 'DELETE', credentials: 'include' })
-      await load(offset)
+      await load()
     } finally {
       setBusy(null)
     }
@@ -96,7 +87,7 @@ export default function CampaignsListClient() {
       const data = await res.json().catch(() => ({}))
       if (res.ok) showToast(`${c.name} published`, 'success')
       else showToast(data.error || 'Failed to publish', 'error')
-      await load(offset)
+      await load()
     } finally {
       setBusy(null)
     }
@@ -111,7 +102,7 @@ export default function CampaignsListClient() {
         credentials: 'include',
         body: JSON.stringify({ enabled: !c.enabled }),
       })
-      await load(offset)
+      list.setRows(rows => rows.map(r => (r.kind === c.kind ? { ...r, enabled: !c.enabled } : r)))
     } finally {
       setBusy(null)
     }
@@ -129,7 +120,7 @@ export default function CampaignsListClient() {
       const res = await fetch(`/api/admin/campaigns/${c.kind}/run`, { method: 'POST', credentials: 'include' })
       const data = await res.json()
       showToast(res.ok ? `Sent ${data.totalSent ?? 0} email(s).` : data.error || 'Failed', res.ok ? 'success' : 'error')
-      await load(offset)
+      await load()
     } finally {
       setBusy(null)
     }
@@ -390,37 +381,8 @@ export default function CampaignsListClient() {
         </>
       )}
 
-      {total > LIMIT && !search && statusFilter === 'all' && channelFilter === 'all' && (
-        <div className="flex items-center justify-between pt-1 text-sm text-foreground-muted">
-          <span>
-            Showing {offset + 1}–{Math.min(offset + LIMIT, total)} of {total}
-          </span>
-          <div className="flex gap-2">
-            <button
-              disabled={offset === 0}
-              onClick={() => {
-                const o = offset - LIMIT
-                setOffset(o)
-                load(o)
-              }}
-              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <button
-              disabled={offset + LIMIT >= total}
-              onClick={() => {
-                const o = offset + LIMIT
-                setOffset(o)
-                load(o)
-              }}
-              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Filters apply to the loaded rows; scrolling loads the next LIMIT. */}
+      <InfiniteFooter shown={campaigns.length} control={list} noun="campaigns" />
     </div>
   )
 }

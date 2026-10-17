@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 
+import { listKey } from '@/lib/admin/list-key'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { Search } from 'lucide-react'
@@ -163,7 +164,7 @@ async function BusinessCustomersListContent({
 // Keys the table Suspense on the query string so filter/pagination changes
 // re-trigger the shimmer while the stats + filters above stay mounted.
 function BusinessCustomersListSection({ resolvedSearchParams, host }: { resolvedSearchParams: SP; host: string }) {
-  const key = JSON.stringify(resolvedSearchParams)
+  const key = listKey(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>
       <BusinessCustomersListContent resolvedSearchParams={resolvedSearchParams} host={host} />

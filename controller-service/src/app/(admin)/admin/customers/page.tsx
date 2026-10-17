@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { listKey } from '@/lib/admin/list-key'
 import { getCustomers, getCustomerStats, getCustomerSegments, getCustomerChannelMix } from '@/lib/queries'
 import CustomersTable from './_components/CustomersTable'
 import { ap } from '@/lib/shared/admin-path'
@@ -120,7 +121,7 @@ function KpiRowSkeleton() {
 // while the stats + filters above stay mounted.
 async function CustomersListSection({ searchParams }: { searchParams: Promise<SP> }) {
   const resolvedSearchParams = await searchParams
-  const key = JSON.stringify(resolvedSearchParams)
+  const key = listKey(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={7} />}>
       <CustomersListContent resolvedSearchParams={resolvedSearchParams} />

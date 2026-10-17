@@ -108,6 +108,8 @@ export default function BrandsTable({
     return ap(`/admin/brands${qs ? `?${qs}` : ''}`)
   }
 
+  const [gone, setGone] = useState<Set<string>>(new Set())
+
   async function deleteBrand(brand: Brand) {
     const res = await fetch(`/api/brands/${brand.id}`, { method: 'DELETE' })
     if (!res.ok) {
@@ -115,6 +117,7 @@ export default function BrandsTable({
       return
     }
     showToast(`"${brand.name}" deleted successfully.`, 'success')
+    setGone(g => new Set(g).add(String(brand.id)))
     router.refresh()
   }
 
@@ -182,6 +185,7 @@ export default function BrandsTable({
     <>
       <DataTable<Brand>
         mode="server"
+        hide={r => gone.has(String(r.id))}
         rows={brands}
         cols={cols}
         rowKey={b => b.id}
@@ -190,7 +194,7 @@ export default function BrandsTable({
         pageSize={pageSize}
         pageHref={pageHref}
         onRowClick={setOpen}
-        mobile={<BrandsMobileList brands={brands} backUrl={backUrl} />}
+        mobile={rows => <BrandsMobileList brands={rows} backUrl={backUrl} />}
         empty={{ title: 'No brands found.', body: 'Add your first brand to get started.' }}
         rowActions={b => [
           {

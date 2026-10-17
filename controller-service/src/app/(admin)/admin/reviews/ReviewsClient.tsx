@@ -8,7 +8,7 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Tabs } from '@/components/admin/channels/ui'
-import { Dialog, EmptyState, PageBody, PageHeader, badgeCls, fieldInputCls } from '@/components/admin/kit'
+import { Dialog, EmptyState, InfiniteFooter, PageBody, PageHeader, badgeCls, fetchJson, fieldInputCls, useInfiniteList } from '@/components/admin/kit'
 import { Check, MessageSquare, Search, ExternalLink, Trash2, AlertTriangle } from 'lucide-react'
 import ReviewsOverview from './_components/ReviewsOverview'
 
@@ -106,14 +106,11 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
   const hasWriteScope = useCanWrite('reviews:write')
   const canWrite = canWriteProp && hasWriteScope
 
-  const [reviews, setReviews] = useState<Review[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [isLoading, setIsLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved'>(
     (searchParams.get('filter') as 'all' | 'pending' | 'approved') || 'pending'
   )
   const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [query, setQuery] = useState(search.trim())
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const { showToast } = useToast()
@@ -121,7 +118,21 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const PAGE_SIZE = 25
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const list = useInfiniteList<Review>({
+    key: `${filter}|${query}`,
+    pageSize: PAGE_SIZE,
+    getKey: r => r.id,
+    fetchPage: async (p, signal) => {
+      const params = new URLSearchParams({ filter })
+      if (query) params.set('q', query)
+      params.set('page', String(p))
+      params.set('pageSize', String(PAGE_SIZE))
+      const data = await fetchJson(`/api/admin/reviews?${params}`, signal)
+      return { rows: data.reviews || [], total: data.total || 0 }
+    },
+  })
+  const reviews = list.rows
+  const isLoading = list.loading
 
   useEffect(() => {
     if (!lightboxUrl) return
@@ -141,35 +152,11 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
     router.replace(ap(`/admin/reviews?${p.toString()}`), { scroll: false })
   }
 
-  useEffect(() => {
-    fetchReviews(search, 1)
-  }, [filter])
-
-  const fetchReviews = async (q = search, p = page) => {
-    setIsLoading(true)
-    try {
-      const params = new URLSearchParams({ filter })
-      if (q.trim()) params.set('q', q.trim())
-      params.set('page', String(p))
-      params.set('pageSize', String(PAGE_SIZE))
-      const response = await fetch(`/api/admin/reviews?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setReviews(data.reviews || [])
-        setTotal(data.total || 0)
-        setPage(p)
-      }
-    } catch {
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   function handleSearchChange(val: string) {
     setSearch(val)
     syncUrl({ q: val })
     if (searchTimer.current) clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => fetchReviews(val, 1), 300)
+    searchTimer.current = setTimeout(() => setQuery(val.trim()), 300)
   }
 
   const handleApprove = async (reviewId: string) => {
@@ -180,7 +167,7 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
         body: JSON.stringify({ reviewId, action: 'approve' }),
       })
       if (response.ok) {
-        fetchReviews(search, page)
+        list.setRows(rows => (filter === 'pending' ? rows.filter(r => r.id !== reviewId) : rows.map(r => (r.id === reviewId ? { ...r, is_approved: true } : r))))
         showToast('Review approved', 'success')
       } else {
         showToast('Failed to approve review', 'error')
@@ -206,7 +193,7 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
         body: JSON.stringify({ reviewId, action: 'reject' }),
       })
       if (response.ok) {
-        fetchReviews(search, page)
+        list.setRows(rows => rows.filter(r => r.id !== reviewId))
         showToast('Review deleted', 'success')
       } else {
         showToast('Failed to delete review', 'error')
@@ -417,35 +404,7 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
         </div>
       )}
 
-      {!isLoading && reviews.length > 0 && totalPages > 1 && (
-        <div className="mt-4 px-1 flex items-center justify-between gap-2">
-          <p className="text-xs text-foreground-muted whitespace-nowrap">
-            <span className="font-medium text-foreground">
-              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
-            </span>{' '}
-            of <span className="font-medium text-foreground">{total}</span> reviews
-          </p>
-          <div className="flex items-center gap-1.5">
-            <button
-              disabled={page <= 1}
-              onClick={() => fetchReviews(search, page - 1)}
-              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
-            >
-              Prev
-            </button>
-            <span className="text-xs text-foreground-muted whitespace-nowrap">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => fetchReviews(search, page + 1)}
-              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      {!isLoading && <InfiniteFooter shown={reviews.length} control={list} noun="reviews" />}
 
       <Dialog open={!!lightboxUrl} onClose={() => setLightboxUrl(null)} title="Review photo" size="xl" zIndex="z-[300]">
         {lightboxUrl && (

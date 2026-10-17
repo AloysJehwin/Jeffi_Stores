@@ -15,7 +15,7 @@ import {
   computeVolumeFactor,
 } from '@/lib/catalog/units'
 import ProductsAdvancedFilters from '../products/_components/ProductsAdvancedFilters'
-import { EmptyState, PageBody, PageHeader, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { EmptyState, InfiniteFooter, PageBody, PageHeader, fetchJson, fieldInputCls, useActionToast, useInfiniteList } from '@/components/admin/kit'
 import { ADMIN_PRODUCT_FILTER_FIELDS, type AdvancedFilterField } from '@/lib/catalog/product-attribute-filters-shared'
 
 type SnapRow = { id: string; name?: string; before: Record<string, any> }
@@ -328,29 +328,21 @@ export default function ControlsClient({
   useEffect(() => {
     if (rollbackError) toast.error(rollbackError)
   }, [rollbackError, toast])
-  const [logs, setLogs] = useState<ControlsLog[]>([])
-  const [logsLoading, setLogsLoading] = useState(false)
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
-  const [logsPage, setLogsPage] = useState(0)
   const LOGS_PER_PAGE = 10
 
-  const loadLogs = useCallback(async () => {
-    setLogsLoading(true)
-    try {
-      const res = await fetch('/api/admin/controls/rollback')
-      if (res.ok) {
-        const data = await res.json()
-        setLogs(data.logs ?? [])
-        setLogsPage(0)
-      }
-    } finally {
-      setLogsLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadLogs()
-  }, [])
+  const logList = useInfiniteList<ControlsLog>({
+    key: 'controls-logs',
+    pageSize: LOGS_PER_PAGE,
+    getKey: l => l.id,
+    fetchPage: async (p, signal) => {
+      const data = await fetchJson(`/api/admin/controls/rollback?limit=${LOGS_PER_PAGE}&offset=${(p - 1) * LOGS_PER_PAGE}`, signal)
+      return { rows: data.logs ?? [], hasMore: !!data.hasMore }
+    },
+  })
+  const logs = logList.rows
+  const logsLoading = logList.loading
+  const loadLogs = logList.reload
 
   // Poll the bulk-image job while it runs; on completion surface success + enable
   // Undo, on failure surface the error. The picker is cleared only once terminal.
@@ -1454,8 +1446,7 @@ export default function ControlsClient({
           <p className="px-4 py-3 text-sm text-foreground-muted">No operations recorded yet.</p>
         ) : (
           (() => {
-            const totalPages = Math.ceil(logs.length / LOGS_PER_PAGE)
-            const pageLogs = logs.slice(logsPage * LOGS_PER_PAGE, (logsPage + 1) * LOGS_PER_PAGE)
+            const pageLogs = logs
             return (
               <>
                 <div className="divide-y divide-border-default">
@@ -1560,47 +1551,7 @@ export default function ControlsClient({
                     )
                   })}
                 </div>
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-4 py-2 border-t border-border-default bg-surface-secondary/50">
-                    <button
-                      type="button"
-                      onClick={() => setLogsPage(p => p - 1)}
-                      disabled={logsPage === 0}
-                      className="text-xs text-foreground-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                    >
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                      </svg>
-                      Prev
-                    </button>
-                    <span className="text-xs text-foreground-muted">
-                      Page {logsPage + 1} of {totalPages}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setLogsPage(p => p + 1)}
-                      disabled={logsPage >= totalPages - 1}
-                      className="text-xs text-foreground-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                    >
-                      Next
-                      <svg
-                        className="w-3.5 h-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
+                <InfiniteFooter className="px-4 pb-3" shown={logs.length} control={logList} noun="operations" />
               </>
             )
           })()

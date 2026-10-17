@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowDown, ArrowUp, Check, Plus, X } from 'lucide-react'
-import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, TableSkeleton, FormFooter, FormButton, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { TabAction, TabActionsPortal, PageHeader, QUOTATION_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, TableSkeleton, FormFooter, FormButton, fieldInputCls, useActionToast, InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit'
 import { useToast } from '@/contexts/ToastContext'
 import RowActions from '@/components/admin/RowActions'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -126,11 +126,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
       router.push(ap(`/admin/quotations?${params.toString()}`), { scroll: false })
     }
   }
-  const [quotations, setQuotations] = useState<Quotation[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
   const [selectedQuote, setSelectedQuote] = useState<Quotation | null>(null)
-  const [loading, setLoading] = useState(true)
   const toast = useActionToast()
   // Load/delete failures are action responses: toast, not a banner.
   const setError = (m: string) => {
@@ -144,7 +140,6 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
   const [sortDir, setSortDir] = useState<SortDir | undefined>(undefined)
 
   const PAGE_SIZE = 25
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   function syncUrl(patch: Record<string, string>) {
     const p = new URLSearchParams(window.location.search)
@@ -261,12 +256,13 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
     status: 'status',
   }
 
-  // Ordered server-side across all quotations via sort/dir params.
-  const sortedQuotations = quotations
 
-  async function loadList(p = 1) {
-    setLoading(true)
-    try {
+  // Ordered server-side across all quotations via sort/dir params.
+  const list = useInfiniteList<Quotation>({
+    key: view === 'list' ? `${statusFilter}|${searchQ}|${fromDate}|${toDate}|${sortCol}|${sortDir}` : null,
+    pageSize: PAGE_SIZE,
+    getKey: q => q.id,
+    fetchPage: async (p, signal) => {
       const params = new URLSearchParams()
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (searchQ) params.set('q', searchQ)
@@ -278,21 +274,14 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
       }
       params.set('page', String(p))
       params.set('pageSize', String(PAGE_SIZE))
-      const res = await fetch(`/api/admin/quotations?${params}`)
-      const data = await res.json()
-      setQuotations(data.quotations || [])
-      setTotal(data.total || 0)
-      setPage(p)
-    } catch {
-      setError('Failed to load quotations')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (view === 'list') loadList(1)
-  }, [view, statusFilter, searchQ, fromDate, toDate, sortCol, sortDir])
+      const data = await fetchJson(`/api/admin/quotations?${params}`, signal)
+      return { rows: data.quotations || [], total: data.total || 0 }
+    },
+  })
+  const quotations = list.rows
+  const sortedQuotations = quotations
+  const loading = list.loading
+  const loadList = list.reload
 
   function newQuotation() {
     setEditId(null)
@@ -747,7 +736,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         const d = await res.json()
         throw new Error(d.error)
       }
-      setQuotations(prev => prev.filter(q => q.id !== id))
+      list.setRows(prev => prev.filter(q => q.id !== id))
     } catch (e: any) {
       setError(e.message || 'Delete failed')
     }
@@ -864,7 +853,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
               inputClassName={inputCls + ' pr-9'}
             />
           </div>
-          <button type="button" onClick={() => loadList(1)} className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600">
+          <button type="button" onClick={() => loadList()} className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600">
             Search
           </button>
           <div className="inline-flex h-control items-center rounded-lg border border-border-default bg-surface-elevated p-0.5">
@@ -1046,27 +1035,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
             </div>
           </>
         )}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between gap-2 px-1 text-xs text-foreground-muted">
-            <span className="tabular-nums">
-              <span className="font-medium text-foreground">
-                {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
-              </span>{' '}
-              of <span className="font-medium text-foreground">{total}</span> quotations
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button disabled={page <= 1} onClick={() => loadList(page - 1)} className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:pointer-events-none disabled:opacity-40">
-                Prev
-              </button>
-              <span className="tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <button disabled={page >= totalPages} onClick={() => loadList(page + 1)} className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:pointer-events-none disabled:opacity-40">
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+        <InfiniteFooter shown={quotations.length} control={list} noun="quotations" />
         <QuotationDetailModal q={selectedQuote} onClose={() => setSelectedQuote(null)} />
         <Dialog
           open={showConvertModal}

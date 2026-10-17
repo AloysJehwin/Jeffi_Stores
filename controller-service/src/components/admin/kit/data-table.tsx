@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ArrowDown, ArrowUp, Bookmark, Search, X } from 'lucide-react'
 import Select from '@/components/ui/Select'
@@ -10,10 +9,12 @@ import RowActions, { type RowAction } from '@/components/admin/RowActions'
 import { useConfirm, usePrompt } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { EmptyState, ErrorState, TableSkeleton, type EmptyStateProps } from './states'
+import { InfiniteFooter, useReveal, useServerPages, type InfiniteControl } from './infinite'
 
-// List tables. Client mode sorts and pages in memory (25 rows). Server mode reads and writes the
-// page's existing query params (?page, ?sort&dir, filters, search) so lists stay server-rendered
-// and bookmarked URLs keep working. A server page cannot pass `cols` (functions) across the
+// List tables, infinite scroll (no page buttons). Client mode sorts in memory and reveals
+// pageSize rows at a time, or shows rows an `infinite` source (useInfiniteList) fetched so far.
+// Server mode reads and writes the page's existing query params (?page, ?sort&dir, filters,
+// search); rows of ?page=1..N accumulate client-side (see useServerPages). A server page cannot pass `cols` (functions) across the
 // client boundary: define the columns in a small client component next to the page.
 
 export interface DataCol<T> {
@@ -58,6 +59,12 @@ export interface DataTableProps<T> {
   pageSize?: number
   /** Server mode: page link builder; defaults to the current URL with ?page set. */
   pageHref?: (page: number) => string
+  /** Client mode fed page by page from an API (useInfiniteList): rows are everything loaded so far. */
+  infinite?: InfiniteControl & { loading?: boolean }
+  /** Rows removed locally (deleted) that earlier accumulated pages may still hold. */
+  hide?: (r: T) => boolean
+  /** Footer wording: "Showing X of Y <noun>". */
+  noun?: string
   /** Search box. Server mode writes ?param; client mode filters rows by `match`. */
   search?: { placeholder: string; param?: string; suggestType?: string; match?: (r: T) => string }
   filters?: FilterDef[]
@@ -71,8 +78,8 @@ export interface DataTableProps<T> {
   onRowClick?: (r: T) => void
   /** Card per row below md. */
   mobileCard?: (r: T) => ReactNode
-  /** Replace the mobile rendering entirely (an existing MobileList component). */
-  mobile?: ReactNode
+  /** Replace the mobile rendering entirely (an existing MobileList). A function gets the loaded rows. */
+  mobile?: ReactNode | ((rows: T[]) => ReactNode)
   loading?: boolean
   error?: string | null
   empty?: string | EmptyStateProps
@@ -205,40 +212,6 @@ function SavedViews({ storageKey }: { storageKey: string }) {
   )
 }
 
-function Pager({ page, pages, total, pageSize, href, onPage }: { page: number; pages: number; total: number; pageSize: number; href?: (p: number) => string; onPage?: (p: number) => void }) {
-  if (pages <= 1) return null
-  const start = (page - 1) * pageSize + 1
-  const end = Math.min(page * pageSize, total)
-  const btn = 'control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary'
-  const nav = (p: number, label: string, off: boolean) =>
-    href ? (
-      <Link href={href(p)} scroll={false} aria-label={label} className={`${btn} ${off ? 'pointer-events-none opacity-40' : ''}`} aria-disabled={off}>
-        {label}
-      </Link>
-    ) : (
-      <button type="button" disabled={off} onClick={() => onPage?.(p)} className={`${btn} disabled:opacity-40`} aria-label={label}>
-        {label}
-      </button>
-    )
-  return (
-    <div className="flex items-center justify-between gap-2 px-1 pt-3 text-xs text-foreground-muted">
-      <span className="tabular-nums">
-        <span className="font-medium text-foreground">
-          {start}-{end}
-        </span>{' '}
-        of <span className="font-medium text-foreground">{total}</span>
-      </span>
-      <div className="flex items-center gap-1.5">
-        {nav(page - 1, 'Prev', page <= 1)}
-        <span className="tabular-nums">
-          {page} / {pages}
-        </span>
-        {nav(page + 1, 'Next', page >= pages)}
-      </div>
-    </div>
-  )
-}
-
 function BulkButton<T>({ a, rows, done }: { a: BulkAction<T>; rows: T[]; done: () => void }) {
   const confirm = useConfirm()
   const allowed = useCanWrite(a.scope ?? 'none')
@@ -266,13 +239,12 @@ function BulkButton<T>({ a, rows, done }: { a: BulkAction<T>; rows: T[]; done: (
 }
 
 export function DataTable<T>(props: DataTableProps<T>) {
-  const { rows, cols, rowKey, mode = 'client', pageSize = 25, search, filters, savedViews, toolbar, selectable, bulkActions, rowActions, onRowClick, mobileCard, mobile, loading, error, empty, bare } = props
+  const { rows, cols, rowKey, mode = 'client', pageSize = 25, search, filters, savedViews, toolbar, selectable, bulkActions, rowActions, onRowClick, mobileCard, mobile, empty, bare, infinite, noun, hide } = props
   const server = mode === 'server'
   const { sp, set } = useQuery()
 
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [desc, setDesc] = useState(true)
-  const [localPage, setLocalPage] = useState(1)
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
@@ -295,24 +267,18 @@ export function DataTable<T>(props: DataTableProps<T>) {
     return r
   }, [server, rows, cols, sortKey, desc, q, search])
 
-  const total = server ? (props.total ?? rows.length) : shownRows.length
-  const page = server ? (props.page ?? 1) : localPage
-  const pages = Math.max(1, Math.ceil(total / pageSize))
-  const visible = server ? shownRows : shownRows.slice((page - 1) * pageSize, page * pageSize)
+  const sv = useServerPages({ rows: server ? rows : [], page: server ? (props.page ?? 1) : 1, total: server ? (props.total ?? rows.length) : 0, rowKey, pageHref: props.pageHref })
+  const reveal = useReveal(shownRows, pageSize, `${q}|${sortKey}|${desc}`)
+  const visibleAll = server ? sv.rows : infinite ? shownRows : reveal.shown
+  const visible = hide ? visibleAll.filter(r => !hide(r)) : visibleAll
+  const control: InfiniteControl = server ? sv.control : infinite ? { ...infinite, total: q.trim() ? null : infinite.total } : reveal.control
+  const loading = props.loading || (server && sv.resetting) || !!infinite?.loading
+  const firstPageError = infinite && !rows.length ? infinite.error : null
+  const error = props.error ?? firstPageError
+  const loadedRows = server ? sv.rows : rows
 
   const serverSort = sp.get('sort')
   const serverDir = sp.get('dir')
-  const pageHref = useMemo(() => {
-    if (!server) return undefined
-    if (props.pageHref) return props.pageHref
-    return (p: number) => {
-      const qs = new URLSearchParams(sp.toString())
-      if (p > 1) qs.set('page', String(p))
-      else qs.delete('page')
-      const s = qs.toString()
-      return `${typeof window !== 'undefined' ? window.location.pathname : ''}${s ? `?${s}` : ''}`
-    }
-  }, [server, props.pageHref, sp])
 
   const onHeader = (c: DataCol<T>) => {
     if (server) {
@@ -335,7 +301,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   const keys = visible.map(rowKey)
   const allOn = keys.length > 0 && keys.every(k => selected.has(k))
-  const selectedRows = rows.filter(r => selected.has(rowKey(r)))
+  const selectedRows = loadedRows.filter(r => selected.has(rowKey(r)))
   const emptyProps: EmptyStateProps = typeof empty === 'string' ? { title: empty } : (empty ?? { title: 'Nothing here yet.' })
 
   const hasToolbar = !!(search || filters?.length || savedViews || toolbar)
@@ -351,10 +317,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
             <input
               value={q}
-              onChange={e => {
-                setQ(e.target.value)
-                setLocalPage(1)
-              }}
+              onChange={e => setQ(e.target.value)}
               placeholder={search.placeholder}
               aria-label="Search"
               className="field-md w-full border border-border-default bg-surface-elevated pl-9 text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40"
@@ -368,12 +331,25 @@ export function DataTable<T>(props: DataTableProps<T>) {
 
   let body: ReactNode
   if (loading) body = <TableSkeleton cols={Math.min(cols.length, 6)} />
-  else if (error) body = <ErrorState body={error} bare={bare} />
+  else if (error)
+    body = (
+      <ErrorState
+        body={error}
+        bare={bare}
+        actionNode={
+          firstPageError && !props.error ? (
+            <button type="button" onClick={infinite?.retry ?? infinite?.loadMore} className="control-sm border border-border-default text-foreground hover:bg-surface-secondary">
+              Retry
+            </button>
+          ) : undefined
+        }
+      />
+    )
   else if (!visible.length) body = <EmptyState {...emptyProps} bare={bare} />
   else
     body = (
       <>
-        {(mobile || mobileCard) && <div className="space-y-2 md:hidden">{mobile ?? visible.map(r => <div key={rowKey(r)}>{mobileCard!(r)}</div>)}</div>}
+        {(mobile || mobileCard) && <div className="space-y-2 md:hidden">{typeof mobile === 'function' ? mobile(visible) : (mobile ?? visible.map(r => <div key={rowKey(r)}>{mobileCard!(r)}</div>))}</div>}
         <div className={`${mobile || mobileCard ? 'hidden md:block' : ''} ${bare ? '' : 'rounded-xl border border-border-default bg-surface-elevated'} overflow-hidden`}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -383,7 +359,8 @@ export function DataTable<T>(props: DataTableProps<T>) {
                     <th className="w-10 px-3 py-2.5">
                       <input
                         type="checkbox"
-                        aria-label="Select all"
+                        aria-label="Select all loaded rows"
+                        title="Select all loaded rows"
                         checked={allOn}
                         onChange={() => setSelected(prev => (allOn ? new Set([...prev].filter(k => !keys.includes(k))) : new Set([...prev, ...keys])))}
                       />
@@ -461,7 +438,9 @@ export function DataTable<T>(props: DataTableProps<T>) {
       {toolbarNode}
       {selectable && bulkActions && selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-accent-500/40 bg-accent-500/5 px-3 py-2 text-sm">
-          <span className="font-medium text-foreground">{selected.size} selected</span>
+          <span className="font-medium text-foreground">
+            {selected.size} selected <span className="font-normal text-foreground-muted">(of {loadedRows.length} loaded)</span>
+          </span>
           {bulkActions.map(a => (
             <BulkButton key={a.key} a={a} rows={selectedRows} done={() => setSelected(new Set())} />
           ))}
@@ -471,7 +450,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
         </div>
       )}
       {body}
-      {!loading && !error && (visible.length > 0 || (server && total > 0)) && <Pager page={page} pages={pages} total={total} pageSize={pageSize} href={pageHref} onPage={server ? undefined : setLocalPage} />}
+      {!loading && !props.error && !firstPageError && (visible.length > 0 || control.hasMore || control.error) && <InfiniteFooter shown={visible.length} control={control} noun={noun} />}
     </div>
   )
 }

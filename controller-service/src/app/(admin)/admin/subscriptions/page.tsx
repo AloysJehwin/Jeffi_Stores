@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { listKey } from '@/lib/admin/list-key'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import { DataToolbar, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import { getAdminSubscriptionStats, listAdminSubscriptions } from '@/lib/queries/subscriptions'
@@ -75,7 +76,7 @@ async function SubscriptionStats() {
 async function SubscriptionsListSection({ searchParams }: { searchParams: Promise<SP> }) {
   const sp = await searchParams
   return (
-    <Suspense key={JSON.stringify(sp)} fallback={<TableSkeleton rows={8} cols={7} />}>
+    <Suspense key={listKey(sp)} fallback={<TableSkeleton rows={8} cols={7} />}>
       <SubscriptionsListContent sp={sp} />
     </Suspense>
   )

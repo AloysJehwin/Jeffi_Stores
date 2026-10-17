@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Dialog, fieldInputCls } from '@/components/admin/kit'
+import { useState, useEffect, useRef } from 'react'
+import { Dialog, InfiniteFooter, fetchJson, fieldInputCls, useInfiniteList } from '@/components/admin/kit'
 import AdminSelect from '@/components/admin/AdminSelect'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
@@ -48,38 +48,28 @@ const PANEL_INPUT = fieldInputCls
  * variant images, and the bulk product-controls image op.
  */
 export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, onClose, pageSize = 24 }: Props) {
-  const [images, setImages] = useState<GalleryImage[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(false)
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [query, setQuery] = useState('')
   const [category, setCategory] = useState('')
   const [selected, setSelected] = useState<string[]>([])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-
-  const load = useCallback(
-    async (p: number, q: string, cat: string) => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams({ page: String(p), limit: String(pageSize) })
-        if (q.trim()) params.set('search', q.trim())
-        if (cat) params.set('category', cat)
-        const res = await fetch(`/api/gallery?${params.toString()}`, { credentials: 'include' })
-        const data = res.ok ? await res.json() : { images: [], total: 0 }
-        setImages(data.images || [])
-        setTotal(data.total || 0)
-      } catch {
-        setImages([])
-        setTotal(0)
-      } finally {
-        setLoading(false)
-      }
+  // Pages of pageSize append on scroll; search + category reset to page 1.
+  const list = useInfiniteList<GalleryImage>({
+    key: `${query}|${category}`,
+    pageSize,
+    getKey: g => g.id,
+    fetchPage: async (p, signal) => {
+      const params = new URLSearchParams({ page: String(p), limit: String(pageSize) })
+      if (query) params.set('search', query)
+      if (category) params.set('category', category)
+      const data = await fetchJson(`/api/gallery?${params.toString()}`, signal)
+      return { rows: data.images || [], total: data.total || 0 }
     },
-    [pageSize]
-  )
+  })
+  const images = list.rows
+  const loading = list.loading
 
   // Load categories once.
   useEffect(() => {
@@ -89,24 +79,17 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
       .catch(() => {})
   }, [])
 
-  // Fetch when page/category change immediately; debounce the search box.
+  // Debounce the search box.
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => load(page, search, category), search ? 300 : 0)
+    debounceRef.current = setTimeout(() => setQuery(search.trim()), 300)
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [page, search, category, load])
+  }, [search])
 
-  // Reset to page 1 when the filters change.
-  function onSearch(v: string) {
-    setSearch(v)
-    setPage(1)
-  }
-  function onCategory(v: string) {
-    setCategory(v)
-    setPage(1)
-  }
+  const onSearch = (v: string) => setSearch(v)
+  const onCategory = (v: string) => setCategory(v)
 
   function toggle(id: string) {
     if (mode === 'single') {
@@ -122,8 +105,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
   }
 
   function confirmMulti() {
-    // Preserve selection order. Selected ids may span pages we've navigated away
-    // from; in practice callers select from the visible page, so map from current.
+    // Preserve selection order; every loaded page stays in `images`.
     const picked = selected.map(id => images.find(g => g.id === id)).filter(Boolean) as GalleryImage[]
     if (picked.length) onConfirm(picked)
   }
@@ -220,38 +202,8 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
               })}
             </div>
           )}
+          {!loading && <InfiniteFooter shown={images.length} control={list} noun="images" />}
         </div>
-
-        {/* Pagination */}
-        {total > pageSize && (
-          <div className="px-5 py-2.5 border-t border-border-default flex items-center justify-between text-xs text-foreground-secondary">
-            <span>
-              {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
-            </span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page <= 1}
-                className="control-sm border border-border-secondary disabled:opacity-40 hover:bg-surface-secondary"
-              >
-                Prev
-              </button>
-              <span className="px-2 tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-                className="control-sm border border-border-secondary disabled:opacity-40 hover:bg-surface-secondary"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-
       </div>
     </Dialog>
   )

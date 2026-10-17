@@ -23,6 +23,8 @@ import {
   type UploadStatus,
 } from '@/lib/google-ads/conversions/types'
 import { Section, Empty, Table } from './ReportViews'
+import { DataTable } from '@/components/admin/kit/data-table'
+import { fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 
 // Server-side purchase conversions: where they upload, Google's view of the account, and the queue.
 
@@ -654,24 +656,19 @@ function UploadLogSection({
   onRetry: (ids?: number[]) => void
 }) {
   const [status, setStatus] = useState<UploadStatus | ''>('')
-  const [page, setPage] = useState(1)
-  const [log, setLog] = useState<UploadLog | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const list = useInfiniteList<UploadRow>({
+    key: `${status}|${reloadKey}`,
+    pageSize: 25,
+    getKey: r => r.id,
+    fetchPage: async (page, signal) => {
+      const qs = new URLSearchParams({ page: String(page) })
+      if (status) qs.set('status', status)
+      const j = await fetchJson<UploadLog>(`/api/admin/google-ads/conversions?${qs}`, signal)
+      return { rows: j.rows, total: j.total }
+    },
+  })
+  const error = list.rows.length ? null : list.error
 
-  useEffect(() => {
-    const qs = new URLSearchParams({ page: String(page) })
-    if (status) qs.set('status', status)
-    fetch(`/api/admin/google-ads/conversions?${qs}`, { credentials: 'include' })
-      .then(async r => {
-        const j = await r.json().catch(() => ({}))
-        if (!r.ok) throw new Error(j.error || 'Could not load the upload log')
-        setError(null)
-        setLog(j)
-      })
-      .catch(e => setError(e.message))
-  }, [status, page, reloadKey])
-
-  const pages = log ? Math.max(1, Math.ceil(log.total / log.pageSize)) : 1
   return (
     <Section
       title="Upload log"
@@ -686,10 +683,7 @@ function UploadLogSection({
           <button
             key={s || 'all'}
             type="button"
-            onClick={() => {
-              setStatus(s)
-              setPage(1)
-            }}
+            onClick={() => setStatus(s)}
             className={`control-xs border ${
               status === s ? 'border-accent-500 text-foreground font-medium' : 'border-border-default text-foreground-muted hover:text-foreground'
             }`}
@@ -700,12 +694,15 @@ function UploadLogSection({
       </div>
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
-      ) : !log ? (
+      ) : list.loading ? (
         <div className="h-24 rounded-lg bg-surface-secondary animate-pulse" />
       ) : (
         <>
-          <Table<UploadRow>
-            rows={log.rows}
+          <DataTable<UploadRow>
+            bare
+            rows={list.rows}
+            infinite={list}
+            noun="uploads"
             rowKey={r => String(r.id)}
             empty="Nothing queued yet. Orders from Google Ads clicks appear here once paid (COD: once delivered)."
             cols={[
@@ -758,19 +755,6 @@ function UploadLogSection({
               },
             ]}
           />
-          {pages > 1 && (
-            <div className="flex items-center justify-end gap-2 pt-3 text-xs text-foreground-muted">
-              <button type="button" disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="disabled:opacity-40">
-                Previous
-              </button>
-              <span>
-                Page {page} of {pages} ({count(log.total)})
-              </span>
-              <button type="button" disabled={page >= pages} onClick={() => setPage(p => p + 1)} className="disabled:opacity-40">
-                Next
-              </button>
-            </div>
-          )}
         </>
       )}
     </Section>

@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { listKey } from '@/lib/admin/list-key'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
 import { headers } from 'next/headers'
@@ -272,7 +273,7 @@ async function CategoriesStatsSection({ searchParams }: { searchParams: Promise<
 // while the stats + filters above stay mounted.
 async function CategoriesListSection({ searchParams }: { searchParams: Promise<SP> }) {
   const resolvedSearchParams = await searchParams
-  const key = JSON.stringify(resolvedSearchParams)
+  const key = listKey(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={4} />}>
       <CategoriesListContent resolvedSearchParams={resolvedSearchParams} />

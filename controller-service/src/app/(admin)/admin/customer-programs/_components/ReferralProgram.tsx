@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
-import Pagination from '@/components/admin/Pagination'
+import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getReferralStats, listReferralSignups, type ReferralStats, type ReferralStatus } from '@/lib/referrals/queries'
 import { getReferralSettings } from '@/lib/referrals/settings'
@@ -54,13 +54,6 @@ export default async function ReferralProgram({ host, query }: { host: string; q
   const live = settings.enabled && loyalty.enabled
 
   const basePath = ap(PROGRAMS_PATH, host)
-  const buildUrl = (target: number) => {
-    const params = new URLSearchParams({ tab: 'referrals' })
-    if (status) params.set('status', status)
-    if (search) params.set('search', search)
-    if (target > 1) params.set('page', String(target))
-    return `${basePath}?${params}`
-  }
   const number = (value: number) => value.toLocaleString('en-IN')
 
   return (
@@ -140,8 +133,14 @@ export default async function ReferralProgram({ host, query }: { host: string; q
                   <th className="px-4 py-3 font-medium">Joined</th>
                 </tr>
               </thead>
-              <tbody>
-                {list.rows.map(row => (
+              <ServerPagedItems
+                wrap="tbody"
+                page={page}
+                total={list.total}
+                noun="referrals"
+                items={list.rows.map(row => ({
+                  key: String(row.id),
+                  node: (
                   <tr key={row.id} className="border-t border-border-default">
                     {[row.referrer, row.friend].map((person, i) => (
                       <td key={i} className="px-4 py-3">
@@ -173,14 +172,12 @@ export default async function ReferralProgram({ host, query }: { host: string; q
                       {formatDate(row.signedUpAt)}
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                  ),
+                }))}
+              />
             </table>
           </div>
         )}
-        <div className="p-4">
-          <Pagination page={page} total={list.total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-        </div>
       </div>
     </ProgramSection>
   )

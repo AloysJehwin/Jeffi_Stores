@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
-import { EmptyState, PageBody, PageHeader, TableSkeleton, badgeCls, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { EmptyState, InfiniteFooter, PageBody, fetchJson, useInfiniteList, PageHeader, TableSkeleton, badgeCls, fieldInputCls, useActionToast } from '@/components/admin/kit'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import InflationHistoryMobileList from './_components/InflationHistoryMobileList'
@@ -101,8 +101,6 @@ export default function InflationClient({ categories, brands }: { categories: Ca
   const [applying, setApplying] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
   const [applySuccess, setApplySuccess] = useState<string | null>(null)
-  const [logs, setLogs] = useState<InflationLog[]>([])
-  const [logsLoading, setLogsLoading] = useState(true)
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
   const [rollingBack, setRollingBack] = useState<string | null>(null)
   const [rollbackError, setRollbackError] = useState<string | null>(null)
@@ -124,12 +122,18 @@ export default function InflationClient({ categories, brands }: { categories: Ca
   }, [rollbackError, toast])
 
   const PAGE_SIZE = 25
-  const [logsPage, setLogsPage] = useState(1)
-  const logsTotalPages = Math.max(1, Math.ceil(logs.length / PAGE_SIZE))
-  useEffect(() => {
-    if (logsPage > logsTotalPages) setLogsPage(logsTotalPages)
-  }, [logsPage, logsTotalPages])
-  const pagedLogs = useMemo(() => logs.slice((logsPage - 1) * PAGE_SIZE, logsPage * PAGE_SIZE), [logs, logsPage])
+  const logList = useInfiniteList<InflationLog>({
+    key: 'logs',
+    pageSize: PAGE_SIZE,
+    getKey: l => l.id,
+    fetchPage: async (p, signal) => {
+      const data = await fetchJson(`/api/admin/inflation/logs?limit=${PAGE_SIZE}&offset=${(p - 1) * PAGE_SIZE}`, signal)
+      return { rows: data.logs || [], total: data.total ?? null }
+    },
+  })
+  const logs = logList.rows
+  const pagedLogs = logs
+  const logsLoading = logList.loading
 
   async function loadProducts(category: Category, brandId?: string) {
     setProductListLoading(true)
@@ -233,18 +237,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
     [productList, selectedBrandId]
   )
 
-  const fetchLogs = useCallback(() => {
-    setLogsLoading(true)
-    fetch('/api/admin/inflation/logs')
-      .then(r => r.json())
-      .then(data => setLogs(data.logs || []))
-      .catch(() => {})
-      .finally(() => setLogsLoading(false))
-  }, [])
-
-  useEffect(() => {
-    fetchLogs()
-  }, [fetchLogs])
+  const fetchLogs = logList.reload
 
   async function handlePreview() {
     if (!selectedCategory || !percentage || selectedProductIds.size === 0) return
@@ -559,6 +552,10 @@ export default function InflationClient({ categories, brands }: { categories: Ca
             </div>
             {logsLoading ? (
               <div className="p-4"><TableSkeleton rows={4} cols={5} /></div>
+            ) : logs.length === 0 && logList.error ? (
+              <div className="p-4">
+                <InfiniteFooter shown={0} control={logList} />
+              </div>
             ) : logs.length === 0 ? (
               <EmptyState bare title="No inflation applied yet." />
             ) : (
@@ -723,36 +720,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                     </tbody>
                   </table>
                 </div>
-                {logsTotalPages > 1 && (
-                  <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border-default">
-                    <p className="text-xs text-foreground-muted whitespace-nowrap">
-                      Showing{' '}
-                      <span className="font-medium text-foreground">
-                        {(logsPage - 1) * PAGE_SIZE + 1}–{Math.min(logsPage * PAGE_SIZE, logs.length)}
-                      </span>{' '}
-                      of <span className="font-medium text-foreground">{logs.length}</span>
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        disabled={logsPage <= 1}
-                        onClick={() => setLogsPage(p => Math.max(1, p - 1))}
-                        className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
-                      >
-                        Prev
-                      </button>
-                      <span className="text-xs text-foreground-muted whitespace-nowrap">
-                        Page {logsPage} of {logsTotalPages}
-                      </span>
-                      <button
-                        disabled={logsPage >= logsTotalPages}
-                        onClick={() => setLogsPage(p => Math.min(logsTotalPages, p + 1))}
-                        className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <InfiniteFooter shown={logs.length} control={logList} noun="runs" className="px-4 pb-3" />
               </div>
             )}
           </div>

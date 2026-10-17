@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowDown, ArrowUp, Check, Download, Plus, X } from 'lucide-react'
-import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, Field, Fields, TableSkeleton, FormFooter, FormButton, fieldInputCls, type StatusMap } from '@/components/admin/kit'
+import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, Field, Fields, TableSkeleton, FormFooter, FormButton, fieldInputCls, InfiniteFooter, fetchJson, useInfiniteList, type StatusMap } from '@/components/admin/kit'
 import Select from '@/components/ui/Select'
 import { ap } from '@/lib/shared/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
@@ -155,10 +155,6 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
     }
   }
 
-  const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
@@ -259,8 +255,6 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   const [draftBatchItems, setDraftBatchItems] = useState<BatchPickerItem[]>([])
   const [draftSerialItems, setDraftSerialItems] = useState<SerialItem[]>([])
 
-  const totalPages = Math.ceil(total / 25)
-
   const INVOICE_SORT_KEYS: Record<string, keyof Invoice> = {
     invoice_number: 'invoice_number',
     date: 'invoice_date',
@@ -270,42 +264,32 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
     source: 'source',
   }
 
-  // Rows are ordered server-side (across all invoices) via sort/dir params.
-  const sortedInvoices = invoices
 
-  const fetchInvoices = useCallback(
-    async (p = 1) => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        if (sourceFilter) params.set('source', sourceFilter)
-        if (paymentFilter) params.set('payment', paymentFilter)
-        if (fromDate) params.set('from', fromDate)
-        if (toDate) params.set('to', toDate)
-        if (searchQ) params.set('search', searchQ)
-        if (sortCol && INVOICE_SORT_KEYS[sortCol]) {
-          params.set('sort', INVOICE_SORT_KEYS[sortCol])
-          params.set('dir', sortDir || 'desc')
-        }
-        params.set('page', String(p))
-        const res = await fetch(`/api/admin/invoices?${params}`, { credentials: 'include' })
-        if (!res.ok) throw new Error('Failed')
-        const data = await res.json()
-        setInvoices(data.invoices || [])
-        setTotal(data.total || 0)
-        setPage(p)
-      } catch {
-        showToast('Failed to load invoices', 'error')
-      } finally {
-        setLoading(false)
+  // Rows are ordered server-side (across all invoices) via sort/dir params; 25 per page.
+  const list = useInfiniteList<Invoice>({
+    key: `${sourceFilter}|${paymentFilter}|${fromDate}|${toDate}|${searchQ}|${sortCol}|${sortDir}`,
+    pageSize: 25,
+    getKey: i => i.id,
+    fetchPage: async (p, signal) => {
+      const params = new URLSearchParams()
+      if (sourceFilter) params.set('source', sourceFilter)
+      if (paymentFilter) params.set('payment', paymentFilter)
+      if (fromDate) params.set('from', fromDate)
+      if (toDate) params.set('to', toDate)
+      if (searchQ) params.set('search', searchQ)
+      if (sortCol && INVOICE_SORT_KEYS[sortCol]) {
+        params.set('sort', INVOICE_SORT_KEYS[sortCol])
+        params.set('dir', sortDir || 'desc')
       }
+      params.set('page', String(p))
+      const data = await fetchJson(`/api/admin/invoices?${params}`, signal)
+      return { rows: data.invoices || [], total: data.total || 0 }
     },
-    [sourceFilter, paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir, showToast]
-  )
-
-  useEffect(() => {
-    fetchInvoices(1)
-  }, [sourceFilter, paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir])
+  })
+  const invoices = list.rows
+  const sortedInvoices = invoices
+  const loading = list.loading
+  const fetchInvoices = list.reload
 
   const fetchDrafts = useCallback(async () => {
     setDraftsLoading(true)
@@ -384,7 +368,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       }
       showToast(`Amendment published as ${data.invoiceNumber || ''}`, 'success')
       fetchDrafts()
-      fetchInvoices(1)
+      fetchInvoices()
     } catch {
       showToast('Failed to publish amendment', 'error')
     } finally {
@@ -412,7 +396,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       }
       showToast(`Invoice ${data.invoiceNumber || ''} finalized`, 'success')
       fetchDrafts()
-      fetchInvoices(1)
+      fetchInvoices()
       if (data.invoiceUrl) window.open(data.invoiceUrl, '_blank')
     } catch {
       showToast('Failed to finalize draft', 'error')
@@ -626,7 +610,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to cancel')
       showToast(`Invoice ${inv.invoice_number} cancelled`, 'success')
-      fetchInvoices(page)
+      fetchInvoices()
     } catch (err: any) {
       showToast(err.message, 'error')
     } finally {
@@ -805,7 +789,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       }
       resetForm()
       navigateView('list')
-      fetchInvoices(1)
+      fetchInvoices()
       fetchDrafts()
     } catch (err: any) {
       setFormError(err.message || 'Failed')
@@ -876,7 +860,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       }
       resetForm()
       navigateView('list')
-      fetchInvoices(1)
+      fetchInvoices()
       fetchDrafts()
     } catch (err: any) {
       setFormError(err.message || 'Failed')
@@ -1083,7 +1067,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
       showToast(`Invoice ${finalData.invoiceNumber || ''} finalized`, 'success')
       resetForm()
       navigateView('list')
-      fetchInvoices(1)
+      fetchInvoices()
       fetchDrafts()
       if (finalData.invoiceUrl) window.open(finalData.invoiceUrl, '_blank')
     } catch (err: any) {
@@ -2055,27 +2039,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
             <InvoicesMobileList invoices={invoices} canWrite={canWrite} sendingEmailId={sendingEmailId} cancellingId={cancellingId} onSendEmail={sendInvoiceEmail} onCancel={cancelInvoice} />
           </>
         )}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between gap-2 px-1 text-xs text-foreground-muted">
-            <span className="tabular-nums">
-              <span className="font-medium text-foreground">
-                {(page - 1) * 25 + 1}–{Math.min(page * 25, total)}
-              </span>{' '}
-              of <span className="font-medium text-foreground">{total}</span> invoices
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button disabled={page <= 1} onClick={() => fetchInvoices(page - 1)} className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:pointer-events-none disabled:opacity-40">
-                Prev
-              </button>
-              <span className="tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <button disabled={page >= totalPages} onClick={() => fetchInvoices(page + 1)} className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:pointer-events-none disabled:opacity-40">
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+        <InfiniteFooter shown={invoices.length} control={list} noun="invoices" />
         <InvoiceDetailModal inv={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
       </div>
     </>

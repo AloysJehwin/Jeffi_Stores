@@ -25,6 +25,7 @@ import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { ACTIVE_STATUS, Dialog, EmptyState, Field, Fields, StatusBadge, badgeCls, useActionToast } from '@/components/admin/kit'
+import { InfiniteFooter } from '@/components/admin/kit/infinite'
 
 interface Category {
   id: string
@@ -579,7 +580,7 @@ export default function CategoriesClient({
   const [saving, setSaving] = useState(false)
   const [viewCategory, setViewCategory] = useState<Category | null>(null)
   const [policyOpenId, setPolicyOpenId] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
+  const [shown, setShown] = useState(10)
   const router = useRouter()
   const searchParams = useSearchParams()
   const toast = useActionToast()
@@ -589,7 +590,7 @@ export default function CategoriesClient({
   const PAGE_SIZE = 10
 
   useEffect(() => {
-    setPage(1)
+    setShown(PAGE_SIZE)
   }, [search, typeFilter])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -624,13 +625,16 @@ export default function CategoriesClient({
           .sort((a, b) => a.display_order - b.display_order)
       : []
 
-  const totalPages =
-    typeFilter === 'sub'
-      ? Math.max(1, Math.ceil(filteredSubOnly.length / PAGE_SIZE))
-      : Math.max(1, Math.ceil(filteredMain.length / PAGE_SIZE))
-
-  const pagedMain = typeFilter === 'sub' ? [] : filteredMain.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const pagedSubOnly = typeFilter === 'sub' ? filteredSubOnly.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : []
+  // Dnd reorder spans the loaded prefix; load 10 more each time.
+  const totalVisible = typeFilter === 'sub' ? filteredSubOnly.length : filteredMain.length
+  const pagedMain = typeFilter === 'sub' ? [] : filteredMain.slice(0, shown)
+  const pagedSubOnly = typeFilter === 'sub' ? filteredSubOnly.slice(0, shown) : []
+  const moreControl = {
+    total: totalVisible,
+    hasMore: shown < totalVisible,
+    loadingMore: false,
+    loadMore: () => setShown(n => n + PAGE_SIZE),
+  }
 
   const mainCategories = pagedMain
 
@@ -959,33 +963,7 @@ export default function CategoriesClient({
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 mt-4 px-1">
-          <p className="text-xs text-foreground-muted whitespace-nowrap">
-            Page <span className="font-medium text-foreground">{page}</span> of{' '}
-            <span className="font-medium text-foreground">{totalPages}</span>
-          </p>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
-            >
-              Prev
-            </button>
-            <span className="text-xs text-foreground-muted whitespace-nowrap">
-              {page}/{totalPages}
-            </span>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <InfiniteFooter shown={Math.min(shown, totalVisible)} control={moreControl} noun="categories" className="mt-4" />
     </div>
   )
 }

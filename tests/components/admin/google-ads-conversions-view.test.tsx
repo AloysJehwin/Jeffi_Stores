@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 
 let canWrite = true
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), useSearchParams: () => new URLSearchParams(window.location.search) }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(window.location.search), usePathname: () => '/admin/google-ads' }))
 vi.mock('@/contexts/AdminScopesContext', () => ({ useCanWrite: () => canWrite }))
 
 import ConversionsView from '@/app/(admin)/admin/google-ads/_components/ConversionsView'
