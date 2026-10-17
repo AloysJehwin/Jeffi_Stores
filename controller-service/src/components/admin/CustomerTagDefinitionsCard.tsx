@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { SectionCard } from '@/components/admin/site-controls/controls'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 interface TagDef {
   id: string
@@ -42,7 +43,8 @@ export default function CustomerTagDefinitionsCard({ isSuperAdmin }: { isSuperAd
   const [input, setInput] = useState('')
   const [color, setColor] = useState<Color>('accent')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useActionToast()
+  const setError = (text: string) => void (text && toast.error(text))
 
   async function load() {
     const res = await fetch('/api/admin/customer-tag-definitions', { credentials: 'include' })
@@ -167,7 +169,6 @@ export default function CustomerTagDefinitionsCard({ isSuperAdmin }: { isSuperAd
                 {input.trim() || 'preview'}
               </span>
             </div>
-            {error && <p className="text-xs text-red-600">{error}</p>}
           </div>
         )}
       </div>

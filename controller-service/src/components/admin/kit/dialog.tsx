@@ -53,7 +53,8 @@ function useFocusTrap(open: boolean, panel: React.RefObject<HTMLDivElement | nul
   }, [open, panel])
 }
 
-const SIZES = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl' }
+// `full`: wide two-pane drill-downs (fixed 90dvh, unpadded body that lays out its own panes).
+const SIZES = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-2xl', xl: 'max-w-4xl', full: 'max-w-[1400px] h-[90dvh]' }
 
 export interface DialogProps {
   open: boolean
@@ -98,7 +99,7 @@ export function Dialog({ open, onClose, title, description, size = 'md', footer,
       <div
         ref={panel}
         tabIndex={-1}
-        className={`relative flex max-h-[90vh] w-full ${SIZES[size]} flex-col rounded-xl border border-border-default bg-surface-elevated shadow-2xl outline-none animate-fade-in-up`}
+        className={`relative flex max-h-[90vh] w-full ${SIZES[size]} ${size === 'full' ? 'max-h-[90dvh]' : ''} flex-col rounded-xl border border-border-default bg-surface-elevated shadow-2xl outline-none animate-fade-in-up`}
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-3 border-b border-border-default p-5">
@@ -114,7 +115,7 @@ export function Dialog({ open, onClose, title, description, size = 'md', footer,
             </button>
           )}
         </div>
-        {children != null && <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>}
+        {children != null && <div className={size === 'full' ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'min-h-0 flex-1 overflow-y-auto p-5'}>{children}</div>}
         {footer && <div className="flex items-center justify-end gap-2 border-t border-border-default px-5 py-3">{footer}</div>}
       </div>
     </div>,

@@ -1,6 +1,6 @@
 'use client'
 
-import { createPortal } from 'react-dom'
+import { Dialog } from '@/components/admin/kit'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 
 import { useState } from 'react'
@@ -72,34 +72,7 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
         )}
       </div>
 
-      {open &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-            onClick={() => setOpen(false)}
-          >
-            <div
-              className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-[95vw] max-w-[1400px] h-[90dvh] flex flex-col"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-border-default">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Biggest Drops (7d)</h2>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    {items.length} customers with sharp health decline
-                  </p>
-                </div>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-                  aria-label="Close"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+      <Dialog open={open} onClose={() => setOpen(false)} title="Biggest Drops (7d)" description={<>{items.length} customers with sharp health decline</>} size="full" zIndex="z-[300]">
               <div className="flex flex-1 min-h-0 flex-col overflow-y-auto divide-y divide-border-default md:flex-row md:overflow-hidden md:divide-y-0 md:divide-x">
                 <div className={`flex flex-col bg-surface-secondary/30 ${canMail ? 'shrink-0 md:w-2/5' : 'flex-1'}`}>
                   <div className="px-6 pt-4 pb-2 shrink-0 border-b border-border-default">
@@ -134,10 +107,7 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
                   </div>
                 )}
               </div>
-            </div>
-          </div>,
-          document.body
-        )}
+      </Dialog>
     </>
   )
 }
