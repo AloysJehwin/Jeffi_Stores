@@ -38,7 +38,7 @@ describe('withImportLock', () => {
       expect.stringContaining('pg_try_advisory_lock'),
       expect.stringContaining('pg_advisory_unlock'),
     ])
-    expect(c.query.mock.calls[0][1]).toEqual(['import:sheet:t1'])
+    expect((c.query.mock.calls[0] as unknown[])[1]).toEqual(['import:sheet:t1'])
     expect(c.release).toHaveBeenCalledOnce()
   })
 

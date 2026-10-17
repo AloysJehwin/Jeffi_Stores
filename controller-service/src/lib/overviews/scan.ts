@@ -1,4 +1,4 @@
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { previousPeriod, ratio, type Period } from '@/lib/overview/period'
 import { BOUNDS, boundArgs, byPeriod, inBoth, n, per, type Row, type StripKpi } from '@/lib/overviews/orders'

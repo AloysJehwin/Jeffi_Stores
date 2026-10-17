@@ -1,6 +1,6 @@
 import { queryMany, queryOne } from '@/lib/shared/db'
 import { bucketFor, previousPeriod, ratio, type Period } from '@/lib/overview/period'
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { kpi, n, nn, plural, snapshot, type OverviewKpi } from './ops-kpi'
 
 // Suppliers overview. Received value is GRN lines (qty x unit cost) by received date; raised is

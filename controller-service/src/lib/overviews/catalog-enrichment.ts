@@ -1,4 +1,4 @@
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { inIst, num } from './catalog'
 
 // AI catalogue enrichment: proposals (product_ai_enrichment_log) and the AI fields filled on

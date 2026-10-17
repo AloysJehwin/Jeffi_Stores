@@ -1,4 +1,4 @@
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { LEAVES, SOLD_LINES, margin, num } from './catalog'
 
 // Catalogue grouped by category or brand: products, stock value at cost (Inventory overview

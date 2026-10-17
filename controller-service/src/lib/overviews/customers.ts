@@ -1,4 +1,4 @@
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { ratio } from '@/lib/overview/period'
 import { BOUNDS, num, periodCase, realized, str } from './marketing'
 

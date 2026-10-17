@@ -1,4 +1,4 @@
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { PRODUCT_IN_STOCK_SQL } from '@/lib/queries/shared'
 import { SOLD_LINES, inIst, istDay, num } from './catalog'
 

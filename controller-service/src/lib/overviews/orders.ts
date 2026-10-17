@@ -1,4 +1,4 @@
-import type { AttentionItem } from '@/components/admin/overview/kit'
+import type { AttentionItem } from '@/lib/overview/attention'
 import { previousPeriod, type Bucket, type Period } from '@/lib/overview/period'
 
 // Shared SQL pieces for the orders and fulfilment overviews, plus the Orders overview helpers.
