@@ -10,12 +10,14 @@ name: Jeffi Stores Pipeline
 #         └→ Images (4, release only, after Lint and Type check)
 #
 # Release (push to main, or workflow_dispatch with deploy=true): Checks passed waits for the one approval, then:
-#   Checks passed (approval) ─┬→ DB · flagship schema ─────┬→ Deploy · flagship ─┬→ Smoke · flagship ─┬→ DB · tenant schema ─────┬→ …
-#                             └→ DB · flagship migrations ─┘                     └→ CloudFront        └→ DB · tenant migrations ─┘
-#   … → Deploy · tenants → Smoke · tenants → Post
-# Each schema/migrations pair starts together and sits stacked; the migrations job waits for its schema job to
-# succeed before it applies anything (both alter the same databases). Each stage computes the release tag from
-# history, so it needs only the stage(s) before it.
+#   Checks passed (approval) ─┬→ DB · flagship schema ─────┬→ Deploy · flagship ─┬→ Smoke · flagship ─────────┬→ Deploy · tenants
+#                             └→ DB · flagship migrations ─┘                     ├→ CloudFront               │   → Smoke · tenants → Post
+#                                                                                ├→ DB · tenant schema ──────┤
+#                                                                                └→ DB · tenant migrations ──┘
+# Stacked stages start together; where order matters a stage waits for the one it depends on before doing
+# anything (.github/actions/wait-for-job): flagship migrations after flagship schema, tenant schema after
+# Smoke · flagship (no store is touched until the flagship is proven live), tenant migrations after tenant
+# schema. Each stage computes the release tag from history, so it needs only the stages before it.
 #
 # Flagship first: the platform database (jeffi_stores) and the platform services, proven live before any store
 # is touched. Tenants follow, since their schema fan-out runs inside the new controller. The schema is additive,
@@ -367,13 +369,15 @@ jobs:
   db-tenant-schema:
     name: DB · tenant schema
     runs-on: ubuntu-latest
-    needs: smoke-flagship # no store is touched until the flagship is proven live
+    needs: deploy-flagship # starts beside Smoke · flagship; touches no store until that has passed
     environment: production-release
     concurrency: { group: deploy-production-db-tenant-schema, cancel-in-progress: false }
-    permissions: { id-token: write, contents: read }
+    permissions: { id-token: write, contents: read, actions: read }
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 } # the release tag is computed from history
+      - uses: ./.github/actions/wait-for-job
+        with: { job: "Smoke · flagship" }
       - uses: ./.github/actions/release-setup
         with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
       - name: Schema fan-out to every store's database
@@ -382,7 +386,7 @@ jobs:
   db-tenant-migrations:
     name: DB · tenant migrations
     runs-on: ubuntu-latest
-    needs: smoke-flagship # starts beside the schema stage; applies nothing until the schema has succeeded
+    needs: deploy-flagship # starts beside the schema stage; applies nothing until the schema has succeeded
     environment: production-release
     concurrency: { group: deploy-production-db-tenant-migrations, cancel-in-progress: false }
     permissions: { id-token: write, contents: read, actions: read }
@@ -399,7 +403,7 @@ jobs:
   deploy-tenants:
     name: Deploy · tenants
     runs-on: ubuntu-latest
-    needs: [db-tenant-schema, db-tenant-migrations]
+    needs: [smoke-flagship, db-tenant-schema, db-tenant-migrations]
     environment: production-release
     concurrency: { group: deploy-production-deploy-tenants, cancel-in-progress: false }
     permissions: { id-token: write, contents: read }
