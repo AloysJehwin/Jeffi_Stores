@@ -244,7 +244,7 @@ export async function POST(request: NextRequest) {
       const gstRate = item.tax_rate ?? 0
 
       let unitCost: number
-      let lineTotalInclGst: number | null = item.line_total_incl_gst ?? null
+      const lineTotalInclGst: number | null = item.line_total_incl_gst ?? null
 
       if (lineTotalInclGst != null) {
         const totalExGst = item.gst_inclusive ? lineTotalInclGst / (1 + gstRate / 100) : lineTotalInclGst
