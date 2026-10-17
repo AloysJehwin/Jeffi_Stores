@@ -2,7 +2,7 @@ name: Jeffi Stores Pipeline
 
 # One pipeline, one card per stage. Per-app stages are matrices (one job per app inside the card).
 #
-#   Init ─┬→ Lint (5) ────────┬→ Build ───────────┐
+#   Init ─┬→ Lint (5) ────────┬→ Build (5) ───────┐
 #         ├→ Type check (5) ──┘                    │
 #         ├→ Security                              ├→ Checks passed (required status; on a release, the approval)
 #         ├→ Unit tests (5) ───────────────────────┤
@@ -200,13 +200,26 @@ jobs:
       - run: npm run test:integration
 
   build:
-    name: Build
-    runs-on: ubuntu-latest
+    name: Build · ${{ matrix.app }}
+    runs-on: ${{ matrix.runner }}
     needs: [lint, typecheck] # a commit failing either never spends a build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The Next app compiles here; the services run their TypeScript directly, so their build is the image
+          # (arm64 like production, not pushed). The service caches are shared with the release Images stage.
+          - { app: controller, runner: ubuntu-latest, kind: next }
+          - { app: messaging, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target messaging . }
+          - { app: documents, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target documents . }
+          - { app: public-api, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target public-api . }
+          - { app: ai-gateway, runner: ubuntu-24.04-arm, kind: image, args: -f ai-platform/gateway/Dockerfile ai-platform }
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/node-setup
+      - if: matrix.kind == 'next'
+        uses: ./.github/actions/node-setup
       - name: Next.js build
+        if: matrix.kind == 'next'
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=6144
@@ -220,6 +233,13 @@ jobs:
           NEXT_PUBLIC_ENABLE_GST: ${{ secrets.NEXT_PUBLIC_ENABLE_GST }}
           NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
           NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+      - if: matrix.kind == 'image'
+        uses: docker/setup-buildx-action@v3
+      - if: matrix.kind == 'image'
+        uses: crazy-max/ghaction-github-runtime@v3 # exposes the cache endpoint buildx's gha cache needs
+      - name: Image build (not pushed)
+        if: matrix.kind == 'image'
+        run: docker buildx build --platform linux/arm64 --cache-from type=gha,scope=${{ matrix.app }} --cache-to type=gha,mode=max,scope=${{ matrix.app }} ${{ matrix.args }}
 
   images:
     name: Image · ${{ matrix.service }}
