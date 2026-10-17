@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition, type ReactNode } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
@@ -202,6 +202,18 @@ function withoutPage(sp: URLSearchParams | { toString(): string }, param: string
   return q.toString()
 }
 
+/** First scrollable ancestor (admin shell's <main>, else the document scroller). SSR-safe. */
+function findScrollParent(): HTMLElement | null {
+  if (typeof document === 'undefined') return null
+  // AdminShell wraps the pane in <main class="... overflow-y-auto">; use it when present.
+  const main = document.querySelector('main') as HTMLElement | null
+  if (main) {
+    const ov = getComputedStyle(main).overflowY
+    if (ov === 'auto' || ov === 'scroll') return main
+  }
+  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement
+}
+
 /**
  * Server-rendered pages (?page=N) accumulated client-side. Advancing replaces the URL with page+1
  * (scroll: false, no history entry) and appends the rows the server renders for it. Any other
@@ -215,6 +227,10 @@ export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param =
   const key = withoutPage(sp, param)
   const [pending, startTransition] = useTransition()
   const store = useRef<{ key: string; pages: Map<number, T[]> } | null>(null)
+  // Snapshot the scroll container before loadMore so we can restore if the RSC swap clamps it.
+  // Fixes jump-to-top when the Suspense boundary briefly swaps in TableSkeleton during the RSC
+  // round-trip, shrinking the pane and letting the browser clamp scrollTop to the new max.
+  const scrollSnap = useRef<{ el: HTMLElement; top: number } | null>(null)
 
   let s = store.current
   if (!s || s.key !== key) {
@@ -265,11 +281,25 @@ export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param =
   useEffect(() => {
     if (!pending && requested.current && !requested.current.endsWith('#1')) requested.current = null
   }, [pending, page])
+  // After a load-more transition commits (page increments, pending flips false), restore the
+  // scroll if the browser clamped it upward. Runs before paint so there is no visible jump.
+  useLayoutEffect(() => {
+    const snap = scrollSnap.current
+    if (!snap || pending) return
+    scrollSnap.current = null
+    if (snap.el.scrollTop < snap.top - 2) snap.el.scrollTop = snap.top
+  }, [page, pending])
+  // Filter/search change (key change) invalidates the snapshot — don't restore to a stale offset.
+  useEffect(() => {
+    scrollSnap.current = null
+  }, [key])
   const loadMore = useCallback(() => {
     if (pending || !hasMore) return
     const target = `${key}#${page + 1}`
     if (requested.current === target) return
     requested.current = target
+    const el = findScrollParent()
+    if (el) scrollSnap.current = { el, top: el.scrollTop }
     startTransition(() => router.replace(href(page + 1), { scroll: false }))
   }, [pending, hasMore, router, href, page, key])
 
