@@ -86,6 +86,7 @@ interface VariantRow {
   product_suppliers?: SupplierRow[]
   subscription_price?: string
   subscription_prices?: Record<string, string>
+  is_active?: boolean
   _isDeleted?: boolean
 }
 
@@ -324,6 +325,7 @@ function emptyVariant(pricing_type: 'unit', unit: string): VariantRow {
     product_suppliers: [],
     subscription_price: '',
     subscription_prices: {},
+    is_active: true,
   }
 }
 
@@ -743,6 +745,8 @@ export default function ProductForm({
   const formRef = useRef<HTMLFormElement>(null)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const initialSnapshotRef = useRef<string | null>(null)
+  const pendingLocalRef = useRef(false)
+  const userEditedRef = useRef(false)
   const [serverSaveStatus, setServerSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const edit = useEditSession({ resourceType: 'product', resourceId: productId ?? null })
 
@@ -818,7 +822,12 @@ export default function ProductForm({
           breadth_cm: v.breadth_cm != null ? String(v.breadth_cm) : '',
           height_cm: v.height_cm != null ? String(v.height_cm) : '',
           sub_variant_type: v.sub_variant_type || '',
-          sub_variant_type_on: !!v.sub_variant_type_on || (Array.isArray(v.sub_variants) && v.sub_variants.length > 0),
+          // The draft's flag wins: a toggled-off variant keeps its sub-variants in the draft.
+          sub_variant_type_on:
+            typeof v.sub_variant_type_on === 'boolean'
+              ? v.sub_variant_type_on
+              : Array.isArray(v.sub_variants) && v.sub_variants.length > 0,
+          is_active: v.is_active !== false,
           variant_type: v.variant_type || '',
           use_own_images:
             v.use_own_images != null ? !!v.use_own_images : !!(v.variant_images && v.variant_images.length > 0),
@@ -860,10 +869,6 @@ export default function ProductForm({
   const getSubcategories = (parentId: string) => categories.filter(c => c.parent_category_id === parentId)
   const leafCategories = categories.filter(c => !categories.some(other => other.parent_category_id === c.id))
 
-  useEffect(() => {
-    const saved = localStorage.getItem(draftKey)
-    if (saved) setHasDraft(true)
-  }, [draftKey])
 
   // Auto-open variant popup from ?popup= query param (set after draft-stay save)
   useEffect(() => {
@@ -919,13 +924,28 @@ export default function ProductForm({
         weightGrams,
       }
       const json = JSON.stringify(snapshot)
-      if (initialSnapshotRef.current == null) initialSnapshotRef.current = json
-      else if (json !== initialSnapshotRef.current) {
-        dirtyRef.current = true
-        savedRef.current = false
+      if (initialSnapshotRef.current == null) {
+        // First run is the loaded state. A different stored snapshot is a newer local autosave:
+        // keep it for Restore instead of overwriting it.
+        initialSnapshotRef.current = json
+        const stored = localStorage.getItem(draftKey)
+        if (stored && stored !== json) {
+          pendingLocalRef.current = true
+          setHasDraft(true)
+          return
+        }
+        localStorage.removeItem(draftKey)
+        setHasDraft(false)
+        return
       }
+      if (json === initialSnapshotRef.current) return
+      // Load-time settling must not replace an unrestored snapshot; the admin's first edit does.
+      if (pendingLocalRef.current && !userEditedRef.current) return
+      pendingLocalRef.current = false
+      dirtyRef.current = true
+      savedRef.current = false
       localStorage.setItem(draftKey, json)
-      setHasDraft(true)
+      setHasDraft(false)
     }, 1000)
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
@@ -954,6 +974,10 @@ export default function ProductForm({
   // Server autosave — fires 5s after last change, only in draft mode
   const serverSaveInFlight = useRef(false)
   const serverSavePending = useRef(false)
+  // Set once the session is being cancelled or the form has been submitted: no more autosaves.
+  const autosaveBlockedRef = useRef(false)
+  // Latest serverSaveNow: a queued re-run must read the newest state, not the closure that queued it.
+  const serverSaveNowRef = useRef<() => Promise<void>>(async () => {})
   const variantsRef = useRef(variants)
   variantsRef.current = variants // always sync — no useEffect delay
 
@@ -968,7 +992,7 @@ export default function ProductForm({
   }
 
   async function serverSaveNow() {
-    if (!isDraft || !productId) return
+    if (!isDraft || !productId || autosaveBlockedRef.current) return
     const form = formRef.current
     if (!form) return
     if (serverSaveInFlight.current) {
@@ -1115,11 +1139,28 @@ export default function ProductForm({
     serverSaveInFlight.current = false
     if (serverSavePending.current) {
       serverSavePending.current = false
-      serverSaveNow()
+      void serverSaveNowRef.current()
     } else {
       // A failure stays visible until the next successful autosave.
       if (saved) setTimeout(() => setServerSaveStatus(cur => (cur === 'saved' ? 'idle' : cur)), 2000)
     }
+  }
+
+  serverSaveNowRef.current = serverSaveNow
+
+  // Cancel rolls the draft back to the session snapshot; an autosave landing after that would undo it.
+  async function cancelEditSession(): Promise<boolean> {
+    autosaveBlockedRef.current = true
+    for (let i = 0; i < 100 && serverSaveInFlight.current; i++) await new Promise(r => setTimeout(r, 100))
+    const ok = await edit.cancel()
+    if (!ok) {
+      autosaveBlockedRef.current = false
+      return false
+    }
+    localStorage.removeItem(draftKey)
+    savedRef.current = true
+    dirtyRef.current = false
+    return true
   }
 
   useEffect(() => {
@@ -1378,6 +1419,9 @@ export default function ProductForm({
   function restoreDraft() {
     const saved = localStorage.getItem(draftKey)
     if (!saved) return
+    pendingLocalRef.current = false
+    userEditedRef.current = true
+    setHasDraft(false)
     try {
       const snap = JSON.parse(saved)
       const form = formRef.current
@@ -1421,6 +1465,32 @@ export default function ProductForm({
     localStorage.removeItem(draftKey)
     setHasDraft(false)
     window.location.reload()
+  }
+
+  // Discard the server draft itself (the live product is unchanged), like the other draft editors.
+  async function discardServerDraft() {
+    if (!productId) return
+    const ok = await confirm({
+      title: 'Discard draft?',
+      message: 'All unpublished changes in this draft are removed. The live product stays as it is.',
+      confirmLabel: 'Discard draft',
+      variant: 'danger',
+    })
+    if (!ok) return
+    autosaveBlockedRef.current = true
+    for (let i = 0; i < 100 && serverSaveInFlight.current; i++) await new Promise(r => setTimeout(r, 100))
+    const r = await fetch(`/api/admin/products/${productId}/draft`, { method: 'DELETE' })
+    if (!r.ok) {
+      autosaveBlockedRef.current = false
+      const j = await r.json().catch(() => ({}))
+      showToast(j?.error || 'Failed to discard draft', 'error')
+      return
+    }
+    localStorage.removeItem(draftKey)
+    savedRef.current = true
+    dirtyRef.current = false
+    showToast('Draft discarded', 'success')
+    router.push(ap(`/admin/products/${productId}`))
   }
 
   function addGroup(pricing_type: 'unit') {
@@ -1594,35 +1664,32 @@ export default function ProductForm({
     const out: any[] = []
     let preferredProductSupplierId = ''
 
+    // Every leaf's rows are kept, whatever the toggles say, so turning variants or sub-variants
+    // off and on again loses nothing; publish applies only the leaves of the published structure.
+    const productRows = productSuppliers.filter(valid)
     if (!hasVariants) {
       // Product leaf — untagged.
-      const rows = productSuppliers.filter(valid)
-      for (const s of rows) out.push(clean(s))
-      preferredProductSupplierId = rows.find(s => s.is_preferred)?.supplier_id || ''
-    } else {
-      for (const v of variants) {
-        if (v._isDeleted) continue
-        const svs = subVariantsMap[v.id || ''] || []
-        if (v.sub_variant_type_on) {
-          // Sub-variant leaves. Draft sub-variants have no SKU/stable id (they're
-          // DELETE+INSERT on publish), so tag by variant_sku + sub_variant_name —
-          // the only keys that survive. Requires the parent variant to have a SKU.
-          if (!v.sku) continue
-          for (const sv of svs) {
-            const svName = sv.sub_variant_name
-            if (!svName) continue
-            for (const s of (sv.product_suppliers || []).filter(valid)) {
-              out.push({ ...clean(s), variant_sku: v.sku, sub_variant_name: svName })
-            }
-          }
-        } else if (v.sku) {
-          // Variant leaf — tag by variant_sku.
-          for (const s of (v.product_suppliers || []).filter(valid)) {
-            out.push({ ...clean(s), variant_sku: v.sku })
-          }
+      for (const s of productRows) out.push(clean(s))
+      preferredProductSupplierId = productRows.find(s => s.is_preferred)?.supplier_id || ''
+    }
+    for (const v of variants) {
+      if (v._isDeleted || !v.sku) continue
+      // Sub-variant leaves. Draft sub-variants have no SKU/stable id (they're
+      // DELETE+INSERT on publish), so tag by variant_sku + sub_variant_name —
+      // the only keys that survive. Requires the parent variant to have a SKU.
+      for (const sv of subVariantsMap[v.id || ''] || []) {
+        const svName = sv.sub_variant_name
+        if (!svName) continue
+        for (const s of (sv.product_suppliers || []).filter(valid)) {
+          out.push({ ...clean(s), variant_sku: v.sku, sub_variant_name: svName })
         }
       }
+      // Variant leaf — tag by variant_sku.
+      for (const s of (v.product_suppliers || []).filter(valid)) {
+        out.push({ ...clean(s), variant_sku: v.sku })
+      }
     }
+    if (hasVariants) for (const s of productRows) out.push(clean(s))
     return { suppliers: out, preferredProductSupplierId }
   }
 
@@ -2089,6 +2156,8 @@ export default function ProductForm({
   }
 
   const activeVariants = variants.filter(v => !v._isDeleted)
+  // Inactive variants stay in the draft (and keep their data) but are not validated for sale.
+  const sellableVariants = activeVariants.filter(v => v.is_active !== false)
 
   const subVariantParents = hasVariants ? activeVariants.filter(v => v.sub_variant_type_on) : []
   const svParent = subVariantParents.find(v => v.id === svVariantId) || subVariantParents[0] || null
@@ -2251,7 +2320,7 @@ export default function ProductForm({
         )
       } else {
         errs.push(...priceErrors('Pricing', { cost: costPrice, discountPct }))
-        for (const v of activeVariants) {
+        for (const v of sellableVariants) {
           if (!v.variant_name?.trim()) {
             if (isPublishIntent) errs.push('Variants: every variant needs a name.')
             continue
@@ -2264,7 +2333,7 @@ export default function ProductForm({
             )
           )
         }
-        if (isPublishIntent && activeVariants.length === 0)
+        if (isPublishIntent && sellableVariants.length === 0)
           errs.push('Variants: add at least one, or turn off variants.')
       }
       if (errs.length > 0) {
@@ -2286,7 +2355,7 @@ export default function ProductForm({
           breadth_cm: dim('breadth_cm'),
           height_cm: dim('height_cm'),
         },
-        variants: activeVariants.map(v => ({
+        variants: sellableVariants.map(v => ({
           ...v,
           label: v.variant_name || v.sku || '',
           subVariants: v.sub_variant_type_on
@@ -2473,6 +2542,13 @@ export default function ProductForm({
       savedRef.current = true
       dirtyRef.current = false
       initialSnapshotRef.current = null
+      // Leaving the editor: the save is the session's end, so a later Cancel cannot roll back past it.
+      const stayOnPage = submitterEl?.value === 'draft-stay'
+      if (!stayOnPage) {
+        autosaveBlockedRef.current = true
+        // Publish closes the session server-side along with the draft.
+        if (edit.sessionId && !isPublishIntent) await edit.save()
+      }
       // Only register serials/batches on publish — a draft save keeps them in the
       // draft snapshot and defers actual stock creation until publish.
       if (showBootstrap && productId && isPublishIntent) await assignBootstrapStock(productId)
@@ -2832,17 +2908,11 @@ export default function ProductForm({
             <button
               type="button"
               onClick={() => {
+                // Only the flag flips: sub-variants, label and prices stay in the draft for a toggle back on.
                 const updated = [...variants]
                 const row = { ...updated[popupIndex] }
                 row.sub_variant_type_on = !row.sub_variant_type_on
-                if (!row.sub_variant_type_on) row.sub_variant_type = ''
-                if (row.sub_variant_type_on) {
-                  row.use_own_images = true
-                  row.price = ''
-                  row.price_ex_gst = ''
-                  row.mrp = ''
-                  row.mrp_ex_gst = ''
-                }
+                if (row.sub_variant_type_on) row.use_own_images = true
                 updated[popupIndex] = row
                 setVariants(updated)
               }}
@@ -3395,13 +3465,15 @@ export default function ProductForm({
         ref={formRef}
         onSubmit={handleSubmit}
         onInput={() => {
+          userEditedRef.current = true
           dirtyRef.current = true
           savedRef.current = false
         }}
         onChange={
           isDraft
             ? () => {
-                void serverSaveNow()
+                // After the re-render, so the save reads the state this change produced.
+                setTimeout(() => void serverSaveNowRef.current(), 0)
               }
             : undefined
         }
@@ -3417,11 +3489,11 @@ export default function ProductForm({
               <EditSessionActions
                 autosaveStatus={serverSaveStatus as AutosaveStatus}
                 sessionStatus={edit.status}
-                onCancel={edit.cancel}
+                onCancel={cancelEditSession}
                 cancelHref={ap('/admin/products')}
                 draft={isDraft}
                 restore={hasDraft ? restoreDraft : undefined}
-                discard={isDraft || hasDraft ? discardDraft : undefined}
+                discard={hasDraft ? discardDraft : isDraft ? discardServerDraft : undefined}
               />
             ) : undefined
           }
@@ -5262,8 +5334,17 @@ export default function ProductForm({
                               key={variant.id || index}
                               className="border border-border-default rounded-lg p-3 space-y-3 bg-surface"
                             >
-                              <div className="flex items-center justify-between">
+                              <div className="flex items-center justify-between gap-2">
                                 <span className="text-xs font-medium text-foreground-muted uppercase">Variant</span>
+                                {variant.is_active === false && <Badge tone="muted">Inactive</Badge>}
+                                <span className="ml-auto">
+                                  <Toggle
+                                    size="sm"
+                                    checked={variant.is_active !== false}
+                                    onChange={on => updateVariant(index, 'is_active', on)}
+                                    label="Active"
+                                  />
+                                </span>
                                 {groupVariants.length > 1 && (
                                   <button
                                     type="button"
@@ -5593,14 +5674,7 @@ export default function ProductForm({
                                       const updated = [...variants]
                                       const row = { ...updated[index] }
                                       row.sub_variant_type_on = !row.sub_variant_type_on
-                                      if (!row.sub_variant_type_on) row.sub_variant_type = ''
-                                      if (row.sub_variant_type_on) {
-                                        row.use_own_images = true
-                                        row.price = ''
-                                        row.price_ex_gst = ''
-                                        row.mrp = ''
-                                        row.mrp_ex_gst = ''
-                                      }
+                                      if (row.sub_variant_type_on) row.use_own_images = true
                                       updated[index] = row
                                       setVariants(updated)
                                     }}
@@ -5665,9 +5739,16 @@ export default function ProductForm({
                                 <Badge tone={stockLabel === 'Out of Stock' ? 'red' : stockLabel === 'Low Stock' ? 'amber' : 'green'}>
                                   {stockLabel}
                                 </Badge>
+                                {variant.is_active === false && <Badge tone="muted">Inactive</Badge>}
                                 <span className="ml-auto text-xs tabular-nums text-foreground-muted">
                                   Variant {pos + 1} of {activeVariants.length}
                                 </span>
+                                <Toggle
+                                  size="sm"
+                                  checked={variant.is_active !== false}
+                                  onChange={on => updateVariant(index, 'is_active', on)}
+                                  label="Active"
+                                />
                                 {allGroupVariants.filter(v => !v._isDeleted).length > 1 && (
                                   <button
                                     type="button"
