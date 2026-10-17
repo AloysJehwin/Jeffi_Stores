@@ -2,15 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { createPortal } from 'react-dom'
-import { AlertTriangle, Check, Plus, X } from 'lucide-react'
-import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
-import AdminSelect from '@/components/admin/AdminSelect'
+import { AlertTriangle, ArrowDown, ArrowUp, Check, Download, Plus, X } from 'lucide-react'
+import { TabAction, TabActionsPortal, PageHeader, PAYMENT_STATUS, StatusBadge, badgeCls, Dialog, EmptyState, Field, Fields, TableSkeleton, FormFooter, FormButton, fieldInputCls, type StatusMap } from '@/components/admin/kit'
+import Select from '@/components/ui/Select'
 import { ap } from '@/lib/shared/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { useToast } from '@/contexts/ToastContext'
 import RowActions from '@/components/admin/RowActions'
-import IconButton from '@/components/ui/IconButton'
 import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, {
   newLineItem,
@@ -28,7 +26,7 @@ import SerialEntryModal, {
   type SerialAssignment,
   SerialPicker,
 } from '@/components/admin/SerialEntryModal'
-import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
+import { type SortDir } from '@/components/admin/sortOptions'
 import DatePicker from '@/components/ui/DatePicker'
 import Toggle from '@/components/ui/Toggle'
 import InvoicesMobileList from './_components/InvoicesMobileList'
@@ -77,25 +75,19 @@ function fmtDate(s: string) {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const inputCls =
-  'field-sm w-full border border-border-default bg-surface-secondary text-foreground focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400 disabled:opacity-60 disabled:cursor-not-allowed'
-const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
+const inputCls = fieldInputCls
+const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1.5'
 
-export const PAYMENT_COLORS: Record<string, string> = {
-  paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  unpaid: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  refunded: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  failed: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+export const SOURCE_STATUS: StatusMap = {
+  online: { label: 'Online', tone: 'blue' },
+  offline: { label: 'Offline', tone: 'muted' },
+  cash_sale: { label: 'Offline', tone: 'muted' },
+  business: { label: 'Business', tone: 'green' },
 }
 
-export const SOURCE_COLORS: Record<string, string> = {
-  online: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  offline: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  cash_sale: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  business: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-}
+// Badge class strings; other lists still key on these.
+export const PAYMENT_COLORS: Record<string, string> = Object.fromEntries(Object.entries(PAYMENT_STATUS).map(([k, v]) => [k, badgeCls(v.tone)]))
+export const SOURCE_COLORS: Record<string, string> = Object.fromEntries(Object.entries(SOURCE_STATUS).map(([k, v]) => [k, badgeCls(v.tone)]))
 
 export default function InvoicesClient({ canWrite = false }: { canWrite?: boolean }) {
   const { showToast } = useToast()
@@ -1173,31 +1165,15 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
             onCancel={() => setSerialPickerItems(null)}
           />
         )}
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                resetForm()
-                navigateView('list')
-              }}
-              className="p-2 text-foreground-secondary hover:text-foreground transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-            </button>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">
-                {isEdit ? 'Edit Offline Invoice' : 'New Offline Invoice'}
-              </h1>
-              <p className="text-foreground-secondary text-xs mt-0.5">
-                {isEdit ? 'Update customer details, items and payment mode' : 'Walk-in, credit sale, B2B or bulk order'}
-              </p>
-            </div>
-          </div>
+        <div className="space-y-5">
+          <PageHeader
+            back={{ href: ap('/admin/invoices'), label: 'Invoices' }}
+            title={isEdit ? 'Edit Offline Invoice' : 'New Offline Invoice'}
+            description={isEdit ? 'Update customer details, items and payment mode' : 'Walk-in, credit sale, B2B or bulk order'}
+          />
 
           {formError && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
+            <div className="rounded-xl border border-red-500/40 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400">
               {formError}
             </div>
           )}
@@ -1205,8 +1181,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           <form onSubmit={isEdit ? handleEdit : handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               {/* Col 1 — Invoice Details */}
-              <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-col gap-3">
-                <h2 className="text-sm font-semibold text-foreground">Invoice Details</h2>
+              <div className="bg-surface-elevated border border-border-default rounded-xl p-5 flex flex-col gap-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Invoice Details</h2>
                 <div>
                   <label className={labelCls}>Invoice Date</label>
                   <DatePicker value={invoiceDate} onChange={setInvoiceDate} />
@@ -1217,7 +1193,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                     {PAYMENT_MODES.map(m => (
                       <label
                         key={m.value}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${paymentMode === m.value ? 'border-secondary-500 dark:border-secondary-400 bg-secondary-50 dark:bg-secondary-700/30 text-secondary-700 dark:text-secondary-200' : 'border-border-default bg-surface-secondary text-foreground-secondary hover:border-secondary-400 dark:hover:border-secondary-500'}`}
+                        className={`flex h-control items-center gap-2 px-3 rounded-lg border cursor-pointer transition-colors ${paymentMode === m.value ? 'border-accent-500 bg-accent-500/10 text-foreground' : 'border-border-default bg-surface text-foreground-secondary hover:border-border-secondary'}`}
                       >
                         <input
                           type="radio"
@@ -1225,19 +1201,19 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                           value={m.value}
                           checked={paymentMode === m.value}
                           onChange={() => setPaymentMode(m.value)}
-                          className="accent-secondary-500 shrink-0"
+                          className="accent-accent-500 shrink-0"
                         />
                         <span className="text-sm font-medium">{m.label}</span>
                       </label>
                     ))}
                   </div>
                   {!selectedPayment?.paid && (
-                    <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-2">
                       Payment status will be <strong>Unpaid</strong> — credit sale
                     </p>
                   )}
                   {paymentMode === 'credit' && creditWarning && (
-                    <div className="mt-2 px-3 py-2 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-xs text-yellow-700 dark:text-yellow-300 flex items-start gap-1.5">
+                    <div className="mt-2 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/40 text-xs text-amber-700 dark:text-amber-400 flex items-start gap-1.5">
                       <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                       <span>
                         {creditWarning.creditLimit > 0
@@ -1260,8 +1236,8 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               </div>
 
               {/* Col 2 — Consignee (Ship to) */}
-              <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-col gap-3">
-                <h2 className="text-sm font-semibold text-foreground">
+              <div className="bg-surface-elevated border border-border-default rounded-xl p-5 flex flex-col gap-3">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
                   Consignee <span className="text-foreground-muted font-normal">(Ship to)</span>
                 </h2>
                 <div className="relative">
@@ -1307,7 +1283,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                   <label className={labelCls}>Phone &amp; Email</label>
                   <div className="flex gap-2">
                     <div className="flex flex-1 min-w-0">
-                      <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">
+                      <span className="inline-flex h-control items-center px-3 rounded-l-lg border border-r-0 border-border-secondary bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">
                         +91
                       </span>
                       <input
@@ -1410,9 +1386,9 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               </div>
 
               {/* Col 3 — Buyer (Bill to) */}
-              <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-col gap-3">
+              <div className="bg-surface-elevated border border-border-default rounded-xl p-5 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-semibold text-foreground">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
                     Buyer <span className="text-foreground-muted font-normal">(Bill to)</span>
                   </h2>
                   <div className="flex items-center gap-2">
@@ -1462,7 +1438,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                       <label className={labelCls}>Phone &amp; Email</label>
                       <div className="flex gap-2">
                         <div className="flex flex-1 min-w-0">
-                          <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">
+                          <span className="inline-flex h-control items-center px-3 rounded-l-lg border border-r-0 border-border-secondary bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">
                             +91
                           </span>
                           <input
@@ -1555,7 +1531,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               </div>
             </div>
 
-            <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-5">
               <LineItemsSection
                 items={items}
                 onChange={setItems}
@@ -1595,58 +1571,35 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 pb-6">
-              {canWrite && (
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-6 h-control bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
-                >
-                  {submitting ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save Changes' : 'Create Invoice'}
-                </button>
-              )}
+            <FormFooter
+              onCancel={() => {
+                resetForm()
+                navigateView('list')
+              }}
+              secondary={
+                isEdit && editIsDraft && autoSaveStatus !== 'idle' ? (
+                  <span className={autoSaveStatus === 'saving' ? 'text-foreground-muted' : autoSaveStatus === 'saved' ? 'text-green-700 dark:text-green-400' : 'text-red-500'}>
+                    {autoSaveStatus === 'saving' ? 'Auto-saving…' : autoSaveStatus === 'saved' ? 'Auto-saved' : 'Auto-save failed'}
+                  </span>
+                ) : undefined
+              }
+            >
               {!isEdit && canWrite && (
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={handleSaveDraft}
-                  className="px-6 h-control border border-border-default hover:bg-surface-secondary text-foreground rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
-                >
+                <FormButton type="button" variant="secondary" disabled={submitting} onClick={handleSaveDraft}>
                   {submitting ? 'Saving…' : 'Save as Draft'}
-                </button>
+                </FormButton>
               )}
               {isEdit && editIsDraft && canWrite && (
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={handleFinalizeEdit}
-                  className="px-6 h-control bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
-                >
+                <FormButton type="button" disabled={submitting} onClick={handleFinalizeEdit} className="bg-amber-500 hover:bg-amber-600">
                   {submitting ? 'Finalizing…' : 'Save & Finalize'}
-                </button>
+                </FormButton>
               )}
-              {isEdit && editIsDraft && autoSaveStatus !== 'idle' && (
-                <span
-                  className={`text-xs ml-auto ${autoSaveStatus === 'saving' ? 'text-foreground-muted' : autoSaveStatus === 'saved' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}
-                >
-                  {autoSaveStatus === 'saving'
-                    ? 'Auto-saving…'
-                    : autoSaveStatus === 'saved'
-                      ? 'Auto-saved'
-                      : 'Auto-save failed'}
-                </span>
+              {canWrite && (
+                <FormButton disabled={submitting}>
+                  {submitting ? (isEdit ? 'Saving…' : 'Creating…') : isEdit ? 'Save Changes' : 'Create Invoice'}
+                </FormButton>
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  resetForm()
-                  navigateView('list')
-                }}
-                className="px-6 h-control border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
+            </FormFooter>
           </form>
         </div>
       </>
@@ -1701,159 +1654,134 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           }}
         />
       )}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Invoices</h1>
-            <p className="text-foreground-secondary mt-1 text-sm">All online and offline invoices</p>
-          </div>
-          {canWrite && (
-            <TabActionsPortal>
-              <TabAction onClick={() => navigateView('create')} icon={<Plus className="w-4 h-4" />} label="New Offline Invoice" />
-            </TabActionsPortal>
-          )}
-        </div>
+      <div className="space-y-5">
+        <PageHeader title="Invoices" description="All online and offline invoices" />
+        {canWrite && (
+          <TabActionsPortal>
+            <TabAction onClick={() => navigateView('create')} icon={<Plus className="w-4 h-4" />} label="New Offline Invoice" />
+          </TabActionsPortal>
+        )}
 
-        <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3">
-          <div className="flex flex-wrap gap-2 items-center">
-            <div className="flex-1 min-w-[200px]">
-              <AdminTypeahead
-                type="invoices"
-                value={searchInput}
-                onChange={setSearchInput}
-                onSelect={item => {
-                  setSearchInput(item.label)
-                  setSearchQ(item.label)
-                  syncUrl({ search: item.label })
-                }}
-                onEnter={val => {
-                  setSearchQ(val)
-                  syncUrl({ search: val })
-                }}
-                placeholder="Search invoice, order, customer…"
-                inputClassName={inputCls + ' pr-9'}
-              />
-            </div>
-            <button
-              onClick={() => {
-                setSearchQ(searchInput)
-                syncUrl({ search: searchInput })
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="min-w-[200px] flex-1">
+            <AdminTypeahead
+              type="invoices"
+              value={searchInput}
+              onChange={setSearchInput}
+              onSelect={item => {
+                setSearchInput(item.label)
+                setSearchQ(item.label)
+                syncUrl({ search: item.label })
               }}
-              className="control-sm border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white font-medium transition-colors"
-            >
-              Search
-            </button>
-            {(searchQ || sourceFilter || paymentFilter || fromDate || toDate) && (
-              <button
-                onClick={() => {
-                  setSearchQ('')
-                  setSearchInput('')
-                  setSourceFilter('')
-                  setPaymentFilter('')
-                  setFromDate('')
-                  setToDate('')
-                  syncUrl({ search: '', source: '', payment: '', from: '', to: '' })
-                }}
-                className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
-              >
-                Clear
-              </button>
-            )}
+              onEnter={val => {
+                setSearchQ(val)
+                syncUrl({ search: val })
+              }}
+              placeholder="Search invoice, order, customer…"
+              inputClassName={inputCls + ' pr-9'}
+            />
           </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <AdminSelect
-              sm
+          <button
+            type="button"
+            onClick={() => {
+              setSearchQ(searchInput)
+              syncUrl({ search: searchInput })
+            }}
+            className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600"
+          >
+            Search
+          </button>
+          <div className="w-[190px]">
+            <Select<string>
               value={sourceFilter}
               onChange={v => {
                 setSourceFilter(v)
                 syncUrl({ source: v })
               }}
-              placeholder="All Sources"
               options={[
-                { value: 'online', label: 'Online' },
-                { value: 'offline', label: 'Offline' },
-                { value: 'cash_sale', label: 'Offline (Cash Sale)' },
+                { value: '', label: 'Source: All' },
+                { value: 'online', label: 'Source: Online' },
+                { value: 'offline', label: 'Source: Offline' },
+                { value: 'cash_sale', label: 'Source: Offline (Cash Sale)' },
               ]}
             />
-            <AdminSelect
-              sm
+          </div>
+          <div className="w-[170px]">
+            <Select<string>
               value={paymentFilter}
               onChange={v => {
                 setPaymentFilter(v)
                 syncUrl({ payment: v })
               }}
-              placeholder="All Payments"
               options={[
-                { value: 'paid', label: 'Paid' },
-                { value: 'unpaid', label: 'Unpaid' },
-                { value: 'refunded', label: 'Refunded' },
-                { value: 'failed', label: 'Failed' },
+                { value: '', label: 'Payment: All' },
+                { value: 'paid', label: 'Payment: Paid' },
+                { value: 'unpaid', label: 'Payment: Unpaid' },
+                { value: 'refunded', label: 'Payment: Refunded' },
+                { value: 'failed', label: 'Payment: Failed' },
               ]}
             />
-            <div className="flex items-center gap-2">
-              <DatePicker
-                className="w-36"
-                value={fromDate}
-                onChange={v => {
-                  setFromDate(v)
-                  syncUrl({ from: v })
-                }}
-              />
-              <span className="text-foreground-secondary text-xs">to</span>
-              <DatePicker
-                className="w-36"
-                value={toDate}
-                onChange={v => {
-                  setToDate(v)
-                  syncUrl({ to: v })
-                }}
-              />
-            </div>
           </div>
+          <div className="flex items-center gap-2">
+            <DatePicker
+              className="w-36"
+              value={fromDate}
+              onChange={v => {
+                setFromDate(v)
+                syncUrl({ from: v })
+              }}
+            />
+            <span className="text-xs text-foreground-muted">to</span>
+            <DatePicker
+              className="w-36"
+              value={toDate}
+              onChange={v => {
+                setToDate(v)
+                syncUrl({ to: v })
+              }}
+            />
+          </div>
+          {(searchQ || sourceFilter || paymentFilter || fromDate || toDate) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQ('')
+                setSearchInput('')
+                setSourceFilter('')
+                setPaymentFilter('')
+                setFromDate('')
+                setToDate('')
+                syncUrl({ search: '', source: '', payment: '', from: '', to: '' })
+              }}
+              className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary"
+            >
+              <X className="h-4 w-4" />
+              Clear
+            </button>
+          )}
         </div>
 
         {(draftsLoading || drafts.length > 0) && (
-          <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-700/50 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-amber-200 dark:border-amber-700/50 flex items-center justify-between">
+          <section className="overflow-hidden rounded-xl border border-amber-500/40 bg-amber-500/5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/30 px-4 py-3">
               <div className="flex items-center gap-2">
-                <svg
-                  className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                  />
-                </svg>
-                <span className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft Invoices</span>
-                {drafts.length > 0 && (
-                  <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-300">
-                    {drafts.length}
-                  </span>
-                )}
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span className="text-sm font-semibold text-foreground">Draft Invoices</span>
+                {drafts.length > 0 && <span className={badgeCls('amber')}>{drafts.length}</span>}
               </div>
-              <p className="text-xs text-amber-700 dark:text-amber-400">
-                Draft invoices pending finalization or amendment publishing
-              </p>
+              <p className="text-xs text-foreground-muted">Draft invoices pending finalization or amendment publishing</p>
             </div>
 
             {draftsLoading ? (
-              <div className="p-6 text-center text-sm text-amber-700 dark:text-amber-400">Loading drafts…</div>
+              <div className="p-6 text-center text-sm text-foreground-muted">Loading drafts…</div>
             ) : (
               <>
-                <div className="hidden md:block overflow-x-auto">
+                <div className="hidden overflow-x-auto md:block">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-amber-200 dark:border-amber-700/50 bg-amber-100/50 dark:bg-amber-900/20">
+                      <tr className="border-b border-amber-500/30 text-xs text-foreground-muted">
                         {['Order No', 'Customer', 'Phone', 'Amount', 'Stock', 'Created', 'Actions'].map(h => (
-                          <th
-                            key={h}
-                            className="px-4 py-2.5 text-left text-xs font-semibold text-amber-700 dark:text-amber-400"
-                          >
+                          <th key={h} className={`px-4 py-2.5 font-medium ${h === 'Amount' ? 'text-right' : 'text-left'}`}>
                             {h}
                           </th>
                         ))}
@@ -1861,93 +1789,48 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                     </thead>
                     <tbody>
                       {drafts.map(draft => (
-                        <tr
-                          key={draft.id}
-                          className="border-b border-amber-100 dark:border-amber-800/30 hover:bg-amber-100/40 dark:hover:bg-amber-900/20 transition-colors"
-                        >
+                        <tr key={draft.id} className="border-b border-amber-500/20 last:border-0 hover:bg-amber-500/5">
                           <td className="px-4 py-3 font-mono text-xs font-medium">
-                            <a
-                              href={ap(`/admin/orders/${draft.id}/view`)}
-                              className="text-foreground hover:text-accent-500 hover:underline transition-colors"
-                            >
+                            <a href={ap(`/admin/orders/${draft.id}/view`)} className="text-foreground hover:text-accent-500 hover:underline">
                               {draft.order_number}
                             </a>
-                            {draft.order_number?.startsWith('AMD-') ? (
-                              <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                                Amendment Draft
-                              </span>
-                            ) : (
-                              <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                                Draft
-                              </span>
-                            )}
+                            <span className={`ml-2 ${badgeCls(draft.order_number?.startsWith('AMD-') ? 'blue' : 'amber')}`}>{draft.order_number?.startsWith('AMD-') ? 'Amendment Draft' : 'Draft'}</span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-foreground">{draft.customer_name}</td>
-                          <td className="px-4 py-3 text-xs text-foreground-secondary">
-                            {draft.customer_phone ? `+91 ${draft.customer_phone}` : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-foreground">
-                            ₹
-                            {parseFloat(draft.total_amount).toLocaleString('en-IN', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
+                          <td className="px-4 py-3 text-foreground">{draft.customer_name}</td>
+                          <td className="px-4 py-3 text-xs text-foreground-secondary">{draft.customer_phone ? `+91 ${draft.customer_phone}` : '—'}</td>
+                          <td className="px-4 py-3 text-right font-semibold tabular-nums text-foreground">₹{fmt(parseFloat(draft.total_amount))}</td>
+                          <td className="whitespace-nowrap px-4 py-3">
                             <DraftStockPill draft={draft} />
                           </td>
-                          <td className="px-4 py-3 text-xs text-foreground-secondary whitespace-nowrap">
-                            {fmtDate(draft.created_at)}
-                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-xs text-foreground-secondary">{fmtDate(draft.created_at)}</td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               {draft.source === 'offline' && !draft.order_number?.startsWith('AMD-') && canWrite && (
                                 <button
-                                  onClick={() =>
-                                    openEdit({
-                                      id: draft.id,
-                                      source: 'offline',
-                                      invoice_number: '',
-                                      status: 'draft',
-                                    } as Invoice)
-                                  }
-                                  className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
+                                  onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
+                                  className="text-xs font-medium text-foreground-secondary hover:text-foreground"
                                 >
                                   Edit
                                 </button>
                               )}
                               {draft.source !== 'offline' && (
-                                <a
-                                  href={ap(`/admin/invoices/${draft.id}/view`)}
-                                  className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
-                                >
+                                <a href={ap(`/admin/invoices/${draft.id}/view`)} className="text-xs font-medium text-foreground-secondary hover:text-foreground">
                                   View
                                 </a>
                               )}
                               {draft.order_number?.startsWith('AMD-') ? (
                                 <>
-                                  <a
-                                    href={ap(`/admin/invoices/${draft.id}/view`)}
-                                    className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
-                                  >
+                                  <a href={ap(`/admin/invoices/${draft.id}/view`)} className="text-xs font-medium text-foreground-secondary hover:text-foreground">
                                     View
                                   </a>
                                   {canWrite && (
-                                    <button
-                                      onClick={() => publishAmendmentDraft(draft.id)}
-                                      disabled={publishingId === draft.id}
-                                      className="text-xs font-semibold text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 disabled:opacity-50 transition-colors"
-                                    >
+                                    <button onClick={() => publishAmendmentDraft(draft.id)} disabled={publishingId === draft.id} className="text-xs font-semibold text-accent-500 hover:underline disabled:opacity-50">
                                       {publishingId === draft.id ? 'Publishing…' : 'Publish Amendment'}
                                     </button>
                                   )}
                                 </>
                               ) : canWrite ? (
-                                <button
-                                  onClick={() => finalizeDraft(draft.id)}
-                                  disabled={finalizingId === draft.id}
-                                  className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 disabled:opacity-50 transition-colors"
-                                >
+                                <button onClick={() => finalizeDraft(draft.id)} disabled={finalizingId === draft.id} className="text-xs font-semibold text-amber-700 hover:underline disabled:opacity-50 dark:text-amber-400">
                                   {finalizingId === draft.id ? 'Finalizing…' : 'Finalize'}
                                 </button>
                               ) : null}
@@ -1959,85 +1842,48 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                   </table>
                 </div>
 
-                <div className="md:hidden divide-y divide-amber-100 dark:divide-amber-800/30">
+                <div className="divide-y divide-amber-500/20 md:hidden">
                   {drafts.map(draft => (
-                    <div key={draft.id} className="p-4 space-y-2">
+                    <div key={draft.id} className="space-y-2 p-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <a
-                            href={ap(`/admin/orders/${draft.id}/view`)}
-                            className="font-mono text-xs font-medium text-foreground hover:text-accent-500 hover:underline transition-colors"
-                          >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a href={ap(`/admin/orders/${draft.id}/view`)} className="font-mono text-xs font-medium text-foreground hover:text-accent-500 hover:underline">
                             {draft.order_number}
                           </a>
-                          {draft.order_number?.startsWith('AMD-') ? (
-                            <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                              Amendment Draft
-                            </span>
-                          ) : (
-                            <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                              Draft
-                            </span>
-                          )}
+                          <span className={badgeCls(draft.order_number?.startsWith('AMD-') ? 'blue' : 'amber')}>{draft.order_number?.startsWith('AMD-') ? 'Amendment Draft' : 'Draft'}</span>
                         </div>
-                        <span className="text-sm font-semibold text-foreground">
-                          ₹
-                          {parseFloat(draft.total_amount).toLocaleString('en-IN', {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </span>
+                        <span className="text-sm font-semibold tabular-nums text-foreground">₹{fmt(parseFloat(draft.total_amount))}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-foreground">{draft.customer_name}</span>
                         <span className="text-xs text-foreground-secondary">{fmtDate(draft.created_at)}</span>
                       </div>
-                      {draft.customer_phone && (
-                        <p className="text-xs text-foreground-secondary">+91 {draft.customer_phone}</p>
-                      )}
+                      {draft.customer_phone && <p className="text-xs text-foreground-secondary">+91 {draft.customer_phone}</p>}
                       <div className="pt-1">
                         <DraftStockPill draft={draft} />
                       </div>
                       <div className="flex gap-4 pt-1">
                         {draft.source === 'offline' && !draft.order_number?.startsWith('AMD-') && canWrite && (
                           <button
-                            onClick={() =>
-                              openEdit({
-                                id: draft.id,
-                                source: 'offline',
-                                invoice_number: '',
-                                status: 'draft',
-                              } as Invoice)
-                            }
-                            className="text-xs text-foreground-secondary hover:text-foreground font-medium"
+                            onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
+                            className="text-xs font-medium text-foreground-secondary hover:text-foreground"
                           >
                             Edit
                           </button>
                         )}
                         {(draft.source !== 'offline' || draft.order_number?.startsWith('AMD-')) && (
-                          <a
-                            href={ap(`/admin/invoices/${draft.id}/view`)}
-                            className="text-xs text-foreground-secondary hover:text-foreground font-medium"
-                          >
+                          <a href={ap(`/admin/invoices/${draft.id}/view`)} className="text-xs font-medium text-foreground-secondary hover:text-foreground">
                             View
                           </a>
                         )}
                         {draft.order_number?.startsWith('AMD-') ? (
                           canWrite && (
-                            <button
-                              onClick={() => publishAmendmentDraft(draft.id)}
-                              disabled={publishingId === draft.id}
-                              className="text-xs font-semibold text-blue-700 dark:text-blue-300 hover:text-blue-900 disabled:opacity-50"
-                            >
+                            <button onClick={() => publishAmendmentDraft(draft.id)} disabled={publishingId === draft.id} className="text-xs font-semibold text-accent-500 disabled:opacity-50">
                               {publishingId === draft.id ? 'Publishing…' : 'Publish Amendment'}
                             </button>
                           )
                         ) : canWrite ? (
-                          <button
-                            onClick={() => finalizeDraft(draft.id)}
-                            disabled={finalizingId === draft.id}
-                            className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 disabled:opacity-50"
-                          >
+                          <button onClick={() => finalizeDraft(draft.id)} disabled={finalizingId === draft.id} className="text-xs font-semibold text-amber-700 disabled:opacity-50 dark:text-amber-400">
                             {finalizingId === draft.id ? 'Finalizing…' : 'Finalize'}
                           </button>
                         ) : null}
@@ -2047,106 +1893,41 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 </div>
               </>
             )}
-          </div>
+          </section>
         )}
 
-        <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
-          {loading ? (
-            <div className="p-4 space-y-2">
-              {[...Array(8)].map((_, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 px-2 py-1 animate-pulse"
-                  style={{ animationDelay: `${i * 50}ms` }}
-                >
-                  <div className="h-4 w-24 bg-surface-secondary rounded" />
-                  <div className="h-4 w-20 bg-surface-secondary rounded" />
-                  <div className="h-4 flex-1 bg-surface-secondary rounded" />
-                  <div className="h-4 w-20 bg-surface-secondary rounded" />
-                  <div className="h-4 w-16 bg-surface-secondary rounded" />
-                  <div className="h-4 w-14 bg-surface-secondary rounded" />
-                  <div className="h-4 w-10 bg-surface-secondary rounded" />
-                  <div className="h-4 w-16 bg-surface-secondary rounded" />
-                </div>
-              ))}
-            </div>
-          ) : invoices.length === 0 ? (
-            <div className="p-12 text-center text-foreground-muted text-sm">No invoices found.</div>
-          ) : (
-            <>
-              <div className="hidden md:block overflow-x-auto">
+        {loading ? (
+          <TableSkeleton rows={8} cols={8} />
+        ) : invoices.length === 0 ? (
+          <EmptyState title="No invoices found." body="Try a different search or clear the filters." />
+        ) : (
+          <>
+            <div className="hidden overflow-hidden rounded-xl border border-border-default bg-surface-elevated md:block">
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-border-default bg-surface-secondary">
-                      <SortableHeader
-                        label="Invoice No"
-                        column="invoice_number"
-                        options={sortOptions('text')}
-                        onSort={handleSort}
-                        currentSort={sortCol}
-                        currentDir={sortDir}
-                      />
-                      <SortableHeader
-                        label="Date"
-                        column="date"
-                        options={sortOptions('date')}
-                        onSort={handleSort}
-                        currentSort={sortCol}
-                        currentDir={sortDir}
-                      />
-                      <SortableHeader
-                        label="Customer"
-                        column="customer"
-                        options={sortOptions('text')}
-                        onSort={handleSort}
-                        currentSort={sortCol}
-                        currentDir={sortDir}
-                      />
-                      <SortableHeader
-                        label="Amount"
-                        column="amount"
-                        options={sortOptions('number')}
-                        onSort={handleSort}
-                        currentSort={sortCol}
-                        currentDir={sortDir}
-                      />
-                      <SortableHeader
-                        label="Payment"
-                        column="payment"
-                        options={sortOptions('text')}
-                        onSort={handleSort}
-                        currentSort={sortCol}
-                        currentDir={sortDir}
-                      />
-                      <SortableHeader
-                        label="Source"
-                        column="source"
-                        options={sortOptions('text')}
-                        onSort={handleSort}
-                        currentSort={sortCol}
-                        currentDir={sortDir}
-                      />
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary">IRN</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary">Actions</th>
+                    <tr className="border-b border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
+                      <SortTh label="Invoice No" col="invoice_number" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh label="Customer" col="customer" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh label="Date" col="date" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh label="Amount" col="amount" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} num />
+                      <SortTh label="Payment" col="payment" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh label="Source" col="source" sortCol={sortCol} sortDir={sortDir} onSort={handleSort} />
+                      <th className="px-3 py-2.5 text-left font-medium">IRN</th>
+                      <th className="px-3 py-2.5 text-right font-medium">
+                        <span className="sr-only">Actions</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {sortedInvoices.map(inv => (
-                      <tr
-                        key={inv.id}
-                        className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer"
-                        onClick={() => setSelectedInvoice(inv)}
-                      >
-                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                      <tr key={inv.id} className="cursor-pointer border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/60" onClick={() => setSelectedInvoice(inv)}>
+                        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                           <HoverCard
                             trigger={
                               <a
-                                href={ap(
-                                  inv.source === 'cash_sale'
-                                    ? `/admin/cash-sale/${inv.id}/view`
-                                    : `/admin/invoices/${inv.id}/view`
-                                )}
-                                className="font-mono font-semibold text-sm text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
+                                href={ap(inv.source === 'cash_sale' ? `/admin/cash-sale/${inv.id}/view` : `/admin/invoices/${inv.id}/view`)}
+                                className="font-mono text-sm font-semibold text-accent-500 hover:text-accent-600 hover:underline"
                               >
                                 {inv.invoice_number}
                               </a>
@@ -2155,11 +1936,11 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                             side="bottom"
                             width="260px"
                           >
-                            <div className="p-3 space-y-2">
-                              <p className="font-mono font-semibold text-foreground text-sm">{inv.invoice_number}</p>
+                            <div className="space-y-2 p-3">
+                              <p className="font-mono text-sm font-semibold text-foreground">{inv.invoice_number}</p>
                               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                                 <span className="text-foreground-muted">Customer</span>
-                                <span className="text-foreground font-medium truncate">{inv.customer_name || '—'}</span>
+                                <span className="truncate font-medium text-foreground">{inv.customer_name || '—'}</span>
                                 {inv.customer_phone && (
                                   <>
                                     <span className="text-foreground-muted">Phone</span>
@@ -2169,89 +1950,43 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                                 <span className="text-foreground-muted">Date</span>
                                 <span className="text-foreground">{fmtDate(inv.invoice_date)}</span>
                                 <span className="text-foreground-muted">Total</span>
-                                <span className="text-foreground font-semibold">
-                                  ₹{fmt(parseFloat(inv.total_amount))}
-                                </span>
+                                <span className="font-semibold text-foreground">₹{fmt(parseFloat(inv.total_amount))}</span>
                                 <span className="text-foreground-muted">Payment</span>
-                                <span
-                                  className={`font-medium ${inv.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : inv.payment_status === 'unpaid' ? 'text-red-600 dark:text-red-400' : 'text-yellow-600 dark:text-yellow-400'}`}
-                                >
-                                  {inv.payment_status}
+                                <span>
+                                  <StatusBadge status={inv.payment_status} map={PAYMENT_STATUS} />
                                 </span>
                                 <span className="text-foreground-muted">Source</span>
-                                <span className="text-foreground">
-                                  {inv.source === 'online'
-                                    ? 'Online'
-                                    : inv.source === 'business'
-                                      ? 'Business'
-                                      : 'Offline'}
-                                </span>
+                                <span className="text-foreground">{SOURCE_STATUS[inv.source]?.label ?? 'Offline'}</span>
                               </div>
                             </div>
                           </HoverCard>
-                          {inv.order_number && (
-                            <div className="text-xs text-foreground-muted mt-0.5 font-mono">{inv.order_number}</div>
-                          )}
+                          {inv.order_number && <div className="mt-0.5 font-mono text-xs text-foreground-muted">{inv.order_number}</div>}
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="font-medium text-foreground text-sm">{inv.customer_name}</div>
-                          {inv.customer_phone && (
-                            <div className="text-xs text-foreground-muted mt-0.5">+91 {inv.customer_phone}</div>
-                          )}
-                          {inv.buyer_gstin && (
-                            <div className="text-xs text-foreground-muted font-mono mt-0.5">{inv.buyer_gstin}</div>
-                          )}
+                        <td className="px-3 py-2.5">
+                          <div className="font-medium text-foreground">{inv.customer_name}</div>
+                          {inv.customer_phone && <div className="mt-0.5 text-xs text-foreground-muted">+91 {inv.customer_phone}</div>}
+                          {inv.buyer_gstin && <div className="mt-0.5 font-mono text-xs text-foreground-muted">{inv.buyer_gstin}</div>}
                         </td>
-                        <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-sm">
-                          {fmtDate(inv.invoice_date)}
+                        <td className="whitespace-nowrap px-3 py-2.5 text-foreground-secondary">{fmtDate(inv.invoice_date)}</td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums">
+                          <div className="font-semibold text-foreground">₹{fmt(parseFloat(inv.total_amount))}</div>
+                          {parseFloat(inv.taxable_amount) > 0 && <div className="mt-0.5 text-xs text-foreground-muted">Taxable ₹{fmt(parseFloat(inv.taxable_amount))}</div>}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="font-semibold text-foreground text-sm">
-                            ₹
-                            {parseFloat(inv.total_amount).toLocaleString('en-IN', {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </div>
-                          {parseFloat(inv.taxable_amount) > 0 && (
-                            <div className="text-xs text-foreground-muted mt-0.5">
-                              Taxable ₹
-                              {parseFloat(inv.taxable_amount).toLocaleString('en-IN', {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </div>
-                          )}
+                        <td className="px-3 py-2.5">
+                          <StatusBadge status={inv.payment_status} map={PAYMENT_STATUS} />
                         </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[inv.payment_status] || ''}`}
-                          >
-                            {inv.payment_status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2.5">
                           <div className="flex flex-wrap items-center gap-1">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}
-                            >
-                              {inv.source === 'online' ? 'Online' : inv.source === 'business' ? 'Business' : 'Offline'}
-                            </span>
-                            {inv.status === 'cancelled' && (
-                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                                Cancelled
-                              </span>
-                            )}
+                            <StatusBadge status={inv.source} map={SOURCE_STATUS} label={SOURCE_STATUS[inv.source]?.label ?? 'Offline'} />
+                            {inv.status === 'cancelled' && <span className={badgeCls('red')}>Cancelled</span>}
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-3 py-2.5">
                           {inv.irn ? (
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1 ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}
-                            >
+                            <span className={`${badgeCls(inv.irn_status === 'generated' ? 'green' : 'amber')} inline-flex items-center gap-1`}>
                               {inv.irn_status === 'generated' ? (
                                 <>
-                                  <Check className="w-3 h-3" /> IRN
+                                  <Check className="h-3 w-3" /> IRN
                                 </>
                               ) : (
                                 'Stub'
@@ -2261,40 +1996,18 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                             <span className="text-xs text-foreground-muted">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <td className="px-3 py-2.5 text-right" onClick={e => e.stopPropagation()}>
                           <RowActions
                             size="sm"
                             actions={
                               inv.source === 'cash_sale'
                                 ? [
-                                    {
-                                      key: 'download-receipt',
-                                      kind: 'download',
-                                      label: 'Download Receipt PDF',
-                                      href: `/api/admin/cash-sale/${inv.id}/receipt`,
-                                      target: '_blank',
-                                    },
-                                    {
-                                      key: 'view-sale',
-                                      kind: 'open',
-                                      label: 'View Sale',
-                                      href: ap(`/admin/cash-sale/${inv.id}/view`),
-                                    },
+                                    { key: 'download-receipt', kind: 'download', label: 'Download Receipt PDF', href: `/api/admin/cash-sale/${inv.id}/receipt`, target: '_blank' },
+                                    { key: 'view-sale', kind: 'open', label: 'View Sale', href: ap(`/admin/cash-sale/${inv.id}/view`) },
                                   ]
                                 : [
-                                    {
-                                      key: 'download-invoice',
-                                      kind: 'download',
-                                      label: 'Download Invoice PDF',
-                                      href: `/api/orders/${inv.id}/invoice`,
-                                      target: '_blank',
-                                    },
-                                    {
-                                      key: 'view-invoice',
-                                      kind: 'open',
-                                      label: 'View Invoice',
-                                      href: ap(`/admin/invoices/${inv.id}/view`),
-                                    },
+                                    { key: 'download-invoice', kind: 'download', label: 'Download Invoice PDF', href: `/api/orders/${inv.id}/invoice`, target: '_blank' },
+                                    { key: 'view-invoice', kind: 'open', label: 'View Invoice', href: ap(`/admin/invoices/${inv.id}/view`) },
                                     {
                                       key: 'send-email',
                                       kind: 'email',
@@ -2337,95 +2050,85 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                   </tbody>
                 </table>
               </div>
+            </div>
 
-              <InvoicesMobileList
-                invoices={invoices}
-                canWrite={canWrite}
-                sendingEmailId={sendingEmailId}
-                cancellingId={cancellingId}
-                onSendEmail={sendInvoiceEmail}
-                onCancel={cancelInvoice}
-              />
-            </>
-          )}
-        </div>
+            <InvoicesMobileList invoices={invoices} canWrite={canWrite} sendingEmailId={sendingEmailId} cancellingId={cancellingId} onSendEmail={sendInvoiceEmail} onCancel={cancelInvoice} />
+          </>
+        )}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border border-border-default border-t-0 rounded-b-xl bg-surface-elevated flex items-center justify-between gap-2">
-            <p className="text-xs text-foreground-muted whitespace-nowrap">
+          <div className="flex items-center justify-between gap-2 px-1 text-xs text-foreground-muted">
+            <span className="tabular-nums">
               <span className="font-medium text-foreground">
                 {(page - 1) * 25 + 1}–{Math.min(page * 25, total)}
               </span>{' '}
               of <span className="font-medium text-foreground">{total}</span> invoices
-            </p>
+            </span>
             <div className="flex items-center gap-1.5">
-              <button
-                disabled={page <= 1}
-                onClick={() => fetchInvoices(page - 1)}
-                className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-              >
+              <button disabled={page <= 1} onClick={() => fetchInvoices(page - 1)} className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:pointer-events-none disabled:opacity-40">
                 Prev
               </button>
-              <span className="text-xs text-foreground-muted whitespace-nowrap">
-                {page}/{totalPages}
+              <span className="tabular-nums">
+                {page} / {totalPages}
               </span>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => fetchInvoices(page + 1)}
-                className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-              >
+              <button disabled={page >= totalPages} onClick={() => fetchInvoices(page + 1)} className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:pointer-events-none disabled:opacity-40">
                 Next
               </button>
             </div>
           </div>
         )}
-        {selectedInvoice && <InvoiceDetailModal inv={selectedInvoice} onClose={() => setSelectedInvoice(null)} />}
+        <InvoiceDetailModal inv={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
       </div>
     </>
   )
 }
 
-function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => void }) {
-  if (typeof document === 'undefined') return null
-  return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div
-        className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-border-default">
-          <div className="min-w-0 pr-4">
-            <h2 className="text-lg font-bold text-foreground leading-tight font-mono">{inv.invoice_number}</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              {new Date(inv.invoice_date).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              })}
-            </p>
-          </div>
-          <IconButton icon={X} label="Close" onClick={onClose} className="flex-shrink-0" />
-        </div>
+/** Header cell that toggles the server sort for one column (desc first, then asc). */
+function SortTh({ label, col, sortCol, sortDir, onSort, num }: { label: string; col: string; sortCol?: string; sortDir?: SortDir; onSort: (c: string, d: SortDir) => void; num?: boolean }) {
+  const on = sortCol === col
+  return (
+    <th
+      aria-sort={on ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
+      onClick={() => onSort(col, on && sortDir !== 'asc' ? 'asc' : 'desc')}
+      className={`cursor-pointer select-none whitespace-nowrap px-3 py-2.5 font-medium hover:text-foreground ${num ? 'text-right' : 'text-left'}`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {on && (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+      </span>
+    </th>
+  )
+}
 
-        <div className="p-5 space-y-5">
-          {/* Badges */}
+function InvoiceDetailModal({ inv, onClose }: { inv: Invoice | null; onClose: () => void }) {
+  const money = (v: string) => `₹${fmt(parseFloat(v))}`
+  const isCash = inv?.source === 'cash_sale'
+  return (
+    <Dialog
+      open={!!inv}
+      onClose={onClose}
+      size="lg"
+      zIndex="z-[300]"
+      title={<span className="font-mono">{inv?.invoice_number}</span>}
+      description={inv && new Date(inv.invoice_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+      footer={
+        inv && (
+          <a href={isCash ? `/api/admin/cash-sale/${inv.id}/receipt` : `/api/orders/${inv.id}/invoice`} target="_blank" rel="noopener noreferrer" className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600">
+            <Download className="h-4 w-4" />
+            {isCash ? 'Receipt PDF' : 'Invoice PDF'}
+          </a>
+        )
+      }
+    >
+      {inv && (
+        <div className="space-y-5">
           <div className="flex flex-wrap gap-2">
-            <span
-              className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${PAYMENT_COLORS[inv.payment_status] || ''}`}
-            >
-              {inv.payment_status}
-            </span>
-            <span className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${SOURCE_COLORS[inv.source] || ''}`}>
-              {inv.source === 'online' ? 'Online' : inv.source === 'business' ? 'Business' : 'Offline'}
-            </span>
+            <StatusBadge status={inv.payment_status} map={PAYMENT_STATUS} />
+            <StatusBadge status={inv.source} map={SOURCE_STATUS} label={SOURCE_STATUS[inv.source]?.label ?? 'Offline'} />
             {inv.irn && (
-              <span
-                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full inline-flex items-center gap-1 ${inv.irn_status === 'generated' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'}`}
-              >
+              <span className={`${badgeCls(inv.irn_status === 'generated' ? 'green' : 'amber')} inline-flex items-center gap-1`}>
                 {inv.irn_status === 'generated' ? (
                   <>
-                    <Check className="w-3 h-3" /> IRN
+                    <Check className="h-3 w-3" /> IRN
                   </>
                 ) : (
                   'IRN Stub'
@@ -2433,121 +2136,38 @@ function InvoiceDetailModal({ inv, onClose }: { inv: Invoice; onClose: () => voi
               </span>
             )}
           </div>
-
-          {/* Customer */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Customer</p>
-              <p className="text-sm font-semibold text-foreground">{inv.customer_name}</p>
-              {inv.customer_phone && (
-                <p className="text-xs text-foreground-secondary mt-0.5">+91 {inv.customer_phone}</p>
-              )}
-              {inv.customer_email && <p className="text-xs text-foreground-secondary mt-0.5">{inv.customer_email}</p>}
-              {inv.buyer_gstin && (
-                <p className="text-xs text-foreground-secondary font-mono mt-0.5">{inv.buyer_gstin}</p>
-              )}
-            </div>
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Order</p>
-              <p className="text-sm text-foreground font-mono">{inv.order_number}</p>
-            </div>
-          </div>
-
-          {/* Tax breakdown */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-surface-secondary">
-            <div>
-              <p className="text-xs text-foreground-muted">Taxable</p>
-              <p className="text-sm font-semibold text-foreground">
-                ₹
-                {parseFloat(inv.taxable_amount).toLocaleString('en-IN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </p>
-            </div>
+          <Fields>
+            <Field
+              label="Customer"
+              value={
+                <span className="block">
+                  <span className="font-semibold">{inv.customer_name}</span>
+                  {inv.customer_phone && <span className="block text-xs text-foreground-secondary">+91 {inv.customer_phone}</span>}
+                  {inv.customer_email && <span className="block text-xs text-foreground-secondary">{inv.customer_email}</span>}
+                  {inv.buyer_gstin && <span className="block font-mono text-xs text-foreground-secondary">{inv.buyer_gstin}</span>}
+                </span>
+              }
+            />
+            <Field label="Order" value={inv.order_number} mono />
+          </Fields>
+          <div className="grid grid-cols-2 gap-3 rounded-lg bg-surface-secondary p-3 sm:grid-cols-4">
+            <Field label="Taxable" value={<span className="font-semibold tabular-nums">{money(inv.taxable_amount)}</span>} />
             {parseFloat(inv.cgst_amount) > 0 && (
-              <div>
-                <p className="text-xs text-foreground-muted">CGST + SGST</p>
-                <p className="text-sm font-semibold text-foreground">
-                  ₹
-                  {parseFloat(inv.cgst_amount).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{' '}
-                  + ₹
-                  {parseFloat(inv.sgst_amount).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
+              <Field
+                label="CGST + SGST"
+                value={
+                  <span className="font-semibold tabular-nums">
+                    {money(inv.cgst_amount)} + {money(inv.sgst_amount)}
+                  </span>
+                }
+              />
             )}
-            {parseFloat(inv.igst_amount) > 0 && (
-              <div>
-                <p className="text-xs text-foreground-muted">IGST</p>
-                <p className="text-sm font-semibold text-foreground">
-                  ₹
-                  {parseFloat(inv.igst_amount).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
-            )}
-            <div>
-              <p className="text-xs text-foreground-muted">Total</p>
-              <p className="text-sm font-bold text-foreground">
-                ₹
-                {parseFloat(inv.total_amount).toLocaleString('en-IN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </p>
-            </div>
-          </div>
-
-          {/* Downloads */}
-          <div className="flex flex-wrap gap-3 pt-1 border-t border-border-default">
-            {inv.source === 'cash_sale' ? (
-              <a
-                href={`/api/admin/cash-sale/${inv.id}/receipt`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                Receipt PDF
-              </a>
-            ) : (
-              <a
-                href={`/api/orders/${inv.id}/invoice`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
-                Invoice PDF
-              </a>
-            )}
+            {parseFloat(inv.igst_amount) > 0 && <Field label="IGST" value={<span className="font-semibold tabular-nums">{money(inv.igst_amount)}</span>} />}
+            <Field label="Total" value={<span className="font-bold tabular-nums">{money(inv.total_amount)}</span>} />
           </div>
         </div>
-      </div>
-    </div>,
-    document.body
+      )}
+    </Dialog>
   )
 }
 
@@ -2572,20 +2192,20 @@ function DraftStockPill({ draft }: { draft: any }) {
     if (total === 0) return <span className="text-xs text-foreground-muted">—</span>
     if (short === 0)
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-green-500/10 text-green-700 dark:text-green-400">
           <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
           All {total} in stock
         </span>
       )
     if (oos > 0)
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-red-500/10 text-red-600 dark:text-red-400">
           <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
           {oos} of {total} out of stock
         </span>
       )
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
         {short} of {total} short
       </span>

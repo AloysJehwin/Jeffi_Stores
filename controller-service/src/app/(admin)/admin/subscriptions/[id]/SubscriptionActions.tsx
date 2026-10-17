@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useToast } from '@/contexts/ToastContext'
+import { useActionToast } from '@/components/admin/kit'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
@@ -36,23 +36,24 @@ export default function SubscriptionActions({
 }) {
   const [busy, setBusy] = useState<Action | null>(null)
   const router = useRouter()
-  const { showToast } = useToast()
+  const toast = useActionToast()
   const confirm = useConfirm()
   const canWrite = useCanWrite('subscriptions:write')
   if (!canWrite) return null
 
   const live = ['active', 'authenticated', 'pending', 'halted', 'paused'].includes(status)
+  const secondary = 'border border-border-default bg-surface-elevated text-foreground hover:bg-surface-secondary'
   const buttons: { action: Action; label: string; show: boolean; cls: string }[] = [
-    { action: 'sync', label: 'Sync from Razorpay', show: true, cls: 'border border-border-default' },
-    { action: 'pause', label: 'Pause', show: status === 'active', cls: 'border border-border-default' },
-    { action: 'resume', label: 'Resume', show: status === 'paused', cls: 'border border-border-default' },
+    { action: 'sync', label: 'Sync from Razorpay', show: true, cls: secondary },
+    { action: 'pause', label: 'Pause', show: status === 'active', cls: secondary },
+    { action: 'resume', label: 'Resume', show: status === 'paused', cls: secondary },
     {
       action: 'cancel_at_end',
       label: 'Cancel at cycle end',
       show: live && !cancelAtCycleEnd,
-      cls: 'border border-red-300 text-red-600',
+      cls: 'border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10',
     },
-    { action: 'cancel_now', label: 'Cancel now', show: live, cls: 'bg-red-600 text-white' },
+    { action: 'cancel_now', label: 'Cancel now', show: live, cls: 'bg-red-600 text-white hover:bg-red-700' },
   ]
 
   const run = async (action: Action) => {
@@ -75,8 +76,8 @@ export default function SubscriptionActions({
     })
     const data = await res.json().catch(() => ({}))
     setBusy(null)
-    if (!res.ok) return showToast(data.error || 'Action failed', 'error')
-    showToast('Subscription updated', 'success')
+    if (!res.ok) return toast.error(data.error || 'Action failed')
+    toast.success('Subscription updated')
     router.refresh()
   }
 
@@ -89,7 +90,7 @@ export default function SubscriptionActions({
             key={b.action}
             onClick={() => run(b.action)}
             disabled={busy !== null}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50 ${b.cls}`}
+            className={`control-md font-medium disabled:opacity-50 ${b.cls}`}
           >
             {busy === b.action ? 'Working…' : b.label}
           </button>

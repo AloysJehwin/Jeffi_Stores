@@ -6,16 +6,7 @@ import { aiFeatureLabel, aiLedgerNote } from '@/lib/ai/feature-labels'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
-import {
-  inputCls,
-  labelCls,
-  btnPrimary,
-  btnSecondary,
-  SummaryCard,
-  Skeleton,
-  thCls,
-  thRight,
-} from '@/app/(admin)/admin/financial/_components/shared'
+import { Banner, Card, DataTable, EmptyState, FormButton, FormField, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton, badgeCls, fieldInputCls, useActionToast, type DataCol } from '@/components/admin/kit'
 
 type LedgerEntry = {
   entry_type: 'recharge' | 'debit' | 'adjustment'
@@ -80,7 +71,9 @@ export default function WalletClient({
   const [wallet, setWallet] = useState<Wallet | null>(initial)
   const [amount, setAmount] = useState('')
   const [busy, setBusy] = useState(false)
-  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  // Top-up responses are toasts; same call sites, no banner.
+  const setToast = (t: { ok: boolean; text: string } | null) => t && toast.result(t)
 
   // filters
   const [dir, setDir] = useState('all')
@@ -208,188 +201,132 @@ export default function WalletClient({
   const balance = wallet?.balance ?? 0
   const low = balance < (wallet?.minBalance ?? 0)
 
+  const when = (iso: string) =>
+    new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })
+  const cols: DataCol<LedgerEntry & { i: number }>[] = [
+    { key: 'date', label: 'Date', render: e => <span className="whitespace-nowrap text-foreground-secondary">{when(e.occurred_at)}</span> },
+    { key: 'cat', label: 'Category', render: e => <span className={badgeCls('muted')}>{catLabel(catOf(e))}</span> },
+    {
+      key: 'ref',
+      label: 'Reference',
+      render: e => (
+        <span className="text-foreground-secondary">
+          {e.order_ref && <span className="mr-2">{e.order_ref}</span>}
+          {e.awb && <span className="text-foreground-muted">{e.awb}</span>}
+          {e.note && <span className="block text-xs text-foreground-muted">{noteOf(e)}</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'amount',
+      label: 'Amount',
+      num: true,
+      render: e => {
+        const amt = Number(e.amount)
+        return (
+          <span className={`font-semibold ${amt >= 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground'}`}>
+            {amt >= 0 ? '+' : '−'}
+            {inr(Math.abs(amt))}
+          </span>
+        )
+      },
+    },
+  ]
+
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Shipping Wallet</h1>
-        <p className="text-sm text-foreground-muted mt-1">
-          Prepaid balance the platform debits for Delhivery charges (forward shipments, return pickups, corrections), messaging and AI.
-        </p>
-      </div>
+    <PageBody>
+      <PageHeader
+        title="Shipping Wallet"
+        description="Prepaid balance the platform debits for Delhivery charges (forward shipments, return pickups, corrections), messaging and AI."
+      />
 
-      {/* Summary cards (shared SummaryCard, same as Financial) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <SummaryCard
-          label="Balance"
-          value={inr(balance)}
-          sub={low ? `below minimum ${inr(wallet?.minBalance ?? 0)}` : `minimum ${inr(wallet?.minBalance ?? 0)}`}
-        />
-        <SummaryCard label="Credits (filtered)" value={inr(totals.credit)} sub="recharges + credits" />
-        <SummaryCard label="Debits (filtered)" value={inr(totals.debit)} sub="shipping + charges" />
-      </div>
+      <KpiGrid>
+        <Kpi label="Balance" value={inr(balance)} sub={low ? `below minimum ${inr(wallet?.minBalance ?? 0)}` : `minimum ${inr(wallet?.minBalance ?? 0)}`} highlight />
+        <Kpi label="Credits (filtered)" value={inr(totals.credit)} sub="recharges + credits" />
+        <Kpi label="Debits (filtered)" value={inr(totals.debit)} sub="shipping + charges" />
+      </KpiGrid>
 
-      {/* Recharge */}
+      {low && <Banner ok={false}>Balance is below the minimum. Shipments may be blocked.</Banner>}
+
       {canWrite && (
-        <div className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
-          <div className="flex flex-wrap gap-3 items-end">
+        <Card title="Top up">
+          <div className="flex flex-wrap items-end gap-3">
             <div className="w-40">
-              <label className={labelCls}>Top up amount (₹)</label>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                placeholder="2000"
-                className={inputCls}
-              />
+              <FormField label="Amount (₹)" htmlFor="wallet-topup">
+                <input id="wallet-topup" type="number" min="1" step="1" value={amount} onChange={e => setAmount(e.target.value)} placeholder="2000" className={fieldInputCls} />
+              </FormField>
             </div>
-            <button className={btnPrimary} onClick={topUp} disabled={busy}>
-              {busy ? 'Processing…' : 'Top up'}
-            </button>
+            <FormButton type="button" onClick={topUp} pending={busy} pendingLabel="Processing…">
+              Top up
+            </FormButton>
             {Number(amount) > 0 && (
-              <span className="text-xs text-foreground-muted pb-1.5 tabular-nums">
+              <span className="pb-1.5 text-xs tabular-nums text-foreground-muted">
                 ₹{Number(amount).toLocaleString('en-IN')} credit + ₹{topupAmounts(Number(amount)).gst.toLocaleString('en-IN')} GST (18%) = pay ₹{topupAmounts(Number(amount)).total.toLocaleString('en-IN')} · tax invoice emailed
               </span>
             )}
-            {low && <span className="text-xs text-amber-600 dark:text-amber-400 pb-1.5">Balance is below the minimum — shipments may be blocked.</span>}
           </div>
-          {toast && (
-            <p className={`text-sm mt-2 ${toast.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-              {toast.text}
-            </p>
-          )}
-        </div>
+        </Card>
       )}
 
       {aiSpend.length > 0 && <AiSpendSection rows={aiSpend} days={aiSpendDays} />}
 
-      {/* Filter bar (shared AdminSelect + DatePicker, same as Financial Transactions) */}
-      <div className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
-        <div className="flex flex-wrap gap-3 items-end">
+      <Card title="Ledger" hint={`Showing the most recent ${ledger.length} entries.`} flush>
+        <div className="flex flex-wrap items-end gap-3 px-5 pb-4">
           <div className="w-40">
             <AdminSelect label="Direction" value={dir} onChange={setDir} options={DIRECTION_OPTIONS} sm />
           </div>
           <div className="w-52">
             <AdminSelect label="Category" value={cat} onChange={setCat} options={categoryOptions} sm />
           </div>
-          <div>
-            <label className={labelCls}>From</label>
+          <FormField label="From">
             <DatePicker className="w-36" value={from} onChange={setFrom} />
-          </div>
-          <div>
-            <label className={labelCls}>To</label>
+          </FormField>
+          <FormField label="To">
             <DatePicker className="w-36" value={to} onChange={setTo} />
+          </FormField>
+          <div className="min-w-[180px] flex-1">
+            <FormField label="Search order / AWB / note" htmlFor="wallet-q">
+              <input id="wallet-q" className={fieldInputCls} value={q} onChange={e => setQ(e.target.value)} placeholder="JS-123, AWB…" />
+            </FormField>
           </div>
-          <div className="flex-1 min-w-[180px]">
-            <label className={labelCls}>Search order / AWB / note</label>
-            <input className={inputCls} value={q} onChange={e => setQ(e.target.value)} placeholder="JS-123, AWB…" />
-          </div>
-          <div className="pb-0.5">
-            <button className={btnSecondary} onClick={exportCsv} disabled={rows.length === 0}>
-              Export CSV
-            </button>
-          </div>
+          <FormButton type="button" variant="secondary" onClick={exportCsv} disabled={rows.length === 0}>
+            Export CSV
+          </FormButton>
         </div>
-      </div>
-
-      {/* Ledger */}
-      {!wallet ? (
-        <Skeleton />
-      ) : (
-        <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="border-b border-border-default">
-              <tr>
-                <th className={thCls}>Date</th>
-                <th className={thCls}>Category</th>
-                <th className={thCls}>Reference</th>
-                <th className={thRight}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-foreground-muted">
-                    No matching entries.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((e, i) => {
-                  const amt = Number(e.amount)
-                  return (
-                    <tr key={i} className="border-b border-border-default last:border-0">
-                      <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
-                        {new Date(e.occurred_at).toLocaleString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'Asia/Kolkata',
-                        })}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-surface-secondary text-foreground-secondary">
-                          {catLabel(catOf(e))}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-foreground-secondary">
-                        {e.order_ref && <span className="mr-2">{e.order_ref}</span>}
-                        {e.awb && <span className="text-foreground-muted">{e.awb}</span>}
-                        {e.note && <span className="block text-xs text-foreground-muted">{noteOf(e)}</span>}
-                      </td>
-                      <td
-                        className={`px-4 py-2.5 text-right font-semibold whitespace-nowrap ${
-                          amt >= 0 ? 'text-green-600 dark:text-green-400' : 'text-foreground'
-                        }`}
-                      >
-                        {amt >= 0 ? '+' : '−'}
-                        {inr(Math.abs(amt))}
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <p className="text-xs text-foreground-muted">Showing the most recent {ledger.length} entries.</p>
-    </div>
+        {!wallet ? (
+          <div className="px-5 pb-5">
+            <TableSkeleton rows={6} cols={4} />
+          </div>
+        ) : rows.length === 0 ? (
+          <EmptyState bare title="No matching entries." />
+        ) : (
+          <DataTable<LedgerEntry & { i: number }> bare rows={rows.map((e, i) => ({ ...e, i }))} cols={cols} rowKey={e => String(e.i)} />
+        )}
+      </Card>
+    </PageBody>
   )
 }
 
 function AiSpendSection({ rows, days }: { rows: AiSpendRow[]; days: number }) {
   const total = rows.reduce((a, r) => a + r.spent, 0)
   const unpaid = rows.reduce((a, r) => a + r.unpaid, 0)
+  const cols: DataCol<AiSpendRow>[] = [
+    { key: 'feature', label: 'Feature', render: r => <span className="text-foreground">{aiFeatureLabel(r.feature)}</span> },
+    { key: 'calls', label: 'Calls', num: true, render: r => <span className="text-foreground-secondary">{r.calls.toLocaleString('en-IN')}</span> },
+    { key: 'spent', label: 'Spent', num: true, render: r => <span className="font-semibold text-foreground">{inr(r.spent)}</span> },
+  ]
   return (
-    <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-border-default flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm font-semibold text-foreground">AI spend, last {days} days</p>
-        <p className="text-sm text-foreground-secondary tabular-nums">
+    <Card
+      title={`AI spend, last ${days} days`}
+      flush
+      action={
+        <p className="text-sm tabular-nums text-foreground-secondary">
           {inr(total)}
           {unpaid > 0 && <span className="ml-2 text-amber-600 dark:text-amber-400">{unpaid} unpaid calls</span>}
         </p>
-      </div>
-      <table className="w-full text-sm">
-        <thead className="border-b border-border-default">
-          <tr>
-            <th className={thCls}>Feature</th>
-            <th className={thRight}>Calls</th>
-            <th className={thRight}>Spent</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(r => (
-            <tr key={r.feature} className="border-b border-border-default last:border-0">
-              <td className="px-4 py-2.5 text-foreground">{aiFeatureLabel(r.feature)}</td>
-              <td className="px-4 py-2.5 text-right tabular-nums text-foreground-secondary">{r.calls.toLocaleString('en-IN')}</td>
-              <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-foreground">{inr(r.spent)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+      }
+    >
+      <DataTable<AiSpendRow> bare rows={rows} cols={cols} rowKey={r => r.feature} />
+    </Card>
   )
 }

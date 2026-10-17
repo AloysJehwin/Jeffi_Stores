@@ -26,3 +26,23 @@ export function SourceBar({
     </div>
   )
 }
+
+const LEGEND = [
+  { label: 'Online', cls: 'bg-blue-500' },
+  { label: 'Business', cls: 'bg-purple-500' },
+  { label: 'Cash Sale', cls: 'bg-green-500' },
+  { label: 'Offline', cls: 'bg-orange-400' },
+]
+
+export function SourceLegend() {
+  return (
+    <div className="flex flex-wrap gap-3 text-xs text-foreground-muted">
+      {LEGEND.map(l => (
+        <span key={l.label} className="flex items-center gap-1.5">
+          <span className={`w-2.5 h-2.5 rounded-sm inline-block ${l.cls}`} />
+          {l.label}
+        </span>
+      ))}
+    </div>
+  )
+}

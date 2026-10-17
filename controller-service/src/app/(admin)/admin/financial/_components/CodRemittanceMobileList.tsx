@@ -5,7 +5,8 @@ import { ap } from '@/lib/shared/admin-path'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
-import { formatDate, formatINR } from './shared'
+import { badgeCls } from '@/components/admin/kit'
+import { formatDate, formatINR, codTone } from './shared'
 
 interface CodOrder {
   id: string
@@ -31,12 +32,6 @@ function statusLabel(s?: string) {
   if (s === 'cod_collected') return 'Collected'
   if (s === 'paid') return 'Remitted'
   return s || '-'
-}
-
-function statusClass(s?: string) {
-  if (s === 'cod_pending') return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-  if (s === 'cod_collected') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-  return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
 }
 
 export default function CodRemittanceMobileList({
@@ -95,7 +90,7 @@ export default function CodRemittanceMobileList({
                 checked={selected.has(order.id)}
                 onChange={() => onToggle(order.id)}
                 onClick={e => e.stopPropagation()}
-                className="mt-0.5 rounded border-border-default accent-secondary-500"
+                className="mt-0.5 rounded border-border-default accent-accent-500"
                 aria-label={`Select order ${order.order_number}`}
               />
             )}
@@ -109,7 +104,7 @@ export default function CodRemittanceMobileList({
               <div className="text-sm text-foreground-secondary truncate">{order.customer_name}</div>
               {order.payment_status && (
                 <span
-                  className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(order.payment_status)}`}
+                  className={badgeCls(codTone(order.payment_status))}
                 >
                   {statusLabel(order.payment_status)}
                 </span>
@@ -129,7 +124,7 @@ export default function CodRemittanceMobileList({
             <button
               type="button"
               onClick={() => setActionsOpen(true)}
-              className="w-full bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+              className="control-md w-full justify-center bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
             >
               Actions
             </button>
@@ -149,7 +144,7 @@ export default function CodRemittanceMobileList({
             {active.payment_status && (
               <div className="flex justify-between">
                 <span className="text-foreground-secondary">Status</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(active.payment_status)}`}>
+                <span className={badgeCls(codTone(active.payment_status))}>
                   {statusLabel(active.payment_status)}
                 </span>
               </div>

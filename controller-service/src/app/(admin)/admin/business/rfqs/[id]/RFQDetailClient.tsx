@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
-import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
+import { Card, DetailHeader, DetailSkeleton, Dialog, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, TextArea, badgeCls, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { RFQ_STATUS, fmtDay } from '../../_status'
 import { round2 } from '@/lib/catalog/gst'
 import { fmtQty } from '@/lib/shared/number-display'
 
@@ -67,15 +68,6 @@ interface RFQ {
   invoice_payment_status: string | null
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-yellow-400/20 text-yellow-300',
-  reviewed: 'bg-blue-400/20 text-blue-300',
-  negotiating: 'bg-purple-400/20 text-purple-300',
-  offer_accepted: 'bg-teal-400/20 text-teal-300',
-  converted: 'bg-green-400/20 text-green-300',
-  rejected: 'bg-red-400/20 text-red-300',
-}
-
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Pending Review',
   reviewed: 'Reviewed',
@@ -133,7 +125,8 @@ function applyDiscount(price: number, pct: number): number {
 }
 
 export default function RFQDetailClient({ id }: { id: string }) {
-  const { showToast } = useToast()
+  const toast = useActionToast()
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => (type === 'error' ? toast.error(msg) : toast.success(msg))
   const canWrite = useCanWrite('business_rfqs:write')
   const [rfq, setRfq] = useState<RFQ | null>(null)
   const [items, setItems] = useState<RFQItem[]>([])
@@ -304,252 +297,199 @@ export default function RFQDetailClient({ id }: { id: string }) {
 
   if (loading)
     return (
-      <div className="p-4 sm:p-6 max-w-full space-y-5">
-        <div className="animate-pulse space-y-4">
-          <div className="h-7 w-48 bg-surface-secondary rounded" />
-          <div className="h-4 w-64 bg-surface-secondary rounded" />
-        </div>
-        <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
-          <div className="p-4 space-y-2">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="flex items-center gap-3 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
-                <div className="h-4 flex-1 bg-surface-secondary rounded" />
-                <div className="h-4 w-20 bg-surface-secondary rounded" />
-                <div className="h-4 w-20 bg-surface-secondary rounded" />
-                <div className="h-4 w-16 bg-surface-secondary rounded" />
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="p-4 sm:p-6">
+        <DetailSkeleton kpis={4} />
       </div>
     )
 
-  if (!rfq) return <div className="p-6 text-center text-foreground-muted">RFQ not found.</div>
+  if (!rfq)
+    return (
+      <div className="p-4 sm:p-6">
+        <EmptyState title="RFQ not found." />
+      </div>
+    )
+
+  const spinner = <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+  const counterPrices = (
+    <div className="space-y-2 rounded-xl border border-border-default bg-surface-secondary/40 p-3">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Counter Price per Item (incl. GST)</p>
+      {items.map(item => (
+        <div key={item.id} className="flex items-center gap-2">
+          <span className="flex-1 truncate text-xs text-foreground-secondary">{item.description}</span>
+          <div className="relative w-28 shrink-0">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-foreground-muted">₹</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder={reqInclGst(item) != null ? String(reqInclGst(item)) : '—'}
+              value={counterInputs[item.id] ?? ''}
+              onChange={e => setCounterInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
+              className={`${fieldInputCls} pl-6 pr-2 text-xs tabular-nums`}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+  const presetChips = (presets: string[]) => (
+    <div className="grid grid-cols-1 gap-2">
+      {presets.map(preset => (
+        <button
+          key={preset}
+          type="button"
+          disabled={sendingReply}
+          onClick={() => setReplyText(prev => (prev === preset ? '' : preset))}
+          className={`w-full rounded-lg border px-3 py-1.5 text-left text-xs transition-colors ${
+            replyText === preset ? 'border-accent-500/50 bg-accent-500/10 font-medium text-foreground' : 'border-border-default bg-surface text-foreground-secondary hover:border-accent-500/30 hover:text-foreground'
+          }`}
+        >
+          {preset}
+        </button>
+      ))}
+    </div>
+  )
+  const counterToggle = (label: string) => (
+    <button type="button" onClick={() => setShowCounterForm(s => !s)} className="flex items-center gap-1.5 text-xs font-medium text-accent-500 hover:text-accent-600">
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d={showCounterForm ? 'M19 9l-7 7-7-7' : 'M9 5l7 7-7 7'} />
+      </svg>
+      {showCounterForm ? 'Hide counter prices' : label}
+    </button>
+  )
+  const sendButton = (label: string) => (
+    <button onClick={handleSendReply} disabled={sendingReply || !replyText.trim()} className="control-md w-full bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50">
+      {sendingReply && spinner}
+      {label}
+    </button>
+  )
 
   return (
-    <div className="p-4 sm:p-6 max-w-full space-y-5">
-      {confirmOpen && (
-        <>
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setConfirmOpen(false)} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-            <div className="bg-surface-elevated border border-border-default rounded-2xl shadow-2xl w-full max-w-sm pointer-events-auto p-6 space-y-4">
-              <h3 className="text-base font-semibold text-foreground">Convert to Quotation?</h3>
-              <p className="text-sm text-foreground-secondary">
-                A draft quotation will be created with the prices from this RFQ. You can edit the rates in the quotation
-                before sending.
-              </p>
-              <div className="flex gap-3 pt-1">
-                <button
-                  onClick={doConvert}
-                  disabled={converting}
-                  className="flex-1 px-4 h-control bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {converting && (
-                    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  )}
-                  Convert
-                </button>
-                <button
-                  onClick={() => setConfirmOpen(false)}
-                  className="px-4 h-control border border-border-default text-sm font-medium rounded-lg hover:bg-surface-secondary transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <Link href={ap('/admin/business/rfqs')} className="text-accent-500 hover:text-accent-600 transition-colors">
-          Business RFQs
-        </Link>
-        <span>/</span>
-        <span className="text-foreground font-mono">{rfq.rfq_number}</span>
-      </div>
-
-      {/* Header card */}
-      <div className="bg-zinc-800 dark:bg-zinc-900 rounded-2xl p-6 text-white shadow-md border border-zinc-700 dark:border-zinc-800">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="w-14 h-14 rounded-xl bg-zinc-600 dark:bg-zinc-700 flex items-center justify-center text-xl font-bold font-mono shrink-0">
-            RFQ
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold font-mono">{rfq.rfq_number}</h1>
-              <span
-                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[rfq.status] || 'bg-zinc-500/20 text-zinc-300'}`}
-              >
-                {STATUS_LABEL[rfq.status] || rfq.status}
-              </span>
-            </div>
-            <p className="text-zinc-400 text-sm mt-0.5">{rfq.company_name || rfq.email}</p>
-            <p className="text-zinc-500 text-xs mt-0.5">
-              Submitted{' '}
-              {new Date(rfq.created_at).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              })}
-            </p>
-          </div>
-          <div className="shrink-0 flex flex-col items-end gap-2">
-            {rfq.status === 'pending' && (
-              <div className="flex items-center gap-2">
+    <>
+      <Dialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Convert to Quotation?"
+        size="sm"
+        footer={
+          <>
+            <button onClick={() => setConfirmOpen(false)} className="control-md border border-border-default text-foreground hover:bg-surface-secondary">
+              Cancel
+            </button>
+            <button onClick={doConvert} disabled={converting} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-60">
+              {converting && spinner}
+              Convert
+            </button>
+          </>
+        }
+      >
+        <p className="text-sm text-foreground-secondary">A draft quotation will be created with the prices from this RFQ. You can edit the rates in the quotation before sending.</p>
+      </Dialog>
+      <EntityPage
+      header={
+        <DetailHeader
+          back={{ href: ap('/admin/business/rfqs'), label: 'Business RFQs' }}
+          title={<span className="font-mono">{rfq.rfq_number}</span>}
+          status={<StatusBadge status={rfq.status} map={RFQ_STATUS} label={STATUS_LABEL[rfq.status]} />}
+          subtitle={rfq.company_name || rfq.email}
+          identifiers={[{ label: 'Submitted', value: fmtDay(rfq.created_at) }]}
+          actions={
+            <>
+              {rfq.status === 'pending' && (
                 <RequireWrite scope="business_rfqs:write">
-                  <button
-                    onClick={() => handleStatusChange('reviewed')}
-                    disabled={actionLoading}
-                    className="px-4 h-control bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60"
-                  >
-                    Mark Reviewed
-                  </button>
-                  <button
-                    onClick={() => setShowRejectForm(s => !s)}
-                    className="px-4 h-control border border-red-400 text-red-300 text-sm font-semibold rounded-lg hover:bg-red-900/30 transition-colors"
-                  >
+                  <button onClick={() => setShowRejectForm(s => !s)} className="control-md border border-red-500/40 font-semibold text-red-600 hover:bg-red-500/10 dark:text-red-400">
                     Reject
                   </button>
+                  <button onClick={() => handleStatusChange('reviewed')} disabled={actionLoading} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-60">
+                    Mark Reviewed
+                  </button>
                 </RequireWrite>
-              </div>
-            )}
-            {(rfq.status === 'reviewed' || rfq.status === 'negotiating' || rfq.status === 'offer_accepted') && (
-              <RequireWrite scope="business_rfqs:write">
-                <button
-                  onClick={() => setConfirmOpen(true)}
-                  disabled={converting}
-                  className={`px-5 py-2 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2 ${rfq.status === 'offer_accepted' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-accent-500 hover:bg-accent-600'}`}
-                >
-                  {converting && (
-                    <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
+              {(rfq.status === 'reviewed' || rfq.status === 'negotiating' || rfq.status === 'offer_accepted') && (
+                <RequireWrite scope="business_rfqs:write">
+                  <button onClick={() => setConfirmOpen(true)} disabled={converting} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-60">
+                    {converting && spinner}
+                    {rfq.status === 'offer_accepted' ? 'Convert to Quotation ✓' : 'Convert to Quotation'}
+                  </button>
+                </RequireWrite>
+              )}
+              {rfq.status === 'converted' && rfq.converted_quotation_id && (
+                <>
+                  {rfq.order_id && (
+                    <Link href={ap(`/admin/invoices/${rfq.order_id}/view`)} className="control-md border border-border-default bg-surface-elevated font-medium text-foreground hover:bg-surface-secondary">
+                      View Invoice {rfq.invoice_number ? `(${rfq.invoice_number})` : ''}
+                      {rfq.order_status === 'draft' && <span className={badgeCls('amber')}>Draft</span>}
+                    </Link>
                   )}
-                  {rfq.status === 'offer_accepted' ? 'Convert to Quotation ✓' : 'Convert to Quotation'}
+                  <Link href={ap(`/admin/quotations/${rfq.converted_quotation_id}/view`)} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600">
+                    View Quotation {rfq.quote_number ? `(${rfq.quote_number})` : ''}
+                  </Link>
+                </>
+              )}
+            </>
+          }
+        />
+      }
+      kpis={
+        <KpiGrid>
+          <Kpi label="Items" value={String(items.length)} />
+          <Kpi label="Customer price total" value={totalCatalog > 0 ? `₹${fmt2(totalCatalog)}` : '-'} />
+          <Kpi label="Requested value" value={totalRequested > 0 ? `₹${fmt2(totalRequested)}` : '-'} highlight={totalRequested > 0} />
+          <Kpi label="GST number" value={rfq.gst_number || '-'} />
+        </KpiGrid>
+      }
+      notices={
+        <>
+          {showRejectForm && (
+            <RequireWrite scope="business_rfqs:write">
+              <div className="space-y-3 rounded-xl border border-red-500/40 bg-red-500/5 p-4">
+                <p className="text-sm font-semibold text-red-600 dark:text-red-400">Reject this RFQ</p>
+                <TextArea value={adminNote} onChange={e => setAdminNote(e.target.value)} placeholder="Reason for rejection (shown to business customer)…" rows={3} className="resize-none" />
+                <div className="flex gap-2">
+                  <button onClick={() => handleStatusChange('rejected')} disabled={actionLoading} className="control-md bg-red-600 font-semibold text-white hover:bg-red-700 disabled:opacity-60">
+                    Confirm Reject
+                  </button>
+                  <button onClick={() => setShowRejectForm(false)} className="control-md border border-border-default text-foreground hover:bg-surface-secondary">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </RequireWrite>
+          )}
+          {rfq.status === 'offer_accepted' && (
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-green-500/40 bg-green-500/5 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-600">
+                  <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-green-700 dark:text-green-400">Customer accepted the offer</p>
+                  <p className="text-xs text-foreground-muted">Ready to convert — create the quotation now.</p>
+                </div>
+              </div>
+              <RequireWrite scope="business_rfqs:write">
+                <button onClick={() => setConfirmOpen(true)} disabled={converting} className="control-md shrink-0 bg-green-600 font-semibold text-white hover:bg-green-700 disabled:opacity-60">
+                  {converting && spinner}
+                  Convert to Quotation
                 </button>
               </RequireWrite>
-            )}
-            {rfq.status === 'converted' && rfq.converted_quotation_id && (
-              <div className="flex flex-col gap-2 items-end">
-                <Link
-                  href={ap(`/admin/quotations/${rfq.converted_quotation_id}/view`)}
-                  className="px-5 py-2 border-2 border-accent-500 text-accent-400 text-sm font-semibold rounded-lg hover:bg-accent-900/20 transition-colors"
-                >
-                  View Quotation {rfq.quote_number ? `(${rfq.quote_number})` : ''} →
-                </Link>
-                {rfq.order_id && (
-                  <Link
-                    href={ap(`/admin/invoices/${rfq.order_id}/view`)}
-                    className="px-5 h-control border-2 border-green-500 text-green-400 text-sm font-semibold rounded-lg hover:bg-green-900/20 transition-colors flex items-center gap-2"
-                  >
-                    View Invoice {rfq.invoice_number ? `(${rfq.invoice_number})` : ''} →
-                    {rfq.order_status === 'draft' && (
-                      <span className="text-xs font-normal text-orange-400">(draft)</span>
-                    )}
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Items', value: String(items.length) },
-            { label: 'Customer Price Total', value: totalCatalog > 0 ? `₹${fmt2(totalCatalog)}` : '—' },
-            { label: 'Requested Value', value: totalRequested > 0 ? `₹${fmt2(totalRequested)}` : '—' },
-            { label: 'GST Number', value: rfq.gst_number || '—' },
-          ].map(({ label, value }) => (
-            <div key={label} className="bg-white/5 rounded-xl p-3.5 border border-white/10">
-              <p className="text-zinc-400 text-xs mb-1">{label}</p>
-              <p className="text-white font-semibold text-sm truncate">{value}</p>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Reject form */}
-      {showRejectForm && (
-        <RequireWrite scope="business_rfqs:write">
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 space-y-3">
-            <p className="text-sm font-semibold text-red-700 dark:text-red-400">Reject this RFQ</p>
-            <textarea
-              value={adminNote}
-              onChange={e => setAdminNote(e.target.value)}
-              placeholder="Reason for rejection (shown to business customer)…"
-              rows={3}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-red-300 dark:border-red-700 bg-surface focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleStatusChange('rejected')}
-                disabled={actionLoading}
-                className="px-4 h-control bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60"
-              >
-                Confirm Reject
-              </button>
-              <button
-                onClick={() => setShowRejectForm(false)}
-                className="px-4 h-control border border-border-default text-sm rounded-lg hover:bg-surface-secondary transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </RequireWrite>
-      )}
-
-      {/* Offer accepted banner */}
-      {rfq.status === 'offer_accepted' && (
-        <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-300 dark:border-teal-700 rounded-xl p-4 flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-teal-500 flex items-center justify-center shrink-0">
-              <svg
-                className="w-5 h-5 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2.5}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-teal-700 dark:text-teal-300">Customer accepted the offer</p>
-              <p className="text-xs text-teal-600/80 dark:text-teal-500">
-                Ready to convert — create the quotation now.
-              </p>
-            </div>
-          </div>
-          <RequireWrite scope="business_rfqs:write">
-            <button
-              onClick={() => setConfirmOpen(true)}
-              disabled={converting}
-              className="px-5 h-control bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2 shrink-0"
-            >
-              {converting && (
-                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              )}
-              Convert to Quotation
-            </button>
-          </RequireWrite>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Items — card layout */}
-        <div className="lg:col-span-2 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">
-              Requested Items{' '}
-              <span className="ml-1 text-foreground-muted font-normal normal-case">({items.length})</span>
+          )}
+        </>
+      }
+      main={
+        <>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
+              Requested items <span className="ml-1 font-normal normal-case text-foreground-muted">({items.length})</span>
             </h2>
             {totalRequested > 0 && totalSellingForDiscountedItems > 0 && (
               <div className="flex items-center gap-3 text-xs text-foreground-muted">
                 <span>
                   Customer:{' '}
-                  <span className="font-semibold text-green-500">
+                  <span className="font-semibold text-green-600 dark:text-green-400">
                     {Math.round(
                       ((totalSellingForDiscountedItems - totalRequested) / totalSellingForDiscountedItems) * 100
                     )}
@@ -561,7 +501,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                   totalBusinessPriceForRequestedItems > totalRequested && (
                     <span>
                       Business:{' '}
-                      <span className="font-semibold text-blue-400">
+                      <span className="font-semibold text-blue-700 dark:text-blue-400">
                         {Math.round(
                           ((totalBusinessPriceForRequestedItems - totalRequested) /
                             totalBusinessPriceForRequestedItems) *
@@ -576,9 +516,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
           </div>
 
           {items.length === 0 ? (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center text-foreground-muted text-sm">
-              No items found.
-            </div>
+            <EmptyState title="No items found." />
           ) : (
             <div className="space-y-3">
               {items.map((item, i) => {
@@ -616,13 +554,13 @@ export default function RFQDetailClient({ id }: { id: string }) {
                 return (
                   <div
                     key={item.id}
-                    className={`bg-surface-elevated rounded-xl border overflow-hidden ${hasDiscount ? 'border-green-400/40 dark:border-green-600/40' : 'border-border-default'}`}
+                    className={`bg-surface-elevated rounded-xl border overflow-hidden ${hasDiscount ? 'border-green-500/40' : 'border-border-default'}`}
                   >
                     {/* Discount tier banner */}
                     {hasAnyBanner && (
                       <div className="flex flex-wrap items-center gap-x-0 border-b border-border-default/60 text-[11px] divide-x divide-border-default/40">
                         {defaultDiscountPct != null && (
-                          <div className="flex items-center gap-1.5 px-4 py-1.5 bg-zinc-500/10">
+                          <div className="flex items-center gap-1.5 px-4 py-1.5 bg-surface-secondary">
                             <span className="text-foreground-muted">Default:</span>
                             <span className="font-semibold text-foreground-secondary">
                               {defaultDiscountPct}% off MRP
@@ -631,24 +569,24 @@ export default function RFQDetailClient({ id }: { id: string }) {
                         )}
                         {businessDiscountPct > 0 && (
                           <div className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-500/10">
-                            <span className="text-blue-400/70">Business:</span>
-                            <span className="font-semibold text-blue-400">
+                            <span className="text-foreground-muted">Business:</span>
+                            <span className="font-semibold text-blue-700 dark:text-blue-400">
                               {businessDiscountPct}% off customer price
                             </span>
                           </div>
                         )}
                         {requestedDiscountPct != null && requestedDiscountPct > 0 && (
                           <div className="flex items-center gap-1.5 px-4 py-1.5 bg-green-500/10">
-                            <span className="text-green-400/70">Requested:</span>
-                            <span className="font-semibold text-green-400">
+                            <span className="text-foreground-muted">Requested:</span>
+                            <span className="font-semibold text-green-700 dark:text-green-400">
                               {requestedDiscountPct}% off {businessPrice != null ? 'business price' : 'customer price'}
                             </span>
                           </div>
                         )}
                         {requestedDiscountPct != null && requestedDiscountPct <= 0 && requestedInclGst != null && (
                           <div className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500/10">
-                            <span className="text-amber-400/70">Requested:</span>
-                            <span className="font-semibold text-amber-400">
+                            <span className="text-foreground-muted">Requested:</span>
+                            <span className="font-semibold text-amber-700 dark:text-amber-400">
                               At/above {businessPrice != null ? 'business' : 'customer'} price
                             </span>
                           </div>
@@ -664,9 +602,9 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           if (mrpPrice != null && mrpPrice > 0 && effectivePrice != null && effectivePrice < mrpPrice) {
                             const effPct = Math.round(((mrpPrice - effectivePrice) / mrpPrice) * 100)
                             return (
-                              <div className="ml-auto flex items-center gap-1.5 px-4 py-1.5 bg-purple-500/10">
-                                <span className="text-purple-400/70">Effective:</span>
-                                <span className="font-semibold text-purple-400">{effPct}% off MRP</span>
+                              <div className="ml-auto flex items-center gap-1.5 px-4 py-1.5 bg-accent-500/10">
+                                <span className="text-foreground-muted">Effective:</span>
+                                <span className="font-semibold text-accent-500">{effPct}% off MRP</span>
                               </div>
                             )
                           }
@@ -740,7 +678,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
 
                             {/* Item notes */}
                             {item.notes && (
-                              <p className="text-xs text-foreground-muted italic mt-1.5 border-l-2 border-accent-300 dark:border-accent-700 pl-2">
+                              <p className="text-xs text-foreground-muted italic mt-1.5 border-l-2 border-accent-500/40 pl-2">
                                 {item.notes}
                               </p>
                             )}
@@ -775,7 +713,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                 <p className="text-[10px] text-foreground-muted uppercase tracking-wide">
                                   Business Price <span className="normal-case">({businessDiscountPct}% off)</span>
                                 </p>
-                                <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                                <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
                                   ₹{fmt2(businessPrice)}
                                   <span className="text-foreground-muted text-[10px] ml-0.5">/unit</span>
                                 </p>
@@ -867,7 +805,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
               {totalBusinessPrice > 0 && totalBusinessPrice !== totalSelling && (
                 <div>
                   <p className="text-xs text-foreground-muted mb-0.5">Total Business Price</p>
-                  <p className="font-semibold text-blue-600 dark:text-blue-400">₹{fmt2(totalBusinessPrice)}</p>
+                  <p className="font-semibold text-blue-700 dark:text-blue-400">₹{fmt2(totalBusinessPrice)}</p>
                 </div>
               )}
               {totalRequested > 0 && (
@@ -916,7 +854,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                     totalBusinessPriceForRequestedItems > totalRequested && (
                       <div className="text-right">
                         <p className="text-xs text-foreground-muted mb-0.5">Discount off Business Price</p>
-                        <p className="font-bold text-blue-500 dark:text-blue-400">
+                        <p className="font-bold text-blue-700 dark:text-blue-400">
                           ₹{fmt2(totalBusinessPriceForRequestedItems - totalRequested)}
                           <span className="text-xs font-normal text-foreground-muted ml-1">
                             (
@@ -934,107 +872,63 @@ export default function RFQDetailClient({ id }: { id: string }) {
               )}
             </div>
           )}
-        </div>
-
-        {/* Right — customer details + notes */}
-        <div className="space-y-5">
-          {/* From */}
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-4">From</h2>
-            <dl className="space-y-3 text-sm">
-              {[
-                ['Company', rfq.company_name || '—'],
-                ['Contact', `${rfq.first_name} ${rfq.last_name || ''}`.trim()],
-                ['Email', rfq.email],
-                ['Phone', rfq.phone ? `+91 ${rfq.phone}` : '—'],
-                ['GST', rfq.gst_number || '—'],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-foreground-muted text-xs mb-0.5">{label}</dt>
-                  <dd className="text-foreground font-medium break-all">{value}</dd>
-                </div>
-              ))}
-            </dl>
-            <div className="mt-4 pt-4 border-t border-border-default">
-              <Link
-                href={ap(`/admin/business/customers/${rfq.user_id}/view`)}
-                className="text-xs text-accent-500 hover:text-accent-600 font-medium"
-              >
-                View customer profile →
+        </>
+      }
+      aside={
+        <>
+          <Card title="From">
+            <Fields cols={1}>
+              <Field label="Company" value={rfq.company_name} />
+              <Field label="Contact" value={`${rfq.first_name} ${rfq.last_name || ''}`.trim()} />
+              <Field label="Email" value={rfq.email} />
+              <Field label="Phone" value={rfq.phone ? `+91 ${rfq.phone}` : null} />
+              <Field label="GST" value={rfq.gst_number} mono copy={rfq.gst_number || undefined} />
+            </Fields>
+            <div className="mt-4 border-t border-border-default pt-4">
+              <Link href={ap(`/admin/business/customers/${rfq.user_id}/view`)} className="text-xs font-medium text-accent-500 hover:text-accent-600">
+                View customer profile
               </Link>
             </div>
-          </div>
+          </Card>
 
-          {/* Customer notes */}
           {rfq.notes && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-              <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-3">
-                Customer Note
-              </h2>
-              <p className="text-sm text-foreground whitespace-pre-line">{rfq.notes}</p>
-            </div>
+            <Card title="Customer note">
+              <p className="whitespace-pre-line text-sm text-foreground">{rfq.notes}</p>
+            </Card>
           )}
 
-          {/* Admin note */}
           {rfq.admin_note && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-              <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-3">Admin Note</h2>
-              <p className="text-sm text-foreground whitespace-pre-line">{rfq.admin_note}</p>
-            </div>
+            <Card title="Admin note">
+              <p className="whitespace-pre-line text-sm text-foreground">{rfq.admin_note}</p>
+            </Card>
           )}
 
-          {/* Converted banner */}
           {rfq.status === 'converted' && rfq.converted_quotation_id && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 space-y-3">
+            <div className="space-y-3 rounded-xl border border-green-500/40 bg-green-500/5 p-4">
               <div>
-                <p className="text-sm text-green-700 dark:text-green-400 font-medium mb-1">Converted to quotation</p>
-                <Link
-                  href={ap(`/admin/quotations/${rfq.converted_quotation_id}/view`)}
-                  className="text-sm font-semibold text-accent-600 dark:text-accent-400 hover:underline"
-                >
-                  Open Quotation {rfq.quote_number ? `(${rfq.quote_number})` : ''} →
+                <p className="mb-1 text-sm font-medium text-green-700 dark:text-green-400">Converted to quotation</p>
+                <Link href={ap(`/admin/quotations/${rfq.converted_quotation_id}/view`)} className="text-sm font-semibold text-accent-500 hover:underline">
+                  Open Quotation {rfq.quote_number ? `(${rfq.quote_number})` : ''}
                 </Link>
               </div>
               {rfq.order_id && (
-                <div className="pt-3 border-t border-green-200 dark:border-green-800">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <p className="text-sm text-green-700 dark:text-green-400 font-medium">Invoice raised</p>
-                    {rfq.order_status === 'draft' && (
-                      <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
-                        Draft
-                      </span>
-                    )}
+                <div className="border-t border-green-500/30 pt-3">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-green-700 dark:text-green-400">Invoice raised</p>
+                    {rfq.order_status === 'draft' && <span className={badgeCls('amber')}>Draft</span>}
                     {rfq.invoice_payment_status && rfq.order_status !== 'draft' && (
-                      <span
-                        className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                          rfq.invoice_payment_status === 'paid'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : rfq.invoice_payment_status === 'partial'
-                              ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                              : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                        }`}
-                      >
-                        {rfq.invoice_payment_status === 'paid'
-                          ? 'Paid'
-                          : rfq.invoice_payment_status === 'partial'
-                            ? 'Partially paid'
-                            : 'Unpaid'}
+                      <span className={badgeCls(rfq.invoice_payment_status === 'paid' ? 'green' : 'amber')}>
+                        {rfq.invoice_payment_status === 'paid' ? 'Paid' : rfq.invoice_payment_status === 'partial' ? 'Partially paid' : 'Unpaid'}
                       </span>
                     )}
                   </div>
                   {rfq.invoice_total && (
-                    <p className="text-xs text-foreground-muted mb-1.5">
-                      Total:{' '}
-                      <span className="font-semibold text-foreground">
-                        ₹{Number(rfq.invoice_total).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                      </span>
+                    <p className="mb-1.5 text-xs text-foreground-muted">
+                      Total: <span className="font-semibold text-foreground">₹{Number(rfq.invoice_total).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
                     </p>
                   )}
-                  <Link
-                    href={ap(`/admin/invoices/${rfq.order_id}/view`)}
-                    className="text-sm font-semibold text-accent-600 dark:text-accent-400 hover:underline"
-                  >
-                    Open Invoice {rfq.invoice_number ? `(${rfq.invoice_number})` : ''} →
+                  <Link href={ap(`/admin/invoices/${rfq.order_id}/view`)} className="text-sm font-semibold text-accent-500 hover:underline">
+                    Open Invoice {rfq.invoice_number ? `(${rfq.invoice_number})` : ''}
                   </Link>
                 </div>
               )}
@@ -1043,20 +937,10 @@ export default function RFQDetailClient({ id }: { id: string }) {
 
           {/* Negotiation thread */}
           {!['converted', 'rejected', 'offer_accepted'].includes(rfq.status) || messages.length > 0 ? (
-            <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-3 border-b border-border-default">
-                <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">
-                  Negotiation Thread
-                </h2>
-                {messages.length > 0 && (
-                  <span className="text-xs text-foreground-muted">
-                    {messages.length} message{messages.length !== 1 ? 's' : ''}
-                  </span>
-                )}
-              </div>
+            <Card title="Negotiation thread" hint={messages.length > 0 ? `${messages.length} message${messages.length !== 1 ? 's' : ''}` : undefined} flush>
 
               {/* Message thread */}
-              <div ref={threadRef} className="max-h-80 overflow-y-auto p-4 space-y-3">
+              <div ref={threadRef} className="max-h-80 space-y-3 overflow-y-auto border-t border-border-default p-4">
                 {messages.length === 0 ? (
                   <p className="text-xs text-foreground-muted text-center py-4">
                     No messages yet. Start the negotiation below.
@@ -1069,7 +953,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                         <div className={`flex items-end gap-2 ${isAdmin ? 'flex-row-reverse' : ''}`}>
                           {/* Avatar */}
                           <div
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isAdmin ? 'bg-accent-500 text-white' : 'bg-purple-500/20 text-purple-400'}`}
+                            className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${isAdmin ? 'bg-accent-500 text-white' : 'bg-surface-secondary text-foreground-secondary'}`}
                           >
                             {isAdmin ? 'A' : 'C'}
                           </div>
@@ -1082,8 +966,8 @@ export default function RFQDetailClient({ id }: { id: string }) {
                         </div>
                         {/* Counter items card */}
                         {msg.counter_items && msg.counter_items.length > 0 && (
-                          <div className="mr-8 bg-purple-500/10 border border-purple-500/30 rounded-xl p-3 space-y-1 w-full max-w-[85%]">
-                            <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide mb-1.5">
+                          <div className="mr-8 w-full max-w-[85%] space-y-1 rounded-xl border border-blue-500/30 bg-blue-500/10 p-3">
+                            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">
                               Counter Prices
                             </p>
                             {msg.counter_items.map(ci => {
@@ -1093,7 +977,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                   <span className="text-foreground-secondary truncate">
                                     {item?.description || ci.rfq_item_id}
                                   </span>
-                                  <span className="font-semibold text-purple-300 shrink-0">
+                                  <span className="shrink-0 font-semibold tabular-nums text-blue-700 dark:text-blue-400">
                                     ₹{fmt2(Number(ci.offered_price))}/unit
                                   </span>
                                 </div>
@@ -1112,128 +996,32 @@ export default function RFQDetailClient({ id }: { id: string }) {
               {!['converted', 'rejected', 'offer_accepted'].includes(rfq.status) && (
                 <RequireWrite scope="business_rfqs:write">
                   {['pending', 'reviewed'].includes(rfq.status) ? (
-                    /* Quick-send chips for early stages — no free-text, structured actions only */
-                    <div className="border-t border-border-default p-4 space-y-4">
-                      <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide">
-                        Quick Replies
-                      </p>
-                      <div className="grid grid-cols-1 gap-2">
-                        {[
-                          "We've received your request and are reviewing it.",
-                          'Could you please provide more details about your requirements?',
-                          "We're preparing a counter offer for you shortly.",
-                          "We can accommodate this request. We'll send pricing soon.",
-                          "Thank you for your inquiry. We'll get back to you by end of day.",
-                        ].map(preset => (
-                          <button
-                            key={preset}
-                            type="button"
-                            disabled={sendingReply}
-                            onClick={() => setReplyText(prev => (prev === preset ? '' : preset))}
-                            className={`w-full text-left px-3 py-1.5 text-xs rounded-xl border transition-colors ${
-                              replyText === preset
-                                ? 'bg-accent-500/15 border-accent-500/50 text-foreground font-medium'
-                                : 'bg-surface border-border-default text-foreground-secondary hover:bg-surface-elevated hover:text-foreground hover:border-accent-500/30'
-                            }`}
-                          >
-                            {preset}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Counter price offer — primary action */}
-                      <button
-                        type="button"
-                        onClick={() => setShowCounterForm(s => !s)}
-                        className="w-full text-xs text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1.5 transition-colors"
-                      >
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d={showCounterForm ? 'M19 9l-7 7-7-7' : 'M9 5l7 7-7 7'}
-                          />
-                        </svg>
-                        {showCounterForm ? 'Hide counter prices' : 'Make an offer — attach counter prices'}
-                      </button>
-
-                      {showCounterForm && (
-                        <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-3 space-y-2">
-                          <p className="text-[10px] text-purple-400 font-semibold uppercase tracking-wide mb-2">
-                            Counter Price per Item (incl. GST)
-                          </p>
-                          {items.map(item => (
-                            <div key={item.id} className="flex items-center gap-2">
-                              <span className="flex-1 text-xs text-foreground-secondary truncate">
-                                {item.description}
-                              </span>
-                              <div className="relative shrink-0 w-28">
-                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-foreground-muted">
-                                  ₹
-                                </span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  placeholder={reqInclGst(item) != null ? String(reqInclGst(item)) : '—'}
-                                  value={counterInputs[item.id] ?? ''}
-                                  onChange={e => setCounterInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                  className="w-full pl-6 pr-2 h-control-sm text-xs bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <button
-                        onClick={handleSendReply}
-                        disabled={sendingReply || !replyText.trim()}
-                        className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
-                      >
-                        {sendingReply && (
-                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        )}
-                        Send
-                      </button>
+                    /* Quick-send chips for early stages: structured actions only */
+                    <div className="space-y-4 border-t border-border-default p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Quick Replies</p>
+                      {presetChips([
+                        "We've received your request and are reviewing it.",
+                        'Could you please provide more details about your requirements?',
+                        "We're preparing a counter offer for you shortly.",
+                        "We can accommodate this request. We'll send pricing soon.",
+                        "Thank you for your inquiry. We'll get back to you by end of day.",
+                      ])}
+                      {counterToggle('Make an offer — attach counter prices')}
+                      {showCounterForm && counterPrices}
+                      {sendButton('Send')}
                     </div>
                   ) : (
                     /* Full composer for negotiating state */
-                    <div className="border-t border-border-default p-4 space-y-3">
-                      <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide">
-                        Quick Replies
-                      </p>
-                      <div className="grid grid-cols-1 gap-2">
-                        {[
-                          "Thanks for the counter. We're reviewing it and will respond shortly.",
-                          "We've adjusted our pricing — please review the latest counter offer.",
-                          "That's the best price we can offer for this quantity.",
-                          'Could you increase the quantity? It will help us offer a better price.',
-                          'We can match this price. Shall we proceed to a final quotation?',
-                        ].map(preset => (
-                          <button
-                            key={preset}
-                            type="button"
-                            disabled={sendingReply}
-                            onClick={() => setReplyText(prev => (prev === preset ? '' : preset))}
-                            className={`w-full text-left px-3 py-1.5 text-xs rounded-xl border transition-colors ${
-                              replyText === preset
-                                ? 'bg-accent-500/15 border-accent-500/50 text-foreground font-medium'
-                                : 'bg-surface border-border-default text-foreground-secondary hover:bg-surface-elevated hover:text-foreground hover:border-accent-500/30'
-                            }`}
-                          >
-                            {preset}
-                          </button>
-                        ))}
-                      </div>
-
-                      <textarea
+                    <div className="space-y-3 border-t border-border-default p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Quick Replies</p>
+                      {presetChips([
+                        "Thanks for the counter. We're reviewing it and will respond shortly.",
+                        "We've adjusted our pricing — please review the latest counter offer.",
+                        "That's the best price we can offer for this quantity.",
+                        'Could you increase the quantity? It will help us offer a better price.',
+                        'We can match this price. Shall we proceed to a final quotation?',
+                      ])}
+                      <TextArea
                         value={replyText}
                         onChange={e => setReplyText(e.target.value)}
                         onKeyDown={e => {
@@ -1244,77 +1032,20 @@ export default function RFQDetailClient({ id }: { id: string }) {
                         }}
                         placeholder="Type a reply… (Enter to send, Shift+Enter for new line)"
                         rows={3}
-                        className="w-full px-3 py-2 text-sm bg-surface border border-border-default rounded-xl focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none"
+                        className="resize-none"
                       />
-
-                      <button
-                        type="button"
-                        onClick={() => setShowCounterForm(s => !s)}
-                        className="text-xs text-purple-400 hover:text-purple-300 font-medium flex items-center gap-1.5 transition-colors"
-                      >
-                        <svg
-                          className="w-3.5 h-3.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d={showCounterForm ? 'M19 9l-7 7-7-7' : 'M9 5l7 7-7 7'}
-                          />
-                        </svg>
-                        {showCounterForm ? 'Hide counter prices' : 'Attach counter prices (optional)'}
-                      </button>
-
-                      {showCounterForm && (
-                        <div className="bg-purple-500/5 border border-purple-500/20 rounded-xl p-3 space-y-2">
-                          <p className="text-[10px] text-purple-400 font-semibold uppercase tracking-wide mb-2">
-                            Counter Price per Item (incl. GST)
-                          </p>
-                          {items.map(item => (
-                            <div key={item.id} className="flex items-center gap-2">
-                              <span className="flex-1 text-xs text-foreground-secondary truncate">
-                                {item.description}
-                              </span>
-                              <div className="relative shrink-0 w-28">
-                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-foreground-muted">
-                                  ₹
-                                </span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  placeholder={reqInclGst(item) != null ? String(reqInclGst(item)) : '—'}
-                                  value={counterInputs[item.id] ?? ''}
-                                  onChange={e => setCounterInputs(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                  className="w-full pl-6 pr-2 h-control-sm text-xs bg-surface border border-border-default rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <button
-                        onClick={handleSendReply}
-                        disabled={sendingReply || !replyText.trim()}
-                        className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
-                      >
-                        {sendingReply && (
-                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        )}
-                        Send Reply
-                      </button>
+                      {counterToggle('Attach counter prices (optional)')}
+                      {showCounterForm && counterPrices}
+                      {sendButton('Send Reply')}
                     </div>
                   )}
                 </RequireWrite>
               )}
-            </div>
+            </Card>
           ) : null}
-        </div>
-      </div>
-    </div>
+        </>
+      }
+      />
+    </>
   )
 }

@@ -4,8 +4,8 @@ import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { useToast } from '@/contexts/ToastContext'
-import { Skeleton, SummaryCard, formatDate, formatINR } from './shared'
+import { EmptyState, badgeCls, useActionToast } from '@/components/admin/kit'
+import { Skeleton, SummaryCard, formatDate, formatINR, theadCls, tableWrapCls, codTone } from './shared'
 import CodRemittanceMobileList from './CodRemittanceMobileList'
 
 export function CodRemittanceTab() {
@@ -15,7 +15,7 @@ export function CodRemittanceTab() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [marking, setMarking] = useState(false)
   const canWrite = useCanWrite('financial:write')
-  const { showToast } = useToast()
+  const toast = useActionToast()
 
   const load = useCallback(() => {
     setLoading(true)
@@ -42,8 +42,10 @@ export function CodRemittanceTab() {
     const j = await res.json()
     setMarking(false)
     if (j.success) {
-      showToast(`Marked ${j.marked} order(s) as remitted.`, 'success')
+      toast.success(`Marked ${j.marked} order(s) as remitted.`)
       load()
+    } else {
+      toast.error(j.error || 'Could not mark as remitted.')
     }
   }
 
@@ -59,9 +61,8 @@ export function CodRemittanceTab() {
   ]
 
   return (
-    <div className="space-y-6">
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <SummaryCard
           label="Pending Collection"
           value={String(summary.cod_pending ?? 0)}
@@ -81,12 +82,13 @@ export function CodRemittanceTab() {
 
       {/* Filter bar + bulk action */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex rounded-lg border border-border-default overflow-hidden text-sm">
+        <div className="flex h-control rounded-lg border border-border-default overflow-hidden text-sm">
           {FILTERS.map(({ value, label }) => (
             <button
               key={value}
               onClick={() => setStatusFilter(value)}
-              className={`px-4 py-1.5 transition-colors font-medium ${statusFilter === value ? 'bg-secondary-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
+              type="button"
+              className={`h-full px-4 transition-colors font-medium ${statusFilter === value ? 'bg-accent-500 text-white' : 'bg-surface-elevated text-foreground-secondary hover:bg-surface-secondary'}`}
             >
               {label}
             </button>
@@ -96,7 +98,8 @@ export function CodRemittanceTab() {
           <button
             onClick={() => markRemitted(Array.from(selected))}
             disabled={marking}
-            className="px-4 h-control-sm bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors"
+            type="button"
+            className="control-md bg-green-600 hover:bg-green-700 text-white font-medium disabled:opacity-50 transition-colors"
           >
             {marking ? 'Marking…' : `Mark ${selected.size} selected as Remitted`}
           </button>
@@ -107,16 +110,14 @@ export function CodRemittanceTab() {
 
       {/* Grouped by delivery week — Collected view */}
       {!loading && statusFilter === 'cod_collected' && weeks.length === 0 && (
-        <div className="rounded-xl border border-border-default px-6 py-12 text-center text-foreground-muted text-sm">
-          No collected COD orders pending remittance.
-        </div>
+        <EmptyState title="No collected COD orders pending remittance." />
       )}
 
       {!loading && statusFilter === 'cod_collected' && weeks.length > 0 && (
         <div className="space-y-4">
           {weeks.map((week: any) => (
-            <div key={week.weekStart} className="rounded-xl border border-border-default overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 bg-surface-secondary border-b border-border-default">
+            <div key={week.weekStart} className={tableWrapCls}>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-surface-secondary/50 border-b border-border-default">
                 <div>
                   <span className="font-semibold text-sm text-foreground">{week.weekLabel}</span>
                   <span className="ml-3 text-xs text-foreground-muted">
@@ -134,14 +135,16 @@ export function CodRemittanceTab() {
                             return next
                           })
                         }
-                        className="text-xs text-secondary-500 hover:underline font-medium"
+                        type="button"
+                        className="text-xs text-accent-500 hover:underline font-medium"
                       >
                         Select all
                       </button>
                       <button
                         onClick={() => markRemitted(week.orders.map((o: any) => o.id))}
                         disabled={marking}
-                        className="text-xs px-3 h-control-sm bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 font-medium transition-colors"
+                        type="button"
+                        className="control-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 font-medium transition-colors"
                       >
                         {marking ? '…' : 'Mark week remitted'}
                       </button>
@@ -167,8 +170,8 @@ export function CodRemittanceTab() {
               </div>
               <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-surface-secondary/50">
-                    <tr className="text-xs font-medium text-foreground-secondary uppercase tracking-wide">
+                  <thead className={theadCls}>
+                    <tr className="text-xs font-medium text-foreground-muted">
                       <th className="px-4 py-2 w-8">
                         {canWrite && (
                           <input
@@ -211,7 +214,7 @@ export function CodRemittanceTab() {
                         <td className="px-4 py-2.5">
                           <Link
                             href={`/admin/orders/${o.id}/view`}
-                            className="text-secondary-500 hover:underline font-mono text-xs font-medium"
+                            className="text-accent-500 hover:underline font-mono text-xs font-medium"
                           >
                             #{o.order_number}
                           </Link>
@@ -235,7 +238,7 @@ export function CodRemittanceTab() {
 
       {/* Flat table — Pending / Remitted / All views */}
       {!loading && statusFilter !== 'cod_collected' && (
-        <div className="rounded-xl border border-border-default overflow-hidden">
+        <div className={tableWrapCls}>
           {orders.length > 0 && (
             <div className="md:hidden p-3 space-y-3">
               <CodRemittanceMobileList
@@ -259,14 +262,14 @@ export function CodRemittanceTab() {
           )}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-surface-secondary">
-                <tr className="text-xs font-medium text-foreground-secondary uppercase tracking-wide">
-                  <th className="px-4 py-3 text-left">Order</th>
-                  <th className="px-4 py-3 text-left">Customer</th>
-                  <th className="px-4 py-3 text-right">Amount</th>
-                  <th className="px-4 py-3 text-left">Status</th>
-                  <th className="px-4 py-3 text-left">Delivered</th>
-                  <th className="px-4 py-3 text-left">Remitted</th>
+              <thead className={theadCls}>
+                <tr className="text-xs font-medium text-foreground-muted">
+                  <th className="px-4 py-2.5 text-left">Order</th>
+                  <th className="px-4 py-2.5 text-left">Customer</th>
+                  <th className="px-4 py-2.5 text-right">Amount</th>
+                  <th className="px-4 py-2.5 text-left">Status</th>
+                  <th className="px-4 py-2.5 text-left">Delivered</th>
+                  <th className="px-4 py-2.5 text-left">Remitted</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
@@ -282,7 +285,7 @@ export function CodRemittanceTab() {
                     <td className="px-4 py-2.5">
                       <Link
                         href={`/admin/orders/${o.id}/view`}
-                        className="text-secondary-500 hover:underline font-mono text-xs font-medium"
+                        className="text-accent-500 hover:underline font-mono text-xs font-medium"
                       >
                         #{o.order_number}
                       </Link>
@@ -292,15 +295,7 @@ export function CodRemittanceTab() {
                       {formatINR(parseFloat(o.total_amount))}
                     </td>
                     <td className="px-4 py-2.5">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          o.payment_status === 'cod_pending'
-                            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                            : o.payment_status === 'cod_collected'
-                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                              : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        }`}
-                      >
+                      <span className={badgeCls(codTone(o.payment_status))}>
                         {o.payment_status === 'cod_pending'
                           ? 'Pending'
                           : o.payment_status === 'cod_collected'
