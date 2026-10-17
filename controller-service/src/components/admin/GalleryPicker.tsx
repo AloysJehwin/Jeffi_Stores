@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import { Dialog, fieldInputCls } from '@/components/admin/kit'
 import AdminSelect from '@/components/admin/AdminSelect'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
@@ -39,8 +39,7 @@ interface Props {
   pageSize?: number
 }
 
-const PANEL_INPUT =
-  'px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent'
+const PANEL_INPUT = fieldInputCls
 
 /**
  * Shared gallery image picker modal. Server-paginated via /api/gallery
@@ -129,29 +128,33 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
     if (picked.length) onConfirm(picked)
   }
 
-  if (typeof document === 'undefined') return null
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center backdrop-blur-sm bg-black/50 p-4"
-      onClick={onClose}
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      zIndex="z-[300]"
+      size="xl"
+      title="Choose from Gallery"
+      footer={
+        mode === 'multi' ? (
+          <>
+            <button type="button" onClick={onClose} className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmMulti}
+              disabled={selected.length === 0}
+              className="control-md bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold"
+            >
+              {selected.length > 0 ? `Add ${selected.length} Image${selected.length > 1 ? 's' : ''}` : 'Add Images'}
+            </button>
+          </>
+        ) : undefined
+      }
     >
-      <div
-        className="bg-surface-elevated rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
-          <h2 className="text-lg font-semibold text-foreground">Choose from Gallery</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-foreground-muted hover:text-foreground transition-colors text-2xl leading-none"
-          >
-            &times;
-          </button>
-        </div>
-
-        <div className="px-6 py-3 border-b border-border-default flex gap-2 items-center">
+      <div className="-m-5">
+        <div className="px-5 py-3 border-b border-border-default flex gap-2 items-center">
           <input
             type="text"
             placeholder="Search by name…"
@@ -172,7 +175,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
           </div>
         </div>
 
-        <div className="overflow-y-auto flex-1 min-h-0 p-4 pr-3">
+        <div className="p-4 pr-3">
           {loading && (
             <div className="flex items-center justify-center py-16">
               <div className="w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full animate-spin" />
@@ -221,7 +224,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
 
         {/* Pagination */}
         {total > pageSize && (
-          <div className="px-6 py-2.5 border-t border-border-default flex items-center justify-between text-xs text-foreground-secondary">
+          <div className="px-5 py-2.5 border-t border-border-default flex items-center justify-between text-xs text-foreground-secondary">
             <span>
               {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}
             </span>
@@ -230,7 +233,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
                 type="button"
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page <= 1}
-                className="px-2 h-control-sm rounded-md border border-border-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
+                className="control-sm border border-border-secondary disabled:opacity-40 hover:bg-surface-secondary"
               >
                 Prev
               </button>
@@ -241,7 +244,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
                 type="button"
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
-                className="px-2 h-control-sm rounded-md border border-border-secondary disabled:opacity-40 hover:bg-surface-secondary transition-colors"
+                className="control-sm border border-border-secondary disabled:opacity-40 hover:bg-surface-secondary"
               >
                 Next
               </button>
@@ -249,27 +252,7 @@ export default function GalleryPicker({ mode = 'multi', maxSelect, onConfirm, on
           </div>
         )}
 
-        {mode === 'multi' && (
-          <div className="px-6 py-4 border-t border-border-default flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={confirmMulti}
-              disabled={selected.length === 0}
-              className="px-4 h-control bg-accent-500 hover:bg-accent-600 disabled:bg-surface-secondary disabled:text-foreground-muted text-white rounded-lg text-sm font-semibold transition-colors"
-            >
-              {selected.length > 0 ? `Add ${selected.length} Image${selected.length > 1 ? 's' : ''}` : 'Add Images'}
-            </button>
-          </div>
-        )}
       </div>
-    </div>,
-    document.body
+    </Dialog>
   )
 }

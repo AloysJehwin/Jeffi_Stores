@@ -4,6 +4,7 @@ import { useState } from 'react'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import { badgeCls } from '@/components/admin/kit'
 
 interface PriceSnapshot {
   mrp_ex_gst: number | null
@@ -94,13 +95,13 @@ export default function InflationHistoryMobileList({ logs, canWrite, rollingBack
               <span className="flex items-center gap-1.5 min-w-0">
                 <span className="font-medium text-foreground truncate">{log.category_name}</span>
                 {log.is_rollback && (
-                  <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 uppercase tracking-wide">
+                  <span className={`shrink-0 ${badgeCls('amber')}`}>
                     Rollback
                   </span>
                 )}
               </span>
               <span
-                className={`shrink-0 font-semibold text-sm ${log.is_rollback ? 'text-orange-600 dark:text-orange-400' : 'text-accent-600 dark:text-accent-400'}`}
+                className={`shrink-0 font-semibold text-sm ${log.is_rollback ? 'text-orange-600 dark:text-orange-400' : 'text-accent-500'}`}
               >
                 {log.is_rollback ? '−' : '+'}
                 {log.percentage}%

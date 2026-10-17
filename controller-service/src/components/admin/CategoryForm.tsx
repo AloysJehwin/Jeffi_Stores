@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useMemo, useRef } from 'react'
-import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import AdminSelect from './AdminSelect'
 import * as Icons from 'lucide-react'
@@ -11,6 +10,7 @@ import { RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
 import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
+import { FormButton, FormFooter, FormSection, fieldInputCls, useActionToast } from '@/components/admin/kit'
 
 const ICON_OPTIONS = [
   'Anchor',
@@ -233,7 +233,7 @@ export default function CategoryForm({
   const parentCat = isSubcat ? (categories.find(c => c.id === category.parent_category_id) ?? null) : null
 
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const toast = useActionToast()
   const [selectedIcon, setSelectedIcon] = useState<string>(
     category?.icon_name || resolveIconByName(category?.name || '')
   )
@@ -286,23 +286,22 @@ export default function CategoryForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setIsSubmitting(true)
-    setError(null)
     try {
       const formData = new FormData(e.currentTarget)
       await action(formData)
     } catch (err: any) {
       if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
-      setError('Failed to save category. Please try again.')
+      toast.error('Failed to save category. Please try again.')
       setIsSubmitting(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+    <form onSubmit={handleSubmit} className="space-y-5">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
-      <div className="p-4 sm:p-6">
+      <FormSection title="Category" description="Name, icon, parent, ordering and description.">
         {edit.sessionId && (
-          <div className="mb-4 flex justify-end">
+          <div className="flex justify-end">
             <EditorToolbar
               autosaveStatus={'idle' as AutosaveStatus}
               sessionStatus={edit.status}
@@ -313,15 +312,9 @@ export default function CategoryForm({
             />
           </div>
         )}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300">
-            {error}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label htmlFor="name" className="block text-sm font-medium text-foreground-secondary mb-2">
+            <label htmlFor="name" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
               Category Name *
             </label>
             <input
@@ -332,19 +325,19 @@ export default function CategoryForm({
               required
               value={categoryName}
               onChange={e => setCategoryName(e.target.value)}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className={`${fieldInputCls}`}
               placeholder="Enter category name"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-foreground-secondary mb-2">Category Icon</label>
+            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Category Icon</label>
 
             <input type="hidden" name="icon_name" value={selectedIcon} />
 
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center border-2 border-accent-300 dark:border-accent-700 shrink-0">
-                <IconPreview name={selectedIcon} className="w-7 h-7 text-accent-600 dark:text-accent-400" />
+              <div className="w-14 h-14 rounded-lg bg-accent-500/10 flex items-center justify-center border-2 border-accent-500/40 shrink-0">
+                <IconPreview name={selectedIcon} className="w-7 h-7 text-accent-500" />
               </div>
               <div className="flex flex-col gap-1.5">
                 <p className="text-sm font-semibold text-foreground">{selectedIcon}</p>
@@ -354,7 +347,7 @@ export default function CategoryForm({
                       type="button"
                       onClick={handleGenerate}
                       disabled={generating}
-                      className="inline-flex items-center gap-1.5 px-3 h-control-sm text-xs font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="control-sm bg-accent-500 hover:bg-accent-600 text-white font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {generating ? (
                         <>
@@ -372,7 +365,7 @@ export default function CategoryForm({
                   <button
                     type="button"
                     onClick={() => setShowPicker(v => !v)}
-                    className="inline-flex items-center gap-1 px-3 h-control-sm text-xs font-medium border border-border-secondary text-foreground-secondary hover:bg-surface-secondary rounded-md transition-colors"
+                    className="control-sm border border-border-secondary text-foreground-secondary hover:bg-surface-secondary font-medium"
                   >
                     <Icons.Grid2x2 className="w-3 h-3" />
                     {showPicker ? 'Close' : 'Browse'}
@@ -388,7 +381,7 @@ export default function CategoryForm({
                   placeholder="Search icons…"
                   value={iconSearch}
                   onChange={e => setIconSearch(e.target.value)}
-                  className="w-full px-3 h-control-sm text-sm border border-border-secondary rounded-md bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent mb-3"
+                  className={`${fieldInputCls} mb-3`}
                 />
                 <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5 max-h-52 overflow-y-auto">
                   {filteredIcons.map(name => (
@@ -435,7 +428,7 @@ export default function CategoryForm({
           />
 
           <div>
-            <label htmlFor="display_order" className="block text-sm font-medium text-foreground-secondary mb-2">
+            <label htmlFor="display_order" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
               Display Order *
             </label>
             <input
@@ -445,14 +438,14 @@ export default function CategoryForm({
               required
               min="0"
               defaultValue={category?.display_order || 0}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className={`${fieldInputCls}`}
               placeholder="0"
             />
             <p className="text-xs text-foreground-muted mt-1">Lower numbers appear first</p>
           </div>
 
           <div>
-            <label htmlFor="sku_prefix" className="block text-sm font-medium text-foreground-secondary mb-2">
+            <label htmlFor="sku_prefix" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
               SKU Prefix
             </label>
             <input
@@ -461,7 +454,7 @@ export default function CategoryForm({
               name="sku_prefix"
               maxLength={10}
               defaultValue={category?.sku_prefix || ''}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent uppercase"
+              className={`${fieldInputCls} uppercase`}
               placeholder="e.g. BOLT, NUT, WSH"
             />
             <p className="text-xs text-foreground-muted mt-1">
@@ -472,7 +465,7 @@ export default function CategoryForm({
           <div className="md:col-span-2">
             <label
               htmlFor="google_product_category"
-              className="block text-sm font-medium text-foreground-secondary mb-2"
+              className="mb-1.5 block text-xs font-medium text-foreground-secondary"
             >
               Google Product Category
             </label>
@@ -481,7 +474,7 @@ export default function CategoryForm({
               id="google_product_category"
               name="google_product_category"
               defaultValue={category?.google_product_category || ''}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className={`${fieldInputCls}`}
               placeholder="e.g., Hardware > Fasteners > Bolts"
             />
             <p className="text-xs text-foreground-muted mt-1">
@@ -498,7 +491,7 @@ export default function CategoryForm({
           </div>
 
           <div className="md:col-span-2">
-            <label htmlFor="description" className="block text-sm font-medium text-foreground-secondary mb-2">
+            <label htmlFor="description" className="mb-1.5 block text-xs font-medium text-foreground-secondary">
               Description
             </label>
             <AIEnrichButton
@@ -515,7 +508,7 @@ export default function CategoryForm({
                 rows={3}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                className="w-full px-4 py-2 pr-8 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                className={`${fieldInputCls} py-2 pr-8`}
                 placeholder="Enter category description"
               />
             </AIEnrichButton>
@@ -528,13 +521,9 @@ export default function CategoryForm({
             </div>
           </div>
         </div>
-      </div>
+      </FormSection>
 
-      <div className="px-4 sm:px-6 py-5 border-t border-border-default">
-        <h2 className="text-base font-semibold text-foreground mb-1">Return &amp; Replacement Policy</h2>
-        <p className="text-xs text-foreground-muted mb-4">
-          Category policy is the default. Brand policy can override per product.
-        </p>
+      <FormSection title="Return & Replacement Policy" description="Category policy is the default. Brand policy can override per product.">
 
         <input type="hidden" name="policy_override" value={overriding ? 'true' : 'false'} />
 
@@ -591,7 +580,7 @@ export default function CategoryForm({
                   <div>
                     <label
                       htmlFor="return_window_days"
-                      className="block text-sm font-medium text-foreground-secondary mb-1"
+                      className="mb-1.5 block text-xs font-medium text-foreground-secondary"
                     >
                       Return window (days)
                     </label>
@@ -603,7 +592,7 @@ export default function CategoryForm({
                       max={90}
                       value={returnDays}
                       onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      className={`${fieldInputCls}`}
                     />
                   </div>
                 )}
@@ -622,7 +611,7 @@ export default function CategoryForm({
                   <div>
                     <label
                       htmlFor="replacement_window_days"
-                      className="block text-sm font-medium text-foreground-secondary mb-1"
+                      className="mb-1.5 block text-xs font-medium text-foreground-secondary"
                     >
                       Replacement window (days)
                     </label>
@@ -634,7 +623,7 @@ export default function CategoryForm({
                       max={90}
                       value={replacementDays}
                       onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      className={`${fieldInputCls}`}
                     />
                   </div>
                 )}
@@ -642,48 +631,26 @@ export default function CategoryForm({
             </div>
           </>
         )}
-      </div>
+      </FormSection>
 
-      <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex justify-end gap-4">
-        <Link
-          href={ap('/admin/categories')}
-          className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors"
-        >
-          Cancel
-        </Link>
+      <FormFooter cancelHref={ap('/admin/categories')}>
         {isDraft ? (
           <RequireWrite scope="categories:write">
-            <button
-              type="submit"
-              name="intent"
-              value="draft"
-              disabled={isSubmitting}
-              className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50"
-            >
+            <FormButton variant="secondary" name="intent" value="draft" disabled={isSubmitting}>
               {isSubmitting ? 'Saving…' : 'Save Draft'}
-            </button>
-            <button
-              type="submit"
-              name="intent"
-              value="publish"
-              disabled={isSubmitting}
-              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
-            >
+            </FormButton>
+            <FormButton name="intent" value="publish" disabled={isSubmitting}>
               {isSubmitting ? 'Publishing…' : 'Publish'}
-            </button>
+            </FormButton>
           </RequireWrite>
         ) : (
           <RequireWrite scope="categories:write">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+            <FormButton disabled={isSubmitting}>
               {isSubmitting ? 'Saving…' : submitLabel || (category ? 'Update Category' : 'Create Category')}
-            </button>
+            </FormButton>
           </RequireWrite>
         )}
-      </div>
+      </FormFooter>
     </form>
   )
 }

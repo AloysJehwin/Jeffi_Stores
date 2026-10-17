@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Tabs } from '@/components/admin/channels/ui'
 import ShelvingOverview from './ShelvingOverview'
+import { PageHeader } from '@/components/admin/kit'
 
 type View = 'overview' | 'list'
 
@@ -23,7 +24,8 @@ export default function ShelvingTabs({ children }: { children: React.ReactNode }
   const set = (v: View) => router.replace(`${pathname}?view=${v}`, { scroll: false })
   return (
     <div className="h-full flex flex-col">
-      <div className="px-4 sm:px-6 pt-3 shrink-0">
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6 shrink-0 space-y-5">
+        <PageHeader title="Shelving" description="Warehouse, location and stock placement" />
         <Tabs
           tabs={[
             { id: 'overview' as View, label: 'Overview' },

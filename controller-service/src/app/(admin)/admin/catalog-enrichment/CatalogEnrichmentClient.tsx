@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, Fragment } from 'react'
 import { CheckCircle, XCircle, Loader2, Sparkles, Play, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
+import { EmptyState, PageBody, PageHeader, TableSkeleton, badgeCls } from '@/components/admin/kit'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
@@ -32,9 +33,9 @@ interface Item {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-  proposed: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200',
-  approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200',
-  rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200',
+  proposed: badgeCls('amber'),
+  approved: badgeCls('green'),
+  rejected: badgeCls('red'),
 }
 
 function TagList({ tags, max = 4, className = '' }: { tags: string[] | null; max?: number; className?: string }) {
@@ -44,7 +45,7 @@ function TagList({ tags, max = 4, className = '' }: { tags: string[] | null; max
       {tags.slice(0, max).map(t => (
         <span
           key={t}
-          className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded"
+          className="text-[10px] px-1.5 py-0.5 bg-accent-500/5 text-accent-500 rounded"
         >
           {t}
         </span>
@@ -189,18 +190,12 @@ export default function CatalogEnrichmentPage() {
   const allProposedSelected = proposedItems.length > 0 && selected.size === proposedItems.length
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-accent-500" />
-            <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
-              Catalog Enrichment
-            </h1>
-          </div>
-          <p className="text-foreground-secondary mt-1 text-sm">AI-generated product intelligence for admin review</p>
-        </div>
-      </div>
+    <PageBody>
+      <PageHeader
+        media={<Sparkles className="w-5 h-5 text-accent-500" />}
+        title="Catalog Enrichment"
+        description="AI-generated product intelligence for admin review"
+      />
 
       <TabLinks
         base="/admin/catalog-enrichment"
@@ -218,7 +213,7 @@ export default function CatalogEnrichmentPage() {
                     onClick={() => bulkAction('approve')}
                     disabled={bulkBusy}
                     aria-label={`Approve ${selected.size}`}
-                    className="flex items-center gap-1.5 px-3 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold disabled:opacity-50"
+                    className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50"
                   >
                     {bulkBusy ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -231,7 +226,7 @@ export default function CatalogEnrichmentPage() {
                     onClick={() => bulkAction('reject')}
                     disabled={bulkBusy}
                     aria-label={`Reject ${selected.size}`}
-                    className="flex items-center gap-1.5 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
+                    className="control-md bg-surface-elevated hover:bg-surface-secondary text-foreground border border-border-default font-semibold disabled:opacity-50"
                   >
                     <XCircle className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Reject {selected.size}</span>
@@ -244,7 +239,7 @@ export default function CatalogEnrichmentPage() {
                   onClick={runAll}
                   disabled={runningAll}
                   aria-label="Run All"
-                  className="flex items-center gap-1.5 px-3 h-control-sm bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
+                  className="control-md bg-surface-elevated hover:bg-surface-secondary text-foreground border border-border-default font-semibold disabled:opacity-50"
                 >
                   {runningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                   <span className="hidden sm:inline">Run All</span>
@@ -259,7 +254,7 @@ export default function CatalogEnrichmentPage() {
         <EnrichmentOverview />
       ) : (
         <>
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end">
             <AdminSelect
               sm
               value={statusFilter}
@@ -273,22 +268,18 @@ export default function CatalogEnrichmentPage() {
             />
           </div>
           {loading && (
-            <div className="flex items-center gap-2 text-sm text-foreground-muted py-16 justify-center">
-              <Loader2 className="w-4 h-4 animate-spin" /> Loading
-            </div>
+            <TableSkeleton rows={8} cols={6} />
           )}
 
           {!loading && items.length === 0 && (
-            <div className="bg-surface-elevated border border-border-default rounded-lg p-12 text-center text-sm text-foreground-muted">
-              Nothing in the {statusFilter} queue. Click <strong>Run All</strong> to enrich products.
-            </div>
+            <EmptyState title={`Nothing in the ${statusFilter} queue.`} body={<>Click <strong>Run All</strong> to enrich products.</>} />
           )}
 
           {!loading && items.length > 0 && (
-            <div className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
+            <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-border-default">
-                  <thead className="bg-surface-secondary">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-border-default bg-surface-secondary/50">
                     <tr>
                       {statusFilter === 'proposed' && (
                         <th className="pl-4 py-3 w-8">
@@ -300,22 +291,22 @@ export default function CatalogEnrichmentPage() {
                           />
                         </th>
                       )}
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted">
                         Product
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden md:table-cell">
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted hidden md:table-cell">
                         AI Description
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden lg:table-cell">
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted hidden lg:table-cell">
                         Use Cases
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden sm:table-cell">
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted hidden sm:table-cell">
                         Status
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider hidden sm:table-cell">
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted hidden sm:table-cell">
                         Proposed
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                      <th className="px-4 py-2.5 text-right text-xs font-medium text-foreground-muted">
                         Actions
                       </th>
                     </tr>
@@ -324,7 +315,7 @@ export default function CatalogEnrichmentPage() {
                     {items.map(item => (
                       <Fragment key={item.id}>
                         <tr
-                          className={`hover:bg-surface-secondary/50 transition-colors ${selected.has(item.id) ? 'bg-accent-50/30 dark:bg-accent-900/10' : ''}`}
+                          className={`hover:bg-surface-secondary/50 transition-colors ${selected.has(item.id) ? 'bg-accent-500/5' : ''}`}
                         >
                           {statusFilter === 'proposed' && (
                             <td className="pl-4 py-3 w-8">
@@ -346,7 +337,7 @@ export default function CatalogEnrichmentPage() {
                               {item.product_name}
                             </Link>
                             {item.ai_product_type && (
-                              <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium mt-0.5">
+                              <p className="text-[10px] text-accent-500 font-medium mt-0.5">
                                 {item.ai_product_type}
                               </p>
                             )}
@@ -360,7 +351,7 @@ export default function CatalogEnrichmentPage() {
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
                             <span
-                              className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_BADGE[item.status] || ''}`}
+                              className={STATUS_BADGE[item.status] || badgeCls('muted')}
                             >
                               {item.status}
                             </span>
@@ -477,7 +468,7 @@ export default function CatalogEnrichmentPage() {
                                     <p className="text-[11px] font-semibold text-red-600 uppercase tracking-wide mb-1">
                                       Embed Error
                                     </p>
-                                    <p className="text-xs text-red-600">{item.error}</p>
+                                    <p className="text-xs text-red-600 dark:text-red-400">{item.error}</p>
                                   </div>
                                 )}
                               </div>
@@ -507,7 +498,7 @@ export default function CatalogEnrichmentPage() {
                     <button
                       disabled={page <= 1}
                       onClick={() => load(page - 1)}
-                      className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                      className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
                     >
                       Prev
                     </button>
@@ -517,7 +508,7 @@ export default function CatalogEnrichmentPage() {
                     <button
                       disabled={page >= totalPages}
                       onClick={() => load(page + 1)}
-                      className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                      className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
                     >
                       Next
                     </button>
@@ -528,6 +519,6 @@ export default function CatalogEnrichmentPage() {
           )}
         </>
       )}
-    </div>
+    </PageBody>
   )
 }

@@ -1,6 +1,7 @@
 import { Star } from 'lucide-react'
 import ProductImage from './ProductImage'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import { badgeCls } from '@/components/admin/kit'
 
 interface Props {
   product: any
@@ -39,16 +40,12 @@ export default function ProductMobileCardBody({ product }: Props) {
         </div>
         <div className="flex flex-col items-end gap-1 flex-shrink-0">
           <span
-            className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-              product.is_active
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                : 'bg-surface-secondary text-foreground'
-            }`}
+            className={badgeCls(product.is_active ? 'green' : 'muted')}
           >
             {product.is_active ? 'Active' : 'Inactive'}
           </span>
           {product.is_featured && (
-            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 inline-flex items-center gap-1">
+            <span className={`${badgeCls('amber')} inline-flex items-center gap-1`}>
               <Star className="w-3 h-3 fill-current" /> Featured
             </span>
           )}
@@ -58,7 +55,7 @@ export default function ProductMobileCardBody({ product }: Props) {
         <div>
           {product.has_variants ? (
             <div className="flex items-baseline gap-1.5">
-              <span className="text-sm font-semibold text-primary-500">
+              <span className="text-sm font-semibold text-foreground">
                 From Rs. {Number(product.variant_min_price || 0).toLocaleString('en-IN')}
               </span>
               {product.variant_min_mrp && Number(product.variant_min_mrp) > Number(product.variant_min_price || 0) && (
@@ -69,7 +66,7 @@ export default function ProductMobileCardBody({ product }: Props) {
             </div>
           ) : (
             <div className="flex items-baseline gap-1.5">
-              <span className="text-sm font-semibold text-primary-500">
+              <span className="text-sm font-semibold text-foreground">
                 Rs. {Number(product.base_price || 0).toLocaleString('en-IN')}
               </span>
               {product.mrp && Number(product.mrp) > Number(product.base_price || 0) && (
@@ -99,13 +96,7 @@ export default function ProductMobileCardBody({ product }: Props) {
             </div>
           )}
           <span
-            className={`inline-block px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
-              isOut
-                ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                : isLow
-                  ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-                  : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-            }`}
+            className={badgeCls(isOut ? 'red' : isLow ? 'amber' : 'green')}
           >
             {isOut ? 'Out' : isLow ? 'Low' : 'In Stock'}
           </span>

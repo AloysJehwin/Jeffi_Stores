@@ -1,3 +1,4 @@
+import { badgeCls } from '@/components/admin/kit'
 interface DetailCategory {
   slug: string
   display_order: number
@@ -38,11 +39,7 @@ export default function CategoryMobileDetailBody({ category, parentName, subCoun
     <div className="px-5 py-4">
       <div className="mb-3">
         <span
-          className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
-            category.is_active
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-              : 'bg-surface-secondary text-foreground'
-          }`}
+          className={`${badgeCls(category.is_active ? 'green' : 'muted')}`}
         >
           {category.is_active ? 'Active' : 'Inactive'}
         </span>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
+import { EmptyState, PageBody, PageHeader, TableSkeleton, badgeCls, fieldInputCls, useActionToast } from '@/components/admin/kit'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import InflationHistoryMobileList from './_components/InflationHistoryMobileList'
@@ -107,6 +108,20 @@ export default function InflationClient({ categories, brands }: { categories: Ca
   const [rollbackError, setRollbackError] = useState<string | null>(null)
   const confirm = useConfirm()
   const canWrite = useCanWrite('financial:write')
+
+  const toast = useActionToast()
+  useEffect(() => {
+    if (previewError) toast.error(previewError)
+  }, [previewError, toast])
+  useEffect(() => {
+    if (applyError) toast.error(applyError)
+  }, [applyError, toast])
+  useEffect(() => {
+    if (applySuccess) toast.success(applySuccess)
+  }, [applySuccess, toast])
+  useEffect(() => {
+    if (rollbackError) toast.error(rollbackError)
+  }, [rollbackError, toast])
 
   const PAGE_SIZE = 25
   const [logsPage, setLogsPage] = useState(1)
@@ -292,14 +307,11 @@ export default function InflationClient({ categories, brands }: { categories: Ca
   const canApply = canPreview && !!preview && preview.length > 0
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Price Inflation</h1>
-        <p className="text-foreground-secondary mt-1">
-          Bulk-increase MRP (ex-GST) by percentage — all derived prices (MRP incl. GST, selling price, wholesale) are
-          automatically recalculated using each product&apos;s discount % and GST rate.
-        </p>
-      </div>
+    <PageBody>
+      <PageHeader
+        title="Price Inflation"
+        description="Bulk-increase MRP (ex-GST) by percentage. All derived prices (MRP incl. GST, selling price, wholesale) are recalculated from each product's discount % and GST rate."
+      />
 
       <TabLinks
         base="/admin/inflation"
@@ -314,12 +326,12 @@ export default function InflationClient({ categories, brands }: { categories: Ca
         <InflationOverview />
       ) : (
         <>
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 space-y-5">
-            <h2 className="text-lg font-semibold text-foreground">Apply Inflation</h2>
+          <div className="bg-surface-elevated rounded-xl border border-border-default p-4 sm:p-6 space-y-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Apply Inflation</h2>
 
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_200px] gap-4">
               <div>
-                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Category *</label>
+                <label className="mb-1.5 block text-xs font-medium text-xs text-foreground-muted">Category *</label>
                 <AdminSelect
                   value={selectedCategory?.id || ''}
                   placeholder="Select a category…"
@@ -338,7 +350,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Brand</label>
+                <label className="mb-1.5 block text-xs font-medium text-xs text-foreground-muted">Brand</label>
                 <AdminSelect
                   value={selectedBrandId}
                   placeholder="All Brands"
@@ -352,7 +364,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                <label className="mb-1.5 block text-xs font-medium text-xs text-foreground-muted">
                   Percentage increase (%) *
                 </label>
                 <input
@@ -366,7 +378,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                     setPreview(null)
                   }}
                   placeholder="e.g. 10 for +10%"
-                  className="w-full px-4 h-control border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                  className={fieldInputCls}
                 />
               </div>
             </div>
@@ -450,7 +462,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                 type="button"
                 onClick={handlePreview}
                 disabled={!canPreview || previewLoading}
-                className="px-4 h-control bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="control-md border border-border-default bg-surface-elevated text-foreground hover:bg-surface-secondary font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {previewLoading ? 'Loading…' : 'Preview Changes'}
               </button>
@@ -459,31 +471,28 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                   type="button"
                   onClick={handleApply}
                   disabled={!canApply || applying}
-                  className="px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {applying ? 'Applying…' : `Apply to ${preview.length} product${preview.length !== 1 ? 's' : ''}`}
                 </button>
               )}
             </div>
 
-            {previewError && <p className="text-sm text-red-600 dark:text-red-400">{previewError}</p>}
-            {applyError && <p className="text-sm text-red-600 dark:text-red-400">{applyError}</p>}
-            {applySuccess && <p className="text-sm text-green-600 dark:text-green-400 font-medium">{applySuccess}</p>}
           </div>
 
           {preview && preview.length > 0 && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
+            <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
               <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center justify-between">
-                <h2 className="text-base font-semibold text-foreground">Preview — {selectedCategory?.name}</h2>
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Preview — {selectedCategory?.name}</h2>
                 <span className="text-xs text-foreground-muted bg-surface px-2.5 py-1 rounded-full border border-border-default">
                   +{percentage}% on MRP (Ex. GST)
                 </span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-surface border-b border-border-default">
+                  <thead className="bg-surface-secondary/50 border-b border-border-default">
                     <tr>
-                      <th className="text-left py-2.5 px-4 font-medium text-foreground-secondary">Product / Variant</th>
+                      <th className="text-left py-2.5 px-4 font-medium text-xs text-foreground-muted">Product / Variant</th>
                       {PREVIEW_COLS.map(c => (
                         <th
                           key={c.key}
@@ -541,20 +550,17 @@ export default function InflationClient({ categories, brands }: { categories: Ca
           )}
 
           {preview && preview.length === 0 && (
-            <p className="text-sm text-foreground-muted bg-surface-elevated border border-border-default rounded-lg px-4 py-3">
-              No active products found in this category.
-            </p>
+            <EmptyState title="No active products found in this category." />
           )}
 
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
+          <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
             <div className="px-4 sm:px-6 py-4 border-b border-border-default">
-              <h2 className="text-base font-semibold text-foreground">Inflation History</h2>
-              {rollbackError && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{rollbackError}</p>}
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Inflation History</h2>
             </div>
             {logsLoading ? (
-              <p className="p-6 text-sm text-foreground-muted">Loading…</p>
+              <div className="p-4"><TableSkeleton rows={4} cols={5} /></div>
             ) : logs.length === 0 ? (
-              <p className="p-6 text-sm text-foreground-muted">No inflation applied yet.</p>
+              <EmptyState bare title="No inflation applied yet." />
             ) : (
               <div>
                 <div className="md:hidden p-4 pt-3 space-y-3">
@@ -567,13 +573,13 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                 </div>
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-surface border-b border-border-default">
+                    <thead className="bg-surface-secondary/50 border-b border-border-default">
                       <tr>
-                        <th className="text-left py-2.5 px-4 font-medium text-foreground-secondary">Category</th>
-                        <th className="text-right py-2.5 px-3 font-medium text-foreground-secondary">%</th>
-                        <th className="text-right py-2.5 px-3 font-medium text-foreground-secondary">Products</th>
-                        <th className="text-left py-2.5 px-3 font-medium text-foreground-secondary">Applied by</th>
-                        <th className="text-left py-2.5 px-3 font-medium text-foreground-secondary">Date</th>
+                        <th className="text-left py-2.5 px-4 font-medium text-xs text-foreground-muted">Category</th>
+                        <th className="text-right py-2.5 px-3 font-medium text-xs text-foreground-muted">%</th>
+                        <th className="text-right py-2.5 px-3 font-medium text-xs text-foreground-muted">Products</th>
+                        <th className="text-left py-2.5 px-3 font-medium text-xs text-foreground-muted">Applied by</th>
+                        <th className="text-left py-2.5 px-3 font-medium text-xs text-foreground-muted">Date</th>
                         <th className="py-2.5 px-3"></th>
                       </tr>
                     </thead>
@@ -599,7 +605,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                                 )}
                                 {log.category_name}
                                 {log.is_rollback && (
-                                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 uppercase tracking-wide ml-1">
+                                  <span className={`${badgeCls('amber')} ml-1`}>
                                     Rollback
                                   </span>
                                 )}
@@ -610,7 +616,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                                 className={
                                   log.is_rollback
                                     ? 'text-orange-600 dark:text-orange-400'
-                                    : 'text-accent-600 dark:text-accent-400'
+                                    : 'text-accent-500'
                                 }
                               >
                                 {log.is_rollback ? '−' : '+'}
@@ -637,7 +643,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                                   type="button"
                                   onClick={() => handleRollback(log)}
                                   disabled={rollingBack === log.id}
-                                  className="px-2.5 h-control-sm text-xs font-medium rounded border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="control-sm border border-orange-500/40 text-orange-600 dark:text-orange-400 hover:bg-orange-500/10 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                   {rollingBack === log.id ? 'Rolling back…' : 'Rollback'}
                                 </button>
@@ -651,7 +657,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                                   <table className="w-full text-xs">
                                     <thead className="bg-surface-secondary border-b border-border-default">
                                       <tr>
-                                        <th className="text-left py-2 px-6 font-medium text-foreground-secondary">
+                                        <th className="text-left py-2 px-6 font-medium text-xs text-foreground-muted">
                                           Product / Variant
                                         </th>
                                         {PREVIEW_COLS.map(c => (
@@ -730,7 +736,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                       <button
                         disabled={logsPage <= 1}
                         onClick={() => setLogsPage(p => Math.max(1, p - 1))}
-                        className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                        className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
                       >
                         Prev
                       </button>
@@ -740,7 +746,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                       <button
                         disabled={logsPage >= logsTotalPages}
                         onClick={() => setLogsPage(p => Math.min(logsTotalPages, p + 1))}
-                        className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                        className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none"
                       >
                         Next
                       </button>
@@ -752,6 +758,6 @@ export default function InflationClient({ categories, brands }: { categories: Ca
           </div>
         </>
       )}
-    </div>
+    </PageBody>
   )
 }

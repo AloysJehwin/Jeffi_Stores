@@ -14,8 +14,8 @@ import {
   computeAreaFactor,
   computeVolumeFactor,
 } from '@/lib/catalog/units'
-import AdminFilters from '@/components/admin/AdminFilters'
-import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
+import ProductsAdvancedFilters from '../products/_components/ProductsAdvancedFilters'
+import { DataToolbar, EmptyState, PageBody, PageHeader, fieldInputCls, useActionToast } from '@/components/admin/kit'
 import { ADMIN_PRODUCT_FILTER_FIELDS, type AdvancedFilterField } from '@/lib/catalog/product-attribute-filters-shared'
 
 type SnapRow = { id: string; name?: string; before: Record<string, any> }
@@ -250,8 +250,7 @@ const OPERATIONS: OpDef[] = [
   { key: 'set_images', label: 'Replace Images', group: 'Media', inputType: 'images', danger: true },
 ]
 
-const inputCls =
-  'w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
+const inputCls = fieldInputCls
 
 export default function ControlsClient({
   categories,
@@ -319,6 +318,16 @@ export default function ControlsClient({
   } | null>(null)
 
   // ── operation history ─────────────────────────────────────────────────────
+  const toast = useActionToast()
+  useEffect(() => {
+    if (applyError) toast.error(applyError)
+  }, [applyError, toast])
+  useEffect(() => {
+    if (applySuccess) toast.success(applySuccess)
+  }, [applySuccess, toast])
+  useEffect(() => {
+    if (rollbackError) toast.error(rollbackError)
+  }, [rollbackError, toast])
   const [logs, setLogs] = useState<ControlsLog[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
@@ -723,23 +732,19 @@ export default function ControlsClient({
   )
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Product Controls</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">
-          Work through the steps: filter products, select a subset, then apply a bulk operation. Every change is logged
-          and can be undone from History. Price changes derive from MRP (Ex-GST) — GST, selling price and discount
-          recalculate automatically.
-        </p>
-      </div>
+    <PageBody>
+      <PageHeader
+        title="Product Controls"
+        description="Filter products, select a subset, then apply a bulk operation. Every change is logged and can be undone from History. Price changes derive from MRP (Ex-GST); GST, selling price and discount recalculate automatically."
+      />
 
       {/* ── Step 1 · Filter ──────────────────────────────────────────── */}
       <section className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border-default bg-surface">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border-default bg-surface-secondary/50">
           <span className="flex items-center justify-center w-6 h-6 rounded-full bg-accent-500 text-white text-xs font-bold shrink-0">
             1
           </span>
-          <h2 className="text-sm font-semibold text-foreground flex-1">Filter products</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground flex-1">Filter products</h2>
           {Object.keys(activeFilters).length > 0 && (
             <button
               type="button"
@@ -751,8 +756,8 @@ export default function ControlsClient({
           )}
         </div>
         <div className="p-4 space-y-3">
-          <AdminFilters
-            bare
+          <DataToolbar
+            search={{ placeholder: 'Search by name or SKU...', param: 'search' }}
             filters={[
               { name: 'category_id', label: 'Category', options: categoryOptions },
               { name: 'brand_id', label: 'Brand', options: brandOptions },
@@ -774,30 +779,21 @@ export default function ControlsClient({
                 ],
               },
             ]}
-            searchPlaceholder="Search by name or SKU..."
-            searchParam="search"
-            advancedContent={
-              <AdvancedFilterPanel
-                fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]}
-                mode="content"
-                forceExpanded
-                valuesEndpoint="/api/admin/controls/attribute-values"
-              />
-            }
           />
+          <ProductsAdvancedFilters fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]} valuesEndpoint="/api/admin/controls/attribute-values" />
 
-          {loadError && <p className="text-xs text-red-500">{loadError}</p>}
+          {loadError && <p className="text-xs text-red-600 dark:text-red-400">{loadError}</p>}
         </div>
       </section>
 
       {/* ── Step 2 · Select ──────────────────────────────────────────── */}
       {(loading || products.length > 0) && (
         <section className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border-default bg-surface flex-wrap">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border-default bg-surface-secondary/50 flex-wrap">
             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-accent-500 text-white text-xs font-bold shrink-0">
               2
             </span>
-            <h2 className="text-sm font-semibold text-foreground flex-1">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground flex-1">
               Select products
               {!loading && (
                 <span className="ml-2 font-normal text-foreground-muted">
@@ -873,11 +869,11 @@ export default function ControlsClient({
         <section
           className={`bg-surface-elevated rounded-xl border border-border-default overflow-hidden transition-opacity ${selectedIds.size === 0 ? 'opacity-60' : ''}`}
         >
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-border-default bg-surface">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border-default bg-surface-secondary/50">
             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-accent-500 text-white text-xs font-bold shrink-0">
               3
             </span>
-            <h2 className="text-sm font-semibold text-foreground flex-1">Choose operation</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground flex-1">Choose operation</h2>
             {selectedIds.size === 0 && <span className="text-xs text-foreground-muted">Select products first</span>}
           </div>
           <div className="p-4 space-y-4">
@@ -931,7 +927,7 @@ export default function ControlsClient({
                 type="button"
                 onClick={handleApply}
                 disabled={!canApply}
-                className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`control-md w-full font-semibold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${
                   opDef?.danger
                     ? 'bg-red-600 hover:bg-red-700 text-white'
                     : 'bg-accent-500 hover:bg-accent-600 text-white'
@@ -1219,18 +1215,18 @@ export default function ControlsClient({
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="block text-xs font-medium text-foreground-secondary">New image</label>
                       {/* Source toggle: Upload / Gallery */}
-                      <div className="inline-flex rounded-md border border-border-secondary overflow-hidden text-xs">
+                      <div className="inline-flex h-control-sm rounded-md border border-border-secondary overflow-hidden text-xs">
                         <button
                           type="button"
                           onClick={() => setImageSource('upload')}
-                          className={`px-2.5 py-1 ${imageSource === 'upload' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
+                          className={`px-2.5 h-full ${imageSource === 'upload' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
                         >
                           Upload
                         </button>
                         <button
                           type="button"
                           onClick={() => setImageSource('gallery')}
-                          className={`px-2.5 py-1 border-l border-border-secondary ${imageSource === 'gallery' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
+                          className={`px-2.5 h-full border-l border-border-secondary ${imageSource === 'gallery' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}
                         >
                           Gallery
                         </button>
@@ -1265,7 +1261,7 @@ export default function ControlsClient({
                               if (imageSource === 'upload') setImageFile(null)
                               else setSelectedGallery(null)
                             }}
-                            className="text-xs text-red-500 hover:underline mt-0.5"
+                            className="text-xs text-red-600 dark:text-red-400 hover:underline mt-0.5"
                           >
                             Remove
                           </button>
@@ -1330,7 +1326,7 @@ export default function ControlsClient({
                   </div>
                 </div>
 
-                {imageError && <p className="text-xs text-red-500">{imageError}</p>}
+                {imageError && <p className="text-xs text-red-600 dark:text-red-400">{imageError}</p>}
 
                 <div>
                   <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
@@ -1345,7 +1341,7 @@ export default function ControlsClient({
                   />
                 </div>
 
-                <p className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded p-2.5 border border-orange-200 dark:border-orange-800">
+                <p className="text-xs text-orange-600 dark:text-orange-400 bg-orange-500/5 rounded p-2.5 border border-orange-500/40">
                   Replaces image #{imageSlot} on the selected products with this image
                   {imageSlot === '1' ? ' and makes it the primary image' : ''}. Other images are untouched. Undoable
                   from History.
@@ -1391,16 +1387,15 @@ export default function ControlsClient({
               </p>
             )}
 
-            {applyError && <p className="text-sm text-red-600 dark:text-red-400">{applyError}</p>}
-            {applySuccess && (
+            {applySuccess && lastLogId && lastLogLabel && canWrite && (
               <div className="flex items-center gap-3 flex-wrap">
-                <p className="text-sm text-green-600 dark:text-green-400 font-medium flex-1">{applySuccess}</p>
+                <p className="text-xs text-foreground-muted flex-1">Last change: {lastLogLabel}</p>
                 {lastLogId && lastLogLabel && canWrite && (
                   <button
                     type="button"
                     onClick={() => handleRollback(lastLogId, lastLogLabel)}
                     disabled={rollingBack}
-                    className="shrink-0 flex items-center gap-1.5 px-3 h-control-sm rounded-lg border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 text-xs font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-50 transition-colors"
+                    className="control-md shrink-0 border border-orange-500/40 bg-orange-500/5 text-orange-700 dark:text-orange-400 font-medium hover:bg-orange-500/10 disabled:opacity-50"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
@@ -1410,36 +1405,35 @@ export default function ControlsClient({
                 )}
               </div>
             )}
-            {rollbackError && <p className="text-sm text-red-600 dark:text-red-400">{rollbackError}</p>}
           </div>
         </section>
       )}
 
       {Object.keys(activeFilters).length > 0 && !loading && products.length === 0 && (
-        <p className="text-sm text-foreground-muted bg-surface-elevated border border-border-default rounded-lg px-4 py-3">
-          No active products match the current filters.
-        </p>
+        <EmptyState title="No active products match the current filters." />
       )}
 
       {Object.keys(activeFilters).length === 0 && (
-        <div className="bg-surface-elevated border border-border-default rounded-lg px-4 py-6 text-center">
-          <p className="text-sm text-foreground-muted">Add one or more filters above to load products.</p>
-          <p className="text-xs text-foreground-muted mt-1">
-            Example: filter by <strong>Grade = 12.9</strong>, select all, then apply <strong>Inflate Price +5%</strong>.
-          </p>
-        </div>
+        <EmptyState
+          title="Add one or more filters above to load products."
+          body={
+            <>
+              Example: filter by <strong>Grade = 12.9</strong>, select all, then apply <strong>Inflate Price +5%</strong>.
+            </>
+          }
+        />
       )}
 
       {/* ── Operation History ─────────────────────────────────────────────── */}
       <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-default bg-surface">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-default bg-surface-secondary/50">
           <div className="flex items-center gap-3">
             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-surface-secondary text-foreground-secondary text-xs font-bold shrink-0">
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </span>
-            <h2 className="text-sm font-semibold text-foreground">Operation History</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Operation History</h2>
           </div>
           <button
             type="button"
@@ -1526,7 +1520,7 @@ export default function ControlsClient({
                                 e.stopPropagation()
                                 handleRollback(log.id, opLabel)
                               }}
-                              className="shrink-0 px-2.5 py-1 rounded border border-border-secondary text-xs text-foreground-secondary hover:border-red-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+                              className="shrink-0 px-2.5 py-1 rounded border border-border-secondary text-xs text-foreground-secondary hover:border-red-500/40 hover:text-red-600 transition-colors cursor-pointer"
                             >
                               Rollback
                             </span>
@@ -1563,7 +1557,7 @@ export default function ControlsClient({
                   })}
                 </div>
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between px-4 py-2 border-t border-border-default bg-surface">
+                  <div className="flex items-center justify-between px-4 py-2 border-t border-border-default bg-surface-secondary/50">
                     <button
                       type="button"
                       onClick={() => setLogsPage(p => p - 1)}
@@ -1608,6 +1602,6 @@ export default function ControlsClient({
           })()
         )}
       </div>
-    </div>
+    </PageBody>
   )
 }
