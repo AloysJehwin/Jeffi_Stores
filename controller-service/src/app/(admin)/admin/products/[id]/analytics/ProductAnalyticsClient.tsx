@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { ChartCard, Dialog, Kpi, KpiGrid } from '@/components/admin/kit'
 import Link from 'next/link'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
@@ -96,37 +96,10 @@ function Modal({
   children: React.ReactNode
   footer?: React.ReactNode
 }) {
-  if (typeof document === 'undefined') return null
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-surface-elevated rounded-2xl border border-border-default p-6 w-full max-w-lg shadow-2xl max-h-[80vh] flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4 shrink-0">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">{titleText}</h2>
-            {subtitle && <p className="text-xs text-foreground-muted mt-0.5">{subtitle}</p>}
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-            aria-label="Close"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="overflow-y-auto flex-1">{children}</div>
-        {footer && <div className="pt-4 shrink-0 border-t border-border-default mt-2">{footer}</div>}
-      </div>
-    </div>,
-    document.body
+  return (
+    <Dialog open onClose={onClose} title={titleText} description={subtitle} zIndex="z-[300]" size="md" footer={footer}>
+      {children}
+    </Dialog>
   )
 }
 
@@ -172,49 +145,47 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
 
   return (
     <div className="space-y-5">
-      <div className="bg-zinc-800 dark:bg-zinc-900 rounded-2xl p-6 text-white shadow-md border border-zinc-700">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-bold truncate">{data.product.name}</h1>
-            <div className="flex items-center gap-3 mt-1 text-xs text-zinc-400 flex-wrap">
-              <span className="font-mono">
-                SKU: {data.product.sku}
-                {data.product.sku && <CopySku sku={data.product.sku} className="ml-1" />}
-              </span>
-              {data.product.brandName && <span>Brand: {data.product.brandName}</span>}
-              <span>
-                Stock:{' '}
-                <span
-                  className={
-                    data.product.stock === 0
-                      ? 'text-red-400'
-                      : data.product.stock < 10
-                        ? 'text-orange-400'
-                        : 'text-green-400'
-                  }
-                >
-                  {data.product.stock}
-                </span>
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {RANGES.map(d => (
-              <button
-                key={d}
-                onClick={() => changeRange(d)}
-                disabled={loading}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 ${
-                  days === d ? 'bg-accent-500 text-white' : 'bg-white/10 text-zinc-300 hover:bg-white/20'
-                } disabled:opacity-50`}
-              >
-                {d}d
-              </button>
-            ))}
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 text-xs text-foreground-muted flex-wrap">
+          <span className="font-mono inline-flex items-center">
+            SKU: {data.product.sku}
+            {data.product.sku && <CopySku sku={data.product.sku} className="ml-1" />}
+          </span>
+          {data.product.brandName && <span>Brand: {data.product.brandName}</span>}
+          <span>
+            Stock:{' '}
+            <span
+              className={`font-semibold tabular-nums ${
+                data.product.stock === 0
+                  ? 'text-red-600 dark:text-red-400'
+                  : data.product.stock < 10
+                    ? 'text-orange-600 dark:text-orange-400'
+                    : 'text-green-600 dark:text-green-400'
+              }`}
+            >
+              {data.product.stock}
+            </span>
+          </span>
         </div>
+        <div className="inline-flex h-control items-center gap-0.5 rounded-lg border border-border-default bg-surface-elevated p-0.5">
+          {RANGES.map(d => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => changeRange(d)}
+              disabled={loading}
+              className={`h-full rounded-md px-3 text-xs font-semibold transition-colors ${
+                days === d ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:bg-surface-secondary hover:text-foreground'
+              } disabled:opacity-50`}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
 
-        <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div>
+        <KpiGrid>
           <Stat
             label="Views"
             value={data.totals.views.toLocaleString('en-IN')}
@@ -241,19 +212,20 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
             sub={`${data.totals.cartConversionRate}% cart→order`}
             highlight={data.totals.conversionRate >= 5}
           />
-        </div>
+        </KpiGrid>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="lg:col-span-2 bg-surface-elevated rounded-xl border border-border-default p-5">
-          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-            <h2 className="text-sm font-semibold text-foreground">Traffic</h2>
-            <div className="flex items-center gap-1 bg-surface-secondary rounded-lg p-0.5">
+        <div className="lg:col-span-2">
+        <ChartCard
+          title="Traffic"
+          action={
+            <div className="inline-flex h-control items-center gap-0.5 rounded-lg bg-surface-secondary p-0.5">
               {(['daily', 'weekly', 'monthly'] as const).map(g => (
                 <button
                   key={g}
                   onClick={() => setGranularity(g)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  className={`h-full px-2.5 rounded-md text-xs font-medium transition-colors ${
                     granularity === g
                       ? 'bg-surface-elevated shadow text-foreground'
                       : 'text-foreground-muted hover:text-foreground'
@@ -263,8 +235,8 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
                 </button>
               ))}
             </div>
-          </div>
-
+          }
+        >
           {displayed.length === 0 ? (
             <p className="text-sm text-foreground-muted py-2">
               No activity in this range.{' '}
@@ -343,12 +315,13 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
               </button>
             )}
           </div>
+        </ChartCard>
         </div>
 
         {/* Top Referrers */}
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground">Top Referrers</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Top Referrers</h2>
             {refHasMore && (
               <button
                 onClick={() => setRefModal(true)}
@@ -382,7 +355,7 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
         {/* Variant Breakdown */}
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground">Variant Breakdown</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Variant Breakdown</h2>
             {variantHasMore && (
               <button
                 onClick={() => setVariantModal(true)}
@@ -412,7 +385,7 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
         {/* Recent Buyers */}
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground">Recent Buyers</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Recent Buyers</h2>
             {buyerHasMore && (
               <button
                 onClick={() => setBuyerModal(true)}
@@ -552,11 +525,5 @@ function BuyerRow({
 }
 
 function Stat({ label, value, sub, highlight }: { label: string; value: string; sub?: string; highlight?: boolean }) {
-  return (
-    <div className="bg-white/5 rounded-xl p-3.5 border border-white/10">
-      <p className="text-zinc-400 text-[10px] uppercase tracking-widest font-medium">{label}</p>
-      <p className={`font-bold text-2xl mt-1 ${highlight ? 'text-green-400' : 'text-white'}`}>{value}</p>
-      {sub && <p className="text-zinc-500 text-[10px] mt-0.5 truncate">{sub}</p>}
-    </div>
-  )
+  return <Kpi label={label} value={value} sub={sub || undefined} highlight={highlight} />
 }
