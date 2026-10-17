@@ -32,9 +32,9 @@ export default function RfqTrendChart({ data }: { data: RfqTrendPoint[] }) {
   const xStep = points.length <= 8 ? 1 : Math.ceil(points.length / 7)
 
   return (
-    <ChartCard title="RFQs received" hint="last 12 months">
+    <ChartCard title="RFQs Received" hint="last 12 months">
       {!hasData ? (
-        <div className="flex h-40 items-center justify-center text-sm text-foreground-muted">No RFQs yet.</div>
+        <div className="flex h-40 items-center justify-center text-sm text-foreground-muted">No RFQs yet</div>
       ) : (
         <div className="overflow-x-auto">
           <svg
