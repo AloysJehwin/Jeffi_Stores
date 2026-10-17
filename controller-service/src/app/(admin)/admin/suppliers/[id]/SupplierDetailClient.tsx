@@ -35,8 +35,17 @@ const muted = 'text-foreground-secondary'
 const money = (v: unknown) => <span className="font-semibold text-foreground">{formatINR(parseFloat(String(v || '0')))}</span>
 const dateCell = (v: unknown) => <span className={`${muted} whitespace-nowrap`}>{formatDate(v as string)}</span>
 
-export default function SupplierDetailClient({ id }: { id: string }) {
+export default function SupplierDetailClient({
+  id,
+  hasDraft = false,
+  startDraftAction,
+}: {
+  id: string
+  hasDraft?: boolean
+  startDraftAction?: (formData: FormData) => void | Promise<void>
+}) {
   const canFinancial = useHasScope('financial:read')
+  const canInventoryWrite = useHasScope('inventory:write')
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab') as Tab | null
@@ -177,9 +186,35 @@ export default function SupplierDetailClient({ id }: { id: string }) {
       <DetailHeader
         back={{ href: listHref, label: 'Suppliers' }}
         title={s.name}
-        status={!s.is_active ? <span className={badgeCls('muted')}>Inactive</span> : null}
+        status={
+          <>
+            {!s.is_active && <span className={badgeCls('muted')}>Inactive</span>}
+            {hasDraft && <span className={badgeCls('amber')}>Draft pending</span>}
+          </>
+        }
         identifiers={s.gstin ? [{ label: 'GSTIN', value: s.gstin, copy: true }] : undefined}
         secondary={[{ key: 'all', label: 'All Suppliers', href: listHref }]}
+        actions={
+          canInventoryWrite ? (
+            hasDraft ? (
+              <Link
+                href={ap(`/admin/suppliers/${id}/edit`)}
+                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+              >
+                Edit Draft
+              </Link>
+            ) : startDraftAction ? (
+              <form action={startDraftAction}>
+                <button
+                  type="submit"
+                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+                >
+                  Edit
+                </button>
+              </form>
+            ) : null
+          ) : null
+        }
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
