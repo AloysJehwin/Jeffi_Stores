@@ -11,7 +11,7 @@ import { ErrorState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
-import EditorToolbar from '@/components/admin/EditorToolbar'
+import { DraftNotice, EditSessionActions } from '@/components/admin/kit'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
@@ -232,31 +232,18 @@ export default function EditSupplierPage() {
             <>
               {edit.sessionId && (
                 <div className="flex justify-end">
-                  <EditorToolbar
+                  <EditSessionActions
                     autosaveStatus={'idle' as AutosaveStatus}
                     sessionStatus={edit.status}
-                    onSave={async () => { await edit.save() }}
                     onCancel={edit.cancel}
                     cancelHref={ap('/admin/suppliers')}
-                    hideSave
+                    draft={hasDraft}
                   />
                 </div>
               )}
               <PageHeader back={{ href: listHref, label: 'Suppliers' }} title={hasDraft ? 'Edit Draft' : 'Edit Supplier'} description={form.name} />
               {hasDraft && (
-                <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Draft pending</p>
-                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-                      Changes are saved to draft. The live supplier stays unchanged until you publish.
-                    </p>
-                  </div>
-                  <RequireWrite scope="inventory">
-                    <button type="button" onClick={discardDraft} className="text-xs text-amber-600 hover:underline ml-4">
-                      Discard draft
-                    </button>
-                  </RequireWrite>
-                </div>
+                <DraftNotice state="draft" onDiscard={discardDraft} />
               )}
             </>
           }

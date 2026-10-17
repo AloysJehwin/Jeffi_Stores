@@ -5,7 +5,7 @@ import { query, queryOne, queryMany, queryCount } from '@/lib/shared/db'
 import CouponForm from '../../CouponForm'
 import CouponEligibleUsersClient from './CouponEligibleUsersClient'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
-import { Badge, Card, FormPage, PageHeader } from '@/components/admin/kit'
+import { Badge, Card, DraftActionNotice, FormPage, PageHeader } from '@/components/admin/kit'
 import { updateCoupon } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -175,23 +175,7 @@ export default async function EditCouponPage({
         }
       >
         {isDraft && (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Draft pending</p>
-              <p className="text-xs text-foreground-muted mt-0.5">
-                Changes are saved to draft. The live coupon stays unchanged until you publish.
-              </p>
-            </div>
-            <form action={updateCoupon.bind(null, id)}>
-              <input type="hidden" name="intent" value="discard" />
-              <button
-                type="submit"
-                className="control-sm border border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
-              >
-                Discard draft
-              </button>
-            </form>
-          </div>
+          <DraftActionNotice action={updateCoupon.bind(null, id)} />
         )}
 
         <CouponForm

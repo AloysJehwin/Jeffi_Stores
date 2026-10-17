@@ -6,10 +6,9 @@ import { ap } from '@/lib/shared/admin-path'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
 import AIFillForm from './AIFillForm'
-import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
-import { FormButton, FormField, FormFooter, FormGrid, FormSection, TextArea, TextInput, NumberInput, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { EditSessionActions, FormButton, FormField, FormFooter, FormGrid, FormSection, TextArea, TextInput, NumberInput, fieldInputCls, useActionToast } from '@/components/admin/kit'
 
 interface BrandFormProps {
   action: (formData: FormData) => Promise<void>
@@ -90,13 +89,12 @@ export default function BrandForm({
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       {edit.sessionId && (
         <div className="flex justify-end">
-          <EditorToolbar
+          <EditSessionActions
             autosaveStatus={'idle' as AutosaveStatus}
             sessionStatus={edit.status}
-            onSave={async () => { await edit.save() }}
             onCancel={edit.cancel}
             cancelHref={ap('/admin/brands')}
-            hideSave
+            draft={isDraft}
           />
         </div>
       )}

@@ -4,7 +4,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne } from '@/lib/shared/db'
 import BrandForm from '@/components/admin/BrandForm'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
-import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
+import { Badge, DraftActionNotice, FormPage, PageHeader } from '@/components/admin/kit'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { hasScope } from '@/lib/auth/scopes'
 import { updateBrand } from './actions'
@@ -63,26 +63,8 @@ export default async function EditBrandPage({
           />
         }
       >
-        {isDraft && (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Draft pending</p>
-              <p className="text-xs text-foreground-muted mt-0.5">Changes are saved to draft. The live brand stays unchanged until you publish.</p>
-            </div>
-            <form action={updateBrand.bind(null, id)}>
-              <input type="hidden" name="intent" value="discard" />
-              <button type="submit" className="control-sm border border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10">
-                Discard draft
-              </button>
-            </form>
-          </div>
-        )}
-
-        {isCreateDraft && (
-          <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">New brand — draft</p>
-            <p className="text-xs text-foreground-muted mt-0.5">This brand is not on the live list yet. Save keeps it a draft; Publish makes it live.</p>
-          </div>
+        {(isDraft || isCreateDraft) && (
+          <DraftActionNotice action={isDraft ? updateBrand.bind(null, id) : undefined} />
         )}
 
         <BrandForm

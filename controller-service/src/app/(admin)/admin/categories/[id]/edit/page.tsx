@@ -4,7 +4,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { getAllCategories } from '@/lib/queries'
 import { queryOne } from '@/lib/shared/db'
 import CategoryForm from '@/components/admin/CategoryForm'
-import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
+import { Badge, DraftActionNotice, FormPage, PageHeader } from '@/components/admin/kit'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { updateCategory } from './actions'
 
@@ -60,22 +60,8 @@ export default async function EditCategoryPage({
         />
       }
     >
-      {isCreateDraft && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-foreground">
-          This category is not on the live list yet. Save keeps it a draft; Publish makes it live.
-        </div>
-      )}
-
-      {isDraft && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-foreground">Changes are saved to draft. The live category stays unchanged until you publish.</p>
-          <form action={updateCategory.bind(null, id)}>
-            <input type="hidden" name="intent" value="discard" />
-            <button type="submit" className="control-sm border border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10">
-              Discard draft
-            </button>
-          </form>
-        </div>
+      {(isDraft || isCreateDraft) && (
+        <DraftActionNotice action={isDraft ? updateCategory.bind(null, id) : undefined} />
       )}
 
       <CategoryForm
