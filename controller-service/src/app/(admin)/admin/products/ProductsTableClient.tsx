@@ -1,5 +1,6 @@
 'use client'
 
+import { pageHrefFrom, type PageUrls } from '@/lib/admin/page-urls'
 import { useState } from 'react'
 import { useHasScope } from '@/contexts/AdminScopesContext'
 import Link from 'next/link'
@@ -22,7 +23,7 @@ interface Props {
   total: number
   page: number
   pageSize: number
-  pageHref: (p: number) => string
+  pageUrls: PageUrls
   backUrl?: string
   isSuperAdmin?: boolean
   canWrite?: boolean
@@ -122,7 +123,7 @@ export default function ProductsTableClient({
   total,
   page,
   pageSize,
-  pageHref,
+  pageUrls,
   backUrl = '/admin/products',
   isSuperAdmin = false,
   canWrite = false,
@@ -299,7 +300,7 @@ export default function ProductsTableClient({
         total={total}
         page={page}
         pageSize={pageSize}
-        pageHref={pageHref}
+        pageHref={pageHrefFrom(pageUrls)}
         onRowClick={setSelected}
         mobile={<ProductsMobileList products={products} featuredCount={featuredCount} backUrl={backUrl} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />}
         empty={{ title: 'No products found.', body: 'Try clearing a filter or add a new product.' }}
