@@ -1,0 +1,17 @@
+[Unit]
+Description=Razer image server (A1111-compatible, SDXL-Turbo) for the AI gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=aloysjehwin
+WorkingDirectory=/opt/razer-sd
+Environment=HF_HUB_OFFLINE=1
+Environment=HF_HOME=/home/aloysjehwin/.cache/huggingface
+Environment=PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+ExecStart=/opt/razer-sd/venv/bin/python -m uvicorn sd_server:app --host 0.0.0.0 --port 7860 --workers 1
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

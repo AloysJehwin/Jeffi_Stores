@@ -1,19 +1,18 @@
 import { Suspense } from 'react'
-import Link from 'next/link'
+import { listKey } from '@/lib/admin/list-key'
+import { Plus } from 'lucide-react'
+import { TabAction } from '@/components/admin/channels/ui'
 import { headers } from 'next/headers'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { hasScope } from '@/lib/auth/scopes'
 import { queryMany, queryCount } from '@/lib/shared/db'
-import AdminFilters from '@/components/admin/AdminFilters'
-import Pagination from '@/components/admin/Pagination'
-import CouponTableRow from '@/components/admin/CouponTableRow'
-import CouponsMobileList from './_components/CouponsMobileList'
-import SortableHeader from '@/components/admin/SortableHeader'
-import { sortOptions } from '@/components/admin/sortOptions'
-import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
-import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import CouponsTable, { type CouponRow } from './_components/CouponsTable'
+import { DataToolbar, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import DraftRowActions from '@/components/admin/DraftRowActions'
+import { resolveListTab } from '@/lib/overviews/marketing'
+import OverviewTabs from './_components/OverviewTabs'
+import CouponsOverview from './_components/CouponsOverview'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -77,52 +76,78 @@ async function getFilteredCoupons(filters: {
   return { coupons, total }
 }
 
-export default function CouponsPage({
+const LIST_KEYS = ['is_active', 'search', 'campaign', 'page', 'sort', 'dir'] as const
+
+export default async function CouponsPage({
   searchParams,
 }: {
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
+  const sp = await searchParams
+  const tab = resolveListTab(sp, LIST_KEYS)
+  const host = await getHost()
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Coupons</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Manage discount coupons</p>
-        </div>
-        <Suspense fallback={null}>
-          <AddCouponButton />
-        </Suspense>
-      </div>
+    <PageBody>
+      <PageHeader title="Coupons" description="Manage discount coupons" />
 
-      <Suspense fallback={<AdminStatsSkeleton cards={4} gridClass="grid-cols-2 sm:grid-cols-4" />}>
-        <CouponsStats />
-      </Suspense>
-
-      <AdminFilters
-        filters={[
-          {
-            name: 'is_active',
-            label: 'Status',
-            options: [
-              { value: 'true', label: 'Active' },
-              { value: 'false', label: 'Inactive' },
-            ],
-          },
-          {
-            name: 'campaign',
-            label: 'Source',
-            options: [
-              { value: '__manual__', label: 'Manual' },
-              { value: 'winback_90', label: 'Winback 90d' },
-              { value: 'winback_180', label: 'Winback 180d' },
-            ],
-          },
-        ]}
-        searchPlaceholder="Search by code or description..."
-        suggestType="coupons"
+      <OverviewTabs
+        basePath={ap('/admin/coupons', host)}
+        active={tab}
+        sp={sp}
+        listLabel="Coupons"
+        actions={
+          <Suspense fallback={null}>
+            <AddCouponButton />
+          </Suspense>
+        }
       />
 
-      <CouponsListSection searchParams={searchParams} />
+      {tab === 'overview' ? (
+        <Suspense fallback={null}>
+          <CouponsOverview />
+        </Suspense>
+      ) : (
+        <>
+          <Suspense fallback={<KpiRowSkeleton />}>
+            <CouponsStats />
+          </Suspense>
+
+          <DataToolbar
+            search={{ placeholder: 'Search by code or description...', param: 'search', suggestType: 'coupons' }}
+            filters={[
+              {
+                name: 'is_active',
+                label: 'Status',
+                options: [
+                  { value: 'true', label: 'Active' },
+                  { value: 'false', label: 'Inactive' },
+                ],
+              },
+              {
+                name: 'campaign',
+                label: 'Source',
+                options: [
+                  { value: '__manual__', label: 'Manual' },
+                  { value: 'winback_90', label: 'Winback 90d' },
+                  { value: 'winback_180', label: 'Winback 180d' },
+                ],
+              },
+            ]}
+          />
+
+          <CouponsListSection searchParams={searchParams} />
+        </>
+      )}
+    </PageBody>
+  )
+}
+
+function KpiRowSkeleton() {
+  return (
+    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6 animate-pulse">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
+      ))}
     </div>
   )
 }
@@ -135,14 +160,9 @@ async function AddCouponButton() {
   const canWrite = hasScope(role, scopes, 'coupons:write')
   if (!canWrite) return null
   return (
-    <div className="hidden md:block">
-      <Link
-        href={ap('/admin/coupons/add', host)}
-        className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-      >
-        Add New Coupon
-      </Link>
-    </div>
+    <span className="hidden md:inline-flex">
+      <TabAction href={ap('/admin/coupons/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Coupon" />
+    </span>
   )
 }
 
@@ -181,30 +201,18 @@ async function CouponsStats() {
   const campaignCoupons = (allStats.coupons as { auto_generated: boolean }[]).filter(c => c.auto_generated).length
 
   return (
-    <div className="animate-fade-in">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCoupons}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Active</p>
-          <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-2">{activeCoupons}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Expired</p>
-          <p className="text-2xl sm:text-3xl font-bold text-red-500 mt-2">{expiredCoupons}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">From Campaigns</p>
-          <p className="text-2xl sm:text-3xl font-bold text-purple-600 mt-2">{campaignCoupons}</p>
-        </div>
-      </div>
+    <div className="animate-fade-in space-y-4">
+      <KpiGrid>
+        <Kpi label="Total" value={totalCoupons.toLocaleString('en-IN')} highlight />
+        <Kpi label="Active" value={activeCoupons.toLocaleString('en-IN')} />
+        <Kpi label="Expired" value={expiredCoupons.toLocaleString('en-IN')} />
+        <Kpi label="From campaigns" value={campaignCoupons.toLocaleString('en-IN')} />
+      </KpiGrid>
 
       {pendingDraftsCount > 0 && (
-        <details className="mb-6 group">
-          <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
-            <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+        <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
+          <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
+            <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
               <svg
                 className="w-4 h-4 transition-transform group-open:rotate-90"
                 fill="none"
@@ -215,10 +223,10 @@ async function CouponsStats() {
               </svg>
               Pending Drafts ({pendingDraftsCount})
             </span>
-            <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
+            <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
           </summary>
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
-            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+          <div className="border-t border-amber-500/30 overflow-hidden">
+            <div className="divide-y divide-amber-500/20">
               {/* Create-drafts: brand-new coupons not yet on the live list. Publish activates them. */}
               {createDrafts.map(d =>
                 canWrite ? (
@@ -239,7 +247,7 @@ async function CouponsStats() {
                   />
                 ) : (
                   <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 font-mono truncate">
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400 font-mono truncate">
                       {d.code}
                     </p>
                     <span className="text-xs text-amber-600 dark:text-amber-400">new</span>
@@ -261,7 +269,7 @@ async function CouponsStats() {
                   />
                 ) : (
                   <div key={d.coupon_id} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 font-mono truncate">
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400 font-mono truncate">
                       {d.code}
                     </p>
                   </div>
@@ -280,9 +288,9 @@ async function CouponsStats() {
 // while the stats + filters above stay mounted.
 async function CouponsListSection({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
-  const key = JSON.stringify(resolvedSearchParams)
+  const key = listKey(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
+    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={7} />}>
       <CouponsListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )
@@ -293,11 +301,6 @@ async function CouponsListContent({
 }: {
   resolvedSearchParams: { [key: string]: string | undefined }
 }) {
-  const host = await getHost()
-  const h = await headers()
-  const role = h.get('x-user-role') || ''
-  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
-  const canWrite = hasScope(role, scopes, 'coupons:write')
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
@@ -312,132 +315,25 @@ async function CouponsListContent({
     dir,
   })
 
-  const buildUrl = (p: number) => {
-    const params = new URLSearchParams()
-    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (campaign) params.set('campaign', campaign)
-    if (sort) params.set('sort', sort)
-    if (dir) params.set('dir', dir)
-    if (p > 1) params.set('page', String(p))
-    const qs = params.toString()
-    return ap(`/admin/coupons${qs ? `?${qs}` : ''}`, host)
-  }
-
   const currentListUrl = (() => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ tab: 'list' })
     if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
     if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (campaign) params.set('campaign', campaign)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (page > 1) params.set('page', String(page))
-    const qs = params.toString()
-    return `/admin/coupons${qs ? `?${qs}` : ''}`
+    return `/admin/coupons?${params}`
   })()
 
   return (
-    <>
-      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mt-4">
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary">
-              <tr>
-                <SortableHeader
-                  label="Code"
-                  column="code"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Type"
-                  column="type"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Value"
-                  column="value"
-                  options={sortOptions('number')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Min Purchase"
-                  column="min_purchase"
-                  options={sortOptions('number')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Usage"
-                  column="usage"
-                  options={sortOptions('number')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Valid Until"
-                  column="valid_until"
-                  options={sortOptions('date')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Status"
-                  column="status"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {(coupons as CouponRow[]).map(c => (
-                <CouponTableRow key={c.id} coupon={c} backUrl={currentListUrl} canWrite={canWrite} />
-              ))}
-              {coupons.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-foreground-muted">
-                    No coupons found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile cards */}
-        <div className="md:hidden p-4">
-          {coupons.length > 0 ? (
-            <CouponsMobileList coupons={coupons as CouponRow[]} backUrl={currentListUrl} />
-          ) : (
-            <p className="text-center text-foreground-muted text-sm">No coupons found</p>
-          )}
-        </div>
-      </div>
-
-      <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-    </>
+    <CouponsTable
+      coupons={coupons as CouponRow[]}
+      total={total}
+      page={page}
+      pageSize={PAGE_SIZE}
+      query={{ is_active: resolvedSearchParams.is_active, search: resolvedSearchParams.search, campaign, sort, dir }}
+      backUrl={currentListUrl}
+    />
   )
-}
-
-interface CouponRow {
-  id: string
-  code: string
-  description: string | null
-  discount_type: string
-  discount_value: number
-  min_purchase_amount: number | null
-  usage_limit: number | null
-  times_used: number
-  valid_until: string | null
-  is_active: boolean
-  auto_generated: boolean
-  generated_for_campaign: string | null
 }

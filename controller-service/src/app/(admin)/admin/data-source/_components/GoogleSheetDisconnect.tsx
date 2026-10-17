@@ -1,13 +1,16 @@
 'use client'
 
 import { useState } from 'react'
+import { Unplug } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 
 export default function GoogleSheetDisconnect({
   onDone,
+  disabled,
 }: {
   onDone: (result: { kind: 'ok' | 'err'; text: string }) => void
+  disabled?: boolean
 }) {
   const canWrite = useCanWrite('products')
   const { showConfirm } = useToast()
@@ -17,8 +20,7 @@ export default function GoogleSheetDisconnect({
   const disconnect = async () => {
     const ok = await showConfirm({
       title: 'Disconnect Google Sheet?',
-      message:
-        'Syncing stops. Products synced from the sheet stay in your store and become manually managed, so a sheet you connect later will not remove them.',
+      message: 'Syncing stops. Products synced from the sheet stay in your store and become manually managed, so a sheet you connect later only ever manages the rows it lists.',
       confirmText: 'Disconnect',
       cancelText: 'Cancel',
       type: 'warning',
@@ -30,24 +32,25 @@ export default function GoogleSheetDisconnect({
       const body = await res.json().catch(() => ({}))
       onDone(
         res.ok
-          ? {
-              kind: 'ok',
-              text: `Google Sheet disconnected. ${body.released ?? 0} synced product(s) are now managed manually.`,
-            }
-          : { kind: 'err', text: body.error || `Disconnect failed (${res.status})` }
+          ? { kind: 'ok', text: `Google Sheet disconnected. ${body.released ?? 0} synced product(s) are now managed manually.` }
+          : { kind: 'err', text: body.error || `Could not disconnect (${res.status}).` }
       )
+    } catch {
+      onDone({ kind: 'err', text: 'Disconnect failed: the connection dropped. Try again.' })
     } finally {
       setWorking(false)
     }
   }
 
+  const busy = working || disabled
   return (
     <button
+      type="button"
       onClick={disconnect}
-      disabled={working}
-      className={`inline-flex items-center rounded-md border border-red-300 px-4 h-control text-sm font-medium text-red-600 ${working ? 'opacity-60 cursor-wait' : 'hover:bg-red-50 dark:hover:bg-red-900/20'}`}
+      disabled={busy}
+      className={`inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-1.5 text-sm font-medium text-red-500 whitespace-nowrap ${busy ? 'opacity-60 cursor-wait' : 'hover:bg-red-500/10'}`}
     >
-      {working ? 'Disconnecting…' : 'Disconnect'}
+      <Unplug className="w-4 h-4" /> {working ? 'Disconnecting...' : 'Disconnect'}
     </button>
   )
 }

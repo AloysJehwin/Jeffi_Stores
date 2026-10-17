@@ -1,6 +1,7 @@
 import { Package, Star } from 'lucide-react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import { badgeCls } from '@/components/admin/kit'
 
 interface Props {
   product: any
@@ -37,12 +38,12 @@ export default function ProductMobileDetailBody({ product: p }: Props) {
 
       <div className="flex flex-wrap gap-2">
         <span
-          className={`px-2 py-0.5 text-xs font-semibold rounded-full ${p.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}
+          className={badgeCls(p.is_active ? 'green' : 'muted')}
         >
           {p.is_active ? 'Active' : 'Inactive'}
         </span>
         {p.is_featured && (
-          <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 inline-flex items-center gap-1">
+          <span className={`${badgeCls('amber')} inline-flex items-center gap-1`}>
             <Star className="w-3 h-3 fill-current" /> Featured
           </span>
         )}
@@ -52,7 +53,7 @@ export default function ProductMobileDetailBody({ product: p }: Props) {
       <div>
         <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Price</p>
         {p.has_variants ? (
-          <p className="text-xl font-bold text-primary-500">
+          <p className="text-xl font-bold text-foreground">
             From Rs.{' '}
             {Number(p.variant_min_price || 0).toLocaleString('en-IN', {
               minimumFractionDigits: 2,
@@ -61,7 +62,7 @@ export default function ProductMobileDetailBody({ product: p }: Props) {
           </p>
         ) : (
           <div className="flex items-baseline gap-3">
-            <p className="text-xl font-bold text-primary-500">
+            <p className="text-xl font-bold text-foreground">
               Rs.{' '}
               {Number(p.base_price || 0).toLocaleString('en-IN', {
                 minimumFractionDigits: 2,

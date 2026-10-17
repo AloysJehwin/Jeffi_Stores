@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { credentialOwnerId } from '@/lib/integrations/owner'
 import { currentAdminBaseUrlAsync } from '@/lib/catalog/brand'
 import { signAdminState } from '@/lib/shared/oauth-state'
 import { oauthProviderInfo, oauthRedirectUri } from '@/lib/integrations/oauth'
@@ -14,12 +14,11 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
-  const tenant = await resolveTenant()
-  if (!tenant) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
+  const tenant = { tenantId: await credentialOwnerId() }
 
   const info = oauthProviderInfo('amazon_seller')
   if (!info.enabled) {
-    const back = `${await currentAdminBaseUrlAsync()}/admin/merchant-sync`
+    const back = `${await currentAdminBaseUrlAsync()}/admin/amazon`
     return NextResponse.redirect(`${back}?connected=0&provider=amazon&error=not_configured`)
   }
 

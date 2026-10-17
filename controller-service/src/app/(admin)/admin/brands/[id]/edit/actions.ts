@@ -8,7 +8,8 @@ import { query, queryOne, withTransaction } from '@/lib/shared/db'
 import type { PoolClient } from 'pg'
 
 export async function updateBrand(brandId: string, formData: FormData) {
-  const name = formData.get('name') as string
+  // The discard-draft form posts only `intent`, so name is missing there.
+  const name = ((formData.get('name') as string | null) ?? '').trim()
   const slug =
     (formData.get('slug') as string) ||
     name

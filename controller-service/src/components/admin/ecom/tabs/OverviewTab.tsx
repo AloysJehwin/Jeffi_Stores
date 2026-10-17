@@ -39,8 +39,8 @@ export default function OverviewTab({
       <div
         className={`rounded-xl border p-5 ${
           serving
-            ? 'border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20'
-            : 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20'
+            ? 'border-green-500/40 bg-green-500/5'
+            : 'border-amber-500/40 bg-amber-500/5'
         }`}
       >
         <div className="flex items-center gap-2.5 flex-wrap">
@@ -108,7 +108,7 @@ export default function OverviewTab({
                   href={`https://${host}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-xs text-accent-600 dark:text-accent-400 hover:underline break-all"
+                  className="font-mono text-xs text-accent-600 hover:underline break-all"
                 >
                   {host} ↗
                 </a>
@@ -160,7 +160,7 @@ function ApiOverview({ tenant: t, owners, approvals }: { tenant: TenantDetail; o
   const statusOf = (s: string) => approvals.find(a => a.service === s)?.status ?? 'approved'
   return (
     <div className="space-y-6 min-w-0">
-      <div className="rounded-xl border border-sky-300 dark:border-sky-700 bg-sky-50 dark:bg-sky-900/20 p-5">
+      <div className="rounded-xl border border-sky-500/40 bg-sky-500/5 p-5">
         <span className="font-semibold text-foreground">API workspace</span>
         <span className="ml-2 text-sm text-foreground-muted">Uses the Messaging / Documents APIs only — there is no store, database or instance to manage. It can add a store later from its console.</span>
       </div>

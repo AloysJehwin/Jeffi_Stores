@@ -117,7 +117,7 @@ export default function ScanActionPopup({ role, scopes, host }: { role: string; 
         {
           label: 'New PO',
           scope: 'inventory:write',
-          path: `/admin/inventory/po/new?${pq}`,
+          path: `/admin/purchase-orders/new?${pq}`,
           d: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4',
         },
         {
@@ -129,7 +129,7 @@ export default function ScanActionPopup({ role, scopes, host }: { role: string; 
         {
           label: 'View Stock',
           scope: 'inventory:read',
-          path: `/admin/inventory?search=${encodeURIComponent(product.sku)}`,
+          path: `/admin/inventory?tab=ledger&ledger_search=${encodeURIComponent(product.sku)}`,
           d: 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4',
         },
       ].filter(a => hasScope(role, scopes, a.scope))

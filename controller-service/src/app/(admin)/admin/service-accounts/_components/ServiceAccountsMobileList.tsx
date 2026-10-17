@@ -99,8 +99,8 @@ export default function ServiceAccountsMobileList({ accounts, scopeLabels, canWr
                 <span
                   className={`flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${
                     sa.is_revoked
-                      ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                      : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                      ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                      : 'bg-green-500/10 text-green-700 dark:text-green-400'
                   }`}
                 >
                   {sa.is_revoked ? 'Revoked' : 'Active'}
@@ -138,8 +138,8 @@ export default function ServiceAccountsMobileList({ accounts, scopeLabels, canWr
               <span
                 className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                   selected.is_revoked
-                    ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                    : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                    ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                    : 'bg-green-500/10 text-green-700 dark:text-green-400'
                 }`}
               >
                 {selected.is_revoked ? 'Revoked' : 'Active'}

@@ -1,6 +1,7 @@
 import { query, queryOne } from '@/lib/shared/db'
 import { publishProductDraft, OpenOrdersBlockError } from '@/lib/catalog/product-draft'
-import { fetchRemoteImage, uploadGalleryImage } from '@/lib/shared/s3'
+import { uploadGalleryImage } from '@/lib/shared/s3'
+import { fetchImportImage } from '@/lib/import/image-url'
 import { parseWorkbook } from '@/lib/import/parse'
 import { groupRows, type ProductGroup } from '@/lib/import/validate-row'
 import {
@@ -9,11 +10,13 @@ import {
   buildSubVariants,
   hasSubVariants,
   backfillBlankOptionalFields,
+  fillCreateDefaults,
   type ResolvedIds,
   type DraftImage,
 } from '@/lib/import/to-draft'
-import type { RowResult, ImageProgress } from '@/lib/import/jobs'
+import type { RowResult, ImageProgress, ImportSource } from '@/lib/import/jobs'
 import { DIGITAL_UNIT_MESSAGE } from '@/lib/catalog/digital-units'
+import { retireProduct } from '@/lib/catalog/product-delete'
 
 export interface ImportOutcome {
   totalRows: number
@@ -28,6 +31,8 @@ export interface ImportOutcome {
 }
 
 export interface RunOptions {
+  // google_sheet takes ownership of every product it touches (data_source); upload leaves it alone.
+  source?: ImportSource
   // Called after each group so the worker can persist incremental progress.
   onProgress?: (partial: {
     processed: number
@@ -57,21 +62,35 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
     errors = 0
 
   for (const o of orphans) {
-    rowResults.push({ row: o.rowNumber, sku: null, outcome: 'error', message: o.message })
+    rowResults.push({ row: o.rowNumber, sheet: o.sheet, sku: o.sku ?? null, outcome: 'error', message: o.message })
     errors++
   }
+  const source: ImportSource = opts.source ?? 'google_sheet'
+  // Progress is a full row_results rewrite, so persist at most every 2s (and always at the end).
+  let lastProgress = 0
+
+  let notNull: string[] | null = null
+  const notNullKeys = async () =>
+    (notNull ??= await query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = current_schema() AND table_name = 'products' AND is_nullable = 'NO'`
+    )
+      .then(r => r.rows.map(x => x.column_name))
+      .catch(() => ['discount_pct', 'extra_delivery_days', 'handling_days', 'sort_order']))
 
   const catCache = new Map<string, string | null>()
   const brandCache = new Map<string, string | null>()
   const supplierCache = new Map<string, string | null>()
 
-  let processed = 0
+  let processed = orphans.length
   for (const group of groups) {
     processed++
+    const at = { row: group.rowNumber, sheet: group.sheet }
+    let createdId: string | null = null
     try {
       if (group.errors.length > 0) {
         rowResults.push({
-          row: group.rowNumber,
+          ...at,
           sku: group.sku || null,
           outcome: 'error',
           message: group.errors.join('; '),
@@ -82,25 +101,29 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
 
       const ids = await resolveRefs(group, catCache, brandCache, supplierCache)
       if (ids.error) {
-        rowResults.push({ row: group.rowNumber, sku: group.sku, outcome: 'error', message: ids.error })
+        rowResults.push({ ...at, sku: group.sku, outcome: 'error', message: ids.error })
         errors++
         continue
       }
 
-      const { productId, isNew, liveRow } = await findOrCreateProduct(group)
+      const { productId, isNew, liveRow } = await findOrCreateProduct(group, source)
+      if (isNew) createdId = productId
 
       const images = await fetchImages(group, imageProgress, rowResults)
 
       // Blank optional cells keep the existing product's values (not NULL) on re-import (#492).
-      const draftFields = backfillBlankOptionalFields(buildFields(group, ids), liveRow)
+      const draftFields = isNew
+        ? fillCreateDefaults(buildFields(group, ids), liveRow, await notNullKeys())
+        : backfillBlankOptionalFields(buildFields(group, ids), liveRow)
       if (group.variants.length > 0 && (draftFields.is_digital === true || draftFields.is_digital === 'true')) {
         rowResults.push({
-          row: group.rowNumber,
+          ...at,
           sku: group.sku,
           outcome: 'error',
           message: `digital products cannot have variant or sub-variant rows (${DIGITAL_UNIT_MESSAGE})`,
         })
         errors++
+        await discardSkeleton(createdId)
         continue
       }
       await writeDraft(productId, draftFields, buildVariants(group), images, [])
@@ -122,20 +145,20 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
         }
       }
 
-      for (const w of group.warnings)
-        rowResults.push({ row: group.rowNumber, sku: group.sku, outcome: 'warning', message: w })
-      rowResults.push({ row: group.rowNumber, sku: group.sku, outcome: isNew ? 'created' : 'updated' })
+      for (const w of group.warnings) rowResults.push({ ...at, sku: group.sku, outcome: 'warning', message: w })
+      rowResults.push({ ...at, sku: group.sku, outcome: isNew ? 'created' : 'updated' })
       if (isNew) created++
       else updated++
       seenProducts.push({ productId, sku: group.sku })
     } catch (err: unknown) {
-      const message =
-        err instanceof OpenOrdersBlockError ? err.message : err instanceof Error ? err.message : 'Unknown error'
-      rowResults.push({ row: group.rowNumber, sku: group.sku || null, outcome: 'error', message })
+      rowResults.push({ ...at, sku: group.sku || null, outcome: 'error', message: rowErrorMessage(err) })
       errors++
+      // A product this run created but could not publish is removed, so a failed row leaves nothing behind.
+      await discardSkeleton(createdId)
     }
 
-    if (opts.onProgress) {
+    if (opts.onProgress && (Date.now() - lastProgress > 2000 || processed === groups.length + orphans.length)) {
+      lastProgress = Date.now()
       await opts.onProgress({ processed, created, updated, errors, rowResults, imageProgress })
     }
   }
@@ -149,6 +172,33 @@ export async function runImport(buf: Buffer, opts: RunOptions = {}): Promise<Imp
     imageProgress,
     seenProducts,
   }
+}
+
+async function discardSkeleton(productId: string | null): Promise<void> {
+  if (!productId) return
+  await retireProduct(productId).catch(e =>
+    console.error('[product-import] could not remove an unpublished product', { productId, message: (e as Error)?.message })
+  )
+}
+
+// A publish failure as a message an admin can fix; database internals are logged, not shown.
+export function rowErrorMessage(err: unknown): string {
+  if (err instanceof OpenOrdersBlockError) return err.message
+  const e = err as { code?: unknown; message?: unknown; constraint?: unknown; detail?: unknown }
+  if (typeof e?.code === 'string' && /^[0-9A-Z]{5}$/.test(e.code)) {
+    console.error('[product-import] row failed', { code: e.code, constraint: e.constraint, message: e.message })
+    if (e.code === '23505') {
+      const what = String(e.constraint ?? '').includes('sku') ? 'SKU' : 'value'
+      return `this ${what} is already used by another product or variant`
+    }
+    if (e.code === '23514') return `a value is not allowed here (${String(e.constraint ?? 'check failed')})`
+    if (e.code === '23502') return 'a required value is missing'
+    if (e.code === '22P02' || e.code === '22007' || e.code === '22008') return 'a value has the wrong format'
+    if (e.code === '22003') return 'a number is too large'
+    if (e.code === '22001') return 'a text value is too long'
+    return 'the product could not be saved (database error)'
+  }
+  return err instanceof Error && err.message ? err.message : 'Unknown error'
 }
 
 interface ResolvedRefs extends ResolvedIds {
@@ -219,7 +269,8 @@ async function lookup(cache: Map<string, string | null>, name: string, sql: stri
 // Upsert by SKU: existing product -> update; new SKU -> skeleton row (publish then fills
 // every field). Mirrors the skeleton create in the products/draft route.
 async function findOrCreateProduct(
-  group: ProductGroup
+  group: ProductGroup,
+  source: ImportSource
 ): Promise<{ productId: string; isNew: boolean; liveRow: Record<string, unknown> | null }> {
   // Dedup by SKU regardless of data_source: an existing product with this SKU (manual OR
   // sheet-sourced) is UPDATED, never duplicated. A found manual product is also promoted to
@@ -227,7 +278,9 @@ async function findOrCreateProduct(
   // The full live row is returned so blank optional cells can preserve its values on re-import (#492).
   const existing = await queryOne<Record<string, unknown>>('SELECT * FROM products WHERE sku = $1 LIMIT 1', [group.sku])
   if (existing) {
-    await query(`UPDATE products SET data_source = 'google_sheet' WHERE id = $1`, [existing.id as string])
+    if (source === 'google_sheet') {
+      await query(`UPDATE products SET data_source = 'google_sheet' WHERE id = $1`, [existing.id as string])
+    }
     return { productId: existing.id as string, isNew: false, liveRow: existing }
   }
 
@@ -238,13 +291,15 @@ async function findOrCreateProduct(
       .replace(/^-|-$/g, '') +
     '-' +
     Date.now().toString(36)
-  const created = await queryOne<{ id: string }>(
-    `INSERT INTO products (name, slug, sku, base_price, mrp, gst_percentage, is_active, is_featured, has_variants, data_source)
-     VALUES ($1, $2, $3, 0, 0, 18, false, false, false, 'google_sheet') RETURNING id`,
-    [group.name, slug, group.sku]
+  const created = await queryOne<Record<string, unknown>>(
+    // is_draft like the editor's skeleton, so the first publish makes the product live.
+    `INSERT INTO products (name, slug, sku, base_price, mrp, gst_percentage, is_active, is_draft, is_featured, has_variants, data_source)
+     VALUES ($1, $2, $3, 0, 0, 18, false, true, false, false, $4) RETURNING *`,
+    [group.name, slug, group.sku, source === 'google_sheet' ? 'google_sheet' : 'import']
   )
   if (!created) throw new Error('failed to create product row')
-  return { productId: created.id, isNew: true, liveRow: null }
+  // liveRow for a new product is its skeleton: only its DB defaults are used (fillCreateDefaults).
+  return { productId: created.id as string, isNew: true, liveRow: created }
 }
 
 async function fetchImages(
@@ -257,7 +312,7 @@ async function fetchImages(
   for (let i = 0; i < group.imageUrls.length; i++) {
     const url = group.imageUrls[i]
     try {
-      const buffer = await fetchRemoteImage(url)
+      const buffer = await fetchImportImage(url)
       const fileName = safeFileName(url)
       const r = await uploadGalleryImage(buffer, fileName)
       images.push({
@@ -279,7 +334,7 @@ async function fetchImages(
       // Image failure degrades to a row warning — the product still imports (locked).
       progress.failed++
       const msg = err instanceof Error ? err.message : 'fetch failed'
-      rowResults.push({ row: group.rowNumber, sku: group.sku, outcome: 'warning', message: `image ${url}: ${msg}` })
+      rowResults.push({ row: group.rowNumber, sheet: group.sheet, sku: group.sku, outcome: 'warning', message: `image ${url}: ${msg}` })
     }
   }
   return images
@@ -343,7 +398,7 @@ async function buildVariantImages(
     let order = 0
     for (const url of urls) {
       try {
-        const buffer = await fetchRemoteImage(url)
+        const buffer = await fetchImportImage(url)
         const r = await uploadGalleryImage(buffer, safeFileName(url))
         out.push({
           id: `draft-vi-${variantId}-${order}`,
@@ -368,6 +423,7 @@ async function buildVariantImages(
         const msg = err instanceof Error ? err.message : 'fetch failed'
         rowResults.push({
           row: group.rowNumber,
+          sheet: group.sheet,
           sku: group.sku,
           outcome: 'warning',
           message: `variant ${v.sku} image ${url}: ${msg}`,

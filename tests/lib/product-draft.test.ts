@@ -321,7 +321,7 @@ describe('publishProductDraft', () => {
         slug: 's',
         base_price: '0',
         is_featured: false,
-        has_variants: false,
+        has_variants: true,
         fragile: false,
         hazardous: false,
         flammable: false,
@@ -623,7 +623,7 @@ describe('publishProductDraft', () => {
         slug: 's',
         base_price: '0',
         is_featured: false,
-        has_variants: false,
+        has_variants: true,
         fragile: false,
         hazardous: false,
         flammable: false,
@@ -1042,7 +1042,7 @@ describe('publishProductDraft', () => {
   it('inserts sub-variant-level unit via savepoint (success path)', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: baseFields(),
+      fields: baseFields({ has_variants: true }),
       variants: [],
       images: [],
       sub_variants: [],
@@ -1065,7 +1065,7 @@ describe('publishProductDraft', () => {
   it('sub-variant-level unit unique-violation → rolls back and updates in place', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: baseFields(),
+      fields: baseFields({ has_variants: true }),
       variants: [],
       images: [],
       sub_variants: [],
@@ -1101,7 +1101,7 @@ describe('publishProductDraft', () => {
   it('sub-variant-level unit non-unique error → rethrows', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: baseFields(),
+      fields: baseFields({ has_variants: true }),
       variants: [],
       images: [],
       sub_variants: [],
@@ -1131,7 +1131,7 @@ describe('publishProductDraft', () => {
   it('skips deletion of sub-variants when order_items reference them (COUNT > 0)', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: baseFields(),
+      fields: baseFields({ has_variants: true }),
       variants: [],
       images: [],
       sub_variants: [{ _seeded: true, variant_id: 'v-1', sub_variant_name: 'Red', is_active: true }],
@@ -1163,7 +1163,7 @@ describe('publishProductDraft', () => {
   it('coerces empty-string numerics to null for staged sub-variant', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: baseFields(),
+      fields: baseFields({ has_variants: true }),
       variants: [],
       images: [],
       sub_variants: [
@@ -1339,7 +1339,7 @@ describe('publishProductDraft', () => {
   it('resolves a _cleared sentinel that lacks variant_id via original_id', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: baseFields(),
+      fields: baseFields({ has_variants: true }),
       variants: [],
       images: [],
       sub_variants: [{ _cleared: true, id: 'cleared-1', original_id: '11111111-1111-4111-8111-111111111111' }],

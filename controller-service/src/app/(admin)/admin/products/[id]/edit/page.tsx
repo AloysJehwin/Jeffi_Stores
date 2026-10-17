@@ -4,7 +4,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne } from '@/lib/shared/db'
 import ProductForm from '@/components/admin/ProductForm'
-import { ChevronLeft } from 'lucide-react'
+import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { updateProduct } from './actions'
@@ -104,20 +104,43 @@ export default async function EditProductPage({
     return (variantList || []).map((v: any) => (byVariant.has(v.id) ? { ...v, sub_variants: byVariant.get(v.id) } : v))
   }
 
-  // getProduct now returns inactive variants/sub-variants too (the detail page needs them
-  // for the status toggle). The draft editor treats inactive as soft-deleted, so keep only
-  // active rows here and drop inactive sub-variants nested under an active variant.
-  const liveActiveVariants = ((product as any)?.product_variants || [])
-    .filter((v: any) => v?.is_active !== false)
-    .map((v: any) => ({
-      ...v,
-      sub_variants: Array.isArray(v?.sub_variants)
-        ? v.sub_variants.filter((sv: any) => sv?.is_active !== false)
-        : v?.sub_variants,
-    }))
+  // Inactive variants are part of the product: the editor shows them (marked Inactive) and
+  // the draft carries their is_active. Inactive sub-variants stay out (soft-deleted).
+  // "Has sub-variants" is on for a live row with active sub-variants even when the stored
+  // flag lags (rows added outside a publish); the form then trusts the flag as given.
+  const liveVariants: any[] = ((product as any)?.product_variants || []).map((v: any) => {
+    const subs = Array.isArray(v?.sub_variants) ? v.sub_variants.filter((sv: any) => sv?.is_active !== false) : []
+    return { ...v, sub_variants: subs, sub_variant_type_on: !!v?.sub_variant_type_on || subs.length > 0 }
+  })
+  const liveById = new Map(liveVariants.map(v => [v.id, v]))
+  // Draft rows override live per id; a row without is_active keeps the live status. Drafts
+  // seeded before inactive variants were included lack them: those come back from live
+  // unchanged (a missing ACTIVE variant was removed in the draft and stays removed).
+  const draftIds = new Set(((draftVariants as any[]) || []).map(v => v.id))
+  const liveOnlyInactive = draftVariants ? liveVariants.filter(v => v.is_active === false && !draftIds.has(v.id)) : []
   const mergedVariants = draftVariants
-    ? withDraftSubVariants(draftVariants as any[])
-    : withDraftSubVariants(liveActiveVariants)
+    ? withDraftSubVariants([
+        ...(draftVariants as any[]).map(v =>
+          v.is_active === true || v.is_active === false
+            ? v
+            : { ...v, is_active: liveById.get(v.id)?.is_active ?? true }
+        ),
+        ...liveOnlyInactive,
+      ])
+    : withDraftSubVariants(liveVariants)
+
+  // Those variants' live images were never staged; stage them so image edits reconcile correctly.
+  if (liveOnlyInactive.length > 0) {
+    await query(
+      `UPDATE product_drafts d SET variant_images = COALESCE(d.variant_images, '[]'::jsonb) || COALESCE(
+         (SELECT jsonb_agg(to_jsonb(vi) ORDER BY vi.display_order) FROM variant_images vi
+           WHERE vi.variant_id = ANY($2::uuid[])
+             AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(d.variant_images, '[]'::jsonb)) e
+                              WHERE e->>'variant_id' = vi.variant_id::text)), '[]'::jsonb)
+        WHERE d.product_id = $1`,
+      [id, liveOnlyInactive.map(v => v.id)]
+    )
+  }
 
   // Feed DRAFT images to the form so removals/reorders/primary changes persist across
   // reopen. The draft images carry their real `id` (kept at draft-entry + autosave),
@@ -133,7 +156,7 @@ export default async function EditProductPage({
           product_variants: mergedVariants,
           ...(draftImagesUsable ? { product_images: draftImages } : {}),
         }
-      : product
+      : { ...product, product_variants: liveVariants }
 
   // On-hand stock grains for the "assign existing stock" bootstrap. These MUST be
   // read from the LIVE product (getProduct), never from the draft merge above: the
@@ -196,37 +219,16 @@ export default async function EditProductPage({
 
   return (
     <MobileEditBlock>
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-2 mb-6 text-sm">
-        <a
-          href={ap(backUrl, host)}
-          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Products
-        </a>
-        <span className="text-border-default">/</span>
-        <span className="text-foreground font-medium">{isDraft ? 'Edit Draft' : 'Edit Product'}</span>
-      </div>
-
-      {isDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
-          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-            Edits are saved to draft. The live product stays unchanged until you publish.
-          </p>
-        </div>
-      )}
-
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
-          {isDraft ? 'Edit Draft' : 'Edit Product'}
-        </h1>
-        <p className="text-foreground-secondary mt-1">
-          {isDraft ? 'Changes are saved to the draft only' : 'Update product information'}
-        </p>
-      </div>
-
+    <FormPage
+      header={
+        <PageHeader
+          back={{ href: ap(backUrl, host), label: 'Products' }}
+          title={isDraft ? 'Edit Draft' : 'Edit Product'}
+          description={isDraft ? 'Changes are saved to the draft only' : 'Update product information'}
+          badges={isDraft ? <Badge tone="amber">Draft pending</Badge> : undefined}
+        />
+      }
+    >
       <ProductForm
         categories={categories || []}
         brands={brands || []}
@@ -244,7 +246,7 @@ export default async function EditProductPage({
         subscriptionsEnabled={flags.subscriptionsEnabled}
         digitalProductsEnabled={flags.digitalProductsEnabled}
       />
-    </div>
+    </FormPage>
     </MobileEditBlock>
   )
 }

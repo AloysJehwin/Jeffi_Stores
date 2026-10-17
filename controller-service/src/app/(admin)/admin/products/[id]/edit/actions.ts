@@ -92,6 +92,7 @@ Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai
         .join('\n')
 
       const r = await aiChat({
+        feature: 'product_copy',
         cacheNamespace,
         modelHint: 'copy',
         jsonMode: true,
@@ -242,13 +243,15 @@ export async function updateProduct(productId: string, formData: FormData): Prom
   }
   const preferredSupplierId = productSuppliers.find((s: any) => s?.is_preferred)?.supplier_id || supplierId || null
   const activeVariants = (Array.isArray(rawVariants) ? rawVariants : []).filter(v => v && !v._isDeleted)
+  // Inactive variants ride along in the draft unchanged; only sellable ones are validated.
+  const sellableVariants = activeVariants.filter(v => v.is_active !== false && v.is_active !== 'false')
 
   // Drafts accept partial data; publish needs the full product.
   const errors: string[] = []
   if (isPublish) {
     if (!rawName || rawName === DRAFT_NAME_PLACEHOLDER) errors.push('Product name is required.')
     if (!categoryId) errors.push('Category is required.')
-    if (hasVariants && rawVariants && activeVariants.length === 0)
+    if (hasVariants && rawVariants && sellableVariants.length === 0)
       errors.push('Add at least one variant, or turn off variants.')
   }
   const gstErr = gstError(gstRaw)
@@ -270,7 +273,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     )
   )
   if (hasVariants) {
-    for (const v of activeVariants) {
+    for (const v of sellableVariants) {
       if (!String(v.variant_name ?? '').trim()) {
         if (isPublish) errors.push('Every variant needs a name.')
         continue
@@ -294,7 +297,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
     const subsOn = (v: any) => v?.sub_variant_type_on === true || v?.sub_variant_type_on === 'true'
     let draftSubs: any[] = []
     let liveSubs: any[] = []
-    if (hasVariants && activeVariants.some(subsOn)) {
+    if (hasVariants && sellableVariants.some(subsOn)) {
       const draftSubRow = await queryOne<{ sub_variants: any[] | null }>(
         'SELECT sub_variants FROM product_drafts WHERE product_id = $1',
         [productId]
@@ -315,7 +318,7 @@ export async function updateProduct(productId: string, formData: FormData): Prom
         breadth_cm: breadthCm,
         height_cm: heightCm,
       },
-      variants: activeVariants.map(v => {
+      variants: sellableVariants.map(v => {
         const label = v?.variant_name || v?.sku || ''
         if (!subsOn(v)) return { ...v, label }
         const staged = draftSubs.filter(sv => sv?.variant_id === v?.id)

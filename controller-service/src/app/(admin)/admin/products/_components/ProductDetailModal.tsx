@@ -1,13 +1,13 @@
 'use client'
 
 import React, { useEffect, useCallback, useState } from 'react'
-import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Package, Star } from 'lucide-react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { ap } from '@/lib/shared/admin-path'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import CopySku from '@/components/ui/CopySku'
+import { Dialog, badgeCls } from '@/components/admin/kit'
 
 interface Props {
   product: any | null
@@ -73,14 +73,6 @@ export default function ProductDetailModal({ product, onClose }: Props) {
     if (product) fetchDetail(product.id)
   }, [product, fetchDetail])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   if (!product) return null
 
   const p = detail || product
@@ -90,54 +82,35 @@ export default function ProductDetailModal({ product, onClose }: Props) {
   const variants: any[] = detail?.product_variants || []
   const stock = p.has_variants ? Number(p.variant_inventory_total ?? 0) : Number(p.inventory_quantity ?? 0)
 
-  if (typeof document === 'undefined') return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-
-      <div
-        className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-3xl max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Loading overlay — covers stale content while fetching */}
+  return (
+    <Dialog
+      open={!!product}
+      onClose={onClose}
+      size="xl"
+      zIndex="z-[300]"
+      title={product.name}
+      description={
+        <span className="inline-flex items-center gap-1 font-mono">
+          {product.sku}
+          {product.sku && <CopySku sku={product.sku} />}
+        </span>
+      }
+      footer={
+        <Link href={ap(`/admin/products/${product.id}`)} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600">
+          View Product
+        </Link>
+      }
+    >
+      <div className="relative -m-5">
+        {/* Loading overlay covers stale content while fetching */}
         {loading && (
-          <div className="absolute inset-0 z-10 bg-surface-elevated/80 rounded-xl flex items-center justify-center">
+          <div className="absolute inset-0 z-10 bg-surface-elevated/80 flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <div className="w-8 h-8 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-foreground-muted">Loading details…</p>
             </div>
           </div>
         )}
-
-        {/* Header */}
-        <div className="flex items-start justify-between p-5 border-b border-border-default">
-          <div className="min-w-0 pr-4">
-            <h2 className="text-lg font-bold text-foreground leading-tight">{product.name}</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              <span className="inline-flex items-center gap-1">
-                {product.sku}
-                {product.sku && <CopySku sku={product.sku} />}
-              </span>
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Link
-              href={ap(`/admin/products/${product.id}`)}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
-            >
-              View Product
-            </Link>
-            <button
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
 
         {detail && (
           <>
@@ -183,22 +156,22 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                 {/* Status badges */}
                 <div className="flex flex-wrap gap-2">
                   <span
-                    className={`px-2 py-0.5 text-xs font-semibold rounded-full ${p.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}
+                    className={badgeCls(p.is_active ? 'green' : 'muted')}
                   >
                     {p.is_active ? 'Active' : 'Inactive'}
                   </span>
                   {p.is_featured && (
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 inline-flex items-center gap-1">
+                    <span className={`${badgeCls('amber')} inline-flex items-center gap-1`}>
                       <Star className="w-3 h-3 fill-current" /> Featured
                     </span>
                   )}
                   {p.stock_status === 'Out of Stock' && (
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                    <span className={badgeCls('red')}>
                       Out of Stock
                     </span>
                   )}
                   {p.stock_status === 'Low Stock' && (
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">
+                    <span className={badgeCls('amber')}>
                       Low Stock
                     </span>
                   )}
@@ -209,7 +182,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                 <div>
                   <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Price</p>
                   {p.has_variants ? (
-                    <p className="text-xl font-bold text-primary-500">
+                    <p className="text-xl font-bold text-foreground">
                       From Rs.{' '}
                       {Number(p.variant_min_price || 0).toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
@@ -218,7 +191,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                     </p>
                   ) : (
                     <div className="flex items-baseline gap-3">
-                      <p className="text-xl font-bold text-primary-500">
+                      <p className="text-xl font-bold text-foreground">
                         Rs.{' '}
                         {Number(p.base_price || 0).toLocaleString('en-IN', {
                           minimumFractionDigits: 2,
@@ -305,7 +278,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                   {p.ai_product_type && (
                     <div>
                       <p className="text-[10px] text-foreground-muted uppercase tracking-wide mb-0.5">Type</p>
-                      <span className="text-xs font-medium text-accent-600 dark:text-accent-400">
+                      <span className="text-xs font-medium text-accent-500">
                         {p.ai_product_type}
                       </span>
                     </div>
@@ -335,7 +308,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                         {p.ai_use_cases.map((t: string) => (
                           <span
                             key={t}
-                            className="text-[10px] px-1.5 py-0.5 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 rounded"
+                            className="text-[10px] px-1.5 py-0.5 bg-accent-500/10 text-accent-500 rounded"
                           >
                             {t}
                           </span>
@@ -457,7 +430,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                               <td className="px-3 py-2 text-foreground-muted whitespace-nowrap">{vListed}</td>
                               <td className="px-3 py-2">
                                 <span
-                                  className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${v.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}
+                                  className={badgeCls(v.is_active ? 'green' : 'muted')}
                                 >
                                   {v.is_active ? 'Active' : 'Off'}
                                 </span>
@@ -492,7 +465,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                                   </td>
                                   <td className="px-3 py-1.5">
                                     <span
-                                      className={`px-1.5 py-0.5 text-[10px] rounded-full font-medium ${sv.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}
+                                      className={badgeCls(sv.is_active ? 'green' : 'muted')}
                                     >
                                       {sv.is_active ? 'Active' : 'Off'}
                                     </span>
@@ -510,10 +483,9 @@ export default function ProductDetailModal({ product, onClose }: Props) {
           </>
         )}
 
-        {/* Placeholder height while loading so modal isn't tiny */}
+        {/* Placeholder height while loading so the dialog isn't tiny */}
         {loading && !detail && <div className="h-64" />}
       </div>
-    </div>,
-    document.body
+    </Dialog>
   )
 }

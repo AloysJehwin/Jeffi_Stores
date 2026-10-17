@@ -55,6 +55,18 @@ patches:
       - op: replace
         path: /data/OLLAMA_BASE_URLS
         value: "http://10.42.0.1:11434,http://100.82.208.8:11434"
+      # Razer image server (host/sd_server.py, A1111 API over SDXL-Turbo), same addressing rule
+      # as Ollama: the k3s cni0 bridge, never a hostname.
+      - op: replace
+        path: /data/SD_WEBUI_URL
+        value: "http://10.42.0.1:7860"
+      - op: replace
+        path: /data/SD_TIMEOUT_MS
+        value: "120000"
+      # Tailnet address of the gateway LB, so returned /v1/files URLs are fetchable by the app.
+      - op: replace
+        path: /data/AI_PUBLIC_URL
+        value: "http://100.82.208.8:8080"
   - patch: |
       apiVersion: v1
       kind: PersistentVolumeClaim
@@ -70,4 +82,11 @@ patches:
       apiVersion: v1
       kind: Service
       metadata: { name: paddleocr, namespace: ai-platform }
+      $patch: delete
+  # The Secret holds real keys set on the box (scripts/razer-set-secrets.sh); applying the base's
+  # empty placeholders would wipe them, so it is never managed by apply.
+  - patch: |
+      apiVersion: v1
+      kind: Secret
+      metadata: { name: ai-gateway-secret, namespace: ai-platform }
       $patch: delete

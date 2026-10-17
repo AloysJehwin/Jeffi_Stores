@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { createPortal } from 'react-dom'
 import { BrowserQRCodeReader, IScannerControls } from '@zxing/browser'
 import CopySku from '@/components/ui/CopySku'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { fmtQty } from '@/lib/shared/number-display'
+import { Sheet, TextInput, useActionToast } from '@/components/admin/kit'
 
 interface OrderInfo {
   id: string
@@ -51,14 +51,14 @@ type Stage =
   | 'unsupported'
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  confirmed: 'bg-blue-100 text-blue-800',
-  processing: 'bg-blue-100 text-blue-800',
-  shipped: 'bg-indigo-100 text-indigo-800',
-  delivered: 'bg-green-100 text-green-800',
-  granted: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
-  cancel_requested: 'bg-orange-100 text-orange-800',
+  pending: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  confirmed: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  processing: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  shipped: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  delivered: 'bg-green-500/10 text-green-700 dark:text-green-400',
+  granted: 'bg-green-500/10 text-green-700 dark:text-green-400',
+  cancelled: 'bg-red-500/10 text-red-600 dark:text-red-400',
+  cancel_requested: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
 }
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
@@ -93,6 +93,7 @@ export default function ScanClient() {
   const [selectedStatus, setSelectedStatus] = useState('')
   const [trackingUrl, setTrackingUrl] = useState('')
   const [manualInput, setManualInput] = useState('')
+  const toast = useActionToast()
   const [errorMsg, setErrorMsg] = useState('')
   const [doneStatus, setDoneStatus] = useState('')
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -224,9 +225,11 @@ export default function ScanClient() {
       } catch {}
       if (!res.ok) throw new Error(d.error || `Server error ${res.status}`)
       setDoneStatus(s)
+      toast.success(`Order #${order!.order_number} marked ${statusLabel(s)}.`)
       setStage('done')
     } catch (e: any) {
       setErrorMsg(e.message || 'Update failed')
+      toast.error(e.message || 'Update failed')
       setStage('error')
     }
   }
@@ -252,9 +255,11 @@ export default function ScanClient() {
       } catch {}
       if (!res.ok) throw new Error(d.error || `Server error ${res.status}`)
       setDoneStatus('shipped')
+      toast.success(`Order #${order.order_number} marked Shipped.`)
       setStage('done')
     } catch (e: any) {
       setErrorMsg(e.message || 'Update failed')
+      toast.error(e.message || 'Update failed')
       setStage('error')
     }
   }
@@ -280,7 +285,7 @@ export default function ScanClient() {
     product && product.mrp > 0 ? Number((product.mrp * (1 + (product.gst_percentage || 0) / 100)).toFixed(2)) : null
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+    <div className="min-h-screen bg-surface text-foreground flex flex-col">
       {stage === 'idle' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-6 p-8">
           <div className="w-20 h-20 rounded-2xl bg-secondary-500/20 flex items-center justify-center">
@@ -304,8 +309,8 @@ export default function ScanClient() {
             </svg>
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">QuickScan</h1>
-            <p className="text-gray-400 mt-1 text-sm">
+            <h1 className="text-2xl font-bold text-foreground">QuickScan</h1>
+            <p className="text-foreground-muted mt-1 text-sm">
               Scan a packing slip QR to update orders, or a product label QR to view product details
             </p>
           </div>
@@ -317,7 +322,7 @@ export default function ScanClient() {
           </button>
           <button
             onClick={() => setStage('unsupported')}
-            className="text-sm text-gray-500 hover:text-gray-400 transition-colors"
+            className="text-sm text-foreground-muted hover:text-foreground transition-colors"
           >
             Enter order number manually
           </button>
@@ -347,28 +352,28 @@ export default function ScanClient() {
       {stage === 'looking_up' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-4 p-8">
           <div className="w-12 h-12 border-4 border-secondary-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400">Looking up…</p>
+          <p className="text-foreground-muted">Looking up…</p>
         </div>
       )}
 
       {stage === 'unsupported' && (
         <div className="flex flex-col flex-1 p-6 gap-4">
           <div className="flex items-center gap-3 mb-2">
-            <button onClick={reset} className="p-2 text-gray-400 hover:text-white">
+            <button onClick={reset} className="p-2 text-foreground-muted hover:text-foreground">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <h2 className="text-lg font-semibold">Enter Order Number</h2>
           </div>
-          <p className="text-gray-400 text-sm">Type the order number from the packing slip.</p>
+          <p className="text-foreground-muted text-sm">Type the order number from the packing slip.</p>
           <input
             type="text"
             placeholder="e.g. ORD-1777399568448-4VQ4RG"
             value={manualInput}
             onChange={e => setManualInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && manualInput.trim() && lookupOrder(manualInput)}
-            className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-secondary-500 text-sm"
+            className="field-md w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
             autoFocus
           />
           <button
@@ -384,7 +389,7 @@ export default function ScanClient() {
       {stage === 'not_found' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-5 p-8 text-center">
           <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
-            <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -393,12 +398,12 @@ export default function ScanClient() {
             </svg>
           </div>
           <div>
-            <p className="text-lg font-semibold text-white">Not found</p>
-            <p className="text-gray-400 text-sm mt-1">This QR code does not match any order or product.</p>
+            <p className="text-lg font-semibold text-foreground">Not found</p>
+            <p className="text-foreground-muted text-sm mt-1">This QR code does not match any order or product.</p>
           </div>
           <button
             onClick={reset}
-            className="w-full max-w-xs py-3.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors"
+            className="w-full max-w-xs py-3.5 bg-surface-secondary hover:bg-border-default text-foreground font-semibold rounded-xl transition-colors"
           >
             Try Again
           </button>
@@ -408,7 +413,7 @@ export default function ScanClient() {
       {stage === 'found_order' && order && (
         <div className="flex flex-col flex-1 p-6 gap-5 overflow-y-auto">
           <div className="flex items-center gap-3">
-            <button onClick={reset} className="p-2 text-gray-400 hover:text-white">
+            <button onClick={reset} className="p-2 text-foreground-muted hover:text-foreground">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
@@ -416,39 +421,39 @@ export default function ScanClient() {
             <h2 className="text-lg font-semibold">Order Found</h2>
           </div>
 
-          <div className="bg-gray-800 rounded-2xl p-4 space-y-3">
+          <div className="rounded-2xl border border-border-default bg-surface-elevated p-4 space-y-3">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs text-gray-400 mb-0.5">Order Number</p>
-                <p className="font-mono font-semibold text-white">#{order.order_number}</p>
+                <p className="text-xs text-foreground-muted mb-0.5">Order Number</p>
+                <p className="font-mono font-semibold text-foreground">#{order.order_number}</p>
               </div>
               <span
-                className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-gray-700 text-gray-300'}`}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-surface-secondary text-foreground-secondary'}`}
               >
                 {statusLabel(order.status)}
               </span>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-0.5">Customer</p>
-              <p className="text-white">{order.customer_name || '—'}</p>
+              <p className="text-xs text-foreground-muted mb-0.5">Customer</p>
+              <p className="text-foreground">{order.customer_name || '—'}</p>
             </div>
           </div>
 
           {nextStatuses.length === 0 || !canWrite ? (
-            <div className="bg-gray-800 rounded-2xl p-4 text-center text-gray-400 text-sm">
+            <div className="rounded-2xl border border-border-default bg-surface-elevated p-4 text-center text-foreground-muted text-sm">
               No further status updates available for this order.
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-gray-400">Update status to:</p>
+              <p className="text-sm text-foreground-muted">Update status to:</p>
               {nextStatuses.map(s => (
                 <button
                   key={s}
                   onClick={() => selectStatus(s)}
-                  className={`w-full py-4 rounded-2xl font-semibold text-white transition-colors text-base ${
+                  className={`w-full py-4 rounded-2xl font-semibold transition-colors text-base ${
                     selectedStatus === s
-                      ? 'bg-secondary-500 ring-2 ring-secondary-400'
-                      : 'bg-gray-700 hover:bg-gray-600 active:bg-gray-500'
+                      ? 'bg-secondary-500 text-white ring-2 ring-secondary-400'
+                      : 'bg-surface-secondary text-foreground hover:bg-border-default active:bg-border-secondary'
                   }`}
                 >
                   {STATUS_LABELS[s] || statusLabel(s)}
@@ -462,7 +467,7 @@ export default function ScanClient() {
       {stage === 'found_product' && product && (
         <div className="flex flex-col flex-1 p-6 gap-5 overflow-y-auto">
           <div className="flex items-center gap-3">
-            <button onClick={reset} className="p-2 text-gray-400 hover:text-white">
+            <button onClick={reset} className="p-2 text-foreground-muted hover:text-foreground">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
@@ -470,66 +475,66 @@ export default function ScanClient() {
             <h2 className="text-lg font-semibold">Product Details</h2>
           </div>
 
-          <div className="bg-gray-800 rounded-2xl overflow-hidden">
+          <div className="rounded-2xl border border-border-default bg-surface-elevated overflow-hidden">
             {product.image_url && (
-              <div className="w-full h-48 bg-gray-900 flex items-center justify-center overflow-hidden">
+              <div className="w-full h-48 bg-surface-secondary flex items-center justify-center overflow-hidden">
                 <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" />
               </div>
             )}
             <div className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-white text-base leading-snug">{product.name}</p>
-                  {product.variant_name && <p className="text-gray-400 text-sm mt-0.5">{product.variant_name}</p>}
+                  <p className="font-semibold text-foreground text-base leading-snug">{product.name}</p>
+                  {product.variant_name && <p className="text-foreground-muted text-sm mt-0.5">{product.variant_name}</p>}
                 </div>
                 <span
-                  className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${product.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}
+                  className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium ${product.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-600 dark:text-red-400'}`}
                 >
                   {product.is_active ? 'Active' : 'Inactive'}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-700/60 rounded-xl p-3">
-                  <p className="text-xs text-gray-400 mb-0.5">SKU</p>
-                  <p className="font-mono text-sm text-white break-all inline-flex items-center gap-1">
+                <div className="bg-surface-secondary rounded-xl p-3">
+                  <p className="text-xs text-foreground-muted mb-0.5">SKU</p>
+                  <p className="font-mono text-sm text-foreground break-all inline-flex items-center gap-1">
                     {product.sku}
-                    {product.sku && <CopySku sku={product.sku} className="text-white/70 hover:text-white" />}
+                    {product.sku && <CopySku sku={product.sku} className="text-foreground-muted hover:text-foreground" />}
                   </p>
                 </div>
-                <div className="bg-gray-700/60 rounded-xl p-3">
-                  <p className="text-xs text-gray-400 mb-1">Stock</p>
+                <div className="bg-surface-secondary rounded-xl p-3">
+                  <p className="text-xs text-foreground-muted mb-1">Stock</p>
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-400">Inventory</span>
+                    <span className="text-xs text-foreground-muted">Inventory</span>
                     <span
-                      className={`text-sm font-semibold ${product.inventory_quantity === 0 ? 'text-red-400' : product.inventory_quantity <= 5 ? 'text-yellow-400' : 'text-green-400'}`}
+                      className={`text-sm font-semibold ${product.inventory_quantity === 0 ? 'text-red-600 dark:text-red-400' : product.inventory_quantity <= 5 ? 'text-yellow-400' : 'text-green-400'}`}
                     >
                       {product.inventory_quantity}
                     </span>
                   </div>
                   <div className="flex justify-between items-center mt-1">
-                    <span className="text-xs text-gray-400">Listed</span>
-                    <span className="text-sm text-gray-300">{product.stock_status || '—'}</span>
+                    <span className="text-xs text-foreground-muted">Listed</span>
+                    <span className="text-sm text-foreground-secondary">{product.stock_status || '—'}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-gray-700/60 rounded-xl p-3 space-y-1.5">
-                <p className="text-xs text-gray-400 mb-1">Pricing (inc. GST)</p>
+              <div className="bg-surface-secondary rounded-xl p-3 space-y-1.5">
+                <p className="text-xs text-foreground-muted mb-1">Pricing (inc. GST)</p>
                 {mrpIncGst && mrpIncGst !== incGst && (
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-gray-400">MRP</span>
-                    <span className="text-sm text-gray-400 line-through">{fmt2(mrpIncGst)}</span>
+                    <span className="text-xs text-foreground-muted">MRP</span>
+                    <span className="text-sm text-foreground-muted line-through">{fmt2(mrpIncGst)}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-400">Selling Price</span>
+                  <span className="text-xs text-foreground-muted">Selling Price</span>
                   <span className="text-base font-bold text-secondary-400">{fmt2(incGst)}</span>
                 </div>
                 {product.gst_percentage > 0 && (
-                  <div className="flex justify-between items-center border-t border-gray-600 pt-1.5">
-                    <span className="text-xs text-gray-500">ex. GST ({product.gst_percentage}%)</span>
-                    <span className="text-xs text-gray-400">{fmt2(product.base_price)}</span>
+                  <div className="flex justify-between items-center border-t border-border-default pt-1.5">
+                    <span className="text-xs text-foreground-muted">ex. GST ({product.gst_percentage}%)</span>
+                    <span className="text-xs text-foreground-muted">{fmt2(product.base_price)}</span>
                   </div>
                 )}
               </div>
@@ -537,40 +542,40 @@ export default function ScanClient() {
               {(product.brand_name || product.category_name) && (
                 <div className="grid grid-cols-2 gap-3">
                   {product.brand_name && (
-                    <div className="bg-gray-700/60 rounded-xl p-3">
-                      <p className="text-xs text-gray-400 mb-0.5">Brand</p>
-                      <p className="text-sm text-white">{product.brand_name}</p>
+                    <div className="bg-surface-secondary rounded-xl p-3">
+                      <p className="text-xs text-foreground-muted mb-0.5">Brand</p>
+                      <p className="text-sm text-foreground">{product.brand_name}</p>
                     </div>
                   )}
                   {product.category_name && (
-                    <div className="bg-gray-700/60 rounded-xl p-3">
-                      <p className="text-xs text-gray-400 mb-0.5">Category</p>
-                      <p className="text-sm text-white">{product.category_name}</p>
+                    <div className="bg-surface-secondary rounded-xl p-3">
+                      <p className="text-xs text-foreground-muted mb-0.5">Category</p>
+                      <p className="text-sm text-foreground">{product.category_name}</p>
                     </div>
                   )}
                 </div>
               )}
 
               {product.gtin && (
-                <div className="bg-gray-700/60 rounded-xl p-3">
-                  <p className="text-xs text-gray-400 mb-0.5">GTIN / Barcode</p>
-                  <p className="font-mono text-sm text-white">{product.gtin}</p>
+                <div className="bg-surface-secondary rounded-xl p-3">
+                  <p className="text-xs text-foreground-muted mb-0.5">GTIN / Barcode</p>
+                  <p className="font-mono text-sm text-foreground">{product.gtin}</p>
                 </div>
               )}
 
-              <div className="bg-gray-700/60 rounded-xl p-3">
-                <p className="text-xs text-gray-400 mb-2">Shelf Locations</p>
+              <div className="bg-surface-secondary rounded-xl p-3">
+                <p className="text-xs text-foreground-muted mb-2">Shelf Locations</p>
                 {shelfLocations.length === 0 ? (
-                  <p className="text-xs text-gray-500 italic">Not assigned to any shelf</p>
+                  <p className="text-xs text-foreground-muted italic">Not assigned to any shelf</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {shelfLocations.map(l => (
                       <div
                         key={l.location_display_code}
-                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-600/60 text-xs"
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-surface-secondary text-xs"
                       >
-                        <span className="font-mono text-white">{l.location_display_code}</span>
-                        <span className="text-gray-500">·</span>
+                        <span className="font-mono text-foreground">{l.location_display_code}</span>
+                        <span className="text-foreground-muted">·</span>
                         <span className="font-semibold text-secondary-400">{fmtQty(l.quantity)}</span>
                       </div>
                     ))}
@@ -589,47 +594,34 @@ export default function ScanClient() {
         </div>
       )}
 
-      {stage === 'shipping' &&
-        order &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div className="fixed inset-0 z-[300] flex flex-col justify-end bg-black/60">
-            <div className="bg-gray-900 rounded-t-3xl p-6 flex flex-col gap-4">
-              <div className="w-10 h-1 bg-gray-600 rounded-full mx-auto mb-1" />
-              <h3 className="text-lg font-bold text-white">Mark as Shipped</h3>
-              <p className="text-gray-400 text-sm -mt-2">#{order.order_number}</p>
-              <div className="space-y-1.5">
-                <label className="text-sm text-gray-300">
-                  Tracking URL <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://track.delhivery.com/..."
-                  value={trackingUrl}
-                  onChange={e => setTrackingUrl(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-secondary-500 text-sm"
-                  autoFocus
-                />
-              </div>
-              <button
-                onClick={confirmShipped}
-                disabled={!trackingUrl.trim()}
-                className="w-full py-4 bg-secondary-500 hover:bg-secondary-600 active:bg-secondary-700 disabled:opacity-40 text-white font-bold rounded-2xl text-base transition-colors"
-              >
-                Confirm Shipped
-              </button>
-              <button onClick={() => setStage('found_order')} className="w-full py-3 text-gray-400 text-sm">
-                Cancel
-              </button>
-            </div>
-          </div>,
-          document.body
-        )}
+      <Sheet
+        open={stage === 'shipping' && !!order}
+        onClose={() => setStage('found_order')}
+        title="Mark as Shipped"
+        description={order ? `#${order.order_number}` : undefined}
+        footer={
+          <>
+            <button type="button" onClick={() => setStage('found_order')} className="control-md text-foreground-secondary hover:text-foreground">
+              Cancel
+            </button>
+            <button type="button" onClick={confirmShipped} disabled={!trackingUrl.trim()} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-40">
+              Confirm Shipped
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-foreground-secondary">
+            Tracking URL <span className="text-red-500">*</span>
+          </label>
+          <TextInput type="url" placeholder="https://track.delhivery.com/..." value={trackingUrl} onChange={e => setTrackingUrl(e.target.value)} autoFocus />
+        </div>
+      </Sheet>
 
       {stage === 'updating' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-4 p-8">
           <div className="w-12 h-12 border-4 border-secondary-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-400">Updating order…</p>
+          <p className="text-foreground-muted">Updating order…</p>
         </div>
       )}
 
@@ -647,11 +639,11 @@ export default function ScanClient() {
             </svg>
           </div>
           <div>
-            <p className="text-2xl font-bold text-white">Done!</p>
-            <p className="text-gray-300 mt-2">
+            <p className="text-2xl font-bold text-foreground">Done!</p>
+            <p className="text-foreground-secondary mt-2">
               <span className="font-mono">#{order.order_number}</span>
             </p>
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-foreground-muted text-sm mt-1">
               Status updated to <span className="font-semibold text-green-400">{statusLabel(doneStatus)}</span>
             </p>
           </div>
@@ -667,7 +659,7 @@ export default function ScanClient() {
       {stage === 'error' && (
         <div className="flex flex-col items-center justify-center flex-1 gap-5 p-8 text-center">
           <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
-            <svg className="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -676,12 +668,12 @@ export default function ScanClient() {
             </svg>
           </div>
           <div>
-            <p className="text-lg font-semibold text-white">Something went wrong</p>
-            <p className="text-gray-400 text-sm mt-1">{errorMsg}</p>
+            <p className="text-lg font-semibold text-foreground">Something went wrong</p>
+            <p className="text-foreground-muted text-sm mt-1">{errorMsg}</p>
           </div>
           <button
             onClick={reset}
-            className="w-full max-w-xs py-3.5 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors"
+            className="w-full max-w-xs py-3.5 bg-surface-secondary hover:bg-border-default text-foreground font-semibold rounded-xl transition-colors"
           >
             Try Again
           </button>

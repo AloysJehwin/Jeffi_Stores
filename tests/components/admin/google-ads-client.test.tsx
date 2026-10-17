@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { render, screen, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, cleanup, waitFor, fireEvent } from '@testing-library/react'
 
 const push = vi.fn()
 let canWrite = true
@@ -7,6 +7,9 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push }), useSearchParams
 vi.mock('@/contexts/AdminScopesContext', () => ({ useCanWrite: () => canWrite }))
 
 import GoogleAdsClient from '@/app/(admin)/admin/google-ads/GoogleAdsClient'
+
+// Connecting lives in the gear dialog (top right), the same as every integration page.
+const openGear = () => fireEvent.click(screen.getByRole('button', { name: /Google Ads connection \(/ }))
 
 const env = {
   developerToken: true,
@@ -45,12 +48,15 @@ afterEach(() => {
 describe('GoogleAdsClient', () => {
   it('shows the setup checklist when the developer token is missing', () => {
     render(<GoogleAdsClient initialStatus={{ ...base, env: { ...env, developerToken: false } }} currency="INR" hasData={false} />)
+    openGear()
     expect(screen.getByText(/not configured on this platform/)).toBeTruthy()
     expect(screen.getByText(/integrations\/google\/callback/)).toBeTruthy()
   })
 
   it('offers sign-in and manual entry when not connected', () => {
     render(<GoogleAdsClient initialStatus={base} currency="INR" hasData={false} />)
+    expect(screen.getByText(/Not connected/)).toBeTruthy()
+    openGear()
     const link = screen.getByText('Connect with Google').closest('a')!
     expect(link.getAttribute('href')).toBe('/api/admin/integrations/google-ads/connect')
     expect(screen.getByText('Enter manually')).toBeTruthy()
@@ -60,6 +66,7 @@ describe('GoogleAdsClient', () => {
   it('hides connect actions from read-only admins', () => {
     canWrite = false
     render(<GoogleAdsClient initialStatus={base} currency="INR" hasData={false} />)
+    openGear()
     expect(screen.queryByText('Connect with Google')).toBeNull()
     expect(screen.getByText(/An admin with Google Ads write access can connect it/)).toBeTruthy()
   })

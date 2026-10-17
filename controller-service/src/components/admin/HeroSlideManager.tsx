@@ -7,6 +7,8 @@ import AdminImage from '@/components/admin/AdminImage'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import Toggle from '@/components/ui/Toggle'
 import { useCanWrite, RequireWrite, RequireAi } from '@/contexts/AdminScopesContext'
+import AiMediaButton from '@/components/admin/ai/AiMediaButton'
+import { AI_SIZE_PRESETS } from '@/lib/ai/media-features'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { notifyHomepageDraftChanged } from '@/components/admin/homepage/draft-events'
 
@@ -332,6 +334,17 @@ function SlideCard({
               >
                 {uploading ? 'Uploading…' : slide.image_url ? 'Replace image' : 'Upload image'}
               </button>
+              <AiMediaButton
+                feature="hero_image"
+                compact
+                sizes={[AI_SIZE_PRESETS.hero, AI_SIZE_PRESETS.wide]}
+                defaultPrompt={aiPrompt || slide.title || ''}
+                usageRef={slide.id}
+                onPick={img => {
+                  field({ image_url: img.url, blurhash: img.blurhash ?? null }, { imageUrl: img.url })
+                  notifyHomepageDraftChanged()
+                }}
+              />
               {slide.image_url && !uploading && !generating && (
                 <span className="text-[11px] text-foreground-muted">Image set</span>
               )}
@@ -360,6 +373,18 @@ function SlideCard({
                     ? 'Replace mobile image'
                     : 'Upload mobile image'}
               </button>
+              <AiMediaButton
+                feature="hero_image"
+                compact
+                label="AI mobile image"
+                sizes={[AI_SIZE_PRESETS.portrait, AI_SIZE_PRESETS.story]}
+                defaultPrompt={aiPrompt || slide.title || ''}
+                usageRef={slide.id}
+                onPick={img => {
+                  field({ image_url_mobile: img.url, blurhash_mobile: img.blurhash ?? null }, { imageUrlMobile: img.url })
+                  notifyHomepageDraftChanged()
+                }}
+              />
               {slide.image_url_mobile && !uploadingMobile ? (
                 <>
                   <div className="w-10 h-10 rounded overflow-hidden border border-border-default shrink-0">

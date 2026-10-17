@@ -100,6 +100,7 @@ export async function enrichField(i: EnrichInput): Promise<string> {
   let strict = ''
   for (let attempt = 0; attempt < 2; attempt++) {
     const r = await aiChat({
+      feature: 'enrichment',
       modelHint: 'enrich',
       jsonMode: true,
       temperature: i.value.trim() ? 0.3 : 0.6,

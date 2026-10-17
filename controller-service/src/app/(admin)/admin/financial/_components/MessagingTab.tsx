@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Skeleton, SummaryCard, formatINR, thCls } from './shared'
+import { Card, DataTable, type DataCol } from '@/components/admin/kit'
+import { Skeleton, SummaryCard, formatINR } from './shared'
 
 interface SpendRow {
   channel: string
   month: string
   spent: number
+  _k?: string
 }
 interface Spend {
   rows: SpendRow[]
@@ -16,6 +18,12 @@ interface Spend {
 }
 
 const CHANNEL_LABEL: Record<string, string> = { sms: 'SMS', whatsapp: 'WhatsApp', email: 'Email' }
+
+const COLS: DataCol<SpendRow>[] = [
+  { key: 'month', label: 'Month', render: r => <span className="text-foreground">{r.month}</span>, sort: r => r.month },
+  { key: 'channel', label: 'Channel', render: r => CHANNEL_LABEL[r.channel] ?? r.channel, sort: r => r.channel },
+  { key: 'spent', label: 'Spent', num: true, render: r => <span className="text-foreground">{formatINR(r.spent)}</span>, sort: r => r.spent },
+]
 
 export function MessagingTab() {
   const [data, setData] = useState<Spend | null>(null)
@@ -29,10 +37,10 @@ export function MessagingTab() {
   }, [])
 
   if (loading) return <Skeleton />
-  if (!data) return <p className="text-sm text-foreground-secondary">No data.</p>
+  if (!data) return <p className="text-sm text-foreground-muted">No data.</p>
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <SummaryCard label="Total spent" value={formatINR(data.total)} />
         <SummaryCard label="This month" value={formatINR(data.thisMonth)} />
@@ -41,34 +49,9 @@ export function MessagingTab() {
         <SummaryCard label="Email" value={formatINR(data.byChannel.email ?? 0)} />
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-border-default">
-        <table className="min-w-full text-sm">
-          <thead className="bg-surface-secondary">
-            <tr>
-              <th className={thCls}>Month</th>
-              <th className={thCls}>Channel</th>
-              <th className={`${thCls} text-right`}>Spent</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-default">
-            {data.rows.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="px-4 py-6 text-center text-foreground-secondary">
-                  No messaging spend yet.
-                </td>
-              </tr>
-            ) : (
-              data.rows.map((r, i) => (
-                <tr key={`${r.month}-${r.channel}-${i}`}>
-                  <td className="px-4 py-2.5 text-foreground">{r.month}</td>
-                  <td className="px-4 py-2.5 text-foreground">{CHANNEL_LABEL[r.channel] ?? r.channel}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-foreground">{formatINR(r.spent)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Card title="Spend by month" flush>
+        <DataTable<SpendRow> bare rows={data.rows.map((r, i) => ({ ...r, _k: `${r.month}-${r.channel}-${i}` }))} cols={COLS} rowKey={r => r._k!} empty="No messaging spend yet." />
+      </Card>
     </div>
   )
 }

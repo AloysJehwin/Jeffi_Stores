@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { AlertCircle, CheckCircle2, X } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 // Campaign management (google_ads_campaigns:write, Pro and up) for the console tabs. Without the
@@ -51,9 +51,9 @@ export function errorText(data: any, fallback = 'Google Ads rejected the change'
 export function AdsManageProvider({ currency, onChanged, children }: { currency: string; onChanged: () => void; children: ReactNode }) {
   const canManage = useCanWrite('google_ads_campaigns')
   const [busyKey, setBusyKey] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
-
-  const notify = useCallback((ok: boolean, text: string) => setNotice({ ok, text }), [])
+  const toast = useActionToast()
+  const setNotice = useCallback((n: { ok: boolean; text: string }) => toast.result(n), [toast])
+  const notify = useCallback((ok: boolean, text: string) => setNotice({ ok, text }), [setNotice])
 
   const run = useCallback(
     async (body: ActionBody, key: string) => {
@@ -74,7 +74,7 @@ export function AdsManageProvider({ currency, onChanged, children }: { currency:
         setBusyKey(null)
       }
     },
-    [onChanged]
+    [onChanged, setNotice]
   )
 
   const value = useMemo<AdsManage>(
@@ -85,20 +85,6 @@ export function AdsManageProvider({ currency, onChanged, children }: { currency:
   return (
     <Ctx.Provider value={value}>
       {children}
-      {notice && (
-        <div
-          role="status"
-          className={`fixed bottom-4 right-4 z-50 max-w-md rounded-lg border px-4 py-3 text-sm shadow-lg flex items-start gap-2 bg-surface-elevated ${
-            notice.ok ? 'border-green-500/50' : 'border-red-500/50'
-          }`}
-        >
-          {notice.ok ? <CheckCircle2 className="w-4 h-4 mt-0.5 text-green-600 shrink-0" /> : <AlertCircle className="w-4 h-4 mt-0.5 text-red-500 shrink-0" />}
-          <span className="flex-1">{notice.text}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => setNotice(null)} className="text-foreground-muted hover:text-foreground">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
     </Ctx.Provider>
   )
 }

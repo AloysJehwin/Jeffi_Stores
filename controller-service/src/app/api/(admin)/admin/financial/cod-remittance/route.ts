@@ -14,8 +14,12 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status') || 'cod_collected' // cod_pending | cod_collected | paid
+  // Optional paging (limit/offset). Without it: the first 500, as before.
+  const paged = searchParams.has('limit')
+  const limit = paged ? Math.min(500, Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50)) : 500
+  const offset = paged ? Math.max(0, parseInt(searchParams.get('offset') || '0', 10) || 0) : 0
 
-  const [orders, allCod] = await Promise.all([
+  const [orders, allCod, counted] = await Promise.all([
     queryMany(
       `SELECT o.id, o.order_number, o.customer_name, o.customer_email,
               o.total_amount, o.payment_status, o.payment_mode,
@@ -24,9 +28,9 @@ export async function GET(request: NextRequest) {
        FROM orders o
        WHERE o.payment_mode = 'cod'
          AND ($1 = 'all' OR o.payment_status = $1)
-       ORDER BY o.delivered_at DESC NULLS LAST, o.updated_at DESC
-       LIMIT 500`,
-      [status]
+       ORDER BY o.delivered_at DESC NULLS LAST, o.updated_at DESC, o.id
+       LIMIT $2 OFFSET $3`,
+      [status, limit, offset]
     ),
     queryMany(
       `SELECT payment_status, total_amount
@@ -34,6 +38,9 @@ export async function GET(request: NextRequest) {
        WHERE payment_mode = 'cod'`,
       []
     ),
+    paged
+      ? queryMany<{ n: string }>(`SELECT COUNT(*)::text AS n FROM orders WHERE payment_mode = 'cod' AND ($1 = 'all' OR payment_status = $1)`, [status])
+      : Promise.resolve(null),
   ])
 
   // Group cod_collected by delivery week
@@ -74,6 +81,7 @@ export async function GET(request: NextRequest) {
     orders,
     weeks: Object.values(weeks).sort((a, b) => b.weekStart.localeCompare(a.weekStart)),
     summary,
+    ...(counted ? { total: parseInt(counted[0]?.n ?? '0', 10) } : {}),
   })
 }
 

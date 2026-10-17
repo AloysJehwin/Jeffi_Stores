@@ -1,4 +1,5 @@
 import { scopeSql, type ServiceScope } from '@jeffi/tenancy'
+import * as wallet from '@jeffi/wallet'
 import { db, one } from './db.js'
 import { poolsForTenant } from './pools.js'
 import { callbacksEnabled, fetchStatus } from './providers/twilio.js'
@@ -30,9 +31,14 @@ export async function applyStatus(id: string, status: string, o: { code?: string
     return
   }
   const error = next === 'failed' ? deliveryReason(o.code, o.message) : null
-  const m = await one<{ tenant_id: string; reference: string | null; channel: string; to_address: string }>(
+  const m = await one<{ tenant_id: string; reference: string | null; channel: string; to_address: string; charged_inr: string }>(
     `UPDATE messages SET status=$2, error=COALESCE($3,error), updated_at=now() WHERE id=$1 AND status <> $2
-     RETURNING tenant_id, reference, channel, to_address`, [id, next, error])
+     RETURNING tenant_id, reference, channel, to_address, charged_inr`, [id, next, error])
+  // Nothing reached the recipient (e.g. Meta's marketing cap, 63049), so the send is not billed.
+  if (m && next === 'failed' && Number(m.charged_inr) > 0) {
+    await wallet.trueUp({ tenantId: m.tenant_id, amountInr: 0, externalRef: `pub:${id}`, note: `refund: ${m.channel} not delivered` })
+    await db.query(`UPDATE messages SET charged_inr=$2 WHERE id=$1`, [id, 0])
+  }
   const campaignId = m?.reference?.match(/^messaging:([0-9a-f-]{36})$/)?.[1]
   if (!m || next !== 'failed' || !campaignId) return
   const { pool } = await poolsForTenant(m.tenant_id)

@@ -5,6 +5,8 @@ import SupplierDetailClient from '../SupplierDetailClient'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
+import { queryOne } from '@/lib/shared/db'
+import { startSupplierDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,5 +23,11 @@ export default async function SupplierViewPage({ params }: { params: Promise<{ i
     redirect(ap('/admin/login', host))
   }
 
-  return <SupplierDetailClient id={id} />
+  const draftRow = await queryOne<{ supplier_id: string }>(
+    `SELECT supplier_id FROM supplier_drafts WHERE supplier_id = $1`,
+    [id]
+  )
+  const hasDraft = !!draftRow
+
+  return <SupplierDetailClient id={id} hasDraft={hasDraft} startDraftAction={startSupplierDraft.bind(null, id)} />
 }

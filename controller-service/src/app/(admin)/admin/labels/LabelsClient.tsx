@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { LabelSpec, LabelSize } from '@/lib/documents/label-sizes'
@@ -8,6 +9,7 @@ import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import BatchSerialLabels from '@/components/admin/BatchSerialLabels'
 import { LabelPreview, fmtPrice, type PreviewProduct } from '@/components/admin/label-preview'
 import CopySku from '@/components/ui/CopySku'
+import { Tabs } from '@/components/admin/channels/ui'
 
 function Highlight({ text, query }: { text: string; query: string }) {
   const trimmed = query.trim()
@@ -22,7 +24,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
         pattern.test(part) ? (
           <mark
             key={i}
-            className="bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 rounded-sm not-italic font-semibold"
+            className="bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-sm not-italic font-semibold"
           >
             {part}
           </mark>
@@ -101,7 +103,8 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
   const [selectedProducts, setSelectedProducts] = useState<SelectedProduct[]>([])
   const [previewIndex, setPreviewIndex] = useState(0)
   const [downloading, setDownloading] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useActionToast()
+  const setError = useCallback((m: string) => m && toast.error(m), [toast])
   const [showPrice, setShowPrice] = useState(false)
   const [qrAction, setQrAction] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -259,24 +262,15 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
   return (
     <div className="space-y-5">
       {/* Label type tabs */}
-      <div className="flex items-center gap-1 border-b border-border-default">
-        {(
-          [
-            { key: 'product', label: 'Product' },
-            { key: 'batch', label: 'Batch product' },
-            { key: 'serial', label: 'Serial product' },
-          ] as const
-        ).map(t => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => changeTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${labelTab === t.key ? 'border-orange-500 text-orange-600 dark:text-orange-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={[
+          { id: 'product' as const, label: 'Product' },
+          { id: 'batch' as const, label: 'Batch product' },
+          { id: 'serial' as const, label: 'Serial product' },
+        ]}
+        value={labelTab}
+        onChange={changeTab}
+      />
 
       {labelTab === 'batch' && <BatchSerialLabels mode="batch" labelSizes={labelSizes} />}
       {labelTab === 'serial' && <BatchSerialLabels mode="serial" labelSizes={labelSizes} />}
@@ -302,7 +296,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                         onClick={() => setSelectedSize(spec.size)}
                         className={`flex flex-col items-center gap-2 py-3 px-2 rounded-lg border-2 transition-all ${
                           isActive
-                            ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                            ? 'border-amber-500 bg-amber-500/5'
                             : 'border-border-default hover:border-orange-300 bg-surface-secondary'
                         }`}
                       >
@@ -311,14 +305,14 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                             style={{ width: rW, height: rH }}
                             className={`border-2 rounded-sm transition-colors ${
                               isActive
-                                ? 'border-orange-500 bg-orange-100 dark:bg-orange-800/30'
+                                ? 'border-amber-500 bg-amber-500/10'
                                 : 'border-border-strong'
                             }`}
                           />
                         </div>
                         <span
                           className={`text-[11px] font-semibold leading-tight text-center ${
-                            isActive ? 'text-orange-600 dark:text-orange-400' : 'text-foreground-secondary'
+                            isActive ? 'text-amber-600 dark:text-amber-400' : 'text-foreground-secondary'
                           }`}
                         >
                           {spec.label}
@@ -337,7 +331,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                     key={m}
                     type="button"
                     onClick={() => setOutputMode(m)}
-                    className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                    className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-amber-500 bg-amber-500/5 text-amber-600 dark:text-amber-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
                   >
                     {m === 'thermal' ? 'Thermal (1/page)' : 'A4 sheet'}
                   </button>
@@ -358,7 +352,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                 type="button"
                 onClick={() => setShowPrice(v => !v)}
                 title="Print price on label"
-                className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-amber-500 bg-amber-500/5 text-amber-600 dark:text-amber-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
               >
                 Print Price: {showPrice ? 'On' : 'Off'}
               </button>
@@ -366,7 +360,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                 type="button"
                 onClick={() => setQrAction(v => !v)}
                 title="QR opens quick actions when scanned"
-                className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
+                className={`px-3 h-control-sm rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-amber-500 bg-amber-500/5 text-amber-600 dark:text-amber-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}
               >
                 QR Action: {qrAction ? 'On' : 'Off'}
               </button>
@@ -495,7 +489,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                               selectTaItem(item)
                             }}
                             className={`w-full text-left px-3 py-2 text-sm flex flex-col gap-0.5 transition-colors ${
-                              idx === taIndex ? 'bg-orange-50 dark:bg-orange-900/20' : 'hover:bg-surface-secondary'
+                              idx === taIndex ? 'bg-amber-500/5' : 'hover:bg-surface-secondary'
                             } ${isSelected ? 'opacity-60' : ''}`}
                           >
                             <span className="font-medium text-foreground truncate">
@@ -526,7 +520,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                       <label
                         key={p.id}
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${
-                          isSelected ? 'bg-orange-50 dark:bg-orange-900/20' : 'hover:bg-surface-secondary'
+                          isSelected ? 'bg-amber-500/5' : 'hover:bg-surface-secondary'
                         }`}
                       >
                         <input
@@ -577,7 +571,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                       key={p.id}
                       className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-colors cursor-pointer ${
                         idx === safePreviewIdx
-                          ? 'bg-orange-50 dark:bg-orange-900/20 ring-1 ring-orange-200 dark:ring-orange-800'
+                          ? 'bg-amber-500/5 ring-1 ring-amber-500/40'
                           : 'bg-surface-secondary'
                       }`}
                       onClick={() => setPreviewIndex(idx)}
@@ -633,11 +627,6 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
               </div>
             )}
 
-            {error && (
-              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-4 py-3 text-sm text-red-700 dark:text-red-400">
-                {error}
-              </div>
-            )}
           </div>
 
           {/* ── Right panel — preview ── */}

@@ -17,7 +17,7 @@ type OAuthMap = Partial<Record<'google_merchant' | 'amazon_seller' | 'meta', OAu
 type Toast = { ok: boolean; text: string } | null
 type SetToast = (t: Toast) => void
 
-// Store-admin credentials popup. Opened by a gear button on /admin/merchant-sync (google + amazon)
+// Store-admin credentials popup. Opened by a gear button on /admin/merchant and /admin/amazon (google + amazon)
 // and /admin/social-posts (meta). Each provider can connect by OAuth (when the platform app is
 // configured) or by entering credentials directly. All fetches target the admin-scoped routes; the
 // tenant is resolved from the admin host server-side, never sent from the client.
@@ -46,6 +46,8 @@ function resultToast(): Toast {
   const err = p.get('error')
   const name = PROVIDER_NAMES[p.get('provider') || connected] || connected
   if (connected === '0' || err) return { ok: false, text: `Could not connect ${name}: ${ERROR_TEXT[err || ''] || err}` }
+  const reg = p.get('register_error')
+  if (reg) return { ok: false, text: `${name} connected, but Merchant API sync could not be enabled: ${reg}` }
   return { ok: true, text: `${name} connected. Use Test connection to check it.` }
 }
 
@@ -71,7 +73,7 @@ export default function AdminIntegrationsPopup({
     setToast(t)
     setOpen(true)
     const url = new URL(window.location.href)
-    for (const k of ['connected', 'error', 'provider']) url.searchParams.delete(k)
+    for (const k of ['connected', 'error', 'provider', 'register_error']) url.searchParams.delete(k)
     window.history.replaceState({}, '', url.toString())
   }, [])
 
@@ -268,6 +270,42 @@ function TestButton({ provider, setToast }: { provider: string; setToast: SetToa
   )
 }
 
+// One-time Merchant API registration of the connected account (also done on every Google sign-in),
+// naming the admin who becomes its API developer.
+function EnableMerchantApiButton({ setToast }: { setToast: SetToast }) {
+  const [busy, setBusy] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const [email, setEmail] = useState('')
+  async function run() {
+    setBusy(true)
+    setToast(null)
+    const { ok, data } = await postJson('/api/admin/merchant/register', 'POST', { email })
+    setToast({ ok: ok && !!data.ok, text: data.message || data.error || 'Could not enable Merchant API sync' })
+    setBusy(false)
+    if (ok && data.ok) setAsking(false)
+  }
+  if (!asking)
+    return (
+      <button type="button" onClick={() => setAsking(true)} className={btnSecondary}>
+        Enable Merchant API sync
+      </button>
+    )
+  return (
+    <div className="w-full flex flex-wrap items-center gap-2">
+      <input
+        type="email"
+        value={email}
+        onChange={e => setEmail(e.target.value)}
+        placeholder="Email of an admin on this Merchant Center account"
+        className="flex-1 min-w-[16rem] h-control rounded-lg border border-border-default bg-surface px-3 text-sm"
+      />
+      <button type="button" onClick={run} disabled={busy || !email.trim()} className={btnSecondary}>
+        {busy ? 'Enabling…' : 'Enable'}
+      </button>
+    </div>
+  )
+}
+
 function DisconnectButton({
   url,
   body,
@@ -380,6 +418,7 @@ function GoogleCard({
               {manual ? 'Hide manual entry' : 'Enter service account'}
             </button>
             {connected && <TestButton provider="google_merchant" setToast={setToast} />}
+            {connected && row?.meta?.connected_via === 'oauth' && <EnableMerchantApiButton setToast={setToast} />}
             {connected && (
               <DisconnectButton
                 url="/api/admin/integrations"

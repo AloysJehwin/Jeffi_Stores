@@ -67,7 +67,19 @@ export async function snapshotResource(
       if (!live) return null
       return { snapshot: { kind: 'create', fields: live }, updatedAt: null }
     }
-    case 'product':
+    case 'product': {
+      // The whole draft: variants, sub-variants, images, units and variant images change in a session too.
+      const draft = await queryOne<Record<string, unknown> & { updated_at: string }>(
+        `SELECT fields, variants, sub_variants, images, units, variant_images, updated_at
+           FROM product_drafts WHERE product_id = $1`,
+        [resourceId]
+      )
+      if (draft) {
+        const { updated_at, ...cols } = draft
+        return { snapshot: { kind: 'edit', ...cols }, updatedAt: updated_at }
+      }
+      return { snapshot: { kind: 'create', fields: {} }, updatedAt: null }
+    }
     case 'category':
     case 'brand':
     case 'coupon': {
@@ -238,7 +250,23 @@ export async function restoreSnapshot(
       }
       return
     }
-    case 'product':
+    case 'product': {
+      if ((snapshot as { kind?: string }).kind !== 'edit') {
+        await client.query(`DELETE FROM product_drafts WHERE product_id = $1`, [resourceId])
+        return
+      }
+      // Older snapshots carry only fields; restore whichever columns were captured.
+      const cols = ['fields', 'variants', 'sub_variants', 'images', 'units', 'variant_images'].filter(
+        c => (snapshot as Record<string, unknown>)[c] !== undefined
+      )
+      if (cols.length === 0) return
+      await client.query(
+        `UPDATE product_drafts SET ${cols.map((c, i) => `${c} = $${i + 1}::jsonb`).join(', ')}, updated_at = now()
+          WHERE product_id = $${cols.length + 1}`,
+        [...cols.map(c => JSON.stringify((snapshot as Record<string, unknown>)[c])), resourceId]
+      )
+      return
+    }
     case 'category':
     case 'brand':
     case 'coupon': {

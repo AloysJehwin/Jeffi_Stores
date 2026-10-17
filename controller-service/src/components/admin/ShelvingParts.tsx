@@ -7,6 +7,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import CopySku from '@/components/ui/CopySku'
 import { ADMIN_INPUT_CLASS } from '@/lib/shared/format'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { fieldInputCls, useActionToast } from '@/components/admin/kit'
 
 export interface Warehouse {
   id: string
@@ -61,7 +62,7 @@ export interface ShelfStock {
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 const inputCls = ADMIN_INPUT_CLASS
 const btnPrimary =
-  'flex-1 control-md border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 font-medium transition-colors disabled:opacity-50'
+  'flex-1 control-md border border-transparent bg-accent-500 hover:bg-accent-600 text-white font-medium transition-colors disabled:opacity-50'
 const btnSecondary =
   'control-md border border-border-default bg-surface hover:bg-surface-secondary text-foreground font-medium transition-colors'
 
@@ -79,6 +80,7 @@ export function WarehouseForm({
   const [address, setAddress] = useState(initial?.address || '')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  const toast = useActionToast()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -91,7 +93,7 @@ export function WarehouseForm({
     try {
       await onSave({ name: name.trim(), code: code.trim(), address: address.trim() })
     } catch (e: any) {
-      setErr(e.message)
+      toast.error(e.message)
     } finally {
       setSaving(false)
     }
@@ -100,7 +102,7 @@ export function WarehouseForm({
   return (
     <form onSubmit={submit} className="space-y-3">
       {err && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+        <div className="rounded-lg bg-red-500/5 border border-red-500/40 px-3 py-2 text-xs text-red-600 dark:text-red-400">
           {err}
         </div>
       )}
@@ -160,6 +162,7 @@ export function LocationForm({
   const [notes, setNotes] = useState(initial?.notes || '')
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  const toast = useActionToast()
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -178,7 +181,7 @@ export function LocationForm({
         notes: notes.trim(),
       })
     } catch (e: any) {
-      setErr(e.message)
+      toast.error(e.message)
     } finally {
       setSaving(false)
     }
@@ -222,7 +225,7 @@ export function LocationForm({
   return (
     <form onSubmit={submit} className="space-y-3">
       {err && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+        <div className="rounded-lg bg-red-500/5 border border-red-500/40 px-3 py-2 text-xs text-red-600 dark:text-red-400">
           {err}
         </div>
       )}
@@ -246,7 +249,7 @@ export function LocationForm({
                   <input
                     value={lvl.value}
                     onChange={e => lvl.onChange(e.target.value)}
-                    className="w-16 px-2 h-control-sm rounded-lg border border-border-default bg-surface text-foreground text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
+                    className={`${fieldInputCls} w-16 px-2 font-mono text-center`}
                     placeholder={lvl.placeholder}
                     maxLength={10}
                   />
@@ -312,6 +315,7 @@ export function StockRow({
   const [batchMoveRaw, setBatchMoveRaw] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
+  const toast = useActionToast()
   const [batchesOpen, setBatchesOpen] = useState(false)
 
   const batches = row.batches ?? []
@@ -362,7 +366,7 @@ export function StockRow({
       setEditing(false)
       onRefresh()
     } catch (e: any) {
-      setErr(e.message)
+      toast.error(e.message)
     } finally {
       setSaving(false)
     }
@@ -412,7 +416,7 @@ export function StockRow({
       setMoving(false)
       onRefresh()
     } catch (e: any) {
-      setErr(e.message)
+      toast.error(e.message)
     } finally {
       setSaving(false)
     }
@@ -445,7 +449,7 @@ export function StockRow({
                 min={unitStep}
                 step={unitStep}
                 max={undefined}
-                className="w-20 px-2 py-1 rounded-lg border border-border-default bg-surface text-foreground text-sm text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                className={`${fieldInputCls} w-20 px-2 text-center`}
               />
               <span className="text-xs text-foreground-muted">{unitLabel}</span>
               <button
@@ -467,7 +471,7 @@ export function StockRow({
           ) : (row.perishable || row.serialized) && batches.length > 0 ? (
             <button
               onClick={() => setBatchesOpen(o => !o)}
-              className="flex items-center gap-1 text-sm font-bold tabular-nums text-foreground hover:text-secondary-500 dark:hover:text-secondary-400 transition-colors min-w-[2rem] text-right"
+              className="flex items-center gap-1 text-sm font-bold tabular-nums text-foreground hover:text-accent-500 transition-colors min-w-[2rem] text-right"
             >
               {displayQty} <span className="text-xs font-normal text-foreground-muted">{unitLabel}</span>
               <svg
@@ -486,7 +490,7 @@ export function StockRow({
                 setEditing(true)
               }}
               disabled={!canWrite}
-              className="text-sm font-bold tabular-nums text-foreground enabled:hover:text-secondary-500 dark:enabled:hover:text-secondary-400 transition-colors min-w-[2rem] text-right disabled:cursor-default"
+              className="text-sm font-bold tabular-nums text-foreground enabled:hover:text-accent-500 transition-colors min-w-[2rem] text-right disabled:cursor-default"
             >
               {displayQty} <span className="text-xs font-normal text-foreground-muted">{unitLabel}</span>
             </button>
@@ -525,7 +529,7 @@ export function StockRow({
                       <td className="px-3 py-2 font-mono text-foreground">
                         {b.lot_number || <span className="text-foreground-muted">—</span>}
                         {idx === 0 && (
-                          <span className="ml-1.5 text-[10px] bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400 px-1 py-0.5 rounded font-medium">
+                          <span className="ml-1.5 text-[10px] bg-accent-500/10 text-accent-500 px-1 py-0.5 rounded font-medium">
                             FIFO
                           </span>
                         )}
@@ -564,7 +568,7 @@ export function StockRow({
                             {serials.map(sn => (
                               <span
                                 key={sn}
-                                className="inline-flex items-center px-2 py-0.5 rounded bg-secondary-50 dark:bg-secondary-900/20 text-xs font-mono text-secondary-700 dark:text-secondary-300 border border-secondary-200 dark:border-secondary-700"
+                                className="inline-flex items-center px-2 py-0.5 rounded bg-accent-500/5 text-xs font-mono text-accent-500 border border-accent-500/30"
                               >
                                 {sn}
                               </span>
@@ -582,7 +586,7 @@ export function StockRow({
       )}
 
       {err && (
-        <div className="mt-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
+        <div className="mt-2 rounded-lg bg-red-500/5 border border-red-500/40 px-3 py-1.5 text-xs text-red-600 dark:text-red-400">
           {err}
         </div>
       )}
@@ -623,7 +627,7 @@ export function StockRow({
                     return (
                       <tr
                         key={b.id}
-                        className={`transition-colors ${checked ? 'bg-secondary-50 dark:bg-secondary-900/10' : 'hover:bg-surface-secondary/50 cursor-pointer'}`}
+                        className={`transition-colors ${checked ? 'bg-accent-500/5' : 'hover:bg-surface-secondary/50 cursor-pointer'}`}
                         onClick={() => {
                           if (checked) {
                             setBatchMoveQtys(s => {
@@ -657,13 +661,13 @@ export function StockRow({
                                 })
                               } else setBatchMoveQtys(s => ({ ...s, [b.id]: b.quantity_remaining }))
                             }}
-                            className="accent-secondary-500"
+                            className="accent-accent-500"
                           />
                         </td>
                         <td className="px-3 py-2 font-mono text-foreground">
                           {b.lot_number || <span className="text-foreground-muted">—</span>}
                           {idx === 0 && (
-                            <span className="ml-1.5 text-[10px] bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400 px-1 py-0.5 rounded font-medium">
+                            <span className="ml-1.5 text-[10px] bg-accent-500/10 text-accent-500 px-1 py-0.5 rounded font-medium">
                               FIFO
                             </span>
                           )}
@@ -707,7 +711,7 @@ export function StockRow({
                                   setBatchMoveQtys(s => ({ ...s, [b.id]: clamped }))
                                   setBatchMoveRaw(s => ({ ...s, [b.id]: String(clamped) }))
                                 }}
-                                className="w-12 text-center text-xs font-medium text-foreground tabular-nums border border-border-default rounded bg-surface px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-secondary-500"
+                                className="field-xs w-12 text-center font-medium text-foreground tabular-nums border border-border-default bg-surface px-1 focus:outline-none focus:ring-1 focus:ring-accent-500"
                               />
                               <button
                                 type="button"
@@ -746,7 +750,7 @@ export function StockRow({
                 type="number"
                 value={moveQty}
                 onChange={e => setMoveQty(e.target.value)}
-                className="w-full px-2 h-control rounded-lg border border-border-default bg-surface text-foreground text-xs text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors"
+                className={`${fieldInputCls} px-2 text-center`}
                 min={unitStep}
                 step={unitStep}
                 max={Number(maxSellQty)}
@@ -758,7 +762,7 @@ export function StockRow({
             <button
               onClick={doMove}
               disabled={saving || (isPerishableWithBatches ? totalBatchMoveQty === 0 : false)}
-              className="px-4 h-control-sm rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50"
+              className="px-4 h-control-sm rounded-lg text-xs font-medium bg-accent-500 hover:bg-accent-600 text-white transition-colors disabled:opacity-50"
             >
               {saving ? '…' : 'Move'}
             </button>
@@ -801,6 +805,7 @@ export function AssignStockForm({
   const [saving, setSaving] = useState(false)
   const [loadingAvail, setLoadingAvail] = useState(false)
   const [err, setErr] = useState('')
+  const toast = useActionToast()
 
   async function handleSelect(item: { id: string; label: string }) {
     const parts = item.id.split('\x1f')
@@ -931,7 +936,7 @@ export function AssignStockForm({
       if (!res.ok) throw new Error((await res.json()).error)
       onSave()
     } catch (e: any) {
-      setErr(e.message)
+      toast.error(e.message)
     } finally {
       setSaving(false)
     }
@@ -962,10 +967,10 @@ export function AssignStockForm({
     <form onSubmit={submit} className="space-y-3 p-4 bg-surface-secondary rounded-xl border border-border-default">
       <p className="text-sm font-medium text-foreground">
         Assign stock to{' '}
-        <span className="font-mono text-secondary-500 dark:text-secondary-400">{location.display_code}</span>
+        <span className="font-mono text-accent-500">{location.display_code}</span>
       </p>
       {err && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+        <div className="rounded-lg bg-red-500/5 border border-red-500/40 px-3 py-2 text-xs text-red-600 dark:text-red-400">
           {err}
         </div>
       )}
@@ -997,7 +1002,7 @@ export function AssignStockForm({
               </div>
               <div className="relative h-2 rounded-full bg-surface-secondary overflow-hidden">
                 <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-secondary-400 dark:bg-secondary-500 transition-all"
+                  className="absolute inset-y-0 left-0 rounded-full bg-accent-500 transition-all"
                   style={{ width: `${fillPct}%` }}
                 />
               </div>

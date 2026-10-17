@@ -1,26 +1,23 @@
-import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/auth/jwt'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { hasScope } from '@/lib/auth/scopes'
-import AdminAuditClient from './AdminAuditClient'
-import AccessDenied from '@/components/admin/AccessDenied'
-import { adminCookieName } from '@/lib/auth/admin-cookie'
+import { settingsHubRedirect } from '@/lib/admin/settings-hub'
+import { ap } from '@/lib/shared/admin-path'
+import { getHost } from '@/lib/tenancy/get-host'
+import AuditPanel from './AuditPanel'
 
-export default async function AdminAuditPage() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get(await adminCookieName())
-  let role = ''
+// Now a Settings hub tab. Admins without settings:read cannot open the hub, so they keep this route.
+export default async function AdminAuditPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
   let scopes: string[] = []
   try {
-    if (token) {
-      const payload = await verifyToken(token.value)
-      role = payload?.role || ''
-      scopes = payload?.scopes || []
-    }
+    scopes = JSON.parse(h.get('x-user-scopes') || '[]')
   } catch {}
-
-  if (!hasScope(role, scopes, 'audit:read')) {
-    return <AccessDenied scopeKey="audit" scopeLabel="Audit Log" />
-  }
-
-  return <AdminAuditClient />
+  if (hasScope(role, scopes, 'settings:read')) redirect(ap(settingsHubRedirect('audit', await searchParams), await getHost()))
+  return <AuditPanel />
 }

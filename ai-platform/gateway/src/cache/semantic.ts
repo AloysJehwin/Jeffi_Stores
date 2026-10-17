@@ -40,7 +40,7 @@ export function semanticKey(req: AiChatRequest, model: string): SemanticKey | nu
 }
 
 export async function semanticGet(pool: Pool, key: SemanticKey, minSimilarity: number): Promise<string | null> {
-  const [embedding] = await ollamaEmbed([key.prompt]).catch(() => [null as unknown as number[]])
+  const embedding = await ollamaEmbed([key.prompt]).then(r => r.embeddings[0]).catch(() => null)
   if (!embedding) return null
   const vec = `[${embedding.join(',')}]`
   // Cosine distance operator <=>; similarity = 1 - distance.
@@ -60,7 +60,7 @@ export async function semanticGet(pool: Pool, key: SemanticKey, minSimilarity: n
 
 export async function semanticSet(pool: Pool, key: SemanticKey, response: string): Promise<void> {
   if (!response.trim()) return
-  const [embedding] = await ollamaEmbed([key.prompt]).catch(() => [null as unknown as number[]])
+  const embedding = await ollamaEmbed([key.prompt]).then(r => r.embeddings[0]).catch(() => null)
   if (!embedding) return
   const vec = `[${embedding.join(',')}]`
   await pool.query(

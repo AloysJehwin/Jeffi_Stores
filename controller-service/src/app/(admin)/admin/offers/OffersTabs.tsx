@@ -1,58 +1,50 @@
 'use client'
 
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { Tabs } from '@/components/admin/channels/ui'
 import OffersClient from './OffersClient'
 import OffersListClient from './OffersListClient'
+import OffersOverview from './OffersOverview'
 
-type Tab = 'bank' | 'offers'
+type Tab = 'overview' | 'bank' | 'offers'
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'bank', label: 'Bank Offers' },
+  { id: 'offers', label: 'Offers' },
+]
 
 export default function OffersTabs({ canWrite }: { canWrite: boolean }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
 
-  const tab: Tab = searchParams.get('tab') === 'offers' ? 'offers' : 'bank'
+  const raw = searchParams.get('tab')
+  const tab: Tab = raw === 'offers' || raw === 'bank' ? raw : 'overview'
 
   function selectTab(next: Tab) {
     const params = new URLSearchParams(searchParams.toString())
-    if (next === 'bank') params.delete('tab')
-    else params.set('tab', 'offers')
+    if (next === 'overview') params.delete('tab')
+    else params.set('tab', next)
+    if (next !== 'overview') {
+      params.delete('from')
+      params.delete('to')
+    }
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }
 
   return (
-    <div>
-      <div className="flex gap-1 border-b border-border mb-6" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'bank'}
-          onClick={() => selectTab('bank')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            tab === 'bank'
-              ? 'border-foreground text-foreground'
-              : 'border-transparent text-foreground-muted hover:text-foreground'
-          }`}
-        >
-          Bank Offers
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'offers'}
-          onClick={() => selectTab('offers')}
-          className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-            tab === 'offers'
-              ? 'border-foreground text-foreground'
-              : 'border-transparent text-foreground-muted hover:text-foreground'
-          }`}
-        >
-          Offers
-        </button>
-      </div>
+    <div className="space-y-5">
+      <Tabs tabs={TABS} value={tab} onChange={selectTab} />
 
-      {tab === 'bank' ? <OffersClient canWrite={canWrite} /> : <OffersListClient canWrite={canWrite} />}
+      {tab === 'overview' ? (
+        <OffersOverview />
+      ) : tab === 'bank' ? (
+        <OffersClient canWrite={canWrite} />
+      ) : (
+        <OffersListClient canWrite={canWrite} />
+      )}
     </div>
   )
 }

@@ -98,6 +98,7 @@ Match tone to the trigger context given by the user (cart abandon = warm urgency
     let text = ''
     try {
       const r = await aiChat({
+        feature: 'email_copy',
         modelHint: 'fast',
         jsonMode: true,
         temperature: 0.6,

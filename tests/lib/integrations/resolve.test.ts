@@ -67,8 +67,18 @@ describe('integrations/resolve', () => {
         privateKey: 'PLATFORM_PK',
         merchantId: 'env-merchant-1',
       })
-      // No tenant -> never touched the credential store.
-      expect(registry.getIntegrationCredential).not.toHaveBeenCalled()
+      // The flagship looks for its own stored row (platform tenant id) before falling back to env.
+      expect(registry.getIntegrationCredential).toHaveBeenCalledWith('00000000-0000-0000-0000-000000000000', 'google_merchant')
+    })
+
+    it('uses the flagship\'s connected google_merchant creds when it has them', async () => {
+      registry.getIntegrationCredential.mockResolvedValue(
+        credRow({ client_email: 'flag@jeffi.iam.gserviceaccount.com', private_key: 'FLAG_PK', merchant_id: 'flag-merchant' })
+      )
+      const { resolveGoogleMerchantCreds } = await import('@/lib/integrations/resolve')
+      const creds = await resolveGoogleMerchantCreds()
+      expect(creds.merchantId).toBe('flag-merchant')
+      expect(creds.clientEmail).toBe('flag@jeffi.iam.gserviceaccount.com')
     })
 
     it("uses the TENANT's connected google_merchant creds (merchantId from the row, not env)", async () => {
@@ -177,7 +187,7 @@ describe('integrations/resolve', () => {
         sellerId: 'env-seller',
         marketplaceId: 'env-marketplace',
       })
-      expect(registry.getIntegrationCredential).not.toHaveBeenCalled()
+      expect(registry.getIntegrationCredential).toHaveBeenCalledWith('00000000-0000-0000-0000-000000000000', 'amazon_seller')
     })
 
     it("uses the TENANT's connected amazon_seller creds", async () => {

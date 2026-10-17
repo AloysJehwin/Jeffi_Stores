@@ -11,7 +11,9 @@ import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildProductSearchClause, buildProductSearchRank } from '@/lib/catalog/search'
 import { buildProductFilterClauses, getFilterFacets } from '@/lib/catalog/product-filters'
 import { getOfferBySlug, listActiveOffers, listFilterOffers } from '@/lib/catalog/product-offers'
-import Pagination from '@/components/ui/Pagination'
+import ProductCard from '@/components/visitor/ProductCard'
+import { pickUnitPrice } from '@/lib/catalog/pricing'
+import { round2 } from '@/lib/catalog/gst'
 import ProductGrid from '@/components/visitor/ProductGrid'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import ListingPromoBanner, { pickPromoOffer } from '@/components/visitor/listing/ListingPromoBanner'
@@ -230,6 +232,60 @@ async function getCategoryBanners() {
   return withProducts.filter(c => c.products.length >= 2)
 }
 
+function renderProductItem(product: any, gstEnabled: boolean) {
+  const primaryImage = product.product_images?.find((i: any) => i.is_primary) || product.product_images?.[0]
+  const hasVariants = product.has_variants
+  const displayPrice =
+    hasVariants && product.variant_min_price
+      ? Number(product.variant_min_price)
+      : pickUnitPrice(
+          {
+            inclusive: Number(product.base_price),
+            exGst: product.price_ex_gst != null ? Number(product.price_ex_gst) : undefined,
+          },
+          gstEnabled
+        )
+  const effectiveStock = hasVariants
+    ? Number(product.variant_stock_total)
+    : product.stock_status !== 'Out of Stock'
+      ? 1
+      : 0
+  const rawMrp = hasVariants
+    ? product.variant_min_mrp
+      ? Number(product.variant_min_mrp)
+      : null
+    : product.mrp
+      ? Number(product.mrp)
+      : null
+  const gstRate = Number(product.gst_percentage ?? 0)
+  const mrp = !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
+  const mrpDiscount = mrp && mrp > Number(displayPrice) ? Math.round(((mrp - Number(displayPrice)) / mrp) * 100) : 0
+  return (
+    <ProductCard
+      id={product.id}
+      name={product.name}
+      slug={product.slug}
+      hasVariants={hasVariants}
+      displayPrice={Number(displayPrice)}
+      mrp={mrp}
+      mrpDiscount={mrpDiscount}
+      effectiveStock={effectiveStock}
+      isDigital={!!product.is_digital}
+      primaryImage={primaryImage || null}
+      brandName={product.brands?.name ?? null}
+      categoryName={product.categories?.name ?? null}
+      categoryId={product.categories?.id ?? null}
+      discountPct={Number(product.discount_pct ?? 0)}
+      extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
+      handlingDays={Number(product.handling_days ?? 2)}
+      fragile={product.fragile}
+      hazardous={product.hazardous}
+      flammable={product.flammable}
+      portal="business"
+    />
+  )
+}
+
 function buildPageUrl(searchParams: Record<string, string | undefined>, page: number, host: string) {
   const params = new URLSearchParams()
   const keep = [
@@ -352,31 +408,46 @@ export default async function BusinessProductsPage({
 
             {products.length > 0 ? (
               <>
-                <ProductGrid
-                  products={products as any[]}
-                  gstEnabled={gstEnabled}
-                  categoryBanners={categoryBanners as any[]}
-                  total={total}
-                  start={start}
-                  end={end}
-                  portal="business"
-                  filterSlot={
-                    <MobileFilterSheet
-                      key="mobile-filters"
-                      categories={allCats}
-                      brands={brands as any[]}
-                      facets={facets}
-                      offers={filterOffers}
-                      basePath={basePath}
-                    />
+                {(() => {
+                  const items = (products as any[]).map(product => ({
+                    key: String(product.id),
+                    node: renderProductItem(product, gstEnabled),
+                  }))
+                  if (page === 1 && promoOffer && items.length > 6) {
+                    items.splice(6, 0, {
+                      key: 'promo-slot',
+                      node: (
+                        <div className="col-span-full">
+                          <ListingPromoBanner offer={promoOffer} />
+                        </div>
+                      ),
+                    })
                   }
-                  promoSlot={promoOffer ? <ListingPromoBanner offer={promoOffer} /> : undefined}
-                />
-                <Pagination
-                  page={page}
-                  totalPages={totalPages}
-                  buildHref={p => buildPageUrl(resolvedSearchParams, p, host)}
-                />
+                  return (
+                    <ProductGrid
+                      products={products as any[]}
+                      gstEnabled={gstEnabled}
+                      categoryBanners={categoryBanners as any[]}
+                      total={total}
+                      start={start}
+                      end={end}
+                      portal="business"
+                      filterSlot={
+                        <MobileFilterSheet
+                          key="mobile-filters"
+                          categories={allCats}
+                          brands={brands as any[]}
+                          facets={facets}
+                          offers={filterOffers}
+                          basePath={basePath}
+                        />
+                      }
+                      promoSlot={promoOffer ? <ListingPromoBanner offer={promoOffer} /> : undefined}
+                      pagedItems={items}
+                      page={page}
+                    />
+                  )
+                })()}
               </>
             ) : (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">

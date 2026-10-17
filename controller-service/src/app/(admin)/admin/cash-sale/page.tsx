@@ -4,7 +4,7 @@ import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import CashSaleClient from './CashSaleClient'
+import CashSaleTabs from './CashSaleTabs'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import { getStoreIdentity } from '@/lib/catalog/site-controls'
 
@@ -32,7 +32,7 @@ export default async function CashSalePage() {
 
   return (
     <div className="p-4 sm:p-6">
-      <CashSaleClient />
+      <CashSaleTabs />
     </div>
   )
 }

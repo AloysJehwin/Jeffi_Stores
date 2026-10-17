@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { productLabel, variantLabel } from '@/lib/catalog/product-label'
 import { round2 } from '@/lib/catalog/gst'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { FileText, ExternalLink, Plus, X } from 'lucide-react'
+import { Badge, Dialog, EmptyState, Field, Fields, InfiniteFooter, PageHeader, TableSkeleton, badgeCls, fetchJson, useActionToast, useInfiniteList, type StatusMap } from '@/components/admin/kit'
+import { TabAction, TabActionsPortal } from '@/components/admin/channels/ui'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import DatePicker from '@/components/ui/DatePicker'
@@ -61,15 +63,18 @@ const PAYMENT_MODES = [
   { value: 'upi_qr', label: 'UPI (QR Scan)' },
 ]
 
-const PAYMENT_COLORS: Record<string, string> = {
-  paid: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  unpaid: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  refunded: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
-  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+// Cash-sale payment_status values; full kit badge classes so callers add nothing.
+const CASH_PAYMENT_STATUS: StatusMap = {
+  paid: { label: 'Paid', tone: 'green' },
+  unpaid: { label: 'Unpaid', tone: 'amber' },
+  refunded: { label: 'Refunded', tone: 'muted' },
+  cancelled: { label: 'Cancelled', tone: 'red' },
 }
+const PAYMENT_COLORS: Record<string, string> = Object.fromEntries(Object.entries(CASH_PAYMENT_STATUS).map(([k, v]) => [k, badgeCls(v.tone)]))
+const payCls = (s: string) => PAYMENT_COLORS[s] || badgeCls('muted')
 
 const inputCls =
-  'field-sm w-full border border-border-default bg-surface-secondary text-foreground focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400'
+  'field-md w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
 function fmt(n: number) {
@@ -108,10 +113,6 @@ export default function CashSaleClient() {
   const router = useRouter()
   const [view, setView] = useState<View>('list')
 
-  const [sales, setSales] = useState<CashSale[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
   const [selectedSale, setSelectedSale] = useState<CashSale | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [paymentFilter, setPaymentFilter] = useState(searchParams.get('payment') || '')
@@ -150,7 +151,9 @@ export default function CashSaleClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const [submitting, setSubmitting] = useState(false)
-  const [formError, setFormError] = useState('')
+  const actionToast = useActionToast()
+  // Validation and submit failures are toasts; '' clears nothing.
+  const setFormError = (m: string) => m && actionToast.error(m)
   const [receipt, setReceipt] = useState<Receipt | null>(null)
 
   // Batch/serial assignment for perishable and serialized products
@@ -172,8 +175,6 @@ export default function CashSaleClient() {
     })
   }, [items])
 
-  const totalPages = Math.ceil(total / 25)
-
   const SORT_KEYS: Record<string, keyof CashSale> = {
     invoice_number: 'invoice_number',
     date: 'invoice_date',
@@ -181,41 +182,31 @@ export default function CashSaleClient() {
     payment: 'payment_status',
   }
 
-  // Ordered server-side across all sales via sort/dir params.
-  const sortedSales = sales
 
-  const fetchSales = useCallback(
-    async (p = 1) => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams()
-        if (paymentFilter) params.set('payment', paymentFilter)
-        if (fromDate) params.set('from', fromDate)
-        if (toDate) params.set('to', toDate)
-        if (searchQ) params.set('search', searchQ)
-        if (sortCol && SORT_KEYS[sortCol]) {
-          params.set('sort', SORT_KEYS[sortCol])
-          params.set('dir', sortDir || 'desc')
-        }
-        params.set('page', String(p))
-        const res = await fetch(`/api/admin/cash-sale?${params}`, { credentials: 'include' })
-        if (!res.ok) throw new Error('Failed')
-        const data = await res.json()
-        setSales(data.sales || [])
-        setTotal(data.total || 0)
-        setPage(p)
-      } catch {
-        showToast('Failed to load cash sales', 'error')
-      } finally {
-        setLoading(false)
+  // Ordered server-side across all sales via sort/dir params; 25 per page.
+  const list = useInfiniteList<CashSale>({
+    key: `${paymentFilter}|${fromDate}|${toDate}|${searchQ}|${sortCol}|${sortDir}`,
+    pageSize: 25,
+    getKey: s => s.id,
+    fetchPage: async (p, signal) => {
+      const params = new URLSearchParams()
+      if (paymentFilter) params.set('payment', paymentFilter)
+      if (fromDate) params.set('from', fromDate)
+      if (toDate) params.set('to', toDate)
+      if (searchQ) params.set('search', searchQ)
+      if (sortCol && SORT_KEYS[sortCol]) {
+        params.set('sort', SORT_KEYS[sortCol])
+        params.set('dir', sortDir || 'desc')
       }
+      params.set('page', String(p))
+      const data = await fetchJson(`/api/admin/cash-sale?${params}`, signal)
+      return { rows: data.sales || [], total: data.total || 0 }
     },
-    [paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir, showToast]
-  )
-
-  useEffect(() => {
-    fetchSales(1)
-  }, [paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir])
+  })
+  const sales = list.rows
+  const sortedSales = sales
+  const loading = list.loading
+  const fetchSales = list.reload
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -260,7 +251,7 @@ export default function CashSaleClient() {
         return
       }
       showToast('Cash sale cancelled and stock restored', 'success')
-      fetchSales(page)
+      fetchSales()
     } catch {
       showToast('Failed to cancel sale', 'error')
     } finally {
@@ -445,7 +436,7 @@ export default function CashSaleClient() {
       showToast(data.invoiceNumber ? `Receipt ${data.invoiceNumber} created` : 'Cash sale recorded', 'success')
       resetForm()
       setView('receipt')
-      fetchSales(1)
+      fetchSales()
     } catch (err: any) {
       setFormError(err.message || 'Failed')
     } finally {
@@ -487,10 +478,8 @@ export default function CashSaleClient() {
                 <p className="text-xs text-foreground-muted uppercase tracking-wide">Customer</p>
                 <p className="text-sm font-semibold text-foreground mt-0.5">Walk-in Customer</p>
                 <div className="flex gap-1.5 justify-end mt-1.5">
-                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                    Paid
-                  </span>
-                  <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-surface border border-border-default text-foreground-secondary capitalize">
+                  <Badge tone="green">Paid</Badge>
+                  <span className={`${badgeCls('muted')} capitalize`}>
                     {receipt.paymentMode.replace(/_/g, ' ')}
                   </span>
                 </div>
@@ -499,11 +488,11 @@ export default function CashSaleClient() {
 
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-border-default bg-surface-secondary">
-                  <th className="px-5 py-2.5 text-left text-xs font-semibold text-foreground-secondary">Item</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-foreground-secondary">Qty</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold text-foreground-secondary">Rate</th>
-                  <th className="px-5 py-2.5 text-right text-xs font-semibold text-foreground-secondary">Amount</th>
+                <tr className="border-b border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
+                  <th className="px-5 py-2.5 text-left font-medium">Item</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Qty</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Rate</th>
+                  <th className="px-5 py-2.5 text-right font-medium">Amount</th>
                 </tr>
               </thead>
               <tbody>
@@ -537,7 +526,7 @@ export default function CashSaleClient() {
 
           <div className="space-y-4">
             <div className="bg-surface-elevated border border-border-default rounded-xl p-5 space-y-3">
-              <h3 className="text-sm font-semibold text-foreground">Summary</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Summary</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between text-foreground-secondary">
                   <span>Subtotal (incl. tax)</span>
@@ -560,16 +549,9 @@ export default function CashSaleClient() {
                   href={receipt.invoiceUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-colors"
+                  className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-accent-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-accent-600"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
+                  <FileText className="h-4 w-4" />
                   Print / Download Receipt
                 </a>
               )}
@@ -578,7 +560,7 @@ export default function CashSaleClient() {
                   setReceipt(null)
                   setView('new')
                 }}
-                className="hidden md:inline-flex items-center justify-center px-4 py-2.5 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
+                className="hidden min-h-10 items-center justify-center rounded-lg bg-accent-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-accent-600 md:inline-flex"
               >
                 New Sale
               </button>
@@ -587,7 +569,7 @@ export default function CashSaleClient() {
                   setReceipt(null)
                   setView('list')
                 }}
-                className="px-4 py-2.5 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+                className="min-h-10 rounded-lg border border-border-default px-4 text-sm font-medium text-foreground transition-colors hover:bg-surface-secondary"
               >
                 View All Sales
               </button>
@@ -686,11 +668,6 @@ export default function CashSaleClient() {
           </div>
         </div>
 
-        {formError && (
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300 text-sm">
-            {formError}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -738,15 +715,13 @@ export default function CashSaleClient() {
               </div>
 
               <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-                <h2 className="text-sm font-semibold text-foreground mb-3">Payment Mode</h2>
+                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-foreground">Payment Mode</h2>
                 <div className="flex flex-wrap gap-2">
                   {PAYMENT_MODES.map(m => (
                     <label
                       key={m.value}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition-colors ${
-                        paymentMode === m.value
-                          ? 'border-secondary-500 dark:border-secondary-400 bg-secondary-50 dark:bg-secondary-700/30 text-secondary-700 dark:text-secondary-200'
-                          : 'border-border-default bg-surface-secondary text-foreground-secondary hover:border-secondary-400 dark:hover:border-secondary-500'
+                      className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border px-4 transition-colors ${
+                        paymentMode === m.value ? 'border-accent-500 bg-accent-500/10 text-foreground' : 'border-border-default bg-surface-secondary text-foreground-secondary hover:border-accent-500/50'
                       }`}
                     >
                       <input
@@ -755,7 +730,7 @@ export default function CashSaleClient() {
                         value={m.value}
                         checked={paymentMode === m.value}
                         onChange={() => setPaymentMode(m.value)}
-                        className="accent-secondary-500 shrink-0"
+                        className="shrink-0 accent-accent-500"
                       />
                       <span className="text-sm font-medium">{m.label}</span>
                     </label>
@@ -777,7 +752,7 @@ export default function CashSaleClient() {
 
             <div className="space-y-4">
               <div className="bg-surface-elevated border border-border-default rounded-xl p-5 sticky top-4">
-                <h3 className="text-sm font-semibold text-foreground mb-4">Order Summary</h3>
+                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-foreground">Order Summary</h3>
                 <div className="space-y-2 text-sm mb-4">
                   <div className="flex justify-between text-foreground-secondary">
                     <span>Items ({items.filter(it => it.product_name).length})</span>
@@ -801,7 +776,7 @@ export default function CashSaleClient() {
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="w-full py-3 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-xl text-sm font-bold disabled:opacity-50 transition-colors"
+                      className="w-full rounded-xl bg-accent-500 py-3 text-sm font-bold text-white transition-colors hover:bg-accent-600 disabled:opacity-50"
                     >
                       {submitting ? 'Processing…' : 'Complete Sale'}
                     </button>
@@ -818,23 +793,20 @@ export default function CashSaleClient() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Cash Sales</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Walk-in sales — no customer details</p>
-        </div>
+        <PageHeader title="Cash Sales" description="Walk-in sales — no customer details" />
         {canWrite && (
-          <button
-            onClick={() => {
-              resetForm()
-              setView('new')
-            }}
-            className="hidden md:flex items-center gap-2 px-4 h-control bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            New Cash Sale
-          </button>
+          <TabActionsPortal>
+            <span className="hidden md:inline-flex">
+              <TabAction
+                onClick={() => {
+                  resetForm()
+                  setView('new')
+                }}
+                icon={<Plus className="w-4 h-4" />}
+                label="New Cash Sale"
+              />
+            </span>
+          </TabActionsPortal>
         )}
       </div>
 
@@ -863,7 +835,7 @@ export default function CashSaleClient() {
               setSearchQ(searchInput)
               syncUrl({ search: searchInput })
             }}
-            className="control-sm border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white font-medium transition-colors"
+            className="control-md bg-accent-500 font-medium text-white transition-colors hover:bg-accent-600"
           >
             Search
           </button>
@@ -877,15 +849,15 @@ export default function CashSaleClient() {
                 setToDate('')
                 syncUrl({ search: '', payment: '', from: '', to: '' })
               }}
-              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
+              className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
             >
+              <X className="h-4 w-4" />
               Clear
             </button>
           )}
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <AdminSelect
-            sm
             value={paymentFilter}
             onChange={v => {
               setPaymentFilter(v)
@@ -922,30 +894,15 @@ export default function CashSaleClient() {
 
       <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-4 space-y-2">
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 px-2 py-1 animate-pulse"
-                style={{ animationDelay: `${i * 50}ms` }}
-              >
-                <div className="h-4 w-24 bg-surface-secondary rounded" />
-                <div className="h-4 w-20 bg-surface-secondary rounded" />
-                <div className="h-4 flex-1 bg-surface-secondary rounded" />
-                <div className="h-4 w-20 bg-surface-secondary rounded" />
-                <div className="h-4 w-16 bg-surface-secondary rounded" />
-                <div className="h-4 w-16 bg-surface-secondary rounded" />
-              </div>
-            ))}
-          </div>
+          <TableSkeleton rows={8} cols={6} />
         ) : sales.length === 0 ? (
-          <div className="p-12 text-center text-foreground-muted text-sm">No cash sales found.</div>
+          <EmptyState bare title="No cash sales found." />
         ) : (
           <>
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border-default bg-surface-secondary">
+                  <tr className="border-b border-border-default bg-surface-secondary/50">
                     <SortableHeader
                       label="Receipt No"
                       column="invoice_number"
@@ -998,7 +955,7 @@ export default function CashSaleClient() {
                   {sortedSales.map(sale => (
                     <tr
                       key={sale.id}
-                      className="border-b border-border-default hover:bg-surface-secondary transition-colors cursor-pointer"
+                      className="cursor-pointer border-b border-border-default/60 transition-colors last:border-0 hover:bg-surface-secondary/60"
                       onClick={() => setSelectedSale(sale)}
                     >
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
@@ -1036,7 +993,7 @@ export default function CashSaleClient() {
                               </span>
                               <span className="text-foreground-muted">Payment</span>
                               <span
-                                className={`font-medium ${sale.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}
+                                className={`font-medium ${sale.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}
                               >
                                 {sale.payment_status}
                               </span>
@@ -1068,16 +1025,8 @@ export default function CashSaleClient() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[sale.payment_status] || ''}`}
-                        >
-                          {sale.payment_status}
-                        </span>
-                        {sale.status === 'cancelled' && (
-                          <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                            Cancelled
-                          </span>
-                        )}
+                        <span className={payCls(sale.payment_status)}>{sale.payment_status}</span>
+                        {sale.status === 'cancelled' && <span className={`ml-1 ${badgeCls('red')}`}>Cancelled</span>}
                       </td>
                       <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                         <RowActions
@@ -1129,35 +1078,7 @@ export default function CashSaleClient() {
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="px-4 py-3 border border-border-default border-t-0 rounded-b-xl bg-surface-elevated flex items-center justify-between gap-2">
-          <p className="text-xs text-foreground-muted whitespace-nowrap">
-            <span className="font-medium text-foreground">
-              {(page - 1) * 25 + 1}–{Math.min(page * 25, total)}
-            </span>{' '}
-            of <span className="font-medium text-foreground">{total}</span> sales
-          </p>
-          <div className="flex items-center gap-1.5">
-            <button
-              disabled={page <= 1}
-              onClick={() => fetchSales(page - 1)}
-              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-            >
-              Prev
-            </button>
-            <span className="text-xs text-foreground-muted whitespace-nowrap">
-              {page}/{totalPages}
-            </span>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => fetchSales(page + 1)}
-              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <InfiniteFooter shown={sales.length} control={list} noun="sales" />
 
       {selectedSale && (
         <SaleDetailModal
@@ -1165,7 +1086,7 @@ export default function CashSaleClient() {
           onClose={() => setSelectedSale(null)}
           onCancelled={() => {
             setSelectedSale(null)
-            fetchSales(page)
+            fetchSales()
           }}
         />
       )}
@@ -1219,161 +1140,61 @@ function SaleDetailModal({
   }
 
   const isCancelled = sale.status === 'cancelled'
-  if (typeof document === 'undefined') return null
-  return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div
-        className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between p-5 border-b border-border-default">
-          <div className="min-w-0 pr-4">
-            <h2 className="text-lg font-bold text-foreground leading-tight font-mono">
-              {sale.invoice_number || sale.order_number}
-            </h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              {new Date(sale.invoice_date).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              })}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors flex-shrink-0"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="p-5 space-y-5">
-          <div className="flex flex-wrap gap-2">
-            <span
-              className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${PAYMENT_COLORS[sale.payment_status] || ''}`}
+  const inr2 = (v: string) => parseFloat(v).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const linkCls = 'control-md border border-border-default text-foreground hover:bg-surface-secondary'
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      size="lg"
+      zIndex="z-[300]"
+      title={<span className="font-mono">{sale.invoice_number || sale.order_number}</span>}
+      description={new Date(sale.invoice_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+      footer={
+        <>
+          <a href={`/api/admin/cash-sale/${sale.id}/receipt`} target="_blank" rel="noopener noreferrer" className={linkCls}>
+            <FileText className="h-4 w-4" />
+            Receipt PDF
+          </a>
+          <a href={ap(`/admin/orders/${sale.id}/view`)} className={linkCls}>
+            <ExternalLink className="h-4 w-4" />
+            View Order
+          </a>
+          {!isCancelled && canWrite && (
+            <button
+              type="button"
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="control-md mr-auto border border-red-500/40 text-red-600 hover:bg-red-500/10 disabled:opacity-50 dark:text-red-400 sm:order-first"
             >
-              {sale.payment_status}
-            </span>
-            <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-surface border border-border-default text-foreground-secondary">
-              Cash Sale
-            </span>
-            {sale.status === 'cancelled' && (
-              <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
-                Cancelled
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Customer</p>
-              <p className="text-sm font-semibold text-foreground">Walk-in Customer</p>
-            </div>
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Order</p>
-              <p className="text-sm text-foreground font-mono">{sale.order_number}</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-surface-secondary">
-            <div>
-              <p className="text-xs text-foreground-muted">Taxable</p>
-              <p className="text-sm font-semibold text-foreground">
-                ₹
-                {parseFloat(sale.taxable_amount).toLocaleString('en-IN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </p>
-            </div>
-            {parseFloat(sale.cgst_amount) > 0 && (
-              <div>
-                <p className="text-xs text-foreground-muted">CGST + SGST</p>
-                <p className="text-sm font-semibold text-foreground">
-                  ₹
-                  {parseFloat(sale.cgst_amount).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{' '}
-                  + ₹
-                  {parseFloat(sale.sgst_amount).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </p>
-              </div>
-            )}
-            <div>
-              <p className="text-xs text-foreground-muted">Total</p>
-              <p className="text-sm font-bold text-foreground">
-                ₹
-                {parseFloat(sale.total_amount).toLocaleString('en-IN', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </p>
-            </div>
-          </div>
-
-          {sale.notes && (
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Notes</p>
-              <p className="text-sm text-foreground">{sale.notes}</p>
-            </div>
+              <X className="h-4 w-4" />
+              {cancelling ? 'Cancelling…' : 'Cancel Sale'}
+            </button>
           )}
-
-          <div className="flex flex-wrap gap-3 pt-1 border-t border-border-default">
-            <a
-              href={`/api/admin/cash-sale/${sale.id}/receipt`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                />
-              </svg>
-              Receipt PDF
-            </a>
-            <a
-              href={ap(`/admin/orders/${sale.id}/view`)}
-              className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors border border-border-default"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                />
-              </svg>
-              View Order
-            </a>
-            {!isCancelled && canWrite && (
-              <div className="ml-auto">
-                <button
-                  onClick={handleCancel}
-                  disabled={cancelling}
-                  className="flex items-center gap-2 px-3 h-control-sm rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  {cancelling ? 'Cancelling…' : 'Cancel Sale'}
-                </button>
-              </div>
-            )}
-          </div>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        <div className="flex flex-wrap gap-2">
+          <span className={payCls(sale.payment_status)}>{sale.payment_status}</span>
+          <Badge>Cash Sale</Badge>
+          {sale.status === 'cancelled' && <Badge tone="red">Cancelled</Badge>}
         </div>
+        <Fields>
+          <Field label="Customer" value="Walk-in Customer" />
+          <Field label="Order" value={sale.order_number} mono />
+        </Fields>
+        <div className="grid grid-cols-2 gap-3 rounded-lg bg-surface-secondary p-3 sm:grid-cols-4">
+          <Field label="Taxable" value={`₹${inr2(sale.taxable_amount)}`} />
+          {parseFloat(sale.cgst_amount) > 0 && <Field label="CGST + SGST" value={`₹${inr2(sale.cgst_amount)} + ₹${inr2(sale.sgst_amount)}`} />}
+          <Field label="Total" value={<span className="font-bold">₹{inr2(sale.total_amount)}</span>} />
+        </div>
+        {sale.notes && (
+          <Fields cols={1}>
+            <Field label="Notes" value={sale.notes} />
+          </Fields>
+        )}
       </div>
-    </div>,
-    document.body
+    </Dialog>
   )
 }

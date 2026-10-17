@@ -33,6 +33,12 @@ import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import DigitalAccessCard, {
   type DigitalAccessLine,
 } from '@/app/(admin)/admin/orders/[id]/_components/DigitalAccessCard'
+import { Download, Eye, ImageIcon, Printer, Truck } from 'lucide-react'
+import { Badge, Card, DetailHeader, EntityPage, Field, Fields, StatusBadge } from '@/components/admin/kit'
+import { ORDER_STATUS_FULL, PAYMENT_STATUS_FULL, inr } from '../../_components/status-maps'
+
+const pill = 'control-md border border-border-default bg-surface-elevated text-foreground hover:bg-surface-secondary'
+const pillIcon = 'control-md control-icon border border-border-default bg-surface-elevated text-foreground-muted hover:bg-surface-secondary hover:text-foreground'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -183,261 +189,101 @@ export default async function OrderDetailsPage({
         eddLabelColor = 'text-accent-500'
       } else if (diffDays < 0) {
         eddLabel = 'Delayed'
-        eddLabelColor = 'text-orange-500'
+        eddLabelColor = 'text-amber-600 dark:text-amber-400'
       }
     }
   }
 
-  return (
-    <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <Link href={ap(backUrl, host)} className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block">
-          ← Back to Orders
-        </Link>
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
-              Order #{order.order_number || order.id.slice(0, 8)}
-            </h1>
-            {order.subscription_id && (
-              <Link href={ap(`/admin/subscriptions/${order.subscription_id}`, host)} className="inline-block mt-1">
-                <SubscriptionOrderBadge subscriptionId={order.subscription_id} cycle={order.subscription_cycle} />
-              </Link>
-            )}
-            {order.original_order_id && order.original_order_number && (
-              <p className="text-sm text-blue-600 dark:text-blue-400 mt-1">
-                Replacement for{' '}
-                <Link
-                  href={ap(`/admin/orders/${order.original_order_id}`, host)}
-                  className="underline hover:text-blue-800 dark:hover:text-blue-300"
-                >
-                  #{order.original_order_number}
-                </Link>
-              </p>
-            )}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mt-1">
-              <p className="text-foreground-secondary">
-                Placed on {new Date(order.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} at{' '}
-                {new Date(order.created_at).toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  timeZone: 'Asia/Kolkata',
-                })}
-                {order.invoice_number && <span className="ml-2">· Invoice {order.invoice_number}</span>}
-              </p>
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
-                  order.payment_status === 'paid'
-                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
-                    : order.payment_status === 'pending'
-                      ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
-                      : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    order.payment_status === 'paid'
-                      ? 'bg-green-500'
-                      : order.payment_status === 'pending'
-                        ? 'bg-yellow-500'
-                        : 'bg-red-500'
-                  }`}
-                />
-                Payment: {order.payment_status}
-              </span>
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-full border ${
-                  order.status === 'delivered' || order.status === 'granted'
-                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800'
-                    : order.status === 'processing' || order.status === 'shipped'
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                      : order.status === 'out_for_delivery'
-                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
-                        : order.status === 'cancelled' || order.status === 'return_rejected'
-                          ? 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-200 dark:border-red-800'
-                          : order.status === 'cancel_requested' || order.status === 'return_requested'
-                            ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-800'
-                            : order.status === 'cancel_rejected'
-                              ? 'bg-gray-100 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'
-                              : order.status === 'returned'
-                                ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800'
-                                : order.status === 'return_approved' || order.status === 'return_received'
-                                  ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                                  : 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    order.status === 'delivered' || order.status === 'granted'
-                      ? 'bg-green-500'
-                      : order.status === 'processing' ||
-                          order.status === 'shipped' ||
-                          order.status === 'return_approved' ||
-                          order.status === 'return_received'
-                        ? 'bg-blue-500'
-                        : order.status === 'out_for_delivery'
-                          ? 'bg-indigo-500'
-                          : order.status === 'cancelled' || order.status === 'return_rejected'
-                            ? 'bg-red-500'
-                            : order.status === 'cancel_requested' || order.status === 'return_requested'
-                              ? 'bg-orange-500'
-                              : order.status === 'cancel_rejected'
-                                ? 'bg-gray-400'
-                                : order.status === 'returned'
-                                  ? 'bg-purple-500'
-                                  : 'bg-yellow-500'
-                  }`}
-                />
-                {order.status === 'cancel_requested'
-                  ? 'Cancellation Requested'
-                  : order.status === 'cancel_rejected'
-                    ? 'Cancellation Rejected'
-                    : order.status === 'granted'
-                      ? 'Access granted'
-                      : order.status.replace(/_/g, ' ')}
-              </span>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:justify-end gap-2 items-center">
-            {/* Packing Slip — download + print combined pill */}
-            {canPackingSlips && !isAllDigital && (
-              <div className="inline-flex w-full sm:w-48 h-9 rounded-full overflow-hidden border text-sm font-semibold border-secondary-300 dark:border-secondary-700">
-                <a
-                  href={`/api/admin/packing-slips/${order.id}`}
-                  download
-                  title="Download Packing Slip"
-                  className="flex-1 min-w-0 px-3 bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 transition-colors inline-flex items-center justify-center gap-1.5 border-r border-secondary-300 dark:border-secondary-700"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  Packing Slip
-                </a>
-                <a
-                  href={`/api/admin/packing-slips/${order.id}?inline=1`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Print Packing Slip"
-                  className="w-10 shrink-0 bg-secondary-100 dark:bg-secondary-900/30 text-secondary-700 dark:text-secondary-300 hover:bg-secondary-200 dark:hover:bg-secondary-800/50 transition-colors inline-flex items-center justify-center"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                    />
-                  </svg>
-                </a>
-              </div>
-            )}
-            {/* Shipping Label — download + print combined pill */}
-            {order.awb_number && (
-              <div className="inline-flex w-full sm:w-48 h-9 rounded-full overflow-hidden border text-sm font-semibold border-blue-300 dark:border-blue-700">
-                <a
-                  href={`/api/admin/orders/${order.id}/shipping-label?size=4R`}
-                  download
-                  title="Download Shipping Label"
-                  className="flex-1 min-w-0 px-3 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors inline-flex items-center justify-center gap-1.5 border-r border-blue-300 dark:border-blue-700"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                  Shipping Label
-                </a>
-                <a
-                  href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Print Shipping Label"
-                  className="w-10 shrink-0 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors inline-flex items-center justify-center"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                    />
-                  </svg>
-                </a>
-              </div>
-            )}
-            {!order.original_order_id &&
-              (order.invoice_number ? (
-                <div className="inline-flex w-full sm:w-48 h-9 rounded-full overflow-hidden border text-sm font-semibold border-accent-300 dark:border-accent-700">
-                  <a
-                    href={order.view_token ? `/invoice/${order.view_token}` : `/api/orders/${order.id}/invoice`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title={`View Invoice ${order.invoice_number}`}
-                    className="flex-1 min-w-0 px-3 bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors inline-flex items-center justify-center gap-1.5 border-r border-accent-300 dark:border-accent-700"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                      />
-                    </svg>
-                    Invoice
-                  </a>
-                  <a
-                    href={`/api/orders/${order.id}/invoice`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Download PDF"
-                    className="w-10 shrink-0 bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors inline-flex items-center justify-center"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                      />
-                    </svg>
-                  </a>
-                </div>
-              ) : (
-                canWrite &&
-                (order.payment_status === 'paid' ||
-                  order.status === 'confirmed' ||
-                  order.status === 'processing' ||
-                  order.status === 'shipped' ||
-                  order.status === 'out_for_delivery' ||
-                  order.status === 'delivered' ||
-                  order.status === 'granted') && <GenerateInvoiceButton orderId={order.id} />
-              ))}
-            {showRetryEmailButton && <RetryPaymentEmailButton orderId={order.id} />}
-          </div>
-        </div>
-      </div>
+  const customerName = order.users
+    ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() || order.customer_name || 'Guest'
+    : order.customer_name || 'Guest'
+  const placedAt = `${new Date(order.created_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} ${new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}`
+  const canGenerateInvoice =
+    canWrite &&
+    (order.payment_status === 'paid' ||
+      order.status === 'confirmed' ||
+      order.status === 'processing' ||
+      order.status === 'shipped' ||
+      order.status === 'out_for_delivery' ||
+      order.status === 'delivered' ||
+      order.status === 'granted')
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-            <div className="px-6 py-4 border-b border-border-default">
-              <h2 className="text-lg font-semibold text-foreground">Order Items</h2>
-            </div>
-            <div className="p-4 sm:p-6">
+  const header = (
+    <DetailHeader
+      back={{ href: ap(backUrl, host), label: 'Orders' }}
+      title={<>Order #{order.order_number || order.id.slice(0, 8)}</>}
+      status={
+        <>
+          <StatusBadge status={order.status} map={ORDER_STATUS_FULL} />
+          <StatusBadge status={order.payment_status} map={PAYMENT_STATUS_FULL} label={`Payment: ${PAYMENT_STATUS_FULL[order.payment_status]?.label ?? order.payment_status}`} />
+          {order.subscription_id && (
+            <Link href={ap(`/admin/subscriptions/${order.subscription_id}`, host)}>
+              <SubscriptionOrderBadge subscriptionId={order.subscription_id} cycle={order.subscription_cycle} />
+            </Link>
+          )}
+        </>
+      }
+      subtitle={
+        order.original_order_id && order.original_order_number ? (
+          <>
+            Replacement for{' '}
+            <Link href={ap(`/admin/orders/${order.original_order_id}`, host)} className="text-accent-500 underline hover:text-accent-600">
+              #{order.original_order_number}
+            </Link>
+          </>
+        ) : undefined
+      }
+      identifiers={[{ label: 'Placed', value: placedAt }, ...(order.invoice_number ? [{ label: 'Invoice', value: String(order.invoice_number), copy: true }] : [])]}
+      actions={
+        <>
+          {canPackingSlips && !isAllDigital && (
+            <span className="inline-flex items-center gap-1">
+              <a href={`/api/admin/packing-slips/${order.id}`} download title="Download Packing Slip" className={pill}>
+                <Download className="h-4 w-4" /> Packing Slip
+              </a>
+              <a href={`/api/admin/packing-slips/${order.id}?inline=1`} target="_blank" rel="noopener noreferrer" title="Print Packing Slip" aria-label="Print Packing Slip" className={pillIcon}>
+                <Printer className="h-4 w-4" />
+              </a>
+            </span>
+          )}
+          {order.awb_number && (
+            <span className="inline-flex items-center gap-1">
+              <a href={`/api/admin/orders/${order.id}/shipping-label?size=4R`} download title="Download Shipping Label" className={pill}>
+                <Truck className="h-4 w-4" /> Shipping Label
+              </a>
+              <a href={`/api/admin/orders/${order.id}/shipping-label?size=4R&print=1`} target="_blank" rel="noopener noreferrer" title="Print Shipping Label" aria-label="Print Shipping Label" className={pillIcon}>
+                <Printer className="h-4 w-4" />
+              </a>
+            </span>
+          )}
+          {!order.original_order_id &&
+            (order.invoice_number ? (
+              <span className="inline-flex items-center gap-1">
+                <a
+                  href={order.view_token ? `/invoice/${order.view_token}` : `/api/orders/${order.id}/invoice`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`View Invoice ${order.invoice_number}`}
+                  className={pill}
+                >
+                  <Eye className="h-4 w-4" /> Invoice
+                </a>
+                <a href={`/api/orders/${order.id}/invoice`} target="_blank" rel="noopener noreferrer" title="Download PDF" aria-label="Download invoice PDF" className={pillIcon}>
+                  <Download className="h-4 w-4" />
+                </a>
+              </span>
+            ) : (
+              canGenerateInvoice && <GenerateInvoiceButton orderId={order.id} />
+            ))}
+          {showRetryEmailButton && <RetryPaymentEmailButton orderId={order.id} />}
+        </>
+      }
+    />
+  )
+
+  const main = (
+    <>
+          <Card title="Order Items">
               <div className="space-y-4">
                 {order.order_items && order.order_items.length > 0 ? (
                   order.order_items.map((item: any) => (
@@ -452,21 +298,7 @@ export default async function OrderDetailsPage({
                           className="w-14 h-14 rounded-lg object-cover border border-border-default shrink-0"
                         />
                       ) : (
-                        <div className="w-14 h-14 rounded-lg bg-surface-secondary border border-border-default shrink-0 flex items-center justify-center">
-                          <svg
-                            className="w-6 h-6 text-foreground-muted"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={1.5}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M9 9.75a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z"
-                            />
-                          </svg>
-                        </div>
+                        <div className="w-14 h-14 rounded-lg bg-surface-secondary border border-border-default shrink-0 flex items-center justify-center"><ImageIcon className="h-6 w-6 text-foreground-muted" /></div>
                       )}
                       <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-foreground">
@@ -474,7 +306,7 @@ export default async function OrderDetailsPage({
                             <Link
                               href={ap(`/admin/products/${item.product_id}`, host)}
                               target="_blank"
-                              className="hover:underline text-orange-600 dark:text-orange-400"
+                              className="hover:underline text-accent-500"
                             >
                               {item.product_name || item.products?.name || 'Product'}
                             </Link>
@@ -489,12 +321,12 @@ export default async function OrderDetailsPage({
                           )}
                         </p>
                         {item.variant_name && (
-                          <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                          <span className="mt-1 inline-block rounded bg-accent-500/10 px-1.5 py-0.5 text-[11px] font-medium text-accent-600">
                             {item.variant_name}
                           </span>
                         )}
                         {item.sub_variant?.sub_variant_name && (
-                          <span className="inline-flex items-center mt-1 ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                          <span className="ml-1 mt-1 inline-block rounded bg-surface-secondary px-1.5 py-0.5 text-[11px] font-medium text-foreground-secondary">
                             {item.sub_variant.sub_variant_name}
                           </span>
                         )}
@@ -506,9 +338,7 @@ export default async function OrderDetailsPage({
                             size="xs"
                           />
                           {digitalItemIds.has(item.id) && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800">
-                              Digital
-                            </span>
+                            <Badge tone="green">Digital</Badge>
                           )}
                         </div>
                         <p className="text-sm text-foreground-secondary mt-1">
@@ -550,7 +380,7 @@ export default async function OrderDetailsPage({
                             item.sell_unit_factor
                           )
                           return conv ? (
-                            <p className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium text-secondary-700 dark:text-secondary-300 bg-secondary-50 dark:bg-secondary-900/30 border border-secondary-200 dark:border-secondary-800 rounded-md px-2 py-0.5">
+                            <p className="mt-1 inline-flex items-center gap-1.5 rounded bg-surface-secondary px-2 py-0.5 text-xs font-medium text-foreground-secondary">
                               {conv.perUnit}
                               <span className="text-foreground-muted">·</span>
                               {conv.total} total
@@ -588,7 +418,7 @@ export default async function OrderDetailsPage({
                 {order.discount_amount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-foreground-secondary">Discount</span>
-                    <span className="text-green-600 dark:text-green-400">
+                    <span className="text-green-600 dark:text-green-400 tabular-nums">
                       -Rs.{' '}
                       {Number(order.discount_amount).toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
@@ -631,7 +461,7 @@ export default async function OrderDetailsPage({
                 )}
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-border-default">
                   <span className="text-foreground">Total</span>
-                  <span className="text-primary-500">
+                  <span className="text-foreground tabular-nums">
                     Rs.{' '}
                     {Number(order.total_amount).toLocaleString('en-IN', {
                       minimumFractionDigits: 2,
@@ -651,8 +481,7 @@ export default async function OrderDetailsPage({
                   />
                 </div>
               )}
-            </div>
-          </div>
+            </Card>
 
           {!isAllDigital &&
             ![
@@ -668,11 +497,7 @@ export default async function OrderDetailsPage({
               'returned',
               'return_rejected',
             ].includes(order.status) && (
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-                <div className="px-6 py-4 border-b border-border-default">
-                  <h2 className="text-lg font-semibold text-foreground">Inventory Status</h2>
-                </div>
-                <div className="divide-y divide-border-default">
+              <Card title="Inventory Status" flush><div className="divide-y divide-border-default border-t border-border-default">
                   {order.order_items && order.order_items.length > 0 ? (
                     order.order_items.map((item: any) => {
                       const inv =
@@ -697,7 +522,7 @@ export default async function OrderDetailsPage({
                                 <Link
                                   href={ap(`/admin/products/${item.product_id}`, host)}
                                   target="_blank"
-                                  className="hover:underline text-orange-600 dark:text-orange-400"
+                                  className="hover:underline text-accent-500"
                                 >
                                   {item.product_name}
                                 </Link>
@@ -720,12 +545,12 @@ export default async function OrderDetailsPage({
                                 : `${orderedQty}${unitLabel ? ` ${unitLabel}` : ''}`}
                             </p>
                             {item.variant_name && (
-                              <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
+                              <span className="mt-1 inline-block rounded bg-accent-500/10 px-1.5 py-0.5 text-[11px] font-medium text-accent-600">
                                 {item.variant_name}
                               </span>
                             )}
                             {item.sub_variant?.sub_variant_name && (
-                              <span className="inline-flex items-center mt-1 ml-1 px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary text-foreground-secondary border border-border-default">
+                              <span className="ml-1 mt-1 inline-block rounded bg-surface-secondary px-1.5 py-0.5 text-[11px] font-medium text-foreground-secondary">
                                 {item.sub_variant.sub_variant_name}
                               </span>
                             )}
@@ -740,20 +565,12 @@ export default async function OrderDetailsPage({
                           </div>
                           <div className="text-right shrink-0">
                             <p
-                              className={`text-sm font-semibold ${isOut ? 'text-red-500' : isLow ? 'text-yellow-500' : 'text-green-600 dark:text-green-400'}`}
+                              className={`text-sm font-semibold tabular-nums ${isOut ? 'text-red-500' : isLow ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}
                             >
                               {inv} in stock
                             </p>
-                            <span
-                              className={`inline-block mt-0.5 px-2 py-0.5 text-xs font-medium rounded-full ${
-                                isOut
-                                  ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                                  : isLow
-                                    ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
-                                    : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                              }`}
-                            >
-                              {isOut ? 'Out of stock' : isLow ? 'Low stock' : 'In stock'}
+                            <span className="mt-0.5 inline-block">
+                              <Badge tone={isOut ? 'red' : isLow ? 'amber' : 'green'}>{isOut ? 'Out of stock' : isLow ? 'Low stock' : 'In stock'}</Badge>
                             </span>
                           </div>
                         </div>
@@ -762,65 +579,36 @@ export default async function OrderDetailsPage({
                   ) : (
                     <p className="px-6 py-4 text-sm text-foreground-muted">No items</p>
                   )}
-                </div>
-              </div>
+                </div></Card>
             )}
 
           {order.status === 'cancel_requested' && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border-2 border-orange-300 dark:border-orange-800">
-              <div className="px-6 py-4 border-b border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/30">
-                <h2 className="text-lg font-semibold text-orange-900 dark:text-orange-300">Cancellation Request</h2>
-              </div>
-              <div className="p-4 sm:p-6">
+            <Card title={<span className="text-amber-600 dark:text-amber-400">Cancellation Request</span>}>
                 {canWrite ? (
                   <CancelReview orderId={order.id} />
                 ) : (
                   <p className="text-sm text-foreground-muted">Read-only access — cannot approve or reject.</p>
                 )}
-              </div>
-            </div>
+              </Card>
           )}
 
           {order.status === 'cancel_rejected' && order.cancellation_note && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border-2 border-gray-200 dark:border-gray-700">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30">
-                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300">Cancellation Rejected</h2>
-              </div>
-              <div className="p-4 sm:p-6">
+            <Card title="Cancellation Rejected">
                 <p className="text-sm text-foreground-secondary mb-1">Reason given to customer:</p>
-                <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-4 py-3">
+                <p className="rounded-lg border border-border-default bg-surface px-4 py-3 text-sm text-foreground">
                   {order.cancellation_note}
                 </p>
-              </div>
-            </div>
+              </Card>
           )}
 
           {isReturnStatus && returnRequest && (
-            <div
-              className={`bg-surface-elevated rounded-lg shadow-sm border-2 ${
-                order.status === 'return_rejected' || order.status === 'returned'
-                  ? 'border-gray-200 dark:border-gray-700'
-                  : 'border-orange-300 dark:border-orange-800'
-              }`}
-            >
-              <div
-                className={`px-6 py-4 border-b ${
-                  order.status === 'return_rejected' || order.status === 'returned'
-                    ? 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30'
-                    : 'border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/30'
-                }`}
-              >
-                <h2
-                  className={`text-lg font-semibold ${
-                    order.status === 'return_rejected' || order.status === 'returned'
-                      ? 'text-gray-700 dark:text-gray-300'
-                      : 'text-orange-900 dark:text-orange-300'
-                  }`}
-                >
+            <Card
+              title={
+                <span className={order.status === 'return_rejected' || order.status === 'returned' ? '' : 'text-amber-600 dark:text-amber-400'}>
                   Return / {returnRequest.type === 'refund' ? 'Refund' : 'Replacement'} Request
-                </h2>
-              </div>
-              <div className="p-4 sm:p-6">
+                </span>
+              }
+            >
                 {canWrite ? (
                   <ReturnReview
                     orderId={order.id}
@@ -830,32 +618,18 @@ export default async function OrderDetailsPage({
                 ) : (
                   <p className="text-sm text-foreground-muted">Read-only access — cannot approve or reject.</p>
                 )}
-              </div>
-            </div>
+              </Card>
           )}
 
           {isReturnStatus && returnRequest?.rvp_awb_number && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-              <div className="px-6 py-4 border-b border-border-default flex items-center gap-2">
-                <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                  />
-                </svg>
-                <h2 className="text-lg font-semibold text-foreground">Return Shipment Tracking</h2>
-              </div>
-              <div className="p-4 sm:p-6">
+            <Card title="Return Shipment Tracking">
                 <DelhiveryTracking
                   orderId={order.id}
                   apiBase="/api/admin/orders"
                   variant="admin"
                   trackPath="track-rvp"
                 />
-              </div>
-            </div>
+              </Card>
           )}
 
           {(order.status === 'cancelled' || order.status === 'returned' || order.status === 'cancel_requested') &&
@@ -885,11 +659,7 @@ export default async function OrderDetailsPage({
             ))}
 
           {order.status !== 'cancelled' && !isReturnStatus && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-              <div className="px-6 py-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-foreground">Update Order Status</h2>
-              </div>
-              <div className="p-4 sm:p-6">
+            <Card title="Update Order Status">
                 {canWrite ? (
                   <UpdateOrderStatus
                     orderId={order.id}
@@ -901,8 +671,7 @@ export default async function OrderDetailsPage({
                 ) : (
                   <p className="text-sm text-foreground-muted">Read-only access — cannot update status.</p>
                 )}
-              </div>
-            </div>
+              </Card>
           )}
 
           <AddressChangeReview
@@ -932,34 +701,21 @@ export default async function OrderDetailsPage({
             !isAllDigital &&
             !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) &&
             canWrite && (
-              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-                <div className="px-6 py-4 border-b border-border-default">
-                  <h2 className="text-lg font-semibold text-foreground">Delhivery Shipment</h2>
-                </div>
-                <div className="p-4 sm:p-6">
+              <Card title="Delhivery Shipment">
                   <CreateShipmentButton orderId={order.id} awbNumber={order.awb_number} />
-                </div>
-              </div>
+                </Card>
             )}
 
           {digitalLines.length > 0 && <DigitalAccessCard orderId={order.id} initial={digitalLines} />}
 
           {order.awb_number && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-              <div className="px-6 py-4 border-b border-border-default">
-                <h2 className="text-lg font-semibold text-foreground">Shipment Tracking</h2>
-              </div>
-              <div className="p-4 sm:p-6">
+            <Card title="Shipment Tracking">
                 <DelhiveryTracking orderId={order.id} apiBase="/api/admin/orders" variant="admin" />
-              </div>
-            </div>
+              </Card>
           )}
 
           {order.user_id && (
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-              <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">
-                Order Notes
-              </h2>
+            <Card title="Order Notes">
               <CustomerNotes
                 customerId={order.user_id}
                 orderId={order.id}
@@ -967,7 +723,7 @@ export default async function OrderDetailsPage({
                 initialNotes={await listNotes({ userId: order.user_id, orderId: order.id })}
                 canWrite={canWrite}
               />
-            </div>
+            </Card>
           )}
 
           {canMail && (
@@ -986,44 +742,20 @@ export default async function OrderDetailsPage({
           )}
 
           <MailLogsPanel orderId={order.id} />
-        </div>
+    </>
+  )
 
-        <div className="space-y-4 sm:space-y-6">
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-            <div className="px-6 py-4 border-b border-border-default">
-              <h2 className="text-lg font-semibold text-foreground">Customer</h2>
-            </div>
-            <div className="p-4 sm:p-6">
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-foreground-secondary">Name</p>
-                  <p className="font-medium text-foreground">
-                    {order.users
-                      ? `${order.users.first_name || ''} ${order.users.last_name || ''}`.trim() ||
-                        order.customer_name ||
-                        'Guest'
-                      : order.customer_name || 'Guest'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-foreground-secondary">Email</p>
-                  <p className="text-foreground">{order.users?.email || order.billing_email}</p>
-                </div>
-                {order.users?.phone && (
-                  <div>
-                    <p className="text-sm text-foreground-secondary">Phone</p>
-                    <p className="text-foreground">+91 {order.users.phone.replace(/^\+91|^91/, '')}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+  const aside = (
+    <>
+          <Card title="Customer">
+              <Fields cols={1}>
+                <Field label="Name" value={<span className="font-medium">{customerName}</span>} />
+                <Field label="Email" value={order.users?.email || order.billing_email} copy={order.users?.email || order.billing_email || undefined} />
+                {order.users?.phone && <Field label="Phone" value={`+91 ${order.users.phone.replace(/^\+91|^91/, '')}`} />}
+              </Fields>
+            </Card>
 
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-            <div className="px-6 py-4 border-b border-border-default">
-              <h2 className="text-lg font-semibold text-foreground">Billing Address</h2>
-            </div>
-            <div className="p-4 sm:p-6">
+          <Card title="Billing Address">
               {order.billing_address ? (
                 <div className="text-sm text-foreground">
                   <p className="font-medium">{order.billing_address.full_name}</p>
@@ -1043,14 +775,9 @@ export default async function OrderDetailsPage({
               ) : (
                 <p className="text-sm text-foreground-muted">No billing address</p>
               )}
-            </div>
-          </div>
+            </Card>
 
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-            <div className="px-6 py-4 border-b border-border-default">
-              <h2 className="text-lg font-semibold text-foreground">Shipping Address</h2>
-            </div>
-            <div className="p-4 sm:p-6">
+          <Card title="Shipping Address">
               {order.shipping_address ? (
                 <div className="text-sm text-foreground">
                   <p className="font-medium">{order.shipping_address.full_name}</p>
@@ -1070,24 +797,7 @@ export default async function OrderDetailsPage({
                     <div className="mt-4 px-4 py-3 rounded-xl border border-border-default bg-surface">
                       {edd ? (
                         <div className="flex items-center gap-3">
-                          <svg
-                            className="w-8 h-8 text-green-500 shrink-0"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={1.5}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M13 16V5a1 1 0 00-1-1H4a1 1 0 00-1 1v11m10 0h-3M6 16H3m4-7h6l3 5"
-                            />
-                          </svg>
+                          <Truck className="h-7 w-7 shrink-0 text-green-600 dark:text-green-400" />
                           <div className="flex-1 min-w-0">
                             <p className={`text-xs font-medium ${eddLabelColor}`}>{eddLabel}</p>
                             <p className="font-bold text-foreground">{edd}</p>
@@ -1106,27 +816,12 @@ export default async function OrderDetailsPage({
               ) : (
                 <p className="text-sm text-foreground-muted">No shipping address</p>
               )}
-            </div>
-          </div>
+            </Card>
 
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
-            <div className="px-6 py-4 border-b border-border-default">
-              <h2 className="text-lg font-semibold text-foreground">Payment</h2>
-            </div>
-            <div className="p-4 sm:p-6">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-foreground-secondary">Status</span>
-                  <span
-                    className={`font-semibold ${
-                      order.payment_status === 'paid'
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-yellow-600 dark:text-yellow-400'
-                    }`}
-                  >
-                    {order.payment_status}
-                  </span>
-                </div>
+          <Card title="Payment">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-foreground-secondary">Status</span>
+                <StatusBadge status={order.payment_status} map={PAYMENT_STATUS_FULL} />
               </div>
 
               {/* All payment transactions on this order (initial charge, variant-change
@@ -1156,17 +851,7 @@ export default async function OrderDetailsPage({
                           <span className="text-xs font-semibold text-foreground">
                             {isVariantChange ? 'Variant-change top-up' : isAdjustment ? 'Order-changes top-up' : idx === 0 ? 'Order payment' : 'Payment'}
                           </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                              p.status === 'completed'
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                : p.status === 'refunded'
-                                  ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                  : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-                            }`}
-                          >
-                            {p.status}
-                          </span>
+                          <Badge tone={p.status === 'completed' ? 'green' : p.status === 'refunded' ? 'red' : 'amber'}>{p.status}</Badge>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span className="text-foreground-secondary">Method</span>
@@ -1207,7 +892,7 @@ export default async function OrderDetailsPage({
                               {r.at ? <span className="block text-[11px] text-foreground-muted">{new Date(r.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span> : null}
                             </span>
                             <span className="text-right">
-                              <span className="block text-red-600 font-semibold">− Rs. {Number(r.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="block font-semibold tabular-nums text-red-600 dark:text-red-400">− Rs. {Number(r.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               <span className="block text-foreground-muted font-mono text-[11px]">{r.id}</span>
                             </span>
                           </div>
@@ -1243,10 +928,9 @@ export default async function OrderDetailsPage({
                   })}
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            </Card>
+    </>
   )
+
+  return <EntityPage header={header} main={main} aside={aside} />
 }

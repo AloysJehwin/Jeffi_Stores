@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
-import Pagination from '@/components/admin/Pagination'
+import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getReferralStats, listReferralSignups, type ReferralStats, type ReferralStatus } from '@/lib/referrals/queries'
 import { getReferralSettings } from '@/lib/referrals/settings'
@@ -19,10 +19,10 @@ const NO_STATS: ReferralStats = {
 
 const STATUS: Record<ReferralStatus, { label: string; className: string }> = {
   joined: { label: 'Joined', className: 'bg-surface-secondary text-foreground-secondary' },
-  rewarded: { label: 'Rewarded', className: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
-  reversed: { label: 'Taken back', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
+  rewarded: { label: 'Rewarded', className: 'bg-green-500/10 text-green-700 dark:text-green-400' },
+  reversed: { label: 'Taken back', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
   capped: { label: 'Yearly limit', className: 'bg-surface-secondary text-foreground-secondary' },
-  rejected: { label: 'Rejected', className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+  rejected: { label: 'Rejected', className: 'bg-red-500/10 text-red-700 dark:text-red-400' },
 }
 
 const REJECT_REASON: Record<string, string> = {
@@ -54,13 +54,6 @@ export default async function ReferralProgram({ host, query }: { host: string; q
   const live = settings.enabled && loyalty.enabled
 
   const basePath = ap(PROGRAMS_PATH, host)
-  const buildUrl = (target: number) => {
-    const params = new URLSearchParams({ tab: 'referrals' })
-    if (status) params.set('status', status)
-    if (search) params.set('search', search)
-    if (target > 1) params.set('page', String(target))
-    return `${basePath}?${params}`
-  }
   const number = (value: number) => value.toLocaleString('en-IN')
 
   return (
@@ -89,19 +82,16 @@ export default async function ReferralProgram({ host, query }: { host: string; q
       <p className="text-sm text-foreground-secondary">
         Invitation emails are sent by the Referral Invite campaign, which is{' '}
         <span className="font-medium text-foreground">{campaign?.enabled ? 'on' : 'off'}</span>.{' '}
-        <Link
-          href={ap('/admin/campaigns/referral_invite', host)}
-          className="text-accent-600 hover:text-accent-700 dark:text-accent-400"
-        >
+        <Link href={ap('/admin/campaigns/referral_invite', host)} className="text-accent-600 hover:text-accent-700">
           Open the campaign
         </Link>
       </p>
 
       <ReferralSettingsForm initial={settings} />
 
-      <div className="bg-surface-elevated rounded-lg border border-border-default">
+      <div className="bg-surface-elevated rounded-xl border border-border-default">
         <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border-default">
-          <h3 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Referrals</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Referrals</h3>
           <form method="get" action={basePath} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="tab" value="referrals" />
             <input
@@ -143,8 +133,14 @@ export default async function ReferralProgram({ host, query }: { host: string; q
                   <th className="px-4 py-3 font-medium">Joined</th>
                 </tr>
               </thead>
-              <tbody>
-                {list.rows.map(row => (
+              <ServerPagedItems
+                wrap="tbody"
+                page={page}
+                total={list.total}
+                noun="referrals"
+                items={list.rows.map(row => ({
+                  key: String(row.id),
+                  node: (
                   <tr key={row.id} className="border-t border-border-default">
                     {[row.referrer, row.friend].map((person, i) => (
                       <td key={i} className="px-4 py-3">
@@ -176,14 +172,12 @@ export default async function ReferralProgram({ host, query }: { host: string; q
                       {formatDate(row.signedUpAt)}
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                  ),
+                }))}
+              />
             </table>
           </div>
         )}
-        <div className="p-4">
-          <Pagination page={page} total={list.total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-        </div>
       </div>
     </ProgramSection>
   )

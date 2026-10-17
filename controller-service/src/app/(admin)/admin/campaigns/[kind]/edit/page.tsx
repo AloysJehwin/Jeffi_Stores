@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { BackLink } from '@/components/admin/kit'
 import CampaignDetailClient from '../CampaignDetailClient'
 import ReorderIntervalsPanel from '../ReorderIntervalsPanel'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
@@ -12,21 +12,8 @@ export default async function CampaignEditPage({ params }: { params: Promise<{ k
   const { kind } = await params
   const host = await getHost()
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <Link href={ap('/admin/campaigns', host)} className="text-accent-500 hover:text-accent-600 transition-colors">
-          Campaigns
-        </Link>
-        <span>/</span>
-        <Link
-          href={ap(`/admin/campaigns/${kind}/view`, host)}
-          className="text-accent-500 hover:text-accent-600 transition-colors capitalize"
-        >
-          {kind.replace(/_/g, ' ')}
-        </Link>
-        <span>/</span>
-        <span className="text-foreground">Edit</span>
-      </div>
+    <div className="p-4 sm:p-6 space-y-5 [&>a:first-child]:capitalize">
+      <BackLink href={ap(`/admin/campaigns/${kind}/view`, host)} label={kind.replace(/_/g, ' ')} />
 
       {/* The block builder / rich editor aren't usable on a phone — editing is desktop-only. */}
       <MobileEditBlock>

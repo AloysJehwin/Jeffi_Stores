@@ -5,6 +5,7 @@ import { normalizeDigitalProduct } from '@/lib/catalog/digital-units'
 import { normalizeSubscriptionPrice, normalizeSubscriptionPrices } from '@/lib/subscriptions/sellable'
 import { cycleLimitsError, normalizeCycleCount } from '@/lib/subscriptions/intervals'
 import { generateVariantSku } from '@/lib/catalog/sku'
+import { purgeVariantRows, type PurgeResult } from '@/lib/catalog/variant-purge'
 import {
   duplicateSkuError,
   friendlyProductDbError,
@@ -267,7 +268,10 @@ interface ProductDraft {
  * then deletes the draft. Called from both the API route and the
  * server action so the publish logic is never duplicated or bypassed.
  */
-export async function publishProductDraft(productId: string, opts: { activate?: boolean } = {}): Promise<void> {
+export async function publishProductDraft(
+  productId: string,
+  opts: { activate?: boolean } = {}
+): Promise<{ keptForHistory: PurgeResult['deactivated'] }> {
   const draft = await queryOne<ProductDraft>(`SELECT * FROM product_drafts WHERE product_id = $1`, [productId])
   if (!draft) throw new Error('Draft not found')
 
@@ -297,6 +301,17 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
       WHERE v.product_id = $1 AND v.is_active = true AND sv.is_active = true`,
       [productId]
     )) || []
+  // Every live variant (inactive too): is_active fallback for old draft rows, and toggle-off intent.
+  const liveVariantRows =
+    (await queryMany<{ id: string; sku: string; is_active: boolean; subs_on: boolean }>(
+      `SELECT v.id, v.sku, v.is_active,
+              (v.sub_variant_type_on OR EXISTS (SELECT 1 FROM product_sub_variants sv
+                 WHERE sv.variant_id = v.id AND sv.is_active = true)) AS subs_on
+         FROM product_variants v WHERE v.product_id = $1`,
+      [productId]
+    )) || []
+  const liveVariantById = new Map(liveVariantRows.map(v => [v.id, v]))
+  const liveVariantBySku = new Map(liveVariantRows.map(v => [v.sku, v]))
   const fields: any = draft.fields || {}
   const newDigital = fields.is_digital === true || fields.is_digital === 'true'
   const newPerishable = !newDigital && (fields.perishable === true || fields.perishable === 'true')
@@ -312,6 +327,8 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
   // their orphaned batches/serials/shelf) must be cleaned up; and we must NOT let the
   // live-data fallback below re-activate them.
   const turnedOffVariants = !newHasVariants && !!liveFlags?.has_variants
+  // Variants are off for this publish (the draft may still hold them for a later toggle-on).
+  const variantsOff = turnedOffVariants || fields.has_variants === false || fields.has_variants === 'false'
 
   // If draft variants/sub_variants are empty, fall back to live data — UNLESS the
   // product just became simple (then there are no intended variants; keep it empty
@@ -323,10 +340,17 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
     !String(v?.sku ?? '').trim() && String(v?.variant_name ?? '').trim() && productSku
       ? { ...v, sku: generateVariantSku(productSku, String(v.variant_name)) }
       : v
-  const variants = turnedOffVariants
+  // A draft row without is_active (older drafts, form snapshots) keeps the live row's status.
+  const keepLiveStatus = (v: any) => {
+    if (v?.is_active === true || v?.is_active === false) return v
+    const live = (v?.id && liveVariantById.get(v.id)) || null
+    return live ? { ...v, is_active: live.is_active } : v
+  }
+  // has_variants off: the draft keeps its variants (toggle back on restores them) but none are published.
+  const variants = variantsOff
     ? []
     : Array.isArray(draft.variants) && draft.variants.length > 0
-      ? draft.variants.map(fillSku)
+      ? draft.variants.map(fillSku).map(keepLiveStatus)
       : await queryMany(`SELECT * FROM product_variants WHERE product_id = $1`, [productId])
 
   const subVariants =
@@ -360,6 +384,7 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
   // Only a staged slug is de-duplicated; no slug in the draft keeps the live one.
   const slug = fields.slug ? await uniqueProductSlug({ query }, String(fields.slug), productId) : ''
 
+  const purged: PurgeResult[] = []
   await withTransaction(async client => {
     await client.query(
       `UPDATE products SET
@@ -518,7 +543,7 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
       // Deactivate variants removed from draft (soft delete only)
       await client.query(
         `UPDATE product_variants SET is_active = false, updated_at = NOW()
-         WHERE product_id = $1 AND sku != ALL($2::text[])`,
+         WHERE product_id = $1 AND sku != ALL($2::text[]) AND is_active = true`,
         [productId, draftSkus]
       )
       await client.query(
@@ -576,11 +601,32 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
          updated_at = NOW()`,
         [productId, JSON.stringify(validVariants)]
       )
-      // "Has sub-variants" explicitly turned OFF retires that variant's sub-variants.
-      // Only a literal false counts: a snapshot missing the key must not retire anything.
+      // "Has sub-variants" turned OFF removes that variant's live sub-variants (deleted, or
+      // deactivated when history references them). Only a literal false counts, and only
+      // when live had it on: a variant that was already off is left untouched.
       const subsOffSkus = validVariants
         .filter((v: any) => v.sub_variant_type_on === false || v.sub_variant_type_on === 'false')
+        .filter((v: any) => {
+          const live = (v.id && liveVariantById.get(v.id)) || liveVariantBySku.get(v.sku)
+          return !live || live.subs_on
+        })
         .map((v: any) => v.sku as string)
+      if (subsOffSkus.length > 0) {
+        const offIds = await client.query<{ id: string }>(
+          `SELECT id FROM product_variants WHERE product_id = $1 AND sku = ANY($2::text[])`,
+          [productId, subsOffSkus]
+        )
+        const ids = (offIds?.rows || []).map(r => r.id)
+        if (ids.length > 0) {
+          const subIds = await client.query<{ id: string }>(
+            `SELECT id FROM product_sub_variants WHERE variant_id = ANY($1::uuid[])`,
+            [ids]
+          )
+          purged.push(
+            await purgeVariantRows(client, productId, { subVariantIds: (subIds?.rows || []).map(r => r.id) })
+          )
+        }
+      }
       for (const sku of subsOffSkus) {
         await client.query(
           `UPDATE product_sub_variants SET is_active = false, updated_at = NOW()
@@ -616,7 +662,7 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
     // are touched (draft-entry seeds all active variants' images, so the admin clearing
     // a variant's images shows up as that variant having zero staged rows → cleared).
     const stagedVI = Array.isArray(draft.variant_images) ? (draft.variant_images as any[]) : []
-    if (stagedVI.length > 0 || validVariants.length > 0) {
+    if (!variantsOff && (stagedVI.length > 0 || validVariants.length > 0)) {
       const byVariant = new Map<string, any[]>()
       for (const vi of stagedVI) {
         if (!vi.variant_id) continue
@@ -630,7 +676,12 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
         `SELECT id FROM product_variants WHERE product_id = $1 AND is_active = true`,
         [productId]
       )
-      const variantIds = new Set<string>([...byVariant.keys(), ...activeVariantIds.rows.map(r => r.id)])
+      // A variant revived by this publish has no staged rows in older drafts; keep its live images.
+      const wasActive = new Set(liveActiveVariants.map(v => v.id))
+      const variantIds = new Set<string>([
+        ...byVariant.keys(),
+        ...activeVariantIds.rows.map(r => r.id).filter(id => wasActive.has(id)),
+      ])
       for (const vid of variantIds) {
         const rows = (byVariant.get(vid) || []).slice().sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
         const keepIds = rows.map(r => r.id).filter((id: any) => id && !String(id).startsWith('draft-vi-'))
@@ -722,6 +773,7 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
       }
     }
     for (const vid of subsOffVariantIds) touchedVariantIds.delete(vid)
+    if (variantsOff) touchedVariantIds.clear()
     if (touchedVariantIds.size > 0) {
       const num = (x: any): number | null => {
         if (x == null || x === '') return null
@@ -843,6 +895,12 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
     // order_items FK is SET NULL, purchase_order_items is RESTRICT). Their stock is
     // discarded by the structural block below and the product restarts at zero.
     if (turnedOffVariants) {
+      const allVariants = await client.query<{ id: string }>(`SELECT id FROM product_variants WHERE product_id = $1`, [
+        productId,
+      ])
+      purged.push(
+        await purgeVariantRows(client, productId, { variantIds: (allVariants?.rows || []).map(r => r.id) })
+      )
       await client.query(
         `UPDATE product_sub_variants SET is_active = false, updated_at = NOW()
          WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = $1)`,
@@ -938,18 +996,21 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
       if (v.has_subs && !liveParentIds.has(v.id)) await discardGrainStock(v.id, null)
     }
 
-    // Retired rows never keep stock.
+    // Rows retired by THIS publish never keep stock. Rows that were already inactive (switched
+    // off from the product page) keep theirs: the draft did not touch them.
+    const retiredSubIds = [...retiredSubsByVariant.values()].flat()
     await client.query(
       `UPDATE product_sub_variants sv SET inventory_quantity = 0, updated_at = NOW()
          FROM product_variants v
         WHERE sv.variant_id = v.id AND v.product_id = $1
-          AND (sv.is_active = false OR v.is_active = false) AND sv.inventory_quantity <> 0`,
-      [productId]
+          AND (sv.is_active = false OR v.is_active = false) AND sv.inventory_quantity <> 0
+          AND (sv.id = ANY($2::uuid[]) OR v.id = ANY($3::uuid[]))`,
+      [productId, retiredSubIds, retiredVariantIds]
     )
     await client.query(
       `UPDATE product_variants SET inventory_quantity = 0, updated_at = NOW()
-        WHERE product_id = $1 AND is_active = false AND inventory_quantity <> 0`,
-      [productId]
+        WHERE product_id = $1 AND is_active = false AND inventory_quantity <> 0 AND id = ANY($2::uuid[])`,
+      [productId, retiredVariantIds]
     )
 
     // ── Roll variant/product inventory up from the child grains ──────────────
@@ -1021,9 +1082,22 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
       // leafKey `${variantId||NIL}:${subVariantId||NIL}` -> { variantId, subVariantId, rows }
       const NIL = '00000000-0000-0000-0000-000000000000'
       const leaves = new Map<string, { variantId: string | null; subVariantId: string | null; rows: any[] }>()
+      // The draft keeps every leaf's rows across toggles; only the leaves of the published
+      // structure are applied (product leaf, variant leaf, or sub-variant leaf).
+      const subsOnBySku = new Map(
+        validVariants.map((v: any) => [String(v.sku), v.sub_variant_type_on === true || v.sub_variant_type_on === 'true'])
+      )
+      const inStructure = (s: any) => {
+        const varSku = s.variant_sku ? String(s.variant_sku) : ''
+        if (!varSku) return !newHasVariants
+        if (variantsOff) return false
+        if (!subsOnBySku.has(varSku)) return true
+        return s.sub_variant_name ? subsOnBySku.get(varSku) === true : subsOnBySku.get(varSku) !== true
+      }
       for (const s of draftSuppliers) {
         const supplierId = String(s.supplier_id || '').trim()
         if (!supplierId) continue
+        if (!inStructure(s)) continue
         let variantId: string | null = null
         let subVariantId: string | null = null
         const subName = s.sub_variant_name ? String(s.sub_variant_name) : ''
@@ -1163,15 +1237,23 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
       const coveredLeafKeys = new Set(Array.from(leaves.keys()))
       const dbLeaves = await client.query(
         `SELECT DISTINCT
-           COALESCE(variant_id::text, '${NIL}') AS vid,
-           COALESCE(sub_variant_id::text, '${NIL}') AS svid,
-           variant_id, sub_variant_id
-         FROM product_suppliers
-         WHERE product_id = $1 AND is_active = true`,
+           COALESCE(ps.variant_id::text, '${NIL}') AS vid,
+           COALESCE(ps.sub_variant_id::text, '${NIL}') AS svid,
+           ps.variant_id, ps.sub_variant_id, COALESCE(v.sku, pv.sku) AS leaf_variant_sku
+         FROM product_suppliers ps
+         LEFT JOIN product_variants v ON v.id = ps.variant_id
+         LEFT JOIN product_sub_variants sub ON sub.id = ps.sub_variant_id
+         LEFT JOIN product_variants pv ON pv.id = sub.variant_id
+         WHERE ps.product_id = $1 AND ps.is_active = true`,
         [productId]
       )
+      const draftSkuSet = new Set(draftSkus.map(String))
       for (const row of dbLeaves.rows) {
         const key = `${row.vid}:${row.svid}`
+        // Leaves of a variant that was already inactive and is absent from the draft are not the draft's to change.
+        const leafSku = row.leaf_variant_sku ? String(row.leaf_variant_sku) : ''
+        if (leafSku && !variantsOff && !draftSkuSet.has(leafSku) && liveVariantBySku.get(leafSku)?.is_active === false)
+          continue
         if (!coveredLeafKeys.has(key)) {
           await client.query(
             `UPDATE product_suppliers SET is_active = false, is_preferred = false, updated_at = NOW()
@@ -1263,7 +1345,13 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
       // Clear sell_unit_id on the variant so it inherits from product
       await client.query(`UPDATE product_variants SET sell_unit_id = NULL, updated_at = NOW() WHERE id = $1`, [vid])
     }
-    const variantUnits = (units as any[]).filter((u: any) => !u._cleared && u.variant_id && u.variant_id !== 'null')
+    // The draft keeps units of toggled-off children; only units of published rows are applied.
+    const purgedVariantIds = new Set(purged.flatMap(p => p.deletedVariantIds))
+    const purgedSubIds = new Set(purged.flatMap(p => p.deletedSubVariantIds))
+    const variantUnits = (units as any[]).filter(
+      (u: any) =>
+        !u._cleared && u.variant_id && u.variant_id !== 'null' && !variantsOff && !purgedVariantIds.has(u.variant_id)
+    )
     // Clear each variant scope's flags once before its upserts, so a base/purchase-default
     // switch to a different unit name doesn't collide on the one_base/one_purchase_variant indexes.
     for (const vid of new Set(variantUnits.map((u: any) => u.variant_id))) {
@@ -1326,7 +1414,8 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
       await client.query(`DELETE FROM product_units WHERE product_id = $1 AND sub_variant_id = $2`, [productId, svid])
     }
     const subVariantUnits = (units as any[]).filter(
-      (u: any) => !u._cleared && u.sub_variant_id && u.sub_variant_id !== 'null'
+      (u: any) =>
+        !u._cleared && u.sub_variant_id && u.sub_variant_id !== 'null' && !variantsOff && !purgedSubIds.has(u.sub_variant_id)
     )
     // Clear each sub-variant scope's flags once before its upserts, so a base/purchase-default
     // switch to a different unit name doesn't collide on the one_base/one_purchase_sub_variant indexes.
@@ -1568,4 +1657,18 @@ export async function publishProductDraft(productId: string, opts: { activate?: 
     if (friendly) throw new ProductValidationError(friendly, { cause: err })
     throw err
   })
+  // The draft is gone: an open edit session would otherwise be resumed against the next draft.
+  try {
+    await query(
+      `UPDATE editor_sessions SET closed_at = now(), closed_reason = 'save'
+        WHERE resource_type = 'product' AND resource_id = $1 AND closed_at IS NULL`,
+      [productId]
+    )
+  } catch (e) {
+    console.error('[product-draft] closing edit sessions failed for', productId, e)
+  }
+  const keptForHistory = purged.flatMap(p => p.deactivated)
+  if (keptForHistory.length > 0)
+    console.warn('[product-draft] toggled-off rows kept (deactivated) for history on', productId, keptForHistory)
+  return { keptForHistory }
 }

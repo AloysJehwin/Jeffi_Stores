@@ -9,6 +9,7 @@ import Image from 'next/image'
 import { bp } from '@/lib/shared/business-path'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import AccountSearch from '@/components/visitor/AccountSearch'
+import { useInfiniteList, InfiniteFooter } from '@/components/admin/kit/infinite'
 
 interface OrderItem {
   id: string
@@ -108,14 +109,29 @@ export default function OrdersPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
   const confirm = useConfirm()
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
-  const [initialLoading, setInitialLoading] = useState(true)
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [pageSize, setPageSize] = useState(10)
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Infinite scroll replaces the prev/next pager; pages 2..N accumulate client-side.
+  const list = useInfiniteList<Order>({
+    key: user ? `b-orders-${user.id}` : null,
+    pageSize: 10,
+    fetchPage: async (p, signal) => {
+      const res = await fetch(`/api/orders?page=${p}`, {
+        credentials: 'include',
+        headers: { 'X-Auth-Portal': 'business' },
+        signal,
+      })
+      if (!res.ok) throw new Error('Could not load orders')
+      const data = await res.json()
+      return { rows: (data.orders || []) as Order[], total: Number(data.total ?? 0) }
+    },
+    getKey: o => o.id,
+  })
+
+  const orders = list.rows
+  const loading = list.loading
+  const initialLoading = loading && orders.length === 0
 
   const suggestions = useMemo(() => {
     const set = new Set<string>()
@@ -142,30 +158,7 @@ export default function OrdersPage() {
     if (!isLoading && !user) {
       router.push(bp('/business/signin?redirect=/account/orders'))
     }
-    if (user) {
-      fetchOrders(page)
-    }
-  }, [user, isLoading, router, page])
-
-  const fetchOrders = async (p: number) => {
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/orders?page=${p}`, {
-        credentials: 'include',
-        headers: { 'X-Auth-Portal': 'business' },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setOrders(data.orders || [])
-        setTotal(data.total || 0)
-        setPageSize(data.pageSize || 10)
-      }
-    } catch {
-    } finally {
-      setLoading(false)
-      setInitialLoading(false)
-    }
-  }
+  }, [user, isLoading, router])
 
   const handleCancelOrder = async (orderId: string) => {
     const ok = await confirm({
@@ -183,7 +176,7 @@ export default function OrdersPage() {
         credentials: 'include',
         headers: { 'X-Auth-Portal': 'business' },
       })
-      await fetchOrders(page)
+      list.reload()
     } catch {
     } finally {
       setCancellingOrderId(null)
@@ -532,35 +525,7 @@ export default function OrdersPage() {
                 )
               })}
 
-              {total > pageSize && (
-                <div className="flex items-center justify-between gap-2 pt-4">
-                  <p className="text-xs text-foreground-muted whitespace-nowrap">
-                    <span className="font-medium text-foreground">
-                      {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}
-                    </span>{' '}
-                    of <span className="font-medium text-foreground">{total}</span> orders
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page <= 1}
-                      className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                    >
-                      Prev
-                    </button>
-                    <span className="text-xs text-foreground-muted whitespace-nowrap">
-                      {page}/{Math.ceil(total / pageSize)}
-                    </span>
-                    <button
-                      onClick={() => setPage(p => p + 1)}
-                      disabled={page >= Math.ceil(total / pageSize)}
-                      className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
+              <InfiniteFooter shown={orders.length} control={list} noun="orders" />
             </div>
           )}
         </div>

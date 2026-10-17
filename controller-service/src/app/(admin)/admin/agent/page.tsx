@@ -1,12 +1,13 @@
 'use client'
 
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, Suspense } from 'react'
 import {
   Bot,
   Send,
   MessageSquare,
   Slash,
   LayoutGrid,
+  BarChart3,
   CheckCircle,
   XCircle,
   Loader2,
@@ -19,6 +20,9 @@ import { useToast } from '@/contexts/ToastContext'
 import AdminAgentMessage from '@/components/admin/AdminAgentMessage'
 import AdminAgentBlocks, { type UiBlock } from '@/components/admin/AdminAgentBlocks'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { Tabs } from '@/components/admin/channels/ui'
+import AgentOverview from './_components/AgentOverview'
+import { PageHeader } from '@/components/admin/kit/layout'
 
 interface ProposedAction {
   id: string
@@ -734,7 +738,7 @@ interface ConversationListItem {
   message_count: number
 }
 
-type Tab = 'chat' | 'slash' | 'tools'
+type Tab = 'chat' | 'slash' | 'tools' | 'overview'
 
 export default function AdminAgentPage() {
   const { showToast } = useToast()
@@ -981,56 +985,48 @@ export default function AdminAgentPage() {
   return (
     <div className="h-full flex flex-col">
       {/* Page header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border-default shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-500 to-secondary-500 flex items-center justify-center shrink-0">
-            <Bot className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="text-base font-semibold text-foreground">Admin Assistant</h1>
-            <p className="text-xs text-foreground-muted">Read-only chat + admin-approved actions</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={newChat}
-            className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-            title="New chat"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setShowHistory(s => !s)}
-            className={`p-1.5 rounded-lg transition-colors ${showHistory ? 'bg-surface-secondary text-foreground' : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
-            title="Chat history"
-          >
-            <History className="w-4 h-4" />
-          </button>
-        </div>
+      <div className="px-4 sm:px-6 py-4 border-b border-border-default shrink-0">
+        <PageHeader
+          title="Admin Assistant"
+          description="Read-only chat + admin-approved actions"
+          media={
+            <div className="w-9 h-9 rounded-xl bg-accent-500 flex items-center justify-center shrink-0">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+          }
+        />
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 px-4 border-b border-border-default shrink-0">
-        {(
-          [
-            { id: 'chat', label: 'Chat', icon: MessageSquare },
-            { id: 'slash', label: 'Slash', icon: Slash },
-            { id: 'tools', label: 'Tools', icon: LayoutGrid },
-          ] as const
-        ).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition-colors border-b-2 ${
-              tab === id
-                ? 'text-accent-600 dark:text-accent-400 border-accent-500'
-                : 'text-foreground-muted hover:text-foreground border-transparent'
-            }`}
-          >
-            <Icon className="w-3.5 h-3.5" />
-            {label}
-          </button>
-        ))}
+      <div className="px-4 shrink-0">
+        <Tabs
+          tabs={[
+            { id: 'chat' as const, label: 'Chat', icon: <MessageSquare className="w-3.5 h-3.5" /> },
+            { id: 'overview' as const, label: 'Overview', icon: <BarChart3 className="w-3.5 h-3.5" /> },
+            { id: 'slash' as const, label: 'Slash', icon: <Slash className="w-3.5 h-3.5" /> },
+            { id: 'tools' as const, label: 'Tools', icon: <LayoutGrid className="w-3.5 h-3.5" /> },
+          ]}
+          value={tab}
+          onChange={setTab}
+          actions={
+            <>
+              <button
+                onClick={newChat}
+                className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
+                title="New chat"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setShowHistory(s => !s)}
+                className={`p-1.5 rounded-lg transition-colors ${showHistory ? 'bg-surface-secondary text-foreground' : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
+                title="Chat history"
+              >
+                <History className="w-4 h-4" />
+              </button>
+            </>
+          }
+        />
       </div>
 
       {/* Chat tab */}
@@ -1143,9 +1139,9 @@ export default function AdminAgentPage() {
                         {turn.pickers.map((picker, pi) => (
                           <div
                             key={pi}
-                            className="rounded-lg border border-accent-300 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/10 p-3"
+                            className="rounded-lg border border-accent-500/40 bg-accent-500/5 p-3"
                           >
-                            <p className="text-xs font-semibold text-accent-900 dark:text-accent-200 mb-2">
+                            <p className="text-xs font-semibold text-foreground mb-2">
                               Pick a {picker.choice_kind}
                               {picker.note ? ` — ${picker.note}` : ''}
                             </p>
@@ -1162,7 +1158,7 @@ export default function AdminAgentPage() {
                                       `Use ${picker.choice_kind} id ${opt.id} (${opt.label}) for the previous request.`
                                     )
                                   }}
-                                  className="w-full text-left px-3 py-1.5 rounded-md hover:bg-accent-100 dark:hover:bg-accent-900/30 transition-colors"
+                                  className="w-full text-left px-3 py-1.5 rounded-md hover:bg-accent-500/10 transition-colors"
                                 >
                                   <p className="text-sm font-medium text-foreground">{opt.label}</p>
                                   {opt.sublabel && <p className="text-[11px] text-foreground-muted">{opt.sublabel}</p>}
@@ -1178,9 +1174,9 @@ export default function AdminAgentPage() {
                         {turn.proposedActions.map(action => (
                           <div
                             key={action.id}
-                            className="rounded-lg border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-3"
+                            className="rounded-lg border-2 border-amber-500/40 bg-amber-500/5 p-3"
                           >
-                            <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2">
+                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">
                               Pending approval — {action.kind}
                             </p>
                             <p className="text-xs text-foreground mb-3">{action.confirmation}</p>
@@ -1208,7 +1204,7 @@ export default function AdminAgentPage() {
                               </p>
                             )}
                             {action.status === 'approved' && (
-                              <p className="text-xs text-green-700 dark:text-green-300 flex items-center gap-1.5">
+                              <p className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1.5">
                                 <CheckCircle className="w-3 h-3" /> Executed
                               </p>
                             )}
@@ -1218,7 +1214,7 @@ export default function AdminAgentPage() {
                               </p>
                             )}
                             {action.status === 'failed' && (
-                              <p className="text-xs text-red-700 dark:text-red-300">
+                              <p className="text-xs text-red-500">
                                 Failed: {action.error || 'unknown'}
                               </p>
                             )}
@@ -1283,7 +1279,7 @@ export default function AdminAgentPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={loading || uploading}
-                  className="w-9 h-9 flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-secondary rounded-lg disabled:opacity-50 shrink-0"
+                  className="w-8 h-8 flex items-center justify-center text-foreground-muted hover:text-foreground hover:bg-surface-secondary rounded-lg disabled:opacity-50 shrink-0"
                   title="Attach file"
                 >
                   <Paperclip className="w-4 h-4" />
@@ -1291,7 +1287,7 @@ export default function AdminAgentPage() {
                 <button
                   onClick={() => sendMessage(input)}
                   disabled={loading || uploading || (!pendingFile && input.trim().length < 2)}
-                  className="w-9 h-9 flex items-center justify-center bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 shrink-0"
+                  className="w-8 h-8 flex items-center justify-center bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 shrink-0"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -1314,7 +1310,7 @@ export default function AdminAgentPage() {
               }}
               className="w-full text-left px-3 py-2.5 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
             >
-              <p className="text-sm font-mono text-accent-600 dark:text-accent-400">{cmd.example}</p>
+              <p className="text-sm font-mono text-accent-500">{cmd.example}</p>
               <p className="text-xs text-foreground-muted mt-0.5">{cmd.description}</p>
             </button>
           ))}
@@ -1322,11 +1318,19 @@ export default function AdminAgentPage() {
       )}
 
       {/* Tools tab */}
+      {tab === 'overview' && (
+        <div className="flex-1 overflow-y-auto p-4">
+          <Suspense fallback={null}>
+            <AgentOverview />
+          </Suspense>
+        </div>
+      )}
+
       {tab === 'tools' && (
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           <p className="text-xs text-foreground-muted">
             Click any tool to send a prompt.{' '}
-            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/40">
               action
             </span>{' '}
             tools require your approval before executing.
@@ -1347,11 +1351,11 @@ export default function AdminAgentPage() {
                     className="text-left px-3 py-2.5 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors group"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 leading-snug">
+                      <p className="text-sm font-medium text-foreground group-hover:text-accent-500 leading-snug">
                         {t.label}
                       </p>
                       {t.mutating && (
-                        <span className="shrink-0 inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 mt-0.5">
+                        <span className="shrink-0 inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/40 mt-0.5">
                           action
                         </span>
                       )}

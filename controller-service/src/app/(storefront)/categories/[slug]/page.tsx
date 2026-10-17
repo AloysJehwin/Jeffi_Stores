@@ -10,7 +10,7 @@ import {
 import { getFeatureFlags } from '@/lib/catalog/site-controls'
 import { pickUnitPrice } from '@/lib/catalog/pricing'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
-import Pagination from '@/components/ui/Pagination'
+import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import ProductCard from '@/components/visitor/ProductCard'
 import { round2 } from '@/lib/catalog/gst'
 
@@ -149,17 +149,12 @@ export default async function CategoryDetailPage({
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-foreground">Products ({total})</h2>
-            {totalPages > 1 && (
-              <p className="text-sm text-foreground-muted">
-                Page {page} of {totalPages}
-              </p>
-            )}
           </div>
 
           {products.length > 0 ? (
             <>
-              <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6">
-                {products.map(product => {
+              {(() => {
+                const items = products.map(product => {
                   const primaryImage =
                     product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
                   const hasVariants = product.has_variants
@@ -188,33 +183,40 @@ export default async function CategoryDetailPage({
                     !gstEnabled && rawMrp != null && gstRate > 0 ? round2(rawMrp / (1 + gstRate / 100)) : rawMrp
                   const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
 
-                  return (
-                    <ProductCard
-                      key={product.id}
-                      id={product.id}
-                      name={product.name}
-                      slug={product.slug}
-                      hasVariants={hasVariants}
-                      displayPrice={Number(displayPrice)}
-                      mrp={mrp}
-                      mrpDiscount={mrpDiscount}
-                      effectiveStock={effectiveStock}
-                      isDigital={!!product.is_digital}
-                      primaryImage={primaryImage || null}
-                      brandName={product.brands?.name || null}
-                      categoryName={product.categories?.name || null}
-                      discountPct={Number(product.discount_pct ?? 0)}
-                      extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
-                      handlingDays={Number(product.handling_days ?? 2)}
-                    />
-                  )
-                })}
-              </div>
-              <Pagination
-                page={page}
-                totalPages={totalPages}
-                buildHref={p => (p > 1 ? `/categories/${slug}?page=${p}` : `/categories/${slug}`)}
-              />
+                  return {
+                    key: String(product.id),
+                    node: (
+                      <ProductCard
+                        id={product.id}
+                        name={product.name}
+                        slug={product.slug}
+                        hasVariants={hasVariants}
+                        displayPrice={Number(displayPrice)}
+                        mrp={mrp}
+                        mrpDiscount={mrpDiscount}
+                        effectiveStock={effectiveStock}
+                        isDigital={!!product.is_digital}
+                        primaryImage={primaryImage || null}
+                        brandName={product.brands?.name || null}
+                        categoryName={product.categories?.name || null}
+                        discountPct={Number(product.discount_pct ?? 0)}
+                        extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
+                        handlingDays={Number(product.handling_days ?? 2)}
+                      />
+                    ),
+                  }
+                })
+                return (
+                  <ServerPagedItems
+                    items={items}
+                    page={page}
+                    total={total}
+                    noun="products"
+                    wrap="div"
+                    wrapClassName="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
+                  />
+                )
+              })()}
             </>
           ) : (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">

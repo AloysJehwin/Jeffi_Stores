@@ -3,6 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { TextArea } from '@/components/admin/kit/form'
+import { Card } from '@/components/admin/kit/layout'
+import { badgeCls, type Tone } from '@/components/admin/kit/tones'
 
 interface Address {
   full_name: string
@@ -25,12 +29,7 @@ export interface AddressChangeRequestView {
   reviewedAt: string | null
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  approved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
-  cancelled: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-}
+const STATUS_TONE: Record<string, Tone> = { pending: 'amber', approved: 'green', rejected: 'red', cancelled: 'muted' }
 const STATUS_LABEL: Record<string, string> = {
   pending: 'Pending',
   approved: 'Approved',
@@ -54,7 +53,7 @@ const fmtDate = (iso: string) =>
 function AddressCard({ title, address, highlight }: { title: string; address: Address | null; highlight?: boolean }) {
   return (
     <div
-      className={`rounded-lg border p-4 ${highlight ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20' : 'border-border-default'}`}
+      className={`rounded-lg border p-4 ${highlight ? 'border-accent-500/50 bg-accent-500/5' : 'border-border-default'}`}
     >
       <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted mb-2">{title}</p>
       {address ? (
@@ -91,7 +90,7 @@ export default function AddressChangeReview({
   const router = useRouter()
   const canWrite = useCanWrite('orders') && canWriteProp
   const [isProcessing, setIsProcessing] = useState(false)
-  const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const toast = useActionToast()
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [rejectNote, setRejectNote] = useState('')
 
@@ -102,7 +101,6 @@ export default function AddressChangeReview({
     if (!pending || !canWrite) return
     if (action === 'reject' && !rejectNote.trim()) return
     setIsProcessing(true)
-    setResult(null)
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/address-change`, {
         method: 'POST',
@@ -115,16 +113,14 @@ export default function AddressChangeReview({
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to review the address change request')
-      setResult({
-        type: 'success',
-        message:
-          action === 'approve'
-            ? `Address change approved. The order now ships to the new address.${data.gstSplitChanged ? ' The GST split was recalculated for the new state.' : ''}`
-            : 'Address change rejected. The customer has been notified with your reason.',
-      })
+      toast.success(
+        action === 'approve'
+          ? `Address change approved. The order now ships to the new address.${data.gstSplitChanged ? ' The GST split was recalculated for the new state.' : ''}`
+          : 'Address change rejected. The customer has been notified with your reason.'
+      )
       setTimeout(() => router.refresh(), 1500)
     } catch (err: any) {
-      setResult({ type: 'error', message: err.message })
+      toast.error(err.message)
     } finally {
       setIsProcessing(false)
     }
@@ -137,28 +133,14 @@ export default function AddressChangeReview({
     !!pending?.oldAddress && norm(pending.oldAddress.postal_code) !== norm(pending.newAddress.postal_code)
 
   return (
-    <div
-      className={`bg-surface-elevated rounded-lg shadow-sm ${pending ? 'border-2 border-orange-300 dark:border-orange-800' : 'border border-border-default'}`}
-    >
-      <div
-        className={`px-6 py-4 border-b ${pending ? 'border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/30' : 'border-border-default'}`}
-      >
-        <h2 className={`text-lg font-semibold ${pending ? 'text-orange-900 dark:text-orange-300' : 'text-foreground'}`}>
+    <Card
+      title={
+        <span className={pending ? 'text-amber-600 dark:text-amber-400' : ''}>
           {pending ? 'Delivery Address Change Request' : 'Delivery Address Changes'}
-        </h2>
-      </div>
-      <div className="p-4 sm:p-6 space-y-4">
-        {result && (
-          <div
-            className={`px-4 py-3 rounded-lg text-sm ${
-              result.type === 'success'
-                ? 'bg-green-50 dark:bg-green-900/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800'
-                : 'bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
-            }`}
-          >
-            {result.message}
-          </div>
-        )}
+        </span>
+      }
+    >
+      <div className="space-y-4">
 
         {pending && (
           <>
@@ -191,7 +173,7 @@ export default function AddressChangeReview({
             )}
 
             {blockReason && (
-              <p className="text-sm text-red-700 dark:text-red-400">
+              <p className="text-sm text-red-600 dark:text-red-400">
                 This request can no longer be approved: {blockReason} You can still reject it to close it.
               </p>
             )}
@@ -201,25 +183,25 @@ export default function AddressChangeReview({
             ) : showRejectForm ? (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">
+                  <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                     Reason for rejection <span className="text-red-500">*</span>
                   </label>
-                  <textarea
+                  <TextArea
                     value={rejectNote}
                     onChange={e => setRejectNote(e.target.value)}
                     rows={3}
                     maxLength={1000}
                     placeholder="e.g. We cannot deliver to this location for this order."
-                    className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent resize-none"
+                    className="resize-none"
                     disabled={isProcessing}
-                  />
+                    />
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => review('reject')}
                     disabled={isProcessing || !rejectNote.trim()}
-                    className="px-4 h-control bg-secondary-600 hover:bg-secondary-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isProcessing ? 'Sending...' : 'Confirm Rejection'}
                   </button>
@@ -230,20 +212,20 @@ export default function AddressChangeReview({
                       setRejectNote('')
                     }}
                     disabled={isProcessing}
-                    className="px-4 h-control bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50"
+                    className="control-md border border-border-secondary font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
                   >
                     Back
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-2">
                 {!blockReason && (
                   <button
                     type="button"
                     onClick={() => review('approve')}
                     disabled={isProcessing}
-                    className="px-4 h-control bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="control-md bg-green-600 font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isProcessing ? 'Processing...' : 'Approve Address Change'}
                   </button>
@@ -252,7 +234,7 @@ export default function AddressChangeReview({
                   type="button"
                   onClick={() => setShowRejectForm(true)}
                   disabled={isProcessing}
-                  className="px-4 h-control bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="control-md border border-border-secondary font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
                 >
                   Reject (Keep Address)
                 </button>
@@ -274,7 +256,7 @@ export default function AddressChangeReview({
                   key={r.id}
                   className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground-secondary"
                 >
-                  <span className={`text-xs px-2 py-0.5 rounded ${STATUS_STYLE[r.status]}`}>
+                  <span className={badgeCls(STATUS_TONE[r.status])}>
                     {STATUS_LABEL[r.status]}
                   </span>
                   <span>
@@ -288,6 +270,6 @@ export default function AddressChangeReview({
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

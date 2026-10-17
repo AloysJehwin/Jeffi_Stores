@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import { StatusBadge } from '@/components/admin/kit/status'
+import { APPROVAL_STATUS, fmtDay } from '../../_status'
 
 interface BusinessCustomerItem {
   user_id: string
@@ -19,20 +21,6 @@ interface BusinessCustomerItem {
   href: string
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-}
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[status] || ''}`}>
-      {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
-  )
-}
-
 function Field({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3 py-2 border-b border-border-default last:border-b-0">
@@ -42,9 +30,6 @@ function Field({ label, value, mono }: { label: string; value: React.ReactNode; 
   )
 }
 
-const joined = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-
 export default function BusinessCustomersMobileList({ customers }: { customers: BusinessCustomerItem[] }) {
   const router = useRouter()
   const [selected, setSelected] = useState<BusinessCustomerItem | null>(null)
@@ -52,9 +37,7 @@ export default function BusinessCustomersMobileList({ customers }: { customers: 
 
   if (customers.length === 0) {
     return (
-      <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
-        No business customers found.
-      </div>
+      <div className="rounded-xl border border-border-default bg-surface-elevated p-8 text-center text-sm text-foreground-muted">No business customers found.</div>
     )
   }
 
@@ -73,7 +56,7 @@ export default function BusinessCustomersMobileList({ customers }: { customers: 
                 {c.first_name} {c.last_name || ''}
               </p>
             </div>
-            <StatusBadge status={c.approval_status} />
+            <StatusBadge status={c.approval_status} map={APPROVAL_STATUS} />
           </div>
           <div className="mt-2 text-xs text-foreground-secondary truncate">{c.email}</div>
         </MobileListCard>
@@ -88,7 +71,7 @@ export default function BusinessCustomersMobileList({ customers }: { customers: 
           <button
             type="button"
             onClick={() => setActionsOpen(true)}
-            className="w-full bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+            className="control-md w-full bg-accent-500 font-semibold text-white hover:bg-accent-600"
           >
             Actions
           </button>
@@ -99,8 +82,8 @@ export default function BusinessCustomersMobileList({ customers }: { customers: 
             <Field label="Email" value={selected.email} />
             <Field label="GST" mono value={selected.gst_number} />
             <Field label="Industry" value={selected.industry} />
-            <Field label="Status" value={<StatusBadge status={selected.approval_status} />} />
-            <Field label="Joined" value={joined(selected.created_at)} />
+            <Field label="Status" value={<StatusBadge status={selected.approval_status} map={APPROVAL_STATUS} />} />
+            <Field label="Joined" value={fmtDay(selected.created_at)} />
           </div>
         )}
       </MobileDetailSheet>

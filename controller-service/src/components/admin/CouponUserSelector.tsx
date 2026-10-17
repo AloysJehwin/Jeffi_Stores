@@ -13,41 +13,41 @@ interface Props {
 }
 
 const SEGMENTS = [
-  { key: 'vip', label: 'VIP', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
-  { key: 'loyal', label: 'Loyal', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
-  { key: 'b2b', label: 'B2B', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
-  { key: 'repeat', label: 'Repeat', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  { key: 'new', label: 'New', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300' },
+  { key: 'vip', label: 'VIP', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
+  { key: 'loyal', label: 'Loyal', color: 'bg-purple-500/10 text-purple-700 dark:text-purple-400' },
+  { key: 'b2b', label: 'B2B', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' },
+  { key: 'repeat', label: 'Repeat', color: 'bg-green-500/10 text-green-700 dark:text-green-400' },
+  { key: 'new', label: 'New', color: 'bg-teal-500/10 text-teal-700 dark:text-teal-400' },
   {
     key: 'at_risk',
     label: 'At Risk',
-    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    color: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
   },
-  { key: 'dormant', label: 'Dormant', color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' },
+  { key: 'dormant', label: 'Dormant', color: 'bg-surface-secondary text-foreground' },
   {
     key: 'one_time',
     label: 'One-time',
-    color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
+    color: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
   },
-  { key: 'lead', label: 'Lead', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' },
+  { key: 'lead', label: 'Lead', color: 'bg-pink-500/10 text-pink-700 dark:text-pink-400' },
 ]
 
 const SCORE_BUCKETS = [
-  { min: 80, max: 100, label: '80–100', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  { min: 60, max: 80, label: '60–80', color: 'bg-lime-100 text-lime-800 dark:bg-lime-900/30 dark:text-lime-300' },
+  { min: 80, max: 100, label: '80–100', color: 'bg-green-500/10 text-green-700 dark:text-green-400' },
+  { min: 60, max: 80, label: '60–80', color: 'bg-lime-500/10 text-lime-700 dark:text-lime-400' },
   {
     min: 40,
     max: 60,
     label: '40–60',
-    color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+    color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   },
   {
     min: 20,
     max: 40,
     label: '20–40',
-    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+    color: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
   },
-  { min: 0, max: 20, label: '0–20', color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
+  { min: 0, max: 20, label: '0–20', color: 'bg-red-500/10 text-red-700 dark:text-red-400' },
 ]
 
 type BulkMode = 'search' | 'segment' | 'score'
@@ -143,7 +143,7 @@ export default function CouponUserSelector({ name = 'eligible_user_ids' }: Props
           {selected.map(u => (
             <span
               key={u.id}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300 text-xs font-medium rounded-full"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent-500/10 text-accent-500 text-xs font-medium rounded-full"
             >
               {u.full_name?.trim() || u.email}
               <button

@@ -1,13 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
-import Pagination from '@/components/visitor/ListPagination'
+import { useInfiniteList, InfiniteFooter, fetchJson } from '@/components/admin/kit/infinite'
 
 type Status = 'joined' | 'rewarded' | 'reversed' | 'capped' | 'rejected'
 
@@ -188,19 +188,12 @@ function Stats({ data }: { data: ReferralsData }) {
   )
 }
 
-function Friends({
-  friends,
-  onPage,
-  busy,
-}: {
-  friends: ReferralsData['friends']
-  onPage: (page: number) => void
-  busy: boolean
-}) {
+function Friends({ friendsList }: { friendsList: ReturnType<typeof useFriendsList> }) {
+  const { rows, total } = friendsList
   return (
     <div className={CARD}>
       <h2 className="font-semibold text-foreground">Your friends</h2>
-      {friends.total === 0 ? (
+      {total === 0 && !friendsList.loading ? (
         <div className="mt-4 flex items-center gap-3 rounded-lg bg-surface-secondary p-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300">
             <ShareIcon />
@@ -212,7 +205,7 @@ function Friends({
       ) : (
         <>
           <ul className="mt-2 divide-y divide-border-default">
-            {friends.items.map(friend => {
+            {rows.map(friend => {
               const chip = statusChip(friend)
               return (
                 <li key={friend.id} className="flex items-center justify-between gap-3 py-3">
@@ -227,11 +220,16 @@ function Friends({
               )
             })}
           </ul>
-          <Pagination page={friends.page} total={friends.total} pageSize={friends.pageSize} onChange={onPage} busy={busy} />
+          <InfiniteFooter shown={rows.length} control={friendsList} noun="friends" />
         </>
       )}
     </div>
   )
+}
+
+// Shared return type for the Friends child.
+function useFriendsList(opts: Parameters<typeof useInfiniteList<Friend>>[0]) {
+  return useInfiniteList<Friend>(opts)
 }
 
 function HowItWorks({ program }: { program: ReferralsData['program'] }) {
@@ -271,35 +269,38 @@ export default function AccountReferrals() {
   const { user, isLoading: authLoading } = useAuth()
   const config = useStoreConfig()
   const router = useRouter()
-  const [data, setData] = useState<ReferralsData | null>(null)
-  const [loading, setLoading] = useState(true)
+  // The friends list auto-paginates; the surrounding stats come from page 1 of the same payload.
+  const [staticData, setStaticData] = useState<ReferralsData | null>(null)
   const [failed, setFailed] = useState(false)
-  const [paging, setPaging] = useState(false)
 
-  const load = useCallback(async (page = 1, silent = false) => {
-    if (silent) setPaging(true)
-    try {
-      const res = await fetch(`/api/user/referrals?page=${page}`)
-      if (!res.ok) throw new Error('load failed')
-      setData(await res.json())
-      setFailed(false)
-    } catch {
-      setFailed(true)
-    } finally {
-      setLoading(false)
-      setPaging(false)
-    }
-  }, [])
+  const friendsList = useFriendsList({
+    key: user ? `referrals-${user.id}` : null,
+    pageSize: 20,
+    fetchPage: async (page, signal) => {
+      try {
+        const data = await fetchJson<ReferralsData>(`/api/user/referrals?page=${page}`, signal)
+        if (page === 1) {
+          setStaticData(data)
+          setFailed(false)
+        }
+        return { rows: data.friends.items, total: data.friends.total }
+      } catch (e) {
+        if (page === 1) setFailed(true)
+        throw e
+      }
+    },
+    getKey: f => f.id,
+  })
 
   useEffect(() => {
     if (authLoading) return
     if (!user) {
       router.push('/login?redirect=/account/referrals')
-      return
     }
-    load()
-  }, [user, authLoading, router, load])
+  }, [user, authLoading, router])
 
+  const loading = authLoading || (friendsList.loading && !staticData)
+  const data = staticData
   const unavailable = !loading && (failed || !data || !data.enabled || data.eligible === false)
 
   return (
@@ -329,7 +330,7 @@ export default function AccountReferrals() {
             <div className="min-w-0 space-y-4 lg:col-span-2">
               <ShareCard data={data} storeName={config.identity.name} />
               <Stats data={data} />
-              <Friends friends={data.friends} busy={paging} onPage={page => load(page, true)} />
+              <Friends friendsList={friendsList} />
             </div>
             <div className="min-w-0 lg:sticky lg:top-4">
               <HowItWorks program={data.program} />

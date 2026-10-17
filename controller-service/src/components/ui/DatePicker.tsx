@@ -16,6 +16,7 @@ interface DatePickerProps {
   triggerClassName?: string
   /** Shows Clear (sets '') and Today under the month grid. */
   clearable?: boolean
+  'aria-label'?: string
 }
 
 const MONTHS = [
@@ -69,6 +70,7 @@ export default function DatePicker({
   placeholder = 'Select date',
   triggerClassName,
   clearable,
+  'aria-label': ariaLabel,
 }: DatePickerProps) {
   const parsed = parseDateVal(value)
   const today = new Date()
@@ -193,17 +195,18 @@ export default function DatePicker({
   const displayVal = formatDisplay(value)
 
   return (
-    <div ref={containerRef} className={`relative ${className.includes('w-full') ? 'block' : 'inline-block'} ${className}`}>
+    <div ref={containerRef} className={`relative ${className.includes('w-full') ? 'block' : 'inline-flex align-top'} ${className}`}>
       <button
         type="button"
         disabled={disabled}
         onClick={openPicker}
+        aria-label={ariaLabel}
         aria-haspopup="dialog"
         aria-expanded={open}
         data-datepicker-trigger
         className={`w-full flex items-center justify-between text-left text-sm transition-colors ${
           triggerClassName ? `${triggerClassName} ${open ? 'ring-2 ring-accent-400' : ''}` :
-          `px-4 py-1.5 rounded-lg border bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400 ${
+          `h-control px-4 rounded-lg border bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400 ${
             open ? 'border-accent-500 ring-2 ring-accent-500 dark:ring-accent-400' : 'border-border-secondary hover:border-border-default'
           }`
         } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}

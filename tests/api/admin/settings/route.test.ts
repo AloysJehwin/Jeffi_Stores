@@ -59,6 +59,18 @@ describe('PATCH /api/admin/settings', () => {
     expect((await res.json()).error).toMatch(/not editable/i)
   })
 
+  it('rejects the messaging provider keys: the platform manages them', async () => {
+    mockAuth.mockResolvedValue(admin)
+    mockHasScope.mockReturnValue(true)
+    for (const key of ['feature_sms_provider', 'feature_whatsapp_provider']) {
+      const res = await PATCH(makeRequest({ key, value: 'aws' }))
+      expect(res.status).toBe(400)
+      const batch = await PATCH(makeRequest({ updates: [{ key, value: 'aws' }] }))
+      expect(batch.status).toBe(400)
+    }
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
   it('updates editable key and returns success', async () => {
     mockAuth.mockResolvedValue(admin)
     mockHasScope.mockReturnValue(true)

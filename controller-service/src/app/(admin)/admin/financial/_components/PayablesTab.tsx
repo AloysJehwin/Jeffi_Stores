@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { ap } from '@/lib/shared/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { EmptyState, useActionToast, InfiniteFooter } from '@/components/admin/kit'
 import {
   inputCls,
   labelCls,
@@ -19,6 +20,8 @@ import {
   thCls,
   thRight,
   thCenter,
+  theadCls,
+  tableWrapCls,
 } from './shared'
 import { PayablesPayModal } from './PayablesPayModal'
 
@@ -52,8 +55,11 @@ export function PayablesTab({ initialData }: { initialData: any }) {
   const [paying, setPaying] = useState(false)
   const [payoutResult, setPayoutResult] = useState<any>(null)
   const [page, setPage] = useState(1)
-  const PAGE_SIZE = 50
+  const [more, setMore] = useState<{ loading: boolean; error: string | null }>({ loading: false, error: null })
+  const applied = useRef('')
+  const inflight = useRef(false)
   const canWrite = useCanWrite('financial:write')
+  const toast = useActionToast()
 
   useEffect(() => {
     if (initialData !== null) {
@@ -62,38 +68,54 @@ export function PayablesTab({ initialData }: { initialData: any }) {
     }
   }, [initialData])
 
+  // Page 1 replaces (with the current filters); later pages append with the filters page 1 used.
   const load = useCallback(
-    async (p = page) => {
-      setLoading(true)
-      const params = new URLSearchParams()
-      if (from) params.set('from', from)
-      if (to) params.set('to', to)
-      if (search) params.set('search', search)
+    async (p = 1) => {
+      if (p > 1 && inflight.current) return
+      inflight.current = true
+      let params: URLSearchParams
+      if (p === 1) {
+        setLoading(true)
+        params = new URLSearchParams()
+        if (from) params.set('from', from)
+        if (to) params.set('to', to)
+        if (search) params.set('search', search)
+        applied.current = params.toString()
+      } else {
+        setMore({ loading: true, error: null })
+        params = new URLSearchParams(applied.current)
+      }
       params.set('page', String(p))
-      const res = await fetch(`/api/admin/financial/payables?${params}`)
-      const json = await res.json()
-      setData(json?.error ? null : json)
-      setPage(p)
-      setLoading(false)
+      try {
+        const res = await fetch(`/api/admin/financial/payables?${params}`)
+        const json = await res.json()
+        if (p === 1) setData(json?.error ? null : json)
+        else if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load')
+        else setData((prev: any) => ({ ...prev, rows: [...(prev?.rows ?? []), ...(json.rows ?? [])], total: json.total }))
+        setPage(p)
+        setMore({ loading: false, error: null })
+      } catch (e) {
+        if (p > 1) setMore({ loading: false, error: e instanceof Error ? e.message : 'Failed to load' })
+      } finally {
+        inflight.current = false
+        if (p === 1) setLoading(false)
+      }
     },
-    [from, to, search, page]
+    [from, to, search]
   )
 
-  const handleRefresh = () => {
-    setPage(1)
-    load(1)
-  }
+  const handleRefresh = () => load(1)
 
-  const totalPages = data?.total ? Math.ceil(data.total / PAGE_SIZE) : 1
 
   const submitBill = async () => {
     if (!addForm.supplier_name || !addForm.amount || !addForm.expense_date) return
     setSaving(true)
-    await fetch('/api/admin/financial/payables', {
+    const res = await fetch('/api/admin/financial/payables', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(addForm),
     })
+    toast.result({ ok: res.ok }, { success: 'Bill saved.', error: 'Could not save the bill.' })
     setShowAddForm(false)
     setAddForm({
       supplier_name: '',
@@ -112,11 +134,12 @@ export function PayablesTab({ initialData }: { initialData: any }) {
   const submitPayment = async () => {
     if (!payModal || !payForm.amount) return
     setPaying(true)
-    await fetch(`/api/admin/financial/payables/${payModal.id}/pay`, {
+    const res = await fetch(`/api/admin/financial/payables/${payModal.id}/pay`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payForm),
     })
+    toast.result({ ok: res.ok }, { success: 'Payment recorded.', error: 'Could not record the payment.' })
     setPayModal(null)
     setPaying(false)
     load()
@@ -135,10 +158,12 @@ export function PayablesTab({ initialData }: { initialData: any }) {
     setPaying(false)
     if (json.success) {
       setPayoutResult({ ok: true, payout_id: json.payout_id, status: json.payout_status })
+      toast.success(`Payout queued. ID ${json.payout_id}, status ${json.payout_status}.`)
       fetch('/api/admin/financial/payables/sync-payouts', { method: 'POST' })
       load()
     } else {
       setPayoutResult({ ok: false, error: json.error })
+      toast.error(json.error || 'Payout failed.')
     }
   }
 
@@ -182,12 +207,12 @@ export function PayablesTab({ initialData }: { initialData: any }) {
             />
           </div>
           <div className="flex gap-2 pb-0.5">
-            <button className={btnPrimary} onClick={handleRefresh}>
+            <button type="button" className={btnPrimary} onClick={handleRefresh} disabled={loading}>
               {loading ? 'Loading…' : 'Refresh'}
             </button>
             {canWrite && (
               <span className="hidden md:contents">
-                <button className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>
+                <button type="button" className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>
                   + Add Bill
                 </button>
               </span>
@@ -198,7 +223,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
 
       {showAddForm && (
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
-          <h3 className="text-sm font-semibold text-foreground">New Supplier Bill</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">New Supplier Bill</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className={labelCls}>Supplier Name *</label>
@@ -264,10 +289,10 @@ export function PayablesTab({ initialData }: { initialData: any }) {
             </div>
           </div>
           <div className="flex gap-2">
-            <button className={btnPrimary} onClick={submitBill} disabled={saving}>
+            <button type="button" className={btnPrimary} onClick={submitBill} disabled={saving}>
               {saving ? 'Saving…' : 'Save Bill'}
             </button>
-            <button className={btnSecondary} onClick={() => setShowAddForm(false)}>
+            <button type="button" className={btnSecondary} onClick={() => setShowAddForm(false)}>
               Cancel
             </button>
           </div>
@@ -286,12 +311,12 @@ export function PayablesTab({ initialData }: { initialData: any }) {
             </div>
 
             {data.rows.length === 0 ? (
-              <p className="text-foreground-secondary text-sm text-center py-10">No outstanding payables</p>
+              <EmptyState title="No outstanding payables" />
             ) : (
               <>
-                <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+                <div className={`hidden md:block overflow-x-auto ${tableWrapCls}`}>
                   <table className="w-full text-sm">
-                    <thead className="bg-surface-secondary">
+                    <thead className={theadCls}>
                       <tr>
                         <th className={thCls}>Supplier</th>
                         <th className={thCls}>Bill #</th>
@@ -362,7 +387,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                             <td className="px-4 py-3 text-center">
                               {canWrite && (
                                 <button
-                                  className="px-3 h-control-sm rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors"
+                                  className="control-sm bg-accent-500 hover:bg-accent-600 text-white transition-colors"
                                   onClick={() => openPayModal(r)}
                                 >
                                   Pay
@@ -376,7 +401,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                   </table>
                 </div>
 
-                <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+                <div className={`md:hidden divide-y divide-border-default ${tableWrapCls}`}>
                   {data.rows.map((r: any) => {
                     const remaining = parseFloat(r.total_amount) - parseFloat(r.paid_amount)
                     return (
@@ -429,7 +454,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                           <StatusBadge status={r.status} />
                           {canWrite && (
                             <button
-                              className="px-4 h-control-sm rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 text-white dark:text-secondary-900 transition-colors"
+                              className="control-sm bg-accent-500 hover:bg-accent-600 text-white transition-colors"
                               onClick={() => openPayModal(r)}
                             >
                               Pay
@@ -441,29 +466,11 @@ export function PayablesTab({ initialData }: { initialData: any }) {
                   })}
                 </div>
 
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-2">
-                    <p className="text-sm text-foreground-secondary">
-                      Page {page} of {totalPages} · {data.total} total
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => load(page - 1)}
-                        disabled={page === 1 || loading}
-                        className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        onClick={() => load(page + 1)}
-                        disabled={page === totalPages || loading}
-                        className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <InfiniteFooter
+                  shown={data.rows.length}
+                  noun="rows"
+                  control={{ total: data.total, hasMore: data.rows.length < (data.total ?? 0), loadingMore: more.loading, error: more.error, loadMore: () => load(page + 1) }}
+                />
               </>
             )}
           </>

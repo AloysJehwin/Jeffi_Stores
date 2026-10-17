@@ -13,6 +13,19 @@ interface Params {
   params: Promise<{ id: string }>
 }
 
+// A session's snapshot belongs to the draft it was opened on; a new or discarded draft ends it.
+async function closeProductSessions(productId: string) {
+  try {
+    await query(
+      `UPDATE editor_sessions SET closed_at = now(), closed_reason = 'save'
+        WHERE resource_type = 'product' AND resource_id = $1 AND closed_at IS NULL`,
+      [productId]
+    )
+  } catch (e) {
+    console.error('[product-draft] closing edit sessions failed for', productId, e)
+  }
+}
+
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
@@ -48,7 +61,7 @@ export async function POST(req: NextRequest, { params }: Params) {
          to_jsonb(p) - 'id' - 'created_at' - 'updated_at' - 'search_vector' - 'views_count' - 'sales_count' - 'inventory_quantity',
          COALESCE((SELECT json_agg(to_jsonb(v) || jsonb_build_object('sub_variant_type_on',
                      v.sub_variant_type_on OR EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = v.id AND sv.is_active = true)))
-                   FROM product_variants v WHERE v.product_id = p.id AND v.is_active = true), '[]'),
+                   FROM product_variants v WHERE v.product_id = p.id), '[]'),
          COALESCE((SELECT json_agg(to_jsonb(i) ORDER BY i.display_order) FROM product_images i WHERE i.product_id = p.id), '[]'),
          COALESCE((SELECT json_agg(to_jsonb(sv) ORDER BY sv.created_at, sv.sub_variant_name)
                    FROM product_sub_variants sv
@@ -58,10 +71,11 @@ export async function POST(req: NextRequest, { params }: Params) {
          COALESCE((SELECT json_agg(to_jsonb(vi) ORDER BY vi.display_order)
                    FROM variant_images vi
                    JOIN product_variants v ON v.id = vi.variant_id
-                   WHERE v.product_id = p.id AND v.is_active = true), '[]')
+                   WHERE v.product_id = p.id), '[]')
        FROM products p WHERE p.id = $1`,
       [id]
     )
+    await closeProductSessions(id)
 
     return NextResponse.json({ success: true, productId: id })
   } catch (err: unknown) {
@@ -211,6 +225,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
       }
     }
     await query(`DELETE FROM product_drafts WHERE product_id = $1`, [id])
+    await closeProductSessions(id)
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
     console.error('[product-draft] discard failed for', id, err)

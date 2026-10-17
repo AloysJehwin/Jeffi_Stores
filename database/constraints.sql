@@ -168,6 +168,30 @@ ALTER TABLE ONLY public.ai_feedback
 
 
 --
+-- Name: ai_usage ai_usage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_usage
+    ADD CONSTRAINT ai_usage_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_usage ai_usage_status_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_usage
+    ADD CONSTRAINT ai_usage_status_check CHECK (((status)::text = ANY (ARRAY['pending'::text, 'ok'::text, 'failed'::text, 'unpaid'::text])));
+
+
+--
+-- Name: ai_usage ai_usage_capability_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ai_usage
+    ADD CONSTRAINT ai_usage_capability_check CHECK (((capability)::text = ANY (ARRAY['text'::text, 'embed'::text, 'vision'::text, 'image'::text, 'video'::text])));
+
+
+--
 -- Name: ai_queries ai_queries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3650,3 +3674,61 @@ ALTER TABLE ONLY public.tenant_service_approvals ADD CONSTRAINT tenant_service_a
 ALTER TABLE ONLY public.template_variant ADD CONSTRAINT template_variant_review_status_check CHECK (((review_status)::text = ANY ((ARRAY['approved'::character varying, 'pending'::character varying, 'rejected'::character varying])::text[])));
 ALTER TABLE ONLY public.messaging_tenant_settings ADD CONSTRAINT messaging_tenant_settings_pkey PRIMARY KEY (tenant_id);
 ALTER TABLE ONLY public.messaging_tenant_settings ADD CONSTRAINT messaging_tenant_settings_mode_check CHECK (((standard_templates)::text = ANY ((ARRAY['all'::character varying, 'selected'::character varying])::text[])));
+
+ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_sync_log ADD CONSTRAINT channel_sync_log_status_check CHECK (((status)::text = ANY ((ARRAY['running'::character varying, 'success'::character varying, 'partial'::character varying, 'error'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_channel_check CHECK (((channel)::text = ANY ((ARRAY['gmc'::character varying, 'amazon'::character varying, 'amazon_ads'::character varying, 'meta_ads'::character varying, 'social'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_status_check CHECK (((status)::text = ANY ((ARRAY['open'::character varying, 'dismissed'::character varying, 'resolved'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_alerts ADD CONSTRAINT channel_alerts_severity_check CHECK (((severity)::text = ANY ((ARRAY['info'::character varying, 'warning'::character varying, 'critical'::character varying])::text[])));
+ALTER TABLE ONLY public.channel_change_log ADD CONSTRAINT channel_change_log_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.channel_change_log ADD CONSTRAINT channel_change_log_status_check CHECK (((status)::text = ANY ((ARRAY['applied'::character varying, 'rejected'::character varying, 'failed'::character varying])::text[])));
+
+ALTER TABLE ONLY public.gmc_product_performance ADD CONSTRAINT gmc_product_performance_pkey PRIMARY KEY (date, offer_id, marketing_method);
+ALTER TABLE ONLY public.gmc_price_competitiveness ADD CONSTRAINT gmc_price_competitiveness_pkey PRIMARY KEY (offer_id);
+ALTER TABLE ONLY public.gmc_price_insights ADD CONSTRAINT gmc_price_insights_pkey PRIMARY KEY (offer_id);
+ALTER TABLE ONLY public.gmc_best_sellers ADD CONSTRAINT gmc_best_sellers_pkey PRIMARY KEY (report_date, category_id, rank);
+ALTER TABLE ONLY public.gmc_best_sellers ADD CONSTRAINT gmc_best_sellers_catalog_status_check CHECK (((catalog_status)::text = ANY ((ARRAY['in_stock'::character varying, 'out_of_stock'::character varying, 'not_listed'::character varying, 'not_carried'::character varying])::text[])));
+ALTER TABLE ONLY public.gmc_account_issues ADD CONSTRAINT gmc_account_issues_pkey PRIMARY KEY (name);
+ALTER TABLE ONLY public.gmc_issue_cache ADD CONSTRAINT gmc_issue_cache_pkey PRIMARY KEY (offer_id);
+ALTER TABLE ONLY public.gmc_account_state ADD CONSTRAINT gmc_account_state_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.gmc_account_state ADD CONSTRAINT gmc_account_state_single CHECK ((id = 1));
+
+ALTER TABLE ONLY public.amazon_offers ADD CONSTRAINT amazon_offers_pkey PRIMARY KEY (sku);
+ALTER TABLE ONLY public.amazon_fee_estimates ADD CONSTRAINT amazon_fee_estimates_pkey PRIMARY KEY (sku);
+ALTER TABLE ONLY public.amazon_repricer_rules ADD CONSTRAINT amazon_repricer_rules_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.amazon_repricer_rules ADD CONSTRAINT amazon_repricer_rules_strategy_check CHECK (((strategy)::text = ANY ((ARRAY['match_buybox'::character varying, 'beat_buybox'::character varying, 'hold'::character varying])::text[])));
+
+ALTER TABLE ONLY public.amazon_orders ADD CONSTRAINT amazon_orders_pkey PRIMARY KEY (amazon_order_id);
+ALTER TABLE ONLY public.amazon_orders ADD CONSTRAINT amazon_orders_stock_state_check CHECK (((stock_state)::text = ANY ((ARRAY['none'::character varying, 'deducted'::character varying, 'restored'::character varying, 'short'::character varying, 'unmatched'::character varying])::text[])));
+ALTER TABLE ONLY public.amazon_order_items ADD CONSTRAINT amazon_order_items_pkey PRIMARY KEY (order_item_id);
+ALTER TABLE ONLY public.amazon_inventory_state ADD CONSTRAINT amazon_inventory_state_pkey PRIMARY KEY (sku);
+ALTER TABLE ONLY public.amazon_order_items ADD CONSTRAINT amazon_order_items_order_fkey FOREIGN KEY (amazon_order_id) REFERENCES public.amazon_orders(amazon_order_id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.amazon_orders ADD CONSTRAINT amazon_orders_order_fkey FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE SET NULL;
+
+ALTER TABLE ONLY public.amazon_report_requests ADD CONSTRAINT amazon_report_requests_pkey PRIMARY KEY (report_id);
+ALTER TABLE ONLY public.amazon_sales_traffic_daily ADD CONSTRAINT amazon_sales_traffic_daily_pkey PRIMARY KEY (date);
+ALTER TABLE ONLY public.amazon_sales_traffic_asin ADD CONSTRAINT amazon_sales_traffic_asin_pkey PRIMARY KEY (asin);
+ALTER TABLE ONLY public.amazon_settlements ADD CONSTRAINT amazon_settlements_pkey PRIMARY KEY (settlement_id);
+
+ALTER TABLE ONLY public.aads_profile ADD CONSTRAINT aads_profile_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.aads_profile ADD CONSTRAINT aads_profile_single CHECK ((id = 1));
+ALTER TABLE ONLY public.aads_campaigns ADD CONSTRAINT aads_campaigns_pkey PRIMARY KEY (campaign_id);
+ALTER TABLE ONLY public.aads_ad_groups ADD CONSTRAINT aads_ad_groups_pkey PRIMARY KEY (ad_group_id);
+ALTER TABLE ONLY public.aads_keywords ADD CONSTRAINT aads_keywords_pkey PRIMARY KEY (keyword_id);
+ALTER TABLE ONLY public.aads_product_ads ADD CONSTRAINT aads_product_ads_pkey PRIMARY KEY (ad_id);
+ALTER TABLE ONLY public.aads_daily_metrics ADD CONSTRAINT aads_daily_metrics_pkey PRIMARY KEY (date, campaign_id);
+ALTER TABLE ONLY public.aads_search_terms ADD CONSTRAINT aads_search_terms_pkey PRIMARY KEY (date, campaign_id, ad_group_id, keyword_id, search_term);
+ALTER TABLE ONLY public.aads_product_metrics ADD CONSTRAINT aads_product_metrics_pkey PRIMARY KEY (date, campaign_id, ad_group_id, sku);
+ALTER TABLE ONLY public.aads_report_requests ADD CONSTRAINT aads_report_requests_pkey PRIMARY KEY (report_id);
+
+ALTER TABLE ONLY public.mads_account ADD CONSTRAINT mads_account_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.mads_account ADD CONSTRAINT mads_account_single CHECK ((id = 1));
+ALTER TABLE ONLY public.mads_campaigns ADD CONSTRAINT mads_campaigns_pkey PRIMARY KEY (campaign_id);
+ALTER TABLE ONLY public.mads_adsets ADD CONSTRAINT mads_adsets_pkey PRIMARY KEY (adset_id);
+ALTER TABLE ONLY public.mads_ads ADD CONSTRAINT mads_ads_pkey PRIMARY KEY (ad_id);
+ALTER TABLE ONLY public.mads_daily_metrics ADD CONSTRAINT mads_daily_metrics_pkey PRIMARY KEY (date, ad_id);
+ALTER TABLE ONLY public.mads_breakdowns ADD CONSTRAINT mads_breakdowns_pkey PRIMARY KEY (dimension, key);
+ALTER TABLE ONLY public.mads_capi_events ADD CONSTRAINT mads_capi_events_pkey PRIMARY KEY (order_id, event_name);
+ALTER TABLE ONLY public.mads_capi_events ADD CONSTRAINT mads_capi_events_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'sent'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])));

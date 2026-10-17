@@ -15,12 +15,14 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/shared/admin-path'
+import { Tabs } from '@/components/admin/channels/ui'
+import { ErrorState, badgeCls, fieldInputCls } from '@/components/admin/kit'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 type Tab = 'locations' | 'labels'
 
 const btnPrimary =
-  'control-sm border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 font-medium transition-colors disabled:opacity-50'
+  'control-sm border border-transparent bg-accent-500 hover:bg-accent-600 text-white font-medium transition-colors disabled:opacity-50'
 const btnSecondary =
   'control-sm border border-border-default bg-surface hover:bg-surface-secondary text-foreground font-medium transition-colors'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -302,29 +304,20 @@ export default function ShelvingClient() {
   return (
     <div className="h-full flex flex-col">
       {/* Page header + tabs */}
-      <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-surface shrink-0">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Shelving</h1>
-            <p className="text-xs text-foreground-muted mt-0.5">Warehouse → Location → Stock</p>
-          </div>
-          <div className="flex gap-1">
-            {(['locations', 'labels'] as Tab[]).map(t => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px capitalize ${tab === t ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}
-              >
-                {t === 'locations' ? 'Locations' : 'Labels'}
-              </button>
-            ))}
-          </div>
-        </div>
+      <div className="px-4 sm:px-6 pt-4 shrink-0">
+        <Tabs
+          tabs={[
+            { id: 'locations' as Tab, label: 'Locations' },
+            { id: 'labels' as Tab, label: 'Labels' },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
       </div>
 
       {error && (
-        <div className="mx-4 sm:mx-6 mt-3 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400 text-sm shrink-0">
-          {error}
+        <div className="mx-4 sm:mx-6 mt-3 shrink-0">
+          <ErrorState title={error} />
         </div>
       )}
 
@@ -392,7 +385,7 @@ export default function ShelvingClient() {
                       setShowWarehouseForm(!showWarehouseForm)
                       setShowLocationForm(false)
                     }}
-                    className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs"
+                    className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-accent-500 hover:text-accent-500 transition-colors text-xs"
                   >
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -492,7 +485,7 @@ export default function ShelvingClient() {
                                 setShowLocationForm(!showLocationForm)
                                 setShowWarehouseForm(false)
                               }}
-                              className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs"
+                              className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-accent-500 hover:text-accent-500 transition-colors text-xs"
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -541,7 +534,7 @@ export default function ShelvingClient() {
                               setShowLocationForm(true)
                               setShowWarehouseForm(false)
                             }}
-                            className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs"
+                            className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-accent-500 hover:text-accent-500 transition-colors text-xs"
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -596,7 +589,7 @@ export default function ShelvingClient() {
                               setShowLocationForm(true)
                               setShowWarehouseForm(false)
                             }}
-                            className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs"
+                            className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-accent-500 hover:text-accent-500 transition-colors text-xs"
                           >
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -666,11 +659,11 @@ export default function ShelvingClient() {
                 <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border-default bg-surface shrink-0">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-secondary-500 dark:text-secondary-400 text-base">
+                      <span className="font-mono font-bold text-accent-500 text-base">
                         {activeLocation.display_code}
                       </span>
                       {!activeLocation.is_active && (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
+                        <span className={badgeCls('amber')}>
                           inactive
                         </span>
                       )}
@@ -704,7 +697,7 @@ export default function ShelvingClient() {
                         <button
                           onClick={() => deleteLocation(selectedLocation)}
                           title="Delete location"
-                          className="px-2 h-control-sm rounded-lg text-sm border border-border-default bg-surface hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-muted hover:text-red-500 transition-colors"
+                          className="px-2 h-control-sm rounded-lg text-sm border border-border-default bg-surface hover:bg-red-500/10 text-foreground-muted hover:text-red-500 transition-colors"
                         >
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path
@@ -762,7 +755,7 @@ export default function ShelvingClient() {
 
                   {stockLoading && (
                     <div className="flex items-center justify-center py-16">
-                      <div className="w-6 h-6 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-6 h-6 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
                     </div>
                   )}
 
@@ -816,8 +809,8 @@ function LevelChip({ label, selected, onSelect }: { label: string; selected: boo
       onClick={onSelect}
       className={`flex items-center h-7 px-3 rounded-full text-xs font-mono font-semibold transition-colors ${
         selected
-          ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900'
-          : 'bg-surface-secondary border border-border-default text-foreground hover:bg-secondary-50 dark:hover:bg-secondary-900/20 hover:border-secondary-300 dark:hover:border-secondary-700'
+          ? 'bg-accent-500 text-white'
+          : 'bg-surface-secondary border border-border-default text-foreground hover:bg-accent-500/10 hover:border-accent-500/40'
       }`}
     >
       {label}
@@ -846,13 +839,13 @@ function WarehouseChip({
         onClick={onSelect}
         className={`flex items-center gap-1.5 h-7 pl-2 pr-2.5 rounded-full text-xs font-medium transition-colors ${
           selected
-            ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900'
-            : 'bg-surface-secondary border border-border-default text-foreground hover:bg-secondary-50 dark:hover:bg-secondary-900/20 hover:border-secondary-300 dark:hover:border-secondary-700'
+            ? 'bg-accent-500 text-white'
+            : 'bg-surface-secondary border border-border-default text-foreground hover:bg-accent-500/10 hover:border-accent-500/40'
         }`}
       >
         <span
           className={`text-[10px] font-mono font-bold px-1 py-0.5 rounded ${
-            selected ? 'bg-white/20 dark:bg-black/20 text-inherit' : 'bg-surface text-foreground-secondary'
+            selected ? 'bg-white/20 text-inherit' : 'bg-surface text-foreground-secondary'
           }`}
         >
           {warehouse.code}
@@ -860,7 +853,7 @@ function WarehouseChip({
         <span>{warehouse.name}</span>
         {!warehouse.is_active && (
           <span
-            className={`text-[9px] px-1 py-0.5 rounded-full ${selected ? 'bg-white/20 text-inherit' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'}`}
+            className={`text-[9px] px-1 py-0.5 rounded-full ${selected ? 'bg-white/20 text-inherit' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'}`}
           >
             off
           </span>
@@ -873,7 +866,7 @@ function WarehouseChip({
               e.stopPropagation()
               onEdit()
             }}
-            className="flex items-center justify-center w-5 h-5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-secondary-500 transition-colors"
+            className="flex items-center justify-center w-5 h-5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-accent-500 transition-colors"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -891,7 +884,7 @@ function WarehouseChip({
               e.stopPropagation()
               onDelete()
             }}
-            className="flex items-center justify-center w-5 h-5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-muted hover:text-red-500 transition-colors"
+            className="flex items-center justify-center w-5 h-5 rounded hover:bg-red-500/10 text-foreground-muted hover:text-red-500 transition-colors"
           >
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -929,8 +922,8 @@ function LocationChip({
         onClick={onSelect}
         className={`flex items-center gap-1.5 h-7 pl-2.5 pr-2.5 rounded-full text-xs font-mono font-medium transition-colors ${
           selected
-            ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900'
-            : 'bg-surface-secondary border border-border-default text-foreground hover:bg-secondary-50 dark:hover:bg-secondary-900/20 hover:border-secondary-300 dark:hover:border-secondary-700'
+            ? 'bg-accent-500 text-white'
+            : 'bg-surface-secondary border border-border-default text-foreground hover:bg-accent-500/10 hover:border-accent-500/40'
         } ${location.is_open_shelf ? 'italic' : ''}`}
       >
         {location.display_code}
@@ -1084,7 +1077,7 @@ function LabelsTab({
                   onClick={() =>
                     setLabelSelections(Array.from(new Set([...labelSelections, ...visibleLocations.map(l => l.id)])))
                   }
-                  className="text-xs font-medium text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 transition-colors"
+                  className="text-xs font-medium text-accent-500 hover:text-accent-600 transition-colors"
                 >
                   All
                 </button>
@@ -1113,7 +1106,7 @@ function LabelsTab({
                     type="checkbox"
                     checked={labelSelections.includes(loc.id)}
                     onChange={() => toggleSelection(loc.id)}
-                    className="rounded border-border-default text-secondary-500 focus:ring-secondary-500 shrink-0"
+                    className="rounded border-border-default text-accent-500 focus:ring-accent-500 shrink-0"
                   />
                   <span className="font-mono text-xs font-medium text-foreground flex-1 truncate">
                     {loc.display_code}
@@ -1133,7 +1126,7 @@ function LabelsTab({
           <div className="flex items-center gap-3">
             <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Selected</span>
             {labelSelections.length > 0 && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-400">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-500/10 text-accent-500">
                 {labelSelections.length} label{labelSelections.length !== 1 ? 's' : ''}
               </span>
             )}
@@ -1145,7 +1138,7 @@ function LabelsTab({
                 type="number"
                 value={labelCopies}
                 onChange={e => setLabelCopies(e.target.value)}
-                className="w-16 px-2 h-control-sm rounded-lg border border-border-default bg-surface text-foreground text-xs text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors"
+                className={`${fieldInputCls} w-16 px-2 text-center`}
                 min={1}
                 max={50}
               />
@@ -1182,7 +1175,7 @@ function LabelsTab({
                 )
               }
               disabled={generating || labelSelections.length === 0}
-              className="px-4 h-control-sm rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 h-control-sm rounded-lg text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {generating ? (
                 <>
@@ -1233,11 +1226,11 @@ function LabelsTab({
               {selectedLocs.map(loc => (
                 <div
                   key={loc.id}
-                  className="relative group/card bg-white dark:bg-neutral-900 rounded-lg border border-border-default shadow-sm aspect-[10/7] flex flex-col items-center justify-center p-2 overflow-hidden"
+                  className="relative group/card bg-surface-elevated rounded-lg border border-border-default shadow-sm aspect-[10/7] flex flex-col items-center justify-center p-2 overflow-hidden"
                 >
                   <button
                     onClick={() => toggleSelection(loc.id)}
-                    className="absolute top-1 right-1 opacity-0 group-hover/card:opacity-100 w-4 h-4 flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30 text-red-500 hover:bg-red-200 transition-all text-[10px] leading-none"
+                    className="absolute top-1 right-1 opacity-0 group-hover/card:opacity-100 w-4 h-4 flex items-center justify-center rounded-full bg-red-500/10 text-red-500 hover:bg-red-200 transition-all text-[10px] leading-none"
                     title="Remove"
                   >
                     ×
@@ -1249,7 +1242,7 @@ function LabelsTab({
                     {loc.warehouse_name}
                   </span>
                   {loc.stock_count > 0 && (
-                    <span className="mt-1 text-[9px] font-medium text-secondary-500 dark:text-secondary-400">
+                    <span className="mt-1 text-[9px] font-medium text-accent-500">
                       {loc.stock_count} SKU{loc.stock_count !== 1 ? 's' : ''}
                     </span>
                   )}

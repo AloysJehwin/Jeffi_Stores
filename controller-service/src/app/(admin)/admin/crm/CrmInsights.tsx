@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { AnalyticsRange } from '@/lib/queries'
 import type { CrmInsights as CrmInsightsData, CrmSegment, CrmSegmentKey } from '@/lib/shared/crm-insights-shared'
 import { CRM_SEGMENT_KEYS } from '@/lib/shared/crm-insights-shared'
+import Select from '@/components/ui/Select'
 import GrowthRetentionCard from './GrowthRetentionCard'
 import EconomicsCard from './EconomicsCard'
 import HealthFactorsCard from './HealthFactorsCard'
@@ -35,7 +36,14 @@ const SEGMENT_LABEL: Record<CrmSegmentKey, string> = {
   lead: 'Lead',
 }
 
-export default function CrmInsights({ initial }: { initial: CrmInsightsData }) {
+export default function CrmInsights({
+  initial,
+  syncRange,
+}: {
+  initial: CrmInsightsData
+  /** Follows the overview period when it maps onto a range. */
+  syncRange?: AnalyticsRange | null
+}) {
   const [data, setData] = useState<CrmInsightsData>(initial)
   const [range, setRange] = useState<AnalyticsRange>(initial.range)
   const [segment, setSegment] = useState<CrmSegment>(initial.segment)
@@ -62,6 +70,13 @@ export default function CrmInsights({ initial }: { initial: CrmInsightsData }) {
     [range, segment, loading, refetch]
   )
 
+  useEffect(() => {
+    if (!syncRange || syncRange === range) return
+    setRange(syncRange)
+    refetch(syncRange, segment)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncRange])
+
   const changeSegment = useCallback(
     (seg: CrmSegment) => {
       if (seg === segment || loading) return
@@ -81,28 +96,25 @@ export default function CrmInsights({ initial }: { initial: CrmInsightsData }) {
               onClick={() => changeRange(r.key)}
               disabled={loading}
               className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${
-                range === r.key
-                  ? 'bg-accent-500 text-white shadow-sm'
-                  : 'text-foreground-secondary hover:text-foreground'
+                range === r.key ? 'bg-accent-500 text-white' : 'text-foreground-secondary hover:text-foreground'
               }`}
             >
               {r.label}
             </button>
           ))}
         </div>
-        <select
+        <Select<CrmSegment>
           value={segment}
-          onChange={e => changeSegment(e.target.value as CrmSegment)}
+          onChange={changeSegment}
           disabled={loading}
-          className="bg-surface-secondary border border-border-default rounded-xl px-3 h-control text-xs font-semibold text-foreground disabled:opacity-50 self-start"
-        >
-          <option value="all">All customers</option>
-          {CRM_SEGMENT_KEYS.map(k => (
-            <option key={k} value={k}>
-              {SEGMENT_LABEL[k]}
-            </option>
-          ))}
-        </select>
+          size="sm"
+          className="self-start"
+          aria-label="Customer segment"
+          options={[
+            { value: 'all', label: 'All customers' },
+            ...CRM_SEGMENT_KEYS.map(k => ({ value: k as CrmSegment, label: SEGMENT_LABEL[k] })),
+          ]}
+        />
       </div>
 
       <div className={`space-y-5 transition-opacity ${loading ? 'opacity-60' : ''}`}>

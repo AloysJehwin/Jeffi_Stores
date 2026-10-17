@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { Card } from '@/components/admin/kit/layout'
+import { FormButton } from '@/components/admin/kit/form'
 
 interface InitiateRefundButtonProps {
   orderId: string
@@ -43,11 +45,7 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
   }
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border-2 border-blue-200 dark:border-blue-800">
-      <div className="px-6 py-4 border-b border-blue-100 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-        <h2 className="text-lg font-semibold text-blue-900 dark:text-blue-300">{heading ?? 'Refund Pending'}</h2>
-      </div>
-      <div className="p-4 sm:p-6">
+    <Card title={<span className="text-blue-600 dark:text-blue-400">{heading ?? 'Refund Pending'}</span>}>
         <p className="text-sm text-foreground-secondary mb-4">
           {description ? (
             <>{description} <span className="font-semibold text-foreground">₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>.</>
@@ -62,44 +60,22 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
 
         {showConfirm ? (
           <RequireWrite scope="orders:write">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleRefund}
-                disabled={isProcessing}
-                className="px-4 h-control bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                    Processing...
-                  </>
-                ) : (
-                  'Confirm Refund'
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowConfirm(false)}
-                disabled={isProcessing}
-                className="px-4 h-control bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors disabled:opacity-50"
-              >
+            <div className="flex flex-wrap items-center gap-2">
+              <FormButton type="button" onClick={handleRefund} pending={isProcessing} pendingLabel="Processing...">
+                Confirm Refund
+              </FormButton>
+              <FormButton type="button" variant="secondary" onClick={() => setShowConfirm(false)} disabled={isProcessing}>
                 Cancel
-              </button>
+              </FormButton>
             </div>
           </RequireWrite>
         ) : (
           <RequireWrite scope="orders:write">
-            <button
-              type="button"
-              onClick={() => setShowConfirm(true)}
-              className="px-4 h-control bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-colors"
-            >
+            <FormButton type="button" onClick={() => setShowConfirm(true)}>
               Initiate Refund ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </button>
+            </FormButton>
           </RequireWrite>
         )}
-      </div>
-    </div>
+    </Card>
   )
 }

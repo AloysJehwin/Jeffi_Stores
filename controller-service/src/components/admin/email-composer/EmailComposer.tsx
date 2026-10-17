@@ -67,7 +67,7 @@ type PopoverState = null | { kind: PopoverKind; left: number }
 const BAR = 'border-b border-border-default bg-surface-secondary rounded-t-lg py-1.5'
 const BTN =
   'inline-flex items-center justify-center gap-1 rounded-lg text-foreground hover:bg-surface hover:text-accent-600 dark:hover:text-accent-400 transition-colors disabled:opacity-40 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500'
-const BTN_ON = 'bg-surface text-accent-600 dark:text-accent-400 ring-1 ring-inset ring-border-default'
+const BTN_ON = 'bg-surface text-accent-500 ring-1 ring-inset ring-border-default'
 const INPUT =
   'w-full px-2.5 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500'
 
@@ -179,7 +179,7 @@ export default function EmailComposer({
       )}
 
       {mode === 'source' && confirmVisual && (
-        <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 border-b border-amber-300 dark:border-amber-700">
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2 text-xs bg-amber-500/5 text-amber-700 dark:text-amber-400 border-b border-amber-500/40">
           <span className="flex-1">
             This HTML has layout markup (tables, divs or images) the visual editor will simplify or drop.
           </span>
@@ -464,7 +464,7 @@ function Toolbar({
               aria-expanded={popover?.kind === 'vars'}
               onMouseDown={e => e.preventDefault()}
               onClick={e => toggle('vars', e)}
-              className={`${BTN} control-sm px-2.5 text-xs font-semibold !text-violet-600 dark:!text-violet-400 hover:!bg-violet-50 dark:hover:!bg-violet-900/30 ${popover?.kind === 'vars' ? BTN_ON : ''}`}
+              className={`${BTN} control-sm px-2.5 text-xs font-semibold !text-violet-600 dark:!text-violet-400 hover:!bg-violet-500/5 dark:hover:!bg-violet-900/30 ${popover?.kind === 'vars' ? BTN_ON : ''}`}
             >
               <Braces className="w-4 h-4" />
               Insert variable
@@ -520,7 +520,9 @@ function Toolbar({
         </Pop>
       )}
       {popover?.kind === 'link' && <LinkDialog editor={editor} left={popover.left} onClose={() => setPopover(null)} />}
-      {popover?.kind === 'button' && <ButtonDialog editor={editor} left={popover.left} defaultUrl={ctaHref} onClose={() => setPopover(null)} />}
+      {popover?.kind === 'button' && (
+        <ButtonDialog editor={editor} left={popover.left} defaultUrl={ctaHref} onClose={() => setPopover(null)} />
+      )}
       {popover?.kind === 'vars' && (
         <VariablePicker
           left={popover.left}
@@ -576,7 +578,17 @@ function Pop({
   )
 }
 
-function ButtonDialog({ editor, left, defaultUrl, onClose }: { editor: Editor; left: number; defaultUrl?: string; onClose: () => void }) {
+function ButtonDialog({
+  editor,
+  left,
+  defaultUrl,
+  onClose,
+}: {
+  editor: Editor
+  left: number
+  defaultUrl?: string
+  onClose: () => void
+}) {
   const [text, setText] = useState('Shop Now')
   const [url, setUrl] = useState(defaultUrl || 'https://')
   const [error, setError] = useState('')
@@ -592,24 +604,55 @@ function ButtonDialog({ editor, left, defaultUrl, onClose }: { editor: Editor; l
         aria-label="Insert button"
       >
         <h3 className="text-xs font-semibold text-foreground mb-2">Insert button</h3>
-        <label className="block text-[11px] text-foreground-muted mb-1" htmlFor="ec-btn-text">Button text</label>
-        <input id="ec-btn-text" autoFocus type="text" value={text} onChange={e => setText(e.target.value)} className={`${INPUT} mb-2`} />
-        <label className="block text-[11px] text-foreground-muted mb-1" htmlFor="ec-btn-url">Link</label>
+        <label className="block text-[11px] text-foreground-muted mb-1" htmlFor="ec-btn-text">
+          Button text
+        </label>
+        <input
+          id="ec-btn-text"
+          autoFocus
+          type="text"
+          value={text}
+          onChange={e => setText(e.target.value)}
+          className={`${INPUT} mb-2`}
+        />
+        <label className="block text-[11px] text-foreground-muted mb-1" htmlFor="ec-btn-url">
+          Link
+        </label>
         <input
           id="ec-btn-url"
           type="text"
           inputMode="url"
           value={url}
-          onChange={e => { setUrl(e.target.value); setError('') }}
+          onChange={e => {
+            setUrl(e.target.value)
+            setError('')
+          }}
           placeholder="https://example.com, mailto:, tel: or {variable}"
           aria-invalid={!!error}
           className={INPUT}
         />
-        {error && <p role="alert" className="text-[11px] text-red-600 dark:text-red-400 mt-1">{error}</p>}
-        <p className="text-[10px] text-foreground-muted mt-1">To change it later, click the button text and use Link.</p>
+        {error && (
+          <p role="alert" className="text-[11px] text-red-600 dark:text-red-400 mt-1">
+            {error}
+          </p>
+        )}
+        <p className="text-[10px] text-foreground-muted mt-1">
+          To change it later, click the button text and use Link.
+        </p>
         <div className="flex items-center justify-end gap-2 mt-3">
-          <button type="button" onClick={onClose} className="px-2.5 py-1 text-xs text-foreground-muted hover:text-foreground">Cancel</button>
-          <button type="submit" className="px-3 py-1 text-xs bg-accent-500 hover:bg-accent-600 text-white rounded font-medium">Insert</button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-2.5 py-1 text-xs text-foreground-muted hover:text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-3 py-1 text-xs bg-accent-500 hover:bg-accent-600 text-white rounded font-medium"
+          >
+            Insert
+          </button>
         </div>
       </form>
     </Pop>

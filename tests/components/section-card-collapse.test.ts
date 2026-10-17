@@ -5,34 +5,15 @@ import { join } from 'path'
 const src = readFileSync(join(process.cwd(), 'controller-service/src/components/admin/site-controls/controls.tsx'), 'utf8')
 const sectionCard = src.slice(src.indexOf('export function SectionCard'), src.indexOf('export function FullSpan'))
 
-describe('SectionCard collapse', () => {
-  it('defaults to collapsed', () => {
-    expect(sectionCard).toMatch(/defaultOpen\s*=\s*false/)
-    expect(sectionCard).toMatch(/useState\(defaultOpen\)/)
+// Site Controls is tabbed, so its sections are always open: no collapse toggle or hidden body.
+describe('SectionCard', () => {
+  it('has no collapse state or toggle', () => {
+    expect(sectionCard).not.toMatch(/defaultOpen|useState|aria-expanded|<button/)
   })
 
-  it('exposes an accessible expand control', () => {
-    expect(sectionCard).toContain('aria-expanded={open}')
-    expect(sectionCard).toMatch(/<button/)
-  })
-
-  it('hides the body rather than unmounting it, to preserve the shortcut registry', () => {
-    expect(sectionCard).toMatch(/!open\s*$|!open\s*\n?\s*\?\s*'hidden'/m)
-    // an unmounting implementation would read `{open && (` around children
-    expect(sectionCard).not.toMatch(/\{open && \(/)
+  it('always renders its children', () => {
     expect(sectionCard).toContain('{children}')
-  })
-
-  // Regression: `hidden={!open}` alone left every section visible, because Tailwind's
-  // `grid` / `space-y-5` set `display` and beat the attribute. The layout classes must
-  // therefore only be applied while open.
-  it('does not apply display-setting layout classes while collapsed', () => {
-    const collapsedBranch = sectionCard.slice(sectionCard.indexOf('!open'))
-    const hiddenFirst = collapsedBranch.indexOf("'hidden'")
-    const gridFirst = collapsedBranch.indexOf('lg:grid-cols-2')
-    expect(hiddenFirst).toBeGreaterThan(-1)
-    expect(hiddenFirst).toBeLessThan(gridFirst)
-    expect(sectionCard).not.toContain('hidden={!open}')
+    expect(sectionCard).not.toContain("'hidden'")
   })
 
   it('keeps both the columns and stacked body layouts', () => {
@@ -44,7 +25,7 @@ describe('SectionCard collapse', () => {
 describe('CustomerTagDefinitionsCard', () => {
   const tagCard = readFileSync(join(process.cwd(), 'controller-service/src/components/admin/CustomerTagDefinitionsCard.tsx'), 'utf8')
 
-  it('uses the shared SectionCard so it collapses with the rest', () => {
+  it('uses the shared SectionCard', () => {
     expect(tagCard).toContain("from '@/components/admin/site-controls/controls'")
     expect(tagCard).toContain('<SectionCard')
     expect(tagCard).toContain('</SectionCard>')

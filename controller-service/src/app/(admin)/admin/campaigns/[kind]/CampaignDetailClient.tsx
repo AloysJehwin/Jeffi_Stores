@@ -1,6 +1,9 @@
 'use client'
 
-import { CAMPAIGN_SAMPLE_VARS as SAMPLE_VARS, renderPreviewTemplate as renderTemplate } from '@/lib/templates/email-preview'
+import {
+  CAMPAIGN_SAMPLE_VARS as SAMPLE_VARS,
+  renderPreviewTemplate as renderTemplate,
+} from '@/lib/templates/email-preview'
 import { useCallback, useEffect, useState } from 'react'
 import { CampaignDetailSkeleton } from '@/components/admin/campaigns/CampaignSkeletons'
 import { useRouter } from 'next/navigation'
@@ -144,8 +147,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           wa_variables: (src.wa_variables ?? data.campaign.wa_variables ?? {}) as Record<string, string>,
           wa_header_image_url: src.wa_header_image_url ?? data.campaign.wa_header_image_url ?? '',
           // A draft can unlink (null), so 'in' — not ?? — decides whether the draft set it.
-          email_template_slug: ('email_template_slug' in src ? src.email_template_slug : data.campaign.email_template_slug) ?? null,
-          sms_template_slug: ('sms_template_slug' in src ? src.sms_template_slug : data.campaign.sms_template_slug) ?? null,
+          email_template_slug:
+            ('email_template_slug' in src ? src.email_template_slug : data.campaign.email_template_slug) ?? null,
+          sms_template_slug:
+            ('sms_template_slug' in src ? src.sms_template_slug : data.campaign.sms_template_slug) ?? null,
           wa_template_slug: ('wa_template_slug' in src ? src.wa_template_slug : data.campaign.wa_template_slug) ?? null,
           parameters: (src.parameters || {}) as Record<string, number | boolean | string>,
         })
@@ -171,16 +176,19 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [baseline, setBaseline] = useState<string | null>(null)
 
-  const writeDraft = useCallback(async (f: NonNullable<typeof form>) => {
-    const res = await fetch(`/api/admin/campaigns/${kind}/draft`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(f),
-    })
-    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to save draft')
-    setHasDraft(true)
-  }, [kind])
+  const writeDraft = useCallback(
+    async (f: NonNullable<typeof form>) => {
+      const res = await fetch(`/api/admin/campaigns/${kind}/draft`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(f),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Failed to save draft')
+      setHasDraft(true)
+    },
+    [kind]
+  )
 
   // Opening the editor starts a draft (from the live values if there is none); every change autosaves it.
   useEffect(() => {
@@ -246,7 +254,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   }
 
   async function discardDraft() {
-    const ok = await confirm({ title: 'Discard draft?', message: 'All unpublished changes to this campaign are removed. The live campaign stays as-is.', confirmLabel: 'Discard', variant: 'danger' })
+    const ok = await confirm({
+      title: 'Discard draft?',
+      message: 'All unpublished changes to this campaign are removed. The live campaign stays as-is.',
+      confirmLabel: 'Discard',
+      variant: 'danger',
+    })
     if (!ok) return
     const res = await fetch(`/api/admin/campaigns/${kind}/draft`, { method: 'DELETE', credentials: 'include' })
     if (res.ok) {
@@ -341,14 +354,25 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const linked = form.email_template_slug && linkedEmail ? linkedEmail : null
   const varsKind = form.scenario_kind || kind
   const composerVars = campaignVariables(varsKind, 'email').map(v => ({
-    key: v.key, label: v.label, description: v.description, sample: v.sample, group: 'order' as const, builtIn: true, section: 'Campaign',
+    key: v.key,
+    label: v.label,
+    description: v.description,
+    sample: v.sample,
+    group: 'order' as const,
+    builtIn: true,
+    section: 'Campaign',
   }))
-  const linkedBlocks = linked?.blocks_format === 'email-blocks' ? ((linked.blocks as any)?.blocks as EmailBlock[] | undefined) : undefined
+  const linkedBlocks =
+    linked?.blocks_format === 'email-blocks' ? ((linked.blocks as any)?.blocks as EmailBlock[] | undefined) : undefined
   const bridgedPreview = bridgeVars(previewVars as Record<string, string | number>)
-  const previewSubject = renderTemplate(linked ? linked.subject ?? '' : form.subject_template, bridgedPreview)
+  const previewSubject = renderTemplate(linked ? (linked.subject ?? '') : form.subject_template, bridgedPreview)
   const previewBodySource = linked
-    ? linkedBlocks?.length ? renderBlocks(linkedBlocks) : linked.body
-    : form.template_mode === 'blocks' && form.blocks?.length ? renderBlocks(form.blocks) : form.body_template
+    ? linkedBlocks?.length
+      ? renderBlocks(linkedBlocks)
+      : linked.body
+    : form.template_mode === 'blocks' && form.blocks?.length
+      ? renderBlocks(form.blocks)
+      : form.body_template
   const previewBody = renderTemplate(previewBodySource, bridgedPreview)
   // Full themed document for the preview iframe, so the selected layout (Fresh vs Promo…) renders
   // with its own shell + CSS. renderLayoutPreview also fills {store_name}/{store_web} via previewVars.
@@ -470,7 +494,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               sm
             />
             {selectedCoupon && (
-              <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-1">
+              <p className="text-[10px] text-accent-500 mt-1">
                 This coupon will be injected as {'{couponCode}'} in the template for all recipients.
               </p>
             )}
@@ -484,7 +508,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               channel="email"
               kind={form.scenario_kind || kind}
               value={form.email_template_slug}
-              onChange={slug => { setLinkedEmail(null); setForm(f => (f ? { ...f, email_template_slug: slug } : f)) }}
+              onChange={slug => {
+                setLinkedEmail(null)
+                setForm(f => (f ? { ...f, email_template_slug: slug } : f))
+              }}
               noneLabel="Inline email (written only for this campaign)"
               supplied={campaignCanFill}
             />
@@ -493,7 +520,13 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           {form.email_template_slug ? (
             <>
               <div className="mt-4">
-                <LinkedTemplateEditor channel="email" slug={form.email_template_slug} currentKind={kind} campaignKind={varsKind} onMirror={setLinkedEmail} />
+                <LinkedTemplateEditor
+                  channel="email"
+                  slug={form.email_template_slug}
+                  currentKind={kind}
+                  campaignKind={varsKind}
+                  onMirror={setLinkedEmail}
+                />
               </div>
               <div className="mt-4">
                 <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
@@ -505,136 +538,142 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                   options={EMAIL_LAYOUT_OPTIONS.map(l => ({ value: l.key, label: l.label }))}
                 />
                 <p className="text-[10px] text-foreground-muted mt-1">
-                  {EMAIL_LAYOUT_OPTIONS.find(l => l.key === form.template_layout)?.description} The theme wraps the template; the
-                  wording lives in the template.
+                  {EMAIL_LAYOUT_OPTIONS.find(l => l.key === form.template_layout)?.description} The theme wraps the
+                  template; the wording lives in the template.
                 </p>
               </div>
             </>
           ) : (
             <>
-          <div className="mt-4">
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-              Subject line
-            </label>
-            <AIEnrichButton
-              fieldLabel="Subject line"
-              value={form.subject_template}
-              onChange={v => setForm({ ...form, subject_template: v })}
-              scope="campaigns:write"
-              context={`Campaign: ${campaign.name ?? ''}`}
-            >
-              <input
-                type="text"
-                value={form.subject_template}
-                onChange={e => setForm({ ...form, subject_template: e.target.value })}
-                className="field-normal w-full pr-8 border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-              />
-            </AIEnrichButton>
-          </div>
-
-          <div className="mt-4">
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
-              Email template
-            </label>
-            <AdminSelect
-              value={form.template_layout}
-              onChange={async key => {
-                const opt = EMAIL_LAYOUT_OPTIONS.find(o => o.key === key)
-                const starter = opt?.starterBody ?? ''
-                // Custom (or no starter): just switch the theme, keep the body.
-                if (key === 'custom' || !starter) {
-                  setForm(f => (f ? { ...f, template_layout: key } : f))
-                  return
-                }
-                // A preset with starter content: confirm before clobbering a non-empty body.
-                const current = (form.body_template || '').trim()
-                const loadStarter =
-                  !current ||
-                  (await confirm({
-                    title: 'Load template content?',
-                    message:
-                      "Replace the current email body with this template's starter content? Your current body will be lost.",
-                    confirmLabel: 'Load template',
-                  }))
-                setForm(f =>
-                  f
-                    ? loadStarter
-                      ? { ...f, template_layout: key, template_mode: 'richtext', body_template: starter }
-                      : { ...f, template_layout: key }
-                    : f
-                )
-              }}
-              options={EMAIL_LAYOUT_OPTIONS.map(l => ({ value: l.key, label: l.label }))}
-            />
-            <p className="text-[10px] text-foreground-muted mt-1">
-              {EMAIL_LAYOUT_OPTIONS.find(l => l.key === form.template_layout)?.description}
-            </p>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide">
-              Email body
-            </label>
-            <div className="inline-flex items-center gap-1 bg-surface-secondary rounded-lg p-0.5">
-              {(['richtext', 'blocks'] as const).map(m => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setForm(f => (f ? { ...f, template_mode: m } : f))}
-                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
-                    form.template_mode === m
-                      ? 'bg-accent-500 text-white'
-                      : 'text-foreground-muted hover:text-foreground'
-                  }`}
+              <div className="mt-4">
+                <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                  Subject line
+                </label>
+                <AIEnrichButton
+                  fieldLabel="Subject line"
+                  value={form.subject_template}
+                  onChange={v => setForm({ ...form, subject_template: v })}
+                  scope="campaigns:write"
+                  context={`Campaign: ${campaign.name ?? ''}`}
                 >
-                  {m === 'richtext' ? 'Rich text' : 'Block builder'}
-                </button>
-              ))}
-            </div>
-          </div>
+                  <input
+                    type="text"
+                    value={form.subject_template}
+                    onChange={e => setForm({ ...form, subject_template: e.target.value })}
+                    className="field-normal w-full pr-8 border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                  />
+                </AIEnrichButton>
+              </div>
 
-          <div className="mt-2">
-            {form.template_mode === 'blocks' ? (
-              <EmailBlockBuilder
-                extraVariables={composerVars}
-                blocks={form.blocks}
-                onChange={b =>
-                  setForm(f =>
-                    f
-                      ? {
-                          ...f,
-                          blocks: b,
-                          template_layout: f.template_layout === 'custom' ? 'custom' : f.template_layout,
-                        }
-                      : f
-                  )
-                }
-              />
-            ) : (
-              <EmailComposer
-                value={form.body_template}
-                onChange={v =>
-                  // Editing a preset's body makes it a Custom template (so edits aren't mislabeled).
-                  setForm(f =>
-                    f
-                      ? {
-                          ...f,
-                          body_template: v,
-                          template_layout:
-                            v !== layoutStarterBody(f.template_layout) && f.template_layout !== 'custom'
-                              ? 'custom'
-                              : f.template_layout,
-                        }
-                      : f
-                  )
-                }
-                extraVariables={composerVars}
-                ctaHref="{ctaUrl}"
-                minHeight={260}
-              />
-            )}
-            <div className="mt-2"><CampaignVariables kind={varsKind} channel="email" text={`${form.subject_template}\n${form.template_mode === 'blocks' ? renderBlocks(form.blocks ?? []) : form.body_template}`} /></div>
-          </div>
+              <div className="mt-4">
+                <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-1">
+                  Email template
+                </label>
+                <AdminSelect
+                  value={form.template_layout}
+                  onChange={async key => {
+                    const opt = EMAIL_LAYOUT_OPTIONS.find(o => o.key === key)
+                    const starter = opt?.starterBody ?? ''
+                    // Custom (or no starter): just switch the theme, keep the body.
+                    if (key === 'custom' || !starter) {
+                      setForm(f => (f ? { ...f, template_layout: key } : f))
+                      return
+                    }
+                    // A preset with starter content: confirm before clobbering a non-empty body.
+                    const current = (form.body_template || '').trim()
+                    const loadStarter =
+                      !current ||
+                      (await confirm({
+                        title: 'Load template content?',
+                        message:
+                          "Replace the current email body with this template's starter content? Your current body will be lost.",
+                        confirmLabel: 'Load template',
+                      }))
+                    setForm(f =>
+                      f
+                        ? loadStarter
+                          ? { ...f, template_layout: key, template_mode: 'richtext', body_template: starter }
+                          : { ...f, template_layout: key }
+                        : f
+                    )
+                  }}
+                  options={EMAIL_LAYOUT_OPTIONS.map(l => ({ value: l.key, label: l.label }))}
+                />
+                <p className="text-[10px] text-foreground-muted mt-1">
+                  {EMAIL_LAYOUT_OPTIONS.find(l => l.key === form.template_layout)?.description}
+                </p>
+              </div>
+
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <label className="block text-xs font-semibold text-foreground-muted uppercase tracking-wide">
+                  Email body
+                </label>
+                <div className="inline-flex items-center gap-1 bg-surface-secondary rounded-lg p-0.5">
+                  {(['richtext', 'blocks'] as const).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setForm(f => (f ? { ...f, template_mode: m } : f))}
+                      className={`h-full px-3 rounded-md text-xs font-semibold transition-colors ${
+                        form.template_mode === m
+                          ? 'bg-accent-500 text-white'
+                          : 'text-foreground-muted hover:text-foreground'
+                      }`}
+                    >
+                      {m === 'richtext' ? 'Rich text' : 'Block builder'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-2">
+                {form.template_mode === 'blocks' ? (
+                  <EmailBlockBuilder
+                    extraVariables={composerVars}
+                    blocks={form.blocks}
+                    onChange={b =>
+                      setForm(f =>
+                        f
+                          ? {
+                              ...f,
+                              blocks: b,
+                              template_layout: f.template_layout === 'custom' ? 'custom' : f.template_layout,
+                            }
+                          : f
+                      )
+                    }
+                  />
+                ) : (
+                  <EmailComposer
+                    value={form.body_template}
+                    onChange={v =>
+                      // Editing a preset's body makes it a Custom template (so edits aren't mislabeled).
+                      setForm(f =>
+                        f
+                          ? {
+                              ...f,
+                              body_template: v,
+                              template_layout:
+                                v !== layoutStarterBody(f.template_layout) && f.template_layout !== 'custom'
+                                  ? 'custom'
+                                  : f.template_layout,
+                            }
+                          : f
+                      )
+                    }
+                    extraVariables={composerVars}
+                    ctaHref="{ctaUrl}"
+                    minHeight={260}
+                  />
+                )}
+                <div className="mt-2">
+                  <CampaignVariables
+                    kind={varsKind}
+                    channel="email"
+                    text={`${form.subject_template}\n${form.template_mode === 'blocks' ? renderBlocks(form.blocks ?? []) : form.body_template}`}
+                  />
+                </div>
+              </div>
             </>
           )}
 
@@ -653,22 +692,27 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               />
               <div className="mt-2">
                 {form.sms_template_slug ? (
-                  <LinkedTemplateEditor channel="sms" slug={form.sms_template_slug} currentKind={kind} campaignKind={varsKind} />
+                  <LinkedTemplateEditor
+                    channel="sms"
+                    slug={form.sms_template_slug}
+                    currentKind={kind}
+                    campaignKind={varsKind}
+                  />
                 ) : (
                   <>
-              <textarea
-                value={form.sms_template}
-                onChange={e => setForm(f => (f ? { ...f, sms_template: e.target.value } : f))}
-                rows={3}
-                maxLength={480}
-                placeholder="Short text sent alongside WhatsApp when a phone is on file. Leave blank to use the built-in line. Variables like {firstName} and {couponCode} are filled per recipient."
-                className="field-normal w-full border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
-              />
-              <p className="text-[10px] text-foreground-muted mt-1">
-                {form.sms_template.length} chars ·{' '}
-                {form.sms_template.length === 0 ? 0 : Math.ceil(form.sms_template.length / 160)} segment
-                {Math.ceil((form.sms_template.length || 0) / 160) === 1 ? '' : 's'} · plain text only, no images.
-              </p>
+                    <textarea
+                      value={form.sms_template}
+                      onChange={e => setForm(f => (f ? { ...f, sms_template: e.target.value } : f))}
+                      rows={3}
+                      maxLength={480}
+                      placeholder="Short text sent alongside WhatsApp when a phone is on file. Leave blank to use the built-in line. Variables like {firstName} and {couponCode} are filled per recipient."
+                      className="field-normal w-full border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    />
+                    <p className="text-[10px] text-foreground-muted mt-1">
+                      {form.sms_template.length} chars ·{' '}
+                      {form.sms_template.length === 0 ? 0 : Math.ceil(form.sms_template.length / 160)} segment
+                      {Math.ceil((form.sms_template.length || 0) / 160) === 1 ? '' : 's'} · plain text only, no images.
+                    </p>
                   </>
                 )}
               </div>
@@ -687,9 +731,15 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                 kind={form.scenario_kind || kind}
                 value={{ slug: form.wa_template_slug, variables: form.wa_variables }}
                 // Picking a library template retires the old registry choice for this campaign.
-                onChange={v => setForm(f => (f ? { ...f, wa_template_slug: v.slug, wa_variables: v.variables, wa_template_sid: null } : f))}
+                onChange={v =>
+                  setForm(f =>
+                    f ? { ...f, wa_template_slug: v.slug, wa_variables: v.variables, wa_template_sid: null } : f
+                  )
+                }
                 needsReview={!!form.parameters?.waNeedsReview}
-                onReviewed={() => setForm(f => (f ? { ...f, parameters: { ...f.parameters, waNeedsReview: false } } : f))}
+                onReviewed={() =>
+                  setForm(f => (f ? { ...f, parameters: { ...f.parameters, waNeedsReview: false } } : f))
+                }
               />
             </div>
           )}
@@ -698,7 +748,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
           <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Preview</h3>
           {tplWarning && (
-            <div className="mb-3 p-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+            <div className="mb-3 p-2.5 rounded-lg border border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2">
               <span className="font-semibold">Warning:</span>
               <span>{tplWarning}</span>
             </div>
@@ -719,10 +769,11 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
           {campaignSupportsWhatsApp(kind) && !!form.parameters?.whatsappEnabled && form.wa_template_slug && (
             <div className="mt-5">
-              <p className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-2">
-                WhatsApp preview
-              </p>
-              <WhatsAppPreview value={{ slug: form.wa_template_slug, variables: form.wa_variables }} vars={previewVars} />
+              <p className="text-sm font-semibold uppercase tracking-wide text-foreground mb-2">WhatsApp preview</p>
+              <WhatsAppPreview
+                value={{ slug: form.wa_template_slug, variables: form.wa_variables }}
+                vars={previewVars}
+              />
             </div>
           )}
         </div>
@@ -762,7 +813,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               {currentScenario
                 ? `${currentScenario.name} — ${currentScenario.description}`
                 : form.scenario_kind || 'Built-in'}
-              <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 align-middle">
+              <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-surface-secondary text-foreground align-middle">
                 Locked
               </span>
             </div>
@@ -880,12 +931,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       <RequireWrite scope="campaigns:write">
         <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 mt-2 border-t border-border-default bg-surface-elevated/95 backdrop-blur px-4 sm:px-6 py-3">
           {hasDraft && (
-            <div className="mb-2 flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
-              <p className="text-xs text-amber-800 dark:text-amber-300 flex-1">Draft pending — changes not live yet.</p>
+            <div className="mb-2 flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/40">
+              <p className="text-xs text-amber-700 dark:text-amber-400 flex-1">Draft pending — changes not live yet.</p>
               <button
                 type="button"
                 onClick={discardDraft}
-                className="h-control-sm inline-flex items-center px-2.5 rounded-md border border-amber-300 dark:border-amber-700 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                className="h-control-sm inline-flex items-center px-2.5 rounded-md border border-amber-500/40 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
               >
                 Discard
               </button>

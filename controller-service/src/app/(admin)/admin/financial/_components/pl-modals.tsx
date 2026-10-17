@@ -1,6 +1,7 @@
 'use client'
 
-import { Modal, formatINR } from './shared'
+import { Dialog } from '@/components/admin/kit'
+import { formatINR } from './shared'
 
 export function PLMonthModal({ m, all, onClose }: { m: any; all: any[]; onClose: () => void }) {
   const W = 520,
@@ -54,18 +55,8 @@ export function PLMonthModal({ m, all, onClose }: { m: any; all: any[]; onClose:
   const curY = tH - ((m.net_revenue - tMin) / tRange) * tH
 
   return (
-    <Modal onClose={onClose}>
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
-          <h2 className="text-lg font-semibold text-foreground">{monthLabel} — P&amp;L Breakdown</h2>
-          <button
-            onClick={onClose}
-            className="text-foreground-secondary hover:text-foreground transition-colors text-xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-        <div className="p-6 space-y-6">
+    <Dialog open onClose={onClose} size="lg" title={`${monthLabel} - P&L breakdown`}>
+        <div className="space-y-6">
           {/* KPI row */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             {[
@@ -76,9 +67,9 @@ export function PLMonthModal({ m, all, onClose }: { m: any; all: any[]; onClose:
               { label: 'Gross Profit', val: m.gross_profit },
               { label: 'Op. Profit', val: m.operating_profit },
             ].map(k => (
-              <div key={k.label} className="bg-surface-elevated rounded-xl px-3 py-2 border border-border-default">
-                <p className="text-xs text-foreground-secondary mb-0.5">{k.label}</p>
-                <p className={`text-base font-bold ${k.val != null && k.val < 0 ? 'text-red-500' : 'text-foreground'}`}>
+              <div key={k.label} className="bg-surface-secondary/50 rounded-lg px-3 py-2 border border-border-default">
+                <p className="text-xs text-foreground-muted mb-0.5">{k.label}</p>
+                <p className={`text-base font-bold tabular-nums ${k.val != null && k.val < 0 ? 'text-red-500' : 'text-foreground'}`}>
                   {k.val != null ? formatINR(k.val) : `${k.pct}%`}
                 </p>
               </div>
@@ -87,7 +78,7 @@ export function PLMonthModal({ m, all, onClose }: { m: any; all: any[]; onClose:
 
           {/* Bar chart */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted mb-2">
               Metric Comparison
             </p>
             <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
@@ -149,7 +140,7 @@ export function PLMonthModal({ m, all, onClose }: { m: any; all: any[]; onClose:
           {/* Revenue source donut-style stacked bar */}
           {srcTotal > 0 && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted mb-2">
                 Revenue by Source
               </p>
               <div className="flex h-5 rounded-full overflow-hidden w-full gap-px">
@@ -178,7 +169,7 @@ export function PLMonthModal({ m, all, onClose }: { m: any; all: any[]; onClose:
           {/* Net revenue trend sparkline */}
           {all.length > 1 && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted mb-2">
                 Net Revenue Trend (period)
               </p>
               <svg viewBox={`0 0 ${tW} ${tH + 16}`} className="w-full h-auto">
@@ -205,8 +196,7 @@ export function PLMonthModal({ m, all, onClose }: { m: any; all: any[]; onClose:
             <span>GST collected: {formatINR(m.tax_collected)}</span>
           </div>
         </div>
-      </div>
-    </Modal>
+    </Dialog>
   )
 }
 
@@ -251,18 +241,8 @@ export function CashflowMonthModal({ m, all, onClose }: { m: any; all: any[]; on
   ].filter(s => s.value > 0)
 
   return (
-    <Modal onClose={onClose}>
-      <div className="bg-surface rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
-          <h2 className="text-lg font-semibold text-foreground">{monthLabel} — Cashflow</h2>
-          <button
-            onClick={onClose}
-            className="text-foreground-secondary hover:text-foreground transition-colors text-xl leading-none"
-          >
-            ×
-          </button>
-        </div>
-        <div className="p-6 space-y-6">
+    <Dialog open onClose={onClose} size="lg" title={`${monthLabel} - Cashflow`}>
+        <div className="space-y-6">
           {/* KPI row */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             {[
@@ -273,10 +253,10 @@ export function CashflowMonthModal({ m, all, onClose }: { m: any; all: any[]; on
               { label: 'Net', val: m.net, pos: m.net >= 0 },
               { label: 'Balance', val: m.running_balance, pos: m.running_balance >= 0 },
             ].map(k => (
-              <div key={k.label} className="bg-surface-elevated rounded-xl px-3 py-2 border border-border-default">
-                <p className="text-xs text-foreground-secondary mb-0.5">{k.label}</p>
+              <div key={k.label} className="bg-surface-secondary/50 rounded-lg px-3 py-2 border border-border-default">
+                <p className="text-xs text-foreground-muted mb-0.5">{k.label}</p>
                 <p
-                  className={`text-base font-bold ${k.pos ? 'text-green-600 dark:text-green-400' : k.val > 0 ? 'text-red-500' : 'text-foreground'}`}
+                  className={`text-base font-bold tabular-nums ${k.pos ? 'text-green-600 dark:text-green-400' : k.val > 0 ? 'text-red-500' : 'text-foreground'}`}
                 >
                   {formatINR(k.val)}
                 </p>
@@ -286,7 +266,7 @@ export function CashflowMonthModal({ m, all, onClose }: { m: any; all: any[]; on
 
           {/* Grouped bar: in vs out */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted mb-2">
               Cash In vs Cash Out
             </p>
             <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto">
@@ -416,7 +396,7 @@ export function CashflowMonthModal({ m, all, onClose }: { m: any; all: any[]; on
           {/* Source breakdown stacked bar */}
           {srcTotal > 0 && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted mb-2">
                 Cash In by Source
               </p>
               <div className="flex h-5 rounded-full overflow-hidden w-full gap-px">
@@ -445,7 +425,7 @@ export function CashflowMonthModal({ m, all, onClose }: { m: any; all: any[]; on
           {/* Running balance sparkline */}
           {all.length > 1 && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted mb-2">
                 Running Balance Trend
               </p>
               <svg viewBox={`0 0 ${tW} ${tH + 16}`} className="w-full h-auto">
@@ -477,7 +457,6 @@ export function CashflowMonthModal({ m, all, onClose }: { m: any; all: any[]; on
             </div>
           )}
         </div>
-      </div>
-    </Modal>
+    </Dialog>
   )
 }

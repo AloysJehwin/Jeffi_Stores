@@ -1,11 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import type { ReactNode } from 'react'
+import { Info } from 'lucide-react'
 import DraftEditButton from '@/components/admin/DraftEditButton'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
+import { Card, DetailHeader, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ACTIVE_STATUS, EmptyState, Badge } from '@/components/admin/kit'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,208 +64,122 @@ export default async function BrandViewPageDetail({
 
   const totalProducts = parseInt(counts?.total || '0', 10)
   const activeProducts = parseInt(counts?.active || '0', 10)
+  const created = new Date(brand.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
   return (
-    <div className="p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link
-            href={ap(backUrl, host)}
-            className="text-foreground-muted hover:text-foreground transition-colors flex-shrink-0"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          {brand.logo_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={brand.logo_url}
-              alt={brand.name}
-              className="w-10 h-10 rounded-lg object-contain bg-surface-secondary flex-shrink-0"
+    <EntityPage
+      header={
+        <DetailHeader
+          back={{ href: ap(backUrl, host), label: 'Brands' }}
+          media={
+            brand.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={brand.logo_url} alt={brand.name} className="w-10 h-10 rounded-lg object-contain bg-surface-secondary flex-shrink-0" />
+            ) : undefined
+          }
+          title={brand.name}
+          status={
+            <>
+              <StatusBadge status={String(brand.is_active)} map={ACTIVE_STATUS} />
+              {hasDraft && <Badge tone="amber">Draft pending</Badge>}
+            </>
+          }
+          subtitle={brand.description || undefined}
+          identifiers={[{ label: 'Created', value: created }]}
+          actions={
+            <DraftEditButton
+              entity="brands"
+              id={id}
+              name={brand.name}
+              hasDraft={!!hasDraft}
+              backUrl={backUrl}
+              className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold"
             />
-          )}
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">{brand.name}</h1>
-              <span
-                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${brand.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}
-              >
-                {brand.is_active ? 'Active' : 'Inactive'}
-              </span>
-              {hasDraft && (
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                  Draft pending
-                </span>
-              )}
-            </div>
-            {brand.description && <p className="text-sm text-foreground-secondary mt-1">{brand.description}</p>}
-            <p className="text-xs text-foreground-muted mt-0.5">
-              Created{' '}
-              {new Date(brand.created_at).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              })}
+          }
+        />
+      }
+      notices={
+        hasDraft && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex items-start gap-3">
+            <Info className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-foreground">
+              This brand has unpublished draft changes. Click <span className="font-semibold">Edit Draft</span> to review and publish them.
             </p>
           </div>
-        </div>
-        <DraftEditButton entity="brands" id={id} name={brand.name} hasDraft={!!hasDraft} backUrl={backUrl} />
-      </div>
-
-      {hasDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-start gap-3">
-          <svg
-            className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          <p className="text-sm text-amber-800 dark:text-amber-200">
-            This brand has unpublished draft changes. Click <span className="font-semibold">Edit Draft</span> to review
-            and publish them.
-          </p>
-        </div>
-      )}
-
-      {/* Stats strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <p className="text-xs text-foreground-secondary">Total Products</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{totalProducts}</p>
-        </div>
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <p className="text-xs text-foreground-secondary">Active Products</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">{activeProducts}</p>
-        </div>
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <p className="text-xs text-foreground-secondary">Created</p>
-          <p className="text-lg font-bold text-foreground mt-1.5">
-            {new Date(brand.created_at).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            })}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: details */}
-        <div className="space-y-6">
-          <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
-            <div className="px-5 py-3 border-b border-border-default bg-surface-secondary">
-              <h2 className="text-sm font-semibold text-foreground">Brand Details</h2>
-            </div>
-            <div className="px-5 divide-y divide-border-default">
-              {[
-                [
-                  'Slug',
-                  <span key="slug" className="font-mono">
-                    {brand.slug}
-                  </span>,
-                ],
-                [
-                  'Website',
-                  brand.website ? (
-                    <a
-                      key="website"
-                      href={brand.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-accent-500 hover:underline"
-                    >
-                      {brand.website.replace(/^https?:\/\//, '')}
-                    </a>
-                  ) : (
-                    '—'
-                  ),
-                ],
-                ['Logo', brand.logo_url ? 'Set' : '—'],
-                ['Returns', brand.return_allowed ? `${brand.return_window_days} days` : 'Not allowed'],
-                ['Replacement', brand.replacement_allowed ? `${brand.replacement_window_days} days` : 'Not allowed'],
-              ].map(([label, value], i) => (
-                <div key={i} className="flex items-center justify-between py-2.5 gap-4">
-                  <span className="text-sm text-foreground-secondary flex-shrink-0">{label}</span>
-                  <span className="text-sm text-foreground font-medium text-right break-all">{value as ReactNode}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: products */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
-            <div className="px-5 py-3 border-b border-border-default bg-surface-secondary flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground">Products</h2>
-              <span className="text-xs text-foreground-muted">
-                {totalProducts > 20
-                  ? `Showing 20 of ${totalProducts}`
-                  : `${totalProducts} product${totalProducts !== 1 ? 's' : ''}`}
-              </span>
-            </div>
-            {products.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-foreground-muted text-center">No products assigned to this brand.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-secondary/50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Product</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">SKU</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Price</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Status</th>
+        )
+      }
+      kpis={
+        <KpiGrid>
+          <Kpi label="Total products" value={totalProducts.toLocaleString('en-IN')} />
+          <Kpi label="Active products" value={activeProducts.toLocaleString('en-IN')} />
+          <Kpi label="Created" value={created} />
+        </KpiGrid>
+      }
+      main={
+        <Card
+          title="Products"
+          hint={totalProducts > 20 ? `Showing 20 of ${totalProducts}` : `${totalProducts} product${totalProducts !== 1 ? 's' : ''}`}
+          flush
+        >
+          {products.length === 0 ? (
+            <EmptyState bare title="No products assigned to this brand." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
+                    <th className="px-5 py-2.5 text-left font-medium">Product</th>
+                    <th className="px-3 py-2.5 text-left font-medium">SKU</th>
+                    <th className="px-3 py-2.5 text-right font-medium">Price</th>
+                    <th className="px-5 py-2.5 text-left font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map(p => (
+                    <tr key={p.id} className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40">
+                      <td className="px-5 py-2.5">
+                        <Link href={ap(`/admin/products/${p.id}`, host)} className="font-medium text-accent-500 hover:underline">
+                          {p.name}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-foreground-muted">
+                        <span className="inline-flex items-center gap-1">
+                          {p.sku}
+                          {p.sku && <CopySku sku={p.sku} />}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-foreground">₹{Number(p.base_price).toLocaleString('en-IN')}</td>
+                      <td className="px-5 py-2.5">
+                        <StatusBadge status={String(p.is_active)} map={ACTIVE_STATUS} />
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-default">
-                    {products.map(p => (
-                      <tr key={p.id} className="hover:bg-surface-secondary/40">
-                        <td className="px-4 py-2.5">
-                          <Link
-                            href={ap(`/admin/products/${p.id}`, host)}
-                            className="font-medium text-accent-500 hover:underline"
-                          >
-                            {p.name}
-                          </Link>
-                        </td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">
-                          <span className="inline-flex items-center gap-1">
-                            {p.sku}
-                            {p.sku && <CopySku sku={p.sku} />}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 font-semibold text-foreground">
-                          ₹{Number(p.base_price).toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {p.is_active ? (
-                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                              Active
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-surface-secondary text-foreground-muted">
-                              Inactive
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      }
+      aside={
+        <Card title="Brand details">
+          <Fields cols={1}>
+            <Field label="Slug" value={brand.slug} mono copy={brand.slug} />
+            <Field
+              label="Website"
+              value={
+                brand.website ? (
+                  <a href={brand.website} target="_blank" rel="noopener noreferrer" className="text-accent-500 hover:underline break-all">
+                    {brand.website.replace(/^https?:\/\//, '')}
+                  </a>
+                ) : null
+              }
+            />
+            <Field label="Logo" value={brand.logo_url ? 'Set' : null} />
+            <Field label="Returns" value={brand.return_allowed ? `${brand.return_window_days} days` : 'Not allowed'} />
+            <Field label="Replacement" value={brand.replacement_allowed ? `${brand.replacement_window_days} days` : 'Not allowed'} />
+          </Fields>
+        </Card>
+      }
+    />
   )
 }

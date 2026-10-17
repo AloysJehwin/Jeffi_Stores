@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useEffect, useMemo, Fragment } from 'react'
-import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import DraftEditButton from '@/components/admin/DraftEditButton'
@@ -25,6 +24,8 @@ import Toggle from '@/components/ui/Toggle'
 import { ap } from '@/lib/shared/admin-path'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
+import { ACTIVE_STATUS, Dialog, EmptyState, Field, Fields, StatusBadge, badgeCls, useActionToast } from '@/components/admin/kit'
+import { InfiniteFooter } from '@/components/admin/kit/infinite'
 
 interface Category {
   id: string
@@ -56,115 +57,71 @@ function ViewModal({
   onClose: () => void
   backUrl?: string
 }) {
-  return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div
-        className="relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full max-w-md max-h-[90vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between p-5 border-b border-border-default">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
-              <CategoryIcon
-                iconName={category.icon_name}
-                categoryName={category.name}
-                className="w-5 h-5 text-accent-600 dark:text-accent-400"
-              />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-foreground">{category.name}</h2>
-              <p className="text-xs text-foreground-muted font-mono mt-0.5">{category.slug}</p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      zIndex="z-[300]"
+      title={
+        <span className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-lg bg-accent-500/10 flex items-center justify-center shrink-0">
+            <CategoryIcon iconName={category.icon_name} categoryName={category.name} className="w-5 h-5 text-accent-500" />
+          </span>
+          {category.name}
+        </span>
+      }
+      description={<span className="font-mono">{category.slug}</span>}
+      footer={
+        <>
+          <a
+            href={`/categories/${category.slug}`}
+            target="_blank"
+            rel="noreferrer"
+            className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-surface-secondary text-sm">
-            <div>
-              <p className="text-xs text-foreground-muted">Status</p>
-              <p
-                className={`font-semibold mt-0.5 ${category.is_active ? 'text-green-600 dark:text-green-400' : 'text-foreground-muted'}`}
-              >
-                {category.is_active ? 'Active' : 'Inactive'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-foreground-muted">Display Order</p>
-              <p className="font-semibold mt-0.5 text-foreground">{category.display_order}</p>
-            </div>
-            {subCount !== undefined && (
-              <div>
-                <p className="text-xs text-foreground-muted">Subcategories</p>
-                <p className="font-semibold mt-0.5 text-foreground">{subCount}</p>
-              </div>
-            )}
-            {productCount !== undefined && (
-              <div>
-                <p className="text-xs text-foreground-muted">Products</p>
-                <p className="font-semibold mt-0.5 text-foreground">{productCount}</p>
-              </div>
-            )}
-          </div>
-          {category.description && (
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Description</p>
-              <p className="text-sm text-foreground leading-relaxed">{category.description}</p>
-            </div>
-          )}
-          <div>
-            <p className="text-xs text-foreground-muted uppercase tracking-wide mb-2">
-              Return &amp; Replacement Policy
-            </p>
-            <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-surface-secondary text-sm">
-              <div>
-                <p className="text-xs text-foreground-muted">Returns</p>
-                <p
-                  className={`font-semibold mt-0.5 ${category.return_allowed !== false ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-                >
+            View on Store
+          </a>
+          <Link
+            href={ap(`/admin/categories/${category.id}?back=${encodeURIComponent(backUrl)}`)}
+            className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+            onClick={onClose}
+          >
+            View Category
+          </Link>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        <Fields>
+          <Field label="Status" value={<StatusBadge status={String(!!category.is_active)} map={ACTIVE_STATUS} />} />
+          <Field label="Display Order" value={String(category.display_order)} />
+          {subCount !== undefined && <Field label="Subcategories" value={String(subCount)} />}
+          {productCount !== undefined && <Field label="Products" value={String(productCount)} />}
+          {category.description && <Field span={2} label="Description" value={category.description} />}
+        </Fields>
+        <div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-foreground-muted">Return &amp; Replacement Policy</h3>
+          <Fields>
+            <Field
+              label="Returns"
+              value={
+                <span className={badgeCls(category.return_allowed !== false ? 'green' : 'red')}>
                   {category.return_allowed !== false ? `${category.return_window_days ?? 7} days` : 'Not allowed'}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-foreground-muted">Replacement</p>
-                <p
-                  className={`font-semibold mt-0.5 ${category.replacement_allowed !== false ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-                >
-                  {category.replacement_allowed !== false
-                    ? `${category.replacement_window_days ?? 7} days`
-                    : 'Not allowed'}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-3 pt-1 border-t border-border-default">
-            <Link
-              href={ap(`/admin/categories/${category.id}?back=${encodeURIComponent(backUrl)}`)}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
-              onClick={onClose}
-            >
-              View Category
-            </Link>
-            <a
-              href={`/categories/${category.slug}`}
-              target="_blank"
-              rel="noreferrer"
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-border-secondary text-foreground-secondary hover:bg-surface-secondary transition-colors"
-            >
-              View on Store
-            </a>
-          </div>
+                </span>
+              }
+            />
+            <Field
+              label="Replacement"
+              value={
+                <span className={badgeCls(category.replacement_allowed !== false ? 'green' : 'red')}>
+                  {category.replacement_allowed !== false ? `${category.replacement_window_days ?? 7} days` : 'Not allowed'}
+                </span>
+              }
+            />
+          </Fields>
         </div>
       </div>
-    </div>,
-    document.body
+    </Dialog>
   )
 }
 
@@ -222,6 +179,7 @@ function PolicyExpandRow({
         throw new Error(d.error || 'Save failed')
       }
       const updated = await res.json()
+      showToast('Policy saved', 'success')
       onSaved(updated)
     } catch (e: any) {
       showToast(e.message || 'Save failed', 'error')
@@ -282,7 +240,7 @@ function PolicyExpandRow({
                       max={90}
                       value={returnDays}
                       onChange={e => setReturnDays(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-16 px-2 py-1 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      className="field-xs w-16 border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                     />
                     <span className="text-xs text-foreground-muted">days</span>
                   </div>
@@ -304,7 +262,7 @@ function PolicyExpandRow({
                       max={90}
                       value={replacementDays}
                       onChange={e => setReplacementDays(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-16 px-2 py-1 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                      className="field-xs w-16 border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                     />
                     <span className="text-xs text-foreground-muted">days</span>
                   </div>
@@ -316,7 +274,7 @@ function PolicyExpandRow({
           <div className="flex items-center gap-2 ml-auto">
             <button
               onClick={onClose}
-              className="px-3 h-control-sm text-xs border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface transition-colors"
+              className="control-sm border border-border-secondary text-foreground-secondary hover:bg-surface"
             >
               Cancel
             </button>
@@ -324,7 +282,7 @@ function PolicyExpandRow({
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-3 h-control-sm text-xs bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
+                className="control-sm bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50"
               >
                 {saving ? 'Saving…' : 'Save Policy'}
               </button>
@@ -431,12 +389,12 @@ function SortableRow({
           )}
           {isSubcat && <span className="text-foreground-muted text-sm mr-1">└</span>}
           <div
-            className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${isSubcat ? 'bg-surface-secondary' : 'bg-accent-100 dark:bg-accent-900/30'}`}
+            className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${isSubcat ? 'bg-surface-secondary' : 'bg-accent-500/10'}`}
           >
             <CategoryIcon
               iconName={category.icon_name}
               categoryName={category.name}
-              className={`w-4 h-4 ${isSubcat ? 'text-foreground-muted' : 'text-accent-600 dark:text-accent-400'}`}
+              className={`w-4 h-4 ${isSubcat ? 'text-foreground-muted' : 'text-accent-500'}`}
             />
           </div>
           <HoverCard
@@ -461,12 +419,12 @@ function SortableRow({
             <div className="p-3 space-y-2">
               <div className="flex items-center gap-2 pb-2 border-b border-border-default">
                 <div
-                  className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${isSubcat ? 'bg-surface-secondary' : 'bg-accent-100 dark:bg-accent-900/30'}`}
+                  className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${isSubcat ? 'bg-surface-secondary' : 'bg-accent-500/10'}`}
                 >
                   <CategoryIcon
                     iconName={category.icon_name}
                     categoryName={category.name}
-                    className={`w-4 h-4 ${isSubcat ? 'text-foreground-muted' : 'text-accent-600 dark:text-accent-400'}`}
+                    className={`w-4 h-4 ${isSubcat ? 'text-foreground-muted' : 'text-accent-500'}`}
                   />
                 </div>
                 <span className="text-sm font-semibold text-foreground">{category.name}</span>
@@ -497,14 +455,14 @@ function SortableRow({
                 )}
                 <span className="text-foreground-muted">Returns</span>
                 <span
-                  className={category.return_allowed !== false ? 'text-green-600 dark:text-green-400' : 'text-red-500'}
+                  className={category.return_allowed !== false ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
                 >
                   {category.return_allowed !== false ? `${category.return_window_days ?? 7}d` : 'No'}
                 </span>
                 <span className="text-foreground-muted">Replacement</span>
                 <span
                   className={
-                    category.replacement_allowed !== false ? 'text-green-600 dark:text-green-400' : 'text-red-500'
+                    category.replacement_allowed !== false ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                   }
                 >
                   {category.replacement_allowed !== false ? `${category.replacement_window_days ?? 7}d` : 'No'}
@@ -543,11 +501,7 @@ function SortableRow({
           scope="categories:write"
           fallback={
             <span
-              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                category.is_active
-                  ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                  : 'bg-surface-secondary text-foreground'
-              }`}
+              className={`${badgeCls(category.is_active ? 'green' : 'muted')}`}
             >
               {category.is_active ? 'Active' : 'Inactive'}
             </span>
@@ -558,11 +512,7 @@ function SortableRow({
               e.stopPropagation()
               onToggleStatus?.()
             }}
-            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full hover:opacity-75 transition-opacity ${
-              category.is_active
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                : 'bg-surface-secondary text-foreground'
-            }`}
+            className={`${badgeCls(category.is_active ? 'green' : 'muted')} hover:opacity-75 transition-opacity`}
           >
             {category.is_active ? 'Active' : 'Inactive'}
           </button>
@@ -573,7 +523,7 @@ function SortableRow({
           <button
             onClick={onTogglePolicy}
             title="Edit return & replacement policy"
-            className={`mr-3 text-xs px-2 h-control-sm rounded border transition-colors ${policyOpen ? 'bg-accent-100 dark:bg-accent-900/30 border-accent-400 text-accent-600 dark:text-accent-400' : 'border-border-secondary text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
+            className={`mr-3 control-sm border ${policyOpen ? 'bg-accent-500/10 border-accent-400 text-accent-500' : 'border-border-secondary text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
           >
             Policy
           </button>
@@ -630,16 +580,17 @@ export default function CategoriesClient({
   const [saving, setSaving] = useState(false)
   const [viewCategory, setViewCategory] = useState<Category | null>(null)
   const [policyOpenId, setPolicyOpenId] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
+  const [shown, setShown] = useState(10)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const toast = useActionToast()
 
   const search = searchParams.get('search') || ''
   const typeFilter = searchParams.get('type') || ''
   const PAGE_SIZE = 10
 
   useEffect(() => {
-    setPage(1)
+    setShown(PAGE_SIZE)
   }, [search, typeFilter])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
@@ -674,13 +625,16 @@ export default function CategoriesClient({
           .sort((a, b) => a.display_order - b.display_order)
       : []
 
-  const totalPages =
-    typeFilter === 'sub'
-      ? Math.max(1, Math.ceil(filteredSubOnly.length / PAGE_SIZE))
-      : Math.max(1, Math.ceil(filteredMain.length / PAGE_SIZE))
-
-  const pagedMain = typeFilter === 'sub' ? [] : filteredMain.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const pagedSubOnly = typeFilter === 'sub' ? filteredSubOnly.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : []
+  // Dnd reorder spans the loaded prefix; load 10 more each time.
+  const totalVisible = typeFilter === 'sub' ? filteredSubOnly.length : filteredMain.length
+  const pagedMain = typeFilter === 'sub' ? [] : filteredMain.slice(0, shown)
+  const pagedSubOnly = typeFilter === 'sub' ? filteredSubOnly.slice(0, shown) : []
+  const moreControl = {
+    total: totalVisible,
+    hasMore: shown < totalVisible,
+    loadingMore: false,
+    loadMore: () => setShown(n => n + PAGE_SIZE),
+  }
 
   const mainCategories = pagedMain
 
@@ -699,7 +653,7 @@ export default function CategoriesClient({
 
   const saveReorder = async (updated: Category[]) => {
     setSaving(true)
-    await fetch('/api/categories/reorder', {
+    const res = await fetch('/api/categories/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -709,8 +663,10 @@ export default function CategoriesClient({
           parent_category_id: c.parent_category_id ?? null,
         })),
       }),
-    })
+    }).catch(() => null)
     setSaving(false)
+    if (res && res.ok) toast.success('Order saved')
+    else toast.error('Failed to save order')
     router.refresh()
   }
 
@@ -799,9 +755,11 @@ export default function CategoriesClient({
       })
       if (!res.ok) {
         setCategories(prev => prev.map(c => (c.id === cat.id ? { ...c, is_active: !next } : c)))
+        toast.error('Failed to update status')
       }
     } catch {
       setCategories(prev => prev.map(c => (c.id === cat.id ? { ...c, is_active: !next } : c)))
+      toast.error('Failed to update status')
     }
   }
 
@@ -810,7 +768,7 @@ export default function CategoriesClient({
   return (
     <div className="relative">
       {saving && (
-        <div className="fixed bottom-4 right-4 z-50 bg-accent-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium flex items-center gap-2">
+        <div className="fixed bottom-4 right-4 z-50 control-md bg-surface-elevated border border-border-default text-foreground shadow-lg">
           <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
@@ -835,29 +793,29 @@ export default function CategoriesClient({
         onDragEnd={handleDragEnd}
       >
         <SortableContext items={flatOrder.map(c => c.id)} strategy={verticalListSortingStrategy}>
-          <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+          <div className="hidden md:block bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
             <div className="overflow-x-auto overflow-y-visible">
-              <table className="min-w-full divide-y divide-border-default">
-                <thead className="bg-surface-secondary">
+              <table className="w-full text-sm">
+                <thead className="border-b border-border-default bg-surface-secondary/50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted">
                       Category
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted">
                       Slug
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted">
                       Order
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-left text-xs font-medium text-foreground-muted">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
+                    <th className="px-4 py-2.5 text-right text-xs font-medium text-foreground-muted">
                       Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border-default">
+                <tbody className="divide-y divide-border-default/60">
                   {typeFilter === 'sub' ? (
                     pagedSubOnly.length > 0 ? (
                       pagedSubOnly.map(sub => {
@@ -890,8 +848,8 @@ export default function CategoriesClient({
                       })
                     ) : (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-foreground-muted">
-                          No subcategories found.
+                        <td colSpan={5}>
+                          <EmptyState bare title="No subcategories found." />
                         </td>
                       </tr>
                     )
@@ -963,8 +921,8 @@ export default function CategoriesClient({
                     })
                   ) : (
                     <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-foreground-muted">
-                        No categories found.
+                      <td colSpan={5}>
+                        <EmptyState bare title="No categories found." />
                       </td>
                     </tr>
                   )}
@@ -986,9 +944,7 @@ export default function CategoriesClient({
 
       <div className="md:hidden">
         {(typeFilter === 'sub' ? pagedSubOnly.length === 0 : mainCategories.length === 0) ? (
-          <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-8 text-center text-foreground-muted">
-            {typeFilter === 'sub' ? 'No subcategories found.' : 'No categories found.'}
-          </div>
+          <EmptyState title={typeFilter === 'sub' ? 'No subcategories found.' : 'No categories found.'} />
         ) : (
           <CategoriesMobileList
             typeFilter={typeFilter}
@@ -1007,33 +963,7 @@ export default function CategoriesClient({
         )}
       </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 mt-4 px-1">
-          <p className="text-xs text-foreground-muted whitespace-nowrap">
-            Page <span className="font-medium text-foreground">{page}</span> of{' '}
-            <span className="font-medium text-foreground">{totalPages}</span>
-          </p>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-            >
-              Prev
-            </button>
-            <span className="text-xs text-foreground-muted whitespace-nowrap">
-              {page}/{totalPages}
-            </span>
-            <button
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <InfiniteFooter shown={Math.min(shown, totalVisible)} control={moreControl} noun="categories" className="mt-4" />
     </div>
   )
 }

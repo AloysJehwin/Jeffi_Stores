@@ -4,7 +4,10 @@ import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
+import { Suspense } from 'react'
+import { PageBody, PageHeader } from '@/components/admin/kit'
 import LabelsClient from './LabelsClient'
+import LabelsTabs from './_components/LabelsTabs'
 import { LABEL_SIZES } from '@/lib/documents/label-pdf'
 import { getAllCategories } from '@/lib/queries'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
@@ -35,14 +38,11 @@ export default async function LabelsPage() {
   const categories = (await getAllCategories()) || []
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Label Generator</h1>
-        <p className="text-foreground-secondary mt-1">
-          Generate and download product labels with barcodes and QR codes
-        </p>
-      </div>
-      <LabelsClient labelSizes={LABEL_SIZES} categories={categories} />
-    </div>
+    <PageBody>
+      <PageHeader title="Label Generator" description="Generate and download product labels with barcodes and QR codes" />
+      <Suspense fallback={null}>
+        <LabelsTabs generator={<LabelsClient labelSizes={LABEL_SIZES} categories={categories} />} />
+      </Suspense>
+    </PageBody>
   )
 }

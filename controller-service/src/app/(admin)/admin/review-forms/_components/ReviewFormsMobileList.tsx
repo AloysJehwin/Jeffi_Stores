@@ -106,9 +106,9 @@ export default function ReviewFormsMobileList({ forms, backUrl, formsBase }: Pro
   }
 
   return (
-    <div className="divide-y divide-border-default">
+    <div className="space-y-2">
       {forms.map(f => (
-        <div key={f.id} className="py-3 first:pt-0 last:pb-0">
+        <div key={f.id}>
           <MobileListCard ariaLabel={`Open ${f.title}`} onTap={() => setSelected(f)}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
@@ -118,7 +118,7 @@ export default function ReviewFormsMobileList({ forms, backUrl, formsBase }: Pro
               <span
                 className={`flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${
                   f.is_active
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                    ? 'bg-green-500/10 text-green-700 dark:text-green-400'
                     : 'bg-surface-secondary text-foreground'
                 }`}
               >
@@ -141,7 +141,7 @@ export default function ReviewFormsMobileList({ forms, backUrl, formsBase }: Pro
           <button
             type="button"
             onClick={() => setActionsOpen(true)}
-            className="w-full bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+            className="control-md w-full bg-accent-500 font-semibold text-white hover:bg-accent-600"
           >
             Actions
           </button>
@@ -153,7 +153,7 @@ export default function ReviewFormsMobileList({ forms, backUrl, formsBase }: Pro
               <span
                 className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                   selected.is_active
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                    ? 'bg-green-500/10 text-green-700 dark:text-green-400'
                     : 'bg-surface-secondary text-foreground-muted'
                 }`}
               >

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Loader2, RefreshCw, Target } from 'lucide-react'
 import IconButton from '@/components/ui/IconButton'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
@@ -9,6 +9,8 @@ import type { AudiencesData, AudienceView } from '@/lib/google-ads/audiences/ref
 import { useAdsManage } from './ManageContext'
 import { Section } from './ReportViews'
 import { Modal, btnGhost, btnPrimary, inputCls } from './wizard/fields'
+import Select from '@/components/ui/Select'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 // Audiences tab: Customer Match lists built from the store's own customers.
 
@@ -38,7 +40,8 @@ export default function AudiencesView({ d: initial }: { d: AudiencesData }) {
   const manage = useAdsManage()
   const [d, setD] = useState<AudiencesData>(initial)
   const [busy, setBusy] = useState<string | null>(null)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setMsg = useCallback((b: { ok: boolean; text: string } | null) => b && toast.result(b), [toast])
   const [attach, setAttach] = useState<AudienceView | null>(null)
   const [agree, setAgree] = useState(false)
   useEffect(() => setD(initial), [initial])
@@ -112,7 +115,6 @@ export default function AudiencesView({ d: initial }: { d: AudiencesData }) {
           </div>
         )}
 
-        {msg && <p className={`text-sm mb-3 ${msg.ok ? 'text-green-700 dark:text-green-400' : 'text-red-500'}`}>{msg.text}</p>}
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -286,13 +288,13 @@ function AttachDialog({ a, campaigns, onClose }: { a: AudienceView; campaigns: A
         <>
           <label className="text-sm block space-y-1">
             <span className="text-foreground-muted text-xs">Campaign</span>
-            <select className={inputCls} value={campaignId} onChange={e => setCampaignId(e.target.value)}>
-              {campaigns.map(c => (
-                <option key={c.campaignId} value={c.campaignId}>
-                  {c.name} ({humanize(c.channelType)})
-                </option>
-              ))}
-            </select>
+            <Select
+              className="w-full"
+              value={campaignId}
+              onChange={setCampaignId}
+              options={campaigns.map(c => ({ value: c.campaignId, label: `${c.name} (${humanize(c.channelType)})` }))}
+              aria-label="Campaign"
+            />
           </label>
           {pmax && (
             <label className="text-sm block space-y-1">
@@ -300,13 +302,13 @@ function AttachDialog({ a, campaigns, onClose }: { a: AudienceView; campaigns: A
               {groups == null ? (
                 <p className="text-xs text-foreground-muted">Loading...</p>
               ) : (
-                <select className={inputCls} value={assetGroupId} onChange={e => setAssetGroupId(e.target.value)}>
-                  {groups.map(g => (
-                    <option key={g.assetGroupId} value={g.assetGroupId}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
+                <Select
+                  className="w-full"
+                  value={assetGroupId}
+                  onChange={setAssetGroupId}
+                  options={groups.map(g => ({ value: g.assetGroupId, label: g.name }))}
+                  aria-label="Asset group"
+                />
               )}
             </label>
           )}

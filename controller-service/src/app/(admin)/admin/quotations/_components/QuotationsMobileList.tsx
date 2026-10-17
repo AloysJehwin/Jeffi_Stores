@@ -7,6 +7,7 @@ import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
 import { type Quotation, STATUS_COLORS } from '../QuotationsClient'
+import { badgeCls } from '@/components/admin/kit/tones'
 
 interface Props {
   quotations: Quotation[]
@@ -117,11 +118,11 @@ export default function QuotationsMobileList({
               <span className="text-xs text-foreground-muted shrink-0">{fmtDate(q.quote_date)}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[q.status] || ''}`}>
+              <span className={STATUS_COLORS[q.status] || badgeCls()}>
                 {statusLabel(q.status)}
               </span>
               {q.converted_order_id && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                <span className={badgeCls('blue')}>
                   Invoiced
                 </span>
               )}
@@ -149,12 +150,12 @@ export default function QuotationsMobileList({
           <div className="p-5 space-y-4">
             <div className="flex flex-wrap gap-2">
               <span
-                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${STATUS_COLORS[selected.status] || ''}`}
+                className={STATUS_COLORS[selected.status] || badgeCls()}
               >
                 {statusLabel(selected.status)}
               </span>
               {selected.converted_order_id && (
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                <span className={badgeCls('blue')}>
                   Invoiced
                 </span>
               )}

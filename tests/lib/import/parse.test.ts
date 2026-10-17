@@ -32,7 +32,7 @@ describe('multi-sheet template', () => {
   })
 
   it('parses the downloadable template itself: help rows skipped, attribute tabs merged by sku', async () => {
-    const parsed = parseWorkbook(await buildTemplateWorkbook())
+    const parsed = parseWorkbook(await buildTemplateWorkbook(), { keepTemplateExample: true })
     expect(parsed.fatal).toBeUndefined()
     expect(parsed.rows.map(r => `${r.sheet}:${r.rowType}`)).toEqual([
       'Products:product',
@@ -59,7 +59,7 @@ describe('multi-sheet template', () => {
   it('parses the same content when it arrives as per-tab value matrices (the Google Sheet path)', async () => {
     const sheets = sheetsOf(await buildTemplateWorkbook())
     delete sheets['Field Guide']
-    const parsed = parseWorkbook(valuesToWorkbookBuffer(sheets))
+    const parsed = parseWorkbook(valuesToWorkbookBuffer(sheets), { keepTemplateExample: true })
     expect(parsed.fatal).toBeUndefined()
     expect(parsed.rows).toHaveLength(5)
     expect(groupRows(parsed.rows).groups[0].values.length_cm).toBe(25)

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import { EmptyState, badgeCls, fieldInputCls } from '@/components/admin/kit'
 import Toggle from '@/components/ui/Toggle'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 
@@ -75,6 +76,7 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
         showToast(d.error || 'Update failed', 'error')
         return
       }
+      showToast('Offer updated', 'success')
       await load()
     } catch {
       showToast('Update failed', 'error')
@@ -87,7 +89,7 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-border-default bg-surface-secondary p-4">
+      <div className="rounded-xl border border-border-default bg-surface-elevated p-4">
         <p className="text-sm text-foreground">
           Offers are created in the Razorpay dashboard, not here — Razorpay&apos;s API does not allow creating them.
           This page controls which of your account&apos;s offers appear on product pages, how they read, and in what
@@ -103,22 +105,20 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
       </div>
 
       {!loading && problem && (
-        <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
-          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4">
+          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
             {problem.reason === 'test_mode'
               ? 'Offers cannot be listed on test keys'
               : problem.reason === 'no_keys'
                 ? 'Razorpay keys are not configured'
                 : 'Could not reach Razorpay'}
           </p>
-          <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-1">{problem.detail}</p>
+          <p className="text-xs text-foreground-secondary mt-1">{problem.detail}</p>
         </div>
       )}
 
       {!loading && !problem && offers.length === 0 && (
-        <div className="rounded-xl border border-border-default p-8 text-center">
-          <p className="text-sm text-foreground-muted">No active offers on this Razorpay account.</p>
-        </div>
+        <EmptyState title="No active offers on this Razorpay account." />
       )}
 
       <div className="space-y-3">
@@ -134,12 +134,12 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                       {o.titleOverride || o.title}
                     </span>
                     {o.titleOverride && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-secondary text-foreground-muted">
+                      <span className={badgeCls('muted')}>
                         edited
                       </span>
                     )}
                     {o.looksInternal && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      <span className={badgeCls('amber')}>
                         looks internal
                       </span>
                     )}
@@ -183,20 +183,20 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                         onChange={e => setDraftTitle(e.target.value)}
                         placeholder={o.title}
                         maxLength={200}
-                        className="flex-1 min-w-[16rem] px-2.5 h-control-sm text-sm rounded-lg border border-border-default bg-surface-secondary text-foreground"
+                        className={`${fieldInputCls} flex-1 min-w-[16rem]`}
                       />
                       <button
                         onClick={() => {
                           patch(o.id, { titleOverride: draftTitle })
                           setEditing(null)
                         }}
-                        className="px-3 h-control-sm text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-medium"
+                        className="control-md bg-accent-500 hover:bg-accent-600 text-white font-medium"
                       >
                         Save
                       </button>
                       <button
                         onClick={() => setEditing(null)}
-                        className="px-3 h-control-sm text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary"
+                        className="control-md border border-border-default text-foreground hover:bg-surface-secondary"
                       >
                         Cancel
                       </button>
@@ -208,7 +208,7 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                           setEditing(o.id)
                           setDraftTitle(o.titleOverride || '')
                         }}
-                        className="text-sm text-accent-600 dark:text-accent-400 hover:underline"
+                        className="text-sm text-accent-500 hover:underline"
                       >
                         {o.titleOverride ? 'Edit wording' : 'Override wording'}
                       </button>
@@ -231,7 +231,7 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                             const v = Number(e.target.value)
                             if (v !== o.displayOrder) patch(o.id, { displayOrder: v })
                           }}
-                          className="w-16 px-2 py-1 rounded border border-border-default bg-surface-secondary text-foreground"
+                          className={`${fieldInputCls} w-20`}
                         />
                       </label>
                     </>

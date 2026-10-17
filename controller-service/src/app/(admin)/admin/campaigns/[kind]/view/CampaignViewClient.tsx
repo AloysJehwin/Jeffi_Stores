@@ -95,14 +95,22 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
   // SMS body can come from a linked library template (slug) instead of an inline template.
   useEffect(() => {
     const slug = c?.sms_template_slug
-    if (!slug) { setSmsLibraryBody(null); return }
+    if (!slug) {
+      setSmsLibraryBody(null)
+      return
+    }
     fetch(`/api/admin/messaging-templates/sms/${encodeURIComponent(slug)}`, { credentials: 'include' })
       .then(r => (r.ok ? r.json() : null))
       .then(a => setSmsLibraryBody(a?.current_version?.body ?? null))
       .catch(() => {})
   }, [c?.sms_template_slug])
 
-  if (loading) return <CampaignPageSkeleton><CampaignDetailSkeleton /></CampaignPageSkeleton>
+  if (loading)
+    return (
+      <CampaignPageSkeleton>
+        <CampaignDetailSkeleton />
+      </CampaignPageSkeleton>
+    )
   if (error || !c) return <div className="p-6 text-sm text-red-600">{error || 'Not found'}</div>
 
   const vars = { ...sampleVariableMap(), ...SAMPLE_VARS }
@@ -127,7 +135,7 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-xl font-bold text-foreground">{c.name}</h2>
                   <span
-                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${c.enabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${c.enabled ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-surface-secondary text-foreground-muted '}`}
                   >
                     {c.enabled ? 'Active' : 'Paused'}
                   </span>
@@ -179,7 +187,7 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
               <iframe
                 title="Email preview"
                 srcDoc={previewDoc}
-                className="w-full rounded-b-lg border-0 bg-white"
+                className="w-full rounded-b-lg border-0 bg-surface-elevated"
                 style={{ height: 520 }}
                 sandbox=""
               />
@@ -198,7 +206,10 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
           {waEnabled && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
               <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">WhatsApp</h3>
-              <WhatsAppPreview value={{ slug: c.wa_template_slug ?? null, variables: c.wa_variables ?? {} }} vars={vars} />
+              <WhatsAppPreview
+                value={{ slug: c.wa_template_slug ?? null, variables: c.wa_variables ?? {} }}
+                vars={vars}
+              />
             </div>
           )}
         </div>

@@ -81,7 +81,7 @@ export default function CustomerAiSummary({
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">About this customer</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">About this customer</h2>
         {canGenerate && (data?.summary || !loading) && (
           <button
             type="button"

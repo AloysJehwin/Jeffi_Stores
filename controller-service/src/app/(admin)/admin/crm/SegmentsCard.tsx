@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useHasScope } from '@/contexts/AdminScopesContext'
-import { createPortal } from 'react-dom'
+import { Dialog } from '@/components/admin/kit'
 import Link from 'next/link'
 import CrmMailerPanel from './CrmMailerPanel'
 import { ap } from '@/lib/shared/admin-path'
@@ -52,10 +52,10 @@ function CustomerRow({ c, large }: { c: Customer; large?: boolean }) {
         <span
           className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
             c.health_score >= 60
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+              ? 'bg-green-500/10 text-green-700 dark:text-green-400'
               : c.health_score >= 40
-                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'
-                : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                : 'bg-red-500/10 text-red-700 dark:text-red-400'
           }`}
         >
           {c.health_score}
@@ -91,38 +91,20 @@ function SegmentModal({ segment, onClose }: ModalProps) {
       .finally(() => setLoading(false))
   }
 
-  if (typeof document === 'undefined') return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div
-        className="relative bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-[95vw] max-w-[1400px] h-[90vh] flex flex-col overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-border-default">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">{segment.label}</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              {segment.count.toLocaleString('en-IN')} customers in segment
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-            aria-label="Close"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <div className="flex flex-1 min-h-0 divide-x divide-border-default">
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={segment.label}
+      description={`${segment.count.toLocaleString('en-IN')} customers in segment`}
+      size="full"
+      zIndex="z-[300]"
+    >
+        <div className="flex flex-1 min-h-0 flex-col overflow-y-auto divide-y divide-border-default md:flex-row md:overflow-hidden md:divide-y-0 md:divide-x">
           {/* Left: customer list */}
-          <div className={`flex flex-col bg-surface-secondary/30 ${canMail ? 'w-2/5 shrink-0' : 'flex-1'}`}>
+          <div className={`flex flex-col bg-surface-secondary/30 ${canMail ? 'shrink-0 md:w-2/5' : 'flex-1'}`}>
             <div className="px-6 pt-4 pb-2 shrink-0 border-b border-border-default">
-              <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Customers</h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Customers</h3>
             </div>
             <div className="overflow-y-auto flex-1 px-6 py-4 divide-y divide-border-default">
               {loading && (
@@ -143,7 +125,7 @@ function SegmentModal({ segment, onClose }: ModalProps) {
           {canMail && (
             <div className="flex flex-col flex-1 min-w-0">
               <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
-                <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Send message</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Send message</h3>
                 <Link
                   href={ap(`/admin/customers?segment=${segment.key}`)}
                   className="text-xs text-accent-500 hover:text-accent-600 font-medium"
@@ -163,9 +145,7 @@ function SegmentModal({ segment, onClose }: ModalProps) {
             </div>
           )}
         </div>
-      </div>
-    </div>,
-    document.body
+    </Dialog>
   )
 }
 
@@ -176,59 +156,54 @@ export default function SegmentsCard({ segments }: { segments: Record<string, nu
     {
       key: 'vip',
       label: 'VIP',
-      color:
-        'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700',
+      color: 'bg-amber-500/10 text-amber-700 border-amber-500/40 dark:text-amber-400',
     },
     {
       key: 'loyal',
       label: 'Loyal',
-      color:
-        'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-700',
+      color: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/40 dark:text-emerald-400',
     },
     {
       key: 'b2b',
       label: 'B2B',
-      color:
-        'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700',
+      color: 'bg-indigo-500/10 text-indigo-700 border-indigo-500/40 dark:text-indigo-400',
     },
     {
       key: 'repeat',
       label: 'Repeat',
-      color: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700',
+      color: 'bg-blue-500/10 text-blue-700 border-blue-500/40 dark:text-blue-400',
     },
     {
       key: 'new',
       label: 'New (<30d)',
-      color:
-        'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700',
+      color: 'bg-purple-500/10 text-purple-700 border-purple-500/40 dark:text-purple-400',
     },
     {
       key: 'at_risk',
       label: 'At Risk',
-      color:
-        'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700',
+      color: 'bg-orange-500/10 text-orange-700 border-orange-500/40 dark:text-orange-400',
     },
     {
       key: 'dormant',
       label: 'Dormant',
-      color: 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700',
+      color: 'bg-red-500/10 text-red-700 border-red-500/40 dark:text-red-400',
     },
     {
       key: 'one_time',
       label: 'One-Time',
-      color: 'bg-zinc-100 text-zinc-700 border-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-700',
+      color: 'bg-surface-secondary text-foreground border-border-default',
     },
     {
       key: 'lead',
       label: 'Lead',
-      color: 'bg-pink-100 text-pink-800 border-pink-300 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-700',
+      color: 'bg-pink-500/10 text-pink-700 border-pink-500/40 dark:text-pink-400',
     },
   ]
 
   return (
     <>
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-        <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Segments</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Segments</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {SEGMENT_META.map(({ key, label, color }) => {
             const count = segments[key] ?? 0

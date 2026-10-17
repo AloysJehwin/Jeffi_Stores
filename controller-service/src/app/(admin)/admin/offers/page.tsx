@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { hasScope } from '@/lib/auth/scopes'
 import OffersTabs from './OffersTabs'
+import { PageBody, PageHeader } from '@/components/admin/kit'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,13 +12,12 @@ export default async function OffersPage() {
   const canWrite = hasScope(role, scopes, 'coupons:write')
 
   return (
-    <div className="p-6 w-full max-w-full min-w-0">
-      <h1 className="text-2xl font-bold text-foreground">Offers</h1>
-      <p className="text-sm text-foreground-muted mt-1 mb-6">
-        Razorpay bank offers shown on product pages, and your own product offers with their titles, dates, images, and
-        assigned products.
-      </p>
+    <PageBody>
+      <PageHeader
+        title="Offers"
+        description="Razorpay bank offers shown on product pages, and your own product offers with their titles, dates, images, and assigned products."
+      />
       <OffersTabs canWrite={canWrite} />
-    </div>
+    </PageBody>
   )
 }

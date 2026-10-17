@@ -11,9 +11,8 @@ vi.mock('@/lib/crypto/token-cipher', () => ({
   encryptToken: (s: string) => `enc:${s}`,
   decryptToken: (s: string) => s.replace(/^enc:/, ''),
 }))
-vi.mock('@/lib/shared/google-credentials', () => ({
-  loadGoogleServiceAccount: () => ({ client_email: 'sa@jeffi.iam.gserviceaccount.com', private_key: 'pk' }),
-}))
+const sa = vi.hoisted(() => ({ load: () => ({ client_email: 'sa@jeffi.iam.gserviceaccount.com', private_key: 'pk' }) as any }))
+vi.mock('@/lib/shared/google-credentials', () => ({ loadGoogleServiceAccount: () => sa.load() }))
 
 import { resolveGoogleAdsCreds, saveAdsConfig, googleAdsEnvStatus, adsTenantKey } from '@/lib/google-ads/credentials'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
@@ -72,6 +71,19 @@ describe('resolveGoogleAdsCreds', () => {
       loginCustomerId: '5554443333',
       connectedVia: 'platform',
     })
+  })
+
+  it('treats the flagship as not connected when this environment has no service-account key', async () => {
+    process.env.GOOGLE_ADS_CUSTOMER_ID = '1112223333'
+    const real = sa.load
+    sa.load = () => {
+      throw Object.assign(new Error("ENOENT: no such file or directory, open 'jeffi-stores-76e9ecaecdd6.json'"), { code: 'ENOENT' })
+    }
+    try {
+      await expect(resolveGoogleAdsCreds(PLATFORM)).rejects.toBeInstanceOf(IntegrationNotConnectedError)
+    } finally {
+      sa.load = real
+    }
   })
 
   it('prefers a stored flagship connection over the platform account', async () => {

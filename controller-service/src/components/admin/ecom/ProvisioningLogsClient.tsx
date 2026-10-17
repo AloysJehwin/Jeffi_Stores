@@ -110,7 +110,7 @@ function StepStage({
         <span className={`text-sm font-mono truncate ${text}`}>{name}</span>
 
         {errors > 0 && (
-          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-700 dark:text-red-400">
             {errors} {errors === 1 ? 'error' : 'errors'}
           </span>
         )}
@@ -120,7 +120,7 @@ function StepStage({
             <span className="text-[10px] tabular-nums text-foreground-muted">{fmtDuration(last.duration_ms)}</span>
           )}
           {state === 'current' && (
-            <span className="text-[11px] font-medium text-accent-600 dark:text-accent-400">running…</span>
+            <span className="text-[11px] font-medium text-accent-600">running…</span>
           )}
           {state === 'failed' && <span className="text-[11px] font-medium text-red-600 dark:text-red-400">failed</span>}
           {hasDetail && (
@@ -249,10 +249,10 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
   const bannerTone = !job
     ? 'border-border-default bg-surface-elevated'
     : job.status === 'done'
-      ? 'border-green-300 dark:border-green-800 bg-green-50 dark:bg-green-900/20'
+      ? 'border-green-500/40 bg-green-500/5'
       : job.status === 'failed'
-        ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20'
-        : 'border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20'
+        ? 'border-red-500/40 bg-red-500/5'
+        : 'border-amber-500/40 bg-amber-500/5'
 
   const barTone = job?.status === 'failed' ? 'bg-red-500' : job?.status === 'done' ? 'bg-green-500' : 'bg-accent-500'
 
@@ -278,8 +278,8 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
       </div>
 
       {err && (
-        <div className="rounded-xl border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
-          <p className="text-sm text-red-700 dark:text-red-300">{err}</p>
+        <div className="rounded-xl border border-red-500/40 bg-red-500/5 p-4">
+          <p className="text-sm text-red-700 dark:text-red-400">{err}</p>
         </div>
       )}
 
@@ -313,7 +313,7 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
             </div>
 
             <div className="mt-3.5">
-              <div className="h-1.5 rounded-full bg-black/5 dark:bg-white/10 overflow-hidden">
+              <div className="h-1.5 rounded-full bg-surface-secondary overflow-hidden">
                 <div className={`h-full ${barTone} transition-all duration-500`} style={{ width: `${pct}%` }} />
               </div>
               <div className="flex justify-between mt-1.5 text-[11px] text-foreground-muted tabular-nums">
@@ -325,7 +325,7 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
             </div>
 
             {job.last_error && (
-              <pre className="mt-3.5 text-xs text-red-800 dark:text-red-300 whitespace-pre-wrap break-all bg-red-100/60 dark:bg-red-950/40 rounded-lg p-3 max-h-48 overflow-y-auto">
+              <pre className="mt-3.5 text-xs text-red-700 dark:text-red-400 whitespace-pre-wrap break-all bg-red-500/10 rounded-lg p-3 max-h-48 overflow-y-auto">
                 {job.last_error}
               </pre>
             )}

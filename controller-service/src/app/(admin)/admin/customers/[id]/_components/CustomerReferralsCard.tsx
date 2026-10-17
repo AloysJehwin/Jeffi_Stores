@@ -50,7 +50,7 @@ export default async function CustomerReferralsCard({
 
   return (
     <div className="bg-surface-elevated rounded-lg border border-border-default p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Referrals</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Referrals</h3>
       {code && (
         <p className="text-sm text-foreground-secondary">
           Code <span className="font-mono font-semibold text-foreground">{code.referral_code}</span>

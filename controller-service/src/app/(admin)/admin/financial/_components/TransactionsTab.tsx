@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
+import { EmptyState, badgeCls, InfiniteFooter } from '@/components/admin/kit'
 import {
   Skeleton,
   SummaryCard,
@@ -16,6 +17,10 @@ import {
   thCls,
   thRight,
   thCenter,
+  theadCls,
+  tableWrapCls,
+  payoutBadge,
+  inputCls,
 } from './shared'
 
 const TYPE_OPTIONS = [
@@ -32,7 +37,9 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
   const [data, setData] = useState<any>(initialData)
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
-  const PAGE_SIZE = 50
+  const [more, setMore] = useState<{ loading: boolean; error: string | null }>({ loading: false, error: null })
+  const applied = useRef('')
+  const inflight = useRef(false)
 
   useEffect(() => {
     if (initialData !== null) {
@@ -41,30 +48,45 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
     }
   }, [initialData])
 
+  // Page 1 replaces (with the current filters); later pages append with the filters page 1 used.
   const load = useCallback(
-    async (p = page) => {
-      setLoading(true)
-      const params = new URLSearchParams()
-      if (from) params.set('from', from)
-      if (to) params.set('to', to)
-      if (search) params.set('search', search)
+    async (p = 1) => {
+      if (p > 1 && inflight.current) return
+      inflight.current = true
+      let params: URLSearchParams
+      if (p === 1) {
+        setLoading(true)
+        params = new URLSearchParams()
+        if (from) params.set('from', from)
+        if (to) params.set('to', to)
+        if (search) params.set('search', search)
       if (type !== 'all') params.set('type', type)
+        applied.current = params.toString()
+      } else {
+        setMore({ loading: true, error: null })
+        params = new URLSearchParams(applied.current)
+      }
       params.set('page', String(p))
-      const res = await fetch(`/api/admin/financial/transactions?${params}`)
-      const json = await res.json()
-      setData(json?.error ? null : json)
-      setPage(p)
-      setLoading(false)
+      try {
+        const res = await fetch(`/api/admin/financial/transactions?${params}`)
+        const json = await res.json()
+        if (p === 1) setData(json?.error ? null : json)
+        else if (!res.ok || json?.error) throw new Error(json?.error || 'Failed to load')
+        else setData((prev: any) => ({ ...prev, rows: [...(prev?.rows ?? []), ...(json.rows ?? [])], total: json.total }))
+        setPage(p)
+        setMore({ loading: false, error: null })
+      } catch (e) {
+        if (p > 1) setMore({ loading: false, error: e instanceof Error ? e.message : 'Failed to load' })
+      } finally {
+        inflight.current = false
+        if (p === 1) setLoading(false)
+      }
     },
-    [from, to, search, type, page]
+    [from, to, search, type]
   )
 
-  const handleRefresh = () => {
-    setPage(1)
-    load(1)
-  }
+  const handleRefresh = () => load(1)
 
-  const totalPages = data?.total ? Math.ceil(data.total / PAGE_SIZE) : 1
 
   const exportCSV = () => {
     if (!data?.rows?.length) return
@@ -100,12 +122,12 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
             <DatePicker className="w-36" value={to} onChange={setTo} />
           </div>
           <div className="w-36">
-            <AdminSelect label="Type" value={type} onChange={setType} options={TYPE_OPTIONS} sm />
+            <AdminSelect label="Type" value={type} onChange={setType} options={TYPE_OPTIONS} />
           </div>
           <div className="flex-1 min-w-[180px]">
             <label className={labelCls}>Search party / ref</label>
             <input
-              className="field-compact w-full border border-border-default bg-surface-secondary text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400"
+              className={inputCls}
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleRefresh()}
@@ -113,11 +135,11 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
             />
           </div>
           <div className="flex gap-2 pb-0.5">
-            <button className={btnPrimary} onClick={handleRefresh}>
+            <button type="button" className={btnPrimary} onClick={handleRefresh} disabled={loading}>
               {loading ? 'Loading…' : 'Refresh'}
             </button>
             {data?.rows?.length > 0 && (
-              <button className={btnSecondary} onClick={exportCSV}>
+              <button type="button" className={btnSecondary} onClick={exportCSV}>
                 Export CSV
               </button>
             )}
@@ -140,12 +162,12 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
           </div>
 
           {data.rows.length === 0 ? (
-            <p className="text-foreground-secondary text-sm text-center py-10">No transactions found</p>
+            <EmptyState title="No transactions found" />
           ) : (
             <>
-              <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+              <div className={`hidden md:block overflow-x-auto ${tableWrapCls}`}>
                 <table className="w-full text-sm">
-                  <thead className="bg-surface-secondary">
+                  <thead className={theadCls}>
                     <tr>
                       <th className={thCls}>Date</th>
                       <th className={thCls}>Type</th>
@@ -165,11 +187,11 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                         </td>
                         <td className="px-4 py-3">
                           {r.direction === 'inflow' ? (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            <span className={badgeCls('green')}>
                               Inflow
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                            <span className={badgeCls('red')}>
                               Outflow
                             </span>
                           )}
@@ -248,7 +270,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                           {r.method?.replace('_', ' ')}
                         </td>
                         <td
-                          className={`px-4 py-3 text-right font-semibold ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+                          className={`px-4 py-3 text-right font-semibold tabular-nums ${r.direction === 'inflow' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
                         >
                           {r.direction === 'inflow' ? '+' : '-'}
                           {formatINR(parseFloat(r.amount))}
@@ -257,21 +279,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                           {r.payout_id || r.reference || '—'}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {r.payout_status ? (
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                r.payout_status === 'processed'
-                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                  : r.payout_status === 'failed' || r.payout_status === 'reversed'
-                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                              }`}
-                            >
-                              {r.payout_status}
-                            </span>
-                          ) : (
-                            <span className="text-foreground-secondary">—</span>
-                          )}
+                          {payoutBadge(r.payout_status)}
                         </td>
                       </tr>
                     ))}
@@ -279,7 +287,7 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                 </table>
               </div>
 
-              <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+              <div className={`md:hidden divide-y divide-border-default ${tableWrapCls}`}>
                 {data.rows.map((r: any) => (
                   <div key={r.id + r.direction} className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
@@ -365,27 +373,15 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                     </div>
                     <div className="flex items-center gap-2">
                       {r.direction === 'inflow' ? (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        <span className={badgeCls('green')}>
                           Inflow
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                        <span className={badgeCls('red')}>
                           Outflow
                         </span>
                       )}
-                      {r.payout_status && (
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            r.payout_status === 'processed'
-                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                              : r.payout_status === 'failed' || r.payout_status === 'reversed'
-                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                                : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                          }`}
-                        >
-                          {r.payout_status}
-                        </span>
-                      )}
+                      {r.payout_status && payoutBadge(r.payout_status)}
                     </div>
                     {(r.payout_id || r.reference) && (
                       <p className="text-xs text-foreground-secondary font-mono">{r.payout_id || r.reference}</p>
@@ -394,29 +390,11 @@ export function TransactionsTab({ initialData }: { initialData: any }) {
                 ))}
               </div>
 
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between pt-2">
-                  <p className="text-sm text-foreground-secondary">
-                    Page {page} of {totalPages} · {data.total} total
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => load(page - 1)}
-                      disabled={page === 1 || loading}
-                      className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => load(page + 1)}
-                      disabled={page === totalPages || loading}
-                      className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
+              <InfiniteFooter
+                shown={data.rows.length}
+                noun="rows"
+                control={{ total: data.total, hasMore: data.rows.length < (data.total ?? 0), loadingMore: more.loading, error: more.error, loadMore: () => load(page + 1) }}
+              />
             </>
           )}
         </>

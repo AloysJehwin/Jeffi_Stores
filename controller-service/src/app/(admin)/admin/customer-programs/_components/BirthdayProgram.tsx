@@ -47,8 +47,8 @@ export default async function BirthdayProgram({ host }: { host: string }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4 min-w-0">
-          <h3 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Campaigns</h3>
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-4 min-w-0">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-3">Campaigns</h3>
           <ul className="space-y-3">
             {CAMPAIGNS.map(campaign => {
               const enabled = enabledByKind.get(campaign.kind) ?? false
@@ -66,7 +66,7 @@ export default async function BirthdayProgram({ host }: { host: string }) {
                   <span
                     className={`shrink-0 px-2.5 py-0.5 rounded-full text-xs font-semibold ${
                       enabled
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                        ? 'bg-green-500/10 text-green-700 dark:text-green-400'
                         : 'bg-surface-secondary text-foreground-secondary'
                     }`}
                   >
@@ -78,8 +78,8 @@ export default async function BirthdayProgram({ host }: { host: string }) {
           </ul>
         </div>
 
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4 min-w-0">
-          <h3 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Coming up</h3>
+        <div className="bg-surface-elevated rounded-xl border border-border-default p-4 min-w-0">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-3">Coming up</h3>
           {stats.upcoming.length === 0 ? (
             <p className="text-sm text-foreground-muted">No birthdays in the next 30 days.</p>
           ) : (

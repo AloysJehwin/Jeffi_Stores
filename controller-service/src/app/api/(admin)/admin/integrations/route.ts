@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireAdminScope } from '@/lib/auth/jwt'
-import { resolveTenant } from '@/lib/tenancy/tenant-context'
+import { credentialOwnerId } from '@/lib/integrations/owner'
 import {
   saveIntegrationCredential,
   listIntegrationCredentials,
@@ -28,9 +28,8 @@ const PROVIDER_LABELS: Record<(typeof PROVIDERS)[number], string> = {
 }
 
 async function requireTenant(): Promise<{ tenantId: string } | { error: NextResponse }> {
-  const t = await resolveTenant()
-  if (!t) return { error: NextResponse.json({ error: 'No tenant context' }, { status: 400 }) }
-  return { tenantId: t.tenantId }
+  // The flagship's credentials live under the platform tenant id, managed the same way.
+  return { tenantId: await credentialOwnerId() }
 }
 
 export async function GET(request: NextRequest) {

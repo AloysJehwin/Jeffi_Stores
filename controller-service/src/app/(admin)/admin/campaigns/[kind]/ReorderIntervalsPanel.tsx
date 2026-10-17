@@ -47,7 +47,9 @@ export default function ReorderIntervalsPanel() {
     return map
   }, [rows, values])
 
-  const changed = (rows ?? []).filter(row => (values[row.categoryId] ?? '') !== (row.days == null ? '' : String(row.days)))
+  const changed = (rows ?? []).filter(
+    row => (values[row.categoryId] ?? '') !== (row.days == null ? '' : String(row.days))
+  )
   const invalid = changed.some(row => {
     const text = values[row.categoryId] ?? ''
     if (text === '') return false
@@ -88,7 +90,7 @@ export default function ReorderIntervalsPanel() {
   return (
     <div className="bg-surface-elevated rounded-lg border border-border-default">
       <div className="p-4 sm:p-5 border-b border-border-default space-y-1">
-        <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Reorder intervals</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Reorder intervals</h2>
         <p className="text-sm text-foreground-secondary">
           Set how often customers typically rebuy from a category, for things that get used up (screws, drill bits,
           belts). Leave tools and other one-off buys empty: nobody is reminded about them. A subcategory without its own
@@ -128,7 +130,9 @@ export default function ReorderIntervalsPanel() {
                 const inherited = row.parentId ? parentDays.get(row.parentId) : ''
                 return (
                   <tr key={row.categoryId} className="border-t border-border-default">
-                    <td className={`px-4 py-2 ${row.parentId ? 'pl-8 text-foreground-secondary' : 'font-medium text-foreground'}`}>
+                    <td
+                      className={`px-4 py-2 ${row.parentId ? 'pl-8 text-foreground-secondary' : 'font-medium text-foreground'}`}
+                    >
                       {row.name}
                     </td>
                     <td className="px-4 py-2 text-right text-foreground-secondary tabular-nums">{row.products}</td>

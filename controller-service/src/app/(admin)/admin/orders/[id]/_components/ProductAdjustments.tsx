@@ -125,7 +125,7 @@ export default function ProductAdjustments({ orderId, items }: { orderId: string
 
   const net = preview?.netDiff ?? 0
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 space-y-3">
+    <div className="rounded-xl border border-border-default bg-surface-elevated p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-foreground">Product adjustments</h3>

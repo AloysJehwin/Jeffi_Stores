@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { ErrorState, PageBody } from '@/components/admin/kit'
 
 export default function EditProductError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
@@ -8,32 +9,26 @@ export default function EditProductError({ error, reset }: { error: Error & { di
   }, [error])
 
   return (
-    <div className="p-6 w-full max-w-3xl">
-      <div className="rounded-lg border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-5">
-        <h1 className="text-lg font-semibold text-red-800 dark:text-red-200">The product edit page could not load</h1>
-        <p className="mt-2 text-sm text-red-700 dark:text-red-300">
-          {error.message || 'An unexpected error occurred while rendering this page.'}
-        </p>
-        {error.digest && (
-          <p className="mt-2 text-xs font-mono text-red-600 dark:text-red-400">Reference: {error.digest}</p>
-        )}
-        <div className="mt-4 flex gap-3">
-          <button
-            type="button"
-            onClick={reset}
-            className="px-3 h-control-sm rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
-          >
-            Try again
-          </button>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="px-3 h-control-sm rounded-md border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 text-sm font-medium hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
-          >
-            Reload
-          </button>
-        </div>
-      </div>
-    </div>
+    <PageBody>
+      <ErrorState
+        title="The product edit page could not load"
+        body={
+          <>
+            {error.message || 'An unexpected error occurred while rendering this page.'}
+            {error.digest && <span className="mt-1 block font-mono">Reference: {error.digest}</span>}
+          </>
+        }
+        actionNode={
+          <div className="flex gap-2">
+            <button type="button" onClick={reset} className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600">
+              Try again
+            </button>
+            <button type="button" onClick={() => window.location.reload()} className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary">
+              Reload
+            </button>
+          </div>
+        }
+      />
+    </PageBody>
   )
 }

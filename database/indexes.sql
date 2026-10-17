@@ -209,6 +209,20 @@ CREATE INDEX idx_ai_queries_recommended_user ON public.ai_queries USING gin (rec
 CREATE INDEX idx_ai_queries_user_time ON public.ai_queries USING btree (user_id, created_at DESC);
 
 
+--
+-- Name: idx_ai_usage_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_usage_created ON public.ai_usage USING btree (created_at DESC);
+
+
+--
+-- Name: idx_ai_usage_feature_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_usage_feature_created ON public.ai_usage USING btree (feature, created_at DESC);
+
+
 
 --
 -- Name: idx_back_in_stock_notify_product; Type: INDEX; Schema: public; Owner: -
@@ -2273,3 +2287,38 @@ CREATE INDEX IF NOT EXISTS idx_bulk_items_job ON public.bulk_job_items (job_id, 
 CREATE INDEX IF NOT EXISTS idx_platform_invoices_tenant ON public.platform_invoices (tenant_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_tenant_service_approvals_pending ON public.tenant_service_approvals (status, requested_at) WHERE status = 'pending';
+
+CREATE INDEX IF NOT EXISTS idx_channel_sync_log_channel ON public.channel_sync_log (channel, kind, started_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_channel_alerts_active_key ON public.channel_alerts (channel, dedupe_key) WHERE ((status)::text = ANY ((ARRAY['open'::character varying, 'dismissed'::character varying])::text[]));
+
+CREATE INDEX IF NOT EXISTS idx_channel_alerts_key_notified ON public.channel_alerts (channel, dedupe_key, notified_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_channel_alerts_status_seen ON public.channel_alerts (channel, status, last_seen_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_channel_change_log_channel ON public.channel_change_log (channel, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_gmc_product_performance_offer ON public.gmc_product_performance (offer_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_gmc_best_sellers_status ON public.gmc_best_sellers (report_date, catalog_status);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_amazon_repricer_rules_sku ON public.amazon_repricer_rules (COALESCE(sku, ''));
+
+CREATE INDEX IF NOT EXISTS idx_amazon_orders_updated ON public.amazon_orders (last_update_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_amazon_order_items_order ON public.amazon_order_items (amazon_order_id);
+
+CREATE INDEX IF NOT EXISTS idx_amazon_order_items_sku ON public.amazon_order_items (sku);
+
+CREATE INDEX IF NOT EXISTS idx_aads_search_terms_term ON public.aads_search_terms (search_term, date);
+
+CREATE INDEX IF NOT EXISTS idx_aads_keywords_ad_group ON public.aads_keywords (ad_group_id);
+
+CREATE INDEX IF NOT EXISTS idx_mads_daily_metrics_campaign ON public.mads_daily_metrics (campaign_id, date);
+
+CREATE INDEX IF NOT EXISTS idx_mads_capi_events_status ON public.mads_capi_events (status, created_at DESC);
+
+CREATE INDEX idx_cart_items_created_at ON public.cart_items USING btree (created_at);
+CREATE INDEX idx_pending_payment_intents_created_at ON public.pending_payment_intents USING btree (created_at);
+CREATE INDEX idx_product_views_user_created ON public.product_views USING btree (user_id, created_at);
+CREATE INDEX idx_wishlist_items_product_id ON public.wishlist_items USING btree (product_id);

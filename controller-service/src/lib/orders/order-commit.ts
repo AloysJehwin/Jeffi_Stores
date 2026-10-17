@@ -9,7 +9,7 @@ import { getFeatureFlags, getBusinessValues } from '@/lib/catalog/site-controls'
 import { grantOrderEntitlements } from '@/lib/orders/entitlements'
 import { digitalUnitError } from '@/lib/catalog/digital-units'
 import { sellingUnitsFor } from '@/lib/catalog/unit-factor'
-import { attachOrderAttribution } from '@/lib/orders/attribution'
+import { attachMetaClickIds, attachOrderAttribution } from '@/lib/orders/attribution'
 import { queueAdsConversion } from '@/lib/google-ads/conversions/queue'
 import type { Attribution } from '@/lib/shared/attribution'
 
@@ -449,6 +449,8 @@ export interface CommitInput {
   attribution?: Attribution | null
   /** Buyer's advertising-cookie choice (consent cookie); null when none was made. */
   adsConsent?: boolean | null
+  /** Meta pixel browser/click ids (Conversions API). */
+  metaClicks?: { fbp?: string; fbc?: string } | null
 }
 
 export interface CartCommitInput extends CommitInput {
@@ -735,6 +737,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     )
     const created = orderResult.rows[0]
     await attachOrderAttribution(client, created.id, input.attribution ?? null, input.adsConsent ?? null)
+    await attachMetaClickIds(client, created.id, input.metaClicks ?? null)
 
     // Selling-unit snapshot (unit, pieces per unit, total pieces) for packing, shipping, stock and adjustments.
     const soldUnits = await sellingUnitsFor(

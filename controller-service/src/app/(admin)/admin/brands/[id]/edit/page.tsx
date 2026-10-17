@@ -3,8 +3,8 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne } from '@/lib/shared/db'
 import BrandForm from '@/components/admin/BrandForm'
-import { ChevronLeft } from 'lucide-react'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
+import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { hasScope } from '@/lib/auth/scopes'
 import { updateBrand } from './actions'
@@ -53,62 +53,25 @@ export default async function EditBrandPage({
 
   return (
     <MobileEditBlock>
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-2 mb-6 text-sm">
-        <a
-          href={ap(backUrl, host)}
-          className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Brands
-        </a>
-        <span className="text-border-default">/</span>
-        <span className="text-foreground font-medium">{isDraft ? 'Edit Draft' : 'Edit Brand'}</span>
-      </div>
-
-      {isDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-              Changes are saved to draft. The live brand stays unchanged until you publish.
-            </p>
-          </div>
-          <form action={updateBrand.bind(null, id)}>
-            <input type="hidden" name="intent" value="discard" />
-            <button type="submit" className="text-xs text-amber-600 hover:underline ml-4">
-              Discard draft
-            </button>
-          </form>
-        </div>
-      )}
-
-      {isCreateDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">New brand — draft</p>
-          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-            This brand is not on the live list yet. Save keeps it a draft; Publish makes it live.
-          </p>
-        </div>
-      )}
-
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">
-          {isCreateDraft ? 'Edit Draft Brand' : isDraft ? 'Edit Draft' : 'Edit Brand'}
-        </h1>
-        <p className="text-foreground-secondary mt-1">
-          {isDraft || isCreateDraft ? 'Changes are saved to the draft only' : 'Update brand information'}
-        </p>
-      </div>
-
-      <BrandForm
-        brand={brandForForm}
-        action={updateBrand.bind(null, id)}
-        backUrl={backUrl}
-        isDraft={isDraft || isCreateDraft}
-        hasReturns={hasReturns}
-      />
-    </div>
+      <FormPage
+        header={
+          <PageHeader
+            back={{ href: ap(backUrl, host), label: 'Brands' }}
+            title={isCreateDraft ? 'Edit Draft Brand' : isDraft ? 'Edit Draft' : 'Edit Brand'}
+            description={isDraft || isCreateDraft ? 'Changes are saved to the draft only' : 'Update brand information'}
+            badges={(isDraft || isCreateDraft) && <Badge tone="amber">Draft</Badge>}
+          />
+        }
+      >
+        <BrandForm
+          brand={brandForForm}
+          action={updateBrand.bind(null, id)}
+          backUrl={backUrl}
+          isDraft={isDraft || isCreateDraft}
+          hasReturns={hasReturns}
+          discardAction={isDraft ? updateBrand.bind(null, id) : undefined}
+        />
+      </FormPage>
     </MobileEditBlock>
   )
 }

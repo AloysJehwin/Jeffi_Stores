@@ -9,51 +9,12 @@ import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
 import SubscriptionOrderBadge from '@/components/admin/SubscriptionOrderBadge'
+import { Badge, StatusBadge } from '@/components/admin/kit'
+import { ORDER_STATUS_FULL, PAYMENT_STATUS_FULL, inr, sourceLabel, sourceTone } from './status-maps'
 
 interface Props {
   orders: any[]
   backUrl: string
-  pagination: React.ReactNode
-}
-
-const SOURCE_LABEL: Record<string, string> = {
-  online: 'Online',
-  business: 'Business',
-  cash_sale: 'Cash Sale',
-}
-
-function sourceLabel(source: string) {
-  return SOURCE_LABEL[source] || 'Offline'
-}
-
-function sourceBadge(source: string) {
-  if (source === 'online') return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-  if (source === 'business') return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-  return 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-}
-
-function statusBadge(status: string) {
-  if (status === 'delivered' || status === 'granted')
-    return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-  if (status === 'processing' || status === 'shipped')
-    return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
-  if (status === 'out_for_delivery') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300'
-  if (status === 'cancelled') return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-  if (status === 'cancel_requested') return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
-  return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-}
-
-function statusLabel(status: string) {
-  if (status === 'granted') return 'Access granted'
-  if (status === 'cancel_requested') return 'Cancel Req.'
-  if (status === 'out_for_delivery') return 'Out for Delivery'
-  return status
-}
-
-function paymentBadge(status: string) {
-  if (status === 'paid') return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-  if (status === 'pending') return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-  return 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
 }
 
 function customerName(order: any) {
@@ -71,7 +32,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
   )
 }
 
-export default function OrdersMobileList({ orders, backUrl, pagination }: Props) {
+export default function OrdersMobileList({ orders, backUrl }: Props) {
   const router = useRouter()
   const canPackingSlips = useHasScope('packing_slips:read')
   const [selected, setSelected] = useState<any>(null)
@@ -115,13 +76,8 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
   }
 
   return (
-    <div className="md:hidden space-y-3">
-      {orders.length === 0 ? (
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
-          No orders found.
-        </div>
-      ) : (
-        <>
+    <div className="space-y-3">
+      <>
           {orders.map((order: any) => (
             <MobileListCard
               key={order.id}
@@ -133,36 +89,22 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
                   <span className="text-sm font-semibold text-foreground truncate">
                     #{order.order_number || order.id.slice(0, 8)}
                   </span>
-                  <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${sourceBadge(order.source)}`}>
-                    {sourceLabel(order.source)}
-                  </span>
+                  <Badge tone={sourceTone(order.source)}>{sourceLabel(order.source)}</Badge>
                   <SubscriptionOrderBadge subscriptionId={order.subscription_id} cycle={order.subscription_cycle} />
                 </div>
-                <span
-                  className={`shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadge(order.status)}`}
-                >
-                  {statusLabel(order.status)}
+                <span className="shrink-0">
+                  <StatusBadge status={order.status} map={ORDER_STATUS_FULL} />
                 </span>
               </div>
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="text-sm text-foreground truncate">{customerName(order)}</span>
-                <span className="text-sm font-semibold text-foreground shrink-0">
-                  Rs.{' '}
-                  {Number(order.total_amount).toLocaleString('en-IN', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
+                <span className="text-sm font-semibold tabular-nums text-foreground shrink-0">{inr(order.total_amount)}</span>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-foreground-muted">
                   {new Date(order.created_at).toLocaleDateString('en-IN')}
                 </span>
-                <span
-                  className={`px-2 py-0.5 text-xs font-semibold rounded-full ${paymentBadge(order.payment_status)}`}
-                >
-                  {order.payment_status}
-                </span>
+                <StatusBadge status={order.payment_status} map={PAYMENT_STATUS_FULL} />
               </div>
             </MobileListCard>
           ))}
@@ -176,7 +118,7 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
               <button
                 type="button"
                 onClick={() => setActionsOpen(true)}
-                className="w-full bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+                className="control-md w-full justify-center bg-accent-500 font-semibold text-white hover:bg-accent-600"
               >
                 Actions
               </button>
@@ -185,27 +127,13 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
             {selected && (
               <div className="p-5 space-y-4">
                 <div className="flex flex-wrap gap-2">
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadge(selected.status)}`}>
-                    {statusLabel(selected.status)}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 text-xs font-semibold rounded-full ${paymentBadge(selected.payment_status)}`}
-                  >
-                    {selected.payment_status}
-                  </span>
-                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${sourceBadge(selected.source)}`}>
-                    {sourceLabel(selected.source)}
-                  </span>
+                  <StatusBadge status={selected.status} map={ORDER_STATUS_FULL} />
+                  <StatusBadge status={selected.payment_status} map={PAYMENT_STATUS_FULL} />
+                  <Badge tone={sourceTone(selected.source)}>{sourceLabel(selected.source)}</Badge>
                 </div>
                 <div>
                   <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Total</p>
-                  <p className="text-xl font-bold text-primary-500">
-                    Rs.{' '}
-                    {Number(selected.total_amount).toLocaleString('en-IN', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
-                  </p>
+                  <p className="text-xl font-bold tabular-nums text-foreground">{inr(selected.total_amount)}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-border-default pt-4">
                   <Field label="Customer" value={customerName(selected)} />
@@ -236,9 +164,7 @@ export default function OrdersMobileList({ orders, backUrl, pagination }: Props)
             title={selected ? `#${selected.order_number || selected.id.slice(0, 8)}` : undefined}
             actions={selected ? buildActions(selected) : []}
           />
-        </>
-      )}
-      {pagination}
+      </>
     </div>
   )
 }

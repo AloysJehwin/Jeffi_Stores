@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { CheckCircle, XCircle, Loader2, Code, Mail, Sparkles } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { PageHeader } from '@/components/admin/kit/layout'
+import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 
 interface ProposedTool {
   id: string
@@ -25,40 +27,24 @@ interface ProposedTool {
 
 export default function ProposedToolsPage() {
   const { showToast } = useToast()
-  const [items, setItems] = useState<ProposedTool[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<'proposed' | 'approved' | 'rejected' | 'all'>('proposed')
   const [rejectingId, setRejectingId] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
 
   const PAGE_SIZE = 25
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  async function load(p = 1) {
-    setLoading(true)
-    try {
-      const res = await fetch(
-        `/api/admin/agent/proposed-tools?status=${statusFilter}&page=${p}&pageSize=${PAGE_SIZE}`,
-        { credentials: 'include' }
-      )
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Load failed')
-      setItems(data.items || [])
-      setTotal(data.total || 0)
-      setPage(p)
-    } catch (err: any) {
-      showToast(err?.message || 'Load failed', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load(1)
-  }, [statusFilter])
+  const list = useInfiniteList<ProposedTool>({
+    key: statusFilter,
+    pageSize: PAGE_SIZE,
+    getKey: t => t.id,
+    fetchPage: async (p, signal) => {
+      const data = await fetchJson(`/api/admin/agent/proposed-tools?status=${statusFilter}&page=${p}&pageSize=${PAGE_SIZE}`, signal)
+      return { rows: data.items || [], total: data.total || 0 }
+    },
+  })
+  const items = list.rows
+  const loading = list.loading
 
   async function decide(id: string, decision: 'approve' | 'reject') {
     if (decision === 'reject') {
@@ -81,7 +67,8 @@ export default function ProposedToolsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Action failed')
       showToast(decision === 'approve' ? 'Tool approved and now callable' : 'Rejected', 'success')
-      load(page)
+      const status = decision === 'approve' ? 'approved' : 'rejected'
+      list.setRows(rows => (statusFilter === 'all' ? rows.map(r => (r.id === id ? { ...r, status } : r)) : rows.filter(r => r.id !== id)))
     } catch (err: any) {
       showToast(err?.message || 'Action failed', 'error')
     } finally {
@@ -93,11 +80,8 @@ export default function ProposedToolsPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-accent-500" />
-          <h1 className="text-xl font-bold text-foreground">Proposed Tools</h1>
-        </div>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <PageHeader title="Proposed Tools" media={<Sparkles className="w-5 h-5 text-accent-500" />} />
         <AdminSelect
           value={statusFilter}
           onChange={v => setStatusFilter(v as any)}
@@ -122,7 +106,7 @@ export default function ProposedToolsPage() {
         </div>
       )}
 
-      {!loading && items.length === 0 && (
+      {!loading && items.length === 0 && !list.error && (
         <div className="text-center py-12 text-sm text-foreground-muted">Nothing in the {statusFilter} queue.</div>
       )}
 
@@ -149,10 +133,10 @@ export default function ProposedToolsPage() {
               <span
                 className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
                   item.status === 'proposed'
-                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+                    ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
                     : item.status === 'approved'
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
+                      ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                      : 'bg-red-500/10 text-red-600 dark:text-red-400'
                 }`}
               >
                 {item.status}
@@ -199,7 +183,7 @@ export default function ProposedToolsPage() {
             )}
 
             {item.rejection_reason && (
-              <p className="text-[11px] text-red-700 dark:text-red-300 mb-2">Rejection: {item.rejection_reason}</p>
+              <p className="text-[11px] text-red-600 dark:text-red-400 mb-2">Rejection: {item.rejection_reason}</p>
             )}
 
             {item.status === 'proposed' && (
@@ -276,36 +260,7 @@ export default function ProposedToolsPage() {
         ))}
       </div>
 
-      {!loading && items.length > 0 && totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between gap-2">
-          <p className="text-xs text-foreground-muted whitespace-nowrap">
-            Showing{' '}
-            <span className="font-medium text-foreground">
-              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
-            </span>{' '}
-            of <span className="font-medium text-foreground">{total}</span>
-          </p>
-          <div className="flex items-center gap-1.5">
-            <button
-              disabled={page <= 1}
-              onClick={() => load(page - 1)}
-              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-            >
-              Prev
-            </button>
-            <span className="text-xs text-foreground-muted whitespace-nowrap">
-              Page {page} of {totalPages}
-            </span>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => load(page + 1)}
-              className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      {!loading && <InfiniteFooter className="mt-2" shown={items.length} control={list} noun="tools" />}
     </div>
   )
 }
