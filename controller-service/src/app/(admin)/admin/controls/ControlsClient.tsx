@@ -15,7 +15,7 @@ import {
   computeVolumeFactor,
 } from '@/lib/catalog/units'
 import ProductsAdvancedFilters from '../products/_components/ProductsAdvancedFilters'
-import { DataToolbar, EmptyState, PageBody, PageHeader, fieldInputCls, useActionToast } from '@/components/admin/kit'
+import { EmptyState, PageBody, PageHeader, fieldInputCls, useActionToast } from '@/components/admin/kit'
 import { ADMIN_PRODUCT_FILTER_FIELDS, type AdvancedFilterField } from '@/lib/catalog/product-attribute-filters-shared'
 
 type SnapRow = { id: string; name?: string; before: Record<string, any> }
@@ -756,31 +756,34 @@ export default function ControlsClient({
           )}
         </div>
         <div className="p-4 space-y-3">
-          <DataToolbar
-            search={{ placeholder: 'Search by name or SKU...', param: 'search' }}
-            filters={[
-              { name: 'category_id', label: 'Category', options: categoryOptions },
-              { name: 'brand_id', label: 'Brand', options: brandOptions },
-              {
-                name: 'is_active',
-                label: 'Status',
-                allLabel: 'Active',
-                options: [
-                  { value: 'false', label: 'Inactive' },
-                  { value: 'any', label: 'Active and inactive' },
-                ],
-              },
-              {
-                name: 'stock',
-                label: 'Stock',
-                options: [
-                  { value: 'low', label: 'Low Stock' },
-                  { value: 'out', label: 'Out of Stock' },
-                ],
-              },
-            ]}
+          <ProductsAdvancedFilters
+            fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]}
+            valuesEndpoint="/api/admin/controls/attribute-values"
+            toolbar={{
+              search: { placeholder: 'Search by name or SKU...', param: 'search' },
+              filters: [
+                { name: 'category_id', label: 'Category', options: categoryOptions },
+                { name: 'brand_id', label: 'Brand', options: brandOptions },
+                {
+                  name: 'is_active',
+                  label: 'Status',
+                  allLabel: 'Active',
+                  options: [
+                    { value: 'false', label: 'Inactive' },
+                    { value: 'any', label: 'Active and inactive' },
+                  ],
+                },
+                {
+                  name: 'stock',
+                  label: 'Stock',
+                  options: [
+                    { value: 'low', label: 'Low Stock' },
+                    { value: 'out', label: 'Out of Stock' },
+                  ],
+                },
+              ],
+            }}
           />
-          <ProductsAdvancedFilters fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]} valuesEndpoint="/api/admin/controls/attribute-values" />
 
           {loadError && <p className="text-xs text-red-600 dark:text-red-400">{loadError}</p>}
         </div>
@@ -1418,7 +1421,8 @@ export default function ControlsClient({
           title="Add one or more filters above to load products."
           body={
             <>
-              Example: filter by <strong>Grade = 12.9</strong>, select all, then apply <strong>Inflate Price +5%</strong>.
+              Example: filter by <strong>Grade = 12.9</strong>, select all, then apply{' '}
+              <strong>Inflate Price +5%</strong>.
             </>
           }
         />

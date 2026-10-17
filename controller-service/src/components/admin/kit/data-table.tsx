@@ -145,6 +145,7 @@ export function DataToolbar({ search, filters = [], savedViews, children }: { se
       {filters.map(f => (
         <div key={f.name} className="w-[160px]">
           <Select<string>
+            className="w-full"
             value={sp.get(f.name) || ''}
             placeholder={f.label}
             options={[{ value: '', label: `${f.label}: ${f.allLabel ?? 'All'}` }, ...f.options.map(o => ({ value: o.value, label: `${f.label}: ${o.label}` }))]}
@@ -436,7 +437,7 @@ export function DataTable<T>(props: DataTableProps<T>) {
                         </td>
                       )}
                       {cols.map(c => (
-                        <td key={c.key} className={`px-3 py-2.5 align-middle ${c.num ? 'whitespace-nowrap text-right tabular-nums' : ''} ${c.hideBelow ? HIDE[c.hideBelow] : ''} ${c.className ?? ''}`}>
+                        <td key={c.key} className={`whitespace-nowrap px-3 py-2.5 align-middle ${c.num ? 'text-right tabular-nums' : ''} ${c.hideBelow ? HIDE[c.hideBelow] : ''} ${c.className ?? ''}`}>
                           {c.render(r)}
                         </td>
                       ))}

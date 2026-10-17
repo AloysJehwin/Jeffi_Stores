@@ -13,7 +13,7 @@ import CopySku from '@/components/ui/CopySku'
 import ProductsTableClient from './ProductsTableClient'
 import ProductsAdvancedFilters from './_components/ProductsAdvancedFilters'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import { DataToolbar, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
 import { ADMIN_PRODUCT_FILTER_FIELDS } from '@/lib/catalog/product-attribute-filters-shared'
@@ -138,13 +138,23 @@ async function ProductsStats() {
             <Kpi label="Inactive" value={(totalCount - activeCount).toLocaleString('en-IN')} />
           </KpiGrid>
         </div>
-        <ProductBreakdownChart byCategory={stats.byCategory} byBrand={stats.byBrand} byStock={stats.byStock} byInventoryValue={stats.byInventoryValue} />
+        <ProductBreakdownChart
+          byCategory={stats.byCategory}
+          byBrand={stats.byBrand}
+          byStock={stats.byStock}
+          byInventoryValue={stats.byInventoryValue}
+        />
       </div>
       {pendingDraftsCount > 0 && (
         <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
           <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
             <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
-              <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg
+                className="w-4 h-4 transition-transform group-open:rotate-90"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
               Pending Drafts ({pendingDraftsCount})
@@ -234,18 +244,13 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   // The overview tab renders no filters.
   const [categories, brands, specFields] =
-    tab === 'list'
-      ? await Promise.all([getAllCategories(), getAllBrands(), getSpecFilterFields()])
-      : [[], [], []]
+    tab === 'list' ? await Promise.all([getAllCategories(), getAllBrands(), getSpecFilterFields()]) : [[], [], []]
 
   const allCats: any[] = categories || []
   const mainCats = allCats.filter((c: any) => !c.parent_category_id)
   const categoryOptions = mainCats.flatMap((cat: any) => {
     const subs = allCats.filter((c: any) => c.parent_category_id === cat.id)
-    return [
-      { value: cat.id, label: cat.name },
-      ...subs.map((sub: any) => ({ value: sub.id, label: `— ${sub.name}` })),
-    ]
+    return [{ value: cat.id, label: cat.name }, ...subs.map((sub: any) => ({ value: sub.id, label: `— ${sub.name}` }))]
   })
 
   return (
@@ -262,7 +267,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         actions={
           canWrite && (
             <span className="hidden md:inline-flex">
-              <TabAction href={ap('/admin/products/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Product" />
+              <TabAction
+                href={ap('/admin/products/add', host)}
+                icon={<Plus className="w-4 h-4" />}
+                label="Add New Product"
+              />
             </span>
           )
         }
@@ -281,34 +290,36 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
             <ProductsStats />
           </Suspense>
 
-          <DataToolbar
-            search={{ placeholder: 'Search by name or SKU...', param: 'search', suggestType: 'products' }}
-            filters={[
-              { name: 'category_id', label: 'Category', options: categoryOptions },
-              {
-                name: 'brand_id',
-                label: 'Brand',
-                options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })),
-              },
-              {
-                name: 'is_active',
-                label: 'Status',
-                options: [
-                  { value: 'true', label: 'Active' },
-                  { value: 'false', label: 'Inactive' },
-                ],
-              },
-              {
-                name: 'stock',
-                label: 'Stock',
-                options: [
-                  { value: 'low', label: 'Low Stock' },
-                  { value: 'out', label: 'Out of Stock' },
-                ],
-              },
-            ]}
+          <ProductsAdvancedFilters
+            fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]}
+            toolbar={{
+              search: { placeholder: 'Search by name or SKU...', param: 'search', suggestType: 'products' },
+              filters: [
+                { name: 'category_id', label: 'Category', options: categoryOptions },
+                {
+                  name: 'brand_id',
+                  label: 'Brand',
+                  options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })),
+                },
+                {
+                  name: 'is_active',
+                  label: 'Status',
+                  options: [
+                    { value: 'true', label: 'Active' },
+                    { value: 'false', label: 'Inactive' },
+                  ],
+                },
+                {
+                  name: 'stock',
+                  label: 'Stock',
+                  options: [
+                    { value: 'low', label: 'Low Stock' },
+                    { value: 'out', label: 'Out of Stock' },
+                  ],
+                },
+              ],
+            }}
           />
-          <ProductsAdvancedFilters fields={[...ADMIN_PRODUCT_FILTER_FIELDS, ...specFields]} />
 
           <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
         </>
