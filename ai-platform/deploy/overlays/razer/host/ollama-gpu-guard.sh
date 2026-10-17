@@ -14,6 +14,11 @@ ours="$(systemctl show -p MainPID --value ollama 2>/dev/null || echo 0)"
 if [ "${ours:-0}" != "0" ]; then
   ours="$ours $(pgrep -P "$ours" 2>/dev/null | tr '\n' ' ' || true)"
 fi
+# The Razer image server (razer-sd) shares the card with Ollama by design: count it as ours.
+sd="$(systemctl show -p MainPID --value razer-sd 2>/dev/null || echo 0)"
+if [ "${sd:-0}" != "0" ]; then
+  ours="$ours $sd $(pgrep -P "$sd" 2>/dev/null | tr '\n' ' ' || true)"
+fi
 is_ours() { for p in $ours; do [ "$1" = "$p" ] && return 0; done; return 1; }
 
 # A foreign GPU process = any compute app on the GPU that is not part of the Ollama tree.
