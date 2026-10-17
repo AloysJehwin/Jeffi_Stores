@@ -92,6 +92,8 @@ interface CategoryFormProps {
   backUrl?: string
   isDraft?: boolean
   submitLabel?: string
+  /** Server action to discard the draft (receives FormData with intent=discard). */
+  discardAction?: (formData: FormData) => Promise<void>
 }
 
 function IconPreview({ name, className }: { name: string; className?: string }) {
@@ -226,6 +228,7 @@ export default function CategoryForm({
   backUrl,
   isDraft = false,
   submitLabel,
+  discardAction,
 }: CategoryFormProps) {
   const isSubcat = !!category?.parent_category_id
   const isCurrentlyInherited = isSubcat && category?.return_allowed == null
@@ -308,6 +311,15 @@ export default function CategoryForm({
               onCancel={edit.cancel}
               cancelHref={ap('/admin/categories')}
               draft={isDraft}
+              discard={
+                isDraft && discardAction
+                  ? () => {
+                      const fd = new FormData()
+                      fd.set('intent', 'discard')
+                      void discardAction(fd)
+                    }
+                  : undefined
+              }
             />
           </div>
         )}

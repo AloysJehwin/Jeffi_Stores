@@ -7,8 +7,8 @@ import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 import type { EditSessionStatus } from '@/hooks/useEditSession'
 import { Badge } from './core'
 
-// Edit-session chrome for the Tabs `actions` slot: autosave pill + Draft chip + Cancel.
-// Markup only; the hooks that drive status/save/cancel stay with the caller.
+// Edit-session chrome for the Tabs `actions` slot: autosave pill + Draft chip +
+// optional inline Restore/Discard (when the caller passes handlers) + Cancel.
 
 export interface EditSessionActionsProps {
   autosaveStatus: AutosaveStatus
@@ -16,9 +16,12 @@ export interface EditSessionActionsProps {
   onCancel: () => Promise<boolean>
   cancelHref?: string | null
   cancelLabel?: string
-  /** Show a 'Draft' chip when the session is unpublished. */
   draft?: boolean
   disabled?: boolean
+  /** When set, a newer local autosave exists — render Restore + Discard inline. */
+  restore?: () => void
+  /** Plain draft discard — rendered only when `restore` is not set. */
+  discard?: () => void
 }
 
 export function EditSessionActions({
@@ -29,6 +32,8 @@ export function EditSessionActions({
   cancelLabel = 'Cancel',
   draft = false,
   disabled = false,
+  restore,
+  discard,
 }: EditSessionActionsProps) {
   const router = useRouter()
   const [confirming, setConfirming] = useState(false)
@@ -45,10 +50,36 @@ export function EditSessionActions({
     if (ok && cancelHref) router.push(cancelHref)
   }
 
+  const localNewer = !!restore
+  const showDiscardInline = localNewer || !!discard
+  const draftTooltip = localNewer
+    ? 'A newer local autosave exists for this draft.'
+    : 'Editing a draft. The live record is unchanged until you publish.'
+
   return (
     <div className="flex items-center gap-2">
       {autosaveStatus !== 'idle' && <AutosaveStatusPill status={autosaveStatus} />}
       {draft && <Badge tone="amber">Draft</Badge>}
+      {localNewer && (
+        <button
+          type="button"
+          onClick={restore}
+          title={draftTooltip}
+          className="h-control inline-flex items-center rounded-lg border border-accent-500/40 bg-accent-500/10 px-3 text-sm font-semibold text-accent-500 transition-colors hover:bg-accent-500/20"
+        >
+          Restore
+        </button>
+      )}
+      {showDiscardInline && (
+        <button
+          type="button"
+          onClick={discard}
+          title={draftTooltip}
+          className="h-control inline-flex items-center rounded-lg border border-border-secondary bg-surface px-3 text-sm text-foreground-secondary transition-colors hover:bg-surface-secondary"
+        >
+          Discard
+        </button>
+      )}
       <button
         type="button"
         onClick={handleCancel}

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Badge, Dialog, DraftNotice, EditSessionActions, Tabs } from '@/components/admin/kit'
+import { Badge, Dialog, EditSessionActions, Tabs } from '@/components/admin/kit'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
@@ -3406,17 +3406,12 @@ export default function ProductForm({
                 onCancel={edit.cancel}
                 cancelHref={ap('/admin/products')}
                 draft={isDraft}
+                restore={hasDraft ? restoreDraft : undefined}
+                discard={isDraft || hasDraft ? discardDraft : undefined}
               />
             ) : undefined
           }
         />
-        {(isDraft || hasDraft) && (
-          <DraftNotice
-            state={hasDraft ? 'draft-with-local' : 'draft'}
-            onRestore={hasDraft ? restoreDraft : undefined}
-            onDiscard={hasDraft ? discardDraft : undefined}
-          />
-        )}
         {error && (
           <div
             ref={topErrorRef}

@@ -19,6 +19,8 @@ interface CouponFormProps {
   showUserSelector?: boolean
   backUrl?: string
   couponId?: string
+  /** Server action to discard the draft (receives FormData with intent=discard). */
+  discardAction?: (formData: FormData) => Promise<void>
   defaultValues?: {
     code?: string
     discount_type?: string
@@ -48,6 +50,7 @@ export default function CouponForm({
   showUserSelector = false,
   backUrl,
   couponId,
+  discardAction,
   defaultValues: d = {},
 }: CouponFormProps) {
   const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
@@ -88,6 +91,15 @@ export default function CouponForm({
             onCancel={edit.cancel}
             cancelHref={ap('/admin/coupons')}
             draft={isDraft}
+            discard={
+              isDraft && discardAction
+                ? () => {
+                    const fd = new FormData()
+                    fd.set('intent', 'discard')
+                    void discardAction(fd)
+                  }
+                : undefined
+            }
           />
         </div>
       )}

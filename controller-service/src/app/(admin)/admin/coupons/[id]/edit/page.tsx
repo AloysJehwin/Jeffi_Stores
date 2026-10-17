@@ -1,11 +1,11 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import { query, queryOne, queryMany, queryCount } from '@/lib/shared/db'
+import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
 import CouponForm from '../../CouponForm'
 import CouponEligibleUsersClient from './CouponEligibleUsersClient'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
-import { Badge, Card, DraftActionNotice, FormPage, PageHeader } from '@/components/admin/kit'
+import { Badge, Card, FormPage, PageHeader } from '@/components/admin/kit'
 import { updateCoupon } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -141,25 +141,17 @@ export default async function EditCouponPage({
             ),
           ])
 
-  // Draft system — auto-create on first edit
-  let draftRow = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
+  // Editing ALWAYS goes through a draft. Direct navigation to the edit URL for a
+  // coupon with no draft redirects to the detail page, where the Edit button
+  // creates a draft first. The live coupon is never edited directly.
+  const draftRow = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
     `SELECT coupon_id, fields FROM coupon_drafts WHERE coupon_id = $1`,
     [coupon.id]
   )
-  if (!draftRow) {
-    await query(
-      `INSERT INTO coupon_drafts (coupon_id, fields)
-       SELECT id, to_jsonb(c) - 'id' - 'created_at' - 'updated_at'
-       FROM coupons c WHERE c.id = $1
-       ON CONFLICT (coupon_id) DO NOTHING`,
-      [coupon.id]
-    )
-    draftRow = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
-      `SELECT coupon_id, fields FROM coupon_drafts WHERE coupon_id = $1`,
-      [coupon.id]
-    )
-  }
   const isDraft = !!draftRow
+  if (!isDraft) {
+    redirect(ap(`/admin/coupons/${id}/view${back ? `?back=${encodeURIComponent(backUrl)}` : ''}`, host))
+  }
   const df = (draftRow?.fields || {}) as any
 
   return (
@@ -174,16 +166,13 @@ export default async function EditCouponPage({
           />
         }
       >
-        {isDraft && (
-          <DraftActionNotice action={updateCoupon.bind(null, id)} />
-        )}
-
         <CouponForm
           action={updateCoupon.bind(null, id)}
           couponId={id}
           submitLabel={isDraft ? undefined : 'Save Changes'}
           isDraft={isDraft}
           backUrl={backUrl}
+          discardAction={isDraft ? updateCoupon.bind(null, id) : undefined}
           defaultValues={{
             code: df.code ?? coupon.code,
             discount_type: df.discount_type ?? coupon.discount_type,

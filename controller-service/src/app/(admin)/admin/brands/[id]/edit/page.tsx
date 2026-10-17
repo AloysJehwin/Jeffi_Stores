@@ -4,7 +4,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne } from '@/lib/shared/db'
 import BrandForm from '@/components/admin/BrandForm'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
-import { Badge, DraftActionNotice, FormPage, PageHeader } from '@/components/admin/kit'
+import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import { getAdminSession } from '@/lib/auth/admin-auth'
 import { hasScope } from '@/lib/auth/scopes'
 import { updateBrand } from './actions'
@@ -63,16 +63,13 @@ export default async function EditBrandPage({
           />
         }
       >
-        {(isDraft || isCreateDraft) && (
-          <DraftActionNotice action={isDraft ? updateBrand.bind(null, id) : undefined} />
-        )}
-
         <BrandForm
           brand={brandForForm}
           action={updateBrand.bind(null, id)}
           backUrl={backUrl}
           isDraft={isDraft || isCreateDraft}
           hasReturns={hasReturns}
+          discardAction={isDraft ? updateBrand.bind(null, id) : undefined}
         />
       </FormPage>
     </MobileEditBlock>

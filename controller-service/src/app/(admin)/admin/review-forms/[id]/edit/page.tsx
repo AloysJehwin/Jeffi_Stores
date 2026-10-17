@@ -4,7 +4,7 @@ import ReviewFormForm from '../../ReviewFormForm'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
-import { Badge, DraftActionNotice, FormPage, PageHeader } from '@/components/admin/kit'
+import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import { discardReviewFormDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -50,7 +50,8 @@ export default async function EditReviewFormPage({
   // (edit-draft) row for it. Publish flips is_draft = false + is_active = true.
   const isCreateDraft = !!form.is_draft
 
-  // Auto-create edit-draft on first edit visit (live forms only).
+  // Auto-create edit-draft on first edit visit (live forms only). Review-forms has
+  // no detail/view page, so the edit page itself is the single entry (list → edit).
   let draftRow = isCreateDraft
     ? null
     : await queryOne<{ form_id: string; fields: Record<string, unknown> }>(
@@ -85,16 +86,13 @@ export default async function EditReviewFormPage({
           />
         }
       >
-        {(isDraft || isCreateDraft) && (
-          <DraftActionNotice action={isDraft ? discardReviewFormDraft.bind(null, id) : undefined} kind="noArg" />
-        )}
-
         <ReviewFormForm
           isDraft={isDraft}
           isCreateDraft={isCreateDraft}
           coupons={coupons}
           formId={form.id}
           backUrl={backUrl}
+          discardAction={isDraft ? discardReviewFormDraft.bind(null, id) : undefined}
           defaultValues={{
             title: df.title ?? form.title,
             slug: df.slug ?? form.slug,

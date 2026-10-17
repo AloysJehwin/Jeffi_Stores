@@ -11,7 +11,7 @@ import { ErrorState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
-import { DraftNotice, EditSessionActions } from '@/components/admin/kit'
+import { EditSessionActions } from '@/components/admin/kit'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
@@ -238,13 +238,11 @@ export default function EditSupplierPage() {
                     onCancel={edit.cancel}
                     cancelHref={ap('/admin/suppliers')}
                     draft={hasDraft}
+                    discard={hasDraft ? discardDraft : undefined}
                   />
                 </div>
               )}
               <PageHeader back={{ href: listHref, label: 'Suppliers' }} title={hasDraft ? 'Edit Draft' : 'Edit Supplier'} description={form.name} />
-              {hasDraft && (
-                <DraftNotice state="draft" onDiscard={discardDraft} />
-              )}
             </>
           }
           footer={

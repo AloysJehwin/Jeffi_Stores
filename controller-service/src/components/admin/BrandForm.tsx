@@ -17,6 +17,8 @@ interface BrandFormProps {
   isDraft?: boolean
   submitLabel?: string
   hasReturns?: boolean // false = Basic plan, hides return/replacement policy section
+  /** Server action to discard the draft (receives FormData with intent=discard). */
+  discardAction?: (formData: FormData) => Promise<void>
 }
 
 export default function BrandForm({
@@ -26,6 +28,7 @@ export default function BrandForm({
   isDraft = false,
   submitLabel,
   hasReturns = true,
+  discardAction,
 }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [logoUrl, setLogoUrl] = useState(brand?.logo_url || '')
@@ -95,6 +98,15 @@ export default function BrandForm({
             onCancel={edit.cancel}
             cancelHref={ap('/admin/brands')}
             draft={isDraft}
+            discard={
+              isDraft && discardAction
+                ? () => {
+                    const fd = new FormData()
+                    fd.set('intent', 'discard')
+                    void discardAction(fd)
+                  }
+                : undefined
+            }
           />
         </div>
       )}
