@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
+import { useInfiniteList, fetchJson, InfiniteFooter } from '@/components/admin/kit/infinite'
 
 interface RFQ {
   id: string
@@ -26,37 +27,25 @@ const STATUS_STYLES: Record<string, string> = {
 export default function MyQuotesPage() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
-  const [rfqs, setRfqs] = useState<RFQ[]>([])
-  const [loading, setLoading] = useState(true)
-  const [initialLoading, setInitialLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
   const PAGE_SIZE = 20
-
-  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const list = useInfiniteList<RFQ>({
+    key: user?.isBusiness ? 'rfqs' : null,
+    pageSize: PAGE_SIZE,
+    getKey: r => r.id,
+    fetchPage: async (p, signal) => {
+      const d = await fetchJson<{ rfqs: RFQ[]; total: number }>(`/api/business/rfqs?page=${p}`, signal)
+      return { rows: d.rfqs || [], total: d.total ?? null }
+    },
+  })
+  const rfqs = list.rows
+  const loading = list.loading || list.loadingMore
+  const initialLoading = list.loading && rfqs.length === 0
 
   useEffect(() => {
     if (!isLoading && (!user || !user.isBusiness || user.approvalStatus !== 'approved')) {
       router.push('/account')
     }
   }, [user, isLoading])
-
-  useEffect(() => {
-    if (!user?.isBusiness) return
-    setLoading(true)
-    fetch(`/api/business/rfqs?page=${page}`, { credentials: 'include' })
-      .then(r => r.json())
-      .then(d => {
-        setRfqs(d.rfqs || [])
-        setTotal(d.total || 0)
-        setLoading(false)
-        setInitialLoading(false)
-      })
-      .catch(() => {
-        setLoading(false)
-        setInitialLoading(false)
-      })
-  }, [user, page])
 
   if (isLoading || initialLoading) {
     return (
@@ -175,29 +164,9 @@ export default function MyQuotesPage() {
                 </div>
               )}
 
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-6 py-4 border-t border-border-default">
-                  <p className="text-sm text-foreground-secondary">
-                    Page {page} of {totalPages} · {total} total
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page === 1}
-                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                      disabled={page === totalPages}
-                      className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div className="px-6 py-3 border-t border-border-default">
+                <InfiniteFooter shown={rfqs.length} control={list} noun="quotes" />
+              </div>
             </div>
           </div>
         </div>

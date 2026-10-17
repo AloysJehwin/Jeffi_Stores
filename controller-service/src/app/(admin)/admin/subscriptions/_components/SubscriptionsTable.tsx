@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { DataTable, StatusBadge, type DataCol } from '@/components/admin/kit'
 import { SUBSCRIPTION_STATUS, fmtDate, inr } from '../_status'
@@ -31,13 +32,14 @@ export default function SubscriptionsTable({
   search?: string
 }) {
   const href = (s: SubscriptionRow) => ap(`/admin/subscriptions/${s.id}/view`)
-  // Same page links as before: tab, status filter, search and page.
+  // Clone every param so advancing page keeps tab/filters; otherwise the parent Suspense re-keys.
+  const sp = useSearchParams()
   const pageHref = (p: number) => {
-    const params = new URLSearchParams({ tab: 'list' })
-    if (status) params.set('status', status)
-    if (search) params.set('search', search)
+    const params = new URLSearchParams(sp.toString())
     if (p > 1) params.set('page', String(p))
-    return ap(`/admin/subscriptions?${params}`)
+    else params.delete('page')
+    const qs = params.toString()
+    return ap(`/admin/subscriptions${qs ? `?${qs}` : ''}`)
   }
 
   const cols: DataCol<SubscriptionRow>[] = [

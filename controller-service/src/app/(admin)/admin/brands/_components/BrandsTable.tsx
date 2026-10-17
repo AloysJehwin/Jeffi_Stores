@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import HoverCard from '@/components/ui/HoverCard'
 import { useToast } from '@/contexts/ToastContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
@@ -98,12 +98,13 @@ export default function BrandsTable({
   const [open, setOpen] = useState<Brand | null>(null)
   const viewHref = (b: Brand) => ap(`/admin/brands/${b.id}?back=${encodeURIComponent(backUrl)}`)
 
-  // Same page links as before: only the status filter, search and page are carried.
+  // Preserve every query param (tab, filters, search) and only change ?page, so advancing a page
+  // never drops ?tab=list — otherwise the parent Suspense re-keys and remounts the list.
+  const sp = useSearchParams()
   const pageHref = (p: number) => {
-    const params = new URLSearchParams()
-    if (isActive) params.set('is_active', isActive)
-    if (search) params.set('search', search)
+    const params = new URLSearchParams(sp.toString())
     if (p > 1) params.set('page', String(p))
+    else params.delete('page')
     const qs = params.toString()
     return ap(`/admin/brands${qs ? `?${qs}` : ''}`)
   }

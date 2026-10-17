@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import HoverCard from '@/components/ui/HoverCard'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
@@ -59,11 +59,14 @@ export default function CouponsTable({
   const [open, setOpen] = useState<CouponRow | null>(null)
   const viewHref = (c: CouponRow) => ap(`/admin/coupons/${c.id}?back=${encodeURIComponent(backUrl)}`)
 
+  // Clone every param so advancing page keeps tab/filters/sort; otherwise the parent Suspense re-keys.
+  const sp = useSearchParams()
   const pageHref = (p: number) => {
-    const params = new URLSearchParams({ tab: 'list' })
-    for (const k of ['is_active', 'search', 'campaign', 'sort', 'dir']) if (query[k]) params.set(k, query[k]!)
+    const params = new URLSearchParams(sp.toString())
     if (p > 1) params.set('page', String(p))
-    return ap(`/admin/coupons?${params}`)
+    else params.delete('page')
+    const qs = params.toString()
+    return ap(`/admin/coupons${qs ? `?${qs}` : ''}`)
   }
 
   const [gone, setGone] = useState<Set<string>>(new Set())

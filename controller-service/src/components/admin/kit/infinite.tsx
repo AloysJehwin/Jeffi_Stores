@@ -280,14 +280,14 @@ export function useServerPages<T>({ rows, page, total, rowKey, pageHref, param =
  * Server components with ?page lists of rendered nodes (no row data on the client): pass this
  * page's rendered items; earlier pages are kept and the footer advances the URL.
  */
-export function ServerPagedItems({ items, page, total, noun, wrap, param }: { items: { key: string; node: ReactNode }[]; page: number; total: number; noun?: string; wrap?: 'tbody' | 'div' | 'ul'; param?: string }) {
+export function ServerPagedItems({ items, page, total, noun, wrap, param, wrapClassName, footerClassName }: { items: { key: string; node: ReactNode }[]; page: number; total: number; noun?: string; wrap?: 'tbody' | 'div' | 'ul'; param?: string; wrapClassName?: string; footerClassName?: string }) {
   const { rows, resetting, control } = useServerPages({ rows: items, page, total, rowKey: i => i.key, param })
   if (resetting) return null
   const nodes = rows.map(i => <FragmentKey key={i.key}>{i.node}</FragmentKey>)
   return (
     <>
-      {wrap === 'tbody' ? <tbody>{nodes}</tbody> : wrap === 'ul' ? <ul>{nodes}</ul> : <div>{nodes}</div>}
-      <InfiniteFooterOutsideTable wrap={wrap} shown={rows.length} control={control} noun={noun} />
+      {wrap === 'tbody' ? <tbody className={wrapClassName}>{nodes}</tbody> : wrap === 'ul' ? <ul className={wrapClassName}>{nodes}</ul> : <div className={wrapClassName}>{nodes}</div>}
+      <InfiniteFooterOutsideTable wrap={wrap} shown={rows.length} control={control} noun={noun} className={footerClassName} />
     </>
   )
 }
@@ -296,16 +296,16 @@ function FragmentKey({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-function InfiniteFooterOutsideTable({ wrap, ...p }: { wrap?: string; shown: number; control: InfiniteControl; noun?: string }) {
+function InfiniteFooterOutsideTable({ wrap, className, ...p }: { wrap?: string; className?: string; shown: number; control: InfiniteControl; noun?: string }) {
   if (wrap === 'tbody')
     return (
       <tfoot>
         <tr>
           <td colSpan={100}>
-            <InfiniteFooter {...p} className="pb-3" />
+            <InfiniteFooter {...p} className={className ?? 'pb-3'} />
           </td>
         </tr>
       </tfoot>
     )
-  return <InfiniteFooter {...p} />
+  return <InfiniteFooter {...p} className={className} />
 }
