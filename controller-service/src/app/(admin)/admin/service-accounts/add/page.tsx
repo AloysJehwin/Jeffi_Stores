@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { ADMIN_SCOPES } from '@/lib/auth/scopes'
 import { PageHeader } from '@/components/admin/kit/layout'
+import { FormButton, FormField, FormFooter, FormPage, FormSection, TextInput } from '@/components/admin/kit/form'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 
 interface Created {
@@ -276,79 +277,74 @@ curl --cert cert.pem --key key.pem \\
   }
 
   // ── Create form ───────────────────────────────────────────────────────────
+  const cancel = () => router.push(ap('/admin/service-accounts'))
   return (
     <MobileEditBlock>
-    <div className="p-4 sm:p-6 space-y-6">
-      <PageHeader
-        back={{ href: ap('/admin/service-accounts'), label: 'Service accounts' }}
-        title="Create Service Account"
-        description="Generate an mTLS client certificate for M2M authentication"
-      />
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Details */}
-        <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
-          <div className="px-5 py-4 border-b border-border-default">
-            <h2 className="text-sm font-semibold text-foreground">Details</h2>
-          </div>
-          <div className="p-5 max-w-md space-y-1.5">
-            <label
-              htmlFor="sa-name"
-              className="block text-xs font-medium text-foreground-muted uppercase tracking-wider"
-            >
-              Name
-            </label>
-            <input
-              id="sa-name"
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="razer-sync"
-              pattern="[a-z0-9\-_]+"
-              minLength={2}
-              maxLength={80}
-              required
-              className="w-full px-3 h-control rounded-lg border border-border-default bg-surface text-foreground text-sm placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-secondary-400 transition"
+      <form onSubmit={handleSubmit}>
+        <FormPage
+          header={
+            <PageHeader
+              back={{ href: ap('/admin/service-accounts'), label: 'Service accounts' }}
+              title="Create Service Account"
+              description="Generate an mTLS client certificate for M2M authentication"
             />
-            <p className="text-xs text-foreground-muted">
-              Lowercase letters, digits, hyphens and underscores only. Cert CN will be{' '}
-              <code className="bg-surface-secondary px-1 rounded">svc-{name || '…'}</code>.
-            </p>
-          </div>
-        </section>
+          }
+          footer={
+            <FormFooter onCancel={cancel}>
+              <FormButton disabled={loading || !name.trim()} pending={loading} pendingLabel="Generating certificate…">
+                Create Service Account
+              </FormButton>
+            </FormFooter>
+          }
+        >
+          <FormSection title="Details">
+            <div className="max-w-md">
+              <FormField
+                label="Name"
+                htmlFor="sa-name"
+                required
+                hint={
+                  <>
+                    Lowercase letters, digits, hyphens and underscores only. Cert CN will be{' '}
+                    <code className="bg-surface-secondary px-1 rounded">svc-{name || '…'}</code>.
+                  </>
+                }
+              >
+                <TextInput
+                  id="sa-name"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="razer-sync"
+                  pattern="[a-z0-9\-_]+"
+                  minLength={2}
+                  maxLength={80}
+                  required
+                />
+              </FormField>
+            </div>
+          </FormSection>
 
-        {/* Scopes */}
-        <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
-          <div className="px-5 py-4 border-b border-border-default flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">Scopes</h2>
-              <p className="text-xs text-foreground-muted mt-0.5">
+          <FormSection
+            title="Scopes"
+            description={
+              <>
                 This account will only be permitted to call endpoints in the selected scopes.
-                {selectedScopes.length > 0 && (
-                  <span className="ml-2 text-secondary-500 font-medium">{selectedScopes.length} selected</span>
-                )}
-              </p>
-            </div>
-            <div className="flex items-center gap-1 shrink-0 text-xs font-medium">
-              <button
-                type="button"
-                onClick={selectAll}
-                className="px-2.5 h-control-sm rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors"
-              >
-                Select All
-              </button>
-              <span className="text-foreground-secondary">|</span>
-              <button
-                type="button"
-                onClick={clearAll}
-                className="px-2.5 h-control-sm rounded-md text-secondary-400 hover:text-secondary-300 hover:bg-surface-secondary transition-colors"
-              >
-                Clear All
-              </button>
-            </div>
-          </div>
-
-          <div className="p-5 space-y-8">
+                {selectedScopes.length > 0 && <span className="ml-2 text-accent-500 font-medium">{selectedScopes.length} selected</span>}
+              </>
+            }
+            aside={
+              <div className="flex items-center gap-1 shrink-0 text-xs font-medium">
+                <button type="button" onClick={selectAll} className="control-sm text-accent-500 hover:bg-surface-secondary">
+                  Select All
+                </button>
+                <span className="text-foreground-secondary">|</span>
+                <button type="button" onClick={clearAll} className="control-sm text-accent-500 hover:bg-surface-secondary">
+                  Clear All
+                </button>
+              </div>
+            }
+          >
+          <div className="space-y-8">
             {Object.entries(SCOPE_GRID).map(([group, pairs]) => (
               <div key={group}>
                 <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">{group}</p>
@@ -362,12 +358,12 @@ curl --cert cert.pem --key key.pem \\
                           onClick={() => toggleScope(read.key)}
                           className={`text-left rounded-xl border px-4 py-3 transition-all ${
                             selectedScopes.includes(read.key)
-                              ? 'border-secondary-400 bg-secondary-500/10 shadow-sm'
+                              ? 'border-accent-500 bg-accent-500/10 shadow-sm'
                               : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/50'
                           }`}
                         >
                           <p
-                            className={`text-sm font-semibold leading-tight ${selectedScopes.includes(read.key) ? 'text-secondary-400' : 'text-foreground'}`}
+                            className={`text-sm font-semibold leading-tight ${selectedScopes.includes(read.key) ? 'text-accent-500' : 'text-foreground'}`}
                           >
                             {read.label}
                           </p>
@@ -384,12 +380,12 @@ curl --cert cert.pem --key key.pem \\
                           onClick={() => toggleScope(write.key)}
                           className={`text-left rounded-xl border px-4 py-3 transition-all ${
                             selectedScopes.includes(write.key)
-                              ? 'border-amber-400 bg-amber-500/10 dark:bg-amber-500/15 shadow-sm'
+                              ? 'border-amber-500 bg-amber-500/10 shadow-sm'
                               : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/50'
                           }`}
                         >
                           <p
-                            className={`text-sm font-semibold leading-tight ${selectedScopes.includes(write.key) ? 'text-amber-400' : 'text-foreground'}`}
+                            className={`text-sm font-semibold leading-tight ${selectedScopes.includes(write.key) ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}
                           >
                             {write.label}
                           </p>
@@ -404,37 +400,9 @@ curl --cert cert.pem --key key.pem \\
               </div>
             ))}
           </div>
-        </section>
-
-
-        <div className="flex items-center gap-3 pb-6">
-          <button
-            type="submit"
-            disabled={loading || !name.trim()}
-            className="inline-flex items-center gap-2 px-5 h-control rounded-lg bg-secondary-500 hover:bg-secondary-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-          >
-            {loading ? (
-              <>
-                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Generating certificate…
-              </>
-            ) : (
-              'Create Service Account'
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push(ap('/admin/service-accounts'))}
-            className="px-5 h-control rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground text-sm font-medium transition-colors"
-          >
-            Cancel
-          </button>
-        </div>
+          </FormSection>
+        </FormPage>
       </form>
-    </div>
     </MobileEditBlock>
   )
 }

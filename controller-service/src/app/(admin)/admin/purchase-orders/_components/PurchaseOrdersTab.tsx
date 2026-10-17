@@ -19,7 +19,21 @@ import { round3 } from '@/lib/shared/number-display'
 import PurchaseOrdersMobileList from './PurchaseOrdersMobileList'
 import { poDaysLate, poReceivedShare } from '@/lib/purchasing/po-status'
 import { documentUrlForLocation } from '@/lib/tenancy/forms-host'
-import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, SummaryCard, ClientPagination, STATUS_BADGE, type Supplier } from '@/components/admin/purchasing/shared'
+import { ChevronLeft } from 'lucide-react'
+import { Kpi, KpiGrid } from '@/components/admin/kit/core'
+import { DetailHeader } from '@/components/admin/kit/actions'
+import { Card, Field, Fields } from '@/components/admin/kit/layout'
+import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
+import { badgeCls } from '@/components/admin/kit/tones'
+import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, ClientPagination, STATUS_BADGE, type Supplier } from '@/components/admin/purchasing/shared'
+
+const PO_STATUS: StatusMap = {
+  draft: { label: 'Draft', tone: 'muted' },
+  sent: { label: 'Sent', tone: 'blue' },
+  partial: { label: 'Partial', tone: 'amber' },
+  received: { label: 'Received', tone: 'green' },
+  cancelled: { label: 'Cancelled', tone: 'red' },
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -697,26 +711,16 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   if (receiveMode) {
     return (
       <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <button
-            className="inline-flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground transition-colors"
-            onClick={cancelReceive}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Back
-          </button>
-          <div>
-            <h3 className="font-semibold text-foreground">Receive Goods — {receiveMode.po.po_number}</h3>
-            <p className="text-xs text-foreground-secondary mt-0.5">Supplier: {receiveMode.po.supplier_name}</p>
-          </div>
-          {/* Barcode scan toggle for serial capture */}
+        <DetailHeader
+          title={`Receive Goods — ${receiveMode.po.po_number}`}
+          subtitle={`Supplier: ${receiveMode.po.supplier_name}`}
+          secondary={[{ key: 'back', label: 'Back', icon: ChevronLeft, onClick: cancelReceive }]}
+          actions={
           <button
             type="button"
             onClick={() => setScanSerials(v => !v)}
             title={scanSerials ? 'Scanning on — scan each unit to fill the next serial slot' : 'Serial scanning off'}
-            className={`ml-auto flex items-center gap-1.5 text-xs font-semibold px-2.5 h-control-sm rounded-lg border transition-colors ${scanSerials ? 'border-accent-500 bg-accent-500/5 text-accent-500' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
+            className={`control-md border transition-colors ${scanSerials ? 'border-accent-500 bg-accent-500/5 text-accent-500' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path
@@ -727,7 +731,8 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             </svg>
             {scanSerials ? 'Scan serials: on' : 'Scan serials: off'}
           </button>
-        </div>
+          }
+        />
         {draftRestored && (
           <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-amber-500/40 bg-amber-500/5">
             <svg
@@ -1111,28 +1116,18 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
   if (viewPO) {
     return (
       <div className="space-y-5">
-        <div className="flex items-center gap-3">
-          <button
-            className="inline-flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground transition-colors"
-            onClick={() => setViewPO(null)}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Back
-          </button>
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-foreground">{viewPO.po.po_number}</h3>
-            <span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium ${STATUS_BADGE[viewPO.po.status] || ''}`}>
-              {viewPO.po.status}
-            </span>
-            {poDaysLate(viewPO.po) > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500">
-                {poDaysLate(viewPO.po)}d overdue
-              </span>
-            )}
-          </div>
-          <div className="ml-auto flex items-center gap-2">
+        <DetailHeader
+          title={<span className="font-mono">{viewPO.po.po_number}</span>}
+          subtitle={`Supplier: ${viewPO.po.supplier_name}`}
+          status={
+            <>
+              <StatusBadge status={viewPO.po.status} map={PO_STATUS} />
+              {poDaysLate(viewPO.po) > 0 && <span className={badgeCls('red')}>{poDaysLate(viewPO.po)}d overdue</span>}
+            </>
+          }
+          secondary={[{ key: 'back', label: 'Back', icon: ChevronLeft, onClick: () => setViewPO(null) }]}
+          actions={
+          <>
             {viewPO.po.view_token && (
               <a
                 href={documentUrlForLocation('purchaseorder', window.location, viewPO.po.view_token)}
@@ -1148,8 +1143,14 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
                 Duplicate
               </Link>
             </RequireWrite>
-          </div>
-        </div>
+          </>
+          }
+        />
+        <KpiGrid>
+          <Kpi label="Subtotal" value={formatINR(parseFloat(viewPO.po.subtotal))} />
+          <Kpi label="Tax" value={formatINR(parseFloat(viewPO.po.tax_amount))} />
+          <Kpi label="Total" value={formatINR(parseFloat(viewPO.po.total_amount))} highlight />
+        </KpiGrid>
         <POProgress items={viewPO.items} />
         {['draft', 'sent', 'partial'].includes(viewPO.po.status) && (
           <RequireWrite scope="inventory">
@@ -1163,19 +1164,14 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             />
           </RequireWrite>
         )}
-        {viewPO.po.notes && (
-          <p className="text-sm text-foreground-secondary bg-surface-elevated border border-border-default rounded-xl px-4 py-3 whitespace-pre-wrap">
-            {viewPO.po.notes}
-          </p>
-        )}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <SummaryCard label="Supplier" value={viewPO.po.supplier_name} />
-          <SummaryCard label="Order Date" value={formatDate(viewPO.po.order_date)} />
-          <SummaryCard label="Expected" value={viewPO.po.expected_date ? formatDate(viewPO.po.expected_date) : '—'} />
-          <SummaryCard label="Subtotal" value={formatINR(parseFloat(viewPO.po.subtotal))} />
-          <SummaryCard label="Tax" value={formatINR(parseFloat(viewPO.po.tax_amount))} />
-          <SummaryCard label="Total" value={formatINR(parseFloat(viewPO.po.total_amount))} accent />
-        </div>
+        <Card title="Details">
+          <Fields cols={3}>
+            <Field label="Supplier" value={viewPO.po.supplier_name} />
+            <Field label="Order Date" value={formatDate(viewPO.po.order_date)} />
+            <Field label="Expected" value={viewPO.po.expected_date ? formatDate(viewPO.po.expected_date) : null} />
+            {viewPO.po.notes && <Field label="Notes" value={<span className="whitespace-pre-wrap">{viewPO.po.notes}</span>} span={3} />}
+          </Fields>
+        </Card>
         <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -1392,10 +1388,10 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
           </button>
         </div>
       )}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <SummaryCard label="Open POs" value={String(openCount)} sub="draft · sent · partial" />
-        <SummaryCard label="Pending Value" value={formatINR(pendingValue)} accent />
-      </div>
+      <KpiGrid>
+        <Kpi label="Open POs" value={String(openCount)} sub="draft · sent · partial" />
+        <Kpi label="Pending Value" value={formatINR(pendingValue)} highlight />
+      </KpiGrid>
 
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex-1 min-w-[200px]">

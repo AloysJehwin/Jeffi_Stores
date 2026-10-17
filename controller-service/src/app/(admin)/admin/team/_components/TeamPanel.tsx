@@ -1,8 +1,8 @@
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { controlPlanePool } from '@/lib/tenant-registry'
 import CreateAdminForm from '@/components/admin/CreateAdminForm'
-import AdminUserActions from '@/components/admin/AdminUserActions'
-import TeamMobileList from './TeamMobileList'
+import TeamTable from './TeamTable'
+import { Card } from '@/components/admin/kit/layout'
 import TeamTabs from './TeamTabs'
 import { Suspense } from 'react'
 import { headers } from 'next/headers'
@@ -40,23 +40,6 @@ async function getAllAdmins() {
     LEFT JOIN users u ON u.id = a.user_id
     ORDER BY a.created_at DESC
   `)
-}
-
-function CertBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    Active: 'bg-green-500/10 text-green-700 dark:text-green-400',
-    'Pending Download': 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-    Revoked: 'bg-red-500/10 text-red-500',
-    Expired: 'bg-red-500/10 text-red-500',
-    'No Certificate': 'bg-surface-secondary text-foreground-muted',
-  }
-  return (
-    <span
-      className={`inline-flex whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${map[status] ?? map['No Certificate']}`}
-    >
-      {status}
-    </span>
-  )
 }
 
 // The portal writes downloaded_at/revoked_at to the CENTRAL portal_certs (control plane), not the
@@ -138,202 +121,39 @@ export default async function TeamPanel() {
           <TeamTabs>
             {/* Add member */}
             <div className="hidden md:block">
-              <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
-                <div className="px-5 py-4 border-b border-border-default">
-                  <h2 className="text-sm font-semibold text-foreground">Add Team Member</h2>
-                  <p className="text-xs text-foreground-muted mt-0.5">
-                    Generate credentials and a client certificate for a new admin user
-                  </p>
-                </div>
-                <div className="p-5">
-                  <CreateAdminForm allowedScopeKeys={allowedScopeKeys} />
-                </div>
-              </section>
+              <Card title="Add Team Member" hint="Generate credentials and a client certificate for a new admin user">
+                <CreateAdminForm allowedScopeKeys={allowedScopeKeys} />
+              </Card>
             </div>
 
-            {/* Members table */}
-            <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm overflow-hidden">
-              <div className="px-5 py-4 border-b border-border-default">
-                <h2 className="text-sm font-semibold text-foreground">All Members</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">
-                  {allAdmins.filter((a: any) => a.is_active !== false).length} active · {allAdmins.length} total
-                </p>
-              </div>
+            <Card
+              title="All Members"
+              hint={`${allAdmins.filter((a: any) => a.is_active !== false).length} active · ${allAdmins.length} total`}
+              flush
+            >
+              <TeamTable
+                admins={allAdmins}
+                currentAdminId={adminInfo.id}
+                allowedScopeKeys={allowedScopeKeys}
+                scopeLabels={scopeLabels}
+                certStatuses={Object.fromEntries(allAdmins.map((a: any) => [a.id, certStatus(a)]))}
+              />
+            </Card>
 
-              {/* Mobile cards */}
-              <div className="md:hidden">
-                <TeamMobileList admins={allAdmins} currentAdminId={adminInfo.id} scopeLabels={scopeLabels} />
-              </div>
-
-              {/* Desktop table */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border-default bg-surface-secondary/40">
-                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-48">
-                        Member
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">
-                        Role
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider max-w-[260px]">
-                        Scopes
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-16">
-                        2FA
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-36">
-                        Certificate
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">
-                        Expiry
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider whitespace-nowrap w-40">
-                        Last Login
-                      </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-default">
-                    {allAdmins.map((admin: any) => {
-                      const status = certStatus(admin)
-                      const cert = (admin.certificates as any[])?.[0]
-                      const scopes: string[] = admin.scopes || []
-                      const visible = scopes.slice(0, 3)
-                      const overflow = scopes.length - visible.length
-                      return (
-                        <tr key={admin.id} className="hover:bg-surface-secondary/30 transition-colors">
-                          <td className="px-5 py-3 w-48">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-full bg-secondary-500/10 flex items-center justify-center shrink-0">
-                                <span className="text-xs font-bold text-foreground-secondary uppercase">
-                                  {(admin.first_name || admin.username)[0]}
-                                </span>
-                              </div>
-                              <div className="min-w-0">
-                                <p className="font-medium text-foreground text-sm truncate">
-                                  {admin.first_name && admin.last_name
-                                    ? `${admin.first_name} ${admin.last_name}`
-                                    : admin.username}
-                                  {admin.id === adminInfo.id && (
-                                    <span className="ml-1 text-xs font-normal text-accent-500">(you)</span>
-                                  )}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-foreground-secondary capitalize w-28">
-                            {admin.role.replace('_', ' ')}
-                          </td>
-                          <td className="px-4 py-3 max-w-[260px]">
-                            <div className="flex items-center gap-1 flex-wrap">
-                              {isPlatformOwner(admin.role) ? (
-                                <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-400 rounded-full text-xs font-medium">
-                                  All
-                                </span>
-                              ) : scopes.length > 0 ? (
-                                <>
-                                  {visible.map(scope => (
-                                    <span
-                                      key={scope}
-                                      className="px-2 py-0.5 bg-surface-secondary text-foreground-secondary rounded-full text-xs whitespace-nowrap"
-                                    >
-                                      {scopeLabels[scope] || scope}
-                                    </span>
-                                  ))}
-                                  {overflow > 0 && (
-                                    <span className="px-2 py-0.5 bg-surface-secondary text-foreground-muted rounded-full text-xs whitespace-nowrap">
-                                      +{overflow}
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-xs text-foreground-muted">None</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 w-24">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                admin.is_active !== false
-                                  ? 'bg-green-500/10 text-green-700 dark:text-green-400'
-                                  : 'bg-surface-secondary text-foreground-muted'
-                              }`}
-                            >
-                              {admin.is_active !== false ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 w-16">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                admin.mfa_enabled
-                                  ? 'bg-green-500/10 text-green-700 dark:text-green-400'
-                                  : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                              }`}
-                            >
-                              {admin.mfa_enabled ? 'On' : 'Off'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 w-36">
-                            <CertBadge status={status} />
-                          </td>
-                          <td className="px-4 py-3 text-xs text-foreground-secondary w-24 whitespace-nowrap">
-                            {cert && !cert.is_revoked ? new Date(cert.expires_at).toLocaleDateString('en-IN') : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-foreground-secondary w-40 whitespace-nowrap">
-                            {admin.last_login
-                              ? new Date(admin.last_login).toLocaleString('en-IN', {
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : 'Never'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end">
-                              <AdminUserActions
-                                admin={admin}
-                                currentAdminId={adminInfo.id}
-                                allowedScopeKeys={allowedScopeKeys}
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            {/* Available Scopes */}
-            <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
-              <div className="px-5 py-4 border-b border-border-default">
-                <h2 className="text-sm font-semibold text-foreground">Available Scopes</h2>
-                <p className="text-xs text-foreground-muted mt-0.5">
-                  {visibleScopes.length} scopes{planSlug ? ` on the ${planSlug} plan` : ''} — assign these when creating
-                  a team member
-                </p>
-              </div>
-              <div className="p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <Card
+              title="Available Scopes"
+              hint={`${visibleScopes.length} scopes${planSlug ? ` on the ${planSlug} plan` : ''} — assign these when creating a team member`}
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {Array.from(new Set(visibleScopes.map(s => s.group || 'General'))).map(groupName => {
                   const groupScopes = visibleScopes.filter(s => (s.group || 'General') === groupName)
                   return (
                     <div key={groupName} className="bg-surface rounded-lg border border-border-default p-4">
-                      <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">
-                        {groupName}
-                      </p>
+                      <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">{groupName}</p>
                       <div className="space-y-2.5">
                         {groupScopes.map(scope => (
                           <div key={scope.key} className="flex items-start gap-2.5">
-                            <span className="shrink-0 mt-px px-1.5 py-0.5 rounded text-xs font-semibold bg-secondary-500/10 border border-secondary-500/20 text-foreground-secondary font-mono leading-tight">
+                            <span className="shrink-0 mt-px px-1.5 py-0.5 rounded text-xs font-semibold bg-surface-secondary border border-border-default text-foreground-secondary font-mono leading-tight">
                               {scope.label}
                             </span>
                             <span className="text-xs text-foreground-muted leading-relaxed">{scope.description}</span>
@@ -344,7 +164,7 @@ export default async function TeamPanel() {
                   )
                 })}
               </div>
-            </section>
+            </Card>
           </TeamTabs>
         </Suspense>
       </div>

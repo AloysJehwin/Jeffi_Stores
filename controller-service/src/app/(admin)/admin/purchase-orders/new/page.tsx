@@ -12,6 +12,9 @@ import { ap } from '@/lib/shared/admin-path'
 import { formatINR as formatINRBase } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { Dialog } from '@/components/admin/kit/dialog'
+import { PageHeader } from '@/components/admin/kit/layout'
+import { FormButton, FormField, FormFooter, FormGrid, FormSection, TextInput, fieldInputCls } from '@/components/admin/kit/form'
+import { useActionToast } from '@/components/admin/kit/toast'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -43,8 +46,7 @@ const PURCHASE_UNITS = [
   { value: 'Kit', label: 'Kit' },
 ]
 
-const inputCls =
-  'w-full px-3 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
+const inputCls = fieldInputCls
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 const btnPrimary =
   'control-sm border border-transparent bg-accent-500 hover:bg-accent-600 text-white font-medium transition-colors disabled:opacity-50'
@@ -201,12 +203,13 @@ export default function NewPOPage() {
   const [pickerResults, setPickerResults] = useState<PickerProduct[]>([])
   const [pickerLoading, setPickerLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useActionToast()
+  const setError = (text: string) => text && toast.error(text)
   // Barcode scanning — default ON. A scan (SKU/barcode/GTIN/serial/lot, CR-terminated)
   // resolves to a product and adds/increments a PO line. captureInInputs so it fires
   // even while a form field is focused; the hook swallows the burst chars.
   const [scanEnabled, setScanEnabled] = useState(true)
-  const [scanMsg, setScanMsg] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null)
+  const setScanMsg = (m: { text: string; kind: 'ok' | 'err' }) => (m.kind === 'ok' ? toast.success(m.text) : toast.error(m.text))
   // Per-line Scanner mode input text, keyed by line id (predictive-search fields
   // drop chars mid-burst; a plain per-line scan field doesn't). data-scan-box so
   // the global keyboard-wedge hook ignores it (no double-add).
@@ -549,11 +552,6 @@ export default function NewPOPage() {
     }
   }
 
-  useEffect(() => {
-    if (!scanMsg) return
-    const t = setTimeout(() => setScanMsg(null), 2500)
-    return () => clearTimeout(t)
-  }, [scanMsg])
 
   // Prefill a line's base unit (from the product's stored sell unit) and its purchase
   // unit + factor (from the remembered supplier+product conversion). Base unit loads
@@ -731,20 +729,9 @@ export default function NewPOPage() {
 
   return (
     <MobileEditBlock>
-      <div className="p-4 sm:p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Link
-            href={ap('/admin/purchase-orders?tab=orders')}
-            className="p-1.5 text-foreground-secondary hover:text-foreground rounded-lg hover:bg-surface-secondary transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold text-foreground">New Purchase Order</h1>
-            <p className="text-foreground-secondary text-sm mt-0.5">Create a new PO for a supplier</p>
-          </div>
+      <div className="p-4 sm:p-6 space-y-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <PageHeader back={{ href: ap('/admin/purchase-orders?tab=orders'), label: 'Purchase orders' }} title="New Purchase Order" description="Create a new PO for a supplier" />
           <EditorToolbar
             autosaveStatus={autosave.status}
             sessionStatus={edit.status}
@@ -759,14 +746,10 @@ export default function NewPOPage() {
           />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-foreground">Order Details</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className={labelCls}>
-                  Supplier <span className="text-red-500">*</span>
-                </label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <FormSection title="Order Details">
+            <FormGrid cols={3}>
+              <FormField label="Supplier" required>
                 <AdminSelect
                   sm
                   value={form.supplier_id}
@@ -777,17 +760,14 @@ export default function NewPOPage() {
                     ...suppliers.map(s => ({ value: s.id, label: s.name })),
                   ]}
                 />
-              </div>
-              <div>
-                <label className={labelCls}>Order Date</label>
+              </FormField>
+              <FormField label="Order Date">
                 <DatePicker value={form.order_date} onChange={v => setForm(p => ({ ...p, order_date: v }))} />
-              </div>
-              <div>
-                <label className={labelCls}>Expected Date</label>
+              </FormField>
+              <FormField label="Expected Date">
                 <DatePicker value={form.expected_date} onChange={v => setForm(p => ({ ...p, expected_date: v }))} />
-              </div>
-              <div>
-                <label className={labelCls}>Status</label>
+              </FormField>
+              <FormField label="Status">
                 <AdminSelect
                   sm
                   value={form.status}
@@ -797,37 +777,24 @@ export default function NewPOPage() {
                     { value: 'sent', label: 'Sent to Supplier' },
                   ]}
                 />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Notes</label>
-                <input
-                  className={inputCls}
-                  value={form.notes}
-                  onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-                  placeholder="Optional notes..."
-                />
-              </div>
-            </div>
-          </div>
+              </FormField>
+              <FormField label="Notes" span={2}>
+                <TextInput value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Optional notes..." />
+              </FormField>
+            </FormGrid>
+          </FormSection>
 
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground">Line Items</h2>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Line Items</h2>
               <div className="flex items-center gap-3">
-                {scanMsg && (
-                  <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded ${scanMsg.kind === 'ok' ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-500'}`}
-                  >
-                    {scanMsg.text}
-                  </span>
-                )}
                 <button
                   type="button"
                   onClick={() => setScanEnabled(v => !v)}
                   title={
                     scanEnabled ? 'Barcode scanning on — scan SKU/lot/serial to add a line' : 'Barcode scanning off'
                   }
-                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${scanEnabled ? 'border-secondary-500 bg-surface-secondary text-foreground-secondary' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
+                  className={`control-sm border text-xs font-semibold transition-colors ${scanEnabled ? 'border-accent-500 bg-accent-500/5 text-accent-500' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -1286,24 +1253,13 @@ export default function NewPOPage() {
             )}
           </div>
 
-          {error && (
-            <div className="bg-red-500/5 border border-red-500/40 rounded-lg p-3 text-sm text-red-600 dark:text-red-400">
-              {error}
-            </div>
-          )}
-
-          <div className="flex gap-3">
+          <FormFooter cancelHref={ap('/admin/purchase-orders?tab=orders')}>
             <RequireWrite scope="inventory">
-              <button
-                type="submit"
-                data-po-submit
-                disabled={saving || !form.supplier_id}
-                className={btnPrimary}
-              >
-                {saving ? 'Creating...' : 'Create PO'}
-              </button>
+              <FormButton data-po-submit disabled={saving || !form.supplier_id} pending={saving} pendingLabel="Creating...">
+                Create PO
+              </FormButton>
             </RequireWrite>
-          </div>
+          </FormFooter>
         </form>
 
         <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} title="Select Product" description={categories.find(c => c.id === pickerCatId)?.name || 'All products'} size="lg" zIndex="z-[300]">

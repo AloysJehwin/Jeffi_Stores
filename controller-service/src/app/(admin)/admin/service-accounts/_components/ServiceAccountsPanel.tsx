@@ -3,9 +3,12 @@ import { headers } from 'next/headers'
 import { ADMIN_SCOPES, hasScope } from '@/lib/auth/scopes'
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
-import Link from 'next/link'
-import ServiceAccountRowActions from '@/components/admin/ServiceAccountRowActions'
-import ServiceAccountsMobileList from './ServiceAccountsMobileList'
+import { Plus } from 'lucide-react'
+import { Kpi, KpiGrid, TabAction } from '@/components/admin/kit/core'
+import { Card } from '@/components/admin/kit/layout'
+import { EmptyState } from '@/components/admin/kit/states'
+import { badgeCls } from '@/components/admin/kit/tones'
+import ServiceAccountsTable from './ServiceAccountsTable'
 import SettingsHub from '@/components/admin/SettingsHub'
 
 async function getServiceAccounts() {
@@ -14,49 +17,6 @@ async function getServiceAccounts() {
             p12_downloaded, created_at, last_used_at
      FROM service_accounts
      ORDER BY created_at DESC`
-  )
-}
-
-function relativeTime(date: string | null): string {
-  if (!date) return '—'
-  const diff = Date.now() - new Date(date).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'Just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  const days = Math.floor(hrs / 24)
-  if (days < 30) return `${days}d ago`
-  return new Date(date).toLocaleDateString('en-IN')
-}
-
-function StatusBadge({ isRevoked }: { isRevoked: boolean }) {
-  if (isRevoked) {
-    return (
-      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500">
-        Revoked
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-700 dark:text-green-400">
-      Active
-    </span>
-  )
-}
-
-function ScopeBadge({ scope, label }: { scope: string; label: string }) {
-  const isWrite = scope.endsWith(':write')
-  return (
-    <span
-      className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
-        isWrite
-          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
-          : 'bg-surface-secondary text-foreground-secondary'
-      }`}
-    >
-      {label}
-    </span>
   )
 }
 
@@ -81,213 +41,49 @@ export default async function ServiceAccountsPanel() {
   const neverUsed = accounts.filter((a: any) => !a.last_used_at && !a.is_revoked).length
 
   const createLink = canWrite ? (
-    <Link
-      href={ap('/admin/service-accounts/add')}
-      className="hidden md:inline-flex items-center gap-1.5 px-3.5 h-control rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium transition-colors"
-    >
-      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-      </svg>
-      Create
-    </Link>
+    <span className="hidden md:inline-flex">
+      <TabAction href={ap('/admin/service-accounts/add')} icon={<Plus className="w-4 h-4" />} label="Create" />
+    </span>
   ) : undefined
 
   return (
     <>
       <SettingsHub active="service-accounts" actions={createLink} />
       <div className="p-4 sm:p-6 space-y-5">
-        {/* Stats row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Total', value: accounts.length },
-            { label: 'Active', value: active, color: 'text-green-600 dark:text-green-400' },
-            { label: 'Revoked', value: revoked, color: revoked > 0 ? 'text-red-500' : undefined },
-            {
-              label: 'Never Used',
-              value: neverUsed,
-              color: neverUsed > 0 ? 'text-amber-600 dark:text-amber-400' : undefined,
-            },
-          ].map(stat => (
-            <div key={stat.label} className="bg-surface-elevated rounded-xl border border-border-default px-4 py-3">
-              <p className="text-xs text-foreground-muted uppercase tracking-wider">{stat.label}</p>
-              <p className={`text-2xl font-bold mt-0.5 ${stat.color || 'text-foreground'}`}>{stat.value}</p>
-            </div>
-          ))}
-        </div>
+        <KpiGrid>
+          <Kpi label="Total" value={String(accounts.length)} />
+          <Kpi label="Active" value={String(active)} />
+          <Kpi label="Revoked" value={String(revoked)} />
+          <Kpi label="Never Used" value={String(neverUsed)} sub={neverUsed > 0 ? 'Active but never called' : undefined} />
+        </KpiGrid>
 
-        {/* Table */}
-        <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-border-default flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-foreground">All Accounts</h2>
-              <p className="text-xs text-foreground-muted mt-0.5">M2M authentication via mTLS client certificates</p>
-            </div>
-            {!canWrite && (
-              <span className="text-xs text-foreground-muted bg-surface-secondary px-2 py-1 rounded-lg">
-                Read-only access
-              </span>
-            )}
-          </div>
-
+        <Card
+          title="All Accounts"
+          hint="M2M authentication via mTLS client certificates"
+          action={!canWrite ? <span className={badgeCls('muted')}>Read-only access</span> : undefined}
+          flush
+        >
           {accounts.length === 0 ? (
-            <div className="px-5 py-16 text-center">
-              <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-surface-secondary flex items-center justify-center">
-                <svg
-                  className="w-7 h-7 text-foreground-muted"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
-                  />
-                </svg>
-              </div>
-              <p className="text-sm font-medium text-foreground">No service accounts</p>
-              <p className="text-xs text-foreground-muted mt-1 mb-4">
-                Create one to enable M2M authentication via mTLS.
-              </p>
-              {canWrite && (
-                <Link
-                  href={ap('/admin/service-accounts/add')}
-                  className="hidden md:inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium transition-colors"
-                >
-                  Create first account
-                </Link>
-              )}
-            </div>
+            <EmptyState
+              bare
+              title="No service accounts"
+              body="Create one to enable M2M authentication via mTLS."
+              actionNode={
+                canWrite ? (
+                  <span className="hidden md:inline-flex">
+                    <TabAction href={ap('/admin/service-accounts/add')} icon={<Plus className="w-4 h-4" />} label="Create first account" />
+                  </span>
+                ) : undefined
+              }
+            />
           ) : (
-            <>
-              {/* Mobile cards */}
-              <div className="md:hidden p-4">
-                <ServiceAccountsMobileList accounts={accounts as any} scopeLabels={scopeLabels} canWrite={canWrite} />
-              </div>
-
-              {/* Desktop table */}
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border-default bg-surface-secondary/40">
-                      <th className="px-5 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                        Account
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                        Cert CN
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                        Scopes
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-24">
-                        Status
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">
-                        Created
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">
-                        Last Used
-                      </th>
-                      {canWrite && (
-                        <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-28">
-                          Actions
-                        </th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-default">
-                    {accounts.map((sa: any) => {
-                      const saScopes: string[] = sa.allowed_scopes || []
-                      const visible = saScopes.slice(0, 3)
-                      const overflow = saScopes.length - visible.length
-                      return (
-                        <tr key={sa.id} className="hover:bg-surface-secondary/30 transition-colors">
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-full bg-secondary-500/10 flex items-center justify-center shrink-0">
-                                <svg
-                                  className="w-3.5 h-3.5 text-foreground-secondary"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z"
-                                  />
-                                </svg>
-                              </div>
-                              <span className="font-medium text-foreground">{sa.name}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-xs text-foreground-muted font-mono">{sa.common_name}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap gap-1">
-                              {saScopes.length > 0 ? (
-                                <>
-                                  {visible.map((s: string) => (
-                                    <ScopeBadge key={s} scope={s} label={scopeLabels[s] || s} />
-                                  ))}
-                                  {overflow > 0 && (
-                                    <span className="px-2 py-0.5 bg-surface-secondary text-foreground-muted rounded-full text-xs">
-                                      +{overflow}
-                                    </span>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="text-xs text-foreground-muted">None</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <StatusBadge isRevoked={sa.is_revoked} />
-                          </td>
-                          <td className="px-4 py-3 text-xs text-foreground-secondary">
-                            {new Date(sa.created_at).toLocaleDateString('en-IN')}
-                          </td>
-                          <td className="px-4 py-3 text-xs">
-                            {sa.last_used_at ? (
-                              <span
-                                className="text-foreground-secondary"
-                                title={new Date(sa.last_used_at).toLocaleString('en-IN')}
-                              >
-                                {relativeTime(sa.last_used_at)}
-                              </span>
-                            ) : (
-                              <span className="text-foreground-muted italic">Never</span>
-                            )}
-                          </td>
-                          {canWrite && (
-                            <td className="px-4 py-3 text-right">
-                              {!sa.is_revoked && (
-                                <div className="flex justify-end">
-                                  <ServiceAccountRowActions id={sa.id} name={sa.name} />
-                                </div>
-                              )}
-                            </td>
-                          )}
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
+            <ServiceAccountsTable accounts={accounts as any[]} scopeLabels={scopeLabels} canWrite={canWrite} />
           )}
-        </section>
+        </Card>
 
         {/* Scope reference */}
-        <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
-          <div className="px-5 py-4 border-b border-border-default">
-            <h2 className="text-sm font-semibold text-foreground">Scope Roles</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              Assign the minimum scopes needed — write always implies read
-            </p>
-          </div>
-          <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card title="Scope Roles" hint="Assign the minimum scopes needed — write always implies read">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-surface rounded-lg border border-border-default p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-surface-secondary border border-foreground-muted shrink-0" />
@@ -300,7 +96,7 @@ export default async function ServiceAccountsPanel() {
                 {ADMIN_SCOPES.filter(s => s.key.endsWith(':read')).map(s => (
                   <span
                     key={s.key}
-                    className="px-2 py-0.5 bg-surface-secondary text-foreground-secondary rounded-full text-xs"
+                    className={badgeCls('muted')}
                   >
                     {s.label}
                   </span>
@@ -320,7 +116,7 @@ export default async function ServiceAccountsPanel() {
                 {ADMIN_SCOPES.filter(s => s.key.endsWith(':write')).map(s => (
                   <span
                     key={s.key}
-                    className="px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-full text-xs"
+                    className={badgeCls('amber')}
                   >
                     {s.label}
                   </span>
@@ -328,7 +124,7 @@ export default async function ServiceAccountsPanel() {
               </div>
             </div>
           </div>
-        </section>
+        </Card>
       </div>
     </>
   )
