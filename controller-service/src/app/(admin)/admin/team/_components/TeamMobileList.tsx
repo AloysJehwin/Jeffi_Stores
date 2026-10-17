@@ -39,8 +39,8 @@ export default function TeamMobileList({ admins, currentAdminId, scopeLabels }: 
             <MobileListCard ariaLabel={`View ${displayName(admin)}`} onTap={() => setSelected(admin)}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-secondary-500/10 dark:bg-secondary-400/10 flex items-center justify-center shrink-0">
-                    <span className="text-xs font-bold text-secondary-600 dark:text-secondary-400 uppercase">
+                  <div className="w-8 h-8 rounded-full bg-secondary-500/10 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-foreground-secondary uppercase">
                       {(admin.first_name || admin.username)[0]}
                     </span>
                   </div>
@@ -57,7 +57,7 @@ export default function TeamMobileList({ admins, currentAdminId, scopeLabels }: 
                 <span
                   className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${
                     admin.is_active !== false
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                      ? 'bg-green-500/10 text-green-700 dark:text-green-400'
                       : 'bg-surface-secondary text-foreground-muted'
                   }`}
                 >
@@ -66,7 +66,7 @@ export default function TeamMobileList({ admins, currentAdminId, scopeLabels }: 
               </div>
               <div className="flex flex-wrap gap-1 mt-2">
                 {isSuper ? (
-                  <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
+                  <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-400 rounded-full text-xs font-medium">
                     All Access
                   </span>
                 ) : scopes.length > 0 ? (
@@ -106,7 +106,7 @@ export default function TeamMobileList({ admins, currentAdminId, scopeLabels }: 
               <span
                 className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
                   selected.is_active !== false
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                    ? 'bg-green-500/10 text-green-700 dark:text-green-400'
                     : 'bg-surface-secondary text-foreground-muted'
                 }`}
               >
@@ -136,7 +136,7 @@ export default function TeamMobileList({ admins, currentAdminId, scopeLabels }: 
               <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1.5">Scopes</p>
               <div className="flex flex-wrap gap-1">
                 {isPlatformOwner(selected.role) ? (
-                  <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
+                  <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-400 rounded-full text-xs font-medium">
                     All Access
                   </span>
                 ) : (selected.scopes || []).length > 0 ? (

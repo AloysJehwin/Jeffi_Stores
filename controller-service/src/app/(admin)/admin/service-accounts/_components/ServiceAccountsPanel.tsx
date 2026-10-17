@@ -33,13 +33,13 @@ function relativeTime(date: string | null): string {
 function StatusBadge({ isRevoked }: { isRevoked: boolean }) {
   if (isRevoked) {
     return (
-      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+      <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-500/10 text-red-500">
         Revoked
       </span>
     )
   }
   return (
-    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+    <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-700 dark:text-green-400">
       Active
     </span>
   )
@@ -51,7 +51,7 @@ function ScopeBadge({ scope, label }: { scope: string; label: string }) {
     <span
       className={`px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
         isWrite
-          ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
           : 'bg-surface-secondary text-foreground-secondary'
       }`}
     >
@@ -95,13 +95,13 @@ export default async function ServiceAccountsPanel() {
   return (
     <>
       <SettingsHub active="service-accounts" actions={createLink} />
-      <div className="p-4 sm:p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-5">
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Total', value: accounts.length },
             { label: 'Active', value: active, color: 'text-green-600 dark:text-green-400' },
-            { label: 'Revoked', value: revoked, color: revoked > 0 ? 'text-red-600 dark:text-red-400' : undefined },
+            { label: 'Revoked', value: revoked, color: revoked > 0 ? 'text-red-500' : undefined },
             {
               label: 'Never Used',
               value: neverUsed,
@@ -205,9 +205,9 @@ export default async function ServiceAccountsPanel() {
                         <tr key={sa.id} className="hover:bg-surface-secondary/30 transition-colors">
                           <td className="px-5 py-3">
                             <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-full bg-secondary-500/10 dark:bg-secondary-400/10 flex items-center justify-center shrink-0">
+                              <div className="w-7 h-7 rounded-full bg-secondary-500/10 flex items-center justify-center shrink-0">
                                 <svg
-                                  className="w-3.5 h-3.5 text-secondary-600 dark:text-secondary-400"
+                                  className="w-3.5 h-3.5 text-foreground-secondary"
                                   fill="none"
                                   viewBox="0 0 24 24"
                                   stroke="currentColor"
@@ -320,7 +320,7 @@ export default async function ServiceAccountsPanel() {
                 {ADMIN_SCOPES.filter(s => s.key.endsWith(':write')).map(s => (
                   <span
                     key={s.key}
-                    className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full text-xs"
+                    className="px-2 py-0.5 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-full text-xs"
                   >
                     {s.label}
                   </span>

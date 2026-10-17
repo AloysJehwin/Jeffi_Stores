@@ -44,10 +44,10 @@ async function getAllAdmins() {
 
 function CertBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
-    Active: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
-    'Pending Download': 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-    Revoked: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
-    Expired: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
+    Active: 'bg-green-500/10 text-green-700 dark:text-green-400',
+    'Pending Download': 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    Revoked: 'bg-red-500/10 text-red-500',
+    Expired: 'bg-red-500/10 text-red-500',
     'No Certificate': 'bg-surface-secondary text-foreground-muted',
   }
   return (
@@ -133,7 +133,7 @@ export default async function TeamPanel() {
   return (
     <>
       <SettingsHub active="team" />
-      <div className="p-4 sm:p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-5">
         <Suspense fallback={null}>
           <TeamTabs>
             {/* Add member */}
@@ -210,8 +210,8 @@ export default async function TeamPanel() {
                         <tr key={admin.id} className="hover:bg-surface-secondary/30 transition-colors">
                           <td className="px-5 py-3 w-48">
                             <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-full bg-secondary-500/10 dark:bg-secondary-400/10 flex items-center justify-center shrink-0">
-                                <span className="text-xs font-bold text-secondary-600 dark:text-secondary-400 uppercase">
+                              <div className="w-7 h-7 rounded-full bg-secondary-500/10 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-foreground-secondary uppercase">
                                   {(admin.first_name || admin.username)[0]}
                                 </span>
                               </div>
@@ -233,7 +233,7 @@ export default async function TeamPanel() {
                           <td className="px-4 py-3 max-w-[260px]">
                             <div className="flex items-center gap-1 flex-wrap">
                               {isPlatformOwner(admin.role) ? (
-                                <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
+                                <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-400 rounded-full text-xs font-medium">
                                   All
                                 </span>
                               ) : scopes.length > 0 ? (
@@ -261,7 +261,7 @@ export default async function TeamPanel() {
                             <span
                               className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                 admin.is_active !== false
-                                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                                  ? 'bg-green-500/10 text-green-700 dark:text-green-400'
                                   : 'bg-surface-secondary text-foreground-muted'
                               }`}
                             >
@@ -272,8 +272,8 @@ export default async function TeamPanel() {
                             <span
                               className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                                 admin.mfa_enabled
-                                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                                  : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
+                                  ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                                  : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
                               }`}
                             >
                               {admin.mfa_enabled ? 'On' : 'Off'}
@@ -333,7 +333,7 @@ export default async function TeamPanel() {
                       <div className="space-y-2.5">
                         {groupScopes.map(scope => (
                           <div key={scope.key} className="flex items-start gap-2.5">
-                            <span className="shrink-0 mt-px px-1.5 py-0.5 rounded text-xs font-semibold bg-secondary-500/10 dark:bg-secondary-400/10 border border-secondary-500/20 dark:border-secondary-400/20 text-secondary-700 dark:text-secondary-300 font-mono leading-tight">
+                            <span className="shrink-0 mt-px px-1.5 py-0.5 rounded text-xs font-semibold bg-secondary-500/10 border border-secondary-500/20 text-foreground-secondary font-mono leading-tight">
                               {scope.label}
                             </span>
                             <span className="text-xs text-foreground-muted leading-relaxed">{scope.description}</span>

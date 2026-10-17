@@ -14,7 +14,8 @@ import { ap } from '@/lib/shared/admin-path'
 import { formatDate } from '@/lib/shared/format'
 import CopySku from '@/components/ui/CopySku'
 import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
-import { Tabs } from '@/components/admin/channels/ui'
+import { Tabs } from '@/components/admin/kit/core'
+import { TableSkeleton } from '@/components/admin/kit/states'
 import InventoryOverviewTab from './_components/InventoryOverviewTab'
 import { labelCls, STOCK_PAGE_SIZE, VALUATION_PAGE_SIZE, formatINR, SummaryCard, ClientPagination, TYPE_BADGE } from '@/components/admin/purchasing/shared'
 
@@ -507,7 +508,7 @@ function StockTab({ view }: { view: StockView }) {
     return (
       <React.Fragment key={rowId}>
         <tr
-          className={`hover:bg-surface-secondary/50 transition-colors ${isEditing ? 'bg-secondary-50/50 dark:bg-secondary-900/10' : ''}`}
+          className={`hover:bg-surface-secondary/50 transition-colors ${isEditing ? 'bg-surface-secondary/40' : ''}`}
         >
           <td className="px-4 py-3 font-medium text-foreground">{firstCell}</td>
           <td className="px-4 py-3 text-foreground-secondary hidden sm:table-cell">{variantCell}</td>
@@ -561,7 +562,7 @@ function StockTab({ view }: { view: StockView }) {
                 const displayQty = parseFloat(p.inventory_quantity || '0')
                 return (
                   <span
-                    className={`font-medium ${displayQty === 0 ? 'text-red-600 dark:text-red-400' : displayQty <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}
+                    className={`font-medium ${displayQty === 0 ? 'text-red-500' : displayQty <= 5 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground'}`}
                   >
                     {displayQty}
                   </span>
@@ -682,7 +683,7 @@ function StockTab({ view }: { view: StockView }) {
           </td>
         </tr>
         {isEditing && (
-          <tr className="bg-secondary-50/50 dark:bg-secondary-900/10">
+          <tr className="bg-surface-secondary/40">
             <td colSpan={10} className="px-4 pb-3 pt-0">
               <div className="flex items-center justify-end gap-2 flex-wrap">
                 <input
@@ -752,10 +753,10 @@ function StockTab({ view }: { view: StockView }) {
                         diffDays === null
                           ? 'text-foreground-muted'
                           : diffDays < 0
-                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            ? 'bg-red-500/10 text-red-500'
                             : diffDays <= 30
-                              ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                              : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                              : 'bg-green-500/10 text-green-700 dark:text-green-400'
                       const qty = parseFloat(b.quantity_remaining || '0')
                       const batchValue = qty * parseFloat(b.unit_cost || '0')
                       const serials: string[] = Array.isArray(b.serials) ? b.serials : []
@@ -810,7 +811,7 @@ function StockTab({ view }: { view: StockView }) {
                                     100
                                   )
                                 }}
-                                className="text-red-500 hover:text-red-700 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                className="text-red-500 hover:text-red-700 text-xs px-1.5 py-0.5 rounded hover:bg-red-500/10 transition-colors"
                                 title="Remove batch"
                               >
                                 Remove
@@ -890,12 +891,7 @@ function StockTab({ view }: { view: StockView }) {
           </div>
 
           {loading ? (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
-              <div className="h-5 w-32 bg-surface-secondary rounded animate-pulse" />
-              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-            </div>
+            <TableSkeleton rows={6} cols={6} />
           ) : (
             <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
               <div className="overflow-x-auto">
@@ -1045,10 +1041,10 @@ function StockTab({ view }: { view: StockView }) {
                                   const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
                                   const cls =
                                     diffDays < 0
-                                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                      ? 'bg-red-500/10 text-red-500'
                                       : diffDays <= 30
-                                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                        : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                        : 'bg-green-500/10 text-green-700 dark:text-green-400'
                                   return (
                                     <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>
                                       {formatDate(tx.expiry_date)}
@@ -1068,10 +1064,10 @@ function StockTab({ view }: { view: StockView }) {
                                   const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
                                   const cls =
                                     diffDays < 0
-                                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                      ? 'bg-red-500/10 text-red-500'
                                       : diffDays <= 30
-                                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                        : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                        ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                        : 'bg-green-500/10 text-green-700 dark:text-green-400'
                                   return (
                                     <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>
                                       {formatDate(tx.expiry_date)}
@@ -1145,7 +1141,7 @@ function StockTab({ view }: { view: StockView }) {
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Change</span>
                                       <span
-                                        className={`font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}
+                                        className={`font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-500' : 'text-foreground-secondary'}`}
                                       >
                                         {fmtChange(chg)}
                                       </span>
@@ -1179,7 +1175,7 @@ function StockTab({ view }: { view: StockView }) {
                               </span>
                             </td>
                             <td
-                              className={`px-4 py-3 text-right font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}
+                              className={`px-4 py-3 text-right font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-500' : 'text-foreground-secondary'}`}
                             >
                               {fmtChange(chg)}
                               {tx.quantity_in_unit != null && tx.unit_label && (
@@ -1252,7 +1248,7 @@ function StockTab({ view }: { view: StockView }) {
                               </span>
                             </td>
                             <td
-                              className={`px-4 py-2.5 text-right font-mono font-semibold ${totalChange > 0 ? 'text-green-600 dark:text-green-400' : totalChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}
+                              className={`px-4 py-2.5 text-right font-mono font-semibold ${totalChange > 0 ? 'text-green-600 dark:text-green-400' : totalChange < 0 ? 'text-red-500' : 'text-foreground-secondary'}`}
                             >
                               {fmtChange(totalChange)}
                               <span className="block text-xs font-normal text-foreground-muted">net total</span>
@@ -1336,7 +1332,7 @@ function StockTab({ view }: { view: StockView }) {
                                     </td>
                                     <td className="px-4 py-2.5" />
                                     <td
-                                      className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${pgTotalChange > 0 ? 'text-green-600 dark:text-green-400' : pgTotalChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}
+                                      className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${pgTotalChange > 0 ? 'text-green-600 dark:text-green-400' : pgTotalChange < 0 ? 'text-red-500' : 'text-foreground-secondary'}`}
                                     >
                                       {fmtChange(pgTotalChange)}
                                       {isExpandable && (
@@ -1396,7 +1392,7 @@ function StockTab({ view }: { view: StockView }) {
                                           </td>
                                           <td className="px-4 py-2" />
                                           <td
-                                            className={`px-4 py-2 text-right font-mono text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}
+                                            className={`px-4 py-2 text-right font-mono text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-500' : 'text-foreground-secondary'}`}
                                           >
                                             {fmtChange(chg)}
                                           </td>
@@ -1412,10 +1408,10 @@ function StockTab({ view }: { view: StockView }) {
                                                 const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
                                                 const cls =
                                                   diffDays < 0
-                                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                                    ? 'bg-red-500/10 text-red-500'
                                                     : diffDays <= 30
-                                                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                                      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                      ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                                      : 'bg-green-500/10 text-green-700 dark:text-green-400'
                                                 return (
                                                   <span
                                                     className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}
@@ -1447,7 +1443,7 @@ function StockTab({ view }: { view: StockView }) {
                                           </td>
                                           <td className="px-4 py-2" />
                                           <td
-                                            className={`px-4 py-2 text-right font-mono text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}
+                                            className={`px-4 py-2 text-right font-mono text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-500' : 'text-foreground-secondary'}`}
                                           >
                                             {fmtChange(chg)}
                                           </td>
@@ -1463,10 +1459,10 @@ function StockTab({ view }: { view: StockView }) {
                                                 const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
                                                 const cls =
                                                   diffDays < 0
-                                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                                    ? 'bg-red-500/10 text-red-500'
                                                     : diffDays <= 30
-                                                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                                                      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                                      ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                                      : 'bg-green-500/10 text-green-700 dark:text-green-400'
                                                 return (
                                                   <span
                                                     className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}
@@ -1592,12 +1588,7 @@ function StockTab({ view }: { view: StockView }) {
           </div>
 
           {loading ? (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
-              <div className="h-5 w-32 bg-surface-secondary rounded animate-pulse" />
-              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-            </div>
+            <TableSkeleton rows={6} cols={6} />
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
-import { Badge, Banner, type Tone } from '@/components/admin/channels/ui'
+import { Badge, Banner, type Tone } from '@/components/admin/kit/core'
 import { ACTIVE, Progress, downloadText, problemsCsv, rowRef, useJob, type ImportJob, type RowResult } from './shared'
 
 const GROUPS: { outcome: RowResult['outcome']; label: string; tone: Tone }[] = [
@@ -17,7 +17,7 @@ const GROUPS: { outcome: RowResult['outcome']; label: string; tone: Tone }[] = [
 export default function JobDetail({ id, compact }: { id: string; compact?: boolean }) {
   const { job, error, loading } = useJob(id)
   if (loading) return <p className="text-sm text-foreground-muted py-2">Loading import details...</p>
-  if (error || !job) return <p className="text-sm text-red-600 dark:text-red-400 py-2">{error || 'Import not found.'}</p>
+  if (error || !job) return <p className="text-sm text-red-500 py-2">{error || 'Import not found.'}</p>
   return <JobBody job={job} compact={compact} />
 }
 
@@ -56,7 +56,7 @@ function JobBody({ job, compact }: { job: ImportJob; compact?: boolean }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <span className="text-green-700 dark:text-green-400">Created {job.created_count}</span>
         <span className="text-blue-700 dark:text-blue-400">Updated {job.updated_count}</span>
-        <span className="text-red-600 dark:text-red-400">Failed {job.error_count}</span>
+        <span className="text-red-500">Failed {job.error_count}</span>
         {(img.total ?? 0) > 0 && (
           <span className="text-foreground-muted">
             Images {img.fetched ?? 0}/{img.total}

@@ -48,7 +48,7 @@ export default function GoogleSheetDisconnect({
       type="button"
       onClick={disconnect}
       disabled={busy}
-      className={`inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-1.5 text-sm font-medium text-red-600 dark:text-red-400 whitespace-nowrap ${busy ? 'opacity-60 cursor-wait' : 'hover:bg-red-500/10'}`}
+      className={`inline-flex items-center gap-1.5 rounded-lg border border-red-500/40 px-3 py-1.5 text-sm font-medium text-red-500 whitespace-nowrap ${busy ? 'opacity-60 cursor-wait' : 'hover:bg-red-500/10'}`}
     >
       <Unplug className="w-4 h-4" /> {working ? 'Disconnecting...' : 'Disconnect'}
     </button>

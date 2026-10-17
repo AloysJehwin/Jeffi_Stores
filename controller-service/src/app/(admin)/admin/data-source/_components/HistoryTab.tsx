@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink } from 'lucide-react'
-import { Badge, Section, when } from '@/components/admin/channels/ui'
+import { Badge, Section, when } from '@/components/admin/kit/core'
 import { useOverviewData } from '@/components/admin/overview/kit'
 import JobDetail from './JobDetail'
 import { JobBadge, duration, sheetUrl, sourceLabel, type ImportJob } from './shared'
@@ -47,7 +47,7 @@ export default function HistoryTab({ refreshKey }: { refreshKey: number }) {
       </div>
 
       {error ? (
-        <p className="text-sm text-red-600 dark:text-red-400 py-6 text-center">{error}</p>
+        <p className="text-sm text-red-500 py-6 text-center">{error}</p>
       ) : loading ? (
         <p className="text-sm text-foreground-muted py-6 text-center">Loading...</p>
       ) : jobs.length === 0 ? (
@@ -64,7 +64,7 @@ export default function HistoryTab({ refreshKey }: { refreshKey: number }) {
                 <th className="px-2 py-2 font-medium text-right">Rows</th>
                 <th className="px-2 py-2 font-medium text-right text-green-700 dark:text-green-400">New</th>
                 <th className="px-2 py-2 font-medium text-right text-blue-700 dark:text-blue-400">Upd</th>
-                <th className="px-2 py-2 font-medium text-right text-red-600 dark:text-red-400">Skip</th>
+                <th className="px-2 py-2 font-medium text-right text-red-500">Skip</th>
                 <th className="px-2 py-2 font-medium">Duration</th>
               </tr>
             </thead>

@@ -4,7 +4,8 @@ import { useRef, useState } from 'react'
 import { Download, FileSpreadsheet, UploadCloud } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useOverviewData } from '@/components/admin/overview/kit'
-import { Banner, Section, btnGhost, when } from '@/components/admin/channels/ui'
+import { Banner, Section, btnGhost, when } from '@/components/admin/kit/core'
+import { useActionToast } from '@/components/admin/kit/toast'
 import JobDetail from './JobDetail'
 import { JobBadge, type ImportJob } from './shared'
 
@@ -34,7 +35,8 @@ export default function ImportTab({ refreshKey, onQueued }: { refreshKey: number
   const inputRef = useRef<HTMLInputElement>(null)
   const [drag, setDrag] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [problem, setProblem] = useState<string | null>(null)
+  const toast = useActionToast()
+  const setProblem = (text: string | null) => text && toast.error(text)
   const [result, setResult] = useState<(UploadResult & { file: string }) | null>(null)
   const last = useOverviewData<{ jobs: ImportJob[] }>(result ? null : `/api/admin/data-source/jobs?source=upload&limit=1&k=${refreshKey}`)
   const lastJob = last.data?.jobs?.[0] ?? null
@@ -58,6 +60,7 @@ export default function ImportTab({ refreshKey, onQueued }: { refreshKey: number
         return
       }
       setResult({ ...(body as UploadResult), file: file.name })
+      if ((body as UploadResult).duplicate) toast.info('This file is already being imported; showing that import.')
       onQueued()
     } catch {
       setProblem('Upload failed: the connection dropped. Check your network and try again.')
@@ -106,17 +109,11 @@ export default function ImportTab({ refreshKey, onQueued }: { refreshKey: number
             <p className="text-xs text-foreground-muted">.xlsx, .xls or .csv, up to 15 MB and 5,000 rows</p>
             <input id="ds-upload" ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" disabled={disabled} onChange={e => upload(e.target.files?.[0])} />
           </div>
-          {problem && (
-            <div className="mt-3">
-              <Banner ok={false}>{problem}</Banner>
-            </div>
-          )}
         </Section>
 
         {result ? (
           <Section title={`Import of ${result.file}`}>
             <div className="space-y-3">
-              {result.duplicate && <Banner ok>This file is already being imported; showing that import.</Banner>}
               {!result.duplicate && (result.invalid ?? 0) > 0 && (
                 <Banner ok={false}>
                   {result.invalid} of {result.totalRows} rows already have problems and will be skipped; the rest import normally.

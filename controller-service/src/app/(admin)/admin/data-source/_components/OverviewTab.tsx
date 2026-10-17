@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { AttentionList, OverviewSkeleton, useOverviewData, type AttentionItem } from '@/components/admin/overview/kit'
-import { Banner, Kpi, KpiGrid, when } from '@/components/admin/channels/ui'
+import { Banner, Kpi, KpiGrid, when } from '@/components/admin/kit/core'
 import { STALE_JOB_MESSAGE } from './shared-constants'
 import { duration, jobState, sheetUrl, sourceLabel, type GsheetStatus, type ImportJob } from './shared'
 

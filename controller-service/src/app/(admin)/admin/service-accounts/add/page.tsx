@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { ADMIN_SCOPES } from '@/lib/auth/scopes'
+import { PageHeader } from '@/components/admin/kit/layout'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 
 interface Created {
@@ -43,7 +45,8 @@ export default function AddServiceAccountPage() {
   const [name, setName] = useState('')
   const [selectedScopes, setSelectedScopes] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useActionToast()
+  const setError = (text: string) => text && toast.error(text)
   const [created, setCreated] = useState<Created | null>(null)
   const [downloaded, setDownloaded] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -111,7 +114,7 @@ export default function AddServiceAccountPage() {
         <div className="w-full max-w-xl space-y-4">
           {/* Header */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
               <svg
                 className="w-5 h-5 text-green-600 dark:text-green-400"
                 fill="none"
@@ -131,7 +134,7 @@ export default function AddServiceAccountPage() {
           </div>
 
           {/* Warning */}
-          <div className="flex gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl px-4 py-3.5">
+          <div className="flex gap-3 bg-amber-500/5 border border-amber-500/40/40 rounded-xl px-4 py-3.5">
             <svg
               className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5"
               fill="none"
@@ -145,7 +148,7 @@ export default function AddServiceAccountPage() {
                 d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
               />
             </svg>
-            <div className="text-xs text-amber-800 dark:text-amber-300 space-y-0.5">
+            <div className="text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
               <p className="font-semibold">One-time download only</p>
               <p>
                 After downloading, the .p12 data is permanently deleted from the server. Store both the file and
@@ -267,7 +270,6 @@ curl --cert cert.pem --key key.pem \\
             </div>
           )}
 
-          {error && <p className="text-sm text-red-600 dark:text-red-400 px-1">{error}</p>}
         </div>
       </div>
     )
@@ -277,24 +279,11 @@ curl --cert cert.pem --key key.pem \\
   return (
     <MobileEditBlock>
     <div className="p-4 sm:p-6 space-y-6">
-      {/* Page header */}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => router.push(ap('/admin/service-accounts'))}
-          className="p-1.5 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Create Service Account</h1>
-          <p className="text-sm text-foreground-muted mt-0.5">
-            Generate an mTLS client certificate for M2M authentication
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        back={{ href: ap('/admin/service-accounts'), label: 'Service accounts' }}
+        title="Create Service Account"
+        description="Generate an mTLS client certificate for M2M authentication"
+      />
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Details */}
@@ -373,7 +362,7 @@ curl --cert cert.pem --key key.pem \\
                           onClick={() => toggleScope(read.key)}
                           className={`text-left rounded-xl border px-4 py-3 transition-all ${
                             selectedScopes.includes(read.key)
-                              ? 'border-secondary-400 bg-secondary-500/10 dark:bg-secondary-500/15 shadow-sm'
+                              ? 'border-secondary-400 bg-secondary-500/10 shadow-sm'
                               : 'border-border-default bg-surface hover:border-border-strong hover:bg-surface-secondary/50'
                           }`}
                         >
@@ -417,7 +406,6 @@ curl --cert cert.pem --key key.pem \\
           </div>
         </section>
 
-        {error && <p className="text-sm text-red-600 dark:text-red-400 px-1">{error}</p>}
 
         <div className="flex items-center gap-3 pb-6">
           <button

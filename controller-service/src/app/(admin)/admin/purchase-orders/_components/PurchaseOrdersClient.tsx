@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
-import { TabAction, TabActionsHost, Tabs } from '@/components/admin/channels/ui'
+import { TabAction, TabActionsHost, Tabs } from '@/components/admin/kit/core'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
 import PurchaseOrdersOverview from './PurchaseOrdersOverview'

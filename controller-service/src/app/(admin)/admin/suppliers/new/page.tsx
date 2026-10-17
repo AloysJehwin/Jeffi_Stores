@@ -12,7 +12,7 @@ import MobileEditBlock from '@/components/admin/MobileEditBlock'
 const inputCls = ADMIN_INPUT_CLASS
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 const btnPrimary =
-  'control-md border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 font-medium transition-colors disabled:opacity-50'
+  'control-md border border-transparent bg-accent-500 hover:bg-accent-600 text-white font-medium transition-colors disabled:opacity-50'
 const btnSecondary =
   'control-md border border-border-default bg-surface hover:bg-surface-secondary text-foreground font-medium transition-colors'
 
@@ -245,7 +245,7 @@ export default function NewSupplierPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+          <div className="bg-red-500/5 border border-red-500/40 rounded-lg p-3 text-sm text-red-600 dark:text-red-400">
             {error}
           </div>
         )}

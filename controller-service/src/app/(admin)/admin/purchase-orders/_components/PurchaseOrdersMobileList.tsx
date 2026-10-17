@@ -113,7 +113,7 @@ export default function PurchaseOrdersMobileList({
             <div className="flex items-center justify-between gap-2 text-xs text-foreground-secondary">
               <span>
                 {formatDate(po.order_date)}
-                {poDaysLate(po) > 0 && <span className="ml-1.5 text-red-600 dark:text-red-400 font-medium">{poDaysLate(po)}d late</span>}
+                {poDaysLate(po) > 0 && <span className="ml-1.5 text-red-500 font-medium">{poDaysLate(po)}d late</span>}
               </span>
               <span className="font-semibold text-foreground">{formatINR(parseFloat(po.total_amount))}</span>
             </div>

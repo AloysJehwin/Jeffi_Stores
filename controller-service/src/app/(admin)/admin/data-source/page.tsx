@@ -1,3 +1,4 @@
+import { PageBody, PageHeader } from '@/components/admin/kit/layout'
 import DataSourceClient from './_components/DataSourceClient'
 import { resolveImportTenantId, getGsheetStatus } from '@/lib/import/jobs'
 
@@ -11,14 +12,12 @@ export default async function DataSourcePage() {
     return undefined
   })
   return (
-    <div className="p-4 sm:p-6 space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Data source</h1>
-        <p className="text-sm text-foreground-muted mt-1">
-          Bulk-import products from a spreadsheet, or sync them from a Google Sheet. New SKUs create products; existing SKUs update them, through the same publish path the editor uses.
-        </p>
-      </div>
+    <PageBody>
+      <PageHeader
+        title="Data source"
+        description="Bulk-import products from a spreadsheet, or sync them from a Google Sheet. New SKUs create products; existing SKUs update them, through the same publish path the editor uses."
+      />
       <DataSourceClient initialGsheet={initialGsheet} />
-    </div>
+    </PageBody>
   )
 }

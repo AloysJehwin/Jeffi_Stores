@@ -1,4 +1,6 @@
 import { formatINR as formatINRBase } from '@/lib/shared/format'
+import { Kpi } from '@/components/admin/kit/core'
+import { TONE_CLS } from '@/components/admin/kit/tones'
 
 // Helpers shared by the inventory, suppliers and purchase-order pages.
 
@@ -7,7 +9,7 @@ export const inputCls =
   'w-full field-sm border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 export const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 export const btnPrimary =
-  'control-sm border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 font-medium transition-colors disabled:opacity-50'
+  'control-sm border border-transparent bg-accent-500 hover:bg-accent-600 text-white font-medium transition-colors disabled:opacity-50'
 export const btnSecondary =
   'control-sm border border-border-default bg-surface hover:bg-surface-secondary text-foreground font-medium transition-colors'
 
@@ -21,18 +23,9 @@ export function fmtINR2(n: number) {
   return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+/** Same look as the kit `Kpi`; `accent` is its `highlight`. */
 export function SummaryCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
-  return (
-    <div
-      className={`rounded-xl border p-4 ${accent ? 'bg-secondary-50 dark:bg-secondary-900/20 border-secondary-200 dark:border-secondary-800/40' : 'bg-surface-elevated border-border-default'}`}
-    >
-      <p className="text-xs font-medium text-foreground-secondary mb-1">{label}</p>
-      <p className={`text-xl font-bold ${accent ? 'text-secondary-600 dark:text-secondary-400' : 'text-foreground'}`}>
-        {value}
-      </p>
-      {sub && <p className="text-xs text-foreground-muted mt-0.5">{sub}</p>}
-    </div>
-  )
+  return <Kpi label={label} value={value} sub={sub} highlight={accent} />
 }
 
 export function ClientPagination({
@@ -78,18 +71,18 @@ export function ClientPagination({
 }
 
 export const STATUS_BADGE: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600 dark:bg-gray-700/40 dark:text-gray-300',
-  sent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  partial: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  received: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  draft: TONE_CLS.muted,
+  sent: TONE_CLS.blue,
+  partial: TONE_CLS.amber,
+  received: TONE_CLS.green,
+  cancelled: TONE_CLS.red,
 }
 
 export const TYPE_BADGE: Record<string, string> = {
-  purchase: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  sale: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  return: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  adjustment: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  purchase: TONE_CLS.green,
+  sale: TONE_CLS.red,
+  return: TONE_CLS.blue,
+  adjustment: TONE_CLS.amber,
 }
 
 export type Supplier = {

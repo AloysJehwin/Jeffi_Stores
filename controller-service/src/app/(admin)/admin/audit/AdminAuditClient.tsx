@@ -84,8 +84,8 @@ const ENTITY_META: Record<string, { Icon: any; color: string }> = {
   admin: { Icon: ShieldCheck, color: 'bg-red-500' },
   order: { Icon: ScrollText, color: 'bg-indigo-500' },
   suppliers: { Icon: Truck, color: 'bg-amber-500' },
-  purchase_orders: { Icon: ClipboardList, color: 'bg-orange-500' },
-  purchase_order_items: { Icon: ClipboardList, color: 'bg-orange-400' },
+  purchase_orders: { Icon: ClipboardList, color: 'bg-amber-500' },
+  purchase_order_items: { Icon: ClipboardList, color: 'bg-amber-400' },
   grns: { Icon: Receipt, color: 'bg-amber-600' },
   grn_items: { Icon: Receipt, color: 'bg-amber-500' },
   expenses: { Icon: Wallet, color: 'bg-rose-500' },
@@ -99,7 +99,7 @@ const ENTITY_META: Record<string, { Icon: any; color: string }> = {
   price_inflation_log: { Icon: TrendingUp, color: 'bg-pink-500' },
   scenarios: { Icon: Wand2, color: 'bg-fuchsia-500' },
   custom_scenarios: { Icon: Wand2, color: 'bg-fuchsia-400' },
-  review_forms: { Icon: ClipboardList, color: 'bg-yellow-500' },
+  review_forms: { Icon: ClipboardList, color: 'bg-amber-500' },
   customer_tag_definitions: { Icon: Tag, color: 'bg-cyan-500' },
 }
 
@@ -497,7 +497,7 @@ export default function AdminAuditClient() {
         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${
           isSystem
             ? 'bg-surface-secondary text-foreground-muted border-border-default'
-            : 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border-accent-200 dark:border-accent-700'
+            : 'bg-accent-500/5 text-accent-700 dark:text-accent-300 border-accent-200 dark:border-accent-700'
         }`}
       >
         {isSystem ? <Settings className="w-2.5 h-2.5 shrink-0" /> : <User className="w-2.5 h-2.5 shrink-0" />}
@@ -847,7 +847,7 @@ export default function AdminAuditClient() {
                     {isExpanded && (
                       <div className="border-t border-border-default">
                         {row.error && (
-                          <div className="px-4 py-2 bg-red-50 dark:bg-red-950/30 text-[11px] text-red-700 dark:text-red-300 font-mono break-all">
+                          <div className="px-4 py-2 bg-red-500/5 text-[11px] text-red-600 dark:text-red-400 font-mono break-all">
                             {row.error}
                           </div>
                         )}
@@ -1066,7 +1066,7 @@ export default function AdminAuditClient() {
                     {isExpanded && (
                       <div className="border-t border-border-default">
                         {row.error && (
-                          <div className="px-4 py-2 bg-red-50 dark:bg-red-950/30 text-[11px] text-red-700 dark:text-red-300 font-mono break-all">
+                          <div className="px-4 py-2 bg-red-500/5 text-[11px] text-red-600 dark:text-red-400 font-mono break-all">
                             {row.error}
                           </div>
                         )}
@@ -1260,7 +1260,7 @@ export default function AdminAuditClient() {
                     {isExpanded && (
                       <div className="border-t border-border-default">
                         {row.error && (
-                          <div className="px-4 py-2 bg-red-50 dark:bg-red-950/30 text-[11px] text-red-700 dark:text-red-300 font-mono break-all">
+                          <div className="px-4 py-2 bg-red-500/5 text-[11px] text-red-600 dark:text-red-400 font-mono break-all">
                             {row.error}
                           </div>
                         )}
@@ -1385,7 +1385,7 @@ export default function AdminAuditClient() {
                             </span>
                           )}
                           {job.inPlan && job.lastStatus === 'error' && (
-                            <span className="flex items-center gap-0.5 text-[10px] text-red-600 dark:text-red-400">
+                            <span className="flex items-center gap-0.5 text-[10px] text-red-500">
                               <XCircle className="w-3 h-3" /> last run failed
                             </span>
                           )}
@@ -1407,7 +1407,7 @@ export default function AdminAuditClient() {
                           type="button"
                           disabled={cronTriggeringId === job.id}
                           onClick={() => triggerCronJob(job.id)}
-                          className="flex items-center gap-1.5 px-3 h-control-sm rounded text-xs font-semibold bg-surface-secondary text-foreground-muted hover:bg-accent-100 dark:hover:bg-accent-900/30 hover:text-accent-700 dark:hover:text-accent-300 disabled:opacity-50 transition-colors"
+                          className="flex items-center gap-1.5 px-3 h-control-sm rounded text-xs font-semibold bg-surface-secondary text-foreground-muted hover:bg-accent-500/10 hover:text-accent-700 dark:hover:text-accent-300 disabled:opacity-50 transition-colors"
                         >
                           {cronTriggeringId === job.id ? (
                             <RefreshCw className="w-3 h-3 animate-spin" />
@@ -1431,8 +1431,8 @@ export default function AdminAuditClient() {
                           onClick={() => toggleCronJob(job.id, !job.enabled)}
                           className={`px-4 py-1.5 rounded text-xs font-semibold transition-colors disabled:opacity-50 ${
                             job.enabled
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-800 dark:hover:text-red-300'
-                              : 'bg-surface-secondary text-foreground-muted hover:bg-green-100 dark:hover:bg-green-900/30 hover:text-green-800 dark:hover:text-green-300'
+                              ? 'bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300'
+                              : 'bg-surface-secondary text-foreground-muted hover:bg-green-500/10 hover:text-green-700 dark:hover:text-green-300'
                           }`}
                         >
                           {cronTogglingId === job.id ? '...' : job.enabled ? 'Enabled' : 'Disabled'}
@@ -1445,7 +1445,7 @@ export default function AdminAuditClient() {
                         {job.log.map((entry, i) => (
                           <div
                             key={i}
-                            className={`px-4 py-2 flex items-start gap-2 text-[11px] ${entry.ok ? '' : 'bg-red-50/50 dark:bg-red-900/10'}`}
+                            className={`px-4 py-2 flex items-start gap-2 text-[11px] ${entry.ok ? '' : 'bg-red-500/5'}`}
                           >
                             {entry.ok ? (
                               <CheckCircle2 className="w-3.5 h-3.5 text-green-500 shrink-0 mt-px" />
@@ -1455,7 +1455,7 @@ export default function AdminAuditClient() {
                             <div className="flex-1 min-w-0">
                               <span className="text-foreground-muted">{new Date(entry.t).toLocaleString('en-IN')}</span>
                               {!entry.ok && entry.err && (
-                                <span className="ml-2 text-red-600 dark:text-red-400 font-mono">{entry.err}</span>
+                                <span className="ml-2 text-red-500 font-mono">{entry.err}</span>
                               )}
                               {entry.detail !== undefined && (
                                 <pre className="mt-1 text-[10px] font-mono bg-surface-secondary rounded p-1.5 overflow-x-auto whitespace-pre-wrap break-all text-foreground-muted leading-relaxed">
@@ -1580,7 +1580,7 @@ export default function AdminAuditClient() {
                                 <button
                                   type="button"
                                   onClick={() => setExpandedGroupId(isExpanded ? null : r.id)}
-                                  className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors flex items-center gap-1"
+                                  className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 transition-colors flex items-center gap-1"
                                 >
                                   {isExpanded ? '−' : '+'}
                                   {sideEffects} cascading update{sideEffects !== 1 ? 's' : ''}
@@ -1727,7 +1727,7 @@ export default function AdminAuditClient() {
                                 <button
                                   type="button"
                                   onClick={() => setExpandedGroupId(isExpanded ? null : r.id)}
-                                  className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors flex items-center gap-1"
+                                  className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 transition-colors flex items-center gap-1"
                                 >
                                   {isExpanded ? '−' : '+'}
                                   {sideEffects} cascading update{sideEffects !== 1 ? 's' : ''}

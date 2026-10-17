@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { Badge, Banner, Empty, TabAction, Tabs, api, btnGhost, btnPrimary, inputCls, pct } from '@/components/admin/channels/ui'
+import { Badge, Empty, TabAction, Tabs, api, btnGhost, btnPrimary, inputCls, pct } from '@/components/admin/kit/core'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { AI_CAPABILITY_LABEL } from '@/lib/ai/feature-labels'
 import Select from '@/components/ui/Select'
 
@@ -39,7 +40,8 @@ export default function AiPricingClient() {
   const canWrite = useCanWrite('ecom_billing:write')
   const [rows, setRows] = useState<Row[] | null>(null)
   const [cap, setCap] = useState<Cap>('all')
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setMsg = (m: { ok: boolean; text: string }) => toast.result(m)
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState(EMPTY_NEW)
 
@@ -79,7 +81,6 @@ export default function AiPricingClient() {
         onChange={setCap}
         actions={canWrite ? <TabAction icon={<Plus className="w-4 h-4" />} label="Add row" onClick={() => setAdding(a => !a)} /> : undefined}
       />
-      {msg && <Banner ok={msg.ok}>{msg.text}</Banner>}
 
       {adding && canWrite && (
         <div className="bg-surface-elevated border border-border-default rounded-xl p-4 grid gap-3 grid-cols-2 md:grid-cols-7 items-end">

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { ExternalLink, FilePlus2, Link2, RefreshCw } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
-import { Badge, Banner, Section, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/channels/ui'
+import { Badge, Banner, Section, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/kit/core'
 import GoogleSheetDisconnect from './GoogleSheetDisconnect'
 import JobDetail from './JobDetail'
 import { ACTIVE, JobBadge, duration, sheetUrl, type GsheetStatus } from './shared'
@@ -38,7 +38,6 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
   const { showToast, showConfirm } = useToast()
   const [sheetInput, setSheetInput] = useState(gsheet.spreadsheetId ?? '')
   const [busy, setBusy] = useState<'create' | 'sync' | 'reconcile' | null>(null)
-  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
   const [selected, setSelected] = useState<Set<string> | null>(null)
 
   useEffect(() => {
@@ -53,14 +52,12 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
   const sheetChanged = !!sheetInput.trim() && sheetInput.trim() !== gsheet.spreadsheetId && !sheetInput.includes(gsheet.spreadsheetId ?? '\u0000')
 
   const finish = async (ok: boolean, text: string) => {
-    setResult({ ok, text })
     showToast(text, ok ? 'success' : 'error')
     await reload()
   }
 
   const createSheet = async () => {
     setBusy('create')
-    setResult(null)
     const r = await post('/api/admin/data-source/google/create')
     if (r.ok && r.data.spreadsheetId) setSheetInput(r.data.spreadsheetId)
     await finish(r.ok, r.ok ? 'Created a template sheet in your Google Drive. Fill it in, then Sync now.' : r.data.error || `Could not create the sheet (${r.status}).`)
@@ -69,7 +66,6 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
 
   const syncNow = async () => {
     setBusy('sync')
-    setResult(null)
     const r = await runSheetSync(sheetChanged ? sheetInput : undefined)
     const extra = r.ok && r.data.invalid ? ` ${r.data.invalid} row(s) already have problems and will be skipped.` : ''
     await finish(r.ok, r.ok ? `Sync queued: ${r.data.totalRows} row(s) from the sheet.${extra}` : r.data.error || `Sync failed (${r.status}).`)
@@ -89,7 +85,6 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
       if (!ok) return
     }
     setBusy('reconcile')
-    setResult(null)
     const all = chosen.size === pending.length
     const r = await post('/api/admin/data-source/google/reconcile', {
       jobId: last.id,
@@ -199,7 +194,6 @@ export default function SheetTab({ gsheet, reload }: { gsheet: GsheetStatus; rel
             <p className="text-sm text-foreground-muted">Read-only: you need products write access to connect or sync a sheet.</p>
           ) : (
             <div className="space-y-4">
-              {result && <Banner ok={result.ok}>{result.text}</Banner>}
               <Action
                 title={state === 'not_connected' ? 'Connect Google' : 'Reconnect Google'}
                 text="Sign in with Google and allow reading your sheets and creating the template sheet."
