@@ -8,7 +8,16 @@ import HoverCard from '@/components/ui/HoverCard'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
-import { DataTable, Dialog, Field, Fields, StatusBadge, ACTIVE_STATUS, badgeCls, type DataCol } from '@/components/admin/kit'
+import {
+  DataTable,
+  Dialog,
+  Field,
+  Fields,
+  StatusBadge,
+  ACTIVE_STATUS,
+  badgeCls,
+  type DataCol,
+} from '@/components/admin/kit'
 import ReviewFormsMobileList from './ReviewFormsMobileList'
 
 export interface FormRow {
@@ -89,7 +98,10 @@ export default function ReviewFormsTable({
       render: f => (
         <HoverCard
           trigger={
-            <span className="cursor-pointer font-medium text-foreground transition-colors hover:text-accent-500" onClick={e => e.stopPropagation()}>
+            <span
+              className="cursor-pointer font-medium text-foreground transition-colors hover:text-accent-500"
+              onClick={e => e.stopPropagation()}
+            >
               {f.title}
             </span>
           }
@@ -125,19 +137,37 @@ export default function ReviewFormsTable({
       hideBelow: 'lg',
       render: f => (
         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-          <a href={url(f)} target="_blank" rel="noopener noreferrer" className="shrink-0 text-xs text-accent-500 hover:underline">
+          <a
+            href={url(f)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 text-xs text-accent-500 hover:underline"
+          >
             Open ↗
           </a>
           <CopyLinkButton url={url(f)} />
         </div>
       ),
     },
-    { key: 'coupon', label: 'Coupon', render: f => (f.coupon_code ? <span className="font-mono text-xs text-foreground-secondary">{f.coupon_code}</span> : <span className="text-foreground-muted">None</span>) },
+    {
+      key: 'coupon',
+      label: 'Coupon',
+      render: f =>
+        f.coupon_code ? (
+          <span className="font-mono text-xs text-foreground-secondary">{f.coupon_code}</span>
+        ) : (
+          <span className="text-foreground-muted">None</span>
+        ),
+    },
     {
       key: 'subs',
       label: 'Submissions',
       render: f => (
-        <Link href={ap(`/admin/review-forms/${f.id}/submissions`)} className="font-medium text-accent-500 hover:underline" onClick={e => e.stopPropagation()}>
+        <Link
+          href={ap(`/admin/review-forms/${f.id}/submissions`)}
+          className="font-medium text-accent-500 hover:underline"
+          onClick={e => e.stopPropagation()}
+        >
           {f.submissions_count} view
         </Link>
       ),
@@ -167,7 +197,12 @@ export default function ReviewFormsTable({
             label: 'Delete Review Form',
             scope: 'review_forms:write',
             onSelect: () => deleteForm(f),
-            confirm: { title: 'Delete Review Form', message: `Delete review form "${f.title}"? This action cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' },
+            confirm: {
+              title: 'Delete Review Form',
+              message: `Delete review form "${f.title}"? This action cannot be undone.`,
+              confirmLabel: 'Delete',
+              variant: 'danger',
+            },
           },
         ]}
       />
@@ -180,7 +215,11 @@ export default function ReviewFormsTable({
         zIndex="z-[300]"
         footer={
           open && (
-            <Link href={editHref(open)} onClick={() => setOpen(null)} className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600">
+            <Link
+              href={editHref(open)}
+              onClick={() => setOpen(null)}
+              className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600"
+            >
               Edit Form
             </Link>
           )
@@ -197,7 +236,12 @@ export default function ReviewFormsTable({
               <Field label="Coupon" value={open.coupon_code} mono />
             </Fields>
             <div className="flex items-center gap-2">
-              <a href={url(open)} target="_blank" rel="noopener noreferrer" className="text-xs text-accent-500 hover:underline">
+              <a
+                href={url(open)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-accent-500 hover:underline"
+              >
                 Open form ↗
               </a>
               <CopyLinkButton url={url(open)} />

@@ -22,9 +22,15 @@ function healthBarColor(score: number | null | undefined) {
   return 'bg-red-500'
 }
 
-const StatusChip = ({ c }: { c: any }) => <span className={badgeCls(customerStatus(c).tone)}>{customerStatus(c).label}</span>
+const StatusChip = ({ c }: { c: any }) => (
+  <span className={badgeCls(customerStatus(c).tone)}>{customerStatus(c).label}</span>
+)
 const BizChip = ({ c, short }: { c: any; short?: boolean }) =>
-  c.user_type === 'business' ? <span className={badgeCls(businessTone(c.bp_approval_status))}>{short ? 'Biz' : businessLabel(c.bp_approval_status)}</span> : null
+  c.user_type === 'business' ? (
+    <span className={badgeCls(businessTone(c.bp_approval_status))}>
+      {short ? 'Biz' : businessLabel(c.bp_approval_status)}
+    </span>
+  ) : null
 
 export default function CustomersMobileList({ customers, backUrl }: Props) {
   const router = useRouter()
@@ -61,7 +67,9 @@ export default function CustomersMobileList({ customers, backUrl }: Props) {
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="text-sm font-semibold text-foreground truncate">{fullName(customer)}</span>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {score != null && <span className={`${badgeCls(healthTone(score))} font-bold tabular-nums`}>{score}</span>}
+                    {score != null && (
+                      <span className={`${badgeCls(healthTone(score))} font-bold tabular-nums`}>{score}</span>
+                    )}
                     <BizChip c={customer} short />
                     <StatusChip c={customer} />
                   </div>
@@ -127,7 +135,14 @@ export default function CustomersMobileList({ customers, backUrl }: Props) {
                   <Fields>
                     <Field label="Phone" value={selected.phone} />
                     <Field label="Health" value={selected.health_score == null ? null : selected.health_score} />
-                    <Field label="Joined" value={new Date(selected.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} />
+                    <Field
+                      label="Joined"
+                      value={new Date(selected.created_at).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    />
                     {selected.bp_company_name && <Field label="Company" value={selected.bp_company_name} />}
                   </Fields>
                 </div>

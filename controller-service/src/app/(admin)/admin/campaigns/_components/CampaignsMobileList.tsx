@@ -160,15 +160,26 @@ export default function CampaignsMobileList({ campaigns, busy, onToggle, onRunNo
 
             <div className="grid grid-cols-2 gap-3">
               <StatTile label="Sent" value={num(selected.total_sent)} />
-              <StatTile label="Opened" value={num(selected.total_opened)} sub={rate(Number(selected.total_opened), Number(selected.total_sent))} />
-              <StatTile label="Clicked" value={num(selected.total_clicked)} sub={rate(Number(selected.total_clicked), Number(selected.total_sent))} />
+              <StatTile
+                label="Opened"
+                value={num(selected.total_opened)}
+                sub={rate(Number(selected.total_opened), Number(selected.total_sent))}
+              />
+              <StatTile
+                label="Clicked"
+                value={num(selected.total_clicked)}
+                sub={rate(Number(selected.total_clicked), Number(selected.total_sent))}
+              />
               <StatTile
                 label="Converted"
                 value={num(selected.total_converted)}
                 sub={rate(Number(selected.total_converted), Number(selected.total_sent))}
                 accent="green"
               />
-              <StatTile label="Revenue" value={`₹${Math.round(Number(selected.revenue_attributed)).toLocaleString('en-IN')}`} />
+              <StatTile
+                label="Revenue"
+                value={`₹${Math.round(Number(selected.revenue_attributed)).toLocaleString('en-IN')}`}
+              />
               <StatTile
                 label="Unsub"
                 value={num(selected.total_unsubscribed)}

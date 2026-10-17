@@ -33,7 +33,10 @@ function StarDisplay({ value }: { value: number }) {
   return (
     <div className="flex gap-0.5">
       {[1, 2, 3, 4, 5].map(s => (
-        <Star key={s} className={`w-3.5 h-3.5 ${s <= value ? 'text-amber-400 fill-amber-400' : 'text-border-default'}`} />
+        <Star
+          key={s}
+          className={`w-3.5 h-3.5 ${s <= value ? 'text-amber-400 fill-amber-400' : 'text-border-default'}`}
+        />
       ))}
     </div>
   )

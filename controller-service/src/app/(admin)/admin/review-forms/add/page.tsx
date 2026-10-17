@@ -21,7 +21,15 @@ export default async function AddReviewFormPage() {
 
   return (
     <MobileEditBlock>
-      <FormPage header={<PageHeader back={{ href: ap('/admin/review-forms', host), label: 'Review Forms' }} title="Create Review Form" description="Build a shareable form to collect Google reviews" />}>
+      <FormPage
+        header={
+          <PageHeader
+            back={{ href: ap('/admin/review-forms', host), label: 'Review Forms' }}
+            title="Create Review Form"
+            description="Build a shareable form to collect Google reviews"
+          />
+        }
+      >
         <ReviewFormForm submitLabel="Save as Draft" coupons={coupons} />
       </FormPage>
     </MobileEditBlock>

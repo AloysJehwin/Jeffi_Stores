@@ -72,12 +72,16 @@ export function CampaignStatsGrid({ c }: { c: CampaignRow }): ReactNode {
       </div>
       <div>
         <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Opened</p>
-        <p className="text-lg font-bold text-foreground tabular-nums">{Number(c.total_opened).toLocaleString('en-IN')}</p>
+        <p className="text-lg font-bold text-foreground tabular-nums">
+          {Number(c.total_opened).toLocaleString('en-IN')}
+        </p>
         <p className="text-[10px] text-foreground-muted">{rate(Number(c.total_opened), Number(c.total_sent))}</p>
       </div>
       <div>
         <p className="text-[10px] uppercase tracking-wide text-foreground-muted">Clicked</p>
-        <p className="text-lg font-bold text-foreground tabular-nums">{Number(c.total_clicked).toLocaleString('en-IN')}</p>
+        <p className="text-lg font-bold text-foreground tabular-nums">
+          {Number(c.total_clicked).toLocaleString('en-IN')}
+        </p>
         <p className="text-[10px] text-foreground-muted">{rate(Number(c.total_clicked), Number(c.total_sent))}</p>
       </div>
       <div>

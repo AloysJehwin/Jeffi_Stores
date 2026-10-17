@@ -89,10 +89,7 @@ export default async function ReferralProgram({ host, query }: { host: string; q
       <p className="text-sm text-foreground-secondary">
         Invitation emails are sent by the Referral Invite campaign, which is{' '}
         <span className="font-medium text-foreground">{campaign?.enabled ? 'on' : 'off'}</span>.{' '}
-        <Link
-          href={ap('/admin/campaigns/referral_invite', host)}
-          className="text-accent-600 hover:text-accent-700"
-        >
+        <Link href={ap('/admin/campaigns/referral_invite', host)} className="text-accent-600 hover:text-accent-700">
           Open the campaign
         </Link>
       </p>

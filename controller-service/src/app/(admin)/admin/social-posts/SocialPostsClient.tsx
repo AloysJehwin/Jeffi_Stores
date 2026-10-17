@@ -36,7 +36,9 @@ export default function SocialPostsClient({ canWrite, canApprove }: { canWrite: 
   const reload = useCallback(() => setReloadKey(k => k + 1), [])
 
   useEffect(() => {
-    api<{ networks: NetworkInfo[] }>('/api/admin/social/networks').then(r => setNetworks(r.ok ? (r.data.networks ?? []) : []))
+    api<{ networks: NetworkInfo[] }>('/api/admin/social/networks').then(r =>
+      setNetworks(r.ok ? (r.data.networks ?? []) : [])
+    )
   }, [reloadKey])
   useEffect(() => {
     api<{ posts: Post[] }>('/api/admin/social-posts').then(r => setAllPosts(r.ok ? (r.data.posts ?? []) : []))
@@ -68,7 +70,11 @@ export default function SocialPostsClient({ canWrite, canApprove }: { canWrite: 
     router.push(`${ap('/admin/social-posts')}?${params.toString()}`, { scroll: false })
   }
 
-  const waiting = new Set((allPosts ?? []).filter(p => p.approval_status === 'pending' && p.status !== 'cancelled').map(p => p.group_id ?? p.id)).size
+  const waiting = new Set(
+    (allPosts ?? [])
+      .filter(p => p.approval_status === 'pending' && p.status !== 'cancelled')
+      .map(p => p.group_id ?? p.id)
+  ).size
   const pendingConnections = (networks ?? []).filter(n => n.status === 'pending').length
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'calendar', label: 'Calendar' },

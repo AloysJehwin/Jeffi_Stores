@@ -104,12 +104,9 @@ function maskNumber(num: string): string {
 
 function sendStatus(s: RecentSend): { label: string; color: string } {
   if (s.bounced_at) return { label: 'Bounced', color: 'bg-red-500/10 text-red-700 dark:text-red-400' }
-  if (s.unsubscribed_at)
-    return { label: 'Unsub', color: 'bg-surface-secondary text-foreground' }
-  if (s.converted_at)
-    return { label: 'Converted', color: 'bg-green-500/10 text-green-700 dark:text-green-400' }
-  if (s.clicked_at)
-    return { label: 'Clicked', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' }
+  if (s.unsubscribed_at) return { label: 'Unsub', color: 'bg-surface-secondary text-foreground' }
+  if (s.converted_at) return { label: 'Converted', color: 'bg-green-500/10 text-green-700 dark:text-green-400' }
+  if (s.clicked_at) return { label: 'Clicked', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' }
   if (s.opened_at) return { label: 'Opened', color: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400' }
   return { label: 'Sent', color: 'bg-surface-secondary text-foreground-muted' }
 }

@@ -98,9 +98,7 @@ function Chip({ label, value, tone }: { label: string; value: string; tone?: 'am
   return (
     <div
       className={`rounded-lg border px-3 py-2 ${
-        tone === 'amber'
-          ? 'border-amber-500/40 bg-amber-500/5'
-          : 'border-border-default bg-surface'
+        tone === 'amber' ? 'border-amber-500/40 bg-amber-500/5' : 'border-border-default bg-surface'
       }`}
     >
       <p
@@ -340,9 +338,7 @@ export default function CustomerConversations({
 
   return (
     <div>
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">
-        Conversation history
-      </h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Conversation history</h2>
 
       {summary && <SummaryStrip summary={summary} />}
 

@@ -11,7 +11,15 @@ export default async function AddCouponPage() {
   const host = await getHost()
   return (
     <MobileEditBlock>
-      <FormPage header={<PageHeader back={{ href: ap('/admin/coupons', host), label: 'Coupons' }} title="Add Coupon" description="Create a new discount coupon" />}>
+      <FormPage
+        header={
+          <PageHeader
+            back={{ href: ap('/admin/coupons', host), label: 'Coupons' }}
+            title="Add Coupon"
+            description="Create a new discount coupon"
+          />
+        }
+      >
         <CouponForm action={createCoupon} submitLabel="Save as Draft" showUserSelector />
       </FormPage>
     </MobileEditBlock>

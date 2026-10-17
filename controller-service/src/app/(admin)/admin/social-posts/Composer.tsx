@@ -85,7 +85,9 @@ export default function Composer({
   const connected = (p: Platform) => netOf(p)?.status === 'connected'
 
   useEffect(() => {
-    api<{ templates: Template[] }>('/api/admin/social/templates').then(r => r.ok && setTemplates(r.data.templates ?? []))
+    api<{ templates: Template[] }>('/api/admin/social/templates').then(
+      r => r.ok && setTemplates(r.data.templates ?? [])
+    )
   }, [])
 
   useEffect(() => {
@@ -208,7 +210,8 @@ export default function Composer({
     setSubmitting(draft ? 'draft' : 'post')
     setResult(null)
     // Extra photos only go with raw images: behind the ad card they would bury it.
-    const extra = !useAdCard && useAllImages && allImages.length >= 2 ? allImages.filter(u => u !== imageUrl.trim()) : null
+    const extra =
+      !useAdCard && useAllImages && allImages.length >= 2 ? allImages.filter(u => u !== imageUrl.trim()) : null
     const r = await api<{ posts: { approval_status: string }[] }>('/api/admin/social-posts', {
       method: 'POST',
       json: {
@@ -317,7 +320,11 @@ export default function Composer({
                     const img = (product.product_images || []).find(i => i.is_primary) || product.product_images?.[0]
                     return img?.thumbnail_url || img?.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={img.thumbnail_url || img.image_url} alt="" className="w-10 h-10 rounded-md object-cover border border-border-default shrink-0" />
+                      <img
+                        src={img.thumbnail_url || img.image_url}
+                        alt=""
+                        className="w-10 h-10 rounded-md object-cover border border-border-default shrink-0"
+                      />
                     ) : null
                   })()}
                   <div className="min-w-0 flex-1">
@@ -328,7 +335,12 @@ export default function Composer({
                     </p>
                   </div>
                   {!visualOnly && !useAdCard && allImages.length >= 2 && (
-                    <Toggle size="sm" checked={useAllImages} onChange={setUseAllImages} label={`Use all ${allImages.length} images (carousel)`} />
+                    <Toggle
+                      size="sm"
+                      checked={useAllImages}
+                      onChange={setUseAllImages}
+                      label={`Use all ${allImages.length} images (carousel)`}
+                    />
                   )}
                 </>
               )}
@@ -339,7 +351,11 @@ export default function Composer({
             <div className="flex items-start gap-3 p-2.5 rounded-lg border border-border-default bg-surface-secondary">
               {useAdCard && adCardUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={adCardUrl} alt="" className="w-10 h-[71px] rounded-md object-cover border border-border-default shrink-0" />
+                <img
+                  src={adCardUrl}
+                  alt=""
+                  className="w-10 h-[71px] rounded-md object-cover border border-border-default shrink-0"
+                />
               )}
               <div className="min-w-0 flex-1">
                 <Toggle checked={useAdCard} onChange={toggleAdCard} label="Post the ad card" />
@@ -384,11 +400,21 @@ export default function Composer({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className={lbl + ' mb-0'}>Hashtags</label>
-              <button type="button" className="text-xs text-accent-500 hover:underline inline-flex items-center gap-1 disabled:opacity-50" disabled={suggesting || (!caption.trim() && !product)} onClick={suggest}>
+              <button
+                type="button"
+                className="text-xs text-accent-500 hover:underline inline-flex items-center gap-1 disabled:opacity-50"
+                disabled={suggesting || (!caption.trim() && !product)}
+                onClick={suggest}
+              >
                 <Hash className="w-3 h-3" /> {suggesting ? 'Suggesting...' : 'Suggest hashtags'}
               </button>
             </div>
-            <input className={inputCls} value={hashtags} onChange={e => setHashtags(e.target.value)} placeholder="#tools #hardware" />
+            <input
+              className={inputCls}
+              value={hashtags}
+              onChange={e => setHashtags(e.target.value)}
+              placeholder="#tools #hardware"
+            />
             {suggested.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {suggested.map(t => {
@@ -406,7 +432,11 @@ export default function Composer({
                     </button>
                   )
                 })}
-                <button type="button" className="text-xs text-accent-500 hover:underline" onClick={() => suggested.forEach(addTag)}>
+                <button
+                  type="button"
+                  className="text-xs text-accent-500 hover:underline"
+                  onClick={() => suggested.forEach(addTag)}
+                >
                   Add all
                 </button>
               </div>
@@ -423,7 +453,10 @@ export default function Composer({
                 const tagsOver = lim.hashtags != null && tags > lim.hashtags
                 const titleOver = lim.title != null && title.length > lim.title
                 return (
-                  <span key={p} className={`rounded-lg border px-2 py-1 text-xs tabular-nums ${over || tagsOver || titleOver ? 'border-red-500/50 text-red-500' : 'border-border-default text-foreground-muted'}`}>
+                  <span
+                    key={p}
+                    className={`rounded-lg border px-2 py-1 text-xs tabular-nums ${over || tagsOver || titleOver ? 'border-red-500/50 text-red-500' : 'border-border-default text-foreground-muted'}`}
+                  >
                     {PLATFORM_LABEL[p]}: {fullText.length}/{lim.caption}
                     {lim.hashtags != null ? `, ${tags}/${lim.hashtags} hashtags` : ''}
                     {lim.title != null && showTitle ? `, title ${title.length}/${lim.title}` : ''}
@@ -445,14 +478,24 @@ export default function Composer({
                   sizes={
                     platforms.includes('ig_reel')
                       ? [AI_SIZE_PRESETS.story, AI_SIZE_PRESETS.portrait, AI_SIZE_PRESETS.square]
-                      : [AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait, AI_SIZE_PRESETS.landscape, AI_SIZE_PRESETS.story]
+                      : [
+                          AI_SIZE_PRESETS.square,
+                          AI_SIZE_PRESETS.portrait,
+                          AI_SIZE_PRESETS.landscape,
+                          AI_SIZE_PRESETS.story,
+                        ]
                   }
                   referenceImageUrl={allImages[0]?.startsWith('http') ? allImages[0] : undefined}
                   saveToGallery
                   onPick={img => setImageUrl(img.url)}
                 />
               </div>
-              <ImageUrlInput value={imageUrl} onChange={setImageUrl} className={inputCls} placeholder="https://... or upload" />
+              <ImageUrlInput
+                value={imageUrl}
+                onChange={setImageUrl}
+                className={inputCls}
+                placeholder="https://... or upload"
+              />
             </div>
             <div>
               <div className="mb-1 flex items-center justify-between">
@@ -468,11 +511,21 @@ export default function Composer({
                   />
                 )}
               </div>
-              <input className={inputCls} value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="https://..." />
+              <input
+                className={inputCls}
+                value={videoUrl}
+                onChange={e => setVideoUrl(e.target.value)}
+                placeholder="https://..."
+              />
             </div>
             <div className="sm:col-span-2">
               <label className={lbl}>Link</label>
-              <input className={inputCls} value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder={productId ? 'The product page when blank' : 'https://...'} />
+              <input
+                className={inputCls}
+                value={linkUrl}
+                onChange={e => setLinkUrl(e.target.value)}
+                placeholder={productId ? 'The product page when blank' : 'https://...'}
+              />
             </div>
           </div>
         </div>
@@ -487,15 +540,33 @@ export default function Composer({
             <label className="flex items-center gap-2">
               <input type="radio" checked={when === 'at'} onChange={() => setWhen('at')} /> At a set time
             </label>
-            {when === 'at' && <DateTimePicker value={at} onChange={setAt} className="w-64" placeholder="Select date and time" />}
+            {when === 'at' && (
+              <DateTimePicker value={at} onChange={setAt} className="w-64" placeholder="Select date and time" />
+            )}
           </div>
-          {canApprove && <Toggle checked={requestApproval} onChange={setRequestApproval} label="Ask for approval before it publishes" />}
+          {canApprove && (
+            <Toggle
+              checked={requestApproval}
+              onChange={setRequestApproval}
+              label="Ask for approval before it publishes"
+            />
+          )}
           {problems.length > 0 && <p className="text-xs text-foreground-muted">{problems.join('. ')}.</p>}
           <div className="flex gap-2">
-            <button type="button" className={btnPrimary} disabled={!!submitting || problems.length > 0} onClick={() => submit(false)}>
+            <button
+              type="button"
+              className={btnPrimary}
+              disabled={!!submitting || problems.length > 0}
+              onClick={() => submit(false)}
+            >
               {submitting === 'post' ? 'Queuing...' : when === 'at' ? 'Schedule' : 'Post'}
             </button>
-            <button type="button" className={btnGhost} disabled={!!submitting || !platforms.length} onClick={() => submit(true)}>
+            <button
+              type="button"
+              className={btnGhost}
+              disabled={!!submitting || !platforms.length}
+              onClick={() => submit(true)}
+            >
               {submitting === 'draft' ? 'Saving...' : 'Save as draft'}
             </button>
             <button type="button" className={btnGhost} onClick={reset}>

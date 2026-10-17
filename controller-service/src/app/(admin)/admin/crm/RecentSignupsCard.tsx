@@ -93,19 +93,19 @@ export default function RecentSignupsCard({ items }: { items: SignupEntry[] }) {
         zIndex="z-[300]"
       >
         <div className="divide-y divide-border-default">
-                {items.map(s => (
-                  <SignupRow key={s.id} s={s} />
-                ))}
-              </div>
-              <div className="pt-4 shrink-0 border-t border-border-default mt-2">
-                <Link
-                  href={ap('/admin/customers?segment=lead')}
-                  className="block text-center text-xs text-accent-500 hover:text-accent-600 font-medium"
-                  onClick={() => setOpen(false)}
-                >
-                  View all leads in Customers →
-                </Link>
-              </div>
+          {items.map(s => (
+            <SignupRow key={s.id} s={s} />
+          ))}
+        </div>
+        <div className="pt-4 shrink-0 border-t border-border-default mt-2">
+          <Link
+            href={ap('/admin/customers?segment=lead')}
+            className="block text-center text-xs text-accent-500 hover:text-accent-600 font-medium"
+            onClick={() => setOpen(false)}
+          >
+            View all leads in Customers →
+          </Link>
+        </div>
       </Dialog>
     </>
   )

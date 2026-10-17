@@ -112,7 +112,12 @@ export default function Inbox({ reloadKey }: { reloadKey: number }) {
                 <p className="text-xs text-foreground-muted truncate">
                   On: {it.post_caption}
                   {it.post_permalink && (
-                    <a href={it.post_permalink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 ml-1 text-accent-500 hover:underline">
+                    <a
+                      href={it.post_permalink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-0.5 ml-1 text-accent-500 hover:underline"
+                    >
                       view <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
@@ -126,12 +131,23 @@ export default function Inbox({ reloadKey }: { reloadKey: number }) {
                 </p>
               ) : canWrite && replying === it.id ? (
                 <div className="space-y-2">
-                  <textarea rows={2} className={inputCls} value={text} onChange={e => setText(e.target.value)} placeholder="Write a reply" />
+                  <textarea
+                    rows={2}
+                    className={inputCls}
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    placeholder="Write a reply"
+                  />
                   <div className="flex gap-2 justify-end">
                     <button type="button" className={btnGhost} onClick={() => setReplying(null)}>
                       Cancel
                     </button>
-                    <button type="button" className={btnPrimary} disabled={sending || !text.trim()} onClick={() => send(it.id)}>
+                    <button
+                      type="button"
+                      className={btnPrimary}
+                      disabled={sending || !text.trim()}
+                      onClick={() => send(it.id)}
+                    >
                       {sending ? 'Sending...' : 'Send reply'}
                     </button>
                   </div>

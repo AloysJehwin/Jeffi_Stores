@@ -27,16 +27,16 @@ export default async function SocialPostsPage() {
         description="Plan, publish and measure posts across Facebook, Instagram, Business Profile, YouTube, Pinterest, LinkedIn and X"
         actions={
           canWrite && (
-          <AdminIntegrationsPopup
-            scope="social"
-            integrations={[]}
-            socialAccounts={socialAccounts.flatMap(s =>
-              s.provider === 'facebook' || s.provider === 'instagram'
-                ? [{ provider: s.provider, page_name: s.page_name, page_id: s.page_id, status: s.status }]
-                : []
-            )}
-            oauth={{ meta: oauthProviderInfo('meta') }}
-          />
+            <AdminIntegrationsPopup
+              scope="social"
+              integrations={[]}
+              socialAccounts={socialAccounts.flatMap(s =>
+                s.provider === 'facebook' || s.provider === 'instagram'
+                  ? [{ provider: s.provider, page_name: s.page_name, page_id: s.page_id, status: s.status }]
+                  : []
+              )}
+              oauth={{ meta: oauthProviderInfo('meta') }}
+            />
           )
         }
       />

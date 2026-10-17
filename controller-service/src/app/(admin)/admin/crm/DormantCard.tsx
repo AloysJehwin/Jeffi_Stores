@@ -50,9 +50,7 @@ export default function DormantCard({ items }: { items: DormantEntry[] }) {
     <>
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-            Dormant — Top by LTV
-          </h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Dormant — Top by LTV</h2>
           <div className="flex items-center gap-3">
             {items.length > 0 && (
               <button
@@ -123,9 +121,7 @@ export default function DormantCard({ items }: { items: DormantEntry[] }) {
                 {canMail && (
                   <div className="flex flex-col flex-1 min-w-0">
                     <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
-                      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-                        Send message
-                      </h3>
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Send message</h3>
                       <Link
                         href={ap('/admin/customers?segment=dormant')}
                         className="text-xs text-accent-500 hover:text-accent-600 font-medium"

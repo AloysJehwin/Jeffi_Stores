@@ -95,14 +95,22 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
   // SMS body can come from a linked library template (slug) instead of an inline template.
   useEffect(() => {
     const slug = c?.sms_template_slug
-    if (!slug) { setSmsLibraryBody(null); return }
+    if (!slug) {
+      setSmsLibraryBody(null)
+      return
+    }
     fetch(`/api/admin/messaging-templates/sms/${encodeURIComponent(slug)}`, { credentials: 'include' })
       .then(r => (r.ok ? r.json() : null))
       .then(a => setSmsLibraryBody(a?.current_version?.body ?? null))
       .catch(() => {})
   }, [c?.sms_template_slug])
 
-  if (loading) return <CampaignPageSkeleton><CampaignDetailSkeleton /></CampaignPageSkeleton>
+  if (loading)
+    return (
+      <CampaignPageSkeleton>
+        <CampaignDetailSkeleton />
+      </CampaignPageSkeleton>
+    )
   if (error || !c) return <div className="p-6 text-sm text-red-600">{error || 'Not found'}</div>
 
   const vars = { ...sampleVariableMap(), ...SAMPLE_VARS }
@@ -198,7 +206,10 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
           {waEnabled && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
               <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">WhatsApp</h3>
-              <WhatsAppPreview value={{ slug: c.wa_template_slug ?? null, variables: c.wa_variables ?? {} }} vars={vars} />
+              <WhatsAppPreview
+                value={{ slug: c.wa_template_slug ?? null, variables: c.wa_variables ?? {} }}
+                vars={vars}
+              />
             </div>
           )}
         </div>

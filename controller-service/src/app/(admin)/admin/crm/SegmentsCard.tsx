@@ -176,20 +176,17 @@ export default function SegmentsCard({ segments }: { segments: Record<string, nu
     {
       key: 'vip',
       label: 'VIP',
-      color:
-        'bg-amber-500/10 text-amber-700 border-amber-500/40 dark:text-amber-400',
+      color: 'bg-amber-500/10 text-amber-700 border-amber-500/40 dark:text-amber-400',
     },
     {
       key: 'loyal',
       label: 'Loyal',
-      color:
-        'bg-emerald-500/10 text-emerald-700 border-emerald-500/40 dark:text-emerald-400',
+      color: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/40 dark:text-emerald-400',
     },
     {
       key: 'b2b',
       label: 'B2B',
-      color:
-        'bg-indigo-500/10 text-indigo-700 border-indigo-500/40 dark:text-indigo-400',
+      color: 'bg-indigo-500/10 text-indigo-700 border-indigo-500/40 dark:text-indigo-400',
     },
     {
       key: 'repeat',
@@ -199,14 +196,12 @@ export default function SegmentsCard({ segments }: { segments: Record<string, nu
     {
       key: 'new',
       label: 'New (<30d)',
-      color:
-        'bg-purple-500/10 text-purple-700 border-purple-500/40 dark:text-purple-400',
+      color: 'bg-purple-500/10 text-purple-700 border-purple-500/40 dark:text-purple-400',
     },
     {
       key: 'at_risk',
       label: 'At Risk',
-      color:
-        'bg-orange-500/10 text-orange-700 border-orange-500/40 dark:text-orange-400',
+      color: 'bg-orange-500/10 text-orange-700 border-orange-500/40 dark:text-orange-400',
     },
     {
       key: 'dormant',

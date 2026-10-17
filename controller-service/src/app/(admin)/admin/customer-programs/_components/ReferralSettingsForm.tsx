@@ -100,7 +100,9 @@ export default function ReferralSettingsForm({ initial }: { initial: ReferralSet
               disabled={!canWrite}
               className={inputClass}
             />
-            <p className={hintClass}>The friend&apos;s first delivered order must be placed this soon after signing up.</p>
+            <p className={hintClass}>
+              The friend&apos;s first delivered order must be placed this soon after signing up.
+            </p>
           </div>
         </div>
       </div>

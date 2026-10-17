@@ -11,10 +11,10 @@ export default async function NewCampaignPage() {
   const host = await getHost()
   return (
     <MobileEditBlock>
-    <div className="p-4 sm:p-6 space-y-5">
-      <BackLink href={ap('/admin/campaigns', host)} label={'Campaigns'} />
-      <NewCampaignClient />
-    </div>
+      <div className="p-4 sm:p-6 space-y-5">
+        <BackLink href={ap('/admin/campaigns', host)} label={'Campaigns'} />
+        <NewCampaignClient />
+      </div>
     </MobileEditBlock>
   )
 }

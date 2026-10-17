@@ -2,7 +2,21 @@
 
 import { useCallback, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Kpi, Section, Badge, Banner, Table, Empty, api, money, count, pct, change, when, type Col } from '@/components/admin/channels/ui'
+import {
+  Kpi,
+  Section,
+  Badge,
+  Banner,
+  Table,
+  Empty,
+  api,
+  money,
+  count,
+  pct,
+  change,
+  when,
+  type Col,
+} from '@/components/admin/channels/ui'
 import { PageHeader } from '@/components/admin/kit'
 import { TrendChart, type SeriesDef, type ChartPoint } from '@/components/admin/dashboard/Charts'
 import { GroupLabel } from '@/components/admin/dashboard/Primitives'
@@ -20,7 +34,14 @@ const DOT: Record<OverviewAttention['severity'], string> = {
 }
 
 const TREND_SERIES: SeriesDef[] = [
-  { key: 'returningRevenue', label: 'Returning revenue', color: 'rgb(16 185 129)', kind: 'area', axis: 'money', on: true },
+  {
+    key: 'returningRevenue',
+    label: 'Returning revenue',
+    color: 'rgb(16 185 129)',
+    kind: 'area',
+    axis: 'money',
+    on: true,
+  },
   { key: 'newRevenue', label: 'New customer revenue', color: 'rgb(59 130 246)', kind: 'area', axis: 'money', on: true },
   { key: 'newBuyers', label: 'New buyers', color: 'rgb(224 123 63)', kind: 'bar', axis: 'count' },
   { key: 'returningBuyers', label: 'Returning buyers', color: 'rgb(168 85 247)', kind: 'line', axis: 'count' },
@@ -57,11 +78,24 @@ function PeriodPicker({
       </div>
       <div className="flex items-center gap-1.5 text-xs text-foreground-muted">
         <span aria-label="From">
-          <DatePicker aria-label="From" value={value.from} max={value.to} disabled={disabled} onChange={v => v && onChange({ from: v, to: value.to })} />
+          <DatePicker
+            aria-label="From"
+            value={value.from}
+            max={value.to}
+            disabled={disabled}
+            onChange={v => v && onChange({ from: v, to: value.to })}
+          />
         </span>
         <span>to</span>
         <span aria-label="To">
-          <DatePicker aria-label="To" value={value.to} min={value.from} max={today} disabled={disabled} onChange={v => v && onChange({ from: value.from, to: v })} />
+          <DatePicker
+            aria-label="To"
+            value={value.to}
+            min={value.from}
+            max={today}
+            disabled={disabled}
+            onChange={v => v && onChange({ from: value.from, to: v })}
+          />
         </span>
       </div>
     </div>
@@ -80,7 +114,9 @@ function AttentionList({ items, host }: { items: OverviewAttention[]; host: stri
         >
           <span className={`w-2 h-2 rounded-full shrink-0 ${DOT[it.severity]}`} />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-foreground group-hover:text-accent-600 transition-colors">{it.label}</p>
+            <p className="text-sm font-medium text-foreground group-hover:text-accent-600 transition-colors">
+              {it.label}
+            </p>
             <p className="text-[11px] text-foreground-muted mt-0.5">{it.sub}</p>
           </div>
         </Link>
@@ -90,7 +126,11 @@ function AttentionList({ items, host }: { items: OverviewAttention[]; host: stri
 }
 
 function cohortLabel(ym: string) {
-  return new Date(`${ym}-01T00:00:00Z`).toLocaleDateString('en-IN', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+  return new Date(`${ym}-01T00:00:00Z`).toLocaleDateString('en-IN', {
+    month: 'short',
+    year: '2-digit',
+    timeZone: 'UTC',
+  })
 }
 
 function cellStyle(v: number | null) {
@@ -176,10 +216,12 @@ export default function CrmOverview({
       url.searchParams.set('from', p.from)
       url.searchParams.set('to', p.to)
       window.history.replaceState(null, '', url)
-      const { ok, data: d } = await api<CrmOverviewData>(`/api/admin/crm/overview?from=${p.from}&to=${p.to}`).catch(() => ({
-        ok: false,
-        data: { error: 'Network error' } as CrmOverviewData & { error?: string },
-      }))
+      const { ok, data: d } = await api<CrmOverviewData>(`/api/admin/crm/overview?from=${p.from}&to=${p.to}`).catch(
+        () => ({
+          ok: false,
+          data: { error: 'Network error' } as CrmOverviewData & { error?: string },
+        })
+      )
       if (ok) setData(d)
       else setError(d.error || 'Failed to load')
       setLoading(false)
@@ -206,7 +248,11 @@ export default function CrmOverview({
     { key: 'orders', label: 'Orders', num: true, render: c => count(c.orders), sort: c => c.orders },
     { key: 'revenue', label: 'Revenue', num: true, render: c => money(c.revenue), sort: c => c.revenue },
     { key: 'ltv', label: 'Lifetime', num: true, render: c => money(c.ltv), sort: c => c.ltv },
-    { key: 'last', label: 'Last order', render: c => <span className="whitespace-nowrap text-xs">{when(c.lastAt)}</span> },
+    {
+      key: 'last',
+      label: 'Last order',
+      render: c => <span className="whitespace-nowrap text-xs">{when(c.lastAt)}</span>,
+    },
     { key: 'health', label: 'Health', render: riskBadge, sort: c => c.healthScore ?? -1 },
   ]
 
@@ -221,20 +267,44 @@ export default function CrmOverview({
       {error && <Banner ok={false}>{error}</Banner>}
 
       <div className={`grid gap-3 grid-cols-2 md:grid-cols-4 transition-opacity ${loading ? 'opacity-60' : ''}`}>
-        <Kpi label="Total customers" value={count(k.totalCustomers)} delta={change(k.totalCustomers, p.totalCustomers)} sub="Registered accounts" />
-        <Kpi label="New customers" value={count(k.newCustomers)} delta={change(k.newCustomers, p.newCustomers)} sub={`${count(k.firstTimeBuyers)} placed a first order`} />
-        <Kpi label="Active customers" value={count(k.activeCustomers)} delta={change(k.activeCustomers, p.activeCustomers)} sub={`${count(k.orders)} orders in period`} highlight />
+        <Kpi
+          label="Total customers"
+          value={count(k.totalCustomers)}
+          delta={change(k.totalCustomers, p.totalCustomers)}
+          sub="Registered accounts"
+        />
+        <Kpi
+          label="New customers"
+          value={count(k.newCustomers)}
+          delta={change(k.newCustomers, p.newCustomers)}
+          sub={`${count(k.firstTimeBuyers)} placed a first order`}
+        />
+        <Kpi
+          label="Active customers"
+          value={count(k.activeCustomers)}
+          delta={change(k.activeCustomers, p.activeCustomers)}
+          sub={`${count(k.orders)} orders in period`}
+          highlight
+        />
         <Kpi
           label="Repeat purchase rate"
           value={pct(k.repeatRate, 0)}
           delta={k.repeatRate != null && p.repeatRate != null ? change(k.repeatRate, p.repeatRate) : null}
           sub="Active customers with 2+ orders to date"
         />
-        <Kpi label="Avg order value" value={money(k.aov)} delta={k.aov != null && p.aov != null ? change(k.aov, p.aov) : null} />
+        <Kpi
+          label="Avg order value"
+          value={money(k.aov)}
+          delta={k.aov != null && p.aov != null ? change(k.aov, p.aov) : null}
+        />
         <Kpi
           label="Revenue per customer"
           value={money(k.revenuePerCustomer)}
-          delta={k.revenuePerCustomer != null && p.revenuePerCustomer != null ? change(k.revenuePerCustomer, p.revenuePerCustomer) : null}
+          delta={
+            k.revenuePerCustomer != null && p.revenuePerCustomer != null
+              ? change(k.revenuePerCustomer, p.revenuePerCustomer)
+              : null
+          }
           sub={`${money(k.revenue)} from customers`}
         />
         <Kpi
@@ -269,17 +339,30 @@ export default function CrmOverview({
       <GroupLabel title="Customers and revenue" hint={periodLabel(data.period)} />
       <div className={`space-y-5 transition-opacity ${loading ? 'opacity-60' : ''}`}>
         <Section title="New vs returning customers">
-          <TrendChart points={points} bucket={data.bucket} series={TREND_SERIES} ariaLabel="Revenue from new and returning customers" />
+          <TrendChart
+            points={points}
+            bucket={data.bucket}
+            series={TREND_SERIES}
+            ariaLabel="Revenue from new and returning customers"
+          />
         </Section>
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
           <div className="xl:col-span-3 min-w-0">
             <Section title="Top customers by revenue">
-              <Table rows={data.topCustomers} cols={cols} rowKey={c => c.id} empty="No customer orders in this period" pageSize={10} />
+              <Table
+                rows={data.topCustomers}
+                cols={cols}
+                rowKey={c => c.id}
+                empty="No customer orders in this period"
+                pageSize={10}
+              />
             </Section>
           </div>
           <div className="xl:col-span-2 min-w-0">
             <Section title="Retention by first-order month">
-              <p className="text-[11px] text-foreground-muted -mt-2 mb-3">Share of each cohort ordering again 1 to 6 months later.</p>
+              <p className="text-[11px] text-foreground-muted -mt-2 mb-3">
+                Share of each cohort ordering again 1 to 6 months later.
+              </p>
               <CohortTable rows={data.cohorts} />
             </Section>
           </div>
@@ -299,7 +382,11 @@ export default function CrmOverview({
         <>
           <GroupLabel
             title="Deep dive"
-            hint={syncRange ? 'follows the period above; filter by segment' : 'pick a range here; custom periods do not apply'}
+            hint={
+              syncRange
+                ? 'follows the period above; filter by segment'
+                : 'pick a range here; custom periods do not apply'
+            }
           />
           <CrmInsights initial={insights} syncRange={syncRange} />
         </>

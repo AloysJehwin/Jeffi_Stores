@@ -6,7 +6,16 @@ import { useRouter } from 'next/navigation'
 import HoverCard from '@/components/ui/HoverCard'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/shared/admin-path'
-import { DataTable, Dialog, Field, Fields, StatusBadge, ACTIVE_STATUS, badgeCls, type DataCol } from '@/components/admin/kit'
+import {
+  DataTable,
+  Dialog,
+  Field,
+  Fields,
+  StatusBadge,
+  ACTIVE_STATUS,
+  badgeCls,
+  type DataCol,
+} from '@/components/admin/kit'
 import CouponsMobileList from './CouponsMobileList'
 
 export interface CouponRow {
@@ -25,7 +34,8 @@ export interface CouponRow {
 }
 
 const expired = (c: CouponRow) => !!c.valid_until && new Date(c.valid_until) < new Date()
-const off = (c: CouponRow) => (c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`)
+const off = (c: CouponRow) =>
+  c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`
 const uses = (c: CouponRow) => `${c.times_used}${c.usage_limit ? `/${c.usage_limit}` : ''}`
 
 export default function CouponsTable({
@@ -74,7 +84,11 @@ export default function CouponsTable({
         <div className="flex flex-col gap-1">
           <HoverCard
             trigger={
-              <Link href={viewHref(c)} className="font-mono font-bold text-accent-500 hover:text-accent-600 hover:underline" onClick={e => e.stopPropagation()}>
+              <Link
+                href={viewHref(c)}
+                className="font-mono font-bold text-accent-500 hover:text-accent-600 hover:underline"
+                onClick={e => e.stopPropagation()}
+              >
                 {c.code}
               </Link>
             }
@@ -120,18 +134,60 @@ export default function CouponsTable({
         </div>
       ),
     },
-    { key: 'type', label: 'Type', sortParam: 'type', render: c => <span className="capitalize text-foreground-secondary">{c.discount_type}</span> },
-    { key: 'value', label: 'Value', sortParam: 'value', num: true, render: c => <span className="font-medium">{c.discount_type === 'percentage' ? `${c.discount_value}%` : `₹${c.discount_value}`}</span> },
-    { key: 'min', label: 'Min Purchase', sortParam: 'min_purchase', num: true, hideBelow: 'lg', render: c => <span className="text-foreground-secondary">{c.min_purchase_amount ? `₹${c.min_purchase_amount}` : '—'}</span> },
-    { key: 'usage', label: 'Usage', sortParam: 'usage', num: true, render: c => <span className="text-foreground-secondary">{uses(c)}</span> },
+    {
+      key: 'type',
+      label: 'Type',
+      sortParam: 'type',
+      render: c => <span className="capitalize text-foreground-secondary">{c.discount_type}</span>,
+    },
+    {
+      key: 'value',
+      label: 'Value',
+      sortParam: 'value',
+      num: true,
+      render: c => (
+        <span className="font-medium">
+          {c.discount_type === 'percentage' ? `${c.discount_value}%` : `₹${c.discount_value}`}
+        </span>
+      ),
+    },
+    {
+      key: 'min',
+      label: 'Min Purchase',
+      sortParam: 'min_purchase',
+      num: true,
+      hideBelow: 'lg',
+      render: c => (
+        <span className="text-foreground-secondary">{c.min_purchase_amount ? `₹${c.min_purchase_amount}` : '—'}</span>
+      ),
+    },
+    {
+      key: 'usage',
+      label: 'Usage',
+      sortParam: 'usage',
+      num: true,
+      render: c => <span className="text-foreground-secondary">{uses(c)}</span>,
+    },
     {
       key: 'valid',
       label: 'Valid Until',
       sortParam: 'valid_until',
       hideBelow: 'lg',
-      render: c => (c.valid_until ? <span className={expired(c) ? 'text-red-500' : 'text-foreground-secondary'}>{new Date(c.valid_until).toLocaleDateString('en-IN')}</span> : <span className="text-foreground-muted">—</span>),
+      render: c =>
+        c.valid_until ? (
+          <span className={expired(c) ? 'text-red-500' : 'text-foreground-secondary'}>
+            {new Date(c.valid_until).toLocaleDateString('en-IN')}
+          </span>
+        ) : (
+          <span className="text-foreground-muted">—</span>
+        ),
     },
-    { key: 'status', label: 'Status', sortParam: 'status', render: c => <StatusBadge status={String(c.is_active)} map={ACTIVE_STATUS} /> },
+    {
+      key: 'status',
+      label: 'Status',
+      sortParam: 'status',
+      render: c => <StatusBadge status={String(c.is_active)} map={ACTIVE_STATUS} />,
+    },
   ]
 
   return (
@@ -149,14 +205,25 @@ export default function CouponsTable({
         mobile={<CouponsMobileList coupons={coupons} backUrl={backUrl} />}
         empty={{ title: 'No coupons found', body: 'Try a different search or clear the filters.' }}
         rowActions={c => [
-          { key: 'edit', kind: 'edit', label: 'Edit Coupon', href: ap(`/admin/coupons/${c.id}/edit?back=${encodeURIComponent(backUrl)}`), scope: 'coupons:write' },
+          {
+            key: 'edit',
+            kind: 'edit',
+            label: 'Edit Coupon',
+            href: ap(`/admin/coupons/${c.id}/edit?back=${encodeURIComponent(backUrl)}`),
+            scope: 'coupons:write',
+          },
           {
             key: 'delete',
             kind: 'delete',
             label: 'Delete Coupon',
             scope: 'coupons:write',
             onSelect: () => deleteCoupon(c),
-            confirm: { title: 'Delete Coupon', message: `Delete coupon "${c.code}"? This action cannot be undone.`, confirmLabel: 'Delete', variant: 'danger' },
+            confirm: {
+              title: 'Delete Coupon',
+              message: `Delete coupon "${c.code}"? This action cannot be undone.`,
+              confirmLabel: 'Delete',
+              variant: 'danger',
+            },
           },
         ]}
       />
@@ -169,7 +236,11 @@ export default function CouponsTable({
         zIndex="z-[300]"
         footer={
           open && (
-            <Link href={viewHref(open)} onClick={() => setOpen(null)} className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600">
+            <Link
+              href={viewHref(open)}
+              onClick={() => setOpen(null)}
+              className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600"
+            >
               View Coupon
             </Link>
           )
@@ -180,7 +251,9 @@ export default function CouponsTable({
             <div className="flex flex-wrap gap-2">
               <StatusBadge status={String(open.is_active)} map={ACTIVE_STATUS} />
               {expired(open) && <span className={badgeCls('amber')}>Expired</span>}
-              {open.generated_for_campaign && <span className={badgeCls('blue')}>Campaign: {open.generated_for_campaign}</span>}
+              {open.generated_for_campaign && (
+                <span className={badgeCls('blue')}>Campaign: {open.generated_for_campaign}</span>
+              )}
             </div>
             <Fields>
               <Field label="Discount" value={off(open)} />
@@ -188,7 +261,14 @@ export default function CouponsTable({
               {open.min_purchase_amount && <Field label="Min Purchase" value={`₹${open.min_purchase_amount}`} />}
               <Field label="Usage" value={`${uses(open)} uses`} />
               {open.valid_until && (
-                <Field label="Valid Until" value={<span className={expired(open) ? 'text-red-500' : ''}>{new Date(open.valid_until).toLocaleDateString('en-IN')}</span>} />
+                <Field
+                  label="Valid Until"
+                  value={
+                    <span className={expired(open) ? 'text-red-500' : ''}>
+                      {new Date(open.valid_until).toLocaleDateString('en-IN')}
+                    </span>
+                  }
+                />
               )}
             </Fields>
           </div>

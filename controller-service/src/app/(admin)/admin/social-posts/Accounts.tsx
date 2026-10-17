@@ -9,7 +9,11 @@ import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { Badge, Section, api, btnGhost, btnPrimary, inputCls, when } from '@/components/admin/channels/ui'
 import type { NetworkInfo } from './shared'
 
-const STATUS_TONE: Record<string, 'green' | 'amber' | 'red' | 'muted'> = { connected: 'green', pending: 'amber', not_connected: 'muted' }
+const STATUS_TONE: Record<string, 'green' | 'amber' | 'red' | 'muted'> = {
+  connected: 'green',
+  pending: 'amber',
+  not_connected: 'muted',
+}
 const META = new Set(['facebook', 'instagram'])
 
 /** What the target id is on each network, for the manual form and the picker. */
@@ -22,7 +26,15 @@ const TARGET_FIELD: Record<string, { label: string; placeholder: string }> = {
 }
 const targetField = (network: string) => TARGET_FIELD[network] ?? { label: 'Target ID', placeholder: '' }
 
-export default function Accounts({ networks, autoPick, onChange }: { networks: NetworkInfo[] | null; autoPick: string | null; onChange: () => void }) {
+export default function Accounts({
+  networks,
+  autoPick,
+  onChange,
+}: {
+  networks: NetworkInfo[] | null
+  autoPick: string | null
+  onChange: () => void
+}) {
   const canWrite = useCanWrite('social')
   const { showToast } = useToast()
   const [picking, setPicking] = useState<string | null>(autoPick)
@@ -58,32 +70,55 @@ export default function Accounts({ networks, autoPick, onChange }: { networks: N
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm font-medium w-40">{n.label}</span>
                 <Badge tone={STATUS_TONE[n.status] ?? 'red'}>{n.status.replace('_', ' ')}</Badge>
-                {n.status !== 'not_connected' && n.via === 'manual' && <Badge>{n.ownApp ? 'manual, own app' : 'manual'}</Badge>}
+                {n.status !== 'not_connected' && n.via === 'manual' && (
+                  <Badge>{n.ownApp ? 'manual, own app' : 'manual'}</Badge>
+                )}
                 {n.target && <span className="text-sm text-foreground-secondary">{n.target}</span>}
                 {n.tokenExpiry && <span className="text-xs text-foreground-muted">expires {when(n.tokenExpiry)}</span>}
                 <span className="text-xs text-foreground-muted">
-                  {[n.features.insights && 'insights', n.features.inbox && 'inbox', n.features.reply && 'replies'].filter(Boolean).join(', ')}
+                  {[n.features.insights && 'insights', n.features.inbox && 'inbox', n.features.reply && 'replies']
+                    .filter(Boolean)
+                    .join(', ')}
                 </span>
                 <div className="ml-auto flex items-center gap-2">
                   {meta ? (
-                    <span className="text-xs text-foreground-muted">Connect or change with the Facebook and Instagram button at the top of the page.</span>
+                    <span className="text-xs text-foreground-muted">
+                      Connect or change with the Facebook and Instagram button at the top of the page.
+                    </span>
                   ) : canWrite ? (
                     <>
                       {n.status === 'pending' && (
-                        <button type="button" className={btnGhost} onClick={() => setPicking(p => (p === n.network ? null : n.network))}>
+                        <button
+                          type="button"
+                          className={btnGhost}
+                          onClick={() => setPicking(p => (p === n.network ? null : n.network))}
+                        >
                           Choose where to post
                         </button>
                       )}
-                      <button type="button" className={btnGhost} onClick={() => setManual(m => (m === n.network ? null : n.network))}>
+                      <button
+                        type="button"
+                        className={btnGhost}
+                        onClick={() => setManual(m => (m === n.network ? null : n.network))}
+                      >
                         Enter credentials
                       </button>
                       {n.configured && (
-                        <a href={`/api/admin/social/networks/${n.network}/connect`} className={n.status === 'connected' ? btnGhost : btnPrimary}>
+                        <a
+                          href={`/api/admin/social/networks/${n.network}/connect`}
+                          className={n.status === 'connected' ? btnGhost : btnPrimary}
+                        >
                           {n.status === 'not_connected' ? 'Connect' : 'Reconnect'}
                         </a>
                       )}
                       {n.status !== 'not_connected' && (
-                        <IconButton icon={Unplug} variant="danger" label="Disconnect" busy={busy === n.network} onClick={() => disconnect(n.network)} />
+                        <IconButton
+                          icon={Unplug}
+                          variant="danger"
+                          label="Disconnect"
+                          busy={busy === n.network}
+                          onClick={() => disconnect(n.network)}
+                        />
                       )}
                     </>
                   ) : null}
@@ -92,17 +127,23 @@ export default function Accounts({ networks, autoPick, onChange }: { networks: N
               {!meta && !n.configured && (
                 <div className="text-xs text-foreground-muted rounded-lg bg-surface-secondary p-2 space-y-1">
                   <p>
-                    {n.label} sign-in is not set up on this platform yet. It needs: <span className="font-mono">{n.missing.join(', ')}</span>.
+                    {n.label} sign-in is not set up on this platform yet. It needs:{' '}
+                    <span className="font-mono">{n.missing.join(', ')}</span>.
                   </p>
                   {n.redirectUri && (
                     <p>
-                      Redirect URI to register with {n.label}: <span className="font-mono break-all">{n.redirectUri}</span>
+                      Redirect URI to register with {n.label}:{' '}
+                      <span className="font-mono break-all">{n.redirectUri}</span>
                     </p>
                   )}
-                  {canWrite && manual !== n.network && <p>You can still connect by entering credentials from your own {n.label} app.</p>}
+                  {canWrite && manual !== n.network && (
+                    <p>You can still connect by entering credentials from your own {n.label} app.</p>
+                  )}
                 </div>
               )}
-              {notice[n.network] && <p className="text-xs text-amber-600 rounded-lg bg-surface-secondary p-2">{notice[n.network]}</p>}
+              {notice[n.network] && (
+                <p className="text-xs text-amber-600 rounded-lg bg-surface-secondary p-2">{notice[n.network]}</p>
+              )}
               {canWrite && manual === n.network && !meta && (
                 <ManualCredentials
                   info={n}
@@ -136,20 +177,37 @@ export default function Accounts({ networks, autoPick, onChange }: { networks: N
   )
 }
 
-function ManualCredentials({ info, onDone }: { info: NetworkInfo; onDone: (saved: boolean, warning?: string) => void }) {
+function ManualCredentials({
+  info,
+  onDone,
+}: {
+  info: NetworkInfo
+  onDone: (saved: boolean, warning?: string) => void
+}) {
   const canWrite = useCanWrite('social')
   const { showToast } = useToast()
-  const [f, setF] = useState({ accessToken: '', refreshToken: '', clientId: '', clientSecret: '', targetId: '', targetName: '' })
+  const [f, setF] = useState({
+    accessToken: '',
+    refreshToken: '',
+    clientId: '',
+    clientSecret: '',
+    targetId: '',
+    targetName: '',
+  })
   const [saving, setSaving] = useState(false)
   const setError = (text: string) => showToast(text, 'error')
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(p => ({ ...p, [k]: e.target.value }))
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setF(p => ({ ...p, [k]: e.target.value }))
   const target = targetField(info.network)
   const pairBroken = !!f.clientId.trim() !== !!f.clientSecret.trim()
 
   async function save() {
     setSaving(true)
     try {
-      const r = await api<{ warning?: string }>(`/api/admin/social/networks/${info.network}/manual`, { method: 'POST', json: f })
+      const r = await api<{ warning?: string }>(`/api/admin/social/networks/${info.network}/manual`, {
+        method: 'POST',
+        json: f,
+      })
       if (!r.ok) return setError(r.data.error || 'Could not save')
       showToast(`${info.label} connected`, 'success')
       onDone(true, r.data.warning)
@@ -167,11 +225,23 @@ function ManualCredentials({ info, onDone }: { info: NetworkInfo; onDone: (saved
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="text-xs space-y-1 sm:col-span-2">
           <span>Access token</span>
-          <input type="password" autoComplete="off" className={inputCls} value={f.accessToken} onChange={set('accessToken')} />
+          <input
+            type="password"
+            autoComplete="off"
+            className={inputCls}
+            value={f.accessToken}
+            onChange={set('accessToken')}
+          />
         </label>
         <label className="text-xs space-y-1 sm:col-span-2">
           <span>Refresh token (optional)</span>
-          <input type="password" autoComplete="off" className={inputCls} value={f.refreshToken} onChange={set('refreshToken')} />
+          <input
+            type="password"
+            autoComplete="off"
+            className={inputCls}
+            value={f.refreshToken}
+            onChange={set('refreshToken')}
+          />
         </label>
         <label className="text-xs space-y-1">
           <span>Your app Client ID {info.configured ? '(optional)' : ''}</span>
@@ -179,7 +249,13 @@ function ManualCredentials({ info, onDone }: { info: NetworkInfo; onDone: (saved
         </label>
         <label className="text-xs space-y-1">
           <span>Your app Client Secret {info.configured ? '(optional)' : ''}</span>
-          <input type="password" autoComplete="off" className={inputCls} value={f.clientSecret} onChange={set('clientSecret')} />
+          <input
+            type="password"
+            autoComplete="off"
+            className={inputCls}
+            value={f.clientSecret}
+            onChange={set('clientSecret')}
+          />
         </label>
         <p className="text-xs text-foreground-muted sm:col-span-2">
           {info.configured
@@ -195,9 +271,16 @@ function ManualCredentials({ info, onDone }: { info: NetworkInfo; onDone: (saved
           <input className={inputCls} value={f.targetName} onChange={set('targetName')} />
         </label>
       </div>
-      {pairBroken && <p className="text-xs text-red-500">Enter both the Client ID and the Client Secret, or neither.</p>}
+      {pairBroken && (
+        <p className="text-xs text-red-500">Enter both the Client ID and the Client Secret, or neither.</p>
+      )}
       <div className="flex gap-2">
-        <button type="button" className={btnPrimary} disabled={saving || !f.accessToken.trim() || !f.targetId.trim() || pairBroken} onClick={save}>
+        <button
+          type="button"
+          className={btnPrimary}
+          disabled={saving || !f.accessToken.trim() || !f.targetId.trim() || pairBroken}
+          onClick={save}
+        >
           {saving ? 'Saving...' : 'Save'}
         </button>
         <button type="button" className={btnGhost} onClick={() => onDone(false)}>
@@ -208,7 +291,15 @@ function ManualCredentials({ info, onDone }: { info: NetworkInfo; onDone: (saved
   )
 }
 
-function TargetPicker({ network, label, onDone }: { network: string; label: string; onDone: (chosen: boolean) => void }) {
+function TargetPicker({
+  network,
+  label,
+  onDone,
+}: {
+  network: string
+  label: string
+  onDone: (chosen: boolean) => void
+}) {
   const canWrite = useCanWrite('social')
   const { showToast } = useToast()
   const [targets, setTargets] = useState<{ id: string; name: string }[] | null>(null)
@@ -263,7 +354,9 @@ function TargetPicker({ network, label, onDone }: { network: string; label: stri
       ) : !targets ? (
         <p className="text-sm text-foreground-muted">Loading...</p>
       ) : !targets.length ? (
-        <p className="text-sm text-foreground-muted">This sign-in has nothing to post to. Sign in with another account.</p>
+        <p className="text-sm text-foreground-muted">
+          This sign-in has nothing to post to. Sign in with another account.
+        </p>
       ) : (
         <div className="flex gap-2 flex-wrap">
           <Select
@@ -287,13 +380,27 @@ function TargetPicker({ network, label, onDone }: { network: string; label: stri
         <div className="flex gap-2 flex-wrap items-end">
           <label className="text-xs space-y-1">
             <span>Enter the {field.label} instead</span>
-            <input className={inputCls + ' max-w-sm'} placeholder={field.placeholder} value={manualId} onChange={e => setManualId(e.target.value)} />
+            <input
+              className={inputCls + ' max-w-sm'}
+              placeholder={field.placeholder}
+              value={manualId}
+              onChange={e => setManualId(e.target.value)}
+            />
           </label>
           <label className="text-xs space-y-1">
             <span>Display name (optional)</span>
-            <input className={inputCls + ' max-w-xs'} value={manualName} onChange={e => setManualName(e.target.value)} />
+            <input
+              className={inputCls + ' max-w-xs'}
+              value={manualName}
+              onChange={e => setManualName(e.target.value)}
+            />
           </label>
-          <button type="button" className={btnPrimary} disabled={saving || !manualId.trim()} onClick={() => save({ id: manualId.trim(), name: manualName.trim() || undefined })}>
+          <button
+            type="button"
+            className={btnPrimary}
+            disabled={saving || !manualId.trim()}
+            onClick={() => save({ id: manualId.trim(), name: manualName.trim() || undefined })}
+          >
             {saving ? 'Saving...' : 'Use this ID'}
           </button>
         </div>

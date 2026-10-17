@@ -7,7 +7,10 @@ export const revalidate = 0
 export default function ScenariosPage() {
   return (
     <PageBody>
-      <PageHeader title="Scenarios" description="Reusable behavioral triggers. Each scenario can power multiple campaigns." />
+      <PageHeader
+        title="Scenarios"
+        description="Reusable behavioral triggers. Each scenario can power multiple campaigns."
+      />
       <ScenariosListClient />
     </PageBody>
   )

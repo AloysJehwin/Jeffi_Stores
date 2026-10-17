@@ -100,9 +100,7 @@ export default function CouponsMobileList({ coupons, backUrl }: Props) {
               <div className="min-w-0 flex-1">
                 <div className="font-mono font-bold text-accent-500 truncate">{c.code}</div>
                 {c.generated_for_campaign && (
-                  <span className={`${badgeCls('blue')} mt-1 w-fit`}>
-                    {c.generated_for_campaign}
-                  </span>
+                  <span className={`${badgeCls('blue')} mt-1 w-fit`}>{c.generated_for_campaign}</span>
                 )}
               </div>
               <StatusBadge status={String(c.is_active)} map={ACTIVE_STATUS} />
@@ -136,9 +134,7 @@ export default function CouponsMobileList({ coupons, backUrl }: Props) {
             <div className="flex flex-wrap gap-2">
               <StatusBadge status={String(selected.is_active)} map={ACTIVE_STATUS} />
               {selected.generated_for_campaign && (
-                <span className={badgeCls('blue')}>
-                  {selected.generated_for_campaign}
-                </span>
+                <span className={badgeCls('blue')}>{selected.generated_for_campaign}</span>
               )}
             </div>
             {selected.description && <p className="text-sm text-foreground">{selected.description}</p>}

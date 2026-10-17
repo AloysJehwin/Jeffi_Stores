@@ -76,9 +76,7 @@ export default async function CrmDashboardPage({
         <Link
           href={ap('/admin/tasks?scope=all&status=overdue', host)}
           className={`rounded-xl border p-4 hover:border-accent-500/50 transition-colors ${
-            data.tasks.overdue > 0
-              ? 'bg-red-500/5 border-red-500/40'
-              : 'bg-surface-elevated border-border-default'
+            data.tasks.overdue > 0 ? 'bg-red-500/5 border-red-500/40' : 'bg-surface-elevated border-border-default'
           }`}
         >
           <p

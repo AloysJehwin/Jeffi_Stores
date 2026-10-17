@@ -86,7 +86,9 @@ export default function CouponForm({
           <EditorToolbar
             autosaveStatus={'idle' as AutosaveStatus}
             sessionStatus={edit.status}
-            onSave={async () => { await edit.save() }}
+            onSave={async () => {
+              await edit.save()
+            }}
             onCancel={edit.cancel}
             cancelHref={ap('/admin/coupons')}
             hideSave
@@ -228,18 +230,21 @@ export default function CouponForm({
 
           <FormSection title="Validity">
             <FormField label="Valid From">
-                <DateTimePicker name="valid_from" value={validFrom} onChange={setValidFrom} className="w-full" />
-              </FormField>
+              <DateTimePicker name="valid_from" value={validFrom} onChange={setValidFrom} className="w-full" />
+            </FormField>
             <FormField label="Valid Until">
-                <DateTimePicker name="valid_until" value={validUntil} onChange={setValidUntil} className="w-full" />
-              </FormField>
+              <DateTimePicker name="valid_until" value={validUntil} onChange={setValidUntil} className="w-full" />
+            </FormField>
             <p className="text-xs text-foreground-muted">Leave blank for no time limit.</p>
           </FormSection>
         </aside>
       </div>
 
       {showUserSelector && (
-        <FormSection title="Eligible Users" description="Optional — restrict this coupon to specific customers. Leave empty to allow all users.">
+        <FormSection
+          title="Eligible Users"
+          description="Optional — restrict this coupon to specific customers. Leave empty to allow all users."
+        >
           <CouponUserSelector name="eligible_user_ids" />
         </FormSection>
       )}

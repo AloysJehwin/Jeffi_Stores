@@ -32,7 +32,6 @@ const STATUS_STYLES: Record<string, string> = {
   failed: TONE_CLS.red,
 }
 
-
 export default async function MailerPage({
   searchParams,
 }: {
@@ -52,7 +51,11 @@ export default async function MailerPage({
         listLabel="Messages"
         actions={
           <span className="hidden md:inline-flex">
-            <TabAction href={ap('/admin/marketing/messaging/new', host)} icon={<Plus className="w-4 h-4" />} label="New message" />
+            <TabAction
+              href={ap('/admin/marketing/messaging/new', host)}
+              icon={<Plus className="w-4 h-4" />}
+              label="New message"
+            />
           </span>
         }
       />
@@ -135,8 +138,8 @@ async function MailerListContent({
       <div className="max-w-xl rounded-xl border border-amber-500/40 bg-amber-500/5 p-5">
         <h2 className="font-semibold text-amber-700 dark:text-amber-400 mb-2">Database migration required</h2>
         <p className="text-sm text-foreground mb-3">
-          The <code className="font-mono bg-amber-500/10 px-1 rounded">email_campaigns</code> table
-          does not exist yet. It is defined in the schema file below and is created by the schema pipeline:
+          The <code className="font-mono bg-amber-500/10 px-1 rounded">email_campaigns</code> table does not exist yet.
+          It is defined in the schema file below and is created by the schema pipeline:
         </p>
         <pre className="bg-amber-500/10 rounded-lg px-4 py-3 text-xs font-mono text-amber-700 dark:text-amber-400 overflow-x-auto">
           database/marketing.sql
