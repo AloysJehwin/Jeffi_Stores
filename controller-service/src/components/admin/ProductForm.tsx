@@ -103,6 +103,49 @@ function toSupplierRow(s: any): SupplierRow {
   }
 }
 
+const AI_PHOTO_SUFFIX = 'On a plain white studio background, soft shadow, product photo.'
+const AI_SPEC_KEY = /material|size|dimension|colou?r|finish|weight/i
+
+// Default prompt for product / variant AI images; empty parts are skipped, capped at 400 chars.
+function buildProductImagePrompt(p: {
+  name?: string
+  brand?: string
+  category?: string
+  specs?: { key: string; value: string }[]
+  variant?: { label?: string; value?: string }
+  sub?: { label?: string; value?: string }
+  weightGrams?: string
+  dims?: [string, string, string]
+  availableIn?: string[]
+}): string {
+  const t = (v?: string) => (v || '').trim()
+  const head = [t(p.name) || 'The product', t(p.brand) && `by ${t(p.brand)}`].filter(Boolean).join(' ')
+  const parts: string[] = [t(p.category) ? `${head}, ${t(p.category)}.` : `${head}.`]
+  const pair = (x?: { label?: string; value?: string }) =>
+    t(x?.value) ? `${t(x?.label) ? `${t(x?.label)}: ` : ''}${t(x?.value)}.` : ''
+  parts.push(pair(p.variant), pair(p.sub))
+  const specs = (p.specs || [])
+    .filter(s => t(s.key) && t(s.value) && AI_SPEC_KEY.test(s.key))
+    .slice(0, 3)
+    .map(s => `${t(s.key)}: ${t(s.value)}`)
+  if (t(p.weightGrams) && Number(p.weightGrams) > 0) specs.push(`Weight: ${t(p.weightGrams)} g`)
+  if (p.dims && p.dims.every(d => Number(d) > 0)) specs.push(`Size: ${p.dims.map(t).join(' x ')} cm`)
+  if (specs.length) parts.push(`${specs.join('; ')}.`)
+  const avail = (p.availableIn || []).map(t).filter(Boolean)
+  if (avail.length > 1) parts.push(`Available in: ${avail.slice(0, 6).join(', ')}.`)
+  let body = parts.filter(Boolean).join(' ')
+  const max = 400 - AI_PHOTO_SUFFIX.length - 1
+  if (body.length > max) body = `${body.slice(0, max - 1).trimEnd()}…`
+  return `${body} ${AI_PHOTO_SUFFIX}`
+}
+
+function absImageUrl(url?: string): string | undefined {
+  if (!url) return undefined
+  if (url.startsWith('http')) return url
+  if (url.startsWith('/') && typeof window !== 'undefined') return `${window.location.origin}${url}`
+  return undefined
+}
+
 interface VariantGroup {
   pricing_type: 'unit'
   unit: string
@@ -1842,14 +1885,14 @@ export default function ProductForm({
     setVariantGalleryOpen(true)
   }, [])
 
-  async function addVariantImagesFromGallery(picked: { id: string }[]) {
-    if (!productId || !variantPopupId) return
-    const currentImages = variantImagesMap[variantPopupId] || []
+  async function addVariantImagesFromGallery(picked: { id: string }[], targetVid?: string) {
+    const vid = targetVid || variantPopupId
+    if (!productId || !vid) return
+    const currentImages = variantImagesMap[vid] || []
     const slotsLeft = 5 - currentImages.length
     const toAdd = picked.map(p => p.id).slice(0, slotsLeft)
     setVariantGalleryOpen(false)
     setVariantImageError(null)
-    const vid = variantPopupId
     setVariantImagePendingAdds(m => ({ ...m, [vid]: (m[vid] || 0) + toAdd.length }))
     for (const galleryImageId of toAdd) {
       try {
@@ -3060,6 +3103,35 @@ export default function ProductForm({
               onSetPrimary={imageId => setVariantImagePrimary(variantPopupId, imageId)}
               onReorder={(from, to) => reorderVariantImages(variantPopupId, from, to)}
               onOpenGallery={productId ? openVariantGallery : undefined}
+              extraActions={
+                productId && !variantPopupId.startsWith('temp-') ? (
+                  <AiMediaButton
+                    feature="product_image"
+                    label="AI image"
+                    sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait]}
+                    defaultPrompt={buildProductImagePrompt({
+                      name: productName,
+                      brand: brands.find(b => b.id === brandId)?.name,
+                      category: categories.find(c => c.id === categoryId)?.name,
+                      specs: specifications,
+                      variant: { label: popupVariant.variant_type, value: popupVariant.variant_name },
+                      weightGrams: popupVariant.weight_grams,
+                      dims: [popupVariant.length_cm, popupVariant.breadth_cm, popupVariant.height_cm],
+                    })}
+                    referenceImageUrl={(() => {
+                      const own = variantImagesMap[variantPopupId] || []
+                      const prod = useDraftImages ? productImages : product?.product_images || []
+                      const main = (own[0] as any) ?? (prod as any[]).find((i: any) => i.is_primary) ?? (prod as any[])[0]
+                      return absImageUrl(main?.image_url)
+                    })()}
+                    usageRef={productId}
+                    saveToGallery
+                    onPick={img => {
+                      if (img.galleryId) void addVariantImagesFromGallery([{ id: img.galleryId }], variantPopupId)
+                    }}
+                  />
+                ) : undefined
+              }
             />
           </>
         ) : (
@@ -4113,7 +4185,13 @@ export default function ProductForm({
                           feature="product_image"
                           label="AI image"
                           sizes={[AI_SIZE_PRESETS.square, AI_SIZE_PRESETS.portrait]}
-                          defaultPrompt={`${productName || 'The product'} on a clean white studio background, soft shadow`}
+                          defaultPrompt={buildProductImagePrompt({
+                            name: productName,
+                            brand: brands.find(b => b.id === brandId)?.name,
+                            category: categories.find(c => c.id === categoryId)?.name,
+                            specs: specifications,
+                            availableIn: hasVariants ? activeVariants.filter(v => v.is_active !== false).map(v => v.variant_name) : undefined,
+                          })}
                           referenceImageUrl={(() => {
                             const primary = productImages.find((i: any) => i.is_primary) ?? productImages[0]
                             const url = primary?.image_url as string | undefined
