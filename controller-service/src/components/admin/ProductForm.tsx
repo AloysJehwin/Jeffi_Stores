@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Badge, Dialog, Tabs } from '@/components/admin/kit'
+import { Badge, Dialog, DraftNotice, EditSessionActions, Tabs } from '@/components/admin/kit'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
@@ -41,7 +41,6 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useToast } from '@/contexts/ToastContext'
 import { gstError, paiseString, priceErrors, publishShippingError } from '@/lib/catalog/product-validation'
-import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 
@@ -3395,47 +3394,28 @@ export default function ProductForm({
         className="space-y-5"
       >
         {backUrl && <input type="hidden" name="_back" value={backUrl} />}
-        <div className="sticky top-0 z-20 rounded-xl border border-border-default bg-surface-elevated/95 px-3 backdrop-blur supports-[backdrop-filter]:bg-surface-elevated/80">
-          <Tabs
-            tabs={tabItems}
-            value={activeTab}
-            onChange={setTab}
-            actions={
-              edit.sessionId ? (
-                <EditorToolbar
-                  autosaveStatus={serverSaveStatus as AutosaveStatus}
-                  sessionStatus={edit.status}
-                  onSave={async () => { await edit.save() }}
-                  onCancel={edit.cancel}
-                  cancelHref={ap('/admin/products')}
-                  hideSave
-                />
-              ) : undefined
-            }
+        <Tabs
+          tabs={tabItems}
+          value={activeTab}
+          onChange={setTab}
+          actions={
+            edit.sessionId ? (
+              <EditSessionActions
+                autosaveStatus={serverSaveStatus as AutosaveStatus}
+                sessionStatus={edit.status}
+                onCancel={edit.cancel}
+                cancelHref={ap('/admin/products')}
+                draft={isDraft}
+              />
+            ) : undefined
+          }
+        />
+        {(isDraft || hasDraft) && (
+          <DraftNotice
+            state={hasDraft ? 'draft-with-local' : 'draft'}
+            onRestore={hasDraft ? restoreDraft : undefined}
+            onDiscard={hasDraft ? discardDraft : undefined}
           />
-        </div>
-        {hasDraft && (
-          <div className="px-4 py-3 bg-amber-500/5 border border-amber-500/40 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
-            <span className="text-foreground">
-              You have an auto-saved draft. Click Restore to load it, or Discard to clear it and reload from database.
-            </span>
-            <div className="flex gap-3 shrink-0">
-              <button
-                type="button"
-                onClick={restoreDraft}
-                className="text-accent-500 font-semibold hover:underline"
-              >
-                Restore
-              </button>
-              <button
-                type="button"
-                onClick={discardDraft}
-                className="text-foreground-secondary font-semibold hover:underline"
-              >
-                Discard
-              </button>
-            </div>
-          </div>
         )}
         {error && (
           <div

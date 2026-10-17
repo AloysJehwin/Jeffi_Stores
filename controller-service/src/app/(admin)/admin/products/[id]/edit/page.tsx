@@ -206,12 +206,6 @@ export default async function EditProductPage({
         />
       }
     >
-      {isDraft && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-foreground">
-          Edits are saved to draft. The live product stays unchanged until you publish.
-        </div>
-      )}
-
       <ProductForm
         categories={categories || []}
         brands={brands || []}
