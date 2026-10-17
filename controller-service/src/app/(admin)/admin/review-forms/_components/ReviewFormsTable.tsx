@@ -71,7 +71,11 @@ export default function ReviewFormsTable({
   const router = useRouter()
   const { showToast } = useToast()
   const [open, setOpen] = useState<FormRow | null>(null)
-  const editHref = (f: FormRow) => ap(`/admin/review-forms/${f.id}/edit?back=${encodeURIComponent(backUrl)}`)
+  // Row Edit routes through the view page so startReviewFormDraft is the single
+  // entry point to editing a live form; the view's Edit button creates the draft
+  // and redirects on. For create-drafts (is_draft=true) the view also hosts the
+  // same Edit button, which just links to /edit since no edit-draft is needed.
+  const editHref = (f: FormRow) => ap(`/admin/review-forms/${f.id}/view?back=${encodeURIComponent(backUrl)}`)
   const url = (f: FormRow) => `${formsBase}/${f.slug}`
 
   // Clone every param so advancing page keeps tab/filters; otherwise the parent Suspense re-keys.

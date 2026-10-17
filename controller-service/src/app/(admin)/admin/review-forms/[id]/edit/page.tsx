@@ -1,5 +1,5 @@
-import { notFound } from 'next/navigation'
-import { queryOne, queryMany, query } from '@/lib/shared/db'
+import { notFound, redirect } from 'next/navigation'
+import { queryOne, queryMany } from '@/lib/shared/db'
 import ReviewFormForm from '../../ReviewFormForm'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
@@ -50,26 +50,17 @@ export default async function EditReviewFormPage({
   // (edit-draft) row for it. Publish flips is_draft = false + is_active = true.
   const isCreateDraft = !!form.is_draft
 
-  // Auto-create edit-draft on first edit visit (live forms only). Review-forms has
-  // no detail/view page, so the edit page itself is the single entry (list → edit).
-  let draftRow = isCreateDraft
+  // Editing a live form ALWAYS goes through an edit-draft; the single entry is the
+  // view page's Edit button (startReviewFormDraft). Hitting /edit directly on a live
+  // form with no draft redirects to the view, matching products/coupons/suppliers.
+  const draftRow = isCreateDraft
     ? null
     : await queryOne<{ form_id: string; fields: Record<string, unknown> }>(
         `SELECT form_id, fields FROM review_form_drafts WHERE form_id = $1`,
         [id]
       )
   if (!isCreateDraft && !draftRow) {
-    await query(
-      `INSERT INTO review_form_drafts (form_id, fields)
-       SELECT id, to_jsonb(rf) - 'id' - 'created_at' - 'updated_at' - 'submissions_count'
-       FROM review_forms rf WHERE rf.id = $1
-       ON CONFLICT (form_id) DO NOTHING`,
-      [id]
-    )
-    draftRow = await queryOne<{ form_id: string; fields: Record<string, unknown> }>(
-      `SELECT form_id, fields FROM review_form_drafts WHERE form_id = $1`,
-      [id]
-    )
+    redirect(ap(`/admin/review-forms/${id}/view${back ? `?back=${encodeURIComponent(backUrl)}` : ''}`, host))
   }
 
   const isDraft = !!draftRow
