@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import type { ReferralSettings } from '@/lib/referrals/settings'
+import { fieldInputCls } from '@/components/admin/kit'
 
-const inputClass =
-  'field-sm w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent disabled:opacity-60'
-const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
+const inputClass = fieldInputCls
+const labelClass = 'mb-1.5 block text-xs font-medium text-foreground-secondary'
 const hintClass = 'mt-1 text-xs text-foreground-muted'
-const cardClass = 'bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5'
-const headingClass = 'text-sm font-semibold text-foreground-secondary uppercase tracking-wide'
+const cardClass = 'rounded-xl border border-border-default bg-surface-elevated p-5 space-y-4'
+const headingClass = 'text-sm font-semibold uppercase tracking-wide text-foreground'
 
 function firstFieldError(body: { error?: string; fields?: Record<string, string> } | null): string {
   const field = body?.fields ? Object.values(body.fields)[0] : null
@@ -109,7 +109,7 @@ export default function ReferralSettingsForm({ initial }: { initial: ReferralSet
         <button
           type="submit"
           disabled={saving}
-          className="control-sm bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors disabled:opacity-60"
+          className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors disabled:opacity-60"
         >
           {saving ? 'Saving' : 'Save settings'}
         </button>

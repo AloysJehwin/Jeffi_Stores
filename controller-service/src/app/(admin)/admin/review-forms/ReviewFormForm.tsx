@@ -16,6 +16,7 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
+import { fieldInputCls } from '@/components/admin/kit'
 
 interface Coupon {
   id: string
@@ -79,9 +80,8 @@ const FIELD_TYPES = [
   { value: 'rating', label: 'Star rating' },
 ]
 
-const inputClass =
-  'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
-const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
+const inputClass = fieldInputCls
+const labelClass = 'block text-xs font-medium text-foreground-secondary mb-1.5'
 
 function randomId() {
   return Math.random().toString(36).slice(2, 10)
@@ -465,7 +465,7 @@ export default function ReviewFormForm({
                     value={field.label}
                     onChange={e => updateField(field.id, { label: e.target.value })}
                     placeholder="Field label"
-                    className="flex-1 basis-0 min-w-0 px-3 h-control-sm border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    className={`${fieldInputCls} flex-1 basis-0 min-w-0`}
                   />
                   <AdminSelect
                     sm
@@ -485,7 +485,7 @@ export default function ReviewFormForm({
                   <button
                     type="button"
                     onClick={() => removeField(field.id)}
-                    className="text-red-400 hover:text-red-500 leading-none"
+                    className="control-sm control-icon text-red-500 hover:bg-red-500/10"
                     aria-label="Remove field"
                   >
                     <X className="w-4 h-4" />
@@ -496,10 +496,10 @@ export default function ReviewFormForm({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
           <Link
             href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')}
-            className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
+            className="control-md border border-border-secondary bg-surface font-medium text-foreground hover:bg-surface-secondary"
           >
             Cancel
           </Link>
@@ -510,7 +510,7 @@ export default function ReviewFormForm({
                   type="submit"
                   value="draft"
                   disabled={submitting}
-                  className="px-5 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
+                  className="control-md border border-border-secondary bg-surface font-semibold text-foreground hover:bg-surface-secondary disabled:opacity-50"
                 >
                   {submitting ? 'Saving…' : 'Save Draft'}
                 </button>
@@ -518,7 +518,7 @@ export default function ReviewFormForm({
                   type="submit"
                   value="publish"
                   disabled={submitting}
-                  className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
+                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
                 >
                   {submitting ? 'Publishing…' : 'Publish'}
                 </button>
@@ -531,7 +531,7 @@ export default function ReviewFormForm({
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50"
+                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
               >
                 {submitting ? 'Saving…' : submitLabel || 'Save Changes'}
               </button>

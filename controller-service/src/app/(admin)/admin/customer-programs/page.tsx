@@ -12,6 +12,7 @@ import ReferralProgram from './_components/ReferralProgram'
 import BirthdayProgram from './_components/BirthdayProgram'
 import ProgramsOverview from './_components/ProgramsOverview'
 import { PROGRAMS_PATH } from './_components/ProgramSection'
+import { PageBody, PageHeader } from '@/components/admin/kit'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -63,13 +64,8 @@ export default async function CustomerProgramsPage({
   const page = pageNumber(params.page)
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Programs</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">
-          Rewards that keep customers coming back. Switch each one on or off in Site Controls.
-        </p>
-      </div>
+    <PageBody>
+      <PageHeader title="Programs" description="Rewards that keep customers coming back. Switch each one on or off in Site Controls." />
 
       <TabLinks
         tabs={TABS.map(t => ({ id: t.key, label: t.label, href: t.key === 'overview' ? basePath : `${basePath}?tab=${t.key}` }))}
@@ -84,6 +80,6 @@ export default async function CustomerProgramsPage({
       {tab === 'loyalty' && <LoyaltyProgram host={host} query={{ page, tier: params.tier || '', search }} />}
       {tab === 'referrals' && <ReferralProgram host={host} query={{ page, status: params.status || '', search }} />}
       {tab === 'birthday' && <BirthdayProgram host={host} />}
-    </div>
+    </PageBody>
   )
 }

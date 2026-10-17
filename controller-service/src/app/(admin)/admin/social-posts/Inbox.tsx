@@ -140,7 +140,7 @@ export default function Inbox({ reloadKey }: { reloadKey: number }) {
                 canWrite && (
                   <button
                     type="button"
-                    className="text-xs text-accent-500 hover:underline"
+                    className="control-sm border border-border-default text-accent-500 hover:bg-surface-secondary"
                     onClick={() => {
                       setReplying(it.id)
                       setText('')

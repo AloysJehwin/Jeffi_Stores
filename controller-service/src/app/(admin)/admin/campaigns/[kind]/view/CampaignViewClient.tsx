@@ -127,7 +127,7 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-xl font-bold text-foreground">{c.name}</h2>
                   <span
-                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${c.enabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}
+                    className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${c.enabled ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-surface-secondary text-foreground-muted '}`}
                   >
                     {c.enabled ? 'Active' : 'Paused'}
                   </span>
@@ -179,7 +179,7 @@ export default function CampaignViewClient({ kind }: { kind: string }) {
               <iframe
                 title="Email preview"
                 srcDoc={previewDoc}
-                className="w-full rounded-b-lg border-0 bg-white"
+                className="w-full rounded-b-lg border-0 bg-surface-elevated"
                 style={{ height: 520 }}
                 sandbox=""
               />

@@ -2,11 +2,11 @@ import { notFound } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { query, queryOne, queryMany, queryCount } from '@/lib/shared/db'
-import Link from 'next/link'
 import CouponForm from '../../CouponForm'
 import Pagination from '@/components/admin/Pagination'
 import CouponEligibleUsersClient from './CouponEligibleUsersClient'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
+import { Badge, Card, FormPage, PageHeader } from '@/components/admin/kit'
 import { updateCoupon } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -165,32 +165,25 @@ export default async function EditCouponPage({
 
   return (
     <MobileEditBlock>
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">
-            {isDraft ? 'Edit Draft' : 'Edit Coupon'}
-          </h1>
-          <p className="text-sm text-foreground-secondary mt-0.5 font-mono">{coupon.code}</p>
-        </div>
-      </div>
-
+      <FormPage
+        header={
+          <PageHeader
+            back={{ href: ap(backUrl, host), label: 'Coupons' }}
+            title={isDraft ? 'Edit Draft' : 'Edit Coupon'}
+            description={<span className="font-mono">{coupon.code}</span>}
+            badges={isDraft && <Badge tone="amber">Draft</Badge>}
+          />
+        }
+      >
       {isDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-              Changes are saved to draft. The live coupon stays unchanged until you publish.
-            </p>
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Draft pending</p>
+            <p className="text-xs text-foreground-muted mt-0.5">Changes are saved to draft. The live coupon stays unchanged until you publish.</p>
           </div>
           <form action={updateCoupon.bind(null, id)}>
             <input type="hidden" name="intent" value="discard" />
-            <button type="submit" className="text-xs text-amber-600 hover:underline ml-4">
+            <button type="submit" className="control-sm border border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10">
               Discard draft
             </button>
           </form>
@@ -218,38 +211,26 @@ export default async function EditCouponPage({
         }}
       />
 
-      {/* Eligible Users */}
-      <div className="mt-8 bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">Eligible Users</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              {isPersonal
-                ? 'This coupon is personal — only the user below can redeem it'
-                : isCampaign
-                  ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} received this campaign — only they have this code`
-                  : hasMailerEligible
-                    ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} were granted this coupon via mailer — only they can redeem it`
-                    : `${usersTotal} active app users can redeem this coupon`}
-            </p>
+      <Card
+        title="Eligible Users"
+        hint={
+          isPersonal
+            ? 'This coupon is personal — only the user below can redeem it'
+            : isCampaign
+              ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} received this campaign — only they have this code`
+              : hasMailerEligible
+                ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} were granted this coupon via mailer — only they can redeem it`
+                : `${usersTotal} active app users can redeem this coupon`
+        }
+        action={
+          <div className="flex flex-wrap gap-1.5">
+            {!coupon.auto_generated && !hasMailerEligible && <Badge tone="blue">All Users</Badge>}
+            {hasMailerEligible && !coupon.auto_generated && <Badge tone="amber">Mailer-assigned</Badge>}
+            {coupon.generated_for_campaign && <Badge tone="blue">{coupon.generated_for_campaign}</Badge>}
           </div>
-          {!coupon.auto_generated && !hasMailerEligible && (
-            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-              All Users
-            </span>
-          )}
-          {hasMailerEligible && !coupon.auto_generated && (
-            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              Mailer-assigned
-            </span>
-          )}
-          {coupon.generated_for_campaign && (
-            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-              {coupon.generated_for_campaign}
-            </span>
-          )}
-        </div>
-
+        }
+        flush
+      >
         {/* Interactive remove/add table — client component */}
         <CouponEligibleUsersClient
           couponId={coupon.id}
@@ -273,8 +254,8 @@ export default async function EditCouponPage({
             />
           </div>
         )}
-      </div>
-    </div>
+      </Card>
+      </FormPage>
     </MobileEditBlock>
   )
 }

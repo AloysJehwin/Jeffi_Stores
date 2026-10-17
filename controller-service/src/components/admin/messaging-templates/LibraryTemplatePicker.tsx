@@ -120,7 +120,7 @@ export default function LibraryTemplatePicker({
             </p>
           )}
           {unfilled.length > 0 && (
-            <p className="text-yellow-700 dark:text-yellow-300">
+            <p className="text-amber-700 dark:text-amber-400">
               This campaign doesn&apos;t provide {unfilled.map(v => `{{${v}}}`).join(', ')} — {unfilled.length === 1 ? 'it' : 'they'} will be left blank.
             </p>
           )}

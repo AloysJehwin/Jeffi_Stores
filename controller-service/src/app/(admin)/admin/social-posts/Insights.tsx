@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { Banner, Kpi, KpiGrid, Section, Table, api, btnGhost, count, money, when } from '@/components/admin/channels/ui'
+import { useActionToast } from '@/components/admin/kit'
+import { Kpi, KpiGrid, Section, Table, api, btnGhost, count, money, when } from '@/components/admin/channels/ui'
 import { label } from './shared'
 
 interface Totals {
@@ -44,7 +45,8 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
   const [d, setD] = useState<{ totals: Totals; byNetwork: NetRow[]; top: TopRow[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
-  const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setBanner = (b: { ok: boolean; text: string } | null) => void (b && toast.result(b))
   const [tick, setTick] = useState(0)
 
   useEffect(() => {
@@ -70,13 +72,13 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg w-fit">
+        <div className="flex h-control w-fit gap-1 rounded-lg border border-border-default bg-surface-elevated p-0.5">
           {[7, 30, 90].map(n => (
             <button
               key={n}
               type="button"
               onClick={() => setDays(n)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md ${days === n ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+              className={`h-full px-3 text-xs font-medium rounded-md ${days === n ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
             >
               {n}d
             </button>
@@ -88,7 +90,6 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
           </button>
         )}
       </div>
-      {banner && <Banner ok={banner.ok}>{banner.text}</Banner>}
       {error ? (
         <p className="text-sm text-red-500">{error}</p>
       ) : !d ? (

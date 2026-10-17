@@ -19,6 +19,7 @@ import SegmentsCard from './SegmentsCard'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
+import { ErrorState, PageBody } from '@/components/admin/kit'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,9 +56,9 @@ export default async function CrmDashboardPage({
   } catch (err) {
     console.error('CRM dashboard failed', err)
     return (
-      <div className="p-6">
-        <p className="text-foreground-muted">Failed to load CRM dashboard.</p>
-      </div>
+      <PageBody>
+        <ErrorState title="Failed to load CRM dashboard." />
+      </PageBody>
     )
   }
   const s = data.segments
@@ -67,29 +68,29 @@ export default async function CrmDashboardPage({
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <Link
           href={ap('/admin/tasks?scope=mine&status=open', host)}
-          className="bg-surface-elevated rounded-xl border border-border-default p-4 hover:shadow-md hover:-translate-y-0.5 transition-all"
+          className="bg-surface-elevated rounded-xl border border-border-default p-4 hover:border-accent-500/50 transition-colors"
         >
           <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">My Tasks</p>
           <p className="text-2xl font-bold text-foreground mt-1">{data.tasks.mine}</p>
         </Link>
         <Link
           href={ap('/admin/tasks?scope=all&status=overdue', host)}
-          className={`rounded-xl border p-4 hover:shadow-md hover:-translate-y-0.5 transition-all ${
+          className={`rounded-xl border p-4 hover:border-accent-500/50 transition-colors ${
             data.tasks.overdue > 0
-              ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+              ? 'bg-red-500/5 border-red-500/40'
               : 'bg-surface-elevated border-border-default'
           }`}
         >
           <p
             className={`text-xs font-semibold uppercase tracking-wide ${
-              data.tasks.overdue > 0 ? 'text-red-700 dark:text-red-300' : 'text-foreground-muted'
+              data.tasks.overdue > 0 ? 'text-red-700 dark:text-red-400' : 'text-foreground-muted'
             }`}
           >
             Overdue
           </p>
           <p
             className={`text-2xl font-bold mt-1 ${
-              data.tasks.overdue > 0 ? 'text-red-700 dark:text-red-300' : 'text-foreground'
+              data.tasks.overdue > 0 ? 'text-red-700 dark:text-red-400' : 'text-foreground'
             }`}
           >
             {data.tasks.overdue}
@@ -97,7 +98,7 @@ export default async function CrmDashboardPage({
         </Link>
         <Link
           href={ap('/admin/tasks?scope=all&status=open', host)}
-          className="bg-surface-elevated rounded-xl border border-border-default p-4 hover:shadow-md hover:-translate-y-0.5 transition-all"
+          className="bg-surface-elevated rounded-xl border border-border-default p-4 hover:border-accent-500/50 transition-colors"
         >
           <p className="text-xs font-semibold uppercase tracking-wide text-foreground-muted">Open (all)</p>
           <p className="text-2xl font-bold text-foreground mt-1">{data.tasks.open}</p>
@@ -128,7 +129,7 @@ export default async function CrmDashboardPage({
       </p>
       <SegmentsCard segments={s} />
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-        <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Top Tags</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Top Tags</h2>
         {data.topTags.length === 0 ? (
           <p className="text-sm text-foreground-muted">No tags applied yet.</p>
         ) : (
@@ -137,7 +138,7 @@ export default async function CrmDashboardPage({
               <Link
                 key={t.tag}
                 href={ap(`/admin/customers?tag=${encodeURIComponent(t.tag)}`, host)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 rounded-full text-xs font-medium hover:bg-accent-200 dark:hover:bg-accent-900/50 transition-colors"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent-500/10 text-accent-500 rounded-full text-xs font-medium hover:bg-accent-500/20 transition-colors"
               >
                 {t.tag}
                 <span className="text-[10px] opacity-70 tabular-nums">{t.count}</span>
@@ -158,7 +159,7 @@ export default async function CrmDashboardPage({
   )
 
   return (
-    <div className="p-4 sm:p-6">
+    <PageBody>
       <CrmOverview
         initial={overview}
         today={today}
@@ -170,6 +171,6 @@ export default async function CrmDashboardPage({
         segments={segments}
         activity={activity}
       />
-    </div>
+    </PageBody>
   )
 }

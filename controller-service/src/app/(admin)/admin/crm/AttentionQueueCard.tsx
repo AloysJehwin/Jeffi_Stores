@@ -8,7 +8,7 @@ import type { AttentionItem, AttentionSeverity } from '@/lib/shared/crm-insights
 const DOT: Record<AttentionSeverity, string> = {
   high: 'bg-red-500',
   medium: 'bg-amber-500',
-  low: 'bg-zinc-400',
+  low: 'bg-border-default',
 }
 
 export default function AttentionQueueCard({ items }: { items: AttentionItem[] }) {

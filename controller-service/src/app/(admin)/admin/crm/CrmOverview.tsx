@@ -2,7 +2,8 @@
 
 import { useCallback, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { Kpi, Section, Badge, Table, Empty, api, money, count, pct, change, when, type Col } from '@/components/admin/channels/ui'
+import { Kpi, Section, Badge, Banner, Table, Empty, api, money, count, pct, change, when, type Col } from '@/components/admin/channels/ui'
+import { PageHeader } from '@/components/admin/kit'
 import { TrendChart, type SeriesDef, type ChartPoint } from '@/components/admin/dashboard/Charts'
 import { GroupLabel } from '@/components/admin/dashboard/Primitives'
 import { ap } from '@/lib/shared/admin-path'
@@ -15,7 +16,7 @@ import type { CohortRow, CrmOverviewData, OverviewAttention, TopCustomer } from 
 const DOT: Record<OverviewAttention['severity'], string> = {
   high: 'bg-red-500',
   medium: 'bg-amber-500',
-  low: 'bg-zinc-400',
+  low: 'bg-border-default',
 }
 
 const TREND_SERIES: SeriesDef[] = [
@@ -39,14 +40,14 @@ function PeriodPicker({
   const active = matchPreset(value, today)
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
-      <div className="flex flex-wrap gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg w-fit">
+      <div className="flex h-control w-fit max-w-full overflow-x-auto gap-1 rounded-lg border border-border-default bg-surface-elevated p-0.5">
         {PERIOD_PRESETS.map(p => (
           <button
             key={p.key}
             type="button"
             disabled={disabled}
             onClick={() => onChange(presetPeriod(p.key, today))}
-            className={`px-2.5 py-1.5 text-xs font-medium rounded-md disabled:opacity-50 ${
+            className={`h-full px-2.5 text-xs font-medium rounded-md disabled:opacity-50 ${
               active === p.key ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'
             }`}
           >
@@ -196,7 +197,7 @@ export default function CrmOverview({
       key: 'name',
       label: 'Customer',
       render: c => (
-        <Link href={ap(`/admin/customers/${c.id}`, host)} className="block min-w-0 hover:text-accent-600">
+        <Link href={ap(`/admin/customers/${c.id}`, host)} className="block min-w-0 hover:text-accent-500">
           <span className="font-medium text-foreground">{c.name}</span>
           {c.email && <span className="block text-[11px] text-foreground-muted truncate max-w-[14rem]">{c.email}</span>}
         </Link>
@@ -211,17 +212,13 @@ export default function CrmOverview({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">CRM</h1>
-          <p className="text-foreground-secondary text-sm mt-1">
-            {periodLabel(data.period)} compared with {periodLabel(data.previous)}
-          </p>
-        </div>
-        <PeriodPicker value={period} today={today} disabled={loading} onChange={changePeriod} />
-      </div>
+      <PageHeader
+        title="CRM"
+        description={`${periodLabel(data.period)} compared with ${periodLabel(data.previous)}`}
+        actions={<PeriodPicker value={period} today={today} disabled={loading} onChange={changePeriod} />}
+      />
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <Banner ok={false}>{error}</Banner>}
 
       <div className={`grid gap-3 grid-cols-2 md:grid-cols-4 transition-opacity ${loading ? 'opacity-60' : ''}`}>
         <Kpi label="Total customers" value={count(k.totalCustomers)} delta={change(k.totalCustomers, p.totalCustomers)} sub="Registered accounts" />

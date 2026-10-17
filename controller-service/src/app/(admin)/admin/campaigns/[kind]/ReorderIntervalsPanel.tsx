@@ -88,7 +88,7 @@ export default function ReorderIntervalsPanel() {
   return (
     <div className="bg-surface-elevated rounded-lg border border-border-default">
       <div className="p-4 sm:p-5 border-b border-border-default space-y-1">
-        <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Reorder intervals</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Reorder intervals</h2>
         <p className="text-sm text-foreground-secondary">
           Set how often customers typically rebuy from a category, for things that get used up (screws, drill bits,
           belts). Leave tools and other one-off buys empty: nobody is reminded about them. A subcategory without its own

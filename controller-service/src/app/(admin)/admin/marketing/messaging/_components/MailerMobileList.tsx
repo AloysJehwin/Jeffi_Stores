@@ -136,7 +136,7 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
 
   const statusBadge = (status: string) => (
     <span
-      className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${statusStyles[status] || 'bg-surface-secondary text-foreground-muted'}`}
+      className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium shrink-0 capitalize ${statusStyles[status] || 'bg-surface-secondary text-foreground-muted'}`}
     >
       {status}
     </span>
@@ -171,7 +171,7 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
           <button
             type="button"
             onClick={() => setActionsOpen(true)}
-            className="w-full bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+            className="control-md w-full bg-accent-500 font-semibold text-white hover:bg-accent-600"
           >
             Actions
           </button>

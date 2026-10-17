@@ -41,9 +41,9 @@ function filtersFor(isBusiness: boolean): { key: 'all' | ConversationChannel; la
 const FAILED_STATUSES = new Set(['failed', 'bounced', 'undelivered', 'error', 'rejected'])
 
 const DIRECTION_BADGE: Record<ConversationItem['direction'], { label: string; className: string }> = {
-  inbound: { label: 'In', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-  outbound: { label: 'Out', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' },
-  internal: { label: 'Internal', className: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300' },
+  inbound: { label: 'In', className: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' },
+  outbound: { label: 'Out', className: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
+  internal: { label: 'Internal', className: 'bg-surface-secondary text-foreground-muted' },
 }
 
 const PAGE_LIMIT = 40
@@ -99,17 +99,17 @@ function Chip({ label, value, tone }: { label: string; value: string; tone?: 'am
     <div
       className={`rounded-lg border px-3 py-2 ${
         tone === 'amber'
-          ? 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20'
+          ? 'border-amber-500/40 bg-amber-500/5'
           : 'border-border-default bg-surface'
       }`}
     >
       <p
-        className={`text-[10px] uppercase tracking-widest font-medium ${tone === 'amber' ? 'text-amber-700 dark:text-amber-300' : 'text-foreground-muted'}`}
+        className={`text-[10px] uppercase tracking-widest font-medium ${tone === 'amber' ? 'text-amber-700 dark:text-amber-400' : 'text-foreground-muted'}`}
       >
         {label}
       </p>
       <p
-        className={`text-sm font-semibold mt-0.5 ${tone === 'amber' ? 'text-amber-800 dark:text-amber-200' : 'text-foreground'}`}
+        className={`text-sm font-semibold mt-0.5 ${tone === 'amber' ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'}`}
       >
         {value}
       </p>
@@ -194,7 +194,7 @@ function FeedItem({ item, phone }: { item: ConversationItem; phone: string | nul
           {item.actor && <span className="text-[11px] text-foreground-muted">{item.actor}</span>}
           <span className="text-[11px] text-foreground-muted">· {relTime(item.at)}</span>
           {failed && (
-            <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+            <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-red-500/10 text-red-700 dark:text-red-400">
               {item.status}
             </span>
           )}
@@ -340,7 +340,7 @@ export default function CustomerConversations({
 
   return (
     <div>
-      <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">
         Conversation history
       </h2>
 

@@ -115,7 +115,7 @@ function PeriodPicker({ value, onChange }: { value: Period; onChange: (p: Period
             key={p.id}
             type="button"
             onClick={() => onChange(presetRange(p.id, today))}
-            className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
+            className={`h-full px-2.5 text-xs font-medium rounded-md whitespace-nowrap ${
               active === p.id ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'
             }`}
           >
@@ -145,7 +145,7 @@ function Distribution({ rows, total }: { rows: { rating: number; count: number }
           <div key={r.rating} className="flex items-center gap-3 text-xs">
             <span className="w-8 shrink-0 flex items-center gap-0.5 text-foreground-secondary tabular-nums">
               {r.rating}
-              <Star className="w-3 h-3 text-yellow-400 fill-yellow-400" />
+              <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
             </span>
             <div className="flex-1 h-2.5 bg-surface-secondary rounded-full overflow-hidden">
               <div className={`h-full rounded-full ${BAR_TONE[r.rating]}`} style={{ width: `${share ? Math.max(2, share * 100) : 0}%` }} />

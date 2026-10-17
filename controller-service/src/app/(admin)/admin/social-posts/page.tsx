@@ -1,6 +1,7 @@
 import { headers } from 'next/headers'
 import { hasScope } from '@/lib/auth/scopes'
 import SocialPostsClient from './SocialPostsClient'
+import { PageBody, PageHeader } from '@/components/admin/kit'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
 import { credentialOwnerId } from '@/lib/integrations/owner'
 import { getTenantSocialAccounts } from '@/lib/tenant-registry'
@@ -20,16 +21,12 @@ export default async function SocialPostsPage() {
   const socialAccounts = canWrite ? await getTenantSocialAccounts(await credentialOwnerId()) : []
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Social</h1>
-          <p className="text-sm text-foreground-secondary mt-0.5">
-            Plan, publish and measure posts across Facebook, Instagram, Business Profile, YouTube, Pinterest, LinkedIn
-            and X
-          </p>
-        </div>
-        {canWrite && (
+    <PageBody>
+      <PageHeader
+        title="Social"
+        description="Plan, publish and measure posts across Facebook, Instagram, Business Profile, YouTube, Pinterest, LinkedIn and X"
+        actions={
+          canWrite && (
           <AdminIntegrationsPopup
             scope="social"
             integrations={[]}
@@ -40,9 +37,10 @@ export default async function SocialPostsPage() {
             )}
             oauth={{ meta: oauthProviderInfo('meta') }}
           />
-        )}
-      </div>
+          )
+        }
+      />
       <SocialPostsClient canWrite={canWrite} canApprove={canApprove} />
-    </div>
+    </PageBody>
   )
 }

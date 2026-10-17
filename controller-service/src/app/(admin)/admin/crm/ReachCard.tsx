@@ -29,7 +29,7 @@ export default function ReachCard({ reach }: { reach: Reach }) {
 
   return (
     <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-      <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">
         Reach and Deliverability
       </h2>
 
