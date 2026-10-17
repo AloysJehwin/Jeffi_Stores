@@ -6,6 +6,7 @@ import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { ap } from '@/lib/shared/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { EmptyState, useActionToast } from '@/components/admin/kit'
 import {
   labelCls,
   btnPrimary,
@@ -19,6 +20,9 @@ import {
   thCls,
   thRight,
   thCenter,
+  theadCls,
+  tableWrapCls,
+  pagerBtn,
 } from './shared'
 
 export function ReceivablesTab({ initialData }: { initialData: any }) {
@@ -31,6 +35,7 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 50
   const canWrite = useCanWrite('financial:write')
+  const toast = useActionToast()
 
   useEffect(() => {
     if (initialData !== null) {
@@ -63,11 +68,12 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
 
   const markPaid = async (orderId: string) => {
     setMarkingPaid(orderId)
-    await fetch(`/api/admin/orders/${orderId}/payment-status`, {
+    const res = await fetch(`/api/admin/orders/${orderId}/payment-status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ payment_status: 'paid' }),
     })
+    toast.result({ ok: res.ok }, { success: 'Marked as paid.', error: 'Could not mark as paid.' })
     await load(page)
     setMarkingPaid(null)
   }
@@ -116,7 +122,7 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
             />
           </div>
           <div className="flex gap-2 pb-0.5">
-            <button className={btnPrimary} onClick={handleRefresh}>
+            <button type="button" className={btnPrimary} onClick={handleRefresh} disabled={loading}>
               {loading ? 'Loading…' : 'Refresh'}
             </button>
             {data?.rows?.length > 0 && (
@@ -140,12 +146,12 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
           </div>
 
           {data.rows.length === 0 ? (
-            <p className="text-foreground-secondary text-sm text-center py-10">No outstanding receivables</p>
+            <EmptyState title="No outstanding receivables" />
           ) : (
             <>
-              <div className="hidden md:block overflow-x-auto rounded-xl border border-border-default">
+              <div className={`hidden md:block overflow-x-auto ${tableWrapCls}`}>
                 <table className="w-full text-sm">
-                  <thead className="bg-surface-secondary">
+                  <thead className={theadCls}>
                     <tr>
                       <th className={thCls}>Customer</th>
                       <th className={thCls}>Invoice #</th>
@@ -219,7 +225,7 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                         <td className="px-4 py-3 text-center">
                           {canWrite && (
                             <button
-                              className="px-3 h-control-sm rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
+                              className="control-sm bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
                               disabled={markingPaid === r.order_id}
                               onClick={() => markPaid(r.order_id)}
                             >
@@ -233,7 +239,7 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                 </table>
               </div>
 
-              <div className="md:hidden rounded-xl border border-border-default divide-y divide-border-default">
+              <div className={`md:hidden divide-y divide-border-default ${tableWrapCls}`}>
                 {data.rows.map((r: any) => (
                   <div key={r.order_id} className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
@@ -297,7 +303,7 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
                     </div>
                     {canWrite && (
                       <button
-                        className="w-full mt-1 h-control-sm rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
+                        className="control-sm w-full mt-1 bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
                         disabled={markingPaid === r.order_id}
                         onClick={() => markPaid(r.order_id)}
                       >
@@ -310,21 +316,21 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
 
               {totalPages > 1 && (
                 <div className="flex items-center justify-between pt-2">
-                  <p className="text-sm text-foreground-secondary">
+                  <p className="text-xs text-foreground-muted tabular-nums">
                     Page {page} of {totalPages} · {data.total} total
                   </p>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => load(page - 1)}
                       disabled={page === 1 || loading}
-                      className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className={pagerBtn}
                     >
                       Previous
                     </button>
                     <button
                       onClick={() => load(page + 1)}
                       disabled={page === totalPages || loading}
-                      className="px-3 h-control-sm rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      className={pagerBtn}
                     >
                       Next
                     </button>

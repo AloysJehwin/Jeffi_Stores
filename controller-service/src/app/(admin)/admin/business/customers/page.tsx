@@ -2,7 +2,9 @@ export const dynamic = 'force-dynamic'
 
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { Search } from 'lucide-react'
 import { TabLinks } from '@/components/admin/channels/ui'
+import { Kpi, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth/jwt'
 import { hasScope } from '@/lib/auth/scopes'
@@ -10,10 +12,8 @@ import { redirect } from 'next/navigation'
 import { queryMany } from '@/lib/shared/db'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
-import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import { adminCookieName } from '@/lib/auth/admin-cookie'
-import BusinessCustomersMobileList from './_components/BusinessCustomersMobileList'
+import BusinessCustomersTable from './_components/BusinessCustomersTable'
 import B2bCustomersOverview from './_components/B2bCustomersOverview'
 
 const PAGE_SIZE = 25
@@ -73,12 +73,6 @@ async function getBusinessCustomers({ status, search, page }: { status?: string;
   return { customers: rows, total: parseInt(countRows[0]?.count || '0', 10) }
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-}
-
 // Builds a business-customers URL that preserves the active status/search
 // filters. Shared by the stat cards, status tabs and pagination.
 function buildUrl(resolvedSearchParams: SP, host: string, p: number, extra: Record<string, string> = {}) {
@@ -112,23 +106,19 @@ async function BusinessCustomersStats({ resolvedSearchParams, host }: { resolved
     s === 'all' ? total : s === 'pending' ? pendingCount : customers.filter(c => c.approval_status === s).length
 
   return (
-    <div className="animate-fade-in">
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        {(['all', 'pending', 'approved'] as const).map(s => (
+    <div className="animate-fade-in grid grid-cols-3 gap-3">
+      {(['all', 'pending', 'approved'] as const).map(s => {
+        const active = (resolvedSearchParams.status ?? 'all') === s
+        return (
           <Link
             key={s}
             href={buildUrl(resolvedSearchParams, host, 1, s === 'all' ? {} : { status: s })}
-            className={`bg-surface-elevated rounded-lg border p-4 text-center transition-colors ${
-              (resolvedSearchParams.status ?? 'all') === s
-                ? 'border-accent-500 ring-1 ring-accent-500'
-                : 'border-border-default hover:border-accent-300'
-            }`}
+            className={`rounded-xl transition-shadow ${active ? 'ring-1 ring-accent-500' : 'hover:ring-1 hover:ring-border-default'}`}
           >
-            <p className="text-xs text-foreground-secondary capitalize">{s}</p>
-            <p className="text-2xl font-bold text-foreground mt-0.5">{cardValue(s)}</p>
+            <Kpi label={s} value={String(cardValue(s))} highlight={active} />
           </Link>
-        ))}
-      </div>
+        )
+      })}
     </div>
   )
 }
@@ -148,124 +138,25 @@ async function BusinessCustomersListContent({
     search: resolvedSearchParams.search,
     page,
   })
-  const totalPages = Math.ceil(total / PAGE_SIZE)
 
   return (
-    <>
-      <div className="md:hidden">
-        <BusinessCustomersMobileList
-          customers={customers.map(c => ({
-            user_id: c.user_id,
-            email: c.email,
-            first_name: c.first_name,
-            last_name: c.last_name,
-            company_name: c.company_name,
-            gst_number: c.gst_number,
-            industry: c.industry,
-            approval_status: c.approval_status,
-            created_at: c.created_at,
-            href: ap(`/admin/business/customers/${c.user_id}/view`, host),
-          }))}
-        />
-      </div>
-
-      {/* Table */}
-      <div className="hidden md:block bg-surface-elevated rounded-lg border border-border-default overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border-default bg-surface-secondary text-foreground-secondary text-xs uppercase tracking-wide">
-              <th className="px-4 py-3 text-left">Company</th>
-              <th className="px-4 py-3 text-left">Contact</th>
-              <th className="px-4 py-3 text-left">GST</th>
-              <th className="px-4 py-3 text-left">Industry</th>
-              <th className="px-4 py-3 text-left">Status</th>
-              <th className="px-4 py-3 text-left">Joined</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-default">
-            {customers.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-foreground-muted">
-                  No business customers found.
-                </td>
-              </tr>
-            ) : (
-              customers.map(c => (
-                <tr key={c.user_id} className="hover:bg-surface-secondary transition-colors">
-                  <td className="px-4 py-3 font-medium">
-                    <Link
-                      href={ap(`/admin/business/customers/${c.user_id}/view`, host)}
-                      className="text-foreground hover:text-accent-500 transition-colors"
-                    >
-                      {c.company_name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="text-foreground">
-                      {c.first_name} {c.last_name || ''}
-                    </p>
-                    <p className="text-xs text-foreground-muted">{c.email}</p>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{c.gst_number}</td>
-                  <td className="px-4 py-3 text-foreground-secondary">{c.industry}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`px-2 py-0.5 text-xs font-semibold rounded-full ${STATUS_STYLES[c.approval_status] || ''}`}
-                    >
-                      {c.approval_status.charAt(0).toUpperCase() + c.approval_status.slice(1)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-foreground-secondary text-xs">
-                    {new Date(c.created_at).toLocaleDateString('en-IN', {
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link
-                      href={ap(`/admin/business/customers/${c.user_id}/view`, host)}
-                      className="text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline"
-                    >
-                      View →
-                    </Link>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between mt-4 text-sm text-foreground-secondary">
-          <span>{total} total</span>
-          <div className="flex gap-2">
-            {page > 1 && (
-              <Link
-                href={buildUrl(resolvedSearchParams, host, page - 1)}
-                className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
-              >
-                Previous
-              </Link>
-            )}
-            <span className="px-3 py-1.5">
-              Page {page} of {totalPages}
-            </span>
-            {page < totalPages && (
-              <Link
-                href={buildUrl(resolvedSearchParams, host, page + 1)}
-                className="px-3 py-1.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
-              >
-                Next
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-    </>
+    <BusinessCustomersTable
+      total={total}
+      page={page}
+      pageSize={PAGE_SIZE}
+      customers={customers.map(c => ({
+        user_id: c.user_id,
+        email: c.email,
+        first_name: c.first_name,
+        last_name: c.last_name,
+        company_name: c.company_name,
+        gst_number: c.gst_number,
+        industry: c.industry,
+        approval_status: c.approval_status,
+        created_at: c.created_at,
+        href: ap(`/admin/business/customers/${c.user_id}/view`, host),
+      }))}
+    />
   )
 }
 
@@ -274,7 +165,7 @@ async function BusinessCustomersListContent({
 function BusinessCustomersListSection({ resolvedSearchParams, host }: { resolvedSearchParams: SP; host: string }) {
   const key = JSON.stringify(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={7} />}>
+    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>
       <BusinessCustomersListContent resolvedSearchParams={resolvedSearchParams} host={host} />
     </Suspense>
   )
@@ -299,21 +190,16 @@ export default async function BusinessCustomersPage({ searchParams }: { searchPa
     (!tab && !!(resolvedSearchParams.status || resolvedSearchParams.search || resolvedSearchParams.page))
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Business Customers</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">Manage B2B partner accounts, approvals, and discounts</p>
-      </div>
+    <PageBody>
+      <PageHeader title="Business Customers" description="Manage B2B partner accounts, approvals, and discounts" />
 
-      <div className="mb-4">
-        <TabLinks
-          tabs={[
-            { id: 'overview', label: 'Overview', href: ap('/admin/business/customers?tab=overview', host) },
-            { id: 'list', label: 'All accounts', href: buildUrl(resolvedSearchParams, host, 1) },
-          ]}
-          value={showList ? 'list' : 'overview'}
-        />
-      </div>
+      <TabLinks
+        tabs={[
+          { id: 'overview', label: 'Overview', href: ap('/admin/business/customers?tab=overview', host) },
+          { id: 'list', label: 'All accounts', href: buildUrl(resolvedSearchParams, host, 1) },
+        ]}
+        value={showList ? 'list' : 'overview'}
+      />
 
       {!showList ? (
         <Suspense fallback={null}>
@@ -321,50 +207,53 @@ export default async function BusinessCustomersPage({ searchParams }: { searchPa
         </Suspense>
       ) : (
         <>
-          {/* Stats */}
-          <Suspense fallback={<AdminStatsSkeleton cards={3} gridClass="grid-cols-3" />}>
+          <Suspense fallback={<KpiRowSkeleton />}>
             <BusinessCustomersStats resolvedSearchParams={resolvedSearchParams} host={host} />
           </Suspense>
 
-          {/* Filters */}
-          <form method="get" className="flex gap-3 mb-4">
-            <input type="hidden" name="tab" value="list" />
-            {resolvedSearchParams.status && <input type="hidden" name="status" value={resolvedSearchParams.status} />}
-            <input
-              type="search"
-              name="search"
-              defaultValue={resolvedSearchParams.search}
-              placeholder="Search by email, company, GST…"
-              className="flex-1 px-3 h-control-sm text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-            />
-            <button
-              type="submit"
-              className="px-4 h-control-sm text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors"
-            >
-              Search
-            </button>
-          </form>
-
-          {/* Status tabs */}
-          <div className="flex gap-2 mb-4 flex-wrap">
-            {['all', 'pending', 'approved', 'rejected'].map(s => (
-              <Link
-                key={s}
-                href={buildUrl(resolvedSearchParams, host, 1, s === 'all' ? {} : { status: s })}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-full capitalize transition-colors ${
-                  (resolvedSearchParams.status ?? 'all') === s
-                    ? 'bg-accent-500 text-white'
-                    : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
-                }`}
-              >
-                {s}
-              </Link>
-            ))}
+          {/* Same GET form as before: tab=list, status carried, search submitted. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <form method="get" className="relative min-w-[200px] flex-1">
+              <input type="hidden" name="tab" value="list" />
+              {resolvedSearchParams.status && <input type="hidden" name="status" value={resolvedSearchParams.status} />}
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
+              <input
+                type="search"
+                name="search"
+                defaultValue={resolvedSearchParams.search}
+                placeholder="Search by email, company, GST..."
+                aria-label="Search"
+                className="field-md w-full border border-border-default bg-surface-elevated pl-9 text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40"
+              />
+            </form>
+            <div className="flex h-control items-center gap-0.5 rounded-lg border border-border-default bg-surface-elevated p-0.5">
+              {['all', 'pending', 'approved', 'rejected'].map(s => (
+                <Link
+                  key={s}
+                  href={buildUrl(resolvedSearchParams, host, 1, s === 'all' ? {} : { status: s })}
+                  className={`flex h-full items-center rounded-md px-3 text-xs font-medium capitalize transition-colors ${
+                    (resolvedSearchParams.status ?? 'all') === s ? 'bg-accent-500 text-white' : 'text-foreground-secondary hover:bg-surface-secondary hover:text-foreground'
+                  }`}
+                >
+                  {s}
+                </Link>
+              ))}
+            </div>
           </div>
 
           <BusinessCustomersListSection resolvedSearchParams={resolvedSearchParams} host={host} />
         </>
       )}
+    </PageBody>
+  )
+}
+
+function KpiRowSkeleton() {
+  return (
+    <div className="grid grid-cols-3 gap-3 animate-pulse">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
+      ))}
     </div>
   )
 }

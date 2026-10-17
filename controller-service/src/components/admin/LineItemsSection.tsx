@@ -367,7 +367,7 @@ function decodeLineItemId(encoded: string) {
 }
 
 const inputCls =
-  'w-full px-2 py-1.5 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 dark:focus:ring-secondary-400 disabled:opacity-60 disabled:cursor-not-allowed'
+  'field-sm w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent disabled:opacity-60 disabled:cursor-not-allowed'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 
 export interface ScannedSerial {
@@ -979,7 +979,7 @@ export default function LineItemsSection({
             type="button"
             onClick={() => setScanEnabled(v => !v)}
             title={scanEnabled ? 'Barcode scanning on — scan a product to add it' : 'Barcode scanning off'}
-            className={`flex items-center gap-1.5 text-xs font-semibold px-2 h-control-sm rounded-lg border transition-colors ${scanEnabled ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
+            className={`flex items-center gap-1.5 text-xs font-semibold px-2 h-control-sm rounded-lg border transition-colors ${scanEnabled ? 'border-accent-500 bg-accent-500/10 text-accent-500' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path
@@ -1001,7 +1001,7 @@ export default function LineItemsSection({
           <button
             type="button"
             onClick={() => onChange([...items, newLineItem()])}
-            className="flex items-center gap-1 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors"
+            className="flex items-center gap-1 text-xs text-accent-500 font-semibold hover:text-accent-600 transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1040,9 +1040,9 @@ export default function LineItemsSection({
 
               <div className="relative">
                 {custom ? (
-                  <div className="px-3 py-2 bg-surface-secondary rounded-lg border border-dashed border-amber-400 dark:border-amber-600 space-y-2">
+                  <div className="px-3 py-2 bg-surface-secondary rounded-lg border border-dashed border-amber-500/60 space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                      <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-400">
                         Custom – not in inventory
                       </span>
                       <span className="flex items-center gap-3 shrink-0">
@@ -1056,7 +1056,7 @@ export default function LineItemsSection({
                         <button
                           type="button"
                           onClick={() => customToSearch(item.id)}
-                          className="text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors"
+                          className="text-xs text-accent-500 font-semibold hover:text-accent-600 transition-colors"
                         >
                           Search store instead
                         </button>
@@ -1099,7 +1099,7 @@ export default function LineItemsSection({
                           <button
                             type="button"
                             onClick={() => onStockBadgeClick?.(item)}
-                            className="text-xs font-medium px-1.5 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                            className="text-xs font-medium px-1.5 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity bg-blue-500/10 text-blue-700 dark:text-blue-400"
                           >
                             Batch: {assignedBatchLabels[item.id]}
                           </button>
@@ -1119,8 +1119,8 @@ export default function LineItemsSection({
                                 onClick={() => onStockBadgeClick(item)}
                                 className={`text-xs font-medium px-1.5 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
                                   isLow
-                                    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                    : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                    ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                    : 'bg-green-500/10 text-green-700 dark:text-green-400'
                                 }`}
                               >
                                 {`Stock: ${stockInUnits} ${unitLabel}`}
@@ -1129,10 +1129,10 @@ export default function LineItemsSection({
                               <span
                                 className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
                                   isOut
-                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                    ? 'bg-red-500/10 text-red-600 dark:text-red-400'
                                     : isLow
-                                      ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                      ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+                                      : 'bg-green-500/10 text-green-700 dark:text-green-400'
                                 }`}
                               >
                                 {isOut ? 'Out of stock' : `Stock: ${stockInUnits} ${unitLabel}`}
@@ -1145,7 +1145,7 @@ export default function LineItemsSection({
                     <button
                       type="button"
                       onClick={() => clearProduct(item.id)}
-                      className="shrink-0 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors"
+                      className="shrink-0 text-xs text-accent-500 font-semibold hover:text-accent-600 transition-colors"
                     >
                       Change
                     </button>
@@ -1175,7 +1175,7 @@ export default function LineItemsSection({
                               return n
                             })
                           }}
-                          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${mode === m ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900 shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}
+                          className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${mode === m ? 'bg-accent-500 text-white shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}
                         >
                           {m === 'name' ? 'Name' : m === 'sku' ? 'SKU' : m === 'category' ? 'Category' : 'Scanner'}
                         </button>
@@ -1277,7 +1277,7 @@ export default function LineItemsSection({
                           type="button"
                           disabled={!categoryIds[item.id]}
                           onClick={() => openPicker(item.id, categoryIds[item.id] ?? '')}
-                          className="px-3 h-control-sm bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+                          className="px-3 h-control-sm bg-accent-500 hover:bg-accent-600 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
                         >
                           Select Product
                         </button>
@@ -1285,9 +1285,9 @@ export default function LineItemsSection({
                     )}
 
                     {mode === 'scanner' && (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-accent-500 bg-accent-50 dark:bg-accent-900/20">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-accent-500 bg-accent-500/10">
                         <svg
-                          className="w-4 h-4 shrink-0 text-accent-600 dark:text-accent-400"
+                          className="w-4 h-4 shrink-0 text-accent-500"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -1567,7 +1567,7 @@ export default function LineItemsSection({
                     <span>
                       MRP: <span className="line-through text-foreground-muted">₹{fmt(Number(item.unit_price))}</span>
                       {' · '}Disc:{' '}
-                      <span className="text-green-600 dark:text-green-400 font-medium">{item.discount_pct}%</span>
+                      <span className="text-green-700 dark:text-green-400 font-medium">{item.discount_pct}%</span>
                       {' · '}Net:{' '}
                       <span className="font-medium text-foreground">
                         ₹{fmt(calcLine({ ...item, quantity: 1 }, gstEnabled))}
@@ -1612,8 +1612,8 @@ export default function LineItemsSection({
                             <span
                               className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
                                 summary.complete
-                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                  : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                  ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                                  : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
                               }`}
                             >
                               {summary.complete ? 'Ready' : 'Needed'}
@@ -1637,7 +1637,7 @@ export default function LineItemsSection({
         <button
           type="button"
           onClick={() => onChange([...items, newLineItem()])}
-          className="mt-3 w-full flex items-center justify-center gap-1.5 h-control-sm rounded-lg border border-dashed border-border-default text-xs font-semibold text-secondary-500 dark:text-secondary-300 hover:bg-surface-secondary hover:border-secondary-400 transition-colors"
+          className="mt-3 w-full flex items-center justify-center gap-1.5 h-control-sm rounded-lg border border-dashed border-border-default text-xs font-semibold text-accent-500 hover:bg-surface-secondary hover:border-accent-500 transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

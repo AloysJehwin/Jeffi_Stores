@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
-import { Tabs } from '@/components/admin/channels/ui'
+import { Tabs } from '@/components/admin/kit'
 import type { Tab } from './_components/shared'
 import { OverviewTab } from './_components/OverviewTab'
 import { ReceivablesTab } from './_components/ReceivablesTab'
@@ -81,7 +81,7 @@ export default function FinancialClient() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <Tabs tabs={TABS.map(t => ({ id: t.key, label: t.label }))} value={tab} onChange={handleTabChange} />
 
       <div>

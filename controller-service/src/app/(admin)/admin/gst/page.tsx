@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { Download, Loader2 } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
-import { Tabs } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
+import { Card, DataTable, EmptyState, Field, Fields, FormField, Kpi, KpiGrid, PageBody, PageHeader, StatusBadge, Tabs, TableSkeleton, badgeCls, useActionToast, type DataCol, type StatusMap } from '@/components/admin/kit'
 import { fmtQty } from '@/lib/shared/number-display'
 
 type Tab = 'gstr1' | 'gstr3b' | 'irn' | 'itc'
@@ -99,41 +100,101 @@ function getPresetRange(preset: string): { from: string; to: string } {
   return { from: new Date(y, m, 1).toISOString().slice(0, 10), to: now.toISOString().slice(0, 10) }
 }
 
-function SummaryCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+// e-invoice statuses as stored on invoices.irn_status.
+const IRN_STATUS: StatusMap = {
+  generated: { label: 'Generated', tone: 'green' },
+  stub: { label: 'Stub', tone: 'amber' },
+  cancelled: { label: 'Cancelled', tone: 'red' },
+}
+
+type K = { _k: string }
+const keyed = <T,>(rows: T[]): (T & K)[] => rows.map((r, i) => ({ ...r, _k: String(i) }))
+const kk = (r: K) => r._k
+
+const money = (v: string | number) => INR(typeof v === 'string' ? parseFloat(v) : v)
+type Tax = { taxable: number; cgst: number; sgst: number; igst: number; total: number }
+function taxCols<T>(pick: (r: T) => Tax, totalLabel = 'Total'): DataCol<T>[] {
+  return [
+    { key: 'taxable', label: 'Taxable', num: true, render: r => INR(pick(r).taxable) },
+    { key: 'cgst', label: 'CGST', num: true, render: r => INR(pick(r).cgst) },
+    { key: 'sgst', label: 'SGST', num: true, render: r => INR(pick(r).sgst) },
+    { key: 'igst', label: 'IGST', num: true, render: r => INR(pick(r).igst) },
+    { key: 'total', label: totalLabel, num: true, render: r => <span className="font-medium text-foreground">{INR(pick(r).total)}</span> },
+  ]
+}
+const invTax = (r: InvoiceRow): Tax => ({ taxable: parseFloat(r.taxable_amount), cgst: parseFloat(r.cgst_amount), sgst: parseFloat(r.sgst_amount), igst: parseFloat(r.igst_amount), total: parseFloat(r.total_amount) })
+function invoiceCols(b2b: boolean): DataCol<InvoiceRow & K>[] {
+  const gstin: DataCol<InvoiceRow & K>[] = b2b ? [{ key: 'gstin', label: 'GSTIN', render: r => <span className="font-mono text-xs text-foreground-secondary">{r.buyer_gstin}</span> }] : []
+  return [
+    { key: 'no', label: 'Invoice No', render: r => <span className="whitespace-nowrap font-medium text-foreground">{r.invoice_number}</span> },
+    { key: 'date', label: 'Date', render: r => <span className="whitespace-nowrap text-foreground-secondary">{fmtDate(r.invoice_date)}</span> },
+    { key: 'customer', label: 'Customer', render: r => <span className="block max-w-[200px] truncate">{r.customer_name}</span> },
+    ...gstin,
+    ...taxCols<InvoiceRow & K>(invTax),
+  ]
+}
+const hsnCols: DataCol<HsnRow & K>[] = [
+  { key: 'hsn', label: 'HSN Code', render: r => <span className="font-mono font-medium text-foreground">{r.hsnCode}</span> },
+  { key: 'rate', label: 'GST Rate', num: true, render: r => `${r.gstRate}%` },
+  ...taxCols<HsnRow & K>(r => ({ taxable: r.taxableVal, cgst: r.cgstAmt, sgst: r.sgstAmt, igst: r.igstAmt, total: r.totalTax }), 'Total Tax'),
+]
+type RateRow = GSTR3BData['summary']['byGstRate'][number] & K
+const rateCols: DataCol<RateRow>[] = [
+  { key: 'rate', label: 'GST Rate', render: r => <span className="font-medium text-foreground">{r.gstRate}%</span> },
+  { key: 'type', label: 'Supply Type', render: r => <span className="text-foreground-secondary">{r.isIgst ? 'Inter-State' : 'Intra-State'}</span> },
+  ...taxCols<RateRow>(r => ({ taxable: r.taxable, cgst: r.cgst, sgst: r.sgst, igst: r.igst, total: r.cgst + r.sgst + r.igst }), 'Total Tax'),
+]
+const irnCols: DataCol<InvoiceRow & K>[] = [
+  { key: 'no', label: 'Invoice No', render: r => <span className="whitespace-nowrap font-medium text-foreground">{r.invoice_number}</span> },
+  { key: 'date', label: 'Date', render: r => <span className="whitespace-nowrap text-foreground-secondary">{fmtDate(r.invoice_date)}</span> },
+  { key: 'customer', label: 'Customer', render: r => <span className="block max-w-[160px] truncate">{r.customer_name}</span> },
+  { key: 'type', label: 'Type', render: r => <span className={badgeCls(r.buyer_gstin ? 'blue' : 'muted')}>{r.buyer_gstin ? 'B2B' : 'B2C'}</span> },
+  { key: 'amount', label: 'Amount', num: true, render: r => <span className="font-medium text-foreground">{money(r.total_amount)}</span> },
+  {
+    key: 'irn',
+    label: 'IRN',
+    render: r => (
+      <span className="block max-w-[120px] truncate font-mono text-xs text-foreground-secondary" title={r.irn || ''}>
+        {r.irn ? r.irn.slice(0, 16) + '…' : <span className="text-amber-600 dark:text-amber-400">Pending</span>}
+      </span>
+    ),
+  },
+  { key: 'ack', label: 'Ack No', render: r => <span className="text-xs text-foreground-secondary">{r.irn_ack_no || '—'}</span> },
+  { key: 'ackdt', label: 'Ack Date', render: r => <span className="whitespace-nowrap text-xs text-foreground-secondary">{r.irn_ack_dt ? fmtDate(r.irn_ack_dt) : '—'}</span> },
+  { key: 'status', label: 'Status', render: r => <StatusBadge status={r.irn_status} map={IRN_STATUS} label={r.irn_status && IRN_STATUS[r.irn_status] ? undefined : 'No IRN'} /> },
+]
+type SupRow = ITCData['supplierSummary'][number] & K
+const supplierCols: DataCol<SupRow>[] = [
+  { key: 'supplier', label: 'Supplier', render: r => <span className="font-medium text-foreground">{r.supplierName}</span> },
+  { key: 'gstin', label: 'GSTIN', render: r => <span className="font-mono text-xs text-foreground-secondary">{r.gstin || <span className="italic text-foreground-muted">No GSTIN</span>}</span> },
+  { key: 'pos', label: 'POs', num: true, render: r => r.poCount },
+  { key: 'taxable', label: 'Taxable', num: true, render: r => INR(r.taxable) },
+  { key: 'tax', label: 'ITC (Tax)', num: true, render: r => <span className="font-medium text-green-700 dark:text-green-400">{INR(r.tax)}</span> },
+]
+const itcCols: DataCol<ITCRow & K>[] = [
+  { key: 'po', label: 'PO No', render: r => <span className="whitespace-nowrap font-medium text-foreground">{r.po_number}</span> },
+  { key: 'date', label: 'Date', render: r => <span className="whitespace-nowrap text-foreground-secondary">{fmtDate(r.order_date)}</span> },
+  { key: 'supplier', label: 'Supplier', render: r => <span className="block max-w-[140px] truncate">{r.supplier_name}</span> },
+  { key: 'product', label: 'Product', render: r => <span className="block max-w-[160px] truncate">{r.product_name}</span> },
+  { key: 'qty', label: 'Qty', num: true, render: r => fmtQty(r.quantity) },
+  { key: 'unit', label: 'Unit Cost', num: true, render: r => money(r.unit_cost) },
+  { key: 'rate', label: 'GST %', num: true, render: r => `${parseFloat(r.tax_rate)}%` },
+  { key: 'taxable', label: 'Taxable', num: true, render: r => money(r.taxable_amount) },
+  { key: 'itc', label: 'ITC', num: true, render: r => <span className="font-medium text-green-700 dark:text-green-400">{money(r.tax_amount)}</span> },
+]
+
+function CsvButton({ onClick }: { onClick: () => void }) {
   return (
-    <div className="bg-surface-elevated rounded-lg border border-border-default p-4 shadow-sm">
-      <p className="text-xs text-foreground-muted uppercase tracking-wide">{label}</p>
-      <p className="text-xl font-bold text-foreground mt-1">{value}</p>
-      {sub && <p className="text-xs text-foreground-secondary mt-0.5">{sub}</p>}
-    </div>
+    <button type="button" onClick={onClick} className="control-md border border-border-default text-foreground hover:bg-surface-secondary">
+      <Download className="h-4 w-4" />
+      Download CSV
+    </button>
   )
 }
 
-function Badge({ status }: { status: string | null }) {
-  if (status === 'generated')
-    return (
-      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-        Generated
-      </span>
-    )
-  if (status === 'stub')
-    return (
-      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
-        Stub
-      </span>
-    )
-  if (status === 'cancelled')
-    return (
-      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
-        Cancelled
-      </span>
-    )
-  return (
-    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-surface-secondary dark:bg-surface-secondary text-foreground-muted">
-      No IRN
-    </span>
-  )
-}
+const Note = ({ children }: { children: React.ReactNode }) => (
+  <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 text-sm text-amber-700 dark:text-amber-400">{children}</div>
+)
 
 export default function GSTPage() {
   const searchParams = useSearchParams()
@@ -151,7 +212,7 @@ export default function GSTPage() {
   const [from, setFrom] = useState(initial.from)
   const [to, setTo] = useState(initial.to)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const toast = useActionToast()
 
   const [gstr1Summary, setGstr1Summary] = useState<GSTSummary | null>(null)
   const [gstr1B2B, setGstr1B2B] = useState<InvoiceRow[]>([])
@@ -162,7 +223,6 @@ export default function GSTPage() {
 
   const fetchAll = useCallback(async (f: string, t: string) => {
     setLoading(true)
-    setError('')
     try {
       const [r1, r3b, itc] = await Promise.all([
         fetch(`/api/admin/gst/gstr1?from=${f}&to=${t}`, { credentials: 'include' }),
@@ -179,11 +239,11 @@ export default function GSTPage() {
       setGstr3b(d3b)
       if (itc.ok) setItcData(ditc)
     } catch (e: any) {
-      setError(e.message)
+      toast.error(e.message)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     fetchAll(from, to)
@@ -221,14 +281,11 @@ export default function GSTPage() {
   const allInvoices = [...gstr1B2B, ...gstr1B2C]
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">GST Compliance</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">GSTR-1 · GSTR-3B · e-Invoice status · ITC Ledger</p>
-      </div>
+    <PageBody>
+      <PageHeader title="GST Compliance" description="GSTR-1 · GSTR-3B · e-Invoice status · ITC Ledger" />
 
-      <div className="bg-surface-elevated rounded-lg border border-border-default p-4 shadow-sm">
-        <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="inline-flex h-control items-center rounded-lg border border-border-default bg-surface-elevated p-0.5">
           {[
             { key: 'this_month', label: 'This Month' },
             { key: 'last_month', label: 'Last Month' },
@@ -237,641 +294,158 @@ export default function GSTPage() {
           ].map(p => (
             <button
               key={p.key}
+              type="button"
               onClick={() => applyPreset(p.key)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                preset === p.key
-                  ? 'bg-accent-500 text-white'
-                  : 'bg-surface-elevated border border-border-default text-foreground hover:bg-surface-secondary'
-              }`}
+              className={`h-full rounded-md px-3 text-sm font-medium transition-colors ${preset === p.key ? 'bg-accent-500 text-white' : 'text-foreground-secondary hover:text-foreground'}`}
             >
               {p.label}
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <label className="block text-xs text-foreground-secondary mb-1">From</label>
-            <DatePicker
-              value={from}
-              onChange={v => {
-                setFrom(v)
-                setPreset('custom')
-              }}
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-foreground-secondary mb-1">To</label>
-            <DatePicker
-              value={to}
-              onChange={v => {
-                setTo(v)
-                setPreset('custom')
-              }}
-            />
-          </div>
-          <button
-            onClick={handleFetch}
-            disabled={loading}
-            className="px-4 h-control-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
-          >
-            {loading ? (
-              <span className="flex items-center gap-1.5">
-                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Fetching…
-              </span>
-            ) : (
-              'Fetch Report'
-            )}
-          </button>
-        </div>
-        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        <FormField label="From">
+          <DatePicker
+            value={from}
+            onChange={v => {
+              setFrom(v)
+              setPreset('custom')
+            }}
+          />
+        </FormField>
+        <FormField label="To">
+          <DatePicker
+            value={to}
+            onChange={v => {
+              setTo(v)
+              setPreset('custom')
+            }}
+          />
+        </FormField>
+        <button type="button" onClick={handleFetch} disabled={loading} className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600 disabled:opacity-50">
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          {loading ? 'Fetching…' : 'Fetch Report'}
+        </button>
       </div>
 
       {loading && (
-        <div className="animate-pulse space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="bg-surface-elevated rounded-lg border border-border-default p-4 shadow-sm space-y-2"
-                style={{ animationDelay: `${i * 50}ms` }}
-              >
-                <div className="h-3 w-20 bg-surface-secondary rounded" />
-                <div className="h-5 w-24 bg-surface-secondary rounded" />
-              </div>
-            ))}
-          </div>
+        <div className="grid animate-pulse grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
+          ))}
         </div>
       )}
 
-      {gstr1Summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <SummaryCard
-            label="Invoices"
-            value={String(gstr1Summary.totalInvoices)}
-            sub={`${gstr1Summary.b2bCount} B2B · ${gstr1Summary.b2cCount} B2C`}
-          />
-          <SummaryCard label="Taxable Value" value={INR(gstr1Summary.totalTaxable)} />
-          <SummaryCard label="CGST" value={INR(gstr1Summary.totalCgst)} />
-          <SummaryCard label="SGST" value={INR(gstr1Summary.totalSgst)} />
-          <SummaryCard label="IGST" value={INR(gstr1Summary.totalIgst)} />
-          <SummaryCard label="Total Tax" value={INR(gstr1Summary.totalTax)} />
+      {gstr1Summary && !loading && (
+        <KpiGrid>
+          <Kpi label="Invoices" value={String(gstr1Summary.totalInvoices)} sub={`${gstr1Summary.b2bCount} B2B · ${gstr1Summary.b2cCount} B2C`} highlight />
+          <Kpi label="Taxable Value" value={INR(gstr1Summary.totalTaxable)} />
+          <Kpi label="CGST" value={INR(gstr1Summary.totalCgst)} />
+          <Kpi label="SGST" value={INR(gstr1Summary.totalSgst)} />
+          <Kpi label="IGST" value={INR(gstr1Summary.totalIgst)} />
+          <Kpi label="Total Tax" value={INR(gstr1Summary.totalTax)} />
+        </KpiGrid>
+      )}
+
+      <Tabs tabs={tabs} value={tab} onChange={handleTabChange} />
+
+      {loading && <TableSkeleton rows={8} cols={6} />}
+
+      {!loading && tab === 'gstr1' && (
+        <div className="space-y-4">
+          {!gstr1Summary ? (
+            <EmptyState title="Select a date range and click Fetch Report." />
+          ) : (
+            <>
+              <Card title={`B2B Invoices (${gstr1B2B.length})`} flush action={<CsvButton onClick={() => downloadCSV('gstr1')} />}>
+                <DataTable bare rows={keyed(gstr1B2B)} cols={invoiceCols(true)} rowKey={kk} empty="No B2B invoices in this period." />
+              </Card>
+              <Card title={`B2C Invoices (${gstr1B2C.length})`} flush>
+                <DataTable bare rows={keyed(gstr1B2C)} cols={invoiceCols(false)} rowKey={kk} empty="No B2C invoices in this period." />
+              </Card>
+              <Card title="HSN Summary" flush>
+                <DataTable bare rows={keyed(hsnSummary)} cols={hsnCols} rowKey={kk} empty="No HSN lines in this period." />
+              </Card>
+            </>
+          )}
         </div>
       )}
 
-      <div className="bg-surface-elevated rounded-lg border border-border-default shadow-sm overflow-hidden">
-        <div className="px-2 pt-1">
-          <Tabs tabs={tabs} value={tab} onChange={handleTabChange} />
-        </div>
-
-        <div className="p-4 sm:p-6">
-          {loading && (
-            <div className="animate-pulse space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="h-5 w-36 bg-surface-secondary rounded" />
-                <div className="h-8 w-28 bg-surface-secondary rounded-lg" />
-              </div>
-              <div className="rounded-lg border border-border-default overflow-hidden">
-                <div className="bg-surface-secondary px-4 py-2.5 flex gap-4">
-                  {[...Array(9)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-3 bg-surface-elevated rounded flex-1"
-                      style={{ animationDelay: `${i * 40}ms` }}
-                    />
-                  ))}
-                </div>
-                {[...Array(8)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="px-4 py-3 border-t border-border-default flex gap-4"
-                    style={{ animationDelay: `${i * 60}ms` }}
-                  >
-                    <div className="h-4 w-24 bg-surface-secondary rounded" />
-                    <div className="h-4 w-20 bg-surface-secondary rounded" />
-                    <div className="h-4 flex-1 bg-surface-secondary rounded" />
-                    <div className="h-4 w-16 bg-surface-secondary rounded" />
-                    <div className="h-4 w-16 bg-surface-secondary rounded" />
-                    <div className="h-4 w-16 bg-surface-secondary rounded" />
-                    <div className="h-4 w-16 bg-surface-secondary rounded" />
-                    <div className="h-4 w-20 bg-surface-secondary rounded" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!loading && tab === 'gstr1' && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-foreground">Outward Supplies</h2>
-                <button
-                  onClick={() => downloadCSV('gstr1')}
-                  className="flex items-center gap-1.5 px-3 h-control-sm text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
-                  </svg>
-                  Download CSV
-                </button>
-              </div>
-
-              {gstr1B2B.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-foreground mb-2">B2B Invoices ({gstr1B2B.length})</p>
-                  <div className="overflow-x-auto rounded-lg border border-border-default">
-                    <table className="min-w-full text-sm divide-y divide-border-default">
-                      <thead className="bg-surface-secondary">
-                        <tr>
-                          {['Invoice No', 'Date', 'Customer', 'GSTIN', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total'].map(
-                            h => (
-                              <th
-                                key={h}
-                                className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total'].includes(h) ? 'text-right' : 'text-left'}`}
-                              >
-                                {h}
-                              </th>
-                            )
-                          )}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border-default">
-                        {gstr1B2B.map((r, i) => (
-                          <tr key={i} className="hover:bg-surface-secondary/50">
-                            <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">
-                              {r.invoice_number}
-                            </td>
-                            <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
-                              {fmtDate(r.invoice_date)}
-                            </td>
-                            <td className="px-4 py-2.5 text-foreground max-w-[160px] truncate">{r.customer_name}</td>
-                            <td className="px-4 py-2.5 font-mono text-xs text-foreground-secondary">{r.buyer_gstin}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">
-                              {INR(parseFloat(r.taxable_amount))}
-                            </td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.cgst_amount))}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.sgst_amount))}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.igst_amount))}</td>
-                            <td className="px-4 py-2.5 text-right font-medium text-foreground">
-                              {INR(parseFloat(r.total_amount))}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {gstr1B2C.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-foreground mb-2">B2C Invoices ({gstr1B2C.length})</p>
-                  <div className="overflow-x-auto rounded-lg border border-border-default">
-                    <table className="min-w-full text-sm divide-y divide-border-default">
-                      <thead className="bg-surface-secondary">
-                        <tr>
-                          {['Invoice No', 'Date', 'Customer', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total'].map(h => (
-                            <th
-                              key={h}
-                              className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total'].includes(h) ? 'text-right' : 'text-left'}`}
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border-default">
-                        {gstr1B2C.map((r, i) => (
-                          <tr key={i} className="hover:bg-surface-secondary/50">
-                            <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">
-                              {r.invoice_number}
-                            </td>
-                            <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
-                              {fmtDate(r.invoice_date)}
-                            </td>
-                            <td className="px-4 py-2.5 text-foreground max-w-[200px] truncate">{r.customer_name}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">
-                              {INR(parseFloat(r.taxable_amount))}
-                            </td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.cgst_amount))}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.sgst_amount))}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(parseFloat(r.igst_amount))}</td>
-                            <td className="px-4 py-2.5 text-right font-medium text-foreground">
-                              {INR(parseFloat(r.total_amount))}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {hsnSummary.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium text-foreground mb-2">HSN Summary</p>
-                  <div className="overflow-x-auto rounded-lg border border-border-default">
-                    <table className="min-w-full text-sm divide-y divide-border-default">
-                      <thead className="bg-surface-secondary">
-                        <tr>
-                          {['HSN Code', 'GST Rate', 'Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax'].map(h => (
-                            <th
-                              key={h}
-                              className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable Value', 'CGST', 'SGST', 'IGST', 'Total Tax'].includes(h) ? 'text-right' : 'text-left'}`}
-                            >
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border-default">
-                        {hsnSummary.map((r, i) => (
-                          <tr key={i} className="hover:bg-surface-secondary/50">
-                            <td className="px-4 py-2.5 font-mono font-medium text-foreground">{r.hsnCode}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{r.gstRate}%</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(r.taxableVal)}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(r.cgstAmt)}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(r.sgstAmt)}</td>
-                            <td className="px-4 py-2.5 text-right text-foreground">{INR(r.igstAmt)}</td>
-                            <td className="px-4 py-2.5 text-right font-medium text-foreground">{INR(r.totalTax)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {!gstr1Summary && !loading && (
-                <p className="text-sm text-foreground-muted text-center py-8">
-                  Select a date range and click Fetch Report.
-                </p>
-              )}
-            </div>
-          )}
-
-          {!loading && tab === 'gstr3b' && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-foreground">GSTR-3B Summary</h2>
-                <button
-                  onClick={() => downloadCSV('gstr3b')}
-                  className="flex items-center gap-1.5 px-3 h-control-sm text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
-                  </svg>
-                  Download CSV
-                </button>
-              </div>
-
-              {gstr3b ? (
-                <>
-                  {(gstr3b.gstin || gstr3b.legalName) && (
-                    <div className="flex gap-6 text-sm text-foreground-secondary">
-                      {gstr3b.legalName && (
-                        <span>
-                          <span className="font-medium text-foreground">Entity:</span> {gstr3b.legalName}
-                        </span>
-                      )}
-                      {gstr3b.gstin && (
-                        <span>
-                          <span className="font-medium text-foreground">GSTIN:</span> {gstr3b.gstin}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="rounded-lg border border-border-default overflow-hidden">
-                    <div className="px-4 py-3 bg-surface-secondary border-b border-border-default">
-                      <p className="text-sm font-semibold text-foreground">3.1 Details of Outward Supplies</p>
-                    </div>
-                    <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <SummaryCard label="Taxable Value" value={INR(gstr3b.table31.outwardTaxable.taxableValue)} />
-                      <SummaryCard
-                        label="Integrated Tax (IGST)"
-                        value={INR(gstr3b.table31.outwardTaxable.integratedTax)}
-                      />
-                      <SummaryCard label="Central Tax (CGST)" value={INR(gstr3b.table31.outwardTaxable.centralTax)} />
-                      <SummaryCard label="State/UT Tax (SGST)" value={INR(gstr3b.table31.outwardTaxable.stateTax)} />
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-border-default overflow-hidden">
-                    <div className="px-4 py-3 bg-surface-secondary border-b border-border-default">
-                      <p className="text-sm font-semibold text-foreground">Tax Breakup by GST Rate</p>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm divide-y divide-border-default">
-                        <thead className="bg-surface-secondary/50">
-                          <tr>
-                            {['GST Rate', 'Supply Type', 'Taxable', 'CGST', 'SGST', 'IGST', 'Total Tax'].map(h => (
-                              <th
-                                key={h}
-                                className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Taxable', 'CGST', 'SGST', 'IGST', 'Total Tax'].includes(h) ? 'text-right' : 'text-left'}`}
-                              >
-                                {h}
-                              </th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border-default">
-                          {gstr3b.summary.byGstRate.map((r, i) => (
-                            <tr key={i} className="hover:bg-surface-secondary/50">
-                              <td className="px-4 py-2.5 font-medium text-foreground">{r.gstRate}%</td>
-                              <td className="px-4 py-2.5 text-foreground-secondary">
-                                {r.isIgst ? 'Inter-State' : 'Intra-State'}
-                              </td>
-                              <td className="px-4 py-2.5 text-right text-foreground">{INR(r.taxable)}</td>
-                              <td className="px-4 py-2.5 text-right text-foreground">{INR(r.cgst)}</td>
-                              <td className="px-4 py-2.5 text-right text-foreground">{INR(r.sgst)}</td>
-                              <td className="px-4 py-2.5 text-right text-foreground">{INR(r.igst)}</td>
-                              <td className="px-4 py-2.5 text-right font-medium text-foreground">
-                                {INR(r.cgst + r.sgst + r.igst)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-border-default overflow-hidden">
-                    <div className="px-4 py-3 bg-surface-secondary border-b border-border-default flex items-center justify-between">
-                      <p className="text-sm font-semibold text-foreground">6. Payment of Tax</p>
-                    </div>
-                    <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      <SummaryCard label="IGST Payable" value={INR(gstr3b.summary.totalIgst)} />
-                      <SummaryCard label="CGST Payable" value={INR(gstr3b.summary.totalCgst)} />
-                      <SummaryCard label="SGST Payable" value={INR(gstr3b.summary.totalSgst)} />
-                      <SummaryCard label="Total Payable" value={INR(gstr3b.summary.totalTax)} />
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-800 dark:text-amber-300">
-                    <span className="font-semibold">Note (Table 4 — ITC): </span>
-                    Input Tax Credit values are shown in the ITC Ledger tab. ITC is eligible only from received POs.
-                    Verify with purchase invoices before filing.
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-foreground-muted text-center py-8">Fetch data to view GSTR-3B.</p>
-              )}
-            </div>
-          )}
-
-          {!loading && tab === 'irn' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-foreground">
-                  e-Invoice (IRN) Status
-                  {allInvoices.length > 0 && (
-                    <span className="ml-2 text-sm font-normal text-foreground-secondary">
-                      {allInvoices.filter(r => r.irn).length} generated · {allInvoices.filter(r => !r.irn).length}{' '}
-                      pending
-                    </span>
-                  )}
-                </h2>
-              </div>
-              {allInvoices.length > 0 ? (
-                <div className="overflow-x-auto rounded-lg border border-border-default">
-                  <table className="min-w-full text-sm divide-y divide-border-default">
-                    <thead className="bg-surface-secondary">
-                      <tr>
-                        {[
-                          'Invoice No',
-                          'Date',
-                          'Customer',
-                          'Type',
-                          'Amount',
-                          'IRN',
-                          'Ack No',
-                          'Ack Date',
-                          'Status',
-                        ].map(h => (
-                          <th
-                            key={h}
-                            className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Amount'].includes(h) ? 'text-right' : 'text-left'}`}
-                          >
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border-default">
-                      {allInvoices.map((r, i) => (
-                        <tr key={i} className="hover:bg-surface-secondary/50">
-                          <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">
-                            {r.invoice_number}
-                          </td>
-                          <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
-                            {fmtDate(r.invoice_date)}
-                          </td>
-                          <td className="px-4 py-2.5 text-foreground max-w-[160px] truncate">{r.customer_name}</td>
-                          <td className="px-4 py-2.5">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.buyer_gstin ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300' : 'bg-surface-secondary text-foreground-muted'}`}
-                            >
-                              {r.buyer_gstin ? 'B2B' : 'B2C'}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 text-right font-medium text-foreground">
-                            {INR(parseFloat(r.total_amount))}
-                          </td>
-                          <td
-                            className="px-4 py-2.5 font-mono text-xs text-foreground-secondary max-w-[120px] truncate"
-                            title={r.irn || ''}
-                          >
-                            {r.irn ? (
-                              r.irn.slice(0, 16) + '…'
-                            ) : (
-                              <span className="text-yellow-600 dark:text-yellow-400">Pending</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 text-xs text-foreground-secondary">{r.irn_ack_no || '—'}</td>
-                          <td className="px-4 py-2.5 text-xs text-foreground-secondary whitespace-nowrap">
-                            {r.irn_ack_dt ? fmtDate(r.irn_ack_dt) : '—'}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <Badge status={r.irn_status} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p className="text-sm text-foreground-muted text-center py-8">No invoices in this period.</p>
-              )}
-            </div>
-          )}
-
-          {!loading && tab === 'itc' && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-foreground">Input Tax Credit Ledger</h2>
-                <button
-                  onClick={() => downloadCSV('itc')}
-                  className="flex items-center gap-1.5 px-3 h-control-sm text-sm border border-border-default rounded-lg hover:bg-surface-secondary transition-colors text-foreground"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
-                  </svg>
-                  Download CSV
-                </button>
-              </div>
-
-              {itcData ? (
-                <>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <SummaryCard
-                      label="PO Line Items"
-                      value={String(itcData.summary.lineCount)}
-                      sub="From received POs"
-                    />
-                    <SummaryCard label="Total Taxable Purchases" value={INR(itcData.summary.totalTaxable)} />
-                    <SummaryCard
-                      label="Total ITC Claimable"
-                      value={INR(itcData.summary.totalTax)}
-                      sub="Verify with supplier invoices"
-                    />
-                  </div>
-
-                  {itcData.supplierSummary.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium text-foreground mb-2">By Supplier</p>
-                      <div className="overflow-x-auto rounded-lg border border-border-default">
-                        <table className="min-w-full text-sm divide-y divide-border-default">
-                          <thead className="bg-surface-secondary">
-                            <tr>
-                              {['Supplier', 'GSTIN', 'POs', 'Taxable', 'ITC (Tax)'].map(h => (
-                                <th
-                                  key={h}
-                                  className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['POs', 'Taxable', 'ITC (Tax)'].includes(h) ? 'text-right' : 'text-left'}`}
-                                >
-                                  {h}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border-default">
-                            {itcData.supplierSummary.map((r, i) => (
-                              <tr key={i} className="hover:bg-surface-secondary/50">
-                                <td className="px-4 py-2.5 font-medium text-foreground">{r.supplierName}</td>
-                                <td className="px-4 py-2.5 font-mono text-xs text-foreground-secondary">
-                                  {r.gstin || <span className="text-foreground-muted italic">No GSTIN</span>}
-                                </td>
-                                <td className="px-4 py-2.5 text-right text-foreground">{r.poCount}</td>
-                                <td className="px-4 py-2.5 text-right text-foreground">{INR(r.taxable)}</td>
-                                <td className="px-4 py-2.5 text-right font-medium text-green-700 dark:text-green-400">
-                                  {INR(r.tax)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {itcData.rows.length > 0 && (
-                    <div>
-                      <p className="text-sm font-medium text-foreground mb-2">Line-level Detail</p>
-                      <div className="overflow-x-auto rounded-lg border border-border-default">
-                        <table className="min-w-full text-sm divide-y divide-border-default">
-                          <thead className="bg-surface-secondary">
-                            <tr>
-                              {[
-                                'PO No',
-                                'Date',
-                                'Supplier',
-                                'Product',
-                                'Qty',
-                                'Unit Cost',
-                                'GST %',
-                                'Taxable',
-                                'ITC',
-                              ].map(h => (
-                                <th
-                                  key={h}
-                                  className={`px-4 py-2.5 text-xs font-medium text-foreground-muted uppercase tracking-wider ${['Qty', 'Unit Cost', 'GST %', 'Taxable', 'ITC'].includes(h) ? 'text-right' : 'text-left'}`}
-                                >
-                                  {h}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-border-default">
-                            {itcData.rows.map((r, i) => (
-                              <tr key={i} className="hover:bg-surface-secondary/50">
-                                <td className="px-4 py-2.5 font-medium text-foreground whitespace-nowrap">
-                                  {r.po_number}
-                                </td>
-                                <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap">
-                                  {fmtDate(r.order_date)}
-                                </td>
-                                <td className="px-4 py-2.5 text-foreground max-w-[140px] truncate">
-                                  {r.supplier_name}
-                                </td>
-                                <td className="px-4 py-2.5 text-foreground max-w-[160px] truncate">{r.product_name}</td>
-                                <td className="px-4 py-2.5 text-right text-foreground">{fmtQty(r.quantity)}</td>
-                                <td className="px-4 py-2.5 text-right text-foreground">
-                                  {INR(parseFloat(r.unit_cost))}
-                                </td>
-                                <td className="px-4 py-2.5 text-right text-foreground">{parseFloat(r.tax_rate)}%</td>
-                                <td className="px-4 py-2.5 text-right text-foreground">
-                                  {INR(parseFloat(r.taxable_amount))}
-                                </td>
-                                <td className="px-4 py-2.5 text-right font-medium text-green-700 dark:text-green-400">
-                                  {INR(parseFloat(r.tax_amount))}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {itcData.rows.length === 0 && (
-                    <p className="text-sm text-foreground-muted text-center py-8">
-                      No received purchase orders in this period.
-                    </p>
-                  )}
-
-                  <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4 text-sm text-amber-800 dark:text-amber-300">
-                    <span className="font-semibold">Note: </span>
-                    ITC is claimable only from suppliers with valid GSTIN. Verify all amounts against supplier tax
-                    invoices before filing GSTR-3B Table 4.
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-foreground-muted text-center py-8">
-                  No ITC data available. Ensure purchase orders are marked as received.
-                </p>
-              )}
-            </div>
+      {!loading && tab === 'gstr3b' && (
+        <div className="space-y-4">
+          {gstr3b ? (
+            <>
+              <Card title="GSTR-3B Summary" action={<CsvButton onClick={() => downloadCSV('gstr3b')} />}>
+                <Fields>
+                  <Field label="Entity" value={gstr3b.legalName} />
+                  <Field label="GSTIN" value={gstr3b.gstin} mono />
+                </Fields>
+              </Card>
+              <Card title="3.1 Details of Outward Supplies">
+                <KpiGrid>
+                  <Kpi label="Taxable Value" value={INR(gstr3b.table31.outwardTaxable.taxableValue)} />
+                  <Kpi label="Integrated Tax (IGST)" value={INR(gstr3b.table31.outwardTaxable.integratedTax)} />
+                  <Kpi label="Central Tax (CGST)" value={INR(gstr3b.table31.outwardTaxable.centralTax)} />
+                  <Kpi label="State/UT Tax (SGST)" value={INR(gstr3b.table31.outwardTaxable.stateTax)} />
+                </KpiGrid>
+              </Card>
+              <Card title="Tax Breakup by GST Rate" flush>
+                <DataTable bare rows={keyed(gstr3b.summary.byGstRate)} cols={rateCols} rowKey={kk} empty="No tax lines in this period." />
+              </Card>
+              <Card title="6. Payment of Tax">
+                <KpiGrid>
+                  <Kpi label="IGST Payable" value={INR(gstr3b.summary.totalIgst)} />
+                  <Kpi label="CGST Payable" value={INR(gstr3b.summary.totalCgst)} />
+                  <Kpi label="SGST Payable" value={INR(gstr3b.summary.totalSgst)} />
+                  <Kpi label="Total Payable" value={INR(gstr3b.summary.totalTax)} highlight />
+                </KpiGrid>
+              </Card>
+              <Note>
+                <span className="font-semibold">Note (Table 4 — ITC): </span>
+                Input Tax Credit values are shown in the ITC Ledger tab. ITC is eligible only from received POs. Verify with purchase invoices before filing.
+              </Note>
+            </>
+          ) : (
+            <EmptyState title="Fetch data to view GSTR-3B." />
           )}
         </div>
-      </div>
-    </div>
+      )}
+
+      {!loading && tab === 'irn' && (
+        <Card
+          title="e-Invoice (IRN) Status"
+          hint={allInvoices.length > 0 ? `${allInvoices.filter(r => r.irn).length} generated · ${allInvoices.filter(r => !r.irn).length} pending` : undefined}
+          flush
+        >
+          <DataTable bare rows={keyed(allInvoices)} cols={irnCols} rowKey={kk} empty="No invoices in this period." />
+        </Card>
+      )}
+
+      {!loading && tab === 'itc' && (
+        <div className="space-y-4">
+          {itcData ? (
+            <>
+              <Card title="Input Tax Credit Ledger" action={<CsvButton onClick={() => downloadCSV('itc')} />}>
+                <KpiGrid>
+                  <Kpi label="PO Line Items" value={String(itcData.summary.lineCount)} sub="From received POs" />
+                  <Kpi label="Total Taxable Purchases" value={INR(itcData.summary.totalTaxable)} />
+                  <Kpi label="Total ITC Claimable" value={INR(itcData.summary.totalTax)} sub="Verify with supplier invoices" highlight />
+                </KpiGrid>
+              </Card>
+              <Card title="By Supplier" flush>
+                <DataTable bare rows={keyed(itcData.supplierSummary)} cols={supplierCols} rowKey={kk} empty="No suppliers in this period." />
+              </Card>
+              <Card title="Line-level Detail" flush>
+                <DataTable bare rows={keyed(itcData.rows)} cols={itcCols} rowKey={kk} empty="No received purchase orders in this period." />
+              </Card>
+              <Note>
+                <span className="font-semibold">Note: </span>
+                ITC is claimable only from suppliers with valid GSTIN. Verify all amounts against supplier tax invoices before filing GSTR-3B Table 4.
+              </Note>
+            </>
+          ) : (
+            <EmptyState title="No ITC data available." body="Ensure purchase orders are marked as received." />
+          )}
+        </div>
+      )}
+    </PageBody>
   )
 }

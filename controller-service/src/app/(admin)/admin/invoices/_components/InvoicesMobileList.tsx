@@ -7,6 +7,7 @@ import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
 import { type Invoice, PAYMENT_COLORS, SOURCE_COLORS } from '../InvoicesClient'
+import { badgeCls } from '@/components/admin/kit/tones'
 
 interface Props {
   invoices: Invoice[]
@@ -119,15 +120,15 @@ export default function InvoicesMobileList({
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               <span
-                className={`px-2 py-0.5 rounded-full text-xs font-medium ${PAYMENT_COLORS[inv.payment_status] || ''}`}
+                className={PAYMENT_COLORS[inv.payment_status] || badgeCls()}
               >
                 {inv.payment_status}
               </span>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${SOURCE_COLORS[inv.source] || ''}`}>
+              <span className={SOURCE_COLORS[inv.source] || badgeCls()}>
                 {sourceLabel(inv.source)}
               </span>
               {inv.status === 'cancelled' && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                <span className={badgeCls('red')}>
                   Cancelled
                 </span>
               )}
@@ -135,8 +136,8 @@ export default function InvoicesMobileList({
                 <span
                   className={`px-2 py-0.5 rounded-full text-xs font-medium inline-flex items-center gap-1 ${
                     inv.irn_status === 'generated'
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                      ? badgeCls('green')
+                      : badgeCls('amber')
                   }`}
                 >
                   {inv.irn_status === 'generated' ? (
@@ -172,17 +173,17 @@ export default function InvoicesMobileList({
           <div className="p-5 space-y-4">
             <div className="flex flex-wrap gap-2">
               <span
-                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${PAYMENT_COLORS[selected.payment_status] || ''}`}
+                className={PAYMENT_COLORS[selected.payment_status] || badgeCls()}
               >
                 {selected.payment_status}
               </span>
               <span
-                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${SOURCE_COLORS[selected.source] || ''}`}
+                className={SOURCE_COLORS[selected.source] || badgeCls()}
               >
                 {sourceLabel(selected.source)}
               </span>
               {selected.status === 'cancelled' && (
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300">
+                <span className={badgeCls('red')}>
                   Cancelled
                 </span>
               )}
