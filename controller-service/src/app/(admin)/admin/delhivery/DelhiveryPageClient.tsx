@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useActionToast } from '@/components/admin/kit/toast'
+import { InfiniteFooter, useReveal } from '@/components/admin/kit/infinite'
 import { TONE_CLS } from '@/components/admin/kit/tones'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -390,24 +391,10 @@ export default function DelhiveryPageClient({
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   const PAGE_SIZE = 25
-  const [ordersPage, setOrdersPage] = useState(1)
-  const [historyPage, setHistoryPage] = useState(1)
-  const ordersTotalPages = Math.max(1, Math.ceil(orders.length / PAGE_SIZE))
-  const historyTotalPages = Math.max(1, Math.ceil(pickupHistory.length / PAGE_SIZE))
-  useEffect(() => {
-    if (ordersPage > ordersTotalPages) setOrdersPage(ordersTotalPages)
-  }, [ordersPage, ordersTotalPages])
-  useEffect(() => {
-    if (historyPage > historyTotalPages) setHistoryPage(historyTotalPages)
-  }, [historyPage, historyTotalPages])
-  const pagedOrders = useMemo(
-    () => orders.slice((ordersPage - 1) * PAGE_SIZE, ordersPage * PAGE_SIZE),
-    [orders, ordersPage]
-  )
-  const pagedHistory = useMemo(
-    () => pickupHistory.slice((historyPage - 1) * PAGE_SIZE, historyPage * PAGE_SIZE),
-    [pickupHistory, historyPage]
-  )
+  // The endpoint already caps these (100 eligible orders, 20 pickups); the pickup request spans the
+  // whole eligible set, so they arrive in one payload and are revealed 25 at a time.
+  const { shown: pagedOrders, control: ordersMore } = useReveal(orders, PAGE_SIZE)
+  const { shown: pagedHistory, control: historyMore } = useReveal(pickupHistory, PAGE_SIZE)
 
   const loadData = () => {
     setLoading(true)
@@ -759,36 +746,7 @@ export default function DelhiveryPageClient({
               </table>
             </div>
 
-            {ordersTotalPages > 1 && (
-              <div className="px-6 py-3 border-t border-border-default flex items-center justify-between gap-2">
-                <p className="text-xs text-foreground-muted whitespace-nowrap">
-                  Showing{' '}
-                  <span className="font-medium text-foreground">
-                    {(ordersPage - 1) * PAGE_SIZE + 1}–{Math.min(ordersPage * PAGE_SIZE, orders.length)}
-                  </span>{' '}
-                  of <span className="font-medium text-foreground">{orders.length}</span>
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    disabled={ordersPage <= 1}
-                    onClick={() => setOrdersPage(p => Math.max(1, p - 1))}
-                    className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                  >
-                    Prev
-                  </button>
-                  <span className="text-xs text-foreground-muted whitespace-nowrap">
-                    Page {ordersPage} of {ordersTotalPages}
-                  </span>
-                  <button
-                    disabled={ordersPage >= ordersTotalPages}
-                    onClick={() => setOrdersPage(p => Math.min(ordersTotalPages, p + 1))}
-                    className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
+            <InfiniteFooter shown={pagedOrders.length} control={ordersMore} noun="orders" className="px-6 pb-3" />
 
             <div className="px-6 py-4 border-t border-border-default flex items-center justify-between gap-3">
               <p className="text-sm text-foreground-secondary">
@@ -1069,36 +1027,7 @@ export default function DelhiveryPageClient({
               </tbody>
             </table>
           </div>
-          {historyTotalPages > 1 && (
-            <div className="px-6 py-3 border-t border-border-default flex items-center justify-between gap-2">
-              <p className="text-xs text-foreground-muted whitespace-nowrap">
-                Showing{' '}
-                <span className="font-medium text-foreground">
-                  {(historyPage - 1) * PAGE_SIZE + 1}–{Math.min(historyPage * PAGE_SIZE, pickupHistory.length)}
-                </span>{' '}
-                of <span className="font-medium text-foreground">{pickupHistory.length}</span>
-              </p>
-              <div className="flex items-center gap-1.5">
-                <button
-                  disabled={historyPage <= 1}
-                  onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
-                  className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                >
-                  Prev
-                </button>
-                <span className="text-xs text-foreground-muted whitespace-nowrap">
-                  Page {historyPage} of {historyTotalPages}
-                </span>
-                <button
-                  disabled={historyPage >= historyTotalPages}
-                  onClick={() => setHistoryPage(p => Math.min(historyTotalPages, p + 1))}
-                  className="px-3 h-control-sm text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          <InfiniteFooter shown={pagedHistory.length} control={historyMore} noun="pickups" className="px-6 pb-3" />
         </div>
       )}
     </div>

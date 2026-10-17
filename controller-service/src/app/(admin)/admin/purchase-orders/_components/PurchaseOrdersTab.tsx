@@ -21,11 +21,12 @@ import { poDaysLate, poReceivedShare } from '@/lib/purchasing/po-status'
 import { documentUrlForLocation } from '@/lib/tenancy/forms-host'
 import { ChevronLeft } from 'lucide-react'
 import { Kpi, KpiGrid } from '@/components/admin/kit/core'
+import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import { DetailHeader } from '@/components/admin/kit/actions'
 import { Card, Field, Fields } from '@/components/admin/kit/layout'
 import { StatusBadge, type StatusMap } from '@/components/admin/kit/status'
 import { badgeCls } from '@/components/admin/kit/tones'
-import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, ClientPagination, STATUS_BADGE, type Supplier } from '@/components/admin/purchasing/shared'
+import { inputCls, labelCls, btnPrimary, btnSecondary, PAGE_SIZE, formatINR, STATUS_BADGE, type Supplier } from '@/components/admin/purchasing/shared'
 
 const PO_STATUS: StatusMap = {
   draft: { label: 'Draft', tone: 'muted' },
@@ -164,10 +165,6 @@ function ExpectedDateEditor({
 export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
-  const [pos, setPOs] = useState<PO[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
@@ -356,6 +353,23 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     status: 'status',
   }
 
+  const list = useInfiniteList<PO>({
+    key: `${search}|${statusFilter}|${supplierFilter}`,
+    pageSize: PAGE_SIZE,
+    getKey: p => p.id,
+    fetchPage: async (pg, signal) => {
+      const params = new URLSearchParams({ page: String(pg), limit: String(PAGE_SIZE) })
+      if (search) params.set('search', search)
+      if (statusFilter) params.set('status', statusFilter)
+      if (supplierFilter) params.set('supplier_id', supplierFilter)
+      const json = await fetchJson(`/api/admin/inventory/po?${params}`, signal)
+      return { rows: json?.purchase_orders || [], total: json?.total || 0 }
+    },
+  })
+  const pos = list.rows
+  const loading = list.loading
+  const load = list.reload
+
   const sortedPOs =
     poSortCol && PO_SORT_KEYS[poSortCol]
       ? [...pos].sort((a, b) => {
@@ -369,26 +383,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
     setPoSortCol(col)
     setPoSortDir(dir)
   }
-
-  const load = useCallback(
-    async (pg = page) => {
-      setLoading(true)
-      const params = new URLSearchParams({ page: String(pg), limit: String(PAGE_SIZE) })
-      if (search) params.set('search', search)
-      if (statusFilter) params.set('status', statusFilter)
-      if (supplierFilter) params.set('supplier_id', supplierFilter)
-      const res = await fetch(`/api/admin/inventory/po?${params}`)
-      const json = await res.json()
-      setPOs(json?.purchase_orders || [])
-      setTotal(json?.total || 0)
-      setLoading(false)
-    },
-    [search, statusFilter, supplierFilter, page]
-  )
-
-  useEffect(() => {
-    load(page)
-  }, [load, page])
 
   // ?po= takes a PO id or a PO number (number links predate the id ones).
   const deepLinked = React.useRef(false)
@@ -664,7 +658,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
       const receivedSerials = items.flatMap((it: any) => (Array.isArray(it.serial_numbers) ? it.serial_numbers : []))
       setLastReceivedSerials(receivedSerials)
       setReceiveMode(null)
-      load(page)
+      load()
       if (Array.isArray(json.warnings) && json.warnings.length) {
         showToast(json.warnings[0], 'error')
       }
@@ -677,7 +671,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'sent' }),
     })
-    load(page)
+    load()
     if (viewPO?.po.id === id) {
       const res = await fetch(`/api/admin/inventory/po/${id}`)
       const json = await res.json()
@@ -699,7 +693,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'cancelled' }),
     })
-    load(page)
+    load()
     if (viewPO?.po.id === id) setViewPO(null)
   }
 
@@ -1159,7 +1153,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
               value={viewPO.po.expected_date ? String(viewPO.po.expected_date).slice(0, 10) : ''}
               onSaved={v => {
                 setViewPO(cur => (cur ? { ...cur, po: { ...cur.po, expected_date: v || null } } : cur))
-                load(page)
+                load()
               }}
             />
           </RequireWrite>
@@ -1401,7 +1395,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             value={search}
             onChange={v => {
               setSearch(v)
-              setPage(1)
             }}
             placeholder="PO number, supplier..."
             inputClassName="w-full h-9 px-3 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
@@ -1415,7 +1408,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             value={statusFilter}
             onChange={v => {
               setStatusFilter(v)
-              setPage(1)
             }}
             placeholder="All statuses"
             options={[
@@ -1436,7 +1428,6 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             value={supplierFilter}
             onChange={v => {
               setSupplierFilter(v)
-              setPage(1)
             }}
             placeholder="All suppliers"
             options={[{ value: '', label: 'All suppliers' }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
@@ -1692,15 +1683,7 @@ export default function PurchaseOrdersTab({ initialPO }: { initialPO?: string })
             </table>
           </div>
           <div className="px-4 pb-4">
-            <ClientPagination
-              page={page}
-              total={total}
-              pageSize={PAGE_SIZE}
-              onChange={p => {
-                setPage(p)
-                setLoading(true)
-              }}
-            />
+            <InfiniteFooter shown={pos.length} control={list} noun="purchase orders" />
           </div>
         </div>
       )}

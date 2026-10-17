@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { listKey } from '@/lib/admin/list-key'
 import { pageUrls } from '@/lib/admin/page-urls'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
@@ -351,7 +352,7 @@ async function ProductsListSection({
   canWrite: boolean
 }) {
   const resolvedSearchParams = await searchParams
-  const key = JSON.stringify(resolvedSearchParams)
+  const key = listKey(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={7} />}>
       <ProductsListContent

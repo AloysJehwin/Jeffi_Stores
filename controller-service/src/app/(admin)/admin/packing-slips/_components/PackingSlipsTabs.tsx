@@ -11,11 +11,7 @@ const TABS = [
 type Tab = (typeof TABS)[number]['id']
 const LIST_PARAMS = ['from', 'to', 'customer', 'status']
 
-export default function PackingSlipsTabs({
-  initialOrders,
-}: {
-  initialOrders: React.ComponentProps<typeof PackingSlipsClient>['initialOrders']
-}) {
+export default function PackingSlipsTabs() {
   // Old links carrying the slip filters open the slips tab.
   const [tab, setTab] = useTab<Tab>(['overview', 'slips'], 'overview', {
     legacy: sp => (LIST_PARAMS.some(k => sp.get(k)) ? 'slips' : null),
@@ -25,7 +21,7 @@ export default function PackingSlipsTabs({
       <Tabs tabs={[...TABS]} value={tab} onChange={setTab} />
     </div>
   )
-  if (tab === 'slips') return <PackingSlipsClient initialOrders={initialOrders} tabs={bar} />
+  if (tab === 'slips') return <PackingSlipsClient tabs={bar} />
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">

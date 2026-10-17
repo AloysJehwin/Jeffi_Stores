@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { InfiniteFooter, fetchJson, useReveal } from '@/components/admin/kit/infinite'
 import { MessageCircle, ChevronDown } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 
@@ -47,7 +48,6 @@ export interface WhatsAppLog {
   sent_at: string
 }
 
-const SENDS_LIMIT = 20
 const WA_LIMIT = 10
 
 // Collapsible card — collapsed by default so a long list isn't a wall of rows; the admin expands the one they need.
@@ -294,30 +294,30 @@ export function RecentSendsPanel({
 }) {
   const [recentSends, setRecentSends] = useState<RecentSend[]>(initialSends)
   const [sendsTotal, setSendsTotal] = useState(initialTotal)
-  const [sendsOffset, setSendsOffset] = useState(0)
   const [sendsLoading, setSendsLoading] = useState(false)
+  const [sendsError, setSendsError] = useState<string | null>(null)
 
-  async function loadSendsPage(o: number) {
-    setSendsOffset(o)
+  const loadMoreSends = useCallback(async () => {
     setSendsLoading(true)
+    setSendsError(null)
     try {
-      const res = await fetch(`/api/admin/campaigns/${kind}?offset=${o}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setRecentSends(data.recentSends || [])
-        setSendsTotal(data.total || 0)
-      }
+      const data = await fetchJson(`/api/admin/campaigns/${kind}?offset=${recentSends.length}`)
+      const seen = new Set(recentSends.map(r => r.id))
+      setRecentSends(prev => [...prev, ...((data.recentSends || []) as RecentSend[]).filter(r => !seen.has(r.id))])
+      setSendsTotal(data.total || 0)
+    } catch (e) {
+      setSendsError(e instanceof Error ? e.message : 'Failed to load')
     } finally {
       setSendsLoading(false)
     }
-  }
+  }, [kind, recentSends])
 
   return (
     <CollapsibleCard title="Recent sends" count={sendsTotal}>
       {recentSends.length === 0 ? (
         <p className="p-8 text-sm text-foreground-muted text-center">No sends yet</p>
       ) : (
-        <div className={sendsLoading ? 'opacity-50 transition-opacity' : 'transition-opacity'}>
+        <div>
           <div className="grid grid-cols-[1fr_auto_auto] gap-3 px-5 py-2 border-b border-border-default bg-surface-secondary/40">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Customer</span>
             <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-center">
@@ -351,29 +351,12 @@ export function RecentSendsPanel({
               )
             })}
           </div>
-          {sendsTotal > SENDS_LIMIT && (
-            <div className="px-5 py-3 border-t border-border-default flex items-center justify-between text-xs text-foreground-muted">
-              <span>
-                {sendsOffset + 1}–{Math.min(sendsOffset + SENDS_LIMIT, sendsTotal)} of {sendsTotal}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  disabled={sendsOffset === 0 || sendsLoading}
-                  onClick={() => loadSendsPage(Math.max(0, sendsOffset - SENDS_LIMIT))}
-                  className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  disabled={sendsOffset + SENDS_LIMIT >= sendsTotal || sendsLoading}
-                  onClick={() => loadSendsPage(sendsOffset + SENDS_LIMIT)}
-                  className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          <InfiniteFooter
+            className="px-5 pb-3"
+            shown={recentSends.length}
+            noun="sends"
+            control={{ total: sendsTotal, hasMore: recentSends.length < sendsTotal, loadingMore: sendsLoading, error: sendsError, loadMore: loadMoreSends }}
+          />
         </div>
       )}
     </CollapsibleCard>
@@ -385,7 +368,7 @@ export function RecentSendsPanel({
  * Gated to kinds that support WhatsApp (returns null otherwise so callers can render it unconditionally).
  */
 export function WhatsAppLogPanel({ kind, logs }: { kind: string; logs: WhatsAppLog[] }) {
-  const [waPage, setWaPage] = useState(0)
+  const wa = useReveal(logs, WA_LIMIT)
   if (!campaignSupportsWhatsApp(kind)) return null
   return (
     <CollapsibleCard
@@ -405,7 +388,7 @@ export function WhatsAppLogPanel({ kind, logs }: { kind: string; logs: WhatsAppL
             </span>
           </div>
           <div className="divide-y divide-border-default">
-            {logs.slice(waPage * WA_LIMIT, waPage * WA_LIMIT + WA_LIMIT).map((w, i) => {
+            {wa.shown.map((w, i) => {
               const sent = w.status === 'sent'
               return (
                 <div
@@ -437,29 +420,7 @@ export function WhatsAppLogPanel({ kind, logs }: { kind: string; logs: WhatsAppL
               )
             })}
           </div>
-          {logs.length > WA_LIMIT && (
-            <div className="px-5 py-3 border-t border-border-default flex items-center justify-between text-xs text-foreground-muted">
-              <span>
-                {waPage * WA_LIMIT + 1}–{Math.min(waPage * WA_LIMIT + WA_LIMIT, logs.length)} of {logs.length}
-              </span>
-              <div className="flex gap-2">
-                <button
-                  disabled={waPage === 0}
-                  onClick={() => setWaPage(p => Math.max(0, p - 1))}
-                  className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
-                >
-                  Previous
-                </button>
-                <button
-                  disabled={(waPage + 1) * WA_LIMIT >= logs.length}
-                  onClick={() => setWaPage(p => p + 1)}
-                  className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          <InfiniteFooter className="px-5 pb-3" shown={wa.shown.length} control={wa.control} noun="messages" />
         </>
       )}
     </CollapsibleCard>

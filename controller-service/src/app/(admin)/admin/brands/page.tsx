@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { listKey } from '@/lib/admin/list-key'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
 import { ap } from '@/lib/shared/admin-path'
@@ -261,7 +262,7 @@ function KpiRowSkeleton() {
 // while the stats + filters above stay mounted.
 async function BrandsListSection({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
-  const key = JSON.stringify(resolvedSearchParams)
+  const key = listKey(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={5} />}>
       <BrandsListContent resolvedSearchParams={resolvedSearchParams} />

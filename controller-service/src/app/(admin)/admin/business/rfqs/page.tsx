@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 
+import { listKey } from '@/lib/admin/list-key'
 import { Suspense } from 'react'
 import Link from 'next/link'
 import { Search } from 'lucide-react'
@@ -140,7 +141,7 @@ async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }
     return ap(`/admin/business/rfqs${qs ? `?${qs}` : ''}`, host)
   }
 
-  const key = JSON.stringify(resolvedSearchParams)
+  const key = listKey(resolvedSearchParams)
   // Overview by default; the list keeps its old filter URLs (status/search/page).
   const tab = resolvedSearchParams.tab
   const showList = tab === 'list' || (!tab && !!(status || search || resolvedSearchParams.page))

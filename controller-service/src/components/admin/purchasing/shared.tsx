@@ -28,48 +28,6 @@ export function SummaryCard({ label, value, sub, accent }: { label: string; valu
   return <Kpi label={label} value={value} sub={sub} highlight={accent} />
 }
 
-export function ClientPagination({
-  page,
-  total,
-  pageSize,
-  onChange,
-}: {
-  page: number
-  total: number
-  pageSize: number
-  onChange: (p: number) => void
-}) {
-  const totalPages = Math.ceil(total / pageSize)
-  if (totalPages <= 1) return null
-
-  const start = (page - 1) * pageSize + 1
-  const end = Math.min(page * pageSize, total)
-  const btnCls =
-    'control-xs font-medium border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
-
-  return (
-    <div className="flex items-center justify-between gap-2 px-1 pt-4 border-t border-border-default mt-2">
-      <p className="text-xs text-foreground-muted whitespace-nowrap">
-        <span className="font-medium text-foreground">
-          {start}–{end}
-        </span>{' '}
-        of <span className="font-medium text-foreground">{total}</span>
-      </p>
-      <div className="flex items-center gap-1.5">
-        <button onClick={() => onChange(page - 1)} disabled={page <= 1} className={btnCls}>
-          Prev
-        </button>
-        <span className="text-xs text-foreground-muted whitespace-nowrap">
-          {page}/{totalPages}
-        </span>
-        <button onClick={() => onChange(page + 1)} disabled={page >= totalPages} className={btnCls}>
-          Next
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export const STATUS_BADGE: Record<string, string> = {
   draft: TONE_CLS.muted,
   sent: TONE_CLS.blue,

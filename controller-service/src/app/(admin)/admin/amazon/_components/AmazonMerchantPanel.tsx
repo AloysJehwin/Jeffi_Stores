@@ -6,7 +6,7 @@ import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { useToast } from '@/contexts/ToastContext'
 import { countSyncErrorItems, type MerchantSyncError } from '@/lib/merchant/sync-errors'
 import { groupAmazonSyncErrors } from '@/lib/amazon/sync-errors'
-import { DataTable, Kpi, StatusBadge, btnGhost, btnPrimary, count, fieldInputCls, type DataCol, type StatusMap } from '@/components/admin/kit'
+import { DataTable, fetchJson, useInfiniteList, Kpi, StatusBadge, btnGhost, btnPrimary, count, fieldInputCls, type DataCol, type StatusMap } from '@/components/admin/kit'
 
 interface Summary {
   last_refreshed_at: string | null
@@ -83,47 +83,28 @@ const LISTING_COLS: DataCol<Row>[] = [
 
 export default function AmazonMerchantPanel() {
   const [summary, setSummary] = useState<Summary | null>(null)
-  const [rows, setRows] = useState<Row[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [applied, setApplied] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [syncRunning, setSyncRunning] = useState(false)
   const { showToast } = useToast()
 
-  const load = useCallback(
-    async (opts?: { page?: number; search?: string; status?: string }) => {
-      setLoading(true)
-      try {
-        const p = opts?.page ?? page
-        const params = new URLSearchParams({ page: String(p), pageSize: String(PAGE_SIZE) })
-        const s = opts?.search ?? search
-        const st = opts?.status ?? statusFilter
-        if (s) params.set('search', s)
-        if (st && st !== 'all') params.set('status', st)
-        const res = await fetch(`/api/admin/merchant/amazon/listing-status?${params.toString()}`)
-        if (!res.ok) throw new Error('Failed to load')
-        const data = await res.json()
-        setSummary(data.summary)
-        setRows(data.rows)
-        setTotal(data.total)
-      } catch {
-        showToast('Failed to load Amazon listing data.', 'error')
-      } finally {
-        setLoading(false)
-      }
+  const list = useInfiniteList<Row>({
+    key: `${applied}|${statusFilter}`,
+    pageSize: PAGE_SIZE,
+    getKey: r => r.sku,
+    fetchPage: async (p, signal) => {
+      const params = new URLSearchParams({ page: String(p), pageSize: String(PAGE_SIZE) })
+      if (applied) params.set('search', applied)
+      if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter)
+      const data = await fetchJson(`/api/admin/merchant/amazon/listing-status?${params.toString()}`, signal)
+      if (p === 1) setSummary(data.summary)
+      return { rows: data.rows, total: data.total }
     },
-    [page, search, statusFilter, showToast]
-  )
-
-  useEffect(() => {
-    load({ page: 1 })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  })
 
   // DB->Amazon push status; `running` reflects the server-side sync lock (any tab or the cron).
   const loadSyncStatus = useCallback(async () => {
@@ -160,8 +141,7 @@ export default function AmazonMerchantPanel() {
         return
       }
       setSummary(data.summary)
-      await load({ page: 1 })
-      setPage(1)
+      list.reload()
       showToast('Refreshed from Amazon.', 'success')
     } catch {
       showToast('Refresh failed.', 'error')
@@ -207,21 +187,8 @@ export default function AmazonMerchantPanel() {
     }
   }
 
-  const go = (p: number) => {
-    setPage(p)
-    load({ page: p })
-  }
-  const doSearch = () => {
-    setPage(1)
-    load({ page: 1 })
-  }
-  const changeStatus = (st: string) => {
-    setStatusFilter(st)
-    setPage(1)
-    load({ page: 1, status: st })
-  }
-
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const doSearch = () => setApplied(search.trim())
+  const changeStatus = (st: string) => setStatusFilter(st)
   const btn =
     'control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors'
 
@@ -300,11 +267,10 @@ export default function AmazonMerchantPanel() {
         </div>
 
         <DataTable
-          rows={rows}
+          rows={list.rows}
+          infinite={list}
           cols={LISTING_COLS}
           rowKey={r => r.sku}
-          pageSize={PAGE_SIZE}
-          loading={loading}
           empty={summary?.last_refreshed_at ? 'No items match.' : 'No data yet. Click "Refresh from Amazon".'}
           mobileCard={r => (
             <div className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-1">
@@ -321,25 +287,6 @@ export default function AmazonMerchantPanel() {
           )}
         />
 
-        {/* Pagination */}
-        {total > PAGE_SIZE && (
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-foreground-muted">
-              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total.toLocaleString()}
-            </p>
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => go(page - 1)} disabled={page <= 1} className={btn}>
-                Prev
-              </button>
-              <span className="text-xs text-foreground-muted">
-                {page}/{totalPages}
-              </span>
-              <button onClick={() => go(page + 1)} disabled={page >= totalPages} className={btn}>
-                Next
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </section>
   )

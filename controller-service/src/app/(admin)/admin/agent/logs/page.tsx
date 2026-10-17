@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Bot, RefreshCw, CheckCircle2, XCircle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
+import { Bot, RefreshCw, CheckCircle2, XCircle } from 'lucide-react'
 import { PageHeader } from '@/components/admin/kit/layout'
+import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 
 interface ToolLogMessage {
   id: string
@@ -24,30 +25,19 @@ function relTime(iso: string) {
 }
 
 export default function AgentLogsPage() {
-  const [toolLogs, setToolLogs] = useState<ToolLogMessage[]>([])
-  const [loading, setLoading] = useState(false)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-
-  async function load(p = page) {
-    setLoading(true)
-    try {
+  const list = useInfiniteList<ToolLogMessage>({
+    key: 'tool-logs',
+    pageSize: 50,
+    getKey: m => m.id,
+    fetchPage: async (p, signal) => {
       const qs = new URLSearchParams({ page: String(p), pageSize: '50' })
-      const res = await fetch(`/api/admin/agent/tool-logs?${qs.toString()}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setToolLogs(data.messages || [])
-        setTotal(data.total || 0)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    load(page)
-  }, [page])
+      const data = await fetchJson(`/api/admin/agent/tool-logs?${qs.toString()}`, signal)
+      return { rows: data.messages || [], total: data.total || 0 }
+    },
+  })
+  const toolLogs = list.rows
+  const loading = list.loading || list.loadingMore
 
   return (
     <div className="p-4 sm:p-6 w-full space-y-5">
@@ -58,7 +48,7 @@ export default function AgentLogsPage() {
         />
         <button
           type="button"
-          onClick={() => load(page)}
+          onClick={list.reload}
           disabled={loading}
           className="control-md border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50"
         >
@@ -171,32 +161,7 @@ export default function AgentLogsPage() {
             })}
           </div>
 
-          {total > 50 && (
-            <div className="mt-4 flex items-center justify-between border-t border-border-default pt-4">
-              <p className="text-xs text-foreground-muted">
-                Showing {(page - 1) * 50 + 1}–{Math.min(page * 50, total)} of {total}
-              </p>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                </button>
-                <span className="text-xs px-2 text-foreground">Page {page}</span>
-                <button
-                  type="button"
-                  onClick={() => setPage(p => p + 1)}
-                  disabled={page * 50 >= total}
-                  className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                >
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          )}
+          <InfiniteFooter shown={toolLogs.length} control={list} noun="responses" />
         </>
       )}
     </div>

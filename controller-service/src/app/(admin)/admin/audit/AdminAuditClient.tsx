@@ -24,10 +24,6 @@ import {
   Wand2,
   ClipboardList,
   Tag,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   Clock,
   CheckCircle2,
   XCircle,
@@ -48,6 +44,7 @@ import IconButton from '@/components/ui/IconButton'
 import { Tabs } from '@/components/admin/channels/ui'
 import { EmptyState } from '@/components/admin/kit/states'
 import { useActionToast } from '@/components/admin/kit/toast'
+import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 
 interface AuditEvent {
   id: string
@@ -136,13 +133,9 @@ export default function AdminAuditClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const [events, setEvents] = useState<AuditEvent[]>([])
-  const [loading, setLoading] = useState(true)
   const [entityFilter, setEntityFilter] = useState<string>('all')
   const [actionFilter, setActionFilter] = useState<string>('all')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(50)
-  const [total, setTotal] = useState(0)
+  const pageSize = 50
 
   const initialTab = (): PageTab => {
     const t = searchParams?.get('tab')
@@ -184,10 +177,6 @@ export default function AdminAuditClient() {
     message_id: string | null
     body_size: number
   }
-  const [mailRows, setMailRows] = useState<MailLogRow[]>([])
-  const [mailLoading, setMailLoading] = useState(false)
-  const [mailPage, setMailPage] = useState(1)
-  const [mailTotal, setMailTotal] = useState(0)
   const mailPageSize = 25
   const [mailKind, setMailKind] = useState<string>('all')
   const [mailStatus, setMailStatus] = useState<string>('all')
@@ -198,26 +187,23 @@ export default function AdminAuditClient() {
     Record<string, { html: string | null; text: string | null; metadata: any; loading: boolean }>
   >({})
 
-  async function loadMailLog() {
-    setMailLoading(true)
-    try {
-      const qs = new URLSearchParams({
-        page: String(mailPage),
-        pageSize: String(mailPageSize),
-      })
+  const mailList = useInfiniteList<MailLogRow>({
+    key: pageTab === 'mail_log' ? [mailKind, mailStatus, mailQueryDebounced].join('|') : null,
+    pageSize: mailPageSize,
+    getKey: r => r.id,
+    fetchPage: async (p, signal) => {
+      const qs = new URLSearchParams({ page: String(p), pageSize: String(mailPageSize) })
       if (mailKind !== 'all') qs.set('kind', mailKind)
       if (mailStatus !== 'all') qs.set('status', mailStatus)
       if (mailQueryDebounced) qs.set('q', mailQueryDebounced)
-      const res = await fetch(`/api/admin/audit/mail-log?${qs.toString()}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setMailRows(data.rows || [])
-        setMailTotal(data.total || 0)
-      }
-    } finally {
-      setMailLoading(false)
-    }
-  }
+      const data = await fetchJson(`/api/admin/audit/mail-log?${qs.toString()}`, signal)
+      return { rows: data.rows || [], total: data.total || 0 }
+    },
+  })
+  const mailRows = mailList.rows
+  const mailLoading = mailList.loading || mailList.loadingMore
+  const loadMailLog = mailList.reload
+
 
   async function loadMailBody(id: string) {
     setMailBodies(prev => ({ ...prev, [id]: { html: null, text: null, metadata: null, loading: true } }))
@@ -265,10 +251,6 @@ export default function AdminAuditClient() {
     sent_at: string
   }
 
-  const [smsRows, setSmsRows] = useState<MessageLogRow[]>([])
-  const [smsLoading, setSmsLoading] = useState(false)
-  const [smsPage, setSmsPage] = useState(1)
-  const [smsTotal, setSmsTotal] = useState(0)
   const smsPageSize = 25
   const [smsKind, setSmsKind] = useState<string>('all')
   const [smsStatus, setSmsStatus] = useState<string>('all')
@@ -276,32 +258,24 @@ export default function AdminAuditClient() {
   const [smsQueryDebounced, setSmsQueryDebounced] = useState<string>('')
   const [expandedSmsId, setExpandedSmsId] = useState<string | null>(null)
 
-  async function loadSmsLog() {
-    setSmsLoading(true)
-    try {
-      const qs = new URLSearchParams({
-        channel: 'sms',
-        page: String(smsPage),
-        pageSize: String(smsPageSize),
-      })
+  const smsList = useInfiniteList<MessageLogRow>({
+    key: pageTab === 'sms_log' ? [smsKind, smsStatus, smsQueryDebounced].join('|') : null,
+    pageSize: smsPageSize,
+    getKey: r => r.id,
+    fetchPage: async (p, signal) => {
+      const qs = new URLSearchParams({ channel: 'sms', page: String(p), pageSize: String(smsPageSize) })
       if (smsKind !== 'all') qs.set('kind', smsKind)
       if (smsStatus !== 'all') qs.set('status', smsStatus)
       if (smsQueryDebounced) qs.set('q', smsQueryDebounced)
-      const res = await fetch(`/api/admin/audit/message-log?${qs.toString()}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setSmsRows(data.rows || [])
-        setSmsTotal(data.total || 0)
-      }
-    } finally {
-      setSmsLoading(false)
-    }
-  }
+      const data = await fetchJson(`/api/admin/audit/message-log?${qs.toString()}`, signal)
+      return { rows: data.rows || [], total: data.total || 0 }
+    },
+  })
+  const smsRows = smsList.rows
+  const smsLoading = smsList.loading || smsList.loadingMore
+  const loadSmsLog = smsList.reload
 
-  const [waRows, setWaRows] = useState<MessageLogRow[]>([])
-  const [waLoading, setWaLoading] = useState(false)
-  const [waPage, setWaPage] = useState(1)
-  const [waTotal, setWaTotal] = useState(0)
+
   const waPageSize = 25
   const [waKind, setWaKind] = useState<string>('all')
   const [waStatus, setWaStatus] = useState<string>('all')
@@ -309,44 +283,39 @@ export default function AdminAuditClient() {
   const [waQueryDebounced, setWaQueryDebounced] = useState<string>('')
   const [expandedWaId, setExpandedWaId] = useState<string | null>(null)
 
-  async function loadWaLog() {
-    setWaLoading(true)
-    try {
-      const qs = new URLSearchParams({
-        channel: 'whatsapp',
-        page: String(waPage),
-        pageSize: String(waPageSize),
-      })
+  const waList = useInfiniteList<MessageLogRow>({
+    key: pageTab === 'whatsapp_log' ? [waKind, waStatus, waQueryDebounced].join('|') : null,
+    pageSize: waPageSize,
+    getKey: r => r.id,
+    fetchPage: async (p, signal) => {
+      const qs = new URLSearchParams({ channel: 'whatsapp', page: String(p), pageSize: String(waPageSize) })
       if (waKind !== 'all') qs.set('kind', waKind)
       if (waStatus !== 'all') qs.set('status', waStatus)
       if (waQueryDebounced) qs.set('q', waQueryDebounced)
-      const res = await fetch(`/api/admin/audit/message-log?${qs.toString()}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setWaRows(data.rows || [])
-        setWaTotal(data.total || 0)
-      }
-    } finally {
-      setWaLoading(false)
-    }
-  }
+      const data = await fetchJson(`/api/admin/audit/message-log?${qs.toString()}`, signal)
+      return { rows: data.rows || [], total: data.total || 0 }
+    },
+  })
+  const waRows = waList.rows
+  const waLoading = waList.loading || waList.loadingMore
+  const loadWaLog = waList.reload
 
-  async function load() {
-    setLoading(true)
-    try {
-      const qs = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+
+  const auditList = useInfiniteList<AuditEvent>({
+    key: `${entityFilter}|${actionFilter}`,
+    pageSize,
+    getKey: e => e.id,
+    fetchPage: async (p, signal) => {
+      const qs = new URLSearchParams({ page: String(p), pageSize: String(pageSize) })
       if (entityFilter !== 'all') qs.set('entity_type', entityFilter)
       if (actionFilter !== 'all') qs.set('action', actionFilter)
-      const res = await fetch(`/api/admin/audit?${qs.toString()}`, { credentials: 'include' })
-      if (res.ok) {
-        const data = await res.json()
-        setEvents(data.events || [])
-        setTotal(data.total || 0)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
+      const data = await fetchJson(`/api/admin/audit?${qs.toString()}`, signal)
+      return { rows: data.events || [], total: data.total || 0 }
+    },
+  })
+  const events = auditList.rows
+  const loading = auditList.loading
+
 
   async function loadCronJobs() {
     setCronLoading(true)
@@ -394,46 +363,22 @@ export default function AdminAuditClient() {
   }
 
   useEffect(() => {
-    setPage(1)
-  }, [entityFilter, actionFilter, pageSize])
-  useEffect(() => {
-    load()
-  }, [entityFilter, actionFilter, page, pageSize])
-  useEffect(() => {
     if (pageTab === 'cron') loadCronJobs()
   }, [pageTab])
-  useEffect(() => {
-    if (pageTab === 'mail_log') loadMailLog()
-  }, [pageTab, mailPage, mailKind, mailStatus, mailQueryDebounced])
   useEffect(() => {
     const id = setTimeout(() => setMailQueryDebounced(mailQuery), 300)
     return () => clearTimeout(id)
   }, [mailQuery])
-  useEffect(() => {
-    setMailPage(1)
-  }, [mailKind, mailStatus, mailQueryDebounced])
 
-  useEffect(() => {
-    if (pageTab === 'sms_log') loadSmsLog()
-  }, [pageTab, smsPage, smsKind, smsStatus, smsQueryDebounced])
   useEffect(() => {
     const id = setTimeout(() => setSmsQueryDebounced(smsQuery), 300)
     return () => clearTimeout(id)
   }, [smsQuery])
-  useEffect(() => {
-    setSmsPage(1)
-  }, [smsKind, smsStatus, smsQueryDebounced])
 
-  useEffect(() => {
-    if (pageTab === 'whatsapp_log') loadWaLog()
-  }, [pageTab, waPage, waKind, waStatus, waQueryDebounced])
   useEffect(() => {
     const id = setTimeout(() => setWaQueryDebounced(waQuery), 300)
     return () => clearTimeout(id)
   }, [waQuery])
-  useEffect(() => {
-    setWaPage(1)
-  }, [waKind, waStatus, waQueryDebounced])
 
   const entityOptions = useMemo(
     () => [
@@ -924,38 +869,7 @@ export default function AdminAuditClient() {
             </div>
           )}
 
-          {!mailLoading &&
-            mailTotal > mailPageSize &&
-            (() => {
-              const totalPages = Math.ceil(mailTotal / mailPageSize)
-              return (
-                <div className="mt-6 flex items-center justify-between border-t border-border-default pt-4">
-                  <p className="text-xs text-foreground-muted">
-                    Page <span className="font-medium text-foreground">{mailPage}</span> of{' '}
-                    <span className="font-medium text-foreground">{totalPages}</span> · {mailTotal} email
-                    {mailTotal !== 1 ? 's' : ''}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setMailPage(p => Math.max(1, p - 1))}
-                      disabled={mailPage === 1}
-                      className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMailPage(p => Math.min(totalPages, p + 1))}
-                      disabled={mailPage >= totalPages}
-                      className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )
-            })()}
+          {!mailList.loading && <InfiniteFooter shown={mailRows.length} control={mailList} noun="emails" className="mt-4" />}
         </div>
       )}
 
@@ -1118,38 +1032,7 @@ export default function AdminAuditClient() {
             </div>
           )}
 
-          {!smsLoading &&
-            smsTotal > smsPageSize &&
-            (() => {
-              const totalPages = Math.ceil(smsTotal / smsPageSize)
-              return (
-                <div className="mt-6 flex items-center justify-between border-t border-border-default pt-4">
-                  <p className="text-xs text-foreground-muted">
-                    Page <span className="font-medium text-foreground">{smsPage}</span> of{' '}
-                    <span className="font-medium text-foreground">{totalPages}</span> · {smsTotal} message
-                    {smsTotal !== 1 ? 's' : ''}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setSmsPage(p => Math.max(1, p - 1))}
-                      disabled={smsPage === 1}
-                      className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSmsPage(p => Math.min(totalPages, p + 1))}
-                      disabled={smsPage >= totalPages}
-                      className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )
-            })()}
+          {!smsList.loading && <InfiniteFooter shown={smsRows.length} control={smsList} noun="messages" className="mt-4" />}
         </div>
       )}
 
@@ -1312,38 +1195,7 @@ export default function AdminAuditClient() {
             </div>
           )}
 
-          {!waLoading &&
-            waTotal > waPageSize &&
-            (() => {
-              const totalPages = Math.ceil(waTotal / waPageSize)
-              return (
-                <div className="mt-6 flex items-center justify-between border-t border-border-default pt-4">
-                  <p className="text-xs text-foreground-muted">
-                    Page <span className="font-medium text-foreground">{waPage}</span> of{' '}
-                    <span className="font-medium text-foreground">{totalPages}</span> · {waTotal} message
-                    {waTotal !== 1 ? 's' : ''}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setWaPage(p => Math.max(1, p - 1))}
-                      disabled={waPage === 1}
-                      className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                    >
-                      <ChevronLeft className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setWaPage(p => Math.min(totalPages, p + 1))}
-                      disabled={waPage >= totalPages}
-                      className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              )
-            })()}
+          {!waList.loading && <InfiniteFooter shown={waRows.length} control={waList} noun="messages" className="mt-4" />}
         </div>
       )}
 
@@ -1936,82 +1788,7 @@ export default function AdminAuditClient() {
             </div>
           )}
 
-          {!loading &&
-            total > 0 &&
-            (() => {
-              const totalPages = Math.max(1, Math.ceil(total / pageSize))
-              const from = (page - 1) * pageSize + 1
-              const to = Math.min(page * pageSize, total)
-              return (
-                <div className="mt-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-border-default pt-4">
-                  <p className="text-xs text-foreground-muted">
-                    Showing{' '}
-                    <span className="font-medium text-foreground">
-                      {from}–{to}
-                    </span>{' '}
-                    of <span className="font-medium text-foreground">{total}</span>
-                  </p>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-foreground-muted">Per page</span>
-                      <AdminSelect
-                        sm
-                        value={String(pageSize)}
-                        onChange={v => setPageSize(parseInt(v, 10))}
-                        options={[
-                          { value: '25', label: '25' },
-                          { value: '50', label: '50' },
-                          { value: '100', label: '100' },
-                          { value: '200', label: '200' },
-                        ]}
-                      />
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setPage(1)}
-                        disabled={page === 1}
-                        className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                        title="First page"
-                      >
-                        <ChevronsLeft className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPage(p => Math.max(1, p - 1))}
-                        disabled={page === 1}
-                        className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                        title="Previous page"
-                      >
-                        <ChevronLeft className="w-3.5 h-3.5" />
-                      </button>
-                      <span className="text-xs px-2 text-foreground">
-                        Page <span className="font-medium">{page}</span> of{' '}
-                        <span className="font-medium">{totalPages}</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        disabled={page >= totalPages}
-                        className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                        title="Next page"
-                      >
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPage(totalPages)}
-                        disabled={page >= totalPages}
-                        className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"
-                        title="Last page"
-                      >
-                        <ChevronsRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })()}
+          {!loading && <InfiniteFooter shown={events.length} control={auditList} noun="events" className="mt-4" />}
         </>
       )}
     </div>

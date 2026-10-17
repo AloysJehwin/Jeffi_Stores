@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Dialog, Tabs } from '@/components/admin/kit'
+import { Badge, Dialog, Tabs } from '@/components/admin/kit'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
@@ -473,8 +473,8 @@ export default function ProductForm({
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
   const [variantPopupId, setVariantPopupId] = useState<string | null>(null)
   const pendingPopupVariantIdRef = useRef<string | null>(null)
-  const [popupUnitKey, setPopupUnitKey] = useState<string>('')
-  const [popupUnitInfo, setPopupUnitInfo] = useState<UnitLoadedInfo | null>(null)
+  // Base unit per variant, reported by each variant's inline units manager.
+  const [variantUnitInfo, setVariantUnitInfo] = useState<Record<string, UnitLoadedInfo>>({})
   const [variantImagesMap, setVariantImagesMap] = useState<Record<string, any[]>>(() => {
     const init: Record<string, any[]> = {}
     if (product?.product_variants) {
@@ -689,7 +689,9 @@ export default function ProductForm({
     return searchParams.get('popup') ? 'variants' : 'basics'
   })
   const [svVariantId, setSvVariantId] = useState<string | null>(null)
-  const [svUnit, setSvUnit] = useState<UnitLoadedInfo | null>(null)
+  // Variant details (images, sub-variants, units) load once the Variants or Sub-variants tab is opened.
+  const [variantsOpened, setVariantsOpened] = useState(false)
+  const variantDetailLoadedRef = useRef<Set<string>>(new Set())
   const [metaTitle, setMetaTitle] = useState(product?.meta_title || '')
   const [metaDescription, setMetaDescription] = useState(product?.meta_description || '')
   const [isSearchable, setIsSearchable] = useState(product?.is_searchable ?? true)
@@ -863,12 +865,6 @@ export default function ProductForm({
     const saved = localStorage.getItem(draftKey)
     if (saved) setHasDraft(true)
   }, [draftKey])
-
-  // Reset cached popup unit when switching variants in the popup
-  useEffect(() => {
-    setPopupUnitKey('')
-    setPopupUnitInfo(null)
-  }, [variantPopupId])
 
   // Auto-open variant popup from ?popup= query param (set after draft-stay save)
   useEffect(() => {
@@ -1641,8 +1637,7 @@ export default function ProductForm({
       : `/api/admin/products/${productId}/variants/${vid}/images`
   }
 
-  async function openVariantPopup(variantId: string) {
-    setVariantPopupId(variantId)
+  async function loadVariantDetail(variantId: string) {
     setVariantImageError(null)
     const isTemp = variantId.startsWith('temp-')
     if (productId && !isTemp) {
@@ -2128,6 +2123,23 @@ export default function ProductForm({
     ),
   }))
 
+  // Interacting with a variant makes it the current one (seeds its auto SKU, targets the gallery picker).
+  const focusVariant = (id: string | undefined) => {
+    if (id && id !== variantPopupId) setVariantPopupId(id)
+  }
+
+  const variantIdsKey = activeVariants.map(v => v.id || '').join(',')
+  useEffect(() => {
+    if (activeTab !== 'variants' && activeTab !== 'subvariants') return
+    setVariantsOpened(true)
+    for (const v of activeVariants) {
+      if (!v.id || v.id.startsWith('temp-') || variantDetailLoadedRef.current.has(v.id)) continue
+      variantDetailLoadedRef.current.add(v.id)
+      void loadVariantDetail(v.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, variantIdsKey])
+
   // A failed save opens the first tab holding an invalid field (the banner and toast still show).
   useEffect(() => {
     const t = errorMessages.map(m => errorTab(m, hasVariants)).find(Boolean)
@@ -2537,6 +2549,505 @@ export default function ProductForm({
 
   const inputCls =
     'field-normal w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent'
+
+  // Former variant popup body, shown inline under each variant row in the Variants tab.
+  const renderVariantDetail = (
+    variantPopupId: string,
+    popupVariant: VariantRow,
+    popupIndex: number,
+    popupUnitKey: string,
+    popupUnitInfo: UnitLoadedInfo | null
+  ) => (
+    <>
+    <div className="p-4 space-y-6">
+      {/* Pricing & Identifiers */}
+      <div>
+        <div className="flex items-baseline justify-between mb-3">
+          <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+            Pricing & Identifiers
+          </p>
+          <span className="text-[10px] text-foreground-muted">
+            Per BASE unit{popupUnitKey ? ` (${popupUnitKey})` : ''}. Other units convert via factor —
+            configure in Variant Units below.
+          </span>
+        </div>
+        {popupUnitInfo && popupUnitInfo.unitKey && !popupVariant.sub_variant_type_on && (
+          <div
+            className={`flex items-center gap-2 flex-wrap mb-3 px-3 py-2 rounded-lg border text-[11px] ${
+              popupUnitInfo.inherited
+                ? 'border-border-default bg-surface-secondary/60 text-foreground-secondary'
+                : 'border-accent-300/50 bg-accent-500/5 text-foreground'
+            }`}
+          >
+            <span className="text-[10px] font-bold uppercase tracking-wide text-foreground-muted">
+              Prices apply to
+            </span>
+            <span className="font-semibold text-foreground">1 {popupUnitKey}</span>
+            {popupUnitInfo.displayLabel && (
+              <span className="text-foreground-muted">({popupUnitInfo.displayLabel})</span>
+            )}
+            <span className="text-border-secondary">·</span>
+            {popupUnitInfo.inherited ? (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface border border-border-default text-foreground-muted">
+                Inherited from product
+              </span>
+            ) : (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent-500/10 border border-accent-300/40 text-accent-500">
+                Variant override
+              </span>
+            )}
+            <span className="ml-auto text-[10px] text-foreground-muted italic">
+              {popupUnitInfo.inherited
+                ? "Change product's Selling Unit, or click Override below to set a variant-specific unit."
+                : 'Reset below to inherit the product’s unit.'}
+            </span>
+          </div>
+        )}
+        {popupVariant.sub_variant_type_on ? (
+          <div className="rounded-lg border border-dashed border-border-secondary bg-surface-secondary/40 p-3 space-y-3">
+            <p className="text-xs text-foreground-secondary">
+              Pricing is managed at the sub-variant level for this variant. Use the Sub-variants section
+              below to set prices.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                  SKU{' '}
+                  {popupVariant.sku && popupVariant.sku !== variantAutoSku(popupVariant)
+                    ? '(manual)'
+                    : '(auto)'}
+                </label>
+                <input
+                  type="text"
+                  value={popupVariant.sku || variantAutoSku(popupVariant)}
+                  onChange={e => updateVariant(popupIndex, 'sku', e.target.value.toUpperCase())}
+                  className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  placeholder="Auto"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-foreground-secondary">MPN</label>
+                <input
+                  type="text"
+                  value={popupVariant.mpn}
+                  onChange={e => updateVariant(popupIndex, 'mpn', e.target.value)}
+                  className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  placeholder="Part No."
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                  GTIN / Barcode
+                </label>
+                <input
+                  type="text"
+                  value={popupVariant.gtin}
+                  onChange={e => updateVariant(popupIndex, 'gtin', e.target.value)}
+                  className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  placeholder="Barcode"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                  Amazon ASIN
+                </label>
+                <input
+                  type="text"
+                  value={popupVariant.asin}
+                  onChange={e => updateVariant(popupIndex, 'asin', e.target.value)}
+                  className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  placeholder="e.g. B0XXXXXXXX"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-foreground-secondary">ISBN</label>
+                <input
+                  type="text"
+                  value={popupVariant.isbn}
+                  onChange={e => updateVariant(popupIndex, 'isbn', e.target.value)}
+                  className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  placeholder="For books"
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3">
+            {/* MRP (Ex. GST) — primary input from price catalog */}
+            <div>
+              <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">
+                MRP (Ex. GST) *
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={popupVariant.mrp_ex_gst}
+                onChange={e => {
+                  const v = e.target.value
+                  const updated = [...variants]
+                  updated[popupIndex] = { ...updated[popupIndex], mrp_ex_gst: v }
+                  const newMrpIncl = v ? exToIncl(v, gstRate) : ''
+                  updated[popupIndex].mrp = newMrpIncl
+                  const mrpExN = parseFloat(v)
+                  const disc = parseFloat(discountPct || '0')
+                  if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
+                    const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
+                    const newPriceIncl = exToIncl(newPriceEx, gstRate)
+                    updated[popupIndex].price_ex_gst = newPriceEx
+                    updated[popupIndex].price = newPriceIncl
+                  } else {
+                    updated[popupIndex].price_ex_gst = ''
+                    updated[popupIndex].price = ''
+                  }
+                  setVariants(updated)
+                }}
+                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="From catalog"
+              />
+            </div>
+            {/* Discount % — product-level read-only */}
+            <div>
+              <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">
+                Discount %
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                readOnly
+                value={discountPct || '0'}
+                className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed"
+              />
+            </div>
+            {/* MRP (incl. GST) — locked */}
+            <div>
+              <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">
+                MRP (incl. GST)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={popupVariant.mrp}
+                readOnly
+                className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed"
+                placeholder="Auto-calculated"
+              />
+            </div>
+            {/* Selling Price (incl. GST) — locked */}
+            <div>
+              <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">
+                Price (incl. GST)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={popupVariant.price}
+                readOnly
+                className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed"
+                placeholder="Auto-calculated"
+              />
+            </div>
+            {/* Selling Price (Ex. GST) — locked */}
+            <div>
+              <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">
+                Price (Ex. GST)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={popupVariant.price_ex_gst}
+                readOnly
+                className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed"
+                placeholder="Auto-calculated"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                SKU{' '}
+                {popupVariant.sku && popupVariant.sku !== variantAutoSku(popupVariant)
+                  ? '(manual)'
+                  : '(auto)'}
+              </label>
+              <input
+                type="text"
+                value={popupVariant.sku || variantAutoSku(popupVariant)}
+                onChange={e => updateVariant(popupIndex, 'sku', e.target.value.toUpperCase())}
+                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="Auto"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground-secondary">MPN</label>
+              <input
+                type="text"
+                value={popupVariant.mpn}
+                onChange={e => updateVariant(popupIndex, 'mpn', e.target.value)}
+                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="Part No."
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                GTIN / Barcode
+              </label>
+              <input
+                type="text"
+                value={popupVariant.gtin}
+                onChange={e => updateVariant(popupIndex, 'gtin', e.target.value)}
+                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="Barcode"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                Amazon ASIN
+              </label>
+              <input
+                type="text"
+                value={popupVariant.asin}
+                onChange={e => updateVariant(popupIndex, 'asin', e.target.value)}
+                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="e.g. B0XXXXXXXX"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground-secondary">ISBN</label>
+              <input
+                type="text"
+                value={popupVariant.isbn}
+                onChange={e => updateVariant(popupIndex, 'isbn', e.target.value)}
+                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="For books"
+              />
+            </div>
+          </div>
+        )}
+        {/* Sub-variants toggle */}
+        <div className="space-y-2 pt-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                const updated = [...variants]
+                const row = { ...updated[popupIndex] }
+                row.sub_variant_type_on = !row.sub_variant_type_on
+                if (!row.sub_variant_type_on) row.sub_variant_type = ''
+                if (row.sub_variant_type_on) {
+                  row.use_own_images = true
+                  row.price = ''
+                  row.price_ex_gst = ''
+                  row.mrp = ''
+                  row.mrp_ex_gst = ''
+                }
+                updated[popupIndex] = row
+                setVariants(updated)
+              }}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
+              role="switch"
+              aria-checked={popupVariant.sub_variant_type_on}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`}
+              />
+            </button>
+            <span className="text-xs font-medium text-foreground-secondary">Has sub-variants</span>
+          </div>
+          {popupVariant.sub_variant_type_on && (
+            <div className="flex items-center gap-2 pl-11">
+              <span className="text-xs text-foreground-muted">Label</span>
+              <input
+                type="text"
+                value={popupVariant.sub_variant_type}
+                onChange={e => updateVariant(popupIndex, 'sub_variant_type', e.target.value)}
+                className="w-40 field-xs border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="e.g. Colour, Finish"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Suppliers — VARIANT leaf (only when this variant has no sub-variants) */}
+      {hasInventory && !popupVariant.sub_variant_type_on && (
+        <div>
+          <ProductSupplierList
+            suppliers={suppliers}
+            value={popupVariant.product_suppliers || []}
+            onChange={rows => updateVariantSuppliers(popupIndex, rows)}
+          />
+        </div>
+      )}
+
+      {/* Shipping */}
+      {!popupVariant.sub_variant_type_on && (
+        <div>
+          <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
+            Shipping
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                Ship Wt. (g)
+              </label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                value={popupVariant.weight_grams}
+                onChange={e => updateVariant(popupIndex, 'weight_grams', e.target.value)}
+                className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                placeholder="e.g. 500"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                Package Type
+              </label>
+              <AdminSelect
+                md
+                value={popupVariant.package_type || 'flat_poly_auto'}
+                onChange={val => updateVariant(popupIndex, 'package_type', val)}
+                options={PACKAGE_TYPE_OPTIONS}
+              />
+            </div>
+          </div>
+          {STORED_DIMS_TYPES.includes(popupVariant.package_type || 'flat_poly_auto') && (
+            <div className="mt-3">
+              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
+                Dimensions per piece (L × B × H cm)
+              </label>
+              <div className="grid grid-cols-3 gap-1.5">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={popupVariant.length_cm}
+                  onChange={e => updateVariant(popupIndex, 'length_cm', e.target.value)}
+                  className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  placeholder="L"
+                />
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={popupVariant.breadth_cm}
+                  onChange={e => updateVariant(popupIndex, 'breadth_cm', e.target.value)}
+                  className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  placeholder="B"
+                />
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={popupVariant.height_cm}
+                  onChange={e => updateVariant(popupIndex, 'height_cm', e.target.value)}
+                  className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  placeholder="H"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Images */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+            Images
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-foreground-secondary">Own images</span>
+            <button
+              type="button"
+              onClick={() => updateVariant(popupIndex, 'use_own_images', !popupVariant.use_own_images)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.use_own_images ? 'bg-accent-500' : 'bg-border-secondary'}`}
+              role="switch"
+              aria-checked={popupVariant.use_own_images}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform ${popupVariant.use_own_images ? 'translate-x-4' : 'translate-x-0'}`}
+              />
+            </button>
+          </div>
+        </div>
+        {popupVariant.use_own_images ? (
+          <>
+            <ImageGalleryEditor
+              images={variantImagesMap[variantPopupId] || []}
+              maxImages={5}
+              size="sm"
+              uploading={!!variantImageUploading[variantPopupId]}
+              pendingAdds={variantImagePendingAdds[variantPopupId] || 0}
+              deleting={variantImageDeleting}
+              error={variantImageError}
+              onUpload={file => uploadVariantImageFile(variantPopupId, file)}
+              onDelete={imageId => deleteVariantImage(variantPopupId, imageId)}
+              onSetPrimary={imageId => setVariantImagePrimary(variantPopupId, imageId)}
+              onReorder={(from, to) => reorderVariantImages(variantPopupId, from, to)}
+              onOpenGallery={productId ? openVariantGallery : undefined}
+            />
+          </>
+        ) : (
+          <p className="text-xs text-foreground-muted italic">Uses product images</p>
+        )}
+      </div>
+
+
+      {popupVariant.sub_variant_type_on && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border-secondary p-3">
+          <p className="text-xs text-foreground-secondary">
+            Sub-variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''} are edited in the Sub-variants tab.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setSvVariantId(variantPopupId)
+              setTab('subvariants')
+            }}
+            className="control-sm border border-border-default text-foreground hover:bg-surface-secondary"
+          >
+            Edit sub-variants
+          </button>
+        </div>
+      )}
+    </div>
+
+    {variantPopupId && variantPopupId.startsWith('temp-') && (
+      <div className="px-5 pb-4 border-t border-border-default-default pt-4 mt-0">
+        <p className="text-xs text-foreground-muted italic">
+          Save the product first to configure selling units for this variant.
+        </p>
+      </div>
+    )}
+    {variantsOpened && productId && !variantPopupId.startsWith('temp-') && (
+      <div className="px-5 pb-4">
+        <UnitsManager
+          productId={productId}
+          variantId={variantPopupId}
+          basePrice={
+            popupVariant?.price ||
+            (popupVariant?.price_ex_gst ? exToIncl(popupVariant.price_ex_gst, gstRate) : null)
+          }
+          onUnitLoaded={info => {
+            setVariantUnitInfo(m => ({ ...m, [variantPopupId]: info }))
+          }}
+          isDraft={isDraft}
+          roleNote={
+            popupVariant?.sub_variant_type_on
+              ? 'Used by any sub-variant that has no unit of its own.'
+              : undefined
+          }
+        />
+      </div>
+    )}
+    </>
+  )
 
   // Sub-variant editor for one variant; shown in the Sub-variants tab.
   const renderSubVariants = (
@@ -4682,6 +5193,32 @@ export default function ProductForm({
           </section>
         </div>
         <div data-pf-tab="variants" role="tabpanel" hidden={activeTab !== 'variants'}>
+          {variantGalleryOpen && (
+            <GalleryPicker
+              mode="multi"
+              maxSelect={Math.max(0, 5 - (variantImagesMap[variantPopupId || '']?.length || 0))}
+              onClose={() => setVariantGalleryOpen(false)}
+              onConfirm={addVariantImagesFromGallery}
+            />
+          )}
+          {activeVariants.length > 1 && (
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs text-foreground-muted">Jump to</span>
+              {activeVariants.map(v => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => {
+                    focusVariant(v.id)
+                    document.querySelector(`[data-variant-card="${v.id}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }}
+                  className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground"
+                >
+                  {v.variant_name || v.sku || 'Untitled variant'}
+                </button>
+              ))}
+            </div>
+          )}
           {/* Variant Management Section */}
           {hasVariants && (
             <div className="md:col-span-2 border border-border-default rounded-xl p-4 bg-surface-secondary/40">
@@ -5105,12 +5642,46 @@ export default function ProductForm({
                                   SKU: {product.sku}-{variant.variant_name.toUpperCase().replace(/[^A-Z0-9]/g, '')}
                                 </div>
                               )}
-                              {variant.id && (
-                                <div className="pt-2 border-t border-border-default-default">
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Desktop: one card per variant, details inline */}
+                      <div className="hidden md:block space-y-4 p-4">
+                        {groupVariants.map(variant => {
+                          const index = variants.indexOf(variant)
+                          const pos = activeVariants.indexOf(variant)
+                          const stockLabel = variant.sub_variant_type_on
+                            ? sumSubVariantStock(subVariantsMap[variant.id || '']) > 0
+                              ? 'In Stock'
+                              : 'Out of Stock'
+                            : variant.stock_status || 'In Stock'
+                          return (
+                            <div
+                              key={variant.id || index}
+                              data-variant-card={variant.id || undefined}
+                              className="scroll-mt-24 rounded-xl border border-border-default bg-surface-elevated shadow-sm"
+                              onFocusCapture={() => focusVariant(variant.id)}
+                              onPointerDownCapture={() => focusVariant(variant.id)}
+                            >
+                              <div className="flex flex-wrap items-center gap-2 rounded-t-xl border-b border-border-default bg-surface-secondary/40 px-4 py-2.5">
+                                <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                                  {variant.variant_name || 'Untitled variant'}
+                                </span>
+                                <span className="font-mono text-xs text-foreground-muted">{variant.sku || variantAutoSku(variant)}</span>
+                                <Badge tone={stockLabel === 'Out of Stock' ? 'red' : stockLabel === 'Low Stock' ? 'amber' : 'green'}>
+                                  {stockLabel}
+                                </Badge>
+                                <span className="ml-auto text-xs tabular-nums text-foreground-muted">
+                                  Variant {pos + 1} of {activeVariants.length}
+                                </span>
+                                {allGroupVariants.filter(v => !v._isDeleted).length > 1 && (
                                   <button
                                     type="button"
-                                    onClick={() => openVariantPopup(variant.id!)}
-                                    className="text-xs font-medium text-accent-500 flex items-center gap-1"
+                                    onClick={() => removeVariant(index)}
+                                    className="text-red-400 hover:text-red-600 p-1 rounded transition-colors"
+                                    title="Remove"
                                   >
                                     <svg
                                       className="w-3.5 h-3.5"
@@ -5122,248 +5693,166 @@ export default function ProductForm({
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                         strokeWidth={2}
-                                        d="M4 6h16M4 10h16M4 14h8"
+                                        d="M6 18L18 6M6 6l12 12"
                                       />
                                     </svg>
-                                    Images & Sub-Variants
                                   </button>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-4 xl:grid-cols-8">
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Name *</label>
+                              <input
+                                type="text"
+                                value={variant.variant_name}
+                                onChange={e => updateVariant(index, 'variant_name', e.target.value)}
+                                className="w-full field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                                placeholder="e.g. M8, Red"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">SKU</label>
+                              <input
+                                type="text"
+                                value={variant.sku || variantAutoSku(variant)}
+                                onChange={e => updateVariant(index, 'sku', e.target.value.toUpperCase())}
+                                className="w-full field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                                placeholder="Auto"
+                              />
+                            </div>
+                                {variant.sub_variant_type_on ? (
+                                  <p className="col-span-2 self-end pb-2 text-xs italic text-foreground-muted lg:col-span-4 xl:col-span-5">
+                                    Pricing managed by sub-variants
+                                  </p>
+                                ) : (
+                                  <>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">MRP (Ex. GST) *</label>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={variant.mrp_ex_gst}
+                                        onChange={e => {
+                                          const v = e.target.value
+                                          const updated = [...variants]
+                                          updated[index] = { ...updated[index], mrp_ex_gst: v }
+                                          const newMrpIncl = v ? exToIncl(v, gstRate) : ''
+                                          updated[index].mrp = newMrpIncl
+                                          const mrpExN = parseFloat(v)
+                                          const disc = parseFloat(discountPct || '0')
+                                          if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
+                                            const newPriceEx = parseFloat(
+                                              (mrpExN * (1 - disc / 100)).toFixed(2)
+                                            ).toString()
+                                            const newPriceIncl = exToIncl(newPriceEx, gstRate)
+                                            updated[index].price_ex_gst = newPriceEx
+                                            updated[index].price = newPriceIncl
+                                          } else {
+                                            updated[index].price_ex_gst = ''
+                                            updated[index].price = ''
+                                          }
+                                          setVariants(updated)
+                                        }}
+                                        className="w-full field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                                        placeholder="From catalog"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Disc %</label>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        max="100"
+                                        readOnly
+                                        value={discountPct || '0'}
+                                        className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">MRP (incl)</label>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={variant.mrp}
+                                        readOnly
+                                        className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                                        placeholder="Auto"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Price (incl) *</label>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={variant.price}
+                                        readOnly
+                                        className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                                        placeholder="Auto"
+                                        required
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Price (Ex)</label>
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={variant.price_ex_gst}
+                                        readOnly
+                                        className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                                        placeholder="Auto"
+                                      />
+                                    </div>
+                                  </>
+                                )}
+                                <div>
+                                  <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Stock Status *</label>
+                                  {variant.sub_variant_type_on ? (
+                                    <input
+                                      type="text"
+                                      value={
+                                        sumSubVariantStock(subVariantsMap[variant.id || '']) > 0
+                                          ? 'In Stock'
+                                          : 'Out of Stock'
+                                      }
+                                      readOnly
+                                      className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                                      title="Derived from sub-variants"
+                                    />
+                                  ) : (
+                                    <AdminSelect
+                                      value={variant.stock_status}
+                                      onChange={v => updateVariant(index, 'stock_status', v)}
+                                      sm
+                                      className="w-full"
+                                      options={[
+                                        { value: 'In Stock', label: 'In Stock' },
+                                        { value: 'Low Stock', label: 'Low Stock' },
+                                        { value: 'Out of Stock', label: 'Out of Stock' },
+                                      ]}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                              {variant.id && (
+                                <div className="border-t border-border-default">
+                                  {renderVariantDetail(
+                                    variant.id,
+                                    variant,
+                                    index,
+                                    variantUnitInfo[variant.id]?.unitKey || '',
+                                    variantUnitInfo[variant.id] || null
+                                  )}
                                 </div>
                               )}
                             </div>
                           )
                         })}
-                      </div>
-
-                      {/* Desktop table — core columns only; details open in the variant popup */}
-                      <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-border-secondary bg-surface">
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">
-                                Name *
-                              </th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs hidden lg:table-cell">
-                                SKU
-                              </th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">
-                                MRP (Ex. GST) *
-                              </th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">
-                                Disc %
-                              </th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">
-                                MRP (incl)
-                              </th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">
-                                Price (incl) *
-                              </th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">
-                                Price (Ex)
-                              </th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">
-                                Stock Status *
-                              </th>
-                              <th className="py-2 px-3 w-16"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {groupVariants.map(variant => {
-                              const index = variants.indexOf(variant)
-                              return (
-                                <React.Fragment key={variant.id || index}>
-                                  <tr className="border-b border-border-default hover:bg-surface-secondary/40">
-                                    <td className="py-2 px-3">
-                                      <input
-                                        type="text"
-                                        value={variant.variant_name}
-                                        onChange={e => updateVariant(index, 'variant_name', e.target.value)}
-                                        className="w-32 field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                                        placeholder="e.g. M8, Red"
-                                        required
-                                      />
-                                    </td>
-                                    <td className="py-2 px-3 hidden lg:table-cell">
-                                      <input
-                                        type="text"
-                                        value={variant.sku || variantAutoSku(variant)}
-                                        onChange={e => updateVariant(index, 'sku', e.target.value.toUpperCase())}
-                                        className="w-36 field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                                        placeholder="Auto"
-                                      />
-                                    </td>
-                                    {variant.sub_variant_type_on ? (
-                                      <td className="py-2 px-3" colSpan={5}>
-                                        <span className="text-xs text-foreground-muted italic">
-                                          Pricing managed by sub-variants
-                                        </span>
-                                      </td>
-                                    ) : (
-                                      <>
-                                        {/* MRP (Ex. GST) — primary input */}
-                                        <td className="py-2 px-3">
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={variant.mrp_ex_gst}
-                                            onChange={e => {
-                                              const v = e.target.value
-                                              const updated = [...variants]
-                                              updated[index] = { ...updated[index], mrp_ex_gst: v }
-                                              const newMrpIncl = v ? exToIncl(v, gstRate) : ''
-                                              updated[index].mrp = newMrpIncl
-                                              const mrpExN = parseFloat(v)
-                                              const disc = parseFloat(discountPct || '0')
-                                              if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                                                const newPriceEx = parseFloat(
-                                                  (mrpExN * (1 - disc / 100)).toFixed(2)
-                                                ).toString()
-                                                const newPriceIncl = exToIncl(newPriceEx, gstRate)
-                                                updated[index].price_ex_gst = newPriceEx
-                                                updated[index].price = newPriceIncl
-                                              } else {
-                                                updated[index].price_ex_gst = ''
-                                                updated[index].price = ''
-                                              }
-                                              setVariants(updated)
-                                            }}
-                                            className="w-28 field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                                            placeholder="From catalog"
-                                          />
-                                        </td>
-                                        {/* Discount % — product-level read-only */}
-                                        <td className="py-2 px-3">
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            max="100"
-                                            readOnly
-                                            value={discountPct || '0'}
-                                            className="w-20 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
-                                          />
-                                        </td>
-                                        {/* MRP (incl. GST) — locked */}
-                                        <td className="py-2 px-3">
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={variant.mrp}
-                                            readOnly
-                                            className="w-28 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
-                                            placeholder="Auto"
-                                          />
-                                        </td>
-                                        {/* Selling Price (incl. GST) — locked */}
-                                        <td className="py-2 px-3">
-                                          <div>
-                                            <input
-                                              type="number"
-                                              step="0.01"
-                                              min="0"
-                                              value={variant.price}
-                                              readOnly
-                                              className="w-28 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
-                                              placeholder="Auto"
-                                              required
-                                            />
-                                          </div>
-                                        </td>
-                                        {/* Selling Price (Ex. GST) — locked */}
-                                        <td className="py-2 px-3">
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={variant.price_ex_gst}
-                                            readOnly
-                                            className="w-28 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
-                                            placeholder="Auto"
-                                          />
-                                        </td>
-                                      </>
-                                    )}
-                                    <td className="py-2 px-3">
-                                      {variant.sub_variant_type_on ? (
-                                        <input
-                                          type="text"
-                                          value={
-                                            sumSubVariantStock(subVariantsMap[variant.id || '']) > 0
-                                              ? 'In Stock'
-                                              : 'Out of Stock'
-                                          }
-                                          readOnly
-                                          className="w-28 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
-                                          title="Derived from sub-variants"
-                                        />
-                                      ) : (
-                                        <AdminSelect
-                                          value={variant.stock_status}
-                                          onChange={v => updateVariant(index, 'stock_status', v)}
-                                          sm
-                                          className="w-28"
-                                          options={[
-                                            { value: 'In Stock', label: 'In Stock' },
-                                            { value: 'Low Stock', label: 'Low Stock' },
-                                            { value: 'Out of Stock', label: 'Out of Stock' },
-                                          ]}
-                                        />
-                                      )}
-                                    </td>
-                                    <td className="py-2 px-3">
-                                      <div className="flex items-center gap-1 justify-end">
-                                        <button
-                                          type="button"
-                                          onClick={() => (variant.id ? openVariantPopup(variant.id) : undefined)}
-                                          className="flex items-center gap-1 px-2 h-control-sm rounded text-xs font-medium transition-colors text-foreground-muted hover:text-foreground hover:bg-surface-secondary"
-                                          title="Edit images & sub-variants"
-                                        >
-                                          <svg
-                                            className="w-3.5 h-3.5"
-                                            fill="none"
-                                            viewBox="0 0 24 24"
-                                            stroke="currentColor"
-                                          >
-                                            <path
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                              strokeWidth={2}
-                                              d="M4 6h16M4 10h16M4 14h8"
-                                            />
-                                          </svg>
-                                          More
-                                        </button>
-                                        {allGroupVariants.filter(v => !v._isDeleted).length > 1 && (
-                                          <button
-                                            type="button"
-                                            onClick={() => removeVariant(index)}
-                                            className="text-red-400 hover:text-red-600 p-1 rounded transition-colors"
-                                            title="Remove"
-                                          >
-                                            <svg
-                                              className="w-3.5 h-3.5"
-                                              fill="none"
-                                              viewBox="0 0 24 24"
-                                              stroke="currentColor"
-                                            >
-                                              <path
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                strokeWidth={2}
-                                                d="M6 18L18 6M6 6l12 12"
-                                              />
-                                            </svg>
-                                          </button>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                </React.Fragment>
-                              )
-                            })}
-                          </tbody>
-                        </table>
                       </div>
 
                       {/* Add variant to group */}
@@ -5396,10 +5885,7 @@ export default function ProductForm({
                   <button
                     key={v.id}
                     type="button"
-                    onClick={() => {
-                      setSvVariantId(v.id ?? null)
-                      setSvUnit(null)
-                    }}
+                    onClick={() => setSvVariantId(v.id ?? null)}
                     aria-pressed={v.id === svParent.id}
                     className={`control-sm border ${
                       v.id === svParent.id
@@ -5412,19 +5898,13 @@ export default function ProductForm({
                   </button>
                 ))}
               </div>
-              {/* Unmounted while the variant popup is open so its unit loader stays the only one running. */}
-              {!variantPopupId && svParent.id && renderSubVariants(svParent.id, svParent, svUnit?.unitKey || '', svUnit)}
-              {!variantPopupId && productId && svParent.id && !svParent.id.startsWith('temp-') && (
-                <UnitsManager
-                  key={svParent.id}
-                  productId={productId}
-                  variantId={svParent.id}
-                  basePrice={svParent.price || (svParent.price_ex_gst ? exToIncl(svParent.price_ex_gst, gstRate) : null)}
-                  onUnitLoaded={setSvUnit}
-                  isDraft={isDraft}
-                  roleNote="Used by any sub-variant that has no unit of its own."
-                />
-              )}
+              {svParent.id &&
+                renderSubVariants(
+                  svParent.id,
+                  svParent,
+                  variantUnitInfo[svParent.id]?.unitKey || '',
+                  variantUnitInfo[svParent.id] || null
+                )}
             </section>
           )}
         </div>
@@ -5500,575 +5980,6 @@ export default function ProductForm({
             </button>
           </RequireWrite>
         </div>
-        {/* Variant Detail Popup */}
-        {variantPopupId &&
-          (() => {
-            const popupVariant = variants.find(v => v.id === variantPopupId)
-            if (!popupVariant) return null
-            const popupIndex = variants.indexOf(popupVariant)
-            const navIndex = activeVariants.findIndex(v => v.id === variantPopupId)
-            const prevVariant = navIndex > 0 ? activeVariants[navIndex - 1] : null
-            const nextVariant = navIndex < activeVariants.length - 1 ? activeVariants[navIndex + 1] : null
-            return (
-              <div
-                className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50"
-                onClick={() => setVariantPopupId(null)}
-              >
-                <div
-                  className="bg-surface-elevated rounded-xl border border-border-default shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto"
-                  onClick={e => e.stopPropagation()}
-                >
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <button
-                        type="button"
-                        onClick={() => prevVariant && setVariantPopupId(prevVariant.id ?? null)}
-                        disabled={!prevVariant}
-                        className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm"
-                      >
-                        &#8249;
-                      </button>
-                      <div className="min-w-0">
-                        <h3 className="text-base font-semibold text-foreground truncate">
-                          {popupVariant.variant_name || 'Variant Details'}
-                        </h3>
-                        <p className="text-xs text-foreground-muted mt-0.5">
-                          {navIndex + 1} / {activeVariants.length}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => nextVariant && setVariantPopupId(nextVariant.id ?? null)}
-                        disabled={!nextVariant}
-                        className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm"
-                      >
-                        &#8250;
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setVariantPopupId(null)}
-                      className="shrink-0 text-foreground-muted hover:text-foreground transition-colors p-1"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  <div className="p-5 space-y-6">
-                    {/* Pricing & Identifiers */}
-                    <div>
-                      <div className="flex items-baseline justify-between mb-3">
-                        <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
-                          Pricing & Identifiers
-                        </p>
-                        <span className="text-[10px] text-foreground-muted">
-                          Per BASE unit{popupUnitKey ? ` (${popupUnitKey})` : ''}. Other units convert via factor —
-                          configure in Variant Units below.
-                        </span>
-                      </div>
-                      {popupUnitInfo && popupUnitInfo.unitKey && !popupVariant.sub_variant_type_on && (
-                        <div
-                          className={`flex items-center gap-2 flex-wrap mb-3 px-3 py-2 rounded-lg border text-[11px] ${
-                            popupUnitInfo.inherited
-                              ? 'border-border-default bg-surface-secondary/60 text-foreground-secondary'
-                              : 'border-accent-300/50 bg-accent-500/5 text-foreground'
-                          }`}
-                        >
-                          <span className="text-[10px] font-bold uppercase tracking-wide text-foreground-muted">
-                            Prices apply to
-                          </span>
-                          <span className="font-semibold text-foreground">1 {popupUnitKey}</span>
-                          {popupUnitInfo.displayLabel && (
-                            <span className="text-foreground-muted">({popupUnitInfo.displayLabel})</span>
-                          )}
-                          <span className="text-border-secondary">·</span>
-                          {popupUnitInfo.inherited ? (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-surface border border-border-default text-foreground-muted">
-                              Inherited from product
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent-500/10 border border-accent-300/40 text-accent-500">
-                              Variant override
-                            </span>
-                          )}
-                          <span className="ml-auto text-[10px] text-foreground-muted italic">
-                            {popupUnitInfo.inherited
-                              ? "Change product's Selling Unit, or click Override below to set a variant-specific unit."
-                              : 'Reset below to inherit the product’s unit.'}
-                          </span>
-                        </div>
-                      )}
-                      {popupVariant.sub_variant_type_on ? (
-                        <div className="rounded-lg border border-dashed border-border-secondary bg-surface-secondary/40 p-3 space-y-3">
-                          <p className="text-xs text-foreground-secondary">
-                            Pricing is managed at the sub-variant level for this variant. Use the Sub-variants section
-                            below to set prices.
-                          </p>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                SKU{' '}
-                                {popupVariant.sku && popupVariant.sku !== variantAutoSku(popupVariant)
-                                  ? '(manual)'
-                                  : '(auto)'}
-                              </label>
-                              <input
-                                type="text"
-                                value={popupVariant.sku || variantAutoSku(popupVariant)}
-                                onChange={e => updateVariant(popupIndex, 'sku', e.target.value.toUpperCase())}
-                                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                                placeholder="Auto"
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-foreground-secondary">MPN</label>
-                              <input
-                                type="text"
-                                value={popupVariant.mpn}
-                                onChange={e => updateVariant(popupIndex, 'mpn', e.target.value)}
-                                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                                placeholder="Part No."
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                GTIN / Barcode
-                              </label>
-                              <input
-                                type="text"
-                                value={popupVariant.gtin}
-                                onChange={e => updateVariant(popupIndex, 'gtin', e.target.value)}
-                                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                                placeholder="Barcode"
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                                Amazon ASIN
-                              </label>
-                              <input
-                                type="text"
-                                value={popupVariant.asin}
-                                onChange={e => updateVariant(popupIndex, 'asin', e.target.value)}
-                                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                                placeholder="e.g. B0XXXXXXXX"
-                              />
-                            </div>
-                            <div>
-                              <label className="mb-1 block text-xs font-medium text-foreground-secondary">ISBN</label>
-                              <input
-                                type="text"
-                                value={popupVariant.isbn}
-                                onChange={e => updateVariant(popupIndex, 'isbn', e.target.value)}
-                                className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                                placeholder="For books"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3">
-                          {/* MRP (Ex. GST) — primary input from price catalog */}
-                          <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">
-                              MRP (Ex. GST) *
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={popupVariant.mrp_ex_gst}
-                              onChange={e => {
-                                const v = e.target.value
-                                const updated = [...variants]
-                                updated[popupIndex] = { ...updated[popupIndex], mrp_ex_gst: v }
-                                const newMrpIncl = v ? exToIncl(v, gstRate) : ''
-                                updated[popupIndex].mrp = newMrpIncl
-                                const mrpExN = parseFloat(v)
-                                const disc = parseFloat(discountPct || '0')
-                                if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                                  const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
-                                  const newPriceIncl = exToIncl(newPriceEx, gstRate)
-                                  updated[popupIndex].price_ex_gst = newPriceEx
-                                  updated[popupIndex].price = newPriceIncl
-                                } else {
-                                  updated[popupIndex].price_ex_gst = ''
-                                  updated[popupIndex].price = ''
-                                }
-                                setVariants(updated)
-                              }}
-                              className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                              placeholder="From catalog"
-                            />
-                          </div>
-                          {/* Discount % — product-level read-only */}
-                          <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">
-                              Discount %
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              max="100"
-                              readOnly
-                              value={discountPct || '0'}
-                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed"
-                            />
-                          </div>
-                          {/* MRP (incl. GST) — locked */}
-                          <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">
-                              MRP (incl. GST)
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={popupVariant.mrp}
-                              readOnly
-                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed"
-                              placeholder="Auto-calculated"
-                            />
-                          </div>
-                          {/* Selling Price (incl. GST) — locked */}
-                          <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">
-                              Price (incl. GST)
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={popupVariant.price}
-                              readOnly
-                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed"
-                              placeholder="Auto-calculated"
-                            />
-                          </div>
-                          {/* Selling Price (Ex. GST) — locked */}
-                          <div>
-                            <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">
-                              Price (Ex. GST)
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={popupVariant.price_ex_gst}
-                              readOnly
-                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed"
-                              placeholder="Auto-calculated"
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                              SKU{' '}
-                              {popupVariant.sku && popupVariant.sku !== variantAutoSku(popupVariant)
-                                ? '(manual)'
-                                : '(auto)'}
-                            </label>
-                            <input
-                              type="text"
-                              value={popupVariant.sku || variantAutoSku(popupVariant)}
-                              onChange={e => updateVariant(popupIndex, 'sku', e.target.value.toUpperCase())}
-                              className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                              placeholder="Auto"
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">MPN</label>
-                            <input
-                              type="text"
-                              value={popupVariant.mpn}
-                              onChange={e => updateVariant(popupIndex, 'mpn', e.target.value)}
-                              className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                              placeholder="Part No."
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                              GTIN / Barcode
-                            </label>
-                            <input
-                              type="text"
-                              value={popupVariant.gtin}
-                              onChange={e => updateVariant(popupIndex, 'gtin', e.target.value)}
-                              className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                              placeholder="Barcode"
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                              Amazon ASIN
-                            </label>
-                            <input
-                              type="text"
-                              value={popupVariant.asin}
-                              onChange={e => updateVariant(popupIndex, 'asin', e.target.value)}
-                              className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                              placeholder="e.g. B0XXXXXXXX"
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">ISBN</label>
-                            <input
-                              type="text"
-                              value={popupVariant.isbn}
-                              onChange={e => updateVariant(popupIndex, 'isbn', e.target.value)}
-                              className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                              placeholder="For books"
-                            />
-                          </div>
-                        </div>
-                      )}
-                      {/* Sub-variants toggle */}
-                      <div className="space-y-2 pt-3">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = [...variants]
-                              const row = { ...updated[popupIndex] }
-                              row.sub_variant_type_on = !row.sub_variant_type_on
-                              if (!row.sub_variant_type_on) row.sub_variant_type = ''
-                              if (row.sub_variant_type_on) {
-                                row.use_own_images = true
-                                row.price = ''
-                                row.price_ex_gst = ''
-                                row.mrp = ''
-                                row.mrp_ex_gst = ''
-                              }
-                              updated[popupIndex] = row
-                              setVariants(updated)
-                            }}
-                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.sub_variant_type_on ? 'bg-accent-500' : 'bg-border-secondary'}`}
-                            role="switch"
-                            aria-checked={popupVariant.sub_variant_type_on}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${popupVariant.sub_variant_type_on ? 'translate-x-4' : 'translate-x-0'}`}
-                            />
-                          </button>
-                          <span className="text-xs font-medium text-foreground-secondary">Has sub-variants</span>
-                        </div>
-                        {popupVariant.sub_variant_type_on && (
-                          <div className="flex items-center gap-2 pl-11">
-                            <span className="text-xs text-foreground-muted">Label</span>
-                            <input
-                              type="text"
-                              value={popupVariant.sub_variant_type}
-                              onChange={e => updateVariant(popupIndex, 'sub_variant_type', e.target.value)}
-                              className="w-40 field-xs border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                              placeholder="e.g. Colour, Finish"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Suppliers — VARIANT leaf (only when this variant has no sub-variants) */}
-                    {hasInventory && !popupVariant.sub_variant_type_on && (
-                      <div>
-                        <ProductSupplierList
-                          suppliers={suppliers}
-                          value={popupVariant.product_suppliers || []}
-                          onChange={rows => updateVariantSuppliers(popupIndex, rows)}
-                        />
-                      </div>
-                    )}
-
-                    {/* Shipping */}
-                    {!popupVariant.sub_variant_type_on && (
-                      <div>
-                        <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
-                          Shipping
-                        </p>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                              Ship Wt. (g)
-                            </label>
-                            <input
-                              type="number"
-                              step="1"
-                              min="0"
-                              value={popupVariant.weight_grams}
-                              onChange={e => updateVariant(popupIndex, 'weight_grams', e.target.value)}
-                              className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                              placeholder="e.g. 500"
-                            />
-                          </div>
-                          <div>
-                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                              Package Type
-                            </label>
-                            <AdminSelect
-                              md
-                              value={popupVariant.package_type || 'flat_poly_auto'}
-                              onChange={val => updateVariant(popupIndex, 'package_type', val)}
-                              options={PACKAGE_TYPE_OPTIONS}
-                            />
-                          </div>
-                        </div>
-                        {STORED_DIMS_TYPES.includes(popupVariant.package_type || 'flat_poly_auto') && (
-                          <div className="mt-3">
-                            <label className="mb-1 block text-xs font-medium text-foreground-secondary">
-                              Dimensions per piece (L × B × H cm)
-                            </label>
-                            <div className="grid grid-cols-3 gap-1.5">
-                              <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                value={popupVariant.length_cm}
-                                onChange={e => updateVariant(popupIndex, 'length_cm', e.target.value)}
-                                className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                                placeholder="L"
-                              />
-                              <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                value={popupVariant.breadth_cm}
-                                onChange={e => updateVariant(popupIndex, 'breadth_cm', e.target.value)}
-                                className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                                placeholder="B"
-                              />
-                              <input
-                                type="number"
-                                step="0.1"
-                                min="0"
-                                value={popupVariant.height_cm}
-                                onChange={e => updateVariant(popupIndex, 'height_cm', e.target.value)}
-                                className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                                placeholder="H"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Images */}
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
-                          Images
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-foreground-secondary">Own images</span>
-                          <button
-                            type="button"
-                            onClick={() => updateVariant(popupIndex, 'use_own_images', !popupVariant.use_own_images)}
-                            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${popupVariant.use_own_images ? 'bg-accent-500' : 'bg-border-secondary'}`}
-                            role="switch"
-                            aria-checked={popupVariant.use_own_images}
-                          >
-                            <span
-                              className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg ring-0 transition-transform ${popupVariant.use_own_images ? 'translate-x-4' : 'translate-x-0'}`}
-                            />
-                          </button>
-                        </div>
-                      </div>
-                      {popupVariant.use_own_images ? (
-                        <>
-                          <ImageGalleryEditor
-                            images={variantImagesMap[variantPopupId] || []}
-                            maxImages={5}
-                            size="sm"
-                            uploading={!!variantImageUploading[variantPopupId]}
-                            pendingAdds={variantImagePendingAdds[variantPopupId] || 0}
-                            deleting={variantImageDeleting}
-                            error={variantImageError}
-                            onUpload={file => uploadVariantImageFile(variantPopupId, file)}
-                            onDelete={imageId => deleteVariantImage(variantPopupId, imageId)}
-                            onSetPrimary={imageId => setVariantImagePrimary(variantPopupId, imageId)}
-                            onReorder={(from, to) => reorderVariantImages(variantPopupId, from, to)}
-                            onOpenGallery={productId ? openVariantGallery : undefined}
-                          />
-                        </>
-                      ) : (
-                        <p className="text-xs text-foreground-muted italic">Uses product images</p>
-                      )}
-                    </div>
-
-                    {variantGalleryOpen && (
-                      <GalleryPicker
-                        mode="multi"
-                        maxSelect={Math.max(0, 5 - (variantImagesMap[variantPopupId || '']?.length || 0))}
-                        onClose={() => setVariantGalleryOpen(false)}
-                        onConfirm={addVariantImagesFromGallery}
-                      />
-                    )}
-
-                    {popupVariant.sub_variant_type_on && (
-                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border-secondary p-3">
-                        <p className="text-xs text-foreground-secondary">
-                          Sub-variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''} are edited in the Sub-variants tab.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSvVariantId(variantPopupId)
-                            setSvUnit(null)
-                            setTab('subvariants')
-                            setVariantPopupId(null)
-                          }}
-                          className="control-sm border border-border-default text-foreground hover:bg-surface-secondary"
-                        >
-                          Edit sub-variants
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  {variantPopupId && variantPopupId.startsWith('temp-') && (
-                    <div className="px-5 pb-4 border-t border-border-default-default pt-4 mt-0">
-                      <p className="text-xs text-foreground-muted italic">
-                        Save the product first to configure selling units for this variant.
-                      </p>
-                    </div>
-                  )}
-                  {productId && variantPopupId && !variantPopupId.startsWith('temp-') && (
-                    <div className="px-5 pb-4">
-                      <UnitsManager
-                        productId={productId}
-                        variantId={variantPopupId}
-                        basePrice={
-                          popupVariant?.price ||
-                          (popupVariant?.price_ex_gst ? exToIncl(popupVariant.price_ex_gst, gstRate) : null)
-                        }
-                        onUnitLoaded={info => {
-                          setPopupUnitKey(info.unitKey)
-                          setPopupUnitInfo(info)
-                        }}
-                        isDraft={isDraft}
-                        roleNote={
-                          popupVariant?.sub_variant_type_on
-                            ? 'Used by any sub-variant that has no unit of its own.'
-                            : undefined
-                        }
-                      />
-                    </div>
-                  )}
-
-                  <div className="px-5 py-4 border-t border-border-default-default flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setVariantPopupId(null)}
-                      className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors"
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })()}
       </form>
     </>
   )

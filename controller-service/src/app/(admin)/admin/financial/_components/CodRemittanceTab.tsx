@@ -1,36 +1,58 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
-import { EmptyState, badgeCls, useActionToast } from '@/components/admin/kit'
+import { EmptyState, InfiniteFooter, badgeCls, fetchJson, useActionToast, useInfiniteList } from '@/components/admin/kit'
 import { Skeleton, SummaryCard, formatDate, formatINR, theadCls, tableWrapCls, codTone } from './shared'
 import CodRemittanceMobileList from './CodRemittanceMobileList'
 
+const PAGE_SIZE = 50
+
+// Same grouping the API applies, over the pages loaded so far (groups grow as more load).
+function groupByWeek(orders: any[]) {
+  const weeks: Record<string, { weekLabel: string; weekStart: string; orders: any[]; total: number }> = {}
+  for (const o of orders) {
+    if (o.payment_status !== 'cod_collected' || !o.delivered_at) continue
+    const d = new Date(o.delivered_at)
+    const day = d.getDay()
+    const mon = new Date(d.setDate(d.getDate() - day + (day === 0 ? -6 : 1)))
+    const weekStart = mon.toISOString().slice(0, 10)
+    weeks[weekStart] ??= {
+      weekLabel: `Week of ${mon.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+      weekStart,
+      orders: [],
+      total: 0,
+    }
+    weeks[weekStart].orders.push(o)
+    weeks[weekStart].total += parseFloat(o.total_amount)
+  }
+  return Object.values(weeks).sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+}
+
 export function CodRemittanceTab() {
   const [statusFilter, setStatusFilter] = useState<'cod_collected' | 'cod_pending' | 'paid' | 'all'>('cod_collected')
-  const [data, setData] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+  const [summary, setSummary] = useState<any>({})
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [marking, setMarking] = useState(false)
   const canWrite = useCanWrite('financial:write')
   const toast = useActionToast()
 
-  const load = useCallback(() => {
-    setLoading(true)
-    fetch(`/api/admin/financial/cod-remittance?status=${statusFilter}`)
-      .then(r => r.json())
-      .then(j => {
-        setData(j)
+  const list = useInfiniteList<any>({
+    key: statusFilter,
+    pageSize: PAGE_SIZE,
+    getKey: o => o.id,
+    fetchPage: async (p, signal) => {
+      const j = await fetchJson(`/api/admin/financial/cod-remittance?status=${statusFilter}&limit=${PAGE_SIZE}&offset=${(p - 1) * PAGE_SIZE}`, signal)
+      if (p === 1) {
+        setSummary(j.summary ?? {})
         setSelected(new Set())
-      })
-      .finally(() => setLoading(false))
-  }, [statusFilter])
-
-  useEffect(() => {
-    load()
-  }, [load])
+      }
+      return { rows: j.orders ?? [], total: j.total }
+    },
+  })
+  const loading = list.loading
 
   async function markRemitted(ids: string[]) {
     setMarking(true)
@@ -43,15 +65,14 @@ export function CodRemittanceTab() {
     setMarking(false)
     if (j.success) {
       toast.success(`Marked ${j.marked} order(s) as remitted.`)
-      load()
+      list.reload()
     } else {
       toast.error(j.error || 'Could not mark as remitted.')
     }
   }
 
-  const orders: any[] = data?.orders ?? []
-  const summary = data?.summary ?? {}
-  const weeks: any[] = data?.weeks ?? []
+  const orders: any[] = list.rows
+  const weeks = useMemo(() => groupByWeek(orders), [orders])
 
   const FILTERS: { value: typeof statusFilter; label: string }[] = [
     { value: 'cod_collected', label: 'Collected' },
@@ -316,6 +337,8 @@ export function CodRemittanceTab() {
           </div>
         </div>
       )}
+
+      {!loading && <InfiniteFooter shown={orders.length} control={list} noun="orders" />}
     </div>
   )
 }

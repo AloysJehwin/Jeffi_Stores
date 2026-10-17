@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { listKey } from '@/lib/admin/list-key'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
 import { queryMany, queryCount } from '@/lib/shared/db'
@@ -177,7 +178,7 @@ async function ReviewFormsListSection({
   host: string
 }) {
   const resolvedSearchParams = await searchParams
-  const key = JSON.stringify(resolvedSearchParams)
+  const key = listKey(resolvedSearchParams)
 
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>

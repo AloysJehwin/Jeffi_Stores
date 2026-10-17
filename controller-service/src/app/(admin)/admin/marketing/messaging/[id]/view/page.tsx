@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { queryOne, queryMany, queryCount } from '@/lib/shared/db'
-import Pagination from '@/components/admin/Pagination'
+import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import AutoRefresh from '@/components/admin/AutoRefresh'
 import { ap } from '@/lib/shared/admin-path'
@@ -89,7 +89,6 @@ export default async function CampaignDetailPage({
     queryCount('SELECT COUNT(*) FROM email_campaign_logs WHERE campaign_id = $1', [id]),
   ])
 
-  const buildUrl = (p: number) => ap(`/admin/marketing/messaging/${id}${p > 1 ? `?logPage=${p}` : ''}`, host)
 
   const sentCount = logs.filter(l => l.status === 'sent').length
   const failedCount = logs.filter(l => l.status === 'failed').length
@@ -185,8 +184,15 @@ export default async function CampaignDetailPage({
                     ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {logs.map((l, i) => (
+                <ServerPagedItems
+                  wrap="tbody"
+                  param="logPage"
+                  page={logPage}
+                  total={logTotal}
+                  noun="deliveries"
+                  items={logs.map((l, i) => ({
+                    key: String((logPage - 1) * logPageSize + i),
+                    node: (
                     <tr
                       key={i}
                       className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40"
@@ -209,12 +215,12 @@ export default async function CampaignDetailPage({
                       </td>
                       <td className="px-5 py-2.5 text-xs text-red-500">{l.error || '—'}</td>
                     </tr>
-                  ))}
-                </tbody>
+                    ),
+                  }))}
+                />
               </table>
             </div>
           </Card>
-          <Pagination page={logPage} total={logTotal} pageSize={logPageSize} buildUrl={buildUrl} />
         </div>
       )}
     </PageBody>

@@ -3,7 +3,6 @@ import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { query, queryOne, queryMany, queryCount } from '@/lib/shared/db'
 import CouponForm from '../../CouponForm'
-import Pagination from '@/components/admin/Pagination'
 import CouponEligibleUsersClient from './CouponEligibleUsersClient'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { Badge, Card, FormPage, PageHeader } from '@/components/admin/kit'
@@ -243,22 +242,10 @@ export default async function EditCouponPage({
             canRemove={!isPersonal && !isCampaign}
             canAdd={!isPersonal && !isCampaign}
             allUsersMode={!isPersonal && !isCampaign && !hasMailerEligible}
+            page={usersPage}
+            total={isPersonal ? eligibleUsers.length : usersTotal}
           />
 
-          {!isPersonal && usersTotal > USERS_PAGE_SIZE && (
-            <div className="border-t border-border-default px-4 py-2">
-              <Pagination
-                page={usersPage}
-                total={usersTotal}
-                pageSize={USERS_PAGE_SIZE}
-                buildUrl={p => {
-                  const sp = new URLSearchParams()
-                  if (p > 1) sp.set('usersPage', String(p))
-                  return ap(`/admin/coupons/${id}/edit${sp.toString() ? `?${sp.toString()}` : ''}`, host)
-                }}
-              />
-            </div>
-          )}
         </Card>
       </FormPage>
     </MobileEditBlock>

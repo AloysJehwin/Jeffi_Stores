@@ -16,8 +16,9 @@ import CopySku from '@/components/ui/CopySku'
 import { useCanWrite, useHasScope } from '@/contexts/AdminScopesContext'
 import { Tabs } from '@/components/admin/kit/core'
 import { TableSkeleton } from '@/components/admin/kit/states'
+import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import InventoryOverviewTab from './_components/InventoryOverviewTab'
-import { labelCls, STOCK_PAGE_SIZE, VALUATION_PAGE_SIZE, formatINR, SummaryCard, ClientPagination, TYPE_BADGE } from '@/components/admin/purchasing/shared'
+import { labelCls, STOCK_PAGE_SIZE, VALUATION_PAGE_SIZE, formatINR, SummaryCard, TYPE_BADGE } from '@/components/admin/purchasing/shared'
 
 type StockTransaction = {
   id: string
@@ -55,9 +56,6 @@ function StockTab({ view }: { view: StockView }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const canWrite = useCanWrite('inventory')
-  const [transactions, setTransactions] = useState<StockTransaction[]>([])
-  const [txTotal, setTxTotal] = useState(0)
-  const [txPage, setTxPage] = useState(1)
   const [valuation, setValuation] = useState<{
     products: any[]
     total: number
@@ -67,12 +65,10 @@ function StockTab({ view }: { view: StockView }) {
     allCategories?: string[]
     allBrands?: string[]
   } | null>(null)
-  const [valPage, setValPage] = useState(1)
   const [valSearch, setValSearch] = useState(searchParams.get('val_search') || '')
   const [valCategory, setValCategory] = useState(searchParams.get('val_category') || '')
   const [valBrand, setValBrand] = useState(searchParams.get('val_brand') || '')
   const [valStockStatus, setValStockStatus] = useState(searchParams.get('val_stock') || '')
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState(searchParams.get('ledger_search') || '')
   const [from, setFrom] = useState(searchParams.get('ledger_from') || '')
   const [to, setTo] = useState(searchParams.get('ledger_to') || '')
@@ -174,6 +170,43 @@ function StockTab({ view }: { view: StockView }) {
     reference: 'reference_type',
   }
 
+  // Ledger groups are rebuilt from every loaded row, so a group split across pages merges.
+  const txList = useInfiniteList<StockTransaction>({
+    key: view === 'ledger' ? `${search}|${from}|${to}` : null,
+    pageSize: STOCK_PAGE_SIZE,
+    getKey: t => t.id,
+    fetchPage: async (pg, signal) => {
+      const params = new URLSearchParams({ view: 'ledger', page: String(pg), limit: String(STOCK_PAGE_SIZE) })
+      if (search) params.set('search', search)
+      if (from) params.set('from', from)
+      if (to) params.set('to', to)
+      const json = await fetchJson(`/api/admin/inventory/stock?${params}`, signal)
+      return { rows: json?.transactions || [], total: json?.total || 0 }
+    },
+  })
+  const transactions = txList.rows
+
+  // Totals and filter options come with page 1; later pages only add rows.
+  const valList = useInfiniteList<any>({
+    key: view === 'valuation' ? `${valSearch}|${valCategory}|${valBrand}|${valStockStatus}|${valSortCol}|${valSortDir}` : null,
+    pageSize: VALUATION_PAGE_SIZE,
+    fetchPage: async (pg, signal) => {
+      const params = new URLSearchParams({ view: 'valuation', page: String(pg), limit: String(VALUATION_PAGE_SIZE) })
+      if (valSearch) params.set('search', valSearch)
+      if (valCategory) params.set('category', valCategory)
+      if (valBrand) params.set('brand', valBrand)
+      if (valStockStatus) params.set('stock_status', valStockStatus)
+      if (valSortCol) {
+        params.set('sort', valSortCol)
+        params.set('dir', valSortDir || 'desc')
+      }
+      const json = await fetchJson(`/api/admin/inventory/stock?${params}`, signal)
+      if (pg === 1) setValuation(json)
+      return { rows: json?.products || [], total: json?.total || 0 }
+    },
+  })
+  const loading = view === 'ledger' ? txList.loading : valList.loading
+
   const sortedTransactions =
     ledgerSortCol && LEDGER_SORT_KEYS[ledgerSortCol]
       ? [...transactions].sort((a, b) => {
@@ -235,55 +268,9 @@ function StockTab({ view }: { view: StockView }) {
   function handleValSort(col: string, dir: SortDir) {
     setValSortCol(col || undefined)
     setValSortDir(col ? dir : undefined)
-    setValPage(1)
   }
 
-  const loadLedger = useCallback(
-    async (pg = txPage) => {
-      setLoading(true)
-      const params = new URLSearchParams({ view: 'ledger', page: String(pg), limit: String(STOCK_PAGE_SIZE) })
-      if (search) params.set('search', search)
-      if (from) params.set('from', from)
-      if (to) params.set('to', to)
-      const res = await fetch(`/api/admin/inventory/stock?${params}`)
-      const json = await res.json()
-      setTransactions(json?.transactions || [])
-      setTxTotal(json?.total || 0)
-      setLoading(false)
-    },
-    [search, from, to, txPage]
-  )
-
-  const loadValuation = useCallback(
-    async (pg = valPage) => {
-      setLoading(true)
-      const params = new URLSearchParams({
-        view: 'valuation',
-        page: String(pg),
-        limit: String(VALUATION_PAGE_SIZE),
-      })
-      if (valSearch) params.set('search', valSearch)
-      if (valCategory) params.set('category', valCategory)
-      if (valBrand) params.set('brand', valBrand)
-      if (valStockStatus) params.set('stock_status', valStockStatus)
-      if (valSortCol) {
-        params.set('sort', valSortCol)
-        params.set('dir', valSortDir || 'desc')
-      }
-      const res = await fetch(`/api/admin/inventory/stock?${params}`)
-      const json = await res.json()
-      setValuation(json)
-      setLoading(false)
-    },
-    [valSearch, valCategory, valBrand, valStockStatus, valPage, valSortCol, valSortDir]
-  )
-
-  useEffect(() => {
-    if (view === 'ledger') loadLedger(txPage)
-    else loadValuation(valPage)
-  }, [view, loadLedger, loadValuation, txPage, valPage])
-
-  const allValRows = valuation?.products || []
+  const allValRows = valList.rows
   const valTotal = valuation?.total || 0
 
   const valCategories = (
@@ -469,7 +456,7 @@ function StockTab({ view }: { view: StockView }) {
     })
     setEditSaving(false)
     setEditingId(null)
-    loadValuation(valPage)
+    valList.reload()
   }
 
   function cancelEdit() {
@@ -857,7 +844,6 @@ function StockTab({ view }: { view: StockView }) {
                 value={search}
                 onChange={v => {
                   setSearch(v)
-                  setTxPage(1)
                   syncUrl({ ledger_search: v })
                 }}
                 placeholder="Name, SKU..."
@@ -871,7 +857,6 @@ function StockTab({ view }: { view: StockView }) {
                 value={from}
                 onChange={v => {
                   setFrom(v)
-                  setTxPage(1)
                   syncUrl({ ledger_from: v })
                 }}
               />
@@ -883,7 +868,6 @@ function StockTab({ view }: { view: StockView }) {
                 value={to}
                 onChange={v => {
                   setTo(v)
-                  setTxPage(1)
                   syncUrl({ ledger_to: v })
                 }}
               />
@@ -1485,15 +1469,7 @@ function StockTab({ view }: { view: StockView }) {
                 </table>
               </div>
               <div className="px-4 pb-4">
-                <ClientPagination
-                  page={txPage}
-                  total={txTotal}
-                  pageSize={STOCK_PAGE_SIZE}
-                  onChange={p => {
-                    setTxPage(p)
-                    setLoading(true)
-                  }}
-                />
+                <InfiniteFooter shown={transactions.length} control={txList} noun="transactions" />
               </div>
             </div>
           )}
@@ -1508,12 +1484,10 @@ function StockTab({ view }: { view: StockView }) {
                 value={valSearch}
                 onChange={v => {
                   setValSearch(v)
-                  setValPage(1)
                   syncUrl({ val_search: v })
                 }}
                 onSelect={item => {
                   setValSearch(item.label)
-                  setValPage(1)
                   syncUrl({ val_search: item.label })
                 }}
                 placeholder="Name, SKU, variant..."
@@ -1527,7 +1501,6 @@ function StockTab({ view }: { view: StockView }) {
                 value={valCategory}
                 onChange={v => {
                   setValCategory(v)
-                  setValPage(1)
                   syncUrl({ val_category: v })
                 }}
                 placeholder="All categories"
@@ -1541,7 +1514,6 @@ function StockTab({ view }: { view: StockView }) {
                 value={valBrand}
                 onChange={v => {
                   setValBrand(v)
-                  setValPage(1)
                   syncUrl({ val_brand: v })
                 }}
                 placeholder="All brands"
@@ -1555,7 +1527,6 @@ function StockTab({ view }: { view: StockView }) {
                 value={valStockStatus}
                 onChange={v => {
                   setValStockStatus(v)
-                  setValPage(1)
                   syncUrl({ val_stock: v })
                 }}
                 placeholder="All"
@@ -1576,8 +1547,7 @@ function StockTab({ view }: { view: StockView }) {
                     setValCategory('')
                     setValBrand('')
                     setValStockStatus('')
-                    setValPage(1)
-                    syncUrl({ val_search: '', val_category: '', val_brand: '', val_stock: '' })
+                      syncUrl({ val_search: '', val_category: '', val_brand: '', val_stock: '' })
                   }}
                   className="px-3 h-control-sm rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
                 >
@@ -1908,15 +1878,7 @@ function StockTab({ view }: { view: StockView }) {
                   </table>
                 </div>
                 <div className="px-4 pb-4">
-                  <ClientPagination
-                    page={valPage}
-                    total={valTotal}
-                    pageSize={VALUATION_PAGE_SIZE}
-                    onChange={p => {
-                      setValPage(p)
-                      cancelEdit()
-                    }}
-                  />
+                  <InfiniteFooter shown={allValRows.length} control={valList} noun="SKUs" />
                 </div>
               </div>
             </>

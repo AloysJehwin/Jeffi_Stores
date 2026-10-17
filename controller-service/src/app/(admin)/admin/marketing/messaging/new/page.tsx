@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AlertTriangle, Mail, MessageSquare, MessageCircle, Sparkles, Loader2, Pencil, Save } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
-import Pagination from '@/components/admin/Pagination'
+import { InfiniteFooter, fetchJson, useInfiniteList } from '@/components/admin/kit/infinite'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import LibraryTemplatePicker from '@/components/admin/messaging-templates/LibraryTemplatePicker'
 import LinkedTemplateEditor from '@/components/admin/messaging-templates/LinkedTemplateEditor'
@@ -129,11 +129,9 @@ export default function NewMessagePage() {
   const [submitting, setSubmitting] = useState(false)
   const setError = (text: string) => void (text && showToast(text, 'error'))
   const [reviewForms, setReviewForms] = useState<ReviewFormOption[]>([])
-  const [audienceRecipients, setAudienceRecipients] = useState<Recipient[]>([])
   const [audienceCount, setAudienceCount] = useState<number | null>(null)
   const [withPhone, setWithPhone] = useState(0)
-  const [recipientPage, setRecipientPage] = useState(1)
-  const [audienceLoading, setAudienceLoading] = useState(false)
+  const [audienceKey, setAudienceKey] = useState<string | null>(null)
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audienceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -370,23 +368,28 @@ export default function NewMessagePage() {
     }
   }, [step, loadPreview, loaded])
 
-  const loadAudience = useCallback(async () => {
-    setAudienceLoading(true)
-    try {
-      const res = await fetch('/api/admin/mailer/audience-preview', {
+  const audienceQuery = useCallback(() => JSON.stringify({ audience_type: audienceType, audience_filter: buildAudienceFilter() }), [audienceType, buildAudienceFilter])
+  // Recipients load 25 at a time; count/withPhone come with the first page.
+  const audience = useInfiniteList<Recipient>({
+    key: step === 3 ? audienceKey : null,
+    pageSize: 25,
+    fetchPage: async (p, signal) => {
+      const body = { ...JSON.parse(audienceKey || '{}'), offset: (p - 1) * 25, limit: 25 }
+      const data = await fetchJson('/api/admin/mailer/audience-preview', signal, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audience_type: audienceType, audience_filter: buildAudienceFilter() }),
+        body: JSON.stringify(body),
       })
-      const data = await res.json()
-      setAudienceRecipients(data.recipients || [])
-      setRecipientPage(1)
-      setAudienceCount(data.count ?? 0)
-      setWithPhone(data.withPhone ?? 0)
-    } finally {
-      setAudienceLoading(false)
-    }
-  }, [audienceType, buildAudienceFilter])
+      if (p === 1) {
+        setAudienceCount(data.count ?? 0)
+        setWithPhone(data.withPhone ?? 0)
+      }
+      return { rows: data.recipients || [], total: data.count ?? 0 }
+    },
+  })
+  const audienceRecipients = audience.rows
+  const audienceLoading = audience.loading
+  const loadAudience = useCallback(() => setAudienceKey(audienceQuery()), [audienceQuery])
 
   useEffect(() => {
     if (step !== 3) return
@@ -1096,7 +1099,7 @@ export default function NewMessagePage() {
                 )}
                 {!audienceLoading && audienceRecipients.length > 0 && (
                   <div className="overflow-y-auto divide-y divide-border-default" style={{ maxHeight: '520px' }}>
-                    {audienceRecipients.slice((recipientPage - 1) * 25, recipientPage * 25).map((r, i) => (
+                    {audienceRecipients.map((r, i) => (
                       <div key={i} className="flex items-center gap-3 px-4 py-2.5">
                         <div className="w-7 h-7 rounded-full bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
                           <span className="text-xs font-semibold text-accent-500">
@@ -1118,15 +1121,15 @@ export default function NewMessagePage() {
                         )}
                       </div>
                     ))}
+                    <InfiniteFooter shown={audienceRecipients.length} control={audience} noun="recipients" className="pb-3" />
+                  </div>
+                )}
+                {!audienceLoading && !audienceRecipients.length && audience.error && (
+                  <div className="p-4">
+                    <InfiniteFooter shown={0} control={audience} />
                   </div>
                 )}
               </div>
-              <Pagination
-                page={recipientPage}
-                total={audienceRecipients.length}
-                pageSize={25}
-                onPageChange={setRecipientPage}
-              />
             </div>
           </div>
         )}

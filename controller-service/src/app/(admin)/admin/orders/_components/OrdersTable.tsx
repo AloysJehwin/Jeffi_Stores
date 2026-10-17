@@ -154,7 +154,7 @@ export default function OrdersTable({ orders, total, page, pageSize, backUrl, pa
         pageSize={pageSize}
         pageHref={pageHrefFrom(pageUrls)}
         onRowClick={setSelected}
-        mobile={<OrdersMobileList orders={orders} backUrl={backUrl} />}
+        mobile={rows => <OrdersMobileList orders={rows} backUrl={backUrl} />}
         empty="No orders found."
         rowActions={o => [
           { key: 'packing-slip', kind: 'print', label: 'Packing Slip', href: `/api/admin/packing-slips/${o.id}`, target: '_blank', hidden: !canPackingSlips },

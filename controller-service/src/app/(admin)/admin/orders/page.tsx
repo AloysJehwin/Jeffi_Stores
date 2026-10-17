@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { listKey } from '@/lib/admin/list-key'
 import { pageUrls } from '@/lib/admin/page-urls'
 import { getFilteredOrders, getRevenueTrendBySource } from '@/lib/queries'
 import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
@@ -282,7 +283,7 @@ function OrdersList({ searchParams }: { searchParams: Promise<SP> }) {
 // while the stats + filters above stay mounted.
 async function OrdersListSection({ searchParams }: { searchParams: Promise<SP> }) {
   const resolvedSearchParams = await searchParams
-  const key = JSON.stringify(resolvedSearchParams)
+  const key = listKey(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>
       <OrdersListContent resolvedSearchParams={resolvedSearchParams} />

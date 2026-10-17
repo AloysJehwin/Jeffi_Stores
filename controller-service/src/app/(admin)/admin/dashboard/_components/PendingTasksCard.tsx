@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useReveal } from '@/components/admin/kit/infinite'
 
 const PAGE_SIZE = 5
 
@@ -16,10 +17,7 @@ interface Task {
 
 export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]; viewAllHref: string }) {
   const [open, setOpen] = useState(false)
-  const [page, setPage] = useState(0)
-
-  const totalPages = Math.ceil(tasks.length / PAGE_SIZE)
-  const paginated = tasks.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const { shown: paginated, control } = useReveal(tasks, PAGE_SIZE)
   const overdueCount = tasks.filter(t => t.overdue).length
 
   return (
@@ -112,27 +110,15 @@ export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]
                   </li>
                 ))}
               </ul>
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-5 py-2.5 border-t border-border-default/50">
-                  <span className="text-[11px] text-foreground-muted">
-                    {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, tasks.length)} of {tasks.length}
+              {/* A dashboard card: no auto-load on scroll, it would always be on screen. */}
+              {control.hasMore && (
+                <div className="flex items-center justify-between px-5 py-2.5 border-t border-border-default/50 text-[11px] text-foreground-muted">
+                  <span className="tabular-nums">
+                    Showing {paginated.length} of {tasks.length}
                   </span>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setPage(p => p - 1)}
-                      disabled={page === 0}
-                      className="control-xs border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      onClick={() => setPage(p => p + 1)}
-                      disabled={page >= totalPages - 1}
-                      className="control-xs border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors"
-                    >
-                      ›
-                    </button>
-                  </div>
+                  <button type="button" onClick={control.loadMore} className="control-xs border border-border-default hover:bg-surface-secondary transition-colors">
+                    Show more
+                  </button>
                 </div>
               )}
             </>

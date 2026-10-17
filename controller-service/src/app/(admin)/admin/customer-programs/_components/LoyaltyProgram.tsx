@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
-import Pagination from '@/components/admin/Pagination'
+import { ServerPagedItems } from '@/components/admin/kit/infinite'
 import { getLoyaltyStats, listLoyaltyMembers, type LoyaltyStats } from '@/lib/loyalty/queries'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { TIER_KEYS, TIER_NAMES, tierName } from '@/lib/loyalty/tiers'
@@ -37,13 +37,6 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
   ])
 
   const basePath = ap(PROGRAMS_PATH, host)
-  const buildUrl = (target: number) => {
-    const params = new URLSearchParams({ tab: 'loyalty' })
-    if (tier) params.set('tier', tier)
-    if (search) params.set('search', search)
-    if (target > 1) params.set('page', String(target))
-    return `${basePath}?${params}`
-  }
   const number = (value: number) => value.toLocaleString('en-IN')
   const outstandingValue = Math.max(0, stats.outstandingPoints) * settings.pointValue
 
@@ -142,8 +135,14 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
                   <th className="px-4 py-3 font-medium">Updated</th>
                 </tr>
               </thead>
-              <tbody>
-                {list.members.map(member => (
+              <ServerPagedItems
+                wrap="tbody"
+                page={page}
+                total={list.total}
+                noun="members"
+                items={list.members.map(member => ({
+                  key: String(member.userId),
+                  node: (
                   <tr key={member.userId} className="border-t border-border-default">
                     <td className="px-4 py-3">
                       <Link
@@ -171,14 +170,12 @@ export default async function LoyaltyProgram({ host, query }: { host: string; qu
                       })}
                     </td>
                   </tr>
-                ))}
-              </tbody>
+                  ),
+                }))}
+              />
             </table>
           </div>
         )}
-        <div className="p-4">
-          <Pagination page={page} total={list.total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-        </div>
       </div>
     </ProgramSection>
   )
