@@ -1068,104 +1068,24 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
           </div>
         )}
         <QuotationDetailModal q={selectedQuote} onClose={() => setSelectedQuote(null)} />
-        {showConvertModal && (
-          <div
-            className="fixed inset-0 z-[400] flex items-center justify-center p-4"
-            onClick={() =>
-              !convertingInvoice &&
-              (setShowConvertModal(false), setConvertQrImageUrl(null), setConvertSavedAsDraft(false))
-            }
-          >
-            <div className="absolute inset-0 bg-black/50" />
-            <div
-              className={`relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full ${convertStep === 'assign' ? 'max-w-4xl' : 'max-w-md'} max-h-[90vh] flex flex-col`}
-              onClick={e => e.stopPropagation()}
-            >
-              {convertSavedAsDraft ? (
-                <>
-                  <div className="flex items-center justify-between p-5 border-b border-border-default">
-                    <h2 className="text-base font-bold text-foreground">Saved as Draft</h2>
-                  </div>
-                  <div className="p-5 space-y-4">
-                    <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/5 border border-orange-500/40">
-                      <svg
-                        className="w-5 h-5 text-orange-500 shrink-0 mt-0.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"
-                        />
-                      </svg>
-                      <div>
-                        <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">
-                          Some items are out of stock
-                        </p>
-                        <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">
-                          The invoice has been saved as a draft. It will be visible to the customer only after stock is
-                          updated and the invoice is finalised.
-                        </p>
-                      </div>
-                    </div>
-                    {convertInsufficientItems.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
-                          Items needing stock
-                        </p>
-                        <ul className="space-y-1">
-                          {convertInsufficientItems.map((name, i) => (
-                            <li key={i} className="text-sm text-foreground-secondary flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
-                              {name}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    <p className="text-xs text-foreground-muted">
-                      Once stock is replenished, open the invoice and finalise it to make it visible and generate an
-                      invoice number.
-                    </p>
-                  </div>
-                  <div className="flex gap-2 justify-end p-5 border-t border-border-default">
-                    <button
-                      onClick={() => {
-                        setShowConvertModal(false)
-                        setConvertSavedAsDraft(false)
-                      }}
-                      className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
-                    >
-                      Close
-                    </button>
-                    {convertResultOrderId && (
-                      <a
-                        href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
-                        className="px-4 py-2 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
-                      >
-                        View Draft Invoice →
-                      </a>
-                    )}
-                  </div>
-                </>
-              ) : convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? (
-                <>
-                  <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
-                    <div>
-                      <h2 className="text-base font-bold text-foreground">Assign Stock</h2>
-                      <p className="text-sm text-foreground-muted mt-0.5">
-                        {convertBatchPickerItems && convertSerialPickerItems
-                          ? 'Assign batches and serial numbers'
-                          : convertBatchPickerItems
-                            ? 'Select batches — quantities auto-filled (FIFO)'
-                            : 'Select serial numbers per item'}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {convertSerialPickerItems && (
+        <Dialog
+          open={showConvertModal}
+          onClose={() => !convertingInvoice && (setShowConvertModal(false), setConvertQrImageUrl(null), setConvertSavedAsDraft(false))}
+          zIndex="z-[400]"
+          size={convertStep === 'assign' ? 'xl' : 'md'}
+          hideClose={convertSavedAsDraft || (!(convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems)) && !!convertQrImageUrl)}
+          title={convertSavedAsDraft ? 'Saved as Draft' : convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? 'Assign Stock' : !convertQrImageUrl ? 'Convert to Invoice' : 'UPI QR Code'}
+          description={
+            !convertSavedAsDraft && convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? (
+              <span className="flex flex-wrap items-center gap-3">
+                <span>
+                  {convertBatchPickerItems && convertSerialPickerItems
+                    ? 'Assign batches and serial numbers'
+                    : convertBatchPickerItems
+                      ? 'Select batches — quantities auto-filled (FIFO)'
+                      : 'Select serial numbers per item'}
+                </span>
+                {convertSerialPickerItems && (
                         <button
                           type="button"
                           onClick={() => setConvertScanEnabled(v => !v)}
@@ -1174,7 +1094,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                               ? 'Scanner mode on — scan a serial to fill each field'
                               : 'Click to select serials manually, or turn scanner mode on'
                           }
-                          className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                          className={`inline-flex items-center gap-1.5 text-xs font-semibold h-control-sm px-2.5 rounded-full border transition-colors ${
                             convertScanEnabled
                               ? 'border-accent-500 bg-accent-500/10 text-foreground'
                               : 'border-border-default text-foreground-muted hover:bg-surface-secondary'
@@ -1191,451 +1111,497 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                           {convertScanEnabled ? 'Scan: on' : 'Scan: off'}
                         </button>
                       )}
-                      <button
-                        onClick={() => {
-                          setShowConvertModal(false)
-                        }}
-                        className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                  <div className="overflow-y-auto flex-1 px-6 py-4 space-y-6">
-                    {convertBatchPickerItems && (
-                      <>
-                        {convertBatchPickerItems && convertSerialPickerItems && (
-                          <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">
-                            Batch Products
-                          </p>
-                        )}
-                        {convertBatchPickerItems.filter(i => !i.already_assigned && i.batches.length === 0).length >
-                          0 && (
-                          <div className="bg-red-500/5 border border-red-500/40 rounded-lg p-4">
-                            <p className="text-sm font-semibold text-red-600 dark:text-red-400 mb-1">
-                              No batches available for:
-                            </p>
-                            <ul className="text-sm text-red-600 dark:text-red-400 list-disc ml-4 space-y-0.5">
-                              {convertBatchPickerItems
-                                .filter(i => !i.already_assigned && i.batches.length === 0)
-                                .map(i => (
-                                  <li key={i.order_item_id}>
-                                    {i.product_name}
-                                    {i.variant_name ? ` / ${i.variant_name}` : ''} — requires {i.required_qty} units
-                                  </li>
-                                ))}
-                            </ul>
-                            <p className="text-xs text-red-500 mt-2">
-                              Receive stock via GRN before processing this order.
-                            </p>
-                          </div>
-                        )}
-                        {convertBatchPickerItems
-                          .filter(i => !i.already_assigned && i.batches.length > 0)
-                          .map(item => {
-                            const sel = convertBatchSelections[item.order_item_id] ?? {}
-                            const allocated = Object.values(sel).reduce((s, q) => s + q, 0)
-                            const isOver = allocated > item.required_qty
-                            const isFull = allocated >= item.required_qty
-                            function setQty(batchId: string, val: number, maxAvail: number) {
-                              setConvertBatchSelections(s => {
-                                const prev = { ...(s[item.order_item_id] ?? {}) }
-                                if (val <= 0) delete prev[batchId]
-                                else prev[batchId] = Math.min(val, maxAvail)
-                                return { ...s, [item.order_item_id]: prev }
-                              })
-                            }
-                            function toggleBatch(batchId: string, maxAvail: number) {
-                              setConvertBatchSelections(s => {
-                                const prev = { ...(s[item.order_item_id] ?? {}) }
-                                if (prev[batchId]) {
-                                  delete prev[batchId]
-                                } else {
-                                  const already = Object.values(prev).reduce((a, b) => a + b, 0)
-                                  const needed = Math.max(0, item.required_qty - already)
-                                  prev[batchId] = Math.min(maxAvail, needed > 0 ? needed : item.required_qty)
-                                }
-                                return { ...s, [item.order_item_id]: prev }
-                              })
-                            }
-                            return (
-                              <div key={item.order_item_id}>
-                                <div className="flex items-center justify-between mb-2">
-                                  <div>
-                                    <p className="font-semibold text-foreground text-sm">
-                                      {item.product_name}
-                                      {item.variant_name ? ` / ${item.variant_name}` : ''}
-                                    </p>
-                                    <p className="text-xs text-foreground-muted">Required: {item.required_qty} units</p>
-                                  </div>
-                                  <div
-                                    className={`text-sm font-semibold px-2 py-0.5 rounded ${isOver ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : isFull ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
-                                  >
-                                    {allocated} / {item.required_qty}
-                                  </div>
-                                </div>
-                                <div className="border border-border-default rounded-lg overflow-hidden">
-                                  <table className="w-full text-sm">
-                                    <thead className="bg-surface border-b border-border-default">
-                                      <tr>
-                                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-8"></th>
-                                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
-                                          Lot
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
-                                          Expiry
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
-                                          Available
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
-                                          Take
-                                        </th>
-                                        <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
-                                          Location
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border-default">
-                                      {item.batches.map((batch, idx) => {
-                                        const isChecked = !!sel[batch.id]
-                                        const qty = sel[batch.id] ?? 0
-                                        return (
-                                          <tr
-                                            key={batch.id}
-                                            className={`transition-colors ${isChecked ? 'bg-accent-500/10' : 'hover:bg-surface cursor-pointer'}`}
-                                            onClick={() => toggleBatch(batch.id, batch.quantity_remaining)}
-                                          >
-                                            <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                                              <input
-                                                type="checkbox"
-                                                checked={isChecked}
-                                                onChange={() => toggleBatch(batch.id, batch.quantity_remaining)}
-                                                className="accent-accent-500"
-                                              />
-                                            </td>
-                                            <td className="px-3 py-2.5 font-mono text-xs text-foreground">
-                                              {batch.lot_number || <span className="text-foreground-muted">—</span>}
-                                              {idx === 0 && (
-                                                <span className="ml-1.5 text-[10px] bg-accent-500/10 text-accent-600 px-1.5 py-0.5 rounded font-medium">
-                                                  FIFO
-                                                </span>
-                                              )}
-                                            </td>
-                                            <td className={`px-3 py-2.5 text-xs ${expiryColor(batch.expiry_date)}`}>
-                                              {batch.expiry_date ? (
-                                                new Date(batch.expiry_date).toLocaleDateString('en-IN', {
-                                                  day: 'numeric',
-                                                  month: 'short',
-                                                  year: 'numeric',
-                                                })
-                                              ) : (
-                                                <span className="text-foreground-muted">—</span>
-                                              )}
-                                            </td>
-                                            <td className="px-3 py-2.5 text-xs text-foreground">
-                                              {batch.quantity_remaining}
-                                              {batch.quantity_remaining < item.required_qty && (
-                                                <span className="ml-1 text-orange-500 text-[10px]">⚠ low</span>
-                                              )}
-                                            </td>
-                                            <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                                              {isChecked ? (
-                                                <div className="flex items-center gap-1">
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => setQty(batch.id, qty - 1, batch.quantity_remaining)}
-                                                    disabled={qty <= 1}
-                                                    className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
-                                                  >
-                                                    ‹
-                                                  </button>
-                                                  <input
-                                                    type="number"
-                                                    min={1}
-                                                    max={batch.quantity_remaining}
-                                                    value={qty}
-                                                    onChange={e => {
-                                                      const v = parseInt(e.target.value)
-                                                      if (!isNaN(v)) setQty(batch.id, v, batch.quantity_remaining)
-                                                    }}
-                                                    className="w-12 text-center text-xs font-medium text-foreground tabular-nums border border-border-default rounded bg-surface px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                                                  />
-                                                  <button
-                                                    type="button"
-                                                    onClick={() => setQty(batch.id, qty + 1, batch.quantity_remaining)}
-                                                    disabled={qty >= batch.quantity_remaining}
-                                                    className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
-                                                  >
-                                                    ›
-                                                  </button>
-                                                </div>
-                                              ) : (
-                                                <span className="text-foreground-muted text-xs">—</span>
-                                              )}
-                                            </td>
-                                            <td className="px-3 py-2.5 font-mono text-xs text-foreground-muted">
-                                              {batch.location || <span>—</span>}
-                                            </td>
-                                          </tr>
-                                        )
-                                      })}
-                                    </tbody>
-                                  </table>
-                                </div>
-                                {isOver && (
-                                  <p className="text-xs text-orange-600 mt-1">
-                                    ⚠ Allocated {allocated} exceeds required {item.required_qty}
-                                  </p>
-                                )}
-                              </div>
-                            )
-                          })}
-                      </>
-                    )}
-                    {convertSerialPickerItems &&
-                      convertSerialPickerItems.filter(i => !i.already_assigned).length > 0 && (
-                        <>
-                          {convertBatchPickerItems && (
-                            <div className="border-t border-border-default pt-4">
-                              <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-4">
-                                Serialized Products
-                              </p>
-                            </div>
-                          )}
-                          {convertSerialPickerItems
-                            .filter(i => !i.already_assigned)
-                            .map(item => (
-                              <SerialPicker
-                                key={item.order_item_id}
-                                item={item}
-                                selected={convertSerialSelections[item.order_item_id] || new Set()}
-                                onChange={next =>
-                                  setConvertSerialSelections(s => ({ ...s, [item.order_item_id]: next }))
-                                }
-                                scanEnabled={convertScanEnabled}
-                              />
-                            ))}
-                        </>
-                      )}
-                  </div>
-                  <div className="px-6 py-4 border-t border-border-default flex justify-between gap-3">
-                    <button
-                      onClick={() => setConvertStep('payment')}
-                      className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
-                    >
-                      ← Back
-                    </button>
-                    <button
-                      onClick={() => {
-                        const batchAssignments: BatchAssignment[] = []
-                        if (convertBatchPickerItems) {
-                          for (const [order_item_id, batchQtys] of Object.entries(convertBatchSelections)) {
-                            for (const [batch_id, qty] of Object.entries(batchQtys)) {
-                              if (qty > 0) batchAssignments.push({ order_item_id, batch_id, qty })
-                            }
-                          }
-                        }
-                        const serialAssignments: SerialAssignment[] = []
-                        if (convertSerialPickerItems) {
-                          for (const item of convertSerialPickerItems.filter(i => !i.already_assigned)) {
-                            for (const sn of convertSerialSelections[item.order_item_id] || []) {
-                              serialAssignments.push({ order_item_id: item.order_item_id, serial_number: sn })
-                            }
-                          }
-                        }
-                        if (pendingConvertArgs) {
-                          const args = pendingConvertArgs
-                          setPendingConvertArgs(null)
-                          convertToInvoice(
-                            args.quoteId,
-                            args.paymentMode,
-                            args.enableDelivery,
-                            batchAssignments.length ? batchAssignments : undefined,
-                            serialAssignments.length ? serialAssignments : undefined
-                          )
-                        }
-                      }}
-                      disabled={
-                        convertBatchPickerItems?.some(i => !i.already_assigned && i.batches.length === 0) ||
-                        convertBatchPickerItems
-                          ?.filter(i => !i.already_assigned && i.batches.length > 0)
-                          .some(item => {
-                            const allocated = Object.values(convertBatchSelections[item.order_item_id] ?? {}).reduce(
-                              (s, q) => s + q,
-                              0
-                            )
-                            return allocated < item.required_qty || allocated > item.required_qty
-                          }) ||
-                        convertSerialPickerItems
-                          ?.filter(i => !i.already_assigned)
-                          .some(
-                            item =>
-                              (convertSerialSelections[item.order_item_id]?.size ?? 0) !==
-                              (item.required_serials ?? item.required_qty)
-                          )
-                      }
-                      className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                    >
-                      Confirm & Convert →
-                    </button>
-                  </div>
-                </>
-              ) : !convertQrImageUrl ? (
-                <>
-                  <div className="flex items-center justify-between p-5 border-b border-border-default">
-                    <h2 className="text-base font-bold text-foreground">Convert to Invoice</h2>
-                    <button
-                      onClick={() => setShowConvertModal(false)}
-                      disabled={convertingInvoice}
-                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="p-5 space-y-5">
-                    <div>
-                      <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
-                        Payment Mode
-                      </p>
-                      {convertHasStockIssue && (
-                        <div className="mb-3 flex items-start gap-2 p-2.5 rounded-lg bg-orange-500/5 border border-orange-500/40">
-                          <svg
-                            className="w-4 h-4 text-orange-500 shrink-0 mt-0.5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                            strokeWidth={2}
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"
-                            />
-                          </svg>
-                          <p className="text-xs text-orange-700 dark:text-orange-400">
-                            Some items may have insufficient stock — cash and bank transfer options are hidden until
-                            stock is confirmed.
-                          </p>
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        {[
-                          { value: 'cash', label: 'Cash', desc: 'Paid immediately — marks order as paid' },
-                          {
-                            value: 'bank_transfer',
-                            label: 'Bank Transfer',
-                            desc: 'Paid via bank — marks order as paid',
-                          },
-                          { value: 'credit', label: 'Credit', desc: 'Deferred payment — order stays unpaid' },
-                          { value: 'upi_qr', label: 'UPI QR', desc: 'Generate a one-time Razorpay QR code' },
-                        ]
-                          .filter(
-                            opt => !convertHasStockIssue || (opt.value !== 'cash' && opt.value !== 'bank_transfer')
-                          )
-                          .map(opt => (
-                            <label
-                              key={opt.value}
-                              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${convertPaymentMode === opt.value ? 'border-accent-500 bg-accent-500/10' : 'border-border-default hover:bg-surface-secondary'}`}
-                            >
-                              <input
-                                type="radio"
-                                name="paymentMode"
-                                value={opt.value}
-                                checked={convertPaymentMode === opt.value}
-                                onChange={() => setConvertPaymentMode(opt.value)}
-                                className="mt-0.5 accent-accent-500"
-                              />
-                              <div>
-                                <p className="text-sm font-medium text-foreground">{opt.label}</p>
-                                <p className="text-xs text-foreground-secondary">{opt.desc}</p>
-                              </div>
-                            </label>
-                          ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
-                        Delivery
-                      </p>
-                      <label className="flex items-start gap-3 p-3 rounded-lg border border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
-                        <input
-                          type="checkbox"
-                          checked={convertEnableDelivery}
-                          onChange={e => setConvertEnableDelivery(e.target.checked)}
-                          className="mt-0.5 accent-accent-500"
-                        />
-                        <div>
-                          <p className="text-sm font-medium text-foreground">Enable delivery tracking</p>
-                          <p className="text-xs text-foreground-secondary">
-                            A Delhivery shipment can be created from the order view once enabled
-                          </p>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 justify-end p-5 border-t border-border-default">
-                    <button
-                      onClick={() => setShowConvertModal(false)}
-                      disabled={convertingInvoice}
-                      className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() =>
-                        convertPendingQuoteId &&
-                        convertToInvoice(convertPendingQuoteId, convertPaymentMode, convertEnableDelivery)
-                      }
-                      disabled={convertingInvoice || !convertPendingQuoteId}
-                      className="px-4 h-control text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 transition-colors"
-                    >
-                      {convertingInvoice ? 'Converting…' : 'Convert →'}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="flex items-center justify-between p-5 border-b border-border-default">
-                    <h2 className="text-base font-bold text-foreground">UPI QR Code</h2>
-                  </div>
-                  <div className="p-5 flex flex-col items-center gap-4">
-                    <img
-                      src={convertQrImageUrl!}
-                      alt="UPI QR Code"
-                      className="max-w-[240px] w-full rounded-lg border border-border-default"
+              </span>
+            ) : undefined
+          }
+        >
+          {convertSavedAsDraft ? (
+            <>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/5 border border-orange-500/40">
+                  <svg
+                    className="w-5 h-5 text-orange-500 shrink-0 mt-0.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"
                     />
-                    <p className="text-sm font-semibold text-foreground">Scan to pay ₹{fmt2(convertQrTotal)}</p>
-                    <p className="text-xs text-foreground-secondary text-center">
-                      Payment status will update automatically once scanned.
+                  </svg>
+                  <div>
+                    <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">
+                      Some items are out of stock
+                    </p>
+                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">
+                      The invoice has been saved as a draft. It will be visible to the customer only after stock is
+                      updated and the invoice is finalised.
                     </p>
                   </div>
-                  <div className="flex gap-2 justify-end p-5 border-t border-border-default">
-                    <button
-                      onClick={() => {
-                        setShowConvertModal(false)
-                        setConvertQrImageUrl(null)
-                      }}
-                      className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
-                    >
-                      Done
-                    </button>
-                    {convertResultOrderId && (
-                      <a
-                        href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
-                        className="px-4 py-2 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
-                      >
-                        View Invoice →
-                      </a>
-                    )}
+                </div>
+                {convertInsufficientItems.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
+                      Items needing stock
+                    </p>
+                    <ul className="space-y-1">
+                      {convertInsufficientItems.map((name, i) => (
+                        <li key={i} className="text-sm text-foreground-secondary flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+                )}
+                <p className="text-xs text-foreground-muted">
+                  Once stock is replenished, open the invoice and finalise it to make it visible and generate an
+                  invoice number.
+                </p>
+              </div>
+              <div className="-mx-5 -mb-5 mt-5 flex justify-end gap-2 border-t border-border-default px-5 py-3">
+                <button
+                  onClick={() => {
+                    setShowConvertModal(false)
+                    setConvertSavedAsDraft(false)
+                  }}
+                  className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+                >
+                  Close
+                </button>
+                {convertResultOrderId && (
+                  <a
+                    href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
+                    className="px-4 py-2 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
+                  >
+                    View Draft Invoice →
+                  </a>
+                )}
+              </div>
+            </>
+          ) : convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? (
+            <>
+              <div className="space-y-6">
+                {convertBatchPickerItems && (
+                  <>
+                    {convertBatchPickerItems && convertSerialPickerItems && (
+                      <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">
+                        Batch Products
+                      </p>
+                    )}
+                    {convertBatchPickerItems.filter(i => !i.already_assigned && i.batches.length === 0).length >
+                      0 && (
+                      <div className="bg-red-500/5 border border-red-500/40 rounded-lg p-4">
+                        <p className="text-sm font-semibold text-red-600 dark:text-red-400 mb-1">
+                          No batches available for:
+                        </p>
+                        <ul className="text-sm text-red-600 dark:text-red-400 list-disc ml-4 space-y-0.5">
+                          {convertBatchPickerItems
+                            .filter(i => !i.already_assigned && i.batches.length === 0)
+                            .map(i => (
+                              <li key={i.order_item_id}>
+                                {i.product_name}
+                                {i.variant_name ? ` / ${i.variant_name}` : ''} — requires {i.required_qty} units
+                              </li>
+                            ))}
+                        </ul>
+                        <p className="text-xs text-red-500 mt-2">
+                          Receive stock via GRN before processing this order.
+                        </p>
+                      </div>
+                    )}
+                    {convertBatchPickerItems
+                      .filter(i => !i.already_assigned && i.batches.length > 0)
+                      .map(item => {
+                        const sel = convertBatchSelections[item.order_item_id] ?? {}
+                        const allocated = Object.values(sel).reduce((s, q) => s + q, 0)
+                        const isOver = allocated > item.required_qty
+                        const isFull = allocated >= item.required_qty
+                        function setQty(batchId: string, val: number, maxAvail: number) {
+                          setConvertBatchSelections(s => {
+                            const prev = { ...(s[item.order_item_id] ?? {}) }
+                            if (val <= 0) delete prev[batchId]
+                            else prev[batchId] = Math.min(val, maxAvail)
+                            return { ...s, [item.order_item_id]: prev }
+                          })
+                        }
+                        function toggleBatch(batchId: string, maxAvail: number) {
+                          setConvertBatchSelections(s => {
+                            const prev = { ...(s[item.order_item_id] ?? {}) }
+                            if (prev[batchId]) {
+                              delete prev[batchId]
+                            } else {
+                              const already = Object.values(prev).reduce((a, b) => a + b, 0)
+                              const needed = Math.max(0, item.required_qty - already)
+                              prev[batchId] = Math.min(maxAvail, needed > 0 ? needed : item.required_qty)
+                            }
+                            return { ...s, [item.order_item_id]: prev }
+                          })
+                        }
+                        return (
+                          <div key={item.order_item_id}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="font-semibold text-foreground text-sm">
+                                  {item.product_name}
+                                  {item.variant_name ? ` / ${item.variant_name}` : ''}
+                                </p>
+                                <p className="text-xs text-foreground-muted">Required: {item.required_qty} units</p>
+                              </div>
+                              <div
+                                className={`text-sm font-semibold px-2 py-0.5 rounded ${isOver ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : isFull ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
+                              >
+                                {allocated} / {item.required_qty}
+                              </div>
+                            </div>
+                            <div className="border border-border-default rounded-lg overflow-hidden">
+                              <table className="w-full text-sm">
+                                <thead className="bg-surface border-b border-border-default">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-8"></th>
+                                    <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
+                                      Lot
+                                    </th>
+                                    <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
+                                      Expiry
+                                    </th>
+                                    <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
+                                      Available
+                                    </th>
+                                    <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
+                                      Take
+                                    </th>
+                                    <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
+                                      Location
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border-default">
+                                  {item.batches.map((batch, idx) => {
+                                    const isChecked = !!sel[batch.id]
+                                    const qty = sel[batch.id] ?? 0
+                                    return (
+                                      <tr
+                                        key={batch.id}
+                                        className={`transition-colors ${isChecked ? 'bg-accent-500/10' : 'hover:bg-surface cursor-pointer'}`}
+                                        onClick={() => toggleBatch(batch.id, batch.quantity_remaining)}
+                                      >
+                                        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                                          <input
+                                            type="checkbox"
+                                            checked={isChecked}
+                                            onChange={() => toggleBatch(batch.id, batch.quantity_remaining)}
+                                            className="accent-accent-500"
+                                          />
+                                        </td>
+                                        <td className="px-3 py-2.5 font-mono text-xs text-foreground">
+                                          {batch.lot_number || <span className="text-foreground-muted">—</span>}
+                                          {idx === 0 && (
+                                            <span className="ml-1.5 text-[10px] bg-accent-500/10 text-accent-600 px-1.5 py-0.5 rounded font-medium">
+                                              FIFO
+                                            </span>
+                                          )}
+                                        </td>
+                                        <td className={`px-3 py-2.5 text-xs ${expiryColor(batch.expiry_date)}`}>
+                                          {batch.expiry_date ? (
+                                            new Date(batch.expiry_date).toLocaleDateString('en-IN', {
+                                              day: 'numeric',
+                                              month: 'short',
+                                              year: 'numeric',
+                                            })
+                                          ) : (
+                                            <span className="text-foreground-muted">—</span>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-xs text-foreground">
+                                          {batch.quantity_remaining}
+                                          {batch.quantity_remaining < item.required_qty && (
+                                            <span className="ml-1 text-orange-500 text-[10px]">⚠ low</span>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                                          {isChecked ? (
+                                            <div className="flex items-center gap-1">
+                                              <button
+                                                type="button"
+                                                onClick={() => setQty(batch.id, qty - 1, batch.quantity_remaining)}
+                                                disabled={qty <= 1}
+                                                className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
+                                              >
+                                                ‹
+                                              </button>
+                                              <input
+                                                type="number"
+                                                min={1}
+                                                max={batch.quantity_remaining}
+                                                value={qty}
+                                                onChange={e => {
+                                                  const v = parseInt(e.target.value)
+                                                  if (!isNaN(v)) setQty(batch.id, v, batch.quantity_remaining)
+                                                }}
+                                                className="w-12 text-center text-xs font-medium text-foreground tabular-nums border border-border-default rounded bg-surface px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                                              />
+                                              <button
+                                                type="button"
+                                                onClick={() => setQty(batch.id, qty + 1, batch.quantity_remaining)}
+                                                disabled={qty >= batch.quantity_remaining}
+                                                className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
+                                              >
+                                                ›
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <span className="text-foreground-muted text-xs">—</span>
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2.5 font-mono text-xs text-foreground-muted">
+                                          {batch.location || <span>—</span>}
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                            {isOver && (
+                              <p className="text-xs text-orange-600 mt-1">
+                                ⚠ Allocated {allocated} exceeds required {item.required_qty}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })}
+                  </>
+                )}
+                {convertSerialPickerItems &&
+                  convertSerialPickerItems.filter(i => !i.already_assigned).length > 0 && (
+                    <>
+                      {convertBatchPickerItems && (
+                        <div className="border-t border-border-default pt-4">
+                          <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-4">
+                            Serialized Products
+                          </p>
+                        </div>
+                      )}
+                      {convertSerialPickerItems
+                        .filter(i => !i.already_assigned)
+                        .map(item => (
+                          <SerialPicker
+                            key={item.order_item_id}
+                            item={item}
+                            selected={convertSerialSelections[item.order_item_id] || new Set()}
+                            onChange={next =>
+                              setConvertSerialSelections(s => ({ ...s, [item.order_item_id]: next }))
+                            }
+                            scanEnabled={convertScanEnabled}
+                          />
+                        ))}
+                    </>
+                  )}
+              </div>
+              <div className="-mx-5 -mb-5 mt-5 flex justify-between gap-3 border-t border-border-default px-5 py-3">
+                <button
+                  onClick={() => setConvertStep('payment')}
+                  className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+                >
+                  ← Back
+                </button>
+                <button
+                  onClick={() => {
+                    const batchAssignments: BatchAssignment[] = []
+                    if (convertBatchPickerItems) {
+                      for (const [order_item_id, batchQtys] of Object.entries(convertBatchSelections)) {
+                        for (const [batch_id, qty] of Object.entries(batchQtys)) {
+                          if (qty > 0) batchAssignments.push({ order_item_id, batch_id, qty })
+                        }
+                      }
+                    }
+                    const serialAssignments: SerialAssignment[] = []
+                    if (convertSerialPickerItems) {
+                      for (const item of convertSerialPickerItems.filter(i => !i.already_assigned)) {
+                        for (const sn of convertSerialSelections[item.order_item_id] || []) {
+                          serialAssignments.push({ order_item_id: item.order_item_id, serial_number: sn })
+                        }
+                      }
+                    }
+                    if (pendingConvertArgs) {
+                      const args = pendingConvertArgs
+                      setPendingConvertArgs(null)
+                      convertToInvoice(
+                        args.quoteId,
+                        args.paymentMode,
+                        args.enableDelivery,
+                        batchAssignments.length ? batchAssignments : undefined,
+                        serialAssignments.length ? serialAssignments : undefined
+                      )
+                    }
+                  }}
+                  disabled={
+                    convertBatchPickerItems?.some(i => !i.already_assigned && i.batches.length === 0) ||
+                    convertBatchPickerItems
+                      ?.filter(i => !i.already_assigned && i.batches.length > 0)
+                      .some(item => {
+                        const allocated = Object.values(convertBatchSelections[item.order_item_id] ?? {}).reduce(
+                          (s, q) => s + q,
+                          0
+                        )
+                        return allocated < item.required_qty || allocated > item.required_qty
+                      }) ||
+                    convertSerialPickerItems
+                      ?.filter(i => !i.already_assigned)
+                      .some(
+                        item =>
+                          (convertSerialSelections[item.order_item_id]?.size ?? 0) !==
+                          (item.required_serials ?? item.required_qty)
+                      )
+                  }
+                  className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                >
+                  Confirm & Convert →
+                </button>
+              </div>
+            </>
+          ) : !convertQrImageUrl ? (
+            <>
+              <div className="space-y-5">
+                <div>
+                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
+                    Payment Mode
+                  </p>
+                  {convertHasStockIssue && (
+                    <div className="mb-3 flex items-start gap-2 p-2.5 rounded-lg bg-orange-500/5 border border-orange-500/40">
+                      <svg
+                        className="w-4 h-4 text-orange-500 shrink-0 mt-0.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"
+                        />
+                      </svg>
+                      <p className="text-xs text-orange-700 dark:text-orange-400">
+                        Some items may have insufficient stock — cash and bank transfer options are hidden until
+                        stock is confirmed.
+                      </p>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {[
+                      { value: 'cash', label: 'Cash', desc: 'Paid immediately — marks order as paid' },
+                      {
+                        value: 'bank_transfer',
+                        label: 'Bank Transfer',
+                        desc: 'Paid via bank — marks order as paid',
+                      },
+                      { value: 'credit', label: 'Credit', desc: 'Deferred payment — order stays unpaid' },
+                      { value: 'upi_qr', label: 'UPI QR', desc: 'Generate a one-time Razorpay QR code' },
+                    ]
+                      .filter(
+                        opt => !convertHasStockIssue || (opt.value !== 'cash' && opt.value !== 'bank_transfer')
+                      )
+                      .map(opt => (
+                        <label
+                          key={opt.value}
+                          className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${convertPaymentMode === opt.value ? 'border-accent-500 bg-accent-500/10' : 'border-border-default hover:bg-surface-secondary'}`}
+                        >
+                          <input
+                            type="radio"
+                            name="paymentMode"
+                            value={opt.value}
+                            checked={convertPaymentMode === opt.value}
+                            onChange={() => setConvertPaymentMode(opt.value)}
+                            className="mt-0.5 accent-accent-500"
+                          />
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                            <p className="text-xs text-foreground-secondary">{opt.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
+                    Delivery
+                  </p>
+                  <label className="flex items-start gap-3 p-3 rounded-lg border border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={convertEnableDelivery}
+                      onChange={e => setConvertEnableDelivery(e.target.checked)}
+                      className="mt-0.5 accent-accent-500"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Enable delivery tracking</p>
+                      <p className="text-xs text-foreground-secondary">
+                        A Delhivery shipment can be created from the order view once enabled
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+              <div className="-mx-5 -mb-5 mt-5 flex justify-end gap-2 border-t border-border-default px-5 py-3">
+                <button
+                  onClick={() => setShowConvertModal(false)}
+                  disabled={convertingInvoice}
+                  className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() =>
+                    convertPendingQuoteId &&
+                    convertToInvoice(convertPendingQuoteId, convertPaymentMode, convertEnableDelivery)
+                  }
+                  disabled={convertingInvoice || !convertPendingQuoteId}
+                  className="px-4 h-control text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 transition-colors"
+                >
+                  {convertingInvoice ? 'Converting…' : 'Convert →'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex flex-col items-center gap-4">
+                <img
+                  src={convertQrImageUrl!}
+                  alt="UPI QR Code"
+                  className="max-w-[240px] w-full rounded-lg border border-border-default"
+                />
+                <p className="text-sm font-semibold text-foreground">Scan to pay ₹{fmt2(convertQrTotal)}</p>
+                <p className="text-xs text-foreground-secondary text-center">
+                  Payment status will update automatically once scanned.
+                </p>
+              </div>
+              <div className="-mx-5 -mb-5 mt-5 flex justify-end gap-2 border-t border-border-default px-5 py-3">
+                <button
+                  onClick={() => {
+                    setShowConvertModal(false)
+                    setConvertQrImageUrl(null)
+                  }}
+                  className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+                >
+                  Done
+                </button>
+                {convertResultOrderId && (
+                  <a
+                    href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
+                    className="px-4 py-2 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
+                  >
+                    View Invoice →
+                  </a>
+                )}
+              </div>
+            </>
+          )}
+        </Dialog>
       </div>
     )
   }
@@ -2011,104 +1977,24 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
         )}
       </FormFooter>
 
-      {showConvertModal && (
-        <div
-          className="fixed inset-0 z-[400] flex items-center justify-center p-4"
-          onClick={() =>
-            !convertingInvoice &&
-            (setShowConvertModal(false), setConvertQrImageUrl(null), setConvertSavedAsDraft(false))
-          }
-        >
-          <div className="absolute inset-0 bg-black/50" />
-          <div
-            className={`relative bg-surface-elevated rounded-xl shadow-2xl border border-border-default w-full ${convertStep === 'assign' ? 'max-w-4xl' : 'max-w-md'} max-h-[90vh] flex flex-col`}
-            onClick={e => e.stopPropagation()}
-          >
-            {convertSavedAsDraft ? (
-              <>
-                <div className="flex items-center justify-between p-5 border-b border-border-default">
-                  <h2 className="text-base font-bold text-foreground">Saved as Draft</h2>
-                </div>
-                <div className="p-5 space-y-4">
-                  <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/5 border border-orange-500/40">
-                    <svg
-                      className="w-5 h-5 text-orange-500 shrink-0 mt-0.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"
-                      />
-                    </svg>
-                    <div>
-                      <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">
-                        Some items are out of stock
-                      </p>
-                      <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">
-                        The invoice has been saved as a draft. It will be visible to the customer only after stock is
-                        updated and the invoice is finalised.
-                      </p>
-                    </div>
-                  </div>
-                  {convertInsufficientItems.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
-                        Items needing stock
-                      </p>
-                      <ul className="space-y-1">
-                        {convertInsufficientItems.map((name, i) => (
-                          <li key={i} className="text-sm text-foreground-secondary flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
-                            {name}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  <p className="text-xs text-foreground-muted">
-                    Once stock is replenished, open the invoice and finalise it to make it visible and generate an
-                    invoice number.
-                  </p>
-                </div>
-                <div className="flex gap-2 justify-end p-5 border-t border-border-default">
-                  <button
-                    onClick={() => {
-                      setShowConvertModal(false)
-                      setConvertSavedAsDraft(false)
-                    }}
-                    className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
-                  >
-                    Close
-                  </button>
-                  {convertResultOrderId && (
-                    <a
-                      href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
-                      className="px-4 py-2 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
-                    >
-                      View Draft Invoice →
-                    </a>
-                  )}
-                </div>
-              </>
-            ) : convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? (
-              <>
-                <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
-                  <div>
-                    <h2 className="text-base font-bold text-foreground">Assign Stock</h2>
-                    <p className="text-sm text-foreground-muted mt-0.5">
-                      {convertBatchPickerItems && convertSerialPickerItems
-                        ? 'Assign batches and serial numbers'
-                        : convertBatchPickerItems
-                          ? 'Select batches — quantities auto-filled (FIFO)'
-                          : 'Select serial numbers per item'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {convertSerialPickerItems && (
+      <Dialog
+        open={showConvertModal}
+        onClose={() => !convertingInvoice && (setShowConvertModal(false), setConvertQrImageUrl(null), setConvertSavedAsDraft(false))}
+        zIndex="z-[400]"
+        size={convertStep === 'assign' ? 'xl' : 'md'}
+        hideClose={convertSavedAsDraft || (!(convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems)) && !!convertQrImageUrl)}
+        title={convertSavedAsDraft ? 'Saved as Draft' : convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? 'Assign Stock' : !convertQrImageUrl ? 'Convert to Invoice' : 'UPI QR Code'}
+        description={
+          !convertSavedAsDraft && convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? (
+            <span className="flex flex-wrap items-center gap-3">
+              <span>
+                {convertBatchPickerItems && convertSerialPickerItems
+                  ? 'Assign batches and serial numbers'
+                  : convertBatchPickerItems
+                    ? 'Select batches — quantities auto-filled (FIFO)'
+                    : 'Select serial numbers per item'}
+              </span>
+              {convertSerialPickerItems && (
                       <button
                         type="button"
                         onClick={() => setConvertScanEnabled(v => !v)}
@@ -2117,7 +2003,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                             ? 'Scanner mode on — scan a serial to fill each field'
                             : 'Click to select serials manually, or turn scanner mode on'
                         }
-                        className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                        className={`inline-flex items-center gap-1.5 text-xs font-semibold h-control-sm px-2.5 rounded-full border transition-colors ${
                           convertScanEnabled
                             ? 'border-accent-500 bg-accent-500/10 text-foreground'
                             : 'border-border-default text-foreground-muted hover:bg-surface-secondary'
@@ -2134,440 +2020,488 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                         {convertScanEnabled ? 'Scan: on' : 'Scan: off'}
                       </button>
                     )}
-                    <button
-                      onClick={() => setShowConvertModal(false)}
-                      className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-                <div className="overflow-y-auto flex-1 px-6 py-4 space-y-6">
-                  {convertBatchPickerItems && (
-                    <>
-                      {convertBatchPickerItems && convertSerialPickerItems && (
-                        <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">
-                          Batch Products
-                        </p>
-                      )}
-                      {convertBatchPickerItems.filter(i => !i.already_assigned && i.batches.length === 0).length >
-                        0 && (
-                        <div className="bg-red-500/5 border border-red-500/40 rounded-lg p-4">
-                          <p className="text-sm font-semibold text-red-600 dark:text-red-400 mb-1">
-                            No batches available for:
-                          </p>
-                          <ul className="text-sm text-red-600 dark:text-red-400 list-disc ml-4 space-y-0.5">
-                            {convertBatchPickerItems
-                              .filter(i => !i.already_assigned && i.batches.length === 0)
-                              .map(i => (
-                                <li key={i.order_item_id}>
-                                  {i.product_name}
-                                  {i.variant_name ? ` / ${i.variant_name}` : ''} — requires {i.required_qty} units
-                                </li>
-                              ))}
-                          </ul>
-                          <p className="text-xs text-red-500 mt-2">
-                            Receive stock via GRN before processing this order.
-                          </p>
-                        </div>
-                      )}
-                      {convertBatchPickerItems
-                        .filter(i => !i.already_assigned && i.batches.length > 0)
-                        .map(item => {
-                          const sel = convertBatchSelections[item.order_item_id] ?? {}
-                          const allocated = Object.values(sel).reduce((s, q) => s + q, 0)
-                          const isOver = allocated > item.required_qty
-                          const isFull = allocated >= item.required_qty
-                          function setQty2(batchId: string, val: number, maxAvail: number) {
-                            setConvertBatchSelections(s => {
-                              const prev = { ...(s[item.order_item_id] ?? {}) }
-                              if (val <= 0) delete prev[batchId]
-                              else prev[batchId] = Math.min(val, maxAvail)
-                              return { ...s, [item.order_item_id]: prev }
-                            })
-                          }
-                          function toggleBatch2(batchId: string, maxAvail: number) {
-                            setConvertBatchSelections(s => {
-                              const prev = { ...(s[item.order_item_id] ?? {}) }
-                              if (prev[batchId]) {
-                                delete prev[batchId]
-                              } else {
-                                const already = Object.values(prev).reduce((a, b) => a + b, 0)
-                                const needed = Math.max(0, item.required_qty - already)
-                                prev[batchId] = Math.min(maxAvail, needed > 0 ? needed : item.required_qty)
-                              }
-                              return { ...s, [item.order_item_id]: prev }
-                            })
-                          }
-                          return (
-                            <div key={item.order_item_id}>
-                              <div className="flex items-center justify-between mb-2">
-                                <div>
-                                  <p className="font-semibold text-foreground text-sm">
-                                    {item.product_name}
-                                    {item.variant_name ? ` / ${item.variant_name}` : ''}
-                                  </p>
-                                  <p className="text-xs text-foreground-muted">Required: {item.required_qty} units</p>
-                                </div>
-                                <div
-                                  className={`text-sm font-semibold px-2 py-0.5 rounded ${isOver ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : isFull ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
-                                >
-                                  {allocated} / {item.required_qty}
-                                </div>
-                              </div>
-                              <div className="border border-border-default rounded-lg overflow-hidden">
-                                <table className="w-full text-sm">
-                                  <thead className="bg-surface border-b border-border-default">
-                                    <tr>
-                                      <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-8"></th>
-                                      <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
-                                        Lot
-                                      </th>
-                                      <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
-                                        Expiry
-                                      </th>
-                                      <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
-                                        Available
-                                      </th>
-                                      <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
-                                        Take
-                                      </th>
-                                      <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
-                                        Location
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-border-default">
-                                    {item.batches.map((batch, idx) => {
-                                      const isChecked = !!sel[batch.id]
-                                      const qty = sel[batch.id] ?? 0
-                                      return (
-                                        <tr
-                                          key={batch.id}
-                                          className={`transition-colors ${isChecked ? 'bg-accent-500/10' : 'hover:bg-surface cursor-pointer'}`}
-                                          onClick={() => toggleBatch2(batch.id, batch.quantity_remaining)}
-                                        >
-                                          <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                                            <input
-                                              type="checkbox"
-                                              checked={isChecked}
-                                              onChange={() => toggleBatch2(batch.id, batch.quantity_remaining)}
-                                              className="accent-accent-500"
-                                            />
-                                          </td>
-                                          <td className="px-3 py-2.5 font-mono text-xs text-foreground">
-                                            {batch.lot_number || <span className="text-foreground-muted">—</span>}
-                                            {idx === 0 && (
-                                              <span className="ml-1.5 text-[10px] bg-accent-500/10 text-accent-600 px-1.5 py-0.5 rounded font-medium">
-                                                FIFO
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td className={`px-3 py-2.5 text-xs ${expiryColor(batch.expiry_date)}`}>
-                                            {batch.expiry_date ? (
-                                              new Date(batch.expiry_date).toLocaleDateString('en-IN', {
-                                                day: 'numeric',
-                                                month: 'short',
-                                                year: 'numeric',
-                                              })
-                                            ) : (
-                                              <span className="text-foreground-muted">—</span>
-                                            )}
-                                          </td>
-                                          <td className="px-3 py-2.5 text-xs text-foreground">
-                                            {batch.quantity_remaining}
-                                            {batch.quantity_remaining < item.required_qty && (
-                                              <span className="ml-1 text-orange-500 text-[10px]">⚠ low</span>
-                                            )}
-                                          </td>
-                                          <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                                            {isChecked ? (
-                                              <div className="flex items-center gap-1">
-                                                <button
-                                                  type="button"
-                                                  onClick={() => setQty2(batch.id, qty - 1, batch.quantity_remaining)}
-                                                  disabled={qty <= 1}
-                                                  className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
-                                                >
-                                                  ‹
-                                                </button>
-                                                <input
-                                                  type="number"
-                                                  min={1}
-                                                  max={batch.quantity_remaining}
-                                                  value={qty}
-                                                  onChange={e => {
-                                                    const v = parseInt(e.target.value)
-                                                    if (!isNaN(v)) setQty2(batch.id, v, batch.quantity_remaining)
-                                                  }}
-                                                  className="w-12 text-center text-xs font-medium text-foreground tabular-nums border border-border-default rounded bg-surface px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent-500"
-                                                />
-                                                <button
-                                                  type="button"
-                                                  onClick={() => setQty2(batch.id, qty + 1, batch.quantity_remaining)}
-                                                  disabled={qty >= batch.quantity_remaining}
-                                                  className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
-                                                >
-                                                  ›
-                                                </button>
-                                              </div>
-                                            ) : (
-                                              <span className="text-foreground-muted text-xs">—</span>
-                                            )}
-                                          </td>
-                                          <td className="px-3 py-2.5 font-mono text-xs text-foreground-muted">
-                                            {batch.location || <span>—</span>}
-                                          </td>
-                                        </tr>
-                                      )
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                              {isOver && (
-                                <p className="text-xs text-orange-600 mt-1">
-                                  ⚠ Allocated {allocated} exceeds required {item.required_qty}
-                                </p>
-                              )}
-                            </div>
-                          )
-                        })}
-                    </>
-                  )}
-                  {convertSerialPickerItems && convertSerialPickerItems.filter(i => !i.already_assigned).length > 0 && (
-                    <>
-                      {convertBatchPickerItems && (
-                        <div className="border-t border-border-default pt-4">
-                          <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-4">
-                            Serialized Products
-                          </p>
-                        </div>
-                      )}
-                      {convertSerialPickerItems
-                        .filter(i => !i.already_assigned)
-                        .map(item => (
-                          <SerialPicker
-                            key={item.order_item_id}
-                            item={item}
-                            selected={convertSerialSelections[item.order_item_id] || new Set()}
-                            onChange={next => setConvertSerialSelections(s => ({ ...s, [item.order_item_id]: next }))}
-                            scanEnabled={convertScanEnabled}
-                          />
-                        ))}
-                    </>
-                  )}
-                </div>
-                <div className="px-6 py-4 border-t border-border-default flex justify-between gap-3">
-                  <button
-                    onClick={() => setConvertStep('payment')}
-                    className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
-                  >
-                    ← Back
-                  </button>
-                  <button
-                    onClick={() => {
-                      const batchAssignments: BatchAssignment[] = []
-                      if (convertBatchPickerItems) {
-                        for (const [order_item_id, batchQtys] of Object.entries(convertBatchSelections)) {
-                          for (const [batch_id, qty] of Object.entries(batchQtys)) {
-                            if (qty > 0) batchAssignments.push({ order_item_id, batch_id, qty })
-                          }
-                        }
-                      }
-                      const serialAssignments: SerialAssignment[] = []
-                      if (convertSerialPickerItems) {
-                        for (const item of convertSerialPickerItems.filter(i => !i.already_assigned)) {
-                          for (const sn of convertSerialSelections[item.order_item_id] || []) {
-                            serialAssignments.push({ order_item_id: item.order_item_id, serial_number: sn })
-                          }
-                        }
-                      }
-                      if (pendingConvertArgs) {
-                        const args = pendingConvertArgs
-                        setPendingConvertArgs(null)
-                        convertToInvoice(
-                          args.quoteId,
-                          args.paymentMode,
-                          args.enableDelivery,
-                          batchAssignments.length ? batchAssignments : undefined,
-                          serialAssignments.length ? serialAssignments : undefined
-                        )
-                      }
-                    }}
-                    disabled={
-                      convertBatchPickerItems?.some(i => !i.already_assigned && i.batches.length === 0) ||
-                      convertBatchPickerItems
-                        ?.filter(i => !i.already_assigned && i.batches.length > 0)
-                        .some(item => {
-                          const allocated = Object.values(convertBatchSelections[item.order_item_id] ?? {}).reduce(
-                            (s, q) => s + q,
-                            0
-                          )
-                          return allocated < item.required_qty || allocated > item.required_qty
-                        }) ||
-                      convertSerialPickerItems
-                        ?.filter(i => !i.already_assigned)
-                        .some(
-                          item =>
-                            (convertSerialSelections[item.order_item_id]?.size ?? 0) !==
-                            (item.required_serials ?? item.required_qty)
-                        )
-                    }
-                    className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                  >
-                    Confirm & Convert →
-                  </button>
-                </div>
-              </>
-            ) : !convertQrImageUrl ? (
-              <>
-                <div className="flex items-center justify-between p-5 border-b border-border-default">
-                  <h2 className="text-base font-bold text-foreground">Convert to Invoice</h2>
-                  <button
-                    onClick={() => setShowConvertModal(false)}
-                    disabled={convertingInvoice}
-                    className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <div className="p-5 space-y-5">
-                  <div>
-                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
-                      Payment Mode
-                    </p>
-                    {convertHasStockIssue && (
-                      <div className="mb-3 flex items-start gap-2 p-2.5 rounded-lg bg-orange-500/5 border border-orange-500/40">
-                        <svg
-                          className="w-4 h-4 text-orange-500 shrink-0 mt-0.5"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"
-                          />
-                        </svg>
-                        <p className="text-xs text-orange-700 dark:text-orange-400">
-                          Some items may have insufficient stock — cash and bank transfer options are hidden until stock
-                          is confirmed.
-                        </p>
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      {[
-                        { value: 'cash', label: 'Cash', desc: 'Paid immediately — marks order as paid' },
-                        { value: 'bank_transfer', label: 'Bank Transfer', desc: 'Paid via bank — marks order as paid' },
-                        { value: 'credit', label: 'Credit', desc: 'Deferred payment — order stays unpaid' },
-                        { value: 'upi_qr', label: 'UPI QR', desc: 'Generate a one-time Razorpay QR code' },
-                      ]
-                        .filter(opt => !convertHasStockIssue || (opt.value !== 'cash' && opt.value !== 'bank_transfer'))
-                        .map(opt => (
-                          <label
-                            key={opt.value}
-                            className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${convertPaymentMode === opt.value ? 'border-accent-500 bg-accent-500/10' : 'border-border-default hover:bg-surface-secondary'}`}
-                          >
-                            <input
-                              type="radio"
-                              name="paymentMode"
-                              value={opt.value}
-                              checked={convertPaymentMode === opt.value}
-                              onChange={() => setConvertPaymentMode(opt.value)}
-                              className="mt-0.5 accent-accent-500"
-                            />
-                            <div>
-                              <p className="text-sm font-medium text-foreground">{opt.label}</p>
-                              <p className="text-xs text-foreground-secondary">{opt.desc}</p>
-                            </div>
-                          </label>
-                        ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
-                      Delivery
-                    </p>
-                    <label className="flex items-start gap-3 p-3 rounded-lg border border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
-                      <input
-                        type="checkbox"
-                        checked={convertEnableDelivery}
-                        onChange={e => setConvertEnableDelivery(e.target.checked)}
-                        className="mt-0.5 accent-accent-500"
-                      />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">Enable delivery tracking</p>
-                        <p className="text-xs text-foreground-secondary">
-                          A Delhivery shipment can be created from the order view once enabled
-                        </p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-                <div className="flex gap-2 justify-end p-5 border-t border-border-default">
-                  <button
-                    onClick={() => setShowConvertModal(false)}
-                    disabled={convertingInvoice}
-                    className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() =>
-                      convertPendingQuoteId &&
-                      convertToInvoice(convertPendingQuoteId, convertPaymentMode, convertEnableDelivery)
-                    }
-                    disabled={convertingInvoice || !convertPendingQuoteId}
-                    className="px-4 h-control text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 transition-colors"
-                  >
-                    {convertingInvoice ? 'Converting…' : 'Convert →'}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center justify-between p-5 border-b border-border-default">
-                  <h2 className="text-base font-bold text-foreground">UPI QR Code</h2>
-                </div>
-                <div className="p-5 flex flex-col items-center gap-4">
-                  <img
-                    src={convertQrImageUrl}
-                    alt="UPI QR Code"
-                    className="w-60 h-60 rounded-lg border border-border-default"
+            </span>
+          ) : undefined
+        }
+      >
+        {convertSavedAsDraft ? (
+          <>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-500/5 border border-orange-500/40">
+                <svg
+                  className="w-5 h-5 text-orange-500 shrink-0 mt-0.5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"
                   />
-                  <p className="text-sm font-semibold text-foreground">Scan to pay ₹{fmt2(convertQrTotal)}</p>
-                  <p className="text-xs text-foreground-secondary text-center">
-                    Payment status will update automatically once scanned.
+                </svg>
+                <div>
+                  <p className="text-sm font-semibold text-orange-700 dark:text-orange-400">
+                    Some items are out of stock
+                  </p>
+                  <p className="text-xs text-orange-600 dark:text-orange-400 mt-0.5">
+                    The invoice has been saved as a draft. It will be visible to the customer only after stock is
+                    updated and the invoice is finalised.
                   </p>
                 </div>
-                <div className="flex gap-2 justify-end p-5 border-t border-border-default">
-                  <button
-                    onClick={() => {
-                      setShowConvertModal(false)
-                      setConvertQrImageUrl(null)
-                    }}
-                    className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
-                  >
-                    Done
-                  </button>
-                  {convertResultOrderId && (
-                    <a
-                      href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
-                      className="px-4 py-2 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
-                    >
-                      View Invoice →
-                    </a>
-                  )}
+              </div>
+              {convertInsufficientItems.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
+                    Items needing stock
+                  </p>
+                  <ul className="space-y-1">
+                    {convertInsufficientItems.map((name, i) => (
+                      <li key={i} className="text-sm text-foreground-secondary flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0" />
+                        {name}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+              )}
+              <p className="text-xs text-foreground-muted">
+                Once stock is replenished, open the invoice and finalise it to make it visible and generate an
+                invoice number.
+              </p>
+            </div>
+            <div className="-mx-5 -mb-5 mt-5 flex justify-end gap-2 border-t border-border-default px-5 py-3">
+              <button
+                onClick={() => {
+                  setShowConvertModal(false)
+                  setConvertSavedAsDraft(false)
+                }}
+                className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+              >
+                Close
+              </button>
+              {convertResultOrderId && (
+                <a
+                  href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
+                  className="px-4 py-2 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
+                >
+                  View Draft Invoice →
+                </a>
+              )}
+            </div>
+          </>
+        ) : convertStep === 'assign' && (convertBatchPickerItems || convertSerialPickerItems) ? (
+          <>
+            <div className="space-y-6">
+              {convertBatchPickerItems && (
+                <>
+                  {convertBatchPickerItems && convertSerialPickerItems && (
+                    <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">
+                      Batch Products
+                    </p>
+                  )}
+                  {convertBatchPickerItems.filter(i => !i.already_assigned && i.batches.length === 0).length >
+                    0 && (
+                    <div className="bg-red-500/5 border border-red-500/40 rounded-lg p-4">
+                      <p className="text-sm font-semibold text-red-600 dark:text-red-400 mb-1">
+                        No batches available for:
+                      </p>
+                      <ul className="text-sm text-red-600 dark:text-red-400 list-disc ml-4 space-y-0.5">
+                        {convertBatchPickerItems
+                          .filter(i => !i.already_assigned && i.batches.length === 0)
+                          .map(i => (
+                            <li key={i.order_item_id}>
+                              {i.product_name}
+                              {i.variant_name ? ` / ${i.variant_name}` : ''} — requires {i.required_qty} units
+                            </li>
+                          ))}
+                      </ul>
+                      <p className="text-xs text-red-500 mt-2">
+                        Receive stock via GRN before processing this order.
+                      </p>
+                    </div>
+                  )}
+                  {convertBatchPickerItems
+                    .filter(i => !i.already_assigned && i.batches.length > 0)
+                    .map(item => {
+                      const sel = convertBatchSelections[item.order_item_id] ?? {}
+                      const allocated = Object.values(sel).reduce((s, q) => s + q, 0)
+                      const isOver = allocated > item.required_qty
+                      const isFull = allocated >= item.required_qty
+                      function setQty2(batchId: string, val: number, maxAvail: number) {
+                        setConvertBatchSelections(s => {
+                          const prev = { ...(s[item.order_item_id] ?? {}) }
+                          if (val <= 0) delete prev[batchId]
+                          else prev[batchId] = Math.min(val, maxAvail)
+                          return { ...s, [item.order_item_id]: prev }
+                        })
+                      }
+                      function toggleBatch2(batchId: string, maxAvail: number) {
+                        setConvertBatchSelections(s => {
+                          const prev = { ...(s[item.order_item_id] ?? {}) }
+                          if (prev[batchId]) {
+                            delete prev[batchId]
+                          } else {
+                            const already = Object.values(prev).reduce((a, b) => a + b, 0)
+                            const needed = Math.max(0, item.required_qty - already)
+                            prev[batchId] = Math.min(maxAvail, needed > 0 ? needed : item.required_qty)
+                          }
+                          return { ...s, [item.order_item_id]: prev }
+                        })
+                      }
+                      return (
+                        <div key={item.order_item_id}>
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <p className="font-semibold text-foreground text-sm">
+                                {item.product_name}
+                                {item.variant_name ? ` / ${item.variant_name}` : ''}
+                              </p>
+                              <p className="text-xs text-foreground-muted">Required: {item.required_qty} units</p>
+                            </div>
+                            <div
+                              className={`text-sm font-semibold px-2 py-0.5 rounded ${isOver ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : isFull ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
+                            >
+                              {allocated} / {item.required_qty}
+                            </div>
+                          </div>
+                          <div className="border border-border-default rounded-lg overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead className="bg-surface border-b border-border-default">
+                                <tr>
+                                  <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium w-8"></th>
+                                  <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
+                                    Lot
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
+                                    Expiry
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
+                                    Available
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
+                                    Take
+                                  </th>
+                                  <th className="px-3 py-2 text-left text-xs text-foreground-muted font-medium">
+                                    Location
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border-default">
+                                {item.batches.map((batch, idx) => {
+                                  const isChecked = !!sel[batch.id]
+                                  const qty = sel[batch.id] ?? 0
+                                  return (
+                                    <tr
+                                      key={batch.id}
+                                      className={`transition-colors ${isChecked ? 'bg-accent-500/10' : 'hover:bg-surface cursor-pointer'}`}
+                                      onClick={() => toggleBatch2(batch.id, batch.quantity_remaining)}
+                                    >
+                                      <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                                        <input
+                                          type="checkbox"
+                                          checked={isChecked}
+                                          onChange={() => toggleBatch2(batch.id, batch.quantity_remaining)}
+                                          className="accent-accent-500"
+                                        />
+                                      </td>
+                                      <td className="px-3 py-2.5 font-mono text-xs text-foreground">
+                                        {batch.lot_number || <span className="text-foreground-muted">—</span>}
+                                        {idx === 0 && (
+                                          <span className="ml-1.5 text-[10px] bg-accent-500/10 text-accent-600 px-1.5 py-0.5 rounded font-medium">
+                                            FIFO
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className={`px-3 py-2.5 text-xs ${expiryColor(batch.expiry_date)}`}>
+                                        {batch.expiry_date ? (
+                                          new Date(batch.expiry_date).toLocaleDateString('en-IN', {
+                                            day: 'numeric',
+                                            month: 'short',
+                                            year: 'numeric',
+                                          })
+                                        ) : (
+                                          <span className="text-foreground-muted">—</span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs text-foreground">
+                                        {batch.quantity_remaining}
+                                        {batch.quantity_remaining < item.required_qty && (
+                                          <span className="ml-1 text-orange-500 text-[10px]">⚠ low</span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                                        {isChecked ? (
+                                          <div className="flex items-center gap-1">
+                                            <button
+                                              type="button"
+                                              onClick={() => setQty2(batch.id, qty - 1, batch.quantity_remaining)}
+                                              disabled={qty <= 1}
+                                              className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
+                                            >
+                                              ‹
+                                            </button>
+                                            <input
+                                              type="number"
+                                              min={1}
+                                              max={batch.quantity_remaining}
+                                              value={qty}
+                                              onChange={e => {
+                                                const v = parseInt(e.target.value)
+                                                if (!isNaN(v)) setQty2(batch.id, v, batch.quantity_remaining)
+                                              }}
+                                              className="w-12 text-center text-xs font-medium text-foreground tabular-nums border border-border-default rounded bg-surface px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                                            />
+                                            <button
+                                              type="button"
+                                              onClick={() => setQty2(batch.id, qty + 1, batch.quantity_remaining)}
+                                              disabled={qty >= batch.quantity_remaining}
+                                              className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
+                                            >
+                                              ›
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <span className="text-foreground-muted text-xs">—</span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2.5 font-mono text-xs text-foreground-muted">
+                                        {batch.location || <span>—</span>}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                          {isOver && (
+                            <p className="text-xs text-orange-600 mt-1">
+                              ⚠ Allocated {allocated} exceeds required {item.required_qty}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                </>
+              )}
+              {convertSerialPickerItems && convertSerialPickerItems.filter(i => !i.already_assigned).length > 0 && (
+                <>
+                  {convertBatchPickerItems && (
+                    <div className="border-t border-border-default pt-4">
+                      <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-4">
+                        Serialized Products
+                      </p>
+                    </div>
+                  )}
+                  {convertSerialPickerItems
+                    .filter(i => !i.already_assigned)
+                    .map(item => (
+                      <SerialPicker
+                        key={item.order_item_id}
+                        item={item}
+                        selected={convertSerialSelections[item.order_item_id] || new Set()}
+                        onChange={next => setConvertSerialSelections(s => ({ ...s, [item.order_item_id]: next }))}
+                        scanEnabled={convertScanEnabled}
+                      />
+                    ))}
+                </>
+              )}
+            </div>
+            <div className="-mx-5 -mb-5 mt-5 flex justify-between gap-3 border-t border-border-default px-5 py-3">
+              <button
+                onClick={() => setConvertStep('payment')}
+                className="px-4 h-control text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+              >
+                ← Back
+              </button>
+              <button
+                onClick={() => {
+                  const batchAssignments: BatchAssignment[] = []
+                  if (convertBatchPickerItems) {
+                    for (const [order_item_id, batchQtys] of Object.entries(convertBatchSelections)) {
+                      for (const [batch_id, qty] of Object.entries(batchQtys)) {
+                        if (qty > 0) batchAssignments.push({ order_item_id, batch_id, qty })
+                      }
+                    }
+                  }
+                  const serialAssignments: SerialAssignment[] = []
+                  if (convertSerialPickerItems) {
+                    for (const item of convertSerialPickerItems.filter(i => !i.already_assigned)) {
+                      for (const sn of convertSerialSelections[item.order_item_id] || []) {
+                        serialAssignments.push({ order_item_id: item.order_item_id, serial_number: sn })
+                      }
+                    }
+                  }
+                  if (pendingConvertArgs) {
+                    const args = pendingConvertArgs
+                    setPendingConvertArgs(null)
+                    convertToInvoice(
+                      args.quoteId,
+                      args.paymentMode,
+                      args.enableDelivery,
+                      batchAssignments.length ? batchAssignments : undefined,
+                      serialAssignments.length ? serialAssignments : undefined
+                    )
+                  }
+                }}
+                disabled={
+                  convertBatchPickerItems?.some(i => !i.already_assigned && i.batches.length === 0) ||
+                  convertBatchPickerItems
+                    ?.filter(i => !i.already_assigned && i.batches.length > 0)
+                    .some(item => {
+                      const allocated = Object.values(convertBatchSelections[item.order_item_id] ?? {}).reduce(
+                        (s, q) => s + q,
+                        0
+                      )
+                      return allocated < item.required_qty || allocated > item.required_qty
+                    }) ||
+                  convertSerialPickerItems
+                    ?.filter(i => !i.already_assigned)
+                    .some(
+                      item =>
+                        (convertSerialSelections[item.order_item_id]?.size ?? 0) !==
+                        (item.required_serials ?? item.required_qty)
+                    )
+                }
+                className="px-4 h-control text-sm font-medium bg-accent-500 hover:bg-accent-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              >
+                Confirm & Convert →
+              </button>
+            </div>
+          </>
+        ) : !convertQrImageUrl ? (
+          <>
+            <div className="space-y-5">
+              <div>
+                <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
+                  Payment Mode
+                </p>
+                {convertHasStockIssue && (
+                  <div className="mb-3 flex items-start gap-2 p-2.5 rounded-lg bg-orange-500/5 border border-orange-500/40">
+                    <svg
+                      className="w-4 h-4 text-orange-500 shrink-0 mt-0.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M12 9v2m0 4h.01M12 3a9 9 0 100 18A9 9 0 0012 3z"
+                      />
+                    </svg>
+                    <p className="text-xs text-orange-700 dark:text-orange-400">
+                      Some items may have insufficient stock — cash and bank transfer options are hidden until stock
+                      is confirmed.
+                    </p>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {[
+                    { value: 'cash', label: 'Cash', desc: 'Paid immediately — marks order as paid' },
+                    { value: 'bank_transfer', label: 'Bank Transfer', desc: 'Paid via bank — marks order as paid' },
+                    { value: 'credit', label: 'Credit', desc: 'Deferred payment — order stays unpaid' },
+                    { value: 'upi_qr', label: 'UPI QR', desc: 'Generate a one-time Razorpay QR code' },
+                  ]
+                    .filter(opt => !convertHasStockIssue || (opt.value !== 'cash' && opt.value !== 'bank_transfer'))
+                    .map(opt => (
+                      <label
+                        key={opt.value}
+                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${convertPaymentMode === opt.value ? 'border-accent-500 bg-accent-500/10' : 'border-border-default hover:bg-surface-secondary'}`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentMode"
+                          value={opt.value}
+                          checked={convertPaymentMode === opt.value}
+                          onChange={() => setConvertPaymentMode(opt.value)}
+                          className="mt-0.5 accent-accent-500"
+                        />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                          <p className="text-xs text-foreground-secondary">{opt.desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
+                  Delivery
+                </p>
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-border-default hover:bg-surface-secondary cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={convertEnableDelivery}
+                    onChange={e => setConvertEnableDelivery(e.target.checked)}
+                    className="mt-0.5 accent-accent-500"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Enable delivery tracking</p>
+                    <p className="text-xs text-foreground-secondary">
+                      A Delhivery shipment can be created from the order view once enabled
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+            <div className="-mx-5 -mb-5 mt-5 flex justify-end gap-2 border-t border-border-default px-5 py-3">
+              <button
+                onClick={() => setShowConvertModal(false)}
+                disabled={convertingInvoice}
+                className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() =>
+                  convertPendingQuoteId &&
+                  convertToInvoice(convertPendingQuoteId, convertPaymentMode, convertEnableDelivery)
+                }
+                disabled={convertingInvoice || !convertPendingQuoteId}
+                className="px-4 h-control text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 transition-colors"
+              >
+                {convertingInvoice ? 'Converting…' : 'Convert →'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-col items-center gap-4">
+              <img
+                src={convertQrImageUrl}
+                alt="UPI QR Code"
+                className="w-60 h-60 rounded-lg border border-border-default"
+              />
+              <p className="text-sm font-semibold text-foreground">Scan to pay ₹{fmt2(convertQrTotal)}</p>
+              <p className="text-xs text-foreground-secondary text-center">
+                Payment status will update automatically once scanned.
+              </p>
+            </div>
+            <div className="-mx-5 -mb-5 mt-5 flex justify-end gap-2 border-t border-border-default px-5 py-3">
+              <button
+                onClick={() => {
+                  setShowConvertModal(false)
+                  setConvertQrImageUrl(null)
+                }}
+                className="px-4 h-control text-sm rounded-lg border border-border-default text-foreground hover:bg-surface-secondary transition-colors"
+              >
+                Done
+              </button>
+              {convertResultOrderId && (
+                <a
+                  href={ap(`/admin/invoices/${convertResultOrderId}/view`)}
+                  className="px-4 py-2 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 text-white font-semibold transition-colors"
+                >
+                  View Invoice →
+                </a>
+              )}
+            </div>
+          </>
+        )}
+      </Dialog>
     </div>
   )
 }
