@@ -10,10 +10,11 @@ name: Jeffi Stores Pipeline
 #         └→ Images (4, release only, after Lint and Type check)
 #
 # Release (push to main, or workflow_dispatch with deploy=true): Checks passed waits for the one approval, then:
-#   Checks passed (approval) ─┬→ DB · flagship schema ─────┬→ Deploy · flagship ─┬→ Smoke · flagship ─────────┬→ Deploy · tenants
-#                             ├→ DB · flagship migrations ─┘                     ├→ CloudFront               │   → Smoke · tenants → Post
-#                             └→ Deploy · AI gateway                             ├→ DB · tenant schema ──────┤
-#                                (Razer box; only Post waits for it)             └→ DB · tenant migrations ──┘
+#   Checks passed (approval) ─┬→ DB · flagship schema ─────┬→ Deploy · flagship ───┬→ Smoke · flagship ─────────┬→ Deploy · tenants
+#                             └→ DB · flagship migrations ─┤                       ├→ CloudFront               │   → Smoke · tenants → Post
+#                                                          │                       ├→ DB · tenant schema ──────┤
+#                                                          │                       └→ DB · tenant migrations ──┘
+#                                                          └→ Deploy · AI gateway ──→ Smoke · AI gateway  (Razer box; only Post waits for it)
 # Stacked stages start together; where order matters a stage waits for the one it depends on before doing
 # anything (.github/actions/wait-for-job): flagship migrations after flagship schema, tenant schema after
 # Smoke · flagship (no store is touched until the flagship is proven live), tenant migrations after tenant
@@ -337,7 +338,7 @@ jobs:
   deploy-ai-gateway:
     name: Deploy · AI gateway
     runs-on: ubuntu-latest
-    needs: checks # beside the flagship database stages; the stores do not wait for it (the Razer box may be offline)
+    needs: [db-flagship-schema, db-flagship-migrations] # beside Deploy · flagship; the stores never wait for it (the Razer box may be offline)
     environment: production-release
     concurrency: { group: deploy-production-deploy-ai-gateway, cancel-in-progress: false }
     permissions: { id-token: write, contents: read }
@@ -349,6 +350,22 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
       - name: Build, roll out and smoke-test the gateway on the Razer box (SSM → core → Tailscale)
         run: bash deploy/k8s/bootstrap/razer-release.sh "$GITHUB_SHA" ${{ env.DRY_FLAG }}
+
+  smoke-ai-gateway:
+    name: Smoke · AI gateway
+    runs-on: ubuntu-latest
+    needs: deploy-ai-gateway # beside Smoke · flagship
+    environment: production-release
+    concurrency: { group: deploy-production-smoke-ai-gateway, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: /healthz and /v1/providers from the core, the way the platform reaches the gateway
+        run: bash deploy/k8s/bootstrap/razer-release.sh smoke
 
   deploy-flagship:
     name: Deploy · flagship
@@ -469,7 +486,7 @@ jobs:
   post:
     name: Post
     runs-on: ubuntu-latest
-    needs: [smoke-tenants, cdn, deploy-ai-gateway]
+    needs: [smoke-tenants, cdn, smoke-ai-gateway]
     if: always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy))
     permissions: { actions: read, contents: read }
     steps:
