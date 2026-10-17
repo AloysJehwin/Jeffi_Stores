@@ -1,5 +1,9 @@
 name: Database report
 description: Puts the SQL a database stage applied (or would apply) in the job summary and uploads it.
+inputs:
+  name:
+    description: Artifact name (unique per job, matrix included)
+    required: true
 runs:
   using: composite
   steps:
@@ -13,6 +17,6 @@ runs:
         done
     - uses: actions/upload-artifact@v4
       with:
-        name: db-${{ github.job }}
+        name: db-${{ inputs.name }}
         path: ${{ runner.temp }}/db
         if-no-files-found: ignore

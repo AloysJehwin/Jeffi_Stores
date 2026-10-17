@@ -16,6 +16,10 @@ runs:
           ai-platform/package-lock.json
     - shell: bash
       run: npm ci
+      env:
+        # onnxruntime-node's install downloads extra CUDA binaries from Microsoft; CI runs on the bundled
+        # CPU build, and that download times out often enough to fail jobs.
+        ONNXRUNTIME_NODE_INSTALL: skip
     - if: inputs.install != ''
       shell: bash
       run: ${{ inputs.install }}
