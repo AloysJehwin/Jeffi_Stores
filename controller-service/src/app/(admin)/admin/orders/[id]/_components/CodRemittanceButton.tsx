@@ -1,6 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 interface Props {
   orderId: string
@@ -14,13 +16,12 @@ interface Props {
  * via PATCH /api/admin/orders/[id].
  */
 export default function CodRemittanceButton({ orderId, remittedAt, codAmount }: Props) {
+  const toast = useActionToast()
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
   const canWrite = useCanWrite('financial:write')
 
   async function setRemitted(remitted: boolean) {
     setSaving(true)
-    setError('')
     try {
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
@@ -33,7 +34,7 @@ export default function CodRemittanceButton({ orderId, remittedAt, codAmount }: 
       }
       window.location.reload()
     } catch (e: any) {
-      setError(e.message)
+      toast.error(e.message)
       setSaving(false)
     }
   }
@@ -42,18 +43,10 @@ export default function CodRemittanceButton({ orderId, remittedAt, codAmount }: 
 
   if (remittedAt) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 px-4 py-3">
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-green-500/40 bg-green-500/5 px-4 py-3">
         <div className="flex items-center gap-2">
-          <svg
-            className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <p className="text-sm text-green-800 dark:text-green-300">
+          <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-green-600" />
+          <p className="text-sm text-foreground">
             COD {inr} remitted on{' '}
             {new Date(remittedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
@@ -72,27 +65,16 @@ export default function CodRemittanceButton({ orderId, remittedAt, codAmount }: 
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20 px-4 py-3">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3">
       <div className="flex items-center gap-2">
-        <svg
-          className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <div>
-          <p className="text-sm text-orange-800 dark:text-orange-300 font-medium">COD {inr} not yet remitted</p>
-          {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
-        </div>
+        <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600" />
+        <p className="text-sm font-medium text-foreground">COD {inr} not yet remitted</p>
       </div>
       {canWrite && (
         <button
           onClick={() => setRemitted(true)}
           disabled={saving}
-          className="px-3 h-control-sm text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors flex-shrink-0"
+          className="control-sm flex-shrink-0 bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Mark as remitted'}
         </button>

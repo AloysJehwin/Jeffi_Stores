@@ -7,6 +7,7 @@ import BatchPickerModal, { BatchPickerItem, BatchAssignment } from '@/components
 import SerialEntryModal, { SerialItem, SerialAssignment } from '@/components/admin/SerialEntryModal'
 import Toggle from '@/components/ui/Toggle'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 interface UpdateOrderStatusProps {
   orderId: string
@@ -97,8 +98,9 @@ export default function UpdateOrderStatus({
   const [status, setStatus] = useState(currentStatus)
   const [paymentStatus, setPaymentStatus] = useState(currentPaymentStatus)
   const [isUpdating, setIsUpdating] = useState(false)
+  const toast = useActionToast()
+  // Validation shown under the fields; action responses go to toasts.
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
   const [paymentAutoResetNote, setPaymentAutoResetNote] = useState<string | null>(null)
   const [batchPickerItems, setBatchPickerItems] = useState<BatchPickerItem[] | null>(null)
   const [serialPickerItems, setSerialPickerItems] = useState<SerialItem[] | null>(null)
@@ -182,7 +184,7 @@ export default function UpdateOrderStatus({
           return
         }
       } catch (err: any) {
-        setError(err.message || 'Failed to check batch availability')
+        toast.error(err.message || 'Failed to check batch availability')
         setIsUpdating(false)
         return
       }
@@ -198,7 +200,6 @@ export default function UpdateOrderStatus({
   ) {
     setIsUpdating(true)
     setError(null)
-    setSuccess(null)
 
     try {
       const body: Record<string, any> = { status, payment_status: pendingPaymentStatus ?? paymentStatus }
@@ -236,12 +237,12 @@ export default function UpdateOrderStatus({
         }
       }
 
-      setSuccess(successMessage)
+      toast.success(successMessage)
       setPaymentAutoResetNote(null)
       setPendingPaymentStatus(null)
       router.refresh()
     } catch (err: any) {
-      setError(err.message || 'Failed to update order. Please try again.')
+      toast.error(err.message || 'Failed to update order. Please try again.')
     } finally {
       setIsUpdating(false)
     }
@@ -270,7 +271,7 @@ export default function UpdateOrderStatus({
         <button
           type="button"
           onClick={() => setOverrideMode(true)}
-          className="text-sm font-medium text-amber-700 dark:text-amber-400 underline underline-offset-4 hover:text-amber-800 dark:hover:text-amber-300"
+          className="text-sm font-medium text-amber-700 underline underline-offset-4 hover:text-amber-600 dark:text-amber-400"
         >
           Override status
         </button>
@@ -318,29 +319,17 @@ export default function UpdateOrderStatus({
       )}
 
       <div className="space-y-4">
-        {error && (
-          <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="p-4 bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-lg text-green-800 dark:text-green-300 text-sm">
-            {success}
-          </div>
-        )}
+        {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         {paymentAutoResetNote && (
-          <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-800 dark:text-blue-300 text-sm">
-            {paymentAutoResetNote}
-          </div>
+          <div className="rounded-lg border border-blue-500/40 bg-blue-500/5 px-4 py-3 text-sm text-foreground">{paymentAutoResetNote}</div>
         )}
 
         {canOverride && (
-          <div className="flex items-start justify-between gap-4 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+          <div className="flex items-start justify-between gap-4 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3">
             <div className="min-w-0">
-              <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">Override</div>
-              <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+              <div className="text-sm font-semibold text-amber-600 dark:text-amber-400">Override</div>
+              <p className="mt-0.5 text-xs text-foreground-muted">
                 Set any status, ignoring the normal transition rules. Recorded in the audit log.
               </p>
             </div>
@@ -359,7 +348,7 @@ export default function UpdateOrderStatus({
 
         {overrideMode && (
           <div className="space-y-1">
-            <label className="block text-sm font-medium text-foreground">
+            <label className="block text-xs font-medium text-foreground-secondary">
               Reason <span className="text-red-500">*</span>
             </label>
             <textarea
@@ -370,7 +359,7 @@ export default function UpdateOrderStatus({
               }}
               rows={2}
               placeholder="Why is this override necessary? Recorded against your admin account."
-              className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-background-secondary text-foreground resize-none"
+              className="field-md w-full resize-none border border-border-secondary bg-surface py-2 text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             <p className="text-xs text-foreground-muted">
               {overrideReason.trim().length}/{MIN_REASON} minimum
@@ -403,17 +392,13 @@ export default function UpdateOrderStatus({
           />
         </div>
 
-        {crossFieldError && (
-          <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
-            {crossFieldError}
-          </div>
-        )}
+        {crossFieldError && <p className="text-sm text-red-600 dark:text-red-400">{crossFieldError}</p>}
 
         <button
           type="button"
           onClick={handleUpdate}
           disabled={isUpdating || !hasChanges || !!crossFieldError || reasonTooShort}
-          className={`w-full px-6 py-3 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`control-md w-full justify-center font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${
             overrideMode ? 'bg-amber-600 hover:bg-amber-700' : 'bg-accent-500 hover:bg-accent-600'
           }`}
         >

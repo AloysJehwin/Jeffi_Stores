@@ -82,7 +82,7 @@ export default function EligibleOrdersMobileList({ orders, selected, onToggle }:
                 <span className="font-mono font-medium text-accent-500 text-sm truncate">
                   #{order.order_number || order.id.slice(0, 8)}
                 </span>
-                <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 capitalize">
+                <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 capitalize">
                   {order.status}
                 </span>
               </div>

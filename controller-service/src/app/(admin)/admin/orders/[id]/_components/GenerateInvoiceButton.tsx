@@ -2,27 +2,29 @@
 
 import { useState } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { Download, FileText } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 export default function GenerateInvoiceButton({ orderId }: { orderId: string }) {
   const [loading, setLoading] = useState(false)
   const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const toast = useActionToast()
 
   const handleGenerate = async () => {
     setLoading(true)
-    setError(null)
     try {
       const res = await fetch(`/api/orders/${orderId}/invoice`, {
         method: 'POST',
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error || 'Failed to generate invoice')
+        toast.error(data.error || 'Failed to generate invoice')
         return
       }
       setInvoiceNumber(data.invoiceNumber)
+      toast.success(`Invoice ${data.invoiceNumber} generated.`)
     } catch {
-      setError('Failed to generate invoice')
+      toast.error('Failed to generate invoice')
     } finally {
       setLoading(false)
     }
@@ -34,17 +36,10 @@ export default function GenerateInvoiceButton({ orderId }: { orderId: string }) 
         href={`/api/orders/${orderId}/invoice`}
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full sm:w-48 h-9 px-3 text-sm font-semibold rounded-full bg-accent-100 text-accent-800 hover:bg-accent-200 transition-colors inline-flex items-center justify-center gap-1.5"
+        className="control-md border border-border-default bg-surface-elevated text-foreground hover:bg-surface-secondary"
         title={`Invoice ${invoiceNumber}`}
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
-        </svg>
+        <Download className="h-4 w-4" />
         Invoice
       </a>
     )
@@ -52,24 +47,10 @@ export default function GenerateInvoiceButton({ orderId }: { orderId: string }) 
 
   return (
     <RequireWrite scope="orders:write">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-        <button
-          onClick={handleGenerate}
-          disabled={loading}
-          className="w-full sm:w-48 h-9 px-3 text-sm font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          {loading ? 'Generating...' : 'Generate Invoice'}
-        </button>
-        {error && <span className="text-sm text-red-600 dark:text-red-400">{error}</span>}
-      </div>
+      <button type="button" onClick={handleGenerate} disabled={loading} className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600 disabled:opacity-50">
+        <FileText className="h-4 w-4" />
+        {loading ? 'Generating...' : 'Generate Invoice'}
+      </button>
     </RequireWrite>
   )
 }

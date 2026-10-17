@@ -1,20 +1,14 @@
 import { Suspense } from 'react'
 import { getFilteredOrders, getRevenueTrendBySource } from '@/lib/queries'
-import AdminFilters from '@/components/admin/AdminFilters'
 import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
-import Pagination from '@/components/admin/Pagination'
-import OrdersTableRows from '@/components/admin/OrdersTableRows'
-import SortableHeader from '@/components/admin/SortableHeader'
-import { sortOptions } from '@/components/admin/sortOptions'
 import { ap } from '@/lib/shared/admin-path'
 import { isFulfilledStatus } from '@/lib/orders/fulfilled-status'
 import { getHost } from '@/lib/tenancy/get-host'
-import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
-import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import RevenueTrendChart from '@/components/admin/RevenueTrendChart'
-import OrdersMobileList from './_components/OrdersMobileList'
+import { Kpi, ListSkeleton, PageBody, PageHeader, TabLinks, TableSkeleton } from '@/components/admin/kit'
+import OrdersTable from './_components/OrdersTable'
+import OrdersFilters from './_components/OrdersFilters'
 import OrdersOverview from './_components/OrdersOverview'
-import { TabLinks } from '@/components/admin/channels/ui'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -60,37 +54,19 @@ async function OrdersStats() {
       return order.payment_status === 'paid' ? sum + Number(order.total_amount) : sum
     }, 0) || 0
 
+  const money = (v: number) => `Rs. ${v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   return (
-    <div className="animate-fade-in">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:h-56">
-        {/* Left: Total Revenue + the 4 order stats as tiles */}
-        <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white">
-          <div>
-            <p className="text-white/80 text-sm">Total Revenue</p>
-            <p className="text-3xl sm:text-4xl font-bold mt-1">
-              Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-          </div>
-          <div className="grid grid-cols-4 gap-2 sm:gap-3 mt-4">
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{totalOrders}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Total</p>
-            </div>
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{pendingOrders}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Pending</p>
-            </div>
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{processingOrders}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Processing</p>
-            </div>
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{completedOrders}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Completed</p>
-            </div>
-          </div>
+    <div className="animate-fade-in grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-2 content-start gap-3">
+        <div className="col-span-2">
+          <Kpi label="Total revenue" value={money(totalRevenue)} sub="Paid orders" highlight />
         </div>
-        {/* Right: revenue trend chart */}
+        <Kpi label="Total" value={totalOrders.toLocaleString('en-IN')} />
+        <Kpi label="Pending" value={pendingOrders.toLocaleString('en-IN')} />
+        <Kpi label="Processing" value={processingOrders.toLocaleString('en-IN')} />
+        <Kpi label="Completed" value={completedOrders.toLocaleString('en-IN')} />
+      </div>
+      <div className="xl:col-span-2">
         <RevenueTrendChart data={revenueTrend} />
       </div>
     </div>
@@ -153,88 +129,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
     return `/admin/orders${qs ? `?${qs}` : ''}`
   })()
 
-  return (
-    <>
-      <OrdersMobileList
-        orders={orders ?? []}
-        backUrl={currentListUrl}
-        pagination={<Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />}
-      />
-
-      <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border-default">
-            <thead className="bg-surface-secondary">
-              <tr>
-                <SortableHeader
-                  label="Order ID"
-                  column="order_number"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Source"
-                  column="source"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Customer"
-                  column="customer"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Date"
-                  column="date"
-                  options={sortOptions('date')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  EDD
-                </th>
-                <SortableHeader
-                  label="Total"
-                  column="total"
-                  options={sortOptions('number')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Payment"
-                  column="payment"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Status"
-                  column="status"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              <OrdersTableRows orders={orders ?? []} backUrl={currentListUrl} />
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="hidden md:block px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
-        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-      </div>
-    </>
-  )
+  return <OrdersTable orders={orders ?? []} total={total} page={page} pageSize={PAGE_SIZE} backUrl={currentListUrl} pageHref={buildUrl} />
 }
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -245,23 +140,16 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     tabParam === 'list' || (tabParam !== 'overview' && LIST_PARAMS.some(k => sp(resolved, k))) ? 'list' : 'overview'
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Orders</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
-        </div>
-      </div>
+    <PageBody>
+      <PageHeader title="Orders" description="Manage customer orders" />
 
-      <div className="mb-5">
-        <TabLinks
-          tabs={[
-            { id: 'overview', label: 'Overview', href: ap('/admin/orders?tab=overview', host) },
-            { id: 'list', label: 'All orders', href: ap('/admin/orders?tab=list', host) },
-          ]}
-          value={tab}
-        />
-      </div>
+      <TabLinks
+        tabs={[
+          { id: 'overview', label: 'Overview', href: ap('/admin/orders?tab=overview', host) },
+          { id: 'list', label: 'All orders', href: ap('/admin/orders?tab=list', host) },
+        ]}
+        value={tab}
+      />
 
       {tab === 'overview' ? (
         <Suspense fallback={null}>
@@ -270,18 +158,18 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       ) : (
         <OrdersList searchParams={searchParams} />
       )}
-    </div>
+    </PageBody>
   )
 }
 
 function OrdersList({ searchParams }: { searchParams: Promise<SP> }) {
   return (
     <>
-      <Suspense fallback={<AdminStatsSkeleton cards={4} banner />}>
+      <Suspense fallback={<ListSkeleton header={false} kpis={3} rows={0} />}>
         <OrdersStats />
       </Suspense>
 
-      <AdminFilters
+      <OrdersFilters
         filters={[
           {
             name: 'source',
@@ -326,10 +214,7 @@ function OrdersList({ searchParams }: { searchParams: Promise<SP> }) {
             ],
           },
         ]}
-        searchPlaceholder="Search by order number or customer..."
-        searchParam="search"
-        suggestType="orders"
-        advancedContent={
+        advanced={
           <AdvancedFilterPanel
             fields={[
               { name: ['date_from', 'date_to'], label: 'Order Date', type: 'date-range', section: 'Date & Amount' },
@@ -398,7 +283,7 @@ async function OrdersListSection({ searchParams }: { searchParams: Promise<SP> }
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={9} />}>
+    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>
       <OrdersListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )

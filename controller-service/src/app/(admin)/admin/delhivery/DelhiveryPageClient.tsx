@@ -1,6 +1,8 @@
 'use client'
 
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { TONE_CLS } from '@/components/admin/kit/tones'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/shared/admin-path'
@@ -49,8 +51,8 @@ function todayIST(): string {
 
 function OwnDelhiveryNote() {
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default px-6 py-4">
-      <h2 className="text-lg font-semibold text-foreground">Delhivery Account</h2>
+    <div className="rounded-xl border border-border-default bg-surface-elevated px-6 py-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Delhivery Account</h2>
       <p className="text-sm text-foreground-secondary mt-1">
         This store ships on its own Delhivery account and is billed by Delhivery directly. The store owner manages the
         API token from the ecom portal.
@@ -75,7 +77,9 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
   const [editingDefault, setEditingDefault] = useState(false)
   const [busy, setBusy] = useState(false)
   const [rowBusy, setRowBusy] = useState<string | null>(null)
-  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
+  const actionToast = useActionToast()
+  // Action responses are toasts; null clears nothing now.
+  const setToast = useCallback((b: { ok: boolean; text: string } | null) => b && actionToast.result(b), [actionToast])
   const [form, setForm] = useState({
     name: '',
     phone: '',
@@ -177,10 +181,10 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
   const extraWarehouses = warehouses.filter(w => w.name !== defaultWarehouse.pickupLocation)
 
   return (
-    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default mb-6">
+    <div className="rounded-xl border border-border-default bg-surface-elevated mb-6">
       <div className="px-6 py-4 border-b border-border-default flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-foreground">Pickup Warehouses</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Pickup Warehouses</h2>
           <span className="text-sm text-foreground-secondary">
             {loading ? 'Loading…' : `${warehouses.length} registered`}
           </span>
@@ -196,17 +200,6 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
         )}
       </div>
       <div className="px-6 py-4 space-y-3">
-        {toast && (
-          <div
-            className={`rounded-lg border px-4 py-2.5 text-sm ${
-              toast.ok
-                ? 'border-green-200 dark:border-green-900/40 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
-                : 'border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
-            }`}
-          >
-            {toast.text}
-          </div>
-        )}
         {open && canWrite && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-border-default bg-surface-secondary/40 p-4">
             {(
@@ -241,7 +234,7 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
               <button
                 onClick={save}
                 disabled={busy || !form.name || !form.address || !form.phone || !form.pincode}
-                className="px-4 h-control rounded-lg bg-accent-600 hover:bg-accent-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+                className="px-4 h-control rounded-lg bg-accent-500 hover:bg-accent-600 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
               >
                 {busy ? 'Adding…' : 'Add warehouse'}
               </button>
@@ -258,7 +251,7 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
                   {defaultWarehouse.pickupLocation || 'Default pickup'}
-                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400">
+                  <span className="ml-2 inline-block rounded bg-accent-500/10 px-1.5 py-0.5 text-[11px] font-medium text-accent-600">
                     Default
                   </span>
                 </p>
@@ -338,7 +331,7 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
                         type="button"
                         onClick={() => remove(w.name)}
                         disabled={rowBusy === w.name}
-                        className="px-2.5 h-control-sm rounded-lg border border-red-200 dark:border-red-900/40 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 transition-colors"
+                        className="px-2.5 h-control-sm rounded-lg border border-red-500/40 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:opacity-40 transition-colors"
                       >
                         Remove
                       </button>
@@ -360,9 +353,9 @@ const STATUS_OPTIONS: { value: PickupRequest['pickup_status']; label: string }[]
 ]
 
 const STATUS_STYLES: Record<PickupRequest['pickup_status'], string> = {
-  pending: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
-  picked_up: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
-  failed: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
+  pending: TONE_CLS.amber,
+  picked_up: TONE_CLS.green,
+  failed: TONE_CLS.red,
 }
 
 export type DeliveryMode = 'flagship' | 'own' | 'platform'
@@ -384,7 +377,12 @@ export default function DelhiveryPageClient({
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-  const [result, setResult] = useState<{ success: boolean; message: string; details?: string } | null>(null)
+  const toast = useActionToast()
+  const setResult = useCallback(
+    (r: { success: boolean; message: string; details?: string } | null) =>
+      r && toast.result({ ok: r.success, text: r.details ? `${r.message} ${r.details}` : r.message }),
+    [toast]
+  )
   const [addAwbFor, setAddAwbFor] = useState<string | null>(null)
   const [addAwbOrderId, setAddAwbOrderId] = useState<string>('')
   const [addAwbLoading, setAddAwbLoading] = useState(false)
@@ -595,19 +593,6 @@ export default function DelhiveryPageClient({
 
   return (
     <div>
-      {result && (
-        <div
-          className={`mb-6 px-4 py-3 rounded-lg border text-sm ${
-            result.success
-              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'
-              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300'
-          }`}
-        >
-          <p className="font-medium">{result.message}</p>
-          {result.details && <p className="mt-1 opacity-80">{result.details}</p>}
-        </div>
-      )}
-
       {/* An own-account tenant is billed by Delhivery and manages its token in the ecom portal.
           Platform-Delhivery tenants are billed by wallet per AWB — the wallet lives on the common
           Wallet page + top-nav badge now, so it is not duplicated here. */}
@@ -615,10 +600,10 @@ export default function DelhiveryPageClient({
 
       <WarehousesCard defaultWarehouse={defaultWarehouse} />
 
-      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default mb-6">
+      <div className="rounded-xl border border-border-default bg-surface-elevated mb-6">
         <div className="px-6 py-4 border-b border-border-default flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-foreground">Eligible Orders</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Eligible Orders</h2>
             <span className="text-sm text-foreground-secondary">{orders.length} found</span>
           </div>
           <div className="flex flex-wrap items-center gap-4">
@@ -764,7 +749,7 @@ export default function DelhiveryPageClient({
                         })}
                       </td>
                       <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 capitalize">
+                        <span className="inline-block rounded bg-blue-500/10 px-1.5 py-0.5 text-[11px] font-medium capitalize text-blue-700 dark:text-blue-400">
                           {order.status}
                         </span>
                       </td>
@@ -848,9 +833,9 @@ export default function DelhiveryPageClient({
       </div>
 
       {pickupHistory.length > 0 && (
-        <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+        <div className="rounded-xl border border-border-default bg-surface-elevated">
           <div className="px-6 py-4 border-b border-border-default">
-            <h2 className="text-lg font-semibold text-foreground">Pickup Request History</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Pickup Request History</h2>
             <p className="text-sm text-foreground-secondary mt-0.5">
               Update each request once you confirm pickup outcome with Delhivery
             </p>

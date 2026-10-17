@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { PageHeader, TONE_CLS, useActionToast } from '@/components/admin/kit'
 import { useSearchParams, useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
@@ -17,13 +18,13 @@ interface Order {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
-  confirmed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-  shipped: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
-  delivered: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  granted: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-  cancelled: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  pending: TONE_CLS.amber,
+  confirmed: TONE_CLS.blue,
+  processing: TONE_CLS.blue,
+  shipped: TONE_CLS.blue,
+  delivered: TONE_CLS.green,
+  granted: TONE_CLS.green,
+  cancelled: TONE_CLS.red,
 }
 
 const STATUS_OPTIONS = [
@@ -52,6 +53,7 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [filtering, setFiltering] = useState(false)
   const [downloading, setDownloading] = useState(false)
+  const toast = useActionToast()
   const [error, setError] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const customerRef = useRef<HTMLDivElement>(null)
@@ -191,7 +193,7 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
       a.remove()
       URL.revokeObjectURL(url)
     } catch (e: any) {
-      setError(e.message)
+      toast.error(e.message)
     } finally {
       setDownloading(false)
     }
@@ -201,9 +203,8 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Packing Slips</h1>
-        <p className="text-sm text-foreground-muted mt-1">Download packing slips to attach to parcels</p>
+      <div className="mb-5">
+        <PageHeader title="Packing Slips" description="Download packing slips to attach to parcels" />
       </div>
 
       {tabs}
@@ -222,7 +223,7 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
                   syncUrl({ customer: e.target.value })
                 }}
                 onFocus={() => setShowSuggestions(true)}
-                className="w-full px-2 h-control-sm pr-9 rounded border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-secondary-500 placeholder:text-foreground-muted"
+                className="field-md w-full border border-border-secondary bg-surface pr-9 text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted pointer-events-none">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -306,12 +307,12 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
       </div>
 
       {error && (
-        <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+        <div className="mb-4 bg-red-500/5 border border-red-500/40 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
           {error}
         </div>
       )}
 
-      <div className="bg-surface-elevated rounded-lg border border-border-default shadow-sm">
+      <div className="bg-surface-elevated rounded-xl border border-border-default">
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
           <h2 className="text-base font-semibold text-foreground">
             Orders
@@ -372,7 +373,7 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
                       <div className="flex items-center gap-1">
                         Customer
                         {customerSearch && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary-100 dark:bg-secondary-900/40 text-secondary-700 dark:text-secondary-300">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-secondary text-foreground-secondary">
                             {customerSearch}
                             <button onClick={() => setCustomerSearch('')} className="ml-1 hover:text-red-500">
                               ×
@@ -386,7 +387,7 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
                       <div className="flex items-center gap-1">
                         Status
                         {statusFilter && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-secondary-100 dark:bg-secondary-900/40 text-secondary-700 dark:text-secondary-300">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-secondary text-foreground-secondary">
                             {statusLabel(statusFilter)}
                             <button onClick={() => setStatusFilter('')} className="ml-1 hover:text-red-500">
                               ×
@@ -428,7 +429,7 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
+                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[order.status] || 'bg-surface-secondary text-foreground-secondary'}`}
                         >
                           {statusLabel(order.status)}
                         </span>
@@ -445,7 +446,7 @@ export default function PackingSlipsClient({ initialOrders, tabs }: { initialOrd
                           href={`/api/admin/packing-slips/${order.id}`}
                           download
                           title="Download Packing Slip"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-secondary-50 dark:bg-secondary-900/30 text-secondary-600 dark:text-secondary-400 hover:bg-secondary-100 dark:hover:bg-secondary-800/50 transition-colors"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path

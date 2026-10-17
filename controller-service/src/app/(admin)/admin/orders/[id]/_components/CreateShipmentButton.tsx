@@ -3,11 +3,14 @@
 import { useState } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { Check, Package, X } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { FormButton } from '@/components/admin/kit/form'
 
 export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: string; awbNumber?: string | null }) {
+  const toast = useActionToast()
   const [loading, setLoading] = useState(false)
   const [awb, setAwb] = useState<string | null>(awbNumber || null)
-  const [error, setError] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelConfirming, setCancelConfirming] = useState(false)
@@ -16,7 +19,6 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
 
   const beginConfirm = async () => {
     setConfirming(true)
-    setError(null)
     try {
       const res = await fetch('/api/admin/delhivery/pickup-locations')
       const data = await res.json()
@@ -31,7 +33,6 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
   const handleCreate = async () => {
     setConfirming(false)
     setLoading(true)
-    setError(null)
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/create-shipment`, {
         method: 'POST',
@@ -41,8 +42,9 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
       const data = await res.json()
       if (!res.ok) throw new Error(data.details || data.error || 'Failed to create shipment')
       setAwb(data.awb)
+      toast.success(`Shipment registered. AWB ${data.awb}`)
     } catch (err: any) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setLoading(false)
     }
@@ -51,14 +53,14 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
   const handleCancel = async () => {
     setCancelConfirming(false)
     setCancelling(true)
-    setError(null)
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/cancel-shipment`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.details || data.error || 'Failed to cancel shipment')
       setAwb(null)
+      toast.success('Shipment cancelled.')
     } catch (err: any) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setCancelling(false)
     }
@@ -67,43 +69,22 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
   if (awb) {
     return (
       <div className="space-y-2">
-        {error && (
-          <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
-            {error}
-          </p>
-        )}
-        <div className="flex items-center gap-3 px-4 py-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-          <svg
-            className="w-5 h-5 text-green-600 dark:text-green-400 shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-green-800 dark:text-green-300 font-medium">Shipment registered</p>
-            <p className="text-xs text-green-700 dark:text-green-400 font-mono mt-0.5">AWB: {awb}</p>
+        <div className="flex items-center gap-3 rounded-lg border border-green-500/40 bg-green-500/5 px-4 py-3">
+          <Check className="h-5 w-5 shrink-0 text-green-600" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-foreground">Shipment registered</p>
+            <p className="mt-0.5 font-mono text-xs text-foreground-muted">AWB: {awb}</p>
           </div>
         </div>
         {cancelConfirming ? (
           <RequireWrite scope="orders:write">
-            <div className="flex items-center gap-3 px-4 py-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-              <p className="text-sm text-red-800 dark:text-red-300 flex-1">
-                Cancel this shipment with Delhivery? This cannot be undone once picked up.
-              </p>
-              <div className="flex gap-2 shrink-0">
-                <button
-                  onClick={handleCancel}
-                  disabled={cancelling}
-                  className="px-3 h-control-sm text-xs font-semibold rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
-                >
-                  {cancelling ? 'Cancelling…' : 'Confirm Cancel'}
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-red-500/40 bg-red-500/5 px-4 py-3">
+              <p className="flex-1 text-sm text-foreground">Cancel this shipment with Delhivery? This cannot be undone once picked up.</p>
+              <div className="flex shrink-0 gap-2">
+                <button type="button" onClick={handleCancel} disabled={cancelling} className="control-sm bg-red-600 font-semibold text-white hover:bg-red-700 disabled:opacity-50">
+                  {cancelling ? 'Cancelling...' : 'Confirm Cancel'}
                 </button>
-                <button
-                  onClick={() => setCancelConfirming(false)}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg text-foreground-secondary hover:text-foreground transition-colors"
-                >
+                <button type="button" onClick={() => setCancelConfirming(false)} className="control-sm text-foreground-secondary hover:text-foreground">
                   Keep
                 </button>
               </div>
@@ -112,13 +93,12 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
         ) : (
           <RequireWrite scope="orders:write">
             <button
+              type="button"
               onClick={() => setCancelConfirming(true)}
               disabled={cancelling}
-              className="w-full px-4 h-control text-sm font-medium rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              className="control-md w-full justify-center border border-red-500/40 text-red-600 hover:bg-red-500/10 disabled:opacity-50 dark:text-red-400 sm:w-auto"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="h-4 w-4" />
               Cancel Shipment
             </button>
           </RequireWrite>
@@ -129,68 +109,31 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
 
   return (
     <div className="space-y-2">
-      {error && (
-        <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
-          {error}
-        </p>
-      )}
       {confirming ? (
         <RequireWrite scope="orders:write">
-          <div className="px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800 space-y-3">
-            <p className="text-sm text-yellow-800 dark:text-yellow-300">
-              Register with Delhivery and generate an AWB number?
-            </p>
+          <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3">
+            <p className="text-sm text-foreground">Register with Delhivery and generate an AWB number?</p>
             {warehouses.length > 1 && (
-              <label className="block text-xs font-medium text-yellow-800 dark:text-yellow-300 space-y-1">
+              <label className="block space-y-1 text-xs font-medium text-foreground-secondary">
                 <span>Pickup warehouse</span>
                 <AdminSelect sm value={pickupLocation} options={warehouses} onChange={setPickupLocation} />
               </label>
             )}
             <div className="flex gap-2">
-              <button
-                onClick={handleCreate}
-                disabled={loading}
-                className="px-3 h-control-sm text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
-              >
+              <FormButton type="button" onClick={handleCreate} disabled={loading}>
                 Confirm
-              </button>
-              <button
-                onClick={() => setConfirming(false)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg text-foreground-secondary hover:text-foreground transition-colors"
-              >
+              </FormButton>
+              <FormButton type="button" variant="secondary" onClick={() => setConfirming(false)}>
                 Cancel
-              </button>
+              </FormButton>
             </div>
           </div>
         </RequireWrite>
       ) : (
         <RequireWrite scope="orders:write">
-          <button
-            onClick={beginConfirm}
-            disabled={loading}
-            className="w-full px-4 h-control text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Creating shipment…
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                  />
-                </svg>
-                Create Delhivery Shipment
-              </>
-            )}
+          <button type="button" onClick={beginConfirm} disabled={loading} className="control-md w-full justify-center bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50 sm:w-auto">
+            <Package className="h-4 w-4" />
+            {loading ? 'Creating shipment...' : 'Create Delhivery Shipment'}
           </button>
         </RequireWrite>
       )}

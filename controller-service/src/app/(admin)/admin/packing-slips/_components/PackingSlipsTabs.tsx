@@ -29,7 +29,7 @@ export default function PackingSlipsTabs({
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Packing Slips</h1>
+        <h1 className="text-2xl font-bold text-foreground">Packing Slips</h1>
         <p className="text-sm text-foreground-muted mt-1">Download packing slips to attach to parcels</p>
       </div>
       {bar}
