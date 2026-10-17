@@ -1,15 +1,16 @@
 #!/bin/bash
 # Roll a release, in phases (ci.yml runs each as its own job; no phase = all three, in order):
 #   platform   the platform (controller, messaging, document and public-api services, CronJobs)
-#   tenant-db  the schema and migration files fanned out to every store tenant's database (40-tenant-fanout.sh)
+#   tenant-db  the schema and migration files fanned out to every store tenant's database (40-tenant-fanout.sh);
+#              tenant-schema / tenant-migrations run just one half (the pipeline's separate stages)
 #   stores     every store: the controller re-applies its namespace at the release images (its controller,
 #              messaging and document pods) and we wait for them, stopping at the first failure
 # --dry-run changes nothing: platform shows `kubectl diff`, tenant-db what it would post, stores what it would wait on.
-# Usage: rollout.sh <tag> [platform|tenant-db|stores] [--dry-run]      e.g. rollout.sh local-1a2b3c4d
+# Usage: rollout.sh <tag> [platform|tenant-db|tenant-schema|tenant-migrations|stores] [--dry-run]      e.g. rollout.sh local-1a2b3c4d
 source "$(dirname "$0")/../db/lib.sh"
 TAG=${1:?tag}
 PHASE=all
-for a in "${@:2}"; do case $a in platform|tenant-db|stores) PHASE=$a ;; esac; done
+for a in "${@:2}"; do case $a in platform|tenant-db|tenant-schema|tenant-migrations|stores) PHASE=$a ;; esac; done
 REG='708835965056\.dkr\.ecr\.us-east-1\.amazonaws\.com'
 PLATFORM=($CTRL jeffi-stores-messaging-service jeffi-stores-document-service jeffi-stores-public-api-service)
 k8s_tunnel
@@ -36,8 +37,8 @@ platform() {
 }
 
 tenant_db() {
-  if $DRY_RUN; then bash "$REPO/deploy/k8s/db/40-tenant-fanout.sh" "${TAG#local-}" --dry-run
-  else bash "$REPO/deploy/k8s/db/40-tenant-fanout.sh" "${TAG#local-}"; fi
+  if $DRY_RUN; then bash "$REPO/deploy/k8s/db/40-tenant-fanout.sh" "${TAG#local-}" "$@" --dry-run
+  else bash "$REPO/deploy/k8s/db/40-tenant-fanout.sh" "${TAG#local-}" "$@"; fi
 }
 
 stores() {
@@ -62,6 +63,8 @@ stores() {
 case $PHASE in
   platform) platform ;;
   tenant-db) tenant_db ;;
+  tenant-schema) tenant_db --schema ;;
+  tenant-migrations) tenant_db --migrations ;;
   stores) stores ;;
   all) platform; tenant_db; stores ;;
 esac

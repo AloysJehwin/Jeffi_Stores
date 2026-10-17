@@ -52,7 +52,7 @@ export const getContent = (sid: string) =>
   call<ContentResource>('GET', `/Content/${sid}`)
 
 export const deleteContent = (sid: string) =>
-  call<{}>('DELETE', `/Content/${sid}`)
+  call<Record<string, never>>('DELETE', `/Content/${sid}`)
 
 export interface ApprovalCreateInput {
   name: string                                             // template name as submitted to Meta (snake_case)

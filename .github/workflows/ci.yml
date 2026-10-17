@@ -1,18 +1,31 @@
 name: Jeffi Stores Pipeline
 
-# PR: verify-scripts, lint, typecheck, test and build in parallel → pr-gate.
-# Push to main (or workflow_dispatch with deploy=true), everything that can overlap does:
-#   checks ─┐
-#   release notes ─┴→ Approve release (production) → Database · schema → Database · migrations ─┐
-#   images (4, arm, tag local-<image_sha>; built while the checks run and you approve) ────────────┴→
-#   Roll out · platform → Database · tenants → Roll out · stores ─┬→ Verify (smoke test)
-#                       └→ CloudFront ─────────────────────────────┘
-# The checks gate the approval, so a failing commit never deploys (its images may still be pushed). The schema
-# is additive, so applying it while the old code runs is safe. Schema and migrations stay in order (both alter
-# jeffi_stores); tenants need the new controller, stores need their databases first. After the one approval the
-# stages run in `production-release` (no reviewer, same branches), each over an SSM tunnel; a failure stops the rest.
-# dry_run (default on for workflow_dispatch) builds the images and shows each stage's SQL, kubectl diff and
-# targets without changing production; schema=true runs the schema stage without a database/ change.
+# One pipeline, one card per stage. Per-app stages are matrices (one job per app inside the card).
+#
+#   Init ─┬→ Lint (5) ────────┬→ Build (5) ───────┐
+#         ├→ Type check (5) ──┘                    │
+#         ├→ Security                              ├→ Checks passed (required status; on a release, the approval)
+#         ├→ Unit tests (5) ───────────────────────┤
+#         ├→ Integration tests ────────────────────┘
+#         └→ Images (4, release only, after Lint and Type check)
+#
+# Release (push to main, or workflow_dispatch with deploy=true): Checks passed waits for the one approval, then:
+#   Checks passed (approval) ─┬→ DB · flagship schema ─────┬→ Deploy · flagship ───┬→ Smoke · flagship ─────────┬→ Deploy · tenants
+#                             └→ DB · flagship migrations ─┤                       ├→ CloudFront               │   → Smoke · tenants → Post
+#                                                          │                       ├→ DB · tenant schema ──────┤
+#                                                          │                       └→ DB · tenant migrations ──┘
+#                                                          └→ Deploy · AI gateway ──→ Smoke · AI gateway  (Razer box; only Post waits for it)
+# Stacked stages start together; where order matters a stage waits for the one it depends on before doing
+# anything (.github/actions/wait-for-job): flagship migrations after flagship schema, tenant schema after
+# Smoke · flagship (no store is touched until the flagship is proven live), tenant migrations after tenant
+# schema. Each stage computes the release tag from history, so it needs only the stages before it.
+#
+# Flagship first: the platform database (jeffi_stores) and the platform services, proven live before any store
+# is touched. Tenants follow, since their schema fan-out runs inside the new controller. The schema is additive,
+# so it lands while the old code runs. Every stage after the approval runs in `production-release` (no
+# reviewer) over an SSM tunnel and a failure stops the rest. Both schema stages always run (they apply only what
+# is missing). dry_run (default on by hand) builds the images and shows each stage's SQL, kubectl diff and
+# targets without changing production.
 
 on:
   pull_request:
@@ -23,17 +36,13 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: Run the release path for this ref (pauses for approval)
+        description: Run the release for this ref (pauses for approval)
         type: boolean
         default: false
       dry_run:
         description: Dry run — build images and show the database SQL, change nothing in production
         type: boolean
         default: true
-      schema:
-        description: Run the jeffi_stores schema step even if database/ is unchanged since the live commit
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -44,14 +53,20 @@ concurrency:
 
 env:
   AWS_REGION: us-east-1
-  DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+  DRY_FLAG: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '' }}
 
 jobs:
-  verify-scripts:
-    name: Referenced scripts exist
+  # ── Init ─────────────────────────────────────────────────────────────────────────────────────
+
+  init:
+    name: Init
     runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.mode.outputs.release }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the image tag and release notes read history
       - name: Every script a workflow runs is committed
         run: |
           set -euo pipefail
@@ -60,37 +75,118 @@ jobs:
             [ -f "$f" ] || { echo "::error::$f is referenced by a workflow but not committed"; missing=1; }
           done
           exit $missing
+      - id: mode
+        name: Release or checks only
+        run: echo "release=${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy) }}" >> "$GITHUB_OUTPUT"
+      - id: notes
+        name: What this release changes
+        if: steps.mode.outputs.release == 'true'
+        run: |
+          set -euo pipefail
+          tag=$(bash deploy/k8s/bootstrap/image-tag.sh)
+          live=$(curl -fsS --max-time 15 https://jeffistores.in/api/health | sed -nE 's/.*"commit":"([0-9a-f]+)".*/\1/p' || true)
+          {
+            echo "## Release $tag (HEAD ${GITHUB_SHA::8})"; echo
+            if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null; then
+              schema=$(git diff --name-only "$live..HEAD" -- database deploy/schema-diff.sh deploy/k8s/db/manual.sql ':(exclude)database/migrations')
+              migrations=$(git diff --name-only "$live..HEAD" -- database/migrations)
+              echo "Live: \`$live\`. Commits since:"; echo
+              git log --max-count=60 --format='- %h %s' "$live..HEAD" # no pipe: head would SIGPIPE git log under pipefail
+            else
+              # Unknown live commit: run both steps (each is idempotent and applies only what is missing).
+              schema="(live commit ${live:-unknown} not in this clone)"; migrations=$schema
+              echo "Live commit \`${live:-unknown}\` is not in this clone; the database stages will run in full."
+            fi
+            echo
+            if [ -n "$schema" ]; then echo "**Schema:** the flagship schema stage applies the \`database/\` diff to jeffi_stores:"; echo "$schema" | sed 's/^/- /'; else echo "**Schema:** unchanged."; fi
+            echo
+            if [ -n "$migrations" ]; then echo "**Migrations:** new \`database/migrations\` files:"; echo "$migrations" | sed 's/^/- /'; else echo "**Migrations:** no new files; the migration stages still run any not yet recorded."; fi
+            echo; echo "Approve the \`production\` environment to proceed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Checks ───────────────────────────────────────────────────────────────────────────────────
 
   lint:
-    name: Lint
+    name: Lint · ${{ matrix.app }}
     runs-on: ubuntu-latest
+    needs: init
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { app: controller, run: npm run lint }
+          - { app: messaging, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts messaging-service/src }
+          - { app: documents, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts document-service/src }
+          - { app: public-api, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts public-api-service/src }
+          - { app: ai-gateway, run: npx eslint --no-eslintrc -c .eslintrc.services.cjs --ext .ts ai-platform/gateway/src ai-platform/sdk }
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
+      - uses: ./.github/actions/node-setup
+      - run: ${{ matrix.run }}
 
   typecheck:
-    name: Type Check
+    name: Type check · ${{ matrix.app }}
     runs-on: ubuntu-latest
+    needs: init
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { app: controller, run: npx tsc --noEmit } # root tsconfig: the app, tests and integration tests
+          - { app: messaging, run: npm --prefix messaging-service run typecheck }
+          - { app: documents, run: npm --prefix document-service run typecheck }
+          - { app: public-api, run: npm --prefix public-api-service run typecheck }
+          - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform run typecheck }
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: ./.github/actions/node-setup
         with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - name: Controller
-        run: npx tsc --noEmit
-      - name: Services and packages
-        run: npm run typecheck:services
+          install: ${{ matrix.install }}
+      - run: ${{ matrix.run }}
+
+  security:
+    name: Security
+    runs-on: ubuntu-latest
+    needs: init
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/node-setup
+      - name: Dependency audit (advisory)
+        run: npm audit --audit-level=high
+        continue-on-error: true
 
   test:
-    name: Test & Coverage
+    name: Unit tests · ${{ matrix.app }}
     runs-on: ubuntu-latest
+    needs: init
+    env:
+      JWT_SECRET: test-jwt-secret-at-least-32-bytes!!
+      CRON_SECRET: test-cron-secret
+      SERVICE_AUTH_SECRET: test-service-auth-secret
+      RAZORPAY_WEBHOOK_SECRET: test-webhook-secret
+      RAZORPAYX_WEBHOOK_SECRET: test-razorpayx-secret
+      DELHIVERY_API_KEY: test-delhivery-key
+      GOOGLE_CLIENT_ID: test-google-client-id
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { app: controller, run: npx vitest run --coverage --pool=forks }
+          - { app: messaging, run: npm --prefix messaging-service test }
+          - { app: documents, run: npm --prefix document-service test }
+          - { app: public-api, run: npm --prefix public-api-service test -- --passWithNoTests }
+          - { app: ai-gateway, install: npm --prefix ai-platform ci, run: npm --prefix ai-platform test }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/node-setup
+        with:
+          install: ${{ matrix.install }}
+      - run: ${{ matrix.run }}
+
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    needs: init
     env:
       JWT_SECRET: test-jwt-secret-at-least-32-bytes!!
       CRON_SECRET: test-cron-secret
@@ -101,35 +197,30 @@ jobs:
       GOOGLE_CLIENT_ID: test-google-client-id
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - name: Security audit
-        run: npm audit --audit-level=high
-        continue-on-error: true
-      - name: Controller tests with coverage
-        run: npx vitest run --coverage --pool=forks
-      - name: Integration / UI tests
-        run: npm run test:integration
-      - name: Service tests
-        run: |
-          npm --prefix messaging-service test
-          npm --prefix document-service test
-          npm --prefix public-api-service test -- --passWithNoTests
+      - uses: ./.github/actions/node-setup
+      - run: npm run test:integration
 
   build:
-    name: Build
-    runs-on: ubuntu-latest
+    name: Build · ${{ matrix.app }}
+    runs-on: ${{ matrix.runner }}
+    needs: [lint, typecheck] # a commit failing either never spends a build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The Next app compiles here; the services run their TypeScript directly, so their build is the image
+          # (arm64 like production, not pushed). The service caches are shared with the release Images stage.
+          - { app: controller, runner: ubuntu-latest, kind: next }
+          - { app: messaging, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target messaging . }
+          - { app: documents, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target documents . }
+          - { app: public-api, runner: ubuntu-24.04-arm, kind: image, args: -f deploy/services.Dockerfile --target public-api . }
+          - { app: ai-gateway, runner: ubuntu-24.04-arm, kind: image, args: -f ai-platform/gateway/Dockerfile ai-platform }
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
+      - if: matrix.kind == 'next'
+        uses: ./.github/actions/node-setup
       - name: Next.js build
+        if: matrix.kind == 'next'
         run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=6144
@@ -143,29 +234,19 @@ jobs:
           NEXT_PUBLIC_ENABLE_GST: ${{ secrets.NEXT_PUBLIC_ENABLE_GST }}
           NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
           NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
-
-  pr-gate:
-    name: PR Gate
-    runs-on: ubuntu-latest
-    needs: [verify-scripts, lint, typecheck, test, build]
-    if: github.event_name == 'pull_request'
-    steps:
-      - run: |
-          echo "Scripts:    ${{ needs.verify-scripts.result }}"
-          echo "Lint:       ${{ needs.lint.result }}"
-          echo "Type Check: ${{ needs.typecheck.result }}"
-          echo "Test:       ${{ needs.test.result }}"
-          echo "Build:      ${{ needs.build.result }}"
-          [[ "${{ needs.verify-scripts.result }}${{ needs.lint.result }}${{ needs.typecheck.result }}${{ needs.test.result }}${{ needs.build.result }}" == "successsuccesssuccesssuccesssuccess" ]] ||
-            { echo "PR Gate FAILED"; exit 1; }
-          echo "PR Gate PASSED"
-
-  # ── Release (push to main, or workflow_dispatch with deploy=true) ─────────────────────────────────────
+      - if: matrix.kind == 'image'
+        uses: docker/setup-buildx-action@v3
+      - if: matrix.kind == 'image'
+        uses: crazy-max/ghaction-github-runtime@v3 # exposes the cache endpoint buildx's gha cache needs
+      - name: Image build (not pushed)
+        if: matrix.kind == 'image'
+        run: docker buildx build --platform linux/arm64 --cache-from type=gha,scope=${{ matrix.app }} --cache-to type=gha,mode=max,scope=${{ matrix.app }} ${{ matrix.args }}
 
   images:
-    name: Image ${{ matrix.service }}
+    name: Image · ${{ matrix.service }}
     runs-on: ubuntu-24.04-arm
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy)
+    needs: [init, lint, typecheck]
+    if: needs.init.outputs.release == 'true'
     permissions:
       id-token: write
       contents: read
@@ -194,209 +275,141 @@ jobs:
           NEXT_PUBLIC_ONDEVICE_MODEL_BASE: ${{ vars.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
         run: bash deploy/k8s/bootstrap/build-push-ecr.sh "${{ matrix.service }}" "${{ steps.tag.outputs.tag }}"
 
-  release-notes:
-    name: Release notes
+  checks:
+    name: Checks passed
     runs-on: ubuntu-latest
-    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy)
-    outputs:
-      tag: ${{ steps.notes.outputs.tag }}
-      schema: ${{ steps.notes.outputs.schema }}
-      migrations: ${{ steps.notes.outputs.migrations }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - id: notes
-        name: What this release changes
-        run: |
-          set -euo pipefail
-          tag=$(bash deploy/k8s/bootstrap/image-tag.sh)
-          live=$(curl -fsS --max-time 15 https://jeffistores.in/api/health | sed -nE 's/.*"commit":"([0-9a-f]+)".*/\1/p' || true)
-          {
-            echo "## Release $tag (HEAD ${GITHUB_SHA::8})"; echo
-            if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null; then
-              schema=$(git diff --name-only "$live..HEAD" -- database deploy/schema-diff.sh deploy/k8s/db/manual.sql ':(exclude)database/migrations')
-              migrations=$(git diff --name-only "$live..HEAD" -- database/migrations)
-              echo "Live: \`$live\`. Commits since:"; echo
-              git log --format='- %h %s' "$live..HEAD" | head -60
-            else
-              # Unknown live commit: run both steps (each is idempotent and applies only what is missing).
-              schema="(live commit ${live:-unknown} not in this clone)"; migrations=$schema
-              echo "Live commit \`${live:-unknown}\` is not in this clone; the database steps will run in full."
-            fi
-            echo
-            if [ -n "$schema" ]; then echo "**Schema:** the deploy job applies the \`database/\` diff to jeffi_stores first:"; echo "$schema" | sed 's/^/- /'; else echo "**Schema:** unchanged."; fi
-            echo
-            if [ -n "$migrations" ]; then echo "**Migrations:** new \`database/migrations\` files:"; echo "$migrations" | sed 's/^/- /'; else echo "**Migrations:** no new files; the deploy job still runs any not yet recorded."; fi
-            echo; echo "Store tenant databases are updated during the rollout. Approve the \`production\` environment to proceed."
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "schema=$([ -n "$schema" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "migrations=$([ -n "$migrations" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
-  # Production: one approval (the `production` environment), then each stage is its own job in the
-  # `production-release` environment (no reviewer, same branches) so the graph shows where a release stands.
-  approve:
-    name: Approve release
-    runs-on: ubuntu-latest
-    needs: [verify-scripts, lint, typecheck, test, build, release-notes]
+    needs: [init, lint, typecheck, security, test, integration, build, images]
+    # A PR (or a release whose checks all passed) runs this; a release with a failed check skips it, so nobody is
+    # asked to approve a broken build. On a release it is also the approval: the `production` environment.
+    if: ${{ always() && (needs.init.outputs.release != 'true' || (needs.lint.result == 'success' && needs.typecheck.result == 'success' && needs.test.result == 'success' && needs.integration.result == 'success' && needs.build.result == 'success' && needs.images.result == 'success')) }}
     environment:
-      name: production
-      url: https://jeffistores.in
+      name: ${{ needs.init.outputs.release == 'true' && 'production' || '' }}
+      url: ${{ needs.init.outputs.release == 'true' && 'https://jeffistores.in' || '' }}
     steps:
-      - run: echo "Approved ${{ needs.release-notes.outputs.tag }}, dry_run=${{ env.DRY }}"
-
-  db-schema:
-    name: Database · schema
-    runs-on: ubuntu-latest
-    needs: [release-notes, approve]
-    if: ${{ !failure() && !cancelled() && needs.approve.result == 'success' && (needs.release-notes.outputs.schema == 'true' || (github.event_name == 'workflow_dispatch' && (inputs.dry_run || inputs.schema))) }}
-    environment: production-release
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/release-setup
-        with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
-      - name: jeffi_stores schema diff, manual.sql, control-plane diff and plan seed
-        run: bash deploy/k8s/db/release-db.sh --schema --yes ${{ env.DRY == 'true' && '--dry-run' || '' }}
-      - name: SQL (summary)
-        if: always()
+      - name: Every check succeeded
         run: |
-          shopt -s nullglob
-          for f in "$OUT_DIR"/applied-schema-platform.sql "$OUT_DIR"/schema-*.sql; do
-            [ -s "$f" ] || continue
-            { echo "<details><summary>$(basename "$f") ($(grep -c ';' "$f") statements)</summary>"; echo; echo '```sql'; head -c 60000 "$f"; echo '```'; echo '</details>'; } >> "$GITHUB_STEP_SUMMARY"
-          done
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: db-${{ github.job }}
-          path: ${{ runner.temp }}/db
-          if-no-files-found: ignore
+          r="${{ needs.init.result }} ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.security.result }} ${{ needs.test.result }} ${{ needs.integration.result }} ${{ needs.build.result }}"
+          echo "Init, Lint, Type check, Security, Unit tests, Integration tests, Build: $r"
+          [ "$r" = "success success success success success success success" ] || { echo "::error::Checks failed"; exit 1; }
+      - name: Approved for release
+        if: needs.init.outputs.release == 'true'
+        run: echo "Approved ${GITHUB_SHA::8} ${{ env.DRY_FLAG }}"
 
-  db-migrations:
-    name: Database · migrations
+  # ── Release: one approval, then flagship before tenants ──────────────────────────────────────
+
+  db-flagship-schema:
+    name: DB · flagship schema
     runs-on: ubuntu-latest
-    needs: [approve, db-schema]
-    if: ${{ !failure() && !cancelled() && needs.approve.result == 'success' }}
+    needs: checks
     environment: production-release
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
+    concurrency: { group: deploy-production-db-flagship-schema, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # the release tag is computed from history
       - uses: ./.github/actions/release-setup
-        with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
-      - name: Pending database/migrations files
-        run: bash deploy/k8s/db/release-db.sh --migrations --yes ${{ env.DRY == 'true' && '--dry-run' || '' }}
-      - name: SQL (summary)
-        if: always()
-        run: |
-          shopt -s nullglob
-          for f in "$OUT_DIR"/applied-schema-platform.sql "$OUT_DIR"/schema-*.sql; do
-            [ -s "$f" ] || continue
-            { echo "<details><summary>$(basename "$f") ($(grep -c ';' "$f") statements)</summary>"; echo; echo '```sql'; head -c 60000 "$f"; echo '```'; echo '</details>'; } >> "$GITHUB_STEP_SUMMARY"
-          done
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: db-${{ github.job }}
-          path: ${{ runner.temp }}/db
-          if-no-files-found: ignore
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - name: jeffi_stores schema diff, manual.sql, control-plane diff and plan seed (applies only what is missing)
+        run: bash deploy/k8s/db/release-db.sh --schema --yes ${{ env.DRY_FLAG }}
+      - if: always()
+        uses: ./.github/actions/db-report
+        with: { name: "db-flagship-schema" }
 
-  rollout-platform:
-    name: Roll out · platform
+  db-flagship-migrations:
+    name: DB · flagship migrations
     runs-on: ubuntu-latest
-    needs: [images, db-migrations]
-    if: success()
+    needs: checks # starts beside the schema stage; applies nothing until the schema has succeeded
     environment: production-release
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
+    concurrency: { group: deploy-production-db-flagship-migrations, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read, actions: read }
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: ./.github/actions/wait-for-job
+        with: { job: "DB · flagship schema" }
       - uses: ./.github/actions/release-setup
-        with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
-      - name: Controller, messaging, documents, public-api and CronJobs at ${{ needs.images.outputs.tag }}
-        run: bash deploy/k8s/bootstrap/rollout.sh ${{ needs.images.outputs.tag }} platform ${{ env.DRY == 'true' && '--dry-run' || '' }}
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - name: Pending database/migrations files on jeffi_stores
+        run: bash deploy/k8s/db/release-db.sh --migrations --yes ${{ env.DRY_FLAG }}
+      - if: always()
+        uses: ./.github/actions/db-report
+        with: { name: "db-flagship-migrations" }
 
-  db-tenants:
-    name: Database · tenants
+  deploy-ai-gateway:
+    name: Deploy · AI gateway
     runs-on: ubuntu-latest
-    needs: [images, rollout-platform]
-    if: success()
+    needs: [db-flagship-schema, db-flagship-migrations] # beside Deploy · flagship; the stores never wait for it (the Razer box may be offline)
     environment: production-release
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
+    concurrency: { group: deploy-production-deploy-ai-gateway, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/release-setup
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
-      - name: Schema and migration files to every store's database
-        run: bash deploy/k8s/bootstrap/rollout.sh ${{ needs.images.outputs.tag }} tenant-db ${{ env.DRY == 'true' && '--dry-run' || '' }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Build, roll out and smoke-test the gateway on the Razer box (SSM → core → Tailscale)
+        run: bash deploy/k8s/bootstrap/razer-release.sh "$GITHUB_SHA" ${{ env.DRY_FLAG }}
 
-  rollout-stores:
-    name: Roll out · stores
+  smoke-ai-gateway:
+    name: Smoke · AI gateway
     runs-on: ubuntu-latest
-    needs: [images, db-tenants]
-    if: success()
+    needs: deploy-ai-gateway # beside Smoke · flagship
     environment: production-release
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
+    concurrency: { group: deploy-production-smoke-ai-gateway, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/release-setup
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
-      - name: Every store's controller, messaging and document pods at ${{ needs.images.outputs.tag }}
-        run: bash deploy/k8s/bootstrap/rollout.sh ${{ needs.images.outputs.tag }} stores ${{ env.DRY == 'true' && '--dry-run' || '' }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: /healthz and /v1/providers from the core, the way the platform reaches the gateway
+        run: bash deploy/k8s/bootstrap/razer-release.sh smoke
+
+  deploy-flagship:
+    name: Deploy · flagship
+    runs-on: ubuntu-latest
+    needs: [db-flagship-schema, db-flagship-migrations]
+    environment: production-release
+    concurrency: { group: deploy-production-deploy-flagship, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # the release tag is computed from history
+      - uses: ./.github/actions/release-setup
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - name: Controller, messaging, documents, public-api and CronJobs at the release tag
+        run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" platform ${{ env.DRY_FLAG }}
+
+  smoke-flagship:
+    name: Smoke · flagship
+    runs-on: ubuntu-latest
+    needs: deploy-flagship
+    environment: production-release
+    concurrency: { group: deploy-production-smoke-flagship, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # the release tag is computed from history
+      - uses: ./.github/actions/release-setup
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - name: Live commit and every platform host
+        run: bash deploy/k8s/bootstrap/smoke.sh "${TAG#local-}" flagship ${{ env.DRY_FLAG }}
 
   cdn:
     name: CloudFront
     runs-on: ubuntu-latest
-    needs: [rollout-platform]
-    if: success() && !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+    needs: deploy-flagship # beside the flagship smoke test
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.dry_run) }}
     environment: production-release
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
+    concurrency: { group: deploy-production-cdn, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # the release tag is computed from history
       - uses: ./.github/actions/release-setup
-        with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
       - name: Invalidate CloudFront
         env:
           DIST_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
@@ -406,53 +419,82 @@ jobs:
           aws cloudfront wait invalidation-completed --distribution-id "$DIST_ID" --id "$id"
           echo "Invalidation $id complete"
 
-  verify:
-    name: Verify
+  db-tenant-schema:
+    name: DB · tenant schema
     runs-on: ubuntu-latest
-    needs: [images, rollout-stores, cdn]
-    if: ${{ !failure() && !cancelled() && needs.rollout-stores.result == 'success' }}
+    needs: deploy-flagship # starts beside Smoke · flagship; touches no store until that has passed
     environment: production-release
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-    permissions:
-      id-token: write
-      contents: read
+    concurrency: { group: deploy-production-db-tenant-schema, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read, actions: read }
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # the release tag is computed from history
+      - uses: ./.github/actions/wait-for-job
+        with: { job: "Smoke · flagship" }
       - uses: ./.github/actions/release-setup
-        with:
-          role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          kubeconfig-b64: ${{ secrets.KUBECONFIG_B64 }}
-      - name: Smoke test (live commit and every host)
-        run: |
-          tag=${{ needs.images.outputs.tag }}
-          bash deploy/k8s/bootstrap/smoke.sh "${tag#local-}" ${{ env.DRY == 'true' && '--dry-run' || '' }}
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - name: Schema fan-out to every store's database
+        run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" tenant-schema ${{ env.DRY_FLAG }}
 
-  summary:
-    name: Pipeline Summary
+  db-tenant-migrations:
+    name: DB · tenant migrations
     runs-on: ubuntu-latest
-    needs: [verify-scripts, lint, typecheck, test, build, pr-gate, images, release-notes, approve, db-schema, db-migrations, rollout-platform, db-tenants, rollout-stores, cdn, verify]
-    if: always()
+    needs: deploy-flagship # starts beside the schema stage; applies nothing until the schema has succeeded
+    environment: production-release
+    concurrency: { group: deploy-production-db-tenant-migrations, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read, actions: read }
     steps:
-      - run: |
-          echo "Scripts:        ${{ needs.verify-scripts.result }}"
-          echo "Lint:           ${{ needs.lint.result }}"
-          echo "Type Check:     ${{ needs.typecheck.result }}"
-          echo "Test:           ${{ needs.test.result }}"
-          echo "Build:          ${{ needs.build.result }}"
-          echo "PR Gate:        ${{ needs.pr-gate.result }}"
-          echo "Images:         ${{ needs.images.result }}"
-          echo "Release notes:  ${{ needs.release-notes.result }}"
-          echo "Approve:        ${{ needs.approve.result }}"
-          echo "DB schema:      ${{ needs.db-schema.result }}"
-          echo "DB migrations:  ${{ needs.db-migrations.result }}"
-          echo "Platform:       ${{ needs.rollout-platform.result }}"
-          echo "DB tenants:     ${{ needs.db-tenants.result }}"
-          echo "Stores:         ${{ needs.rollout-stores.result }}"
-          echo "CloudFront:     ${{ needs.cdn.result }}"
-          echo "Verify:         ${{ needs.verify.result }}"
-          case "${{ needs.verify-scripts.result }} ${{ needs.lint.result }} ${{ needs.typecheck.result }} ${{ needs.test.result }} ${{ needs.build.result }} ${{ needs.pr-gate.result }} ${{ needs.images.result }} ${{ needs.release-notes.result }} ${{ needs.approve.result }} ${{ needs.db-schema.result }} ${{ needs.db-migrations.result }} ${{ needs.rollout-platform.result }} ${{ needs.db-tenants.result }} ${{ needs.rollout-stores.result }} ${{ needs.cdn.result }} ${{ needs.verify.result }}" in
-            *failure*|*cancelled*) echo "Pipeline FAILED"; exit 1 ;;
-          esac
-          echo "Pipeline OK"
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: ./.github/actions/wait-for-job
+        with: { job: "DB · tenant schema" }
+      - uses: ./.github/actions/release-setup
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - name: Pending migration files on every store's database
+        run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" tenant-migrations ${{ env.DRY_FLAG }}
+
+  deploy-tenants:
+    name: Deploy · tenants
+    runs-on: ubuntu-latest
+    needs: [smoke-flagship, db-tenant-schema, db-tenant-migrations]
+    environment: production-release
+    concurrency: { group: deploy-production-deploy-tenants, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # the release tag is computed from history
+      - uses: ./.github/actions/release-setup
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - name: Every store's controller, messaging and document pods at the release tag
+        run: bash deploy/k8s/bootstrap/rollout.sh "$TAG" stores ${{ env.DRY_FLAG }}
+
+  smoke-tenants:
+    name: Smoke · tenants
+    runs-on: ubuntu-latest
+    needs: deploy-tenants
+    environment: production-release
+    concurrency: { group: deploy-production-smoke-tenants, cancel-in-progress: false }
+    permissions: { id-token: write, contents: read }
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 } # the release tag is computed from history
+      - uses: ./.github/actions/release-setup
+        with: { role-arn: "${{ secrets.AWS_ROLE_ARN }}", kubeconfig-b64: "${{ secrets.KUBECONFIG_B64 }}" }
+      - name: Every running store's health at the release commit
+        run: bash deploy/k8s/bootstrap/smoke.sh "${TAG#local-}" tenants ${{ env.DRY_FLAG }}
+
+  post:
+    name: Post
+    runs-on: ubuntu-latest
+    needs: [smoke-tenants, cdn, smoke-ai-gateway]
+    if: always() && ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.deploy))
+    permissions: { actions: read, contents: read }
+    steps:
+      - name: Release summary (every stage's result, from the run itself)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          jobs=$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs" --jq '.jobs[] | select(.name != "Post") | "\(.name)\t\(.conclusion // .status)"')
+          { echo "## Release ${GITHUB_SHA::8}"; echo; echo "| Stage | Result |"; echo "|---|---|"; echo "$jobs" | awk -F'\t' '{print "| " $1 " | " $2 " |"}'; } >> "$GITHUB_STEP_SUMMARY"
+          if echo "$jobs" | awk -F'\t' '$2 == "failure" || $2 == "cancelled"' | grep -q .; then echo "::error::Release did not complete"; exit 1; fi

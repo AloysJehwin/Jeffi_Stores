@@ -6,7 +6,8 @@
 #   jeffi-github-deploy  only jobs in the `production` (approval) and `production-release` (the stages after it)
 #                        environments: read jeffi/production (the RDS
 #                        master password for 05-table-owner.sh), SSM tunnels to the core and through it to RDS,
-#                        log in to RDS as app_user (schema diff, migrations), invalidate CloudFront.
+#                        log in to RDS as app_user (schema diff, migrations), invalidate CloudFront, and run one
+#                        SSM command on the core to release the AI gateway on the Razer box (razer-release.sh).
 # Idempotent; --dry-run prints the policies. Then set the secrets it prints.
 # Usage: bash deploy/k8s/bootstrap/github-oidc.sh [--dry-run]
 source "$(dirname "$0")/../db/lib.sh"
@@ -49,6 +50,9 @@ DEPLOY_POLICY=$(cat <<JSON
   "Resource":["arn:aws:ec2:$AWS_REGION:$ACCOUNT:instance/$CORE_ID","arn:aws:ssm:$AWS_REGION::document/AWS-StartPortForwardingSession",
    "arn:aws:ssm:$AWS_REGION::document/AWS-StartPortForwardingSessionToRemoteHost"]},
  {"Sid":"OwnSessions","Effect":"Allow","Action":["ssm:TerminateSession","ssm:ResumeSession"],"Resource":"arn:aws:ssm:*:*:session/\${aws:userid}-*"},
+ {"Sid":"RazerRelease","Effect":"Allow","Action":"ssm:SendCommand",
+  "Resource":["arn:aws:ec2:$AWS_REGION:$ACCOUNT:instance/$CORE_ID","arn:aws:ssm:$AWS_REGION::document/AWS-RunShellScript"]},
+ {"Sid":"RazerReleaseOutput","Effect":"Allow","Action":"ssm:GetCommandInvocation","Resource":"*"},
  {"Sid":"Cdn","Effect":"Allow","Action":["cloudfront:CreateInvalidation","cloudfront:GetInvalidation"],"Resource":"arn:aws:cloudfront::$ACCOUNT:distribution/*"}
 ]}
 JSON
