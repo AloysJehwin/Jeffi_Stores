@@ -30,3 +30,6 @@ runs:
         mkdir -p ~/.kube
         echo "$KUBECONFIG_B64" | base64 -d > ~/.kube/jeffi-k3s.yaml
         chmod 600 ~/.kube/jeffi-k3s.yaml
+    - name: Release tag
+      shell: bash
+      run: echo "TAG=$(bash deploy/k8s/bootstrap/image-tag.sh)" >> "$GITHUB_ENV" # needs the full history (fetch-depth 0)
