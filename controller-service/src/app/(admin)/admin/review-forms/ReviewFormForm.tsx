@@ -308,9 +308,9 @@ export default function ReviewFormForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
       {edit.sessionId && (
-        <div className="xl:col-span-2 flex justify-end">
+        <div className="lg:col-span-2 flex justify-end">
           <EditSessionActions
             autosaveStatus={'idle' as AutosaveStatus}
             sessionStatus={edit.status}
@@ -321,7 +321,7 @@ export default function ReviewFormForm({
           />
         </div>
       )}
-      <div className="xl:col-span-2">
+      <div className="lg:col-span-2">
         <AIFillForm
           fields={[
             { name: 'title', label: 'Form Title', type: 'text' },

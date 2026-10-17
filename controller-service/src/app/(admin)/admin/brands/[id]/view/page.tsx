@@ -124,39 +124,60 @@ export default async function BrandViewPageDetail({
           {products.length === 0 ? (
             <EmptyState bare title="No products assigned to this brand." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
-                    <th className="px-5 py-2.5 text-left font-medium">Product</th>
-                    <th className="px-3 py-2.5 text-left font-medium">SKU</th>
-                    <th className="px-3 py-2.5 text-right font-medium">Price</th>
-                    <th className="px-5 py-2.5 text-left font-medium">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map(p => (
-                    <tr key={p.id} className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40">
-                      <td className="px-5 py-2.5">
-                        <Link href={ap(`/admin/products/${p.id}`, host)} className="font-medium text-accent-500 hover:underline">
-                          {p.name}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2.5 font-mono text-xs text-foreground-muted">
-                        <span className="inline-flex items-center gap-1">
-                          {p.sku}
-                          {p.sku && <CopySku sku={p.sku} />}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-foreground">₹{Number(p.base_price).toLocaleString('en-IN')}</td>
-                      <td className="px-5 py-2.5">
-                        <StatusBadge status={String(p.is_active)} map={ACTIVE_STATUS} />
-                      </td>
+            <>
+              <ul className="md:hidden divide-y divide-border-default/60 border-y border-border-default">
+                {products.map(p => (
+                  <li key={p.id} className="px-5 py-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <Link href={ap(`/admin/products/${p.id}`, host)} className="block font-medium text-accent-500 hover:underline truncate">
+                        {p.name}
+                      </Link>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-foreground-muted font-mono">
+                        {p.sku}
+                        {p.sku && <CopySku sku={p.sku} />}
+                      </div>
+                    </div>
+                    <div className="shrink-0 flex flex-col items-end gap-1">
+                      <span className="font-semibold tabular-nums text-foreground text-sm">₹{Number(p.base_price).toLocaleString('en-IN')}</span>
+                      <StatusBadge status={String(p.is_active)} map={ACTIVE_STATUS} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted">
+                      <th className="px-5 py-2.5 text-left font-medium">Product</th>
+                      <th className="px-3 py-2.5 text-left font-medium">SKU</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Price</th>
+                      <th className="px-5 py-2.5 text-left font-medium">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {products.map(p => (
+                      <tr key={p.id} className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40">
+                        <td className="px-5 py-2.5">
+                          <Link href={ap(`/admin/products/${p.id}`, host)} className="font-medium text-accent-500 hover:underline">
+                            {p.name}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2.5 font-mono text-xs text-foreground-muted">
+                          <span className="inline-flex items-center gap-1">
+                            {p.sku}
+                            {p.sku && <CopySku sku={p.sku} />}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-foreground">₹{Number(p.base_price).toLocaleString('en-IN')}</td>
+                        <td className="px-5 py-2.5">
+                          <StatusBadge status={String(p.is_active)} map={ACTIVE_STATUS} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </Card>
       }

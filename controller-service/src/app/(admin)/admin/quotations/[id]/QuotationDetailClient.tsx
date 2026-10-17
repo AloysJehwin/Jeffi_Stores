@@ -121,7 +121,24 @@ export default function QuotationDetailClient({ id }: { id: string }) {
       main={
         <>
           <Card title="Line items" flush>
-            <div className="overflow-x-auto">
+            <div className="divide-y divide-border-default/60 md:hidden">
+              {items.map((item: any, idx: number) => (
+                <div key={idx} className="space-y-1 px-4 py-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium text-foreground">{item.description}</div>
+                      {!item.product_id && <span className={badgeCls('amber')}>Custom – not in inventory</span>}
+                    </div>
+                    <span className="shrink-0 whitespace-nowrap text-right font-semibold tabular-nums text-foreground">{formatINR(parseFloat(item.amount))}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-foreground-secondary">
+                    <span className="tabular-nums">Qty {parseFloat(item.quantity)} {item.unit || 'PCS'} × {formatINR(parseFloat(item.rate))}</span>
+                    <span>GST {Number(item.gst_rate)}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-y border-border-default bg-surface-secondary/50">

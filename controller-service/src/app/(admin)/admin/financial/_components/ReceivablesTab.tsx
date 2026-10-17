@@ -22,6 +22,7 @@ import {
   thCenter,
   theadCls,
   tableWrapCls,
+  tableWrapClippedCls,
 } from './shared'
 
 export function ReceivablesTab({ initialData }: { initialData: any }) {
@@ -154,7 +155,7 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
         <Skeleton />
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <SummaryCard label="Total Outstanding" value={formatINR(data.summary.total)} />
             <SummaryCard label="0–30 Days" value={formatINR(data.summary.bucket_0_30)} sub="current" />
             <SummaryCard label="31–60 Days" value={formatINR(data.summary.bucket_31_60)} sub="aging" />
@@ -165,7 +166,7 @@ export function ReceivablesTab({ initialData }: { initialData: any }) {
             <EmptyState title="No outstanding receivables" />
           ) : (
             <>
-              <div className={`hidden md:block overflow-x-auto ${tableWrapCls}`}>
+              <div className={`hidden md:block overflow-x-auto ${tableWrapClippedCls}`}>
                 <table className="w-full text-sm">
                   <thead className={theadCls}>
                     <tr>

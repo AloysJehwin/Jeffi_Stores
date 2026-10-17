@@ -6117,26 +6117,28 @@ export default function ProductForm({
           cancelHref={edit.sessionId ? undefined : ap('/admin/products')}
         >
           <RequireWrite scope="products:write">
-            <button
-              type="submit"
-              name="intent"
-              value="draft"
-              // Drafts may be partial: skip native required checks (the server fills placeholders).
-              formNoValidate
-              disabled={isSubmitting}
-              className="control-md border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Saving...' : 'Save as Draft'}
-            </button>
-            <button
-              type="submit"
-              name="intent"
-              value="publish"
-              disabled={isSubmitting}
-              className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? 'Saving...' : product ? 'Update & Publish' : 'Save & Publish'}
-            </button>
+            <div className="w-full sm:w-auto flex flex-wrap sm:flex-nowrap justify-end gap-2">
+              <button
+                type="submit"
+                name="intent"
+                value="draft"
+                // Drafts may be partial: skip native required checks (the server fills placeholders).
+                formNoValidate
+                disabled={isSubmitting}
+                className="control-md border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Saving...' : 'Save as Draft'}
+              </button>
+              <button
+                type="submit"
+                name="intent"
+                value="publish"
+                disabled={isSubmitting}
+                className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? 'Saving...' : product ? 'Update & Publish' : 'Save & Publish'}
+              </button>
+            </div>
           </RequireWrite>
         </FormFooter>
       </form>

@@ -170,13 +170,17 @@ export default function MetaAdsConsole() {
         <NotConnectedState provider="Meta Ads" onOpen={() => setGearOpen(true)} />
       ) : (
         <>
-          <div className="flex items-center gap-3 flex-wrap">
-            <RangePresets value={range} onChange={setRange} />
-            <span className="text-xs text-foreground-muted">
-              {status.adAccountName} ({status.adAccountId}) ·{' '}
-              {status.connectedVia === 'manual' ? 'system user token' : 'Facebook sign-in'}
-              {status.tokenExpiresAt ? ` · sign-in valid until ${when(status.tokenExpiresAt)}` : ''}
-            </span>
+          <div className="space-y-1">
+            <div className="flex items-center gap-3 flex-wrap">
+              <RangePresets value={range} onChange={setRange} />
+              <span className="flex-1 min-w-0 truncate text-xs text-foreground-muted">
+                {status.adAccountName} ({status.adAccountId}) ·{' '}
+                {status.connectedVia === 'manual' ? 'system user token' : 'Facebook sign-in'}
+              </span>
+            </div>
+            {status.tokenExpiresAt && (
+              <p className="text-xs text-foreground-muted">sign-in valid until {when(status.tokenExpiresAt)}</p>
+            )}
           </div>
           <Tabs
             tabs={TABS}
@@ -523,17 +527,10 @@ function Body({ tab, d, status, onChanged }: { tab: MadsTab; d: any; status: any
                             </button>
                           )}
                           {level !== 'ad' && r.dailyBudget != null && (
-                            <button
-                              type="button"
-                              className="underline"
-                              onClick={() => {
-                                const v = window.prompt('New daily budget', String(r.dailyBudget))
-                                if (v && Number(v) > 0)
-                                  setPending({ action: 'budget', level, id: r.id, dailyBudget: Number(v) })
-                              }}
-                            >
-                              Budget
-                            </button>
+                            <BudgetEdit
+                              current={Number(r.dailyBudget)}
+                              onSubmit={(v: number) => setPending({ action: 'budget', level, id: r.id, dailyBudget: v })}
+                            />
                           )}
                         </span>
                       ),
@@ -661,5 +658,42 @@ function CapiView({ d, status, onChanged }: { d: any; status: any; onChanged: ()
         />
       </Section>
     </div>
+  )
+}
+
+function BudgetEdit({ current, onSubmit }: { current: number; onSubmit: (v: number) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [v, setV] = useState(String(current))
+  if (!editing) {
+    return (
+      <button type="button" className="underline" title="Change daily budget" onClick={() => { setV(String(current)); setEditing(true) }}>
+        Budget
+      </button>
+    )
+  }
+  return (
+    <span className="inline-flex gap-1 items-center">
+      <input
+        className={`${inputCls} w-24 py-1`}
+        type="number"
+        min={0}
+        value={v}
+        aria-label="New daily budget"
+        onChange={e => setV(e.target.value)}
+      />
+      <button
+        type="button"
+        className="text-xs underline"
+        onClick={() => {
+          setEditing(false)
+          if (Number(v) > 0) onSubmit(Number(v))
+        }}
+      >
+        Preview
+      </button>
+      <button type="button" className="text-xs text-foreground-muted" onClick={() => setEditing(false)}>
+        Cancel
+      </button>
+    </span>
   )
 }

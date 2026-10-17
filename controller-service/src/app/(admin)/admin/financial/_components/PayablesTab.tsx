@@ -22,6 +22,7 @@ import {
   thCenter,
   theadCls,
   tableWrapCls,
+  tableWrapClippedCls,
 } from './shared'
 import { PayablesPayModal } from './PayablesPayModal'
 
@@ -211,11 +212,9 @@ export function PayablesTab({ initialData }: { initialData: any }) {
               {loading ? 'Loading…' : 'Refresh'}
             </button>
             {canWrite && (
-              <span className="hidden md:contents">
-                <button type="button" className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>
-                  + Add Bill
-                </button>
-              </span>
+              <button type="button" className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>
+                + Add Bill
+              </button>
             )}
           </div>
         </div>
@@ -314,7 +313,7 @@ export function PayablesTab({ initialData }: { initialData: any }) {
               <EmptyState title="No outstanding payables" />
             ) : (
               <>
-                <div className={`hidden md:block overflow-x-auto ${tableWrapCls}`}>
+                <div className={`hidden md:block overflow-x-auto ${tableWrapClippedCls}`}>
                   <table className="w-full text-sm">
                     <thead className={theadCls}>
                       <tr>

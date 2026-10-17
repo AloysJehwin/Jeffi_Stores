@@ -255,7 +255,7 @@ export function RepricerView({ d, onChanged }: { d: any; onChanged: () => void }
           ]}
         />
         {canPrice && (
-          <div className="grid gap-2 md:grid-cols-7 items-end mt-4 rounded-lg border border-border-default p-3">
+          <div className="grid gap-2 grid-cols-2 md:grid-cols-4 xl:grid-cols-7 items-end mt-4 rounded-lg border border-border-default p-3">
             <label className="text-xs text-foreground-muted">
               SKU (empty = all)
               <input className={inputCls} value={form.sku} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} />
@@ -286,10 +286,10 @@ export function RepricerView({ d, onChanged }: { d: any; onChanged: () => void }
               Min margin %
               <input className={inputCls} type="number" min={0} max={90} value={form.minMarginPct} onChange={e => setForm(f => ({ ...f, minMarginPct: e.target.value }))} />
             </label>
-            <div className="flex flex-col gap-2">
-              <label className="text-xs flex items-center gap-1">
-                <input type="checkbox" checked={form.autoApply} onChange={e => setForm(f => ({ ...f, autoApply: e.target.checked }))} /> Apply automatically
-              </label>
+            <label className="text-xs flex items-center gap-1">
+              <input type="checkbox" checked={form.autoApply} onChange={e => setForm(f => ({ ...f, autoApply: e.target.checked }))} /> Apply automatically
+            </label>
+            <div className="col-span-full flex justify-end">
               <button type="button" className={btnPrimary} onClick={saveRule}>
                 Save rule
               </button>
@@ -351,10 +351,10 @@ export function OrdersStockView({ onChanged }: { onChanged: () => void }) {
             <input type="checkbox" disabled={!canWrite} checked={form.pushStock} onChange={e => setForm(f => ({ ...f!, pushStock: e.target.checked }))} />
             <span>Keep Amazon&apos;s stock in step with yours (for products that track stock), every 15 minutes, only when it changes.</span>
           </label>
-          <label className="flex items-center gap-2">
-            Safety buffer
+          <label className="block">
+            <span className="text-xs text-foreground-muted">Safety buffer</span>
             <input className={`${inputCls} w-24`} type="number" min={0} max={1000} disabled={!canWrite} value={form.buffer} onChange={e => setForm(f => ({ ...f!, buffer: Number(e.target.value) }))} />
-            units held back from Amazon per SKU
+            <span className="block text-xs text-foreground-muted">units held back from Amazon per SKU</span>
           </label>
           {d.stock.pushDisabled && <p className="text-xs text-amber-600">Pushing to Amazon is turned off in this environment, so stock is calculated but not sent.</p>}
           {canWrite && (

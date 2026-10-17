@@ -871,7 +871,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap">
             <DatePicker
               className="w-36"
               value={fromDate}

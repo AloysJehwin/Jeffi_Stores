@@ -1223,7 +1223,7 @@ export default function NewPOPage() {
 
             {lineItems.some(it => it.line_total_incl_gst) && (
               <div className="border-t border-border-default pt-3 mt-3 flex justify-end">
-                <div className="text-right space-y-1 min-w-[220px]">
+                <div className="text-right space-y-1 w-full sm:w-auto sm:min-w-[220px]">
                   <div className="flex justify-between text-xs text-foreground-secondary">
                     <span>Taxable Value</span>
                     <span>₹{fmtINR2(taxableValue)}</span>

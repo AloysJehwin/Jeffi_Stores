@@ -267,13 +267,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         ]}
         actions={
           canWrite && (
-            <span className="hidden md:inline-flex">
-              <TabAction
-                href={ap('/admin/products/add', host)}
-                icon={<Plus className="w-4 h-4" />}
-                label="Add New Product"
-              />
-            </span>
+            <TabAction
+              href={ap('/admin/products/add', host)}
+              icon={<Plus className="w-4 h-4" />}
+              label="Add New Product"
+            />
           )
         }
       />

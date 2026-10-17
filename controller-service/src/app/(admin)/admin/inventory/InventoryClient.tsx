@@ -594,6 +594,7 @@ function StockTab({ view }: { view: StockView }) {
                     onClick={() => saveEdit(p)}
                     disabled={editSaving || editQty === ''}
                     title="Save"
+                    aria-label="Save stock adjustment"
                     className="field-xs font-medium bg-secondary-500 hover:bg-secondary-600 text-white disabled:opacity-50 transition-colors"
                   >
                     {editSaving ? '…' : 'Save'}
@@ -601,6 +602,7 @@ function StockTab({ view }: { view: StockView }) {
                   <button
                     onClick={cancelEdit}
                     title="Cancel"
+                    aria-label="Cancel stock adjustment"
                     className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -613,6 +615,7 @@ function StockTab({ view }: { view: StockView }) {
                   <Link
                     href={ap(`/admin/products/${p.id}`)}
                     title="View Product"
+                    aria-label="View product"
                     className="p-1.5 rounded-lg hover:bg-surface-secondary text-accent-500 hover:text-accent-600 transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -630,6 +633,7 @@ function StockTab({ view }: { view: StockView }) {
                         ? 'Stock managed via batches or serials — use GRN to receive or Remove to deduct'
                         : 'Adjust stock'
                     }
+                    aria-label="Adjust stock"
                     disabled={!!(p.perishable || p.serialized)}
                     className={`p-1.5 rounded-lg transition-colors ${p.perishable || p.serialized ? 'opacity-30 cursor-not-allowed text-foreground-muted' : 'hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500'}`}
                     hidden={!canWrite}
@@ -645,6 +649,7 @@ function StockTab({ view }: { view: StockView }) {
                   <button
                     onClick={() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)}
                     title="Batch details"
+                    aria-label={expandedValRows[rowId] !== undefined ? 'Collapse batch details' : 'Expand batch details'}
                     className={`p-1.5 rounded-lg hover:bg-surface-secondary transition-colors ${expandedValRows[rowId] !== undefined ? 'text-secondary-500' : 'text-foreground-secondary hover:text-secondary-500'}`}
                   >
                     {loadingBatchRow === rowId ? (
@@ -1476,8 +1481,8 @@ function StockTab({ view }: { view: StockView }) {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-[200px]">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end">
+            <div className="col-span-2 sm:flex-1 sm:min-w-[200px]">
               <label className={labelCls}>Search product</label>
               <AdminTypeahead
                 type="products"
@@ -1494,7 +1499,7 @@ function StockTab({ view }: { view: StockView }) {
                 inputClassName="w-full field-sm pr-9 bg-surface border border-border-secondary text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
               />
             </div>
-            <div className="w-44">
+            <div className="sm:w-44">
               <label className={labelCls}>Category</label>
               <AdminSelect
                 sm
@@ -1507,7 +1512,7 @@ function StockTab({ view }: { view: StockView }) {
                 options={[{ value: '', label: 'All categories' }, ...valCategories.map(c => ({ value: c, label: c }))]}
               />
             </div>
-            <div className="w-40">
+            <div className="sm:w-40">
               <label className={labelCls}>Brand</label>
               <AdminSelect
                 sm
@@ -1520,7 +1525,7 @@ function StockTab({ view }: { view: StockView }) {
                 options={[{ value: '', label: 'All brands' }, ...valBrands.map(b => ({ value: b, label: b }))]}
               />
             </div>
-            <div className="w-40">
+            <div className="sm:w-40">
               <label className={labelCls}>Stock status</label>
               <AdminSelect
                 sm
@@ -1539,8 +1544,8 @@ function StockTab({ view }: { view: StockView }) {
               />
             </div>
             {(valSearch || valCategory || valBrand || valStockStatus) && (
-              <div className="flex flex-col">
-                <span className={labelCls}>&nbsp;</span>
+              <div className="col-span-2 flex flex-col sm:col-auto">
+                <span className={`${labelCls} hidden sm:block`}>&nbsp;</span>
                 <button
                   onClick={() => {
                     setValSearch('')

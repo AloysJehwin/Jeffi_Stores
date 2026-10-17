@@ -144,7 +144,7 @@ export default async function CouponsPage({
 
 function KpiRowSkeleton() {
   return (
-    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6 animate-pulse">
+    <div className="grid gap-3 grid-cols-2 sm:grid-cols-[repeat(auto-fit,minmax(150px,1fr))] animate-pulse">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
       ))}
@@ -159,11 +159,7 @@ async function AddCouponButton() {
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'coupons:write')
   if (!canWrite) return null
-  return (
-    <span className="hidden md:inline-flex">
-      <TabAction href={ap('/admin/coupons/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Coupon" />
-    </span>
-  )
+  return <TabAction href={ap('/admin/coupons/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Coupon" />
 }
 
 async function CouponsStats() {

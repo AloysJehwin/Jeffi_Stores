@@ -54,11 +54,7 @@ async function getFilteredBrands(filters: { is_active?: string; search?: string;
 
 async function AddBrandButton() {
   const host = await getHost()
-  return (
-    <span className="hidden md:inline-flex">
-      <TabAction href={ap('/admin/brands/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Brand" />
-    </span>
-  )
+  return <TabAction href={ap('/admin/brands/add', host)} icon={<Plus className="w-4 h-4" />} label="Add New Brand" />
 }
 
 async function BrandsStats() {

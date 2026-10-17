@@ -76,8 +76,8 @@ export function EntityPage({ header, tabs, notices, kpis, attention, main, aside
       {kpis}
       {attention && attention.length > 0 && <AttentionList items={attention} />}
       {aside ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-          <div className="min-w-0 space-y-4 xl:col-span-2">{main}</div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="min-w-0 space-y-4 lg:col-span-2 xl:col-span-3">{main}</div>
           <div className="min-w-0 space-y-4">{aside}</div>
         </div>
       ) : (

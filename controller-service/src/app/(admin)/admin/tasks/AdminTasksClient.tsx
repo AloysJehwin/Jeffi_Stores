@@ -381,7 +381,7 @@ export default function AdminTasksClient() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto -mx-4 px-4 whitespace-nowrap sm:flex-wrap sm:overflow-visible sm:mx-0 sm:px-0 [&>button]:shrink-0">
           {SEGMENTS.map(seg => (
             <button
               key={seg.key}

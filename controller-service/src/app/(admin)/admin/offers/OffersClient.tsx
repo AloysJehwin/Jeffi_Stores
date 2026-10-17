@@ -183,7 +183,7 @@ export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boo
                         onChange={e => setDraftTitle(e.target.value)}
                         placeholder={o.title}
                         maxLength={200}
-                        className={`${fieldInputCls} flex-1 min-w-[16rem]`}
+                        className={`${fieldInputCls} w-full sm:w-auto sm:flex-1 sm:min-w-[16rem]`}
                       />
                       <button
                         onClick={() => {

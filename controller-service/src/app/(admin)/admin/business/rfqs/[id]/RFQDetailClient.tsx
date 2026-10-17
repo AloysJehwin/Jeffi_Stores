@@ -558,9 +558,9 @@ export default function RFQDetailClient({ id }: { id: string }) {
                   >
                     {/* Discount tier banner */}
                     {hasAnyBanner && (
-                      <div className="flex flex-wrap items-center gap-x-0 border-b border-border-default/60 text-[11px] divide-x divide-border-default/40">
+                      <div className="flex flex-wrap items-center gap-x-0 border-b border-border-default/60 text-[11px]">
                         {defaultDiscountPct != null && (
-                          <div className="flex items-center gap-1.5 px-4 py-1.5 bg-surface-secondary">
+                          <div className="flex items-center gap-1.5 px-4 py-1.5 bg-surface-secondary border-l border-border-default/40 first:border-l-0">
                             <span className="text-foreground-muted">Default:</span>
                             <span className="font-semibold text-foreground-secondary">
                               {defaultDiscountPct}% off MRP
@@ -568,7 +568,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           </div>
                         )}
                         {businessDiscountPct > 0 && (
-                          <div className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-500/10">
+                          <div className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-500/10 border-l border-border-default/40 first:border-l-0">
                             <span className="text-foreground-muted">Business:</span>
                             <span className="font-semibold text-blue-700 dark:text-blue-400">
                               {businessDiscountPct}% off customer price
@@ -576,7 +576,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           </div>
                         )}
                         {requestedDiscountPct != null && requestedDiscountPct > 0 && (
-                          <div className="flex items-center gap-1.5 px-4 py-1.5 bg-green-500/10">
+                          <div className="flex items-center gap-1.5 px-4 py-1.5 bg-green-500/10 border-l border-border-default/40 first:border-l-0">
                             <span className="text-foreground-muted">Requested:</span>
                             <span className="font-semibold text-green-700 dark:text-green-400">
                               {requestedDiscountPct}% off {businessPrice != null ? 'business price' : 'customer price'}
@@ -584,7 +584,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           </div>
                         )}
                         {requestedDiscountPct != null && requestedDiscountPct <= 0 && requestedInclGst != null && (
-                          <div className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500/10">
+                          <div className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500/10 border-l border-border-default/40 first:border-l-0">
                             <span className="text-foreground-muted">Requested:</span>
                             <span className="font-semibold text-amber-700 dark:text-amber-400">
                               At/above {businessPrice != null ? 'business' : 'customer'} price
@@ -602,7 +602,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           if (mrpPrice != null && mrpPrice > 0 && effectivePrice != null && effectivePrice < mrpPrice) {
                             const effPct = Math.round(((mrpPrice - effectivePrice) / mrpPrice) * 100)
                             return (
-                              <div className="ml-auto flex items-center gap-1.5 px-4 py-1.5 bg-accent-500/10">
+                              <div className="w-full md:w-auto md:ml-auto flex items-center gap-1.5 px-4 py-1.5 bg-accent-500/10 border-l border-border-default/40 first:border-l-0">
                                 <span className="text-foreground-muted">Effective:</span>
                                 <span className="font-semibold text-accent-500">{effPct}% off MRP</span>
                               </div>
@@ -615,12 +615,12 @@ export default function RFQDetailClient({ id }: { id: string }) {
 
                     <div className="flex gap-0">
                       {/* Position number */}
-                      <div className="flex items-center justify-center w-10 shrink-0 bg-surface-secondary border-r border-border-default">
+                      <div className="flex items-center justify-center w-6 md:w-10 shrink-0 bg-surface-secondary border-r border-border-default">
                         <span className="text-xs font-mono text-foreground-muted">{i + 1}</span>
                       </div>
 
                       {/* Product image */}
-                      <div className="w-20 h-20 shrink-0 bg-surface border-r border-border-default overflow-hidden self-stretch flex items-center justify-center">
+                      <div className="w-14 h-14 md:w-20 md:h-20 shrink-0 bg-surface border-r border-border-default overflow-hidden self-stretch flex items-center justify-center">
                         {item.product_image_url ? (
                           <img
                             src={item.product_image_url}

@@ -53,7 +53,11 @@ export default function EcomFilters({
   ]
 
   return (
-    <div className="bg-surface-elevated rounded-lg border border-border-default p-4 mb-6 grid grid-cols-1 sm:grid-cols-[minmax(0,200px)_minmax(0,200px)_1fr] gap-3 items-end">
+    <div
+      className={`bg-surface-elevated rounded-lg border border-border-default p-4 mb-6 grid grid-cols-1 gap-3 items-end ${
+        showPlan ? 'sm:grid-cols-[minmax(0,200px)_minmax(0,200px)_1fr]' : 'sm:grid-cols-[minmax(0,200px)_1fr]'
+      }`}
+    >
       <AdminSelect
         label="Status"
         value={params.get('status') || ''}

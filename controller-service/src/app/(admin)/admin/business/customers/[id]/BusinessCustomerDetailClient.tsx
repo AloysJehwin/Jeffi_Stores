@@ -258,7 +258,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
             {availableCategories.length > 0 && (
               <RequireWrite scope="business_customers:write">
                 <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-border-default pt-4">
-                  <div className="min-w-[200px] flex-1">
+                  <div className="w-full sm:min-w-[200px] sm:flex-1 sm:w-auto">
                     <AdminSelect
                       label="Category"
                       value={newCategoryId}
@@ -268,22 +268,24 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                       sm
                     />
                   </div>
-                  <div className="w-28">
-                    <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Discount %</label>
-                    <input
-                      type="number"
-                      value={newDiscountPct}
-                      onChange={e => setNewDiscountPct(e.target.value)}
-                      placeholder="e.g. 10"
-                      min={0}
-                      max={100}
-                      step={0.5}
-                      className={`${fieldInputCls} text-right tabular-nums`}
-                    />
+                  <div className="flex w-full gap-2 sm:w-auto">
+                    <div className="w-28">
+                      <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">Discount %</label>
+                      <input
+                        type="number"
+                        value={newDiscountPct}
+                        onChange={e => setNewDiscountPct(e.target.value)}
+                        placeholder="e.g. 10"
+                        min={0}
+                        max={100}
+                        step={0.5}
+                        className={`${fieldInputCls} text-right tabular-nums`}
+                      />
+                    </div>
+                    <button onClick={handleAddDiscount} disabled={!newCategoryId || !newDiscountPct} className="control-md flex-1 self-end bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50 sm:flex-none">
+                      Add
+                    </button>
                   </div>
-                  <button onClick={handleAddDiscount} disabled={!newCategoryId || !newDiscountPct} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50">
-                    Add
-                  </button>
                 </div>
               </RequireWrite>
             )}

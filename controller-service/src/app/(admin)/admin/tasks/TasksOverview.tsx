@@ -49,7 +49,7 @@ export default function TasksOverview() {
               />
             ))}
           </KpiGrid>
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             <AttentionList items={data.attention.map(a => ({ ...a, href: a.href && ap(a.href) }))} />
             <Section title="By assignee">
               <Table

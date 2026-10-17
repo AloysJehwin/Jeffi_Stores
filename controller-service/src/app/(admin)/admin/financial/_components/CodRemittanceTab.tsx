@@ -103,7 +103,7 @@ export function CodRemittanceTab() {
 
       {/* Filter bar + bulk action */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex h-control rounded-lg border border-border-default overflow-hidden text-sm">
+        <div className="flex h-control max-w-full overflow-x-auto rounded-lg border border-border-default text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {FILTERS.map(({ value, label }) => (
             <button
               key={value}

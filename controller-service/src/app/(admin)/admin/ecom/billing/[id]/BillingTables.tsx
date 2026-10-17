@@ -67,7 +67,29 @@ export function LedgerTable({ rows, labels, balance }: { rows: LedgerEntry[]; la
   ]
   return (
     <div className="space-y-3">
-      <DataTable rows={rows} cols={cols} rowKey={e => e.id} empty="No ledger entries yet." bare />
+      <DataTable
+        rows={rows}
+        cols={cols}
+        rowKey={e => e.id}
+        empty="No ledger entries yet."
+        bare
+        mobileCard={e => {
+          const amt = Number(e.amount)
+          return (
+            <div className="rounded-xl border border-border-default bg-surface-elevated p-3 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-foreground">{labels[e.entry_type] || e.entry_type}</span>
+                <span className={`font-semibold tabular-nums ${signTone(amt)}`}>
+                  {amt >= 0 ? '+' : '−'}
+                  {inr(Math.abs(amt))}
+                </span>
+              </div>
+              <div className="text-xs text-foreground-muted">{day(e.occurred_at)}</div>
+              {e.note && <div className="text-xs text-foreground-muted">{e.note}</div>}
+            </div>
+          )
+        }}
+      />
       <div className="flex items-center justify-between border-t border-border-default pt-3 text-sm font-semibold">
         <span className="text-foreground">Balance</span>
         <span className={`tabular-nums ${signTone(balance)}`}>{inr(balance)}</span>

@@ -144,36 +144,40 @@ export function Heatmap({ cells }: { cells: { dow: number; hour: number; views: 
   const by = new Map(cells.map(c => [`${c.dow}-${c.hour}`, c.views]))
   const max = Math.max(1, ...cells.map(c => c.views))
   return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[560px] space-y-1">
-        {DAYS.map((d, i) => (
-          <div key={d} className="flex items-center gap-1">
-            <span className="w-8 text-[10px] text-foreground-muted">{d}</span>
-            <div className="flex-1 grid gap-0.5" style={{ gridTemplateColumns: 'repeat(24,1fr)' }}>
-              {Array.from({ length: 24 }, (_, h) => {
-                const v = by.get(`${i + 1}-${h}`) ?? 0
-                const a = v / max
-                return (
-                  <div
-                    key={h}
-                    title={`${d} ${h}:00 · ${v} views`}
-                    className="h-5 rounded-sm bg-surface-secondary"
-                    style={v ? { backgroundColor: `rgba(132,204,22,${0.15 + a * 0.85})` } : undefined}
-                  />
-                )
-              })}
+    <div className="relative">
+      <div className="overflow-x-auto">
+        <div className="min-w-[560px] space-y-1">
+          {DAYS.map((d, i) => (
+            <div key={d} className="flex items-center gap-1">
+              <span className="w-8 text-[10px] text-foreground-muted">{d}</span>
+              <div className="flex-1 grid gap-0.5" style={{ gridTemplateColumns: 'repeat(24,1fr)' }}>
+                {Array.from({ length: 24 }, (_, h) => {
+                  const v = by.get(`${i + 1}-${h}`) ?? 0
+                  const a = v / max
+                  return (
+                    <div
+                      key={h}
+                      title={`${d} ${h}:00 · ${v} views`}
+                      className="h-5 rounded-sm bg-surface-secondary"
+                      style={v ? { backgroundColor: `rgba(132,204,22,${0.15 + a * 0.85})` } : undefined}
+                    />
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
-        <div className="flex items-center gap-1">
-          <span className="w-8" />
-          <div className="flex-1 flex justify-between text-[9px] text-foreground-muted">
-            {[0, 3, 6, 9, 12, 15, 18, 21].map(h => (
-              <span key={h}>{h}:00</span>
-            ))}
+          ))}
+          <div className="flex items-center gap-1">
+            <span className="w-8" />
+            <div className="flex-1 flex justify-between text-[9px] text-foreground-muted">
+              {[0, 3, 6, 9, 12, 15, 18, 21].map(h => (
+                <span key={h}>{h}:00</span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
+      <div className="md:hidden pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-surface-elevated to-transparent" />
+      <p className="md:hidden mt-2 text-[10px] text-foreground-muted text-right">Swipe for more hours →</p>
     </div>
   )
 }

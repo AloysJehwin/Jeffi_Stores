@@ -162,13 +162,13 @@ function PeriodBar({ range, onChange, previous }: { range: Range; onChange: (r: 
   const active = matchPreset(range)
   return (
     <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex flex-wrap gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg w-fit max-w-full">
+      <div className="flex gap-1 p-1 bg-surface-elevated border border-border-default rounded-lg max-w-full overflow-x-auto flex-nowrap md:flex-wrap md:w-fit [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {PRESETS.map(p => (
           <button
             key={p.key}
             type="button"
             onClick={() => onChange(presetRange(p.key))}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap ${
+            className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap shrink-0 ${
               active === p.key ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'
             }`}
           >

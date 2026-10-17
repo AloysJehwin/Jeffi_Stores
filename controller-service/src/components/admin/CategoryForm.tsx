@@ -394,7 +394,7 @@ export default function CategoryForm({
                   onChange={e => setIconSearch(e.target.value)}
                   className={`${fieldInputCls} mb-3`}
                 />
-                <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5 max-h-52 overflow-y-auto">
+                <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-1.5 max-h-52 overflow-y-auto">
                   {filteredIcons.map(name => (
                     <button
                       key={name}

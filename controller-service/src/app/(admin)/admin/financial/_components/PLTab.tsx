@@ -123,13 +123,13 @@ export function PLTab({ initialData }: { initialData: any }) {
         <Skeleton rows={6} />
       ) : (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <SummaryCard label="Gross Revenue" value={formatINR(data.totals.revenue)} sub={`${data.totals.order_count} orders`} />
             <SummaryCard label="Refunds" value={formatINR(data.totals.refunds)} />
             <SummaryCard label="Net Revenue" value={formatINR(data.totals.net_revenue)} />
             <SummaryCard label="Gross Margin" value={`${data.totals.gross_margin_pct}%`} />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <SummaryCard label="COGS" value={formatINR(data.totals.cogs)} />
             <SummaryCard label="Gross Profit" value={formatINR(data.totals.gross_profit)} />
             <SummaryCard label="Op. Expenses" value={formatINR(data.totals.operating_expenses)} />

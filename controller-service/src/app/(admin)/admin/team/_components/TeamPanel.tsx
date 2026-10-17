@@ -120,7 +120,7 @@ export default async function TeamPanel() {
         <Suspense fallback={null}>
           <TeamTabs>
             {/* Add member */}
-            <div className="hidden md:block">
+            <div className="max-w-xl">
               <Card title="Add Team Member" hint="Generate credentials and a client certificate for a new admin user">
                 <CreateAdminForm allowedScopeKeys={allowedScopeKeys} />
               </Card>

@@ -14,7 +14,7 @@ type Tab = (typeof TABS)[number]['id']
 export default function ScanTabs() {
   const [tab, setTab] = useTab<Tab>(['scan', 'overview'], 'scan')
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="flex flex-1 flex-col">
       <div className="px-4 pt-3 bg-surface">
         <Tabs tabs={[...TABS]} value={tab} onChange={setTab} />
       </div>
