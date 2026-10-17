@@ -63,7 +63,15 @@ export interface ReviewsOverviewData {
     top: ProductRow[]
     lowest: ProductRow[]
     mostNegative: ProductRow[]
-    ratingDrops: { id: string; name: string; slug: string | null; beforeAvg: number | null; afterAvg: number | null; newAvg: number | null; newReviews: number }[]
+    ratingDrops: {
+      id: string
+      name: string
+      slug: string | null
+      beforeAvg: number | null
+      afterAvg: number | null
+      newAvg: number | null
+      newReviews: number
+    }[]
   }
   recentNegative: {
     id: string
@@ -78,7 +86,11 @@ export interface ReviewsOverviewData {
     customer: string | null
   }[]
   funnel: { current: Funnel; previous: Funnel }
-  forms: { current: FormsStats; previous: FormsStats; pendingByForm: { id: string; title: string; pending: number }[] } | null
+  forms: {
+    current: FormsStats
+    previous: FormsStats
+    pendingByForm: { id: string; title: string; pending: number }[]
+  } | null
 }
 
 const ratio = (a: number, b: number) => (b ? a / b : null)
@@ -125,11 +137,22 @@ function PeriodPicker({ value, onChange }: { value: Period; onChange: (p: Period
       </div>
       <div className="flex items-center gap-1.5">
         <span aria-label="From">
-          <DatePicker aria-label="From" value={value.from} max={value.to} onChange={v => v && onChange({ ...value, from: v })} />
+          <DatePicker
+            aria-label="From"
+            value={value.from}
+            max={value.to}
+            onChange={v => v && onChange({ ...value, from: v })}
+          />
         </span>
         <span className="text-xs text-foreground-muted">to</span>
         <span aria-label="To">
-          <DatePicker aria-label="To" value={value.to} min={value.from} max={today} onChange={v => v && onChange({ ...value, to: v })} />
+          <DatePicker
+            aria-label="To"
+            value={value.to}
+            min={value.from}
+            max={today}
+            onChange={v => v && onChange({ ...value, to: v })}
+          />
         </span>
       </div>
     </div>
@@ -148,7 +171,10 @@ function Distribution({ rows, total }: { rows: { rating: number; count: number }
               <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
             </span>
             <div className="flex-1 h-2.5 bg-surface-secondary rounded-full overflow-hidden">
-              <div className={`h-full rounded-full ${BAR_TONE[r.rating]}`} style={{ width: `${share ? Math.max(2, share * 100) : 0}%` }} />
+              <div
+                className={`h-full rounded-full ${BAR_TONE[r.rating]}`}
+                style={{ width: `${share ? Math.max(2, share * 100) : 0}%` }}
+              />
             </div>
             <span className="w-20 text-right shrink-0 tabular-nums text-foreground">
               {count(r.count)} <span className="text-foreground-muted">({pct(share, 0)})</span>
@@ -160,7 +186,15 @@ function Distribution({ rows, total }: { rows: { rating: number; count: number }
   )
 }
 
-function ProductList({ rows, empty, metric }: { rows: ProductRow[]; empty: string; metric: (r: ProductRow) => React.ReactNode }) {
+function ProductList({
+  rows,
+  empty,
+  metric,
+}: {
+  rows: ProductRow[]
+  empty: string
+  metric: (r: ProductRow) => React.ReactNode
+}) {
   if (!rows.length) return <Empty msg={empty} />
   return (
     <ul className="divide-y divide-border-default/60">
@@ -281,7 +315,10 @@ export default function ReviewsOverview() {
     }
   }, [period.from, period.to])
 
-  const trendPoints = useMemo<ChartPoint[]>(() => (data?.trend ?? []).map(t => ({ label: t.day, reviews: t.reviews, negative: t.negative })), [data])
+  const trendPoints = useMemo<ChartPoint[]>(
+    () => (data?.trend ?? []).map(t => ({ label: t.day, reviews: t.reviews, negative: t.negative })),
+    [data]
+  )
   const ratingPoints = useMemo<ChartPoint[]>(() => {
     const t = data?.trend ?? []
     const run = runningAverage(t)
@@ -290,7 +327,13 @@ export default function ReviewsOverview() {
 
   const header = <PeriodPicker value={period} onChange={setPeriod} />
 
-  if (error) return <div className="space-y-4">{header}<Banner ok={false}>{error}</Banner></div>
+  if (error)
+    return (
+      <div className="space-y-4">
+        {header}
+        <Banner ok={false}>{error}</Banner>
+      </div>
+    )
   if (!data) {
     return (
       <div className="space-y-4">
@@ -321,20 +364,51 @@ export default function ReviewsOverview() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         {header}
         <p className="text-xs text-foreground-muted">
-          vs {data.previous.from} to {data.previous.to}. Store rating {rating(data.allTime.avgRating)} from {count(data.allTime.reviews)} published reviews.
+          vs {data.previous.from} to {data.previous.to}. Store rating {rating(data.allTime.avgRating)} from{' '}
+          {count(data.allTime.reviews)} published reviews.
         </p>
       </div>
 
       <KpiGrid>
-        <Kpi label="New reviews" value={count(cur.reviews)} delta={change(cur.reviews, prev.reviews)} sub={`${count(cur.verified)} verified purchases`} />
-        <Kpi label="Average rating" value={rating(cur.avgRating)} delta={ratingDelta(cur.avgRating, prev.avgRating)} highlight />
-        <Kpi label="4-5 star" value={pct(posShare)} delta={shareDelta(posShare, prevPos)} sub={`${count(cur.positive)} reviews`} />
-        <Kpi label="1-2 star" value={pct(negShare)} delta={shareDelta(negShare, prevNeg)} invert sub={`${count(cur.negative)} reviews`} />
-        <Kpi label="With photos" value={count(cur.withPhotos)} delta={change(cur.withPhotos, prev.withPhotos)} sub={`${pct(ratio(cur.withPhotos, cur.reviews))} of reviews`} />
+        <Kpi
+          label="New reviews"
+          value={count(cur.reviews)}
+          delta={change(cur.reviews, prev.reviews)}
+          sub={`${count(cur.verified)} verified purchases`}
+        />
+        <Kpi
+          label="Average rating"
+          value={rating(cur.avgRating)}
+          delta={ratingDelta(cur.avgRating, prev.avgRating)}
+          highlight
+        />
+        <Kpi
+          label="4-5 star"
+          value={pct(posShare)}
+          delta={shareDelta(posShare, prevPos)}
+          sub={`${count(cur.positive)} reviews`}
+        />
+        <Kpi
+          label="1-2 star"
+          value={pct(negShare)}
+          delta={shareDelta(negShare, prevNeg)}
+          invert
+          sub={`${count(cur.negative)} reviews`}
+        />
+        <Kpi
+          label="With photos"
+          value={count(cur.withPhotos)}
+          delta={change(cur.withPhotos, prev.withPhotos)}
+          sub={`${pct(ratio(cur.withPhotos, cur.reviews))} of reviews`}
+        />
         <Kpi
           label="Pending moderation"
           value={count(data.pending.count)}
-          sub={data.pending.count ? `oldest ${ageDays(data.pending.oldest)}d, ${count(data.pending.negative)} are 1-2 star` : 'All caught up'}
+          sub={
+            data.pending.count
+              ? `oldest ${ageDays(data.pending.oldest)}d, ${count(data.pending.negative)} are 1-2 star`
+              : 'All caught up'
+          }
         />
       </KpiGrid>
 
@@ -353,7 +427,10 @@ export default function ReviewsOverview() {
                   <p className="text-sm font-medium text-foreground">{a.title}</p>
                   {a.detail && <p className="text-xs text-foreground-secondary line-clamp-2">{a.detail}</p>}
                 </div>
-                <Link href={a.href} className="shrink-0 text-xs font-medium text-accent-500 hover:underline whitespace-nowrap">
+                <Link
+                  href={a.href}
+                  className="shrink-0 text-xs font-medium text-accent-500 hover:underline whitespace-nowrap"
+                >
                   {a.action}
                 </Link>
               </li>
@@ -374,13 +451,22 @@ export default function ReviewsOverview() {
           </Section>
         </div>
         <Section title="Rating distribution">
-          {cur.reviews ? <Distribution rows={data.distribution} total={cur.reviews} /> : <Empty msg="No reviews in this period." />}
+          {cur.reviews ? (
+            <Distribution rows={data.distribution} total={cur.reviews} />
+          ) : (
+            <Empty msg="No reviews in this period." />
+          )}
         </Section>
       </div>
 
       <Section title="Average rating trend">
         {cur.reviews ? (
-          <TrendChart points={ratingPoints} series={RATING_SERIES} height={180} ariaLabel="Average rating over the period" />
+          <TrendChart
+            points={ratingPoints}
+            series={RATING_SERIES}
+            height={180}
+            ariaLabel="Average rating over the period"
+          />
         ) : (
           <Empty msg="No reviews in this period." />
         )}
@@ -397,14 +483,20 @@ export default function ReviewsOverview() {
         {f.orders ? (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-3">
-              <FunnelStep label="Orders asked" value={f.orders} base={f.orders} sub={`${count(f.messages)} messages (${count(f.emails)} email)`} />
+              <FunnelStep
+                label="Orders asked"
+                value={f.orders}
+                base={f.orders}
+                sub={`${count(f.messages)} messages (${count(f.emails)} email)`}
+              />
               <FunnelStep label="Opened" value={f.opened} base={f.orders} />
               <FunnelStep label="Clicked" value={f.clicked} base={f.orders} />
               <FunnelStep label="Reviewed" value={f.reviewed} base={f.orders} />
             </div>
             <p className="text-xs text-foreground-muted">
               Conversion {pct(conv)}
-              {fp.orders ? ` (previous ${pct(ratio(fp.reviewed, fp.orders))} of ${count(fp.orders)} orders)` : ''}. Opens and clicks are tracked for email only.
+              {fp.orders ? ` (previous ${pct(ratio(fp.reviewed, fp.orders))} of ${count(fp.orders)} orders)` : ''}.
+              Opens and clicks are tracked for email only.
             </p>
           </div>
         ) : (
@@ -451,7 +543,8 @@ export default function ReviewsOverview() {
         </Section>
       </div>
       <p className="text-[11px] text-foreground-muted">
-        Product ratings use every review up to {data.period.to} (published and pending), minimum {data.products.minReviews} reviews.
+        Product ratings use every review up to {data.period.to} (published and pending), minimum{' '}
+        {data.products.minReviews} reviews.
       </p>
     </div>
   )

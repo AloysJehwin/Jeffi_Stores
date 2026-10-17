@@ -85,48 +85,51 @@ export default async function EditReviewFormPage({
           />
         }
       >
-      {isCreateDraft && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">New form — draft</p>
-          <p className="text-xs text-foreground-muted mt-0.5">
-            This form is not on the live list yet. Save keeps it a draft; Publish makes it live.
-          </p>
-        </div>
-      )}
-
-      {isDraft && (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Draft pending</p>
+        {isCreateDraft && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">New form — draft</p>
             <p className="text-xs text-foreground-muted mt-0.5">
-              Changes are saved to draft. The live form stays unchanged until you publish.
+              This form is not on the live list yet. Save keeps it a draft; Publish makes it live.
             </p>
           </div>
-          <form action={discardReviewFormDraft.bind(null, id)}>
-            <button type="submit" className="control-sm border border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10">
-              Discard draft
-            </button>
-          </form>
-        </div>
-      )}
+        )}
 
-      <ReviewFormForm
-        isDraft={isDraft}
-        isCreateDraft={isCreateDraft}
-        coupons={coupons}
-        formId={form.id}
-        backUrl={backUrl}
-        defaultValues={{
-          title: df.title ?? form.title,
-          slug: df.slug ?? form.slug,
-          template_type: df.template_type ?? form.template_type ?? 'google_review',
-          google_review_url: df.google_review_url ?? form.google_review_url,
-          coupon_id: df.coupon_id ?? form.coupon_id,
-          description: df.description ?? form.description,
-          is_active: df.is_active ?? form.is_active,
-          custom_fields: df.custom_fields ?? form.custom_fields ?? [],
-        }}
-      />
+        {isDraft && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Draft pending</p>
+              <p className="text-xs text-foreground-muted mt-0.5">
+                Changes are saved to draft. The live form stays unchanged until you publish.
+              </p>
+            </div>
+            <form action={discardReviewFormDraft.bind(null, id)}>
+              <button
+                type="submit"
+                className="control-sm border border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+              >
+                Discard draft
+              </button>
+            </form>
+          </div>
+        )}
+
+        <ReviewFormForm
+          isDraft={isDraft}
+          isCreateDraft={isCreateDraft}
+          coupons={coupons}
+          formId={form.id}
+          backUrl={backUrl}
+          defaultValues={{
+            title: df.title ?? form.title,
+            slug: df.slug ?? form.slug,
+            template_type: df.template_type ?? form.template_type ?? 'google_review',
+            google_review_url: df.google_review_url ?? form.google_review_url,
+            coupon_id: df.coupon_id ?? form.coupon_id,
+            description: df.description ?? form.description,
+            is_active: df.is_active ?? form.is_active,
+            custom_fields: df.custom_fields ?? form.custom_fields ?? [],
+          }}
+        />
       </FormPage>
     </MobileEditBlock>
   )

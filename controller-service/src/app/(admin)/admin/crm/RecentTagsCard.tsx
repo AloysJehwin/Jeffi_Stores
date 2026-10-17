@@ -82,10 +82,10 @@ export default function RecentTagsCard({ items }: { items: TagEntry[] }) {
         zIndex="z-[300]"
       >
         <div className="divide-y divide-border-default">
-                {items.map((t, i) => (
-                  <TagRow key={i} t={t} />
-                ))}
-              </div>
+          {items.map((t, i) => (
+            <TagRow key={i} t={t} />
+          ))}
+        </div>
       </Dialog>
     </>
   )

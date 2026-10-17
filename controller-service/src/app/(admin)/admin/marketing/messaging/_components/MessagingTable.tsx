@@ -29,14 +29,18 @@ export const MESSAGE_STATUS: StatusMap = {
   failed: { label: 'Failed', tone: 'red' },
 }
 
-export const channelLabel = (c: { template_key: string; channels?: Record<string, { slug: string }> | null }, labels: Record<string, string>) =>
+export const channelLabel = (
+  c: { template_key: string; channels?: Record<string, { slug: string }> | null },
+  labels: Record<string, string>
+) =>
   c.template_key === 'library'
     ? Object.entries(c.channels ?? {})
         .map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`)
         .join(' · ') || 'No channels'
     : labels[c.template_key] || c.template_key
 
-const ist = (d: string) => new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })
+const ist = (d: string) =>
+  new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })
 
 export default function MessagingTable({
   campaigns,
@@ -59,7 +63,8 @@ export default function MessagingTable({
   templateLabels: Record<string, string>
   statusStyles: Record<string, string>
 }) {
-  const viewHref = (c: Campaign) => ap(`/admin/marketing/messaging/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)
+  const viewHref = (c: Campaign) =>
+    ap(`/admin/marketing/messaging/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`, host)
   const pageHref = (p: number) => {
     const qs = new URLSearchParams({ tab: 'list' })
     if (search) qs.set('search', search)
@@ -83,9 +88,23 @@ export default function MessagingTable({
         </div>
       ),
     },
-    { key: 'template', label: 'Template', render: c => <span className="text-foreground-secondary">{channelLabel(c, templateLabels)}</span> },
-    { key: 'audience', label: 'Audience', hideBelow: 'lg', render: c => <span className="capitalize text-foreground-secondary">{c.audience_type.replace('_', ' ')}</span> },
-    { key: 'recipients', label: 'Recipients', num: true, render: c => <span className="text-foreground-secondary">{c.recipient_count ?? '—'}</span> },
+    {
+      key: 'template',
+      label: 'Template',
+      render: c => <span className="text-foreground-secondary">{channelLabel(c, templateLabels)}</span>,
+    },
+    {
+      key: 'audience',
+      label: 'Audience',
+      hideBelow: 'lg',
+      render: c => <span className="capitalize text-foreground-secondary">{c.audience_type.replace('_', ' ')}</span>,
+    },
+    {
+      key: 'recipients',
+      label: 'Recipients',
+      num: true,
+      render: c => <span className="text-foreground-secondary">{c.recipient_count ?? '—'}</span>,
+    },
     { key: 'status', label: 'Status', render: c => <StatusBadge status={c.status} map={MESSAGE_STATUS} /> },
     {
       key: 'date',
@@ -93,7 +112,11 @@ export default function MessagingTable({
       hideBelow: 'lg',
       render: c => (
         <span className="whitespace-nowrap text-xs text-foreground-secondary">
-          {c.status === 'scheduled' && c.scheduled_at ? `Scheduled ${ist(c.scheduled_at)}` : c.sent_at ? ist(c.sent_at) : new Date(c.created_at).toLocaleDateString('en-IN')}
+          {c.status === 'scheduled' && c.scheduled_at
+            ? `Scheduled ${ist(c.scheduled_at)}`
+            : c.sent_at
+              ? ist(c.sent_at)
+              : new Date(c.created_at).toLocaleDateString('en-IN')}
         </span>
       ),
     },
@@ -102,7 +125,9 @@ export default function MessagingTable({
       label: <span className="sr-only">Actions</span>,
       render: c => (
         <div className="flex items-center justify-end gap-3" onClick={e => e.stopPropagation()}>
-          {(c.status === 'draft' || c.status === 'scheduled') && <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />}
+          {(c.status === 'draft' || c.status === 'scheduled') && (
+            <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />
+          )}
           <MailerRowActions id={c.id} title={c.title} viewHref={viewHref(c)} canDelete={c.status !== 'sending'} />
         </div>
       ),
@@ -119,20 +144,25 @@ export default function MessagingTable({
       page={page}
       pageSize={pageSize}
       pageHref={pageHref}
-      mobile={<MailerMobileList campaigns={campaigns} templateLabels={templateLabels} statusStyles={statusStyles} currentListUrl={currentListUrl} host={host} />}
-      empty={
-        {
-          title: 'No campaigns yet.',
-          actionNode: (
-            <span className="hidden md:contents">
-              <Link href={ap('/admin/marketing/messaging/new', host)} className="text-sm text-accent-500 hover:underline">
-                Create your first one.
-              </Link>
-            </span>
-          ),
-        }
+      mobile={
+        <MailerMobileList
+          campaigns={campaigns}
+          templateLabels={templateLabels}
+          statusStyles={statusStyles}
+          currentListUrl={currentListUrl}
+          host={host}
+        />
       }
+      empty={{
+        title: 'No campaigns yet.',
+        actionNode: (
+          <span className="hidden md:contents">
+            <Link href={ap('/admin/marketing/messaging/new', host)} className="text-sm text-accent-500 hover:underline">
+              Create your first one.
+            </Link>
+          </span>
+        ),
+      }}
     />
   )
 }
-

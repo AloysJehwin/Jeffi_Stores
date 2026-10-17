@@ -1,7 +1,21 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AlertTriangle, Tag } from 'lucide-react'
-import { Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, badgeCls, type StatusMap, type Tone } from '@/components/admin/kit'
+import {
+  Badge,
+  Card,
+  DetailHeader,
+  EmptyState,
+  EntityPage,
+  Field,
+  Fields,
+  Kpi,
+  KpiGrid,
+  StatusBadge,
+  badgeCls,
+  type StatusMap,
+  type Tone,
+} from '@/components/admin/kit'
 import { businessLabel, businessTone } from '../../_components/status-maps'
 import { headers } from 'next/headers'
 import { getCustomerById } from '@/lib/queries'
@@ -154,7 +168,12 @@ export default async function CustomerDetailPage({
 
       <Card title="Account actions">
         {canWrite ? (
-          <CustomerActionButton customerId={customer.id} customerName={fullName} isActive={customer.is_active} isFlagged={customer.is_flagged} />
+          <CustomerActionButton
+            customerId={customer.id}
+            customerName={fullName}
+            isActive={customer.is_active}
+            isFlagged={customer.is_flagged}
+          />
         ) : (
           <p className="text-xs text-foreground-muted">Read-only access — cannot modify account.</p>
         )}
@@ -180,27 +199,44 @@ export default async function CustomerDetailPage({
         <Card title="Business details">
           <Fields cols={1}>
             {customer.company_name && <Field label="Company" value={customer.company_name} />}
-            {customer.gst_number && <Field label="GST Number" value={customer.gst_number} mono copy={customer.gst_number} />}
-            {customer.credit_limit && <Field label="Credit Limit" value={`₹${Number(customer.credit_limit).toLocaleString('en-IN')}`} />}
+            {customer.gst_number && (
+              <Field label="GST Number" value={customer.gst_number} mono copy={customer.gst_number} />
+            )}
+            {customer.credit_limit && (
+              <Field label="Credit Limit" value={`₹${Number(customer.credit_limit).toLocaleString('en-IN')}`} />
+            )}
           </Fields>
         </Card>
       )}
 
       {customer.user_type === 'business' && customer.bp_company_name && (
-        <Card title="Business partner" action={<StatusBadge status={customer.bp_approval_status || 'pending'} map={BP_STATUS} />}>
+        <Card
+          title="Business partner"
+          action={<StatusBadge status={customer.bp_approval_status || 'pending'} map={BP_STATUS} />}
+        >
           <Fields cols={1}>
             <Field label="Company" value={customer.bp_company_name} />
-            {customer.bp_gst_number && <Field label="GST Number" value={customer.bp_gst_number} mono copy={customer.bp_gst_number} />}
+            {customer.bp_gst_number && (
+              <Field label="GST Number" value={customer.bp_gst_number} mono copy={customer.bp_gst_number} />
+            )}
             {customer.bp_industry && <Field label="Industry" value={customer.bp_industry} />}
             {customer.bp_business_address && <Field label="Business Address" value={customer.bp_business_address} />}
             {customer.bp_created_at && <Field label="Applied" value={day(customer.bp_created_at)} />}
-            {customer.bp_approved_at && customer.bp_approval_status === 'approved' && <Field label="Approved On" value={day(customer.bp_approved_at)} />}
+            {customer.bp_approved_at && customer.bp_approval_status === 'approved' && (
+              <Field label="Approved On" value={day(customer.bp_approved_at)} />
+            )}
             {customer.bp_rejection_note && customer.bp_approval_status === 'rejected' && (
-              <Field label="Rejection Note" value={<span className="text-red-600 dark:text-red-400">{customer.bp_rejection_note}</span>} />
+              <Field
+                label="Rejection Note"
+                value={<span className="text-red-600 dark:text-red-400">{customer.bp_rejection_note}</span>}
+              />
             )}
           </Fields>
           <div className="mt-4 border-t border-border-default pt-3">
-            <Link href={ap(`/admin/business/customers/${customer.id}`, host)} className="text-xs font-medium text-accent-500 hover:text-accent-600">
+            <Link
+              href={ap(`/admin/business/customers/${customer.id}`, host)}
+              className="text-xs font-medium text-accent-500 hover:text-accent-600"
+            >
               Manage in Business Customers →
             </Link>
           </div>
@@ -215,7 +251,13 @@ export default async function CustomerDetailPage({
         <CustomerAiSummary customerId={customer.id} canWrite={canWrite} />
       </div>
       <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
-        <CustomerConversations customerId={customer.id} email={customer.email} phone={customer.phone} canWrite={canWrite} isBusiness={customer.user_type === 'business'} />
+        <CustomerConversations
+          customerId={customer.id}
+          email={customer.email}
+          phone={customer.phone}
+          canWrite={canWrite}
+          isBusiness={customer.user_type === 'business'}
+        />
       </div>
       <div className="rounded-xl border border-border-default bg-surface-elevated p-5">
         <CustomerTimeline customerId={customer.id} />
@@ -226,7 +268,10 @@ export default async function CustomerDetailPage({
         flush
         action={
           totalOrders > 10 && (
-            <Link href={ap(`/admin/orders?customer=${customer.id}`, host)} className="text-xs font-medium text-accent-500 hover:text-accent-600">
+            <Link
+              href={ap(`/admin/orders?customer=${customer.id}`, host)}
+              className="text-xs font-medium text-accent-500 hover:text-accent-600"
+            >
               View all {totalOrders} →
             </Link>
           )
@@ -247,20 +292,34 @@ export default async function CustomerDetailPage({
               </thead>
               <tbody>
                 {customer.recent_orders.map((order: any) => (
-                  <tr key={order.id} className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40">
-                    <td className="whitespace-nowrap px-5 py-2.5 font-mono text-xs font-semibold text-foreground">#{order.order_number || order.id.slice(0, 8)}</td>
+                  <tr
+                    key={order.id}
+                    className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40"
+                  >
+                    <td className="whitespace-nowrap px-5 py-2.5 font-mono text-xs font-semibold text-foreground">
+                      #{order.order_number || order.id.slice(0, 8)}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-foreground-secondary">{day(order.created_at)}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold tabular-nums text-foreground">
-                      ₹{Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ₹
+                      {Number(order.total_amount).toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </td>
                     <td className="px-3 py-2.5">
-                      <span className={badgeCls(paymentTone(order.payment_status))}>{formatPaymentStatus(order.payment_status)}</span>
+                      <span className={badgeCls(paymentTone(order.payment_status))}>
+                        {formatPaymentStatus(order.payment_status)}
+                      </span>
                     </td>
                     <td className="px-3 py-2.5">
                       <span className={badgeCls(orderTone(order.status))}>{formatOrderStatus(order.status)}</span>
                     </td>
                     <td className="px-5 py-2.5 text-right">
-                      <Link href={ap(`/admin/orders/${order.id}`, host)} className="text-xs font-medium text-accent-500 hover:text-accent-600">
+                      <Link
+                        href={ap(`/admin/orders/${order.id}`, host)}
+                        className="text-xs font-medium text-accent-500 hover:text-accent-600"
+                      >
                         View →
                       </Link>
                     </td>
@@ -300,18 +359,28 @@ export default async function CustomerDetailPage({
       header={
         <DetailHeader
           back={{ href: ap(backUrl, host), label: 'Customers' }}
-          media={<div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border-default bg-surface-secondary text-lg font-bold text-foreground">{initials}</div>}
+          media={
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-border-default bg-surface-secondary text-lg font-bold text-foreground">
+              {initials}
+            </div>
+          }
           title={fullName}
           status={
             <>
               <StatusBadge status={currentStatus} map={CUSTOMER_STATUS} />
-              {customer.user_type === 'business' && <span className={badgeCls(businessTone(customer.bp_approval_status))}>{businessLabel(customer.bp_approval_status).replace('Business', 'Business Partner')}</span>}
+              {customer.user_type === 'business' && (
+                <span className={badgeCls(businessTone(customer.bp_approval_status))}>
+                  {businessLabel(customer.bp_approval_status).replace('Business', 'Business Partner')}
+                </span>
+              )}
               {customer.customer_type && customer.customer_type !== 'retail' && (
                 <Badge>
                   <span className="capitalize">{customer.customer_type}</span>
                 </Badge>
               )}
-              {customer.segments?.map((seg: string) => <StatusBadge key={seg} status={seg} map={SEGMENTS} />)}
+              {customer.segments?.map((seg: string) => (
+                <StatusBadge key={seg} status={seg} map={SEGMENTS} />
+              ))}
             </>
           }
           subtitle={customer.email}
@@ -334,18 +403,38 @@ export default async function CustomerDetailPage({
               <div className="mb-2 flex items-center gap-2">
                 <Tag className="h-4 w-4 shrink-0 text-amber-500" />
                 <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
-                  {customer.assigned_coupons.length} Personal Coupon{customer.assigned_coupons.length > 1 ? 's' : ''} Assigned
+                  {customer.assigned_coupons.length} Personal Coupon{customer.assigned_coupons.length > 1 ? 's' : ''}{' '}
+                  Assigned
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
-                {customer.assigned_coupons.map((c: { id: string; code: string; discount_type: string; discount_value: number; valid_until: string | null; times_used: number }) => (
-                  <div key={c.id} className="flex items-center gap-2 rounded-lg border border-border-default bg-surface-elevated px-3 py-1.5 text-xs">
-                    <span className="font-mono font-bold text-foreground">{c.code}</span>
-                    <span className="text-foreground-muted">{c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}</span>
-                    {c.times_used > 0 && <span className={badgeCls('green')}>Used</span>}
-                    {c.valid_until && <span className="text-foreground-muted">until {new Date(c.valid_until).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>}
-                  </div>
-                ))}
+                {customer.assigned_coupons.map(
+                  (c: {
+                    id: string
+                    code: string
+                    discount_type: string
+                    discount_value: number
+                    valid_until: string | null
+                    times_used: number
+                  }) => (
+                    <div
+                      key={c.id}
+                      className="flex items-center gap-2 rounded-lg border border-border-default bg-surface-elevated px-3 py-1.5 text-xs"
+                    >
+                      <span className="font-mono font-bold text-foreground">{c.code}</span>
+                      <span className="text-foreground-muted">
+                        {c.discount_type === 'percentage' ? `${c.discount_value}% off` : `₹${c.discount_value} off`}
+                      </span>
+                      {c.times_used > 0 && <span className={badgeCls('green')}>Used</span>}
+                      {c.valid_until && (
+                        <span className="text-foreground-muted">
+                          until{' '}
+                          {new Date(c.valid_until).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                        </span>
+                      )}
+                    </div>
+                  )
+                )}
               </div>
             </div>
           )}
@@ -355,7 +444,10 @@ export default async function CustomerDetailPage({
         <KpiGrid>
           <Kpi label="Total orders" value={totalOrders.toLocaleString('en-IN')} highlight />
           <Kpi label="Lifetime spend" value={`₹${lifetime.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} />
-          <Kpi label="Avg. order" value={totalOrders > 0 ? `₹${Math.round(lifetime / totalOrders).toLocaleString('en-IN')}` : '-'} />
+          <Kpi
+            label="Avg. order"
+            value={totalOrders > 0 ? `₹${Math.round(lifetime / totalOrders).toLocaleString('en-IN')}` : '-'}
+          />
           <Kpi label="Member since" value={day(customer.created_at)} />
         </KpiGrid>
       }

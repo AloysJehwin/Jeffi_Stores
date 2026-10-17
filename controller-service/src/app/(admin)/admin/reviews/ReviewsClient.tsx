@@ -63,7 +63,8 @@ export default function ReviewsClient({ canWrite = false }: { canWrite?: boolean
   const router = useRouter()
   // Old links (?filter / ?q without ?view) still open the list.
   const initial: View =
-    searchParams.get('view') === 'reviews' || (!searchParams.get('view') && (searchParams.has('filter') || searchParams.has('q')))
+    searchParams.get('view') === 'reviews' ||
+    (!searchParams.get('view') && (searchParams.has('filter') || searchParams.has('q')))
       ? 'reviews'
       : 'overview'
   const [view, setView] = useState<View>(initial)
@@ -82,7 +83,10 @@ export default function ReviewsClient({ canWrite = false }: { canWrite?: boolean
 
   return (
     <PageBody>
-      <PageHeader title="Reviews" description="Ratings, review requests and moderation of customer reviews before they appear on product pages" />
+      <PageHeader
+        title="Reviews"
+        description="Ratings, review requests and moderation of customer reviews before they appear on product pages"
+      />
       <Tabs
         tabs={[
           { id: 'overview', label: 'Overview' },
@@ -249,7 +253,14 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
         </div>
         <div className="relative min-w-[200px] max-w-sm flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
-          <input type="text" value={search} onChange={e => handleSearchChange(e.target.value)} placeholder="Search by product or reviewer…" aria-label="Search" className={`${fieldInputCls} pl-9`} />
+          <input
+            type="text"
+            value={search}
+            onChange={e => handleSearchChange(e.target.value)}
+            placeholder="Search by product or reviewer…"
+            aria-label="Search"
+            className={`${fieldInputCls} pl-9`}
+          />
         </div>
       </div>
 
@@ -274,7 +285,9 @@ function ReviewsList({ canWrite: canWriteProp = false }: { canWrite?: boolean })
         <EmptyState
           icon={<MessageSquare className="h-5 w-5" />}
           title="No reviews found"
-          body={filter === 'pending' ? 'All caught up — no reviews awaiting approval.' : 'No reviews match your filters.'}
+          body={
+            filter === 'pending' ? 'All caught up — no reviews awaiting approval.' : 'No reviews match your filters.'
+          }
         />
       ) : (
         <div className="space-y-3">

@@ -66,7 +66,11 @@ export default async function ReviewFormsPage({
         listLabel="Forms"
         actions={
           <span className="hidden md:inline-flex">
-            <TabAction href={ap('/admin/review-forms/add', host)} icon={<Plus className="w-4 h-4" />} label="Create Form" />
+            <TabAction
+              href={ap('/admin/review-forms/add', host)}
+              icon={<Plus className="w-4 h-4" />}
+              label="Create Form"
+            />
           </span>
         }
       />
@@ -77,7 +81,9 @@ export default async function ReviewFormsPage({
         </Suspense>
       ) : (
         <>
-          <DataToolbar search={{ placeholder: 'Search by title or slug...', param: 'search', suggestType: 'review_forms' }} />
+          <DataToolbar
+            search={{ placeholder: 'Search by title or slug...', param: 'search', suggestType: 'review_forms' }}
+          />
 
           <Suspense fallback={null}>
             <ReviewFormsDraftsBanner host={host} />

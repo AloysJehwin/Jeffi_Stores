@@ -21,9 +21,7 @@ function ScoreBadge({ score }: { score: number }) {
   return (
     <span
       className={`px-1.5 py-0.5 text-[10px] font-bold rounded shrink-0 ml-2 ${
-        score < 20
-          ? 'bg-red-200 text-red-700 dark:text-red-400'
-          : 'bg-red-500/10 text-red-700 dark:text-red-400'
+        score < 20 ? 'bg-red-200 text-red-700 dark:text-red-400' : 'bg-red-500/10 text-red-700 dark:text-red-400'
       }`}
     >
       {score}
@@ -132,9 +130,7 @@ export default function ChurnRisksCard({ items }: { items: ChurnRisk[] }) {
                 {canMail && (
                   <div className="flex flex-col flex-1 min-w-0">
                     <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
-                      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-                        Send message
-                      </h3>
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Send message</h3>
                       <Link
                         href={ap('/admin/customers?segment=dormant')}
                         className="text-xs text-accent-500 hover:text-accent-600 font-medium"

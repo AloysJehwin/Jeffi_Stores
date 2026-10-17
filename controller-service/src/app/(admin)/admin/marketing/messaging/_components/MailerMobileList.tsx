@@ -32,9 +32,14 @@ interface Props {
   host?: string
 }
 
-const channelLabel = (c: { template_key: string; channels?: Record<string, { slug: string }> | null }, labels: Record<string, string>) =>
+const channelLabel = (
+  c: { template_key: string; channels?: Record<string, { slug: string }> | null },
+  labels: Record<string, string>
+) =>
   c.template_key === 'library'
-    ? Object.entries(c.channels ?? {}).map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`).join(' · ') || 'No channels'
+    ? Object.entries(c.channels ?? {})
+        .map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`)
+        .join(' · ') || 'No channels'
     : labels[c.template_key] || c.template_key
 
 function formatDate(c: Campaign): string {
@@ -185,9 +190,7 @@ export default function MailerMobileList({ campaigns, templateLabels, statusStyl
             </div>
             <div className="flex items-center justify-between gap-3">
               <dt className="text-foreground-muted">Template</dt>
-              <dd className="text-foreground text-right">
-                {channelLabel(selected, templateLabels)}
-              </dd>
+              <dd className="text-foreground text-right">{channelLabel(selected, templateLabels)}</dd>
             </div>
             <div className="flex items-center justify-between gap-3">
               <dt className="text-foreground-muted">Audience</dt>

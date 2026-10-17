@@ -133,7 +133,11 @@ export default function ScenariosListClient() {
         actions={
           <RequireWrite scope="campaigns:write">
             <span className="hidden md:inline-flex">
-              <TabAction href={ap('/admin/campaigns/scenarios/new')} icon={<Plus className="w-4 h-4" />} label="New scenario" />
+              <TabAction
+                href={ap('/admin/campaigns/scenarios/new')}
+                icon={<Plus className="w-4 h-4" />}
+                label="New scenario"
+              />
             </span>
           </RequireWrite>
         }
@@ -152,7 +156,10 @@ export default function ScenariosListClient() {
 
           {/* Desktop: full card */}
           {scenarios.map(s => (
-            <div key={s.kind} className="hidden md:block bg-surface-elevated rounded-xl border border-border-default p-5">
+            <div
+              key={s.kind}
+              className="hidden md:block bg-surface-elevated rounded-xl border border-border-default p-5"
+            >
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
@@ -296,7 +303,9 @@ export default function ScenariosListClient() {
                             : 'bg-surface-secondary hover:bg-surface-secondary text-foreground-muted'
                         }`}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${c.enabled ? 'bg-green-500' : 'bg-border-default'}`} />
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${c.enabled ? 'bg-green-500' : 'bg-border-default'}`}
+                        />
                         {c.name}
                       </Link>
                     ))}

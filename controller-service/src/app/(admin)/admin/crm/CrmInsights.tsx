@@ -96,9 +96,7 @@ export default function CrmInsights({
               onClick={() => changeRange(r.key)}
               disabled={loading}
               className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${
-                range === r.key
-                  ? 'bg-accent-500 text-white'
-                  : 'text-foreground-secondary hover:text-foreground'
+                range === r.key ? 'bg-accent-500 text-white' : 'text-foreground-secondary hover:text-foreground'
               }`}
             >
               {r.label}
@@ -112,7 +110,10 @@ export default function CrmInsights({
           size="sm"
           className="self-start"
           aria-label="Customer segment"
-          options={[{ value: 'all', label: 'All customers' }, ...CRM_SEGMENT_KEYS.map(k => ({ value: k as CrmSegment, label: SEGMENT_LABEL[k] }))]}
+          options={[
+            { value: 'all', label: 'All customers' },
+            ...CRM_SEGMENT_KEYS.map(k => ({ value: k as CrmSegment, label: SEGMENT_LABEL[k] })),
+          ]}
         />
       </div>
 

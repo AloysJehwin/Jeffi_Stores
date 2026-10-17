@@ -47,7 +47,9 @@ export default function ReorderIntervalsPanel() {
     return map
   }, [rows, values])
 
-  const changed = (rows ?? []).filter(row => (values[row.categoryId] ?? '') !== (row.days == null ? '' : String(row.days)))
+  const changed = (rows ?? []).filter(
+    row => (values[row.categoryId] ?? '') !== (row.days == null ? '' : String(row.days))
+  )
   const invalid = changed.some(row => {
     const text = values[row.categoryId] ?? ''
     if (text === '') return false
@@ -128,7 +130,9 @@ export default function ReorderIntervalsPanel() {
                 const inherited = row.parentId ? parentDays.get(row.parentId) : ''
                 return (
                   <tr key={row.categoryId} className="border-t border-border-default">
-                    <td className={`px-4 py-2 ${row.parentId ? 'pl-8 text-foreground-secondary' : 'font-medium text-foreground'}`}>
+                    <td
+                      className={`px-4 py-2 ${row.parentId ? 'pl-8 text-foreground-secondary' : 'font-medium text-foreground'}`}
+                    >
                       {row.name}
                     </td>
                     <td className="px-4 py-2 text-right text-foreground-secondary tabular-nums">{row.products}</td>

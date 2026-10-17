@@ -157,11 +157,21 @@ async function CustomersListContent({ resolvedSearchParams }: { resolvedSearchPa
 
   const currentListUrl = (() => {
     const params = new URLSearchParams({ tab: 'list' })
-    for (const k of ['status', 'search', 'segment', 'tag', 'health', 'sort', 'dir'] as const) if (query[k]) params.set(k, query[k]!)
+    for (const k of ['status', 'search', 'segment', 'tag', 'health', 'sort', 'dir'] as const)
+      if (query[k]) params.set(k, query[k]!)
     if (page > 1) params.set('page', String(page))
     const qs = params.toString()
     return `/admin/customers${qs ? `?${qs}` : ''}`
   })()
 
-  return <CustomersTable customers={customers ?? []} total={total} page={page} pageSize={PAGE_SIZE} query={query} backUrl={currentListUrl} />
+  return (
+    <CustomersTable
+      customers={customers ?? []}
+      total={total}
+      page={page}
+      pageSize={PAGE_SIZE}
+      query={query}
+      backUrl={currentListUrl}
+    />
+  )
 }

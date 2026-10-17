@@ -29,9 +29,7 @@ export default function ReachCard({ reach }: { reach: Reach }) {
 
   return (
     <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">
-        Reach and Deliverability
-      </h2>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-4">Reach and Deliverability</h2>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
         <Channel label="Email" sent={reach.emailSent} failed={reach.emailFailed} />

@@ -19,9 +19,14 @@ const TEMPLATE_LABELS: Record<string, string> = {
   custom: 'Custom',
 }
 
-const channelLabel = (c: { template_key: string; channels?: Record<string, { slug: string }> | null }, labels: Record<string, string>) =>
+const channelLabel = (
+  c: { template_key: string; channels?: Record<string, { slug: string }> | null },
+  labels: Record<string, string>
+) =>
   c.template_key === 'library'
-    ? Object.entries(c.channels ?? {}).map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`).join(' · ') || 'No channels'
+    ? Object.entries(c.channels ?? {})
+        .map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`)
+        .join(' · ') || 'No channels'
     : labels[c.template_key] || c.template_key
 
 const STATUS_STYLES: Record<string, string> = {
@@ -89,8 +94,9 @@ export default async function CampaignDetailPage({
   const sentCount = logs.filter(l => l.status === 'sent').length
   const failedCount = logs.filter(l => l.status === 'failed').length
   // SMS/WhatsApp outcomes land after the send — keep refreshing for 10 minutes.
-  const awaiting = campaign.status === 'sending' || logs.some(l =>
-    l.status === 'sent' && l.channel !== 'email' && Date.now() - new Date(l.sent_at).getTime() < 600_000)
+  const awaiting =
+    campaign.status === 'sending' ||
+    logs.some(l => l.status === 'sent' && l.channel !== 'email' && Date.now() - new Date(l.sent_at).getTime() < 600_000)
 
   return (
     <PageBody>
@@ -99,21 +105,42 @@ export default async function CampaignDetailPage({
         back={{ href: ap(backUrl, host), label: 'Messaging' }}
         title={campaign.title}
         subtitle={campaign.subject}
-        status={<span className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium capitalize ${STATUS_STYLES[campaign.status] || 'bg-surface-secondary text-foreground-muted'}`}>{campaign.status}</span>}
-        actions={(campaign.status === 'draft' || campaign.status === 'scheduled') && <DispatchCampaignButton id={campaign.id} />}
+        status={
+          <span
+            className={`inline-block rounded px-1.5 py-0.5 text-[11px] font-medium capitalize ${STATUS_STYLES[campaign.status] || 'bg-surface-secondary text-foreground-muted'}`}
+          >
+            {campaign.status}
+          </span>
+        }
+        actions={
+          (campaign.status === 'draft' || campaign.status === 'scheduled') && (
+            <DispatchCampaignButton id={campaign.id} />
+          )
+        }
       />
 
       <KpiGrid>
         {[
-          { label: campaign.template_key === 'library' ? 'Channels' : 'Template', value: channelLabel(campaign, TEMPLATE_LABELS) },
+          {
+            label: campaign.template_key === 'library' ? 'Channels' : 'Template',
+            value: channelLabel(campaign, TEMPLATE_LABELS),
+          },
           { label: 'Audience', value: campaign.audience_type.replace(/_/g, ' ') },
           { label: 'Recipients', value: campaign.recipient_count ?? '—' },
           {
             label: campaign.sent_at ? 'Sent' : campaign.scheduled_at ? 'Scheduled' : 'Created',
             value: campaign.sent_at
-              ? new Date(campaign.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })
+              ? new Date(campaign.sent_at).toLocaleString('en-IN', {
+                  dateStyle: 'medium',
+                  timeStyle: 'short',
+                  timeZone: 'Asia/Kolkata',
+                })
               : campaign.scheduled_at
-                ? new Date(campaign.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })
+                ? new Date(campaign.scheduled_at).toLocaleString('en-IN', {
+                    dateStyle: 'medium',
+                    timeStyle: 'short',
+                    timeZone: 'Asia/Kolkata',
+                  })
                 : new Date(campaign.created_at).toLocaleDateString('en-IN'),
           },
         ].map(stat => (
@@ -125,7 +152,11 @@ export default async function CampaignDetailPage({
         <Card title="Template data">
           <Fields>
             {Object.entries(campaign.template_data).map(([k, v]) => (
-              <Field key={k} label={<span className="capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>} value={<span className="break-all">{v}</span>} />
+              <Field
+                key={k}
+                label={<span className="capitalize">{k.replace(/([A-Z])/g, ' $1')}</span>}
+                value={<span className="break-all">{v}</span>}
+              />
             ))}
           </Fields>
         </Card>
@@ -156,16 +187,25 @@ export default async function CampaignDetailPage({
                 </thead>
                 <tbody>
                   {logs.map((l, i) => (
-                    <tr key={i} className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40">
+                    <tr
+                      key={i}
+                      className="border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40"
+                    >
                       <td className="px-5 py-2.5 text-foreground-secondary">
                         {l.to_address || l.email}
-                        {l.channel !== 'email' && <span className="ml-1.5 text-[10px] uppercase text-foreground-muted">{l.channel}</span>}
+                        {l.channel !== 'email' && (
+                          <span className="ml-1.5 text-[10px] uppercase text-foreground-muted">{l.channel}</span>
+                        )}
                       </td>
                       <td className="px-5 py-2.5">
                         <span className={badgeCls(l.status === 'sent' ? 'green' : 'red')}>{l.status}</span>
                       </td>
                       <td className="px-5 py-2.5 text-xs text-foreground-secondary">
-                        {new Date(l.sent_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}
+                        {new Date(l.sent_at).toLocaleString('en-IN', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                          timeZone: 'Asia/Kolkata',
+                        })}
                       </td>
                       <td className="px-5 py-2.5 text-xs text-red-500">{l.error || '—'}</td>
                     </tr>

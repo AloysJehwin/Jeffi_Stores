@@ -65,10 +65,17 @@ export default async function CustomerProgramsPage({
 
   return (
     <PageBody>
-      <PageHeader title="Programs" description="Rewards that keep customers coming back. Switch each one on or off in Site Controls." />
+      <PageHeader
+        title="Programs"
+        description="Rewards that keep customers coming back. Switch each one on or off in Site Controls."
+      />
 
       <TabLinks
-        tabs={TABS.map(t => ({ id: t.key, label: t.label, href: t.key === 'overview' ? basePath : `${basePath}?tab=${t.key}` }))}
+        tabs={TABS.map(t => ({
+          id: t.key,
+          label: t.label,
+          href: t.key === 'overview' ? basePath : `${basePath}?tab=${t.key}`,
+        }))}
         value={tab}
       />
 

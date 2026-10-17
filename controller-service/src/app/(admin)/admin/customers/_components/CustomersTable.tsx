@@ -16,11 +16,18 @@ function TagChips({ tags, max }: { tags: string[]; max: number }) {
   return (
     <div className="mt-1.5 flex max-w-[220px] flex-wrap gap-1">
       {tags.slice(0, max).map(tag => (
-        <span key={tag} className="whitespace-nowrap rounded bg-accent-500/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-500">
+        <span
+          key={tag}
+          className="whitespace-nowrap rounded bg-accent-500/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-500"
+        >
           {tag}
         </span>
       ))}
-      {tags.length > max && <span className="rounded bg-surface-secondary px-1.5 py-0.5 text-[10px] font-medium text-foreground-muted">+{tags.length - max}</span>}
+      {tags.length > max && (
+        <span className="rounded bg-surface-secondary px-1.5 py-0.5 text-[10px] font-medium text-foreground-muted">
+          +{tags.length - max}
+        </span>
+      )}
     </div>
   )
 }
@@ -28,7 +35,10 @@ function TagChips({ tags, max }: { tags: string[]; max: number }) {
 function StatusChips({ c, tooltips }: { c: any; tooltips?: boolean }) {
   const s = customerStatus(c)
   const status = <span className={badgeCls(s.tone)}>{s.label}</span>
-  const biz = c.user_type === 'business' ? <span className={badgeCls(businessTone(c.bp_approval_status))}>{businessLabel(c.bp_approval_status)}</span> : null
+  const biz =
+    c.user_type === 'business' ? (
+      <span className={badgeCls(businessTone(c.bp_approval_status))}>{businessLabel(c.bp_approval_status)}</span>
+    ) : null
   if (!tooltips)
     return (
       <div className="flex flex-wrap gap-1.5">
@@ -38,7 +48,17 @@ function StatusChips({ c, tooltips }: { c: any; tooltips?: boolean }) {
     )
   return (
     <div className="flex flex-col items-start gap-1">
-      <Tooltip content={c.is_flagged ? 'Account flagged — potential fraud or policy violation' : c.is_active ? 'Account in good standing' : 'Account deactivated'}>{status}</Tooltip>
+      <Tooltip
+        content={
+          c.is_flagged
+            ? 'Account flagged — potential fraud or policy violation'
+            : c.is_active
+              ? 'Account in good standing'
+              : 'Account deactivated'
+        }
+      >
+        {status}
+      </Tooltip>
       {biz && (
         <Tooltip
           content={`Business partner · ${c.bp_approval_status === 'approved' ? 'Approved' : c.bp_approval_status === 'rejected' ? 'Rejected' : 'Pending approval'}${c.bp_company_name ? ` · ${c.bp_company_name}` : ''}`}
@@ -69,7 +89,8 @@ export default function CustomersTable({
   const [open, setOpen] = useState<any>(null)
   const pageHref = (p: number) => {
     const params = new URLSearchParams({ tab: 'list' })
-    for (const k of ['status', 'search', 'segment', 'tag', 'health', 'sort', 'dir']) if (query[k]) params.set(k, query[k]!)
+    for (const k of ['status', 'search', 'segment', 'tag', 'health', 'sort', 'dir'])
+      if (query[k]) params.set(k, query[k]!)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
     return ap(`/admin/customers${qs ? `?${qs}` : ''}`)
@@ -85,7 +106,10 @@ export default function CustomersTable({
         <div className="min-w-0" onClick={e => e.stopPropagation()}>
           <HoverCard
             trigger={
-              <Link href={viewHref(c)} className="whitespace-nowrap font-medium text-foreground hover:text-accent-500 transition-colors">
+              <Link
+                href={viewHref(c)}
+                className="whitespace-nowrap font-medium text-foreground hover:text-accent-500 transition-colors"
+              >
                 {fullName(c, '—')}
               </Link>
             }
@@ -119,7 +143,9 @@ export default function CustomersTable({
                 {c.user_type === 'business' && (
                   <>
                     <span className="text-foreground-muted">Type</span>
-                    <span className="text-foreground">Business{c.bp_company_name ? ` · ${c.bp_company_name}` : ''}</span>
+                    <span className="text-foreground">
+                      Business{c.bp_company_name ? ` · ${c.bp_company_name}` : ''}
+                    </span>
                   </>
                 )}
                 <span className="text-foreground-muted">Joined</span>
@@ -137,15 +163,33 @@ export default function CustomersTable({
         </div>
       ),
     },
-    { key: 'email', label: 'Email', sortParam: 'email', render: c => <span className="text-foreground">{c.email}</span> },
-    { key: 'phone', label: 'Phone', sortParam: 'phone', hideBelow: 'lg', render: c => <span className="whitespace-nowrap text-foreground">{c.phone || '—'}</span> },
+    {
+      key: 'email',
+      label: 'Email',
+      sortParam: 'email',
+      render: c => <span className="text-foreground">{c.email}</span>,
+    },
+    {
+      key: 'phone',
+      label: 'Phone',
+      sortParam: 'phone',
+      hideBelow: 'lg',
+      render: c => <span className="whitespace-nowrap text-foreground">{c.phone || '—'}</span>,
+    },
     {
       key: 'joined',
       label: 'Joined',
       sortParam: 'joined',
       hideBelow: 'lg',
       render: c => (
-        <Tooltip content={new Date(c.created_at).toLocaleString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}>
+        <Tooltip
+          content={new Date(c.created_at).toLocaleString('en-IN', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          })}
+        >
           <span className="cursor-default whitespace-nowrap text-foreground">{joined(c.created_at)}</span>
         </Tooltip>
       ),
@@ -169,7 +213,9 @@ export default function CustomersTable({
         c.health_score == null ? (
           <span className="text-xs text-foreground-muted">—</span>
         ) : (
-          <Tooltip content={`Churn risk: ${c.churn_risk || 'unknown'}${c.trend_delta_30d ? ` · ${c.trend_delta_30d > 0 ? '+' : ''}${c.trend_delta_30d} (30d)` : ''}`}>
+          <Tooltip
+            content={`Churn risk: ${c.churn_risk || 'unknown'}${c.trend_delta_30d ? ` · ${c.trend_delta_30d > 0 ? '+' : ''}${c.trend_delta_30d} (30d)` : ''}`}
+          >
             <span className={`${badgeCls(healthTone(c.health_score))} cursor-default font-bold tabular-nums`}>
               {c.health_score}
               {c.trend_delta_30d > 5 && <span className="ml-1 text-green-600">▲</span>}
@@ -206,7 +252,11 @@ export default function CustomersTable({
         zIndex="z-[300]"
         footer={
           open && (
-            <Link href={viewHref(open)} onClick={() => setOpen(null)} className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600">
+            <Link
+              href={viewHref(open)}
+              onClick={() => setOpen(null)}
+              className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600"
+            >
               Full Profile
             </Link>
           )

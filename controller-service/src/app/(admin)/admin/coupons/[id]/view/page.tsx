@@ -1,6 +1,19 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ACTIVE_STATUS, badgeCls } from '@/components/admin/kit'
+import {
+  Badge,
+  Card,
+  DetailHeader,
+  EmptyState,
+  EntityPage,
+  Field,
+  Fields,
+  Kpi,
+  KpiGrid,
+  StatusBadge,
+  ACTIVE_STATUS,
+  badgeCls,
+} from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
@@ -129,7 +142,8 @@ export default async function CouponViewPage({
   const totalDiscount = usageRows.reduce((s, r) => s + Number(r.discount_amount), 0)
   const eligibleCount = isCampaign ? parseInt(campaignSentCount?.count || '0') : eligibleUsers.length
 
-  const day = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  const day = (d: string) =>
+    new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
   const thead = 'border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted'
   const row = 'border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40'
 
@@ -150,7 +164,10 @@ export default async function CouponViewPage({
           subtitle={coupon.description || undefined}
           identifiers={[{ label: 'Created', value: day(coupon.created_at) }]}
           actions={
-            <Link href={ap(`/admin/coupons/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600">
+            <Link
+              href={ap(`/admin/coupons/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
+              className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+            >
               {hasDraft ? 'Edit Draft' : 'Edit'}
             </Link>
           }
@@ -159,22 +176,51 @@ export default async function CouponViewPage({
       kpis={
         <KpiGrid>
           <Kpi label="Times used" value={`${coupon.times_used}${coupon.usage_limit ? `/${coupon.usage_limit}` : ''}`} />
-          <Kpi label="Total discount given" value={`₹${totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`} />
+          <Kpi
+            label="Total discount given"
+            value={`₹${totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
+          />
           <Kpi label="Eligible users" value={eligibleCount > 0 ? String(eligibleCount) : 'All'} />
-          <Kpi label="Discount" value={coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : `₹${coupon.discount_value}`} highlight />
+          <Kpi
+            label="Discount"
+            value={coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : `₹${coupon.discount_value}`}
+            highlight
+          />
         </KpiGrid>
       }
       aside={
         <Card title="Coupon details">
           <Fields cols={1}>
             <Field label="Type" value={<span className="capitalize">{coupon.discount_type}</span>} />
-            <Field label="Value" value={coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : `₹${coupon.discount_value} off`} />
+            <Field
+              label="Value"
+              value={
+                coupon.discount_type === 'percentage'
+                  ? `${coupon.discount_value}% off`
+                  : `₹${coupon.discount_value} off`
+              }
+            />
             <Field label="Min Purchase" value={coupon.min_purchase_amount ? `₹${coupon.min_purchase_amount}` : null} />
             <Field label="Max Discount" value={coupon.max_discount_amount ? `₹${coupon.max_discount_amount}` : null} />
             <Field label="Usage Limit" value={coupon.usage_limit ? `${coupon.usage_limit} total` : 'Unlimited'} />
-            <Field label="Per-User Limit" value={coupon.usage_limit_per_user ? `${coupon.usage_limit_per_user} per user` : 'Unlimited'} />
-            <Field label="Valid From" value={coupon.valid_from ? new Date(coupon.valid_from).toLocaleString('en-IN') : null} />
-            <Field label="Valid Until" value={coupon.valid_until ? <span className={isExpired ? 'text-red-500' : ''}>{new Date(coupon.valid_until).toLocaleString('en-IN')}</span> : null} />
+            <Field
+              label="Per-User Limit"
+              value={coupon.usage_limit_per_user ? `${coupon.usage_limit_per_user} per user` : 'Unlimited'}
+            />
+            <Field
+              label="Valid From"
+              value={coupon.valid_from ? new Date(coupon.valid_from).toLocaleString('en-IN') : null}
+            />
+            <Field
+              label="Valid Until"
+              value={
+                coupon.valid_until ? (
+                  <span className={isExpired ? 'text-red-500' : ''}>
+                    {new Date(coupon.valid_until).toLocaleString('en-IN')}
+                  </span>
+                ) : null
+              }
+            />
             <Field label="Auto Generated" value={coupon.auto_generated ? 'Yes' : 'No'} />
             <Field label="Source" value={coupon.generated_for_campaign || (isPersonal ? 'Personal' : 'Manual')} />
           </Fields>
@@ -205,14 +251,19 @@ export default async function CouponViewPage({
                         </td>
                         <td className="px-3 py-2.5">
                           {r.order_id ? (
-                            <Link href={ap(`/admin/orders/${r.order_id}`, host)} className="font-mono text-xs text-accent-500 hover:underline">
+                            <Link
+                              href={ap(`/admin/orders/${r.order_id}`, host)}
+                              className="font-mono text-xs text-accent-500 hover:underline"
+                            >
                               #{r.order_display_id || r.order_id.slice(0, 8)}
                             </Link>
                           ) : (
                             '—'
                           )}
                         </td>
-                        <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-green-600 dark:text-green-400">₹{Number(r.discount_amount).toLocaleString('en-IN')}</td>
+                        <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-green-600 dark:text-green-400">
+                          ₹{Number(r.discount_amount).toLocaleString('en-IN')}
+                        </td>
                         <td className="px-5 py-2.5 text-xs text-foreground-muted">{day(r.created_at)}</td>
                       </tr>
                     ))}
@@ -233,7 +284,13 @@ export default async function CouponViewPage({
                     ? `${eligibleUsers.length} users granted via mailer`
                     : 'All active users can redeem'
             }
-            action={eligibleUsers.length > 0 && <span className="text-xs text-foreground-muted">{eligibleUsers.length} user{eligibleUsers.length !== 1 ? 's' : ''}</span>}
+            action={
+              eligibleUsers.length > 0 && (
+                <span className="text-xs text-foreground-muted">
+                  {eligibleUsers.length} user{eligibleUsers.length !== 1 ? 's' : ''}
+                </span>
+              )
+            }
             flush
           >
             {eligibleUsers.length === 0 && !isCampaign ? (
@@ -252,12 +309,18 @@ export default async function CouponViewPage({
                     {eligibleUsers.map(u => (
                       <tr key={u.user_id} className={row}>
                         <td className="px-5 py-2.5">
-                          <p className="font-medium text-foreground">{[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}</p>
+                          <p className="font-medium text-foreground">
+                            {[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}
+                          </p>
                           <p className="text-xs text-foreground-muted">{u.email}</p>
                         </td>
                         <td className="px-3 py-2.5 text-xs text-foreground-muted">{day(u.added_at)}</td>
                         <td className="px-5 py-2.5">
-                          {u.times_used > 0 ? <span className={badgeCls('green')}>{u.times_used}×</span> : <span className="text-xs text-foreground-muted">Not yet</span>}
+                          {u.times_used > 0 ? (
+                            <span className={badgeCls('green')}>{u.times_used}×</span>
+                          ) : (
+                            <span className="text-xs text-foreground-muted">Not yet</span>
+                          )}
                         </td>
                       </tr>
                     ))}

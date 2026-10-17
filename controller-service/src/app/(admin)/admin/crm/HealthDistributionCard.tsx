@@ -72,13 +72,7 @@ export default function HealthDistributionCard({ distribution }: { distribution:
         <Bars d={distribution} />
       </div>
 
-      <Dialog
-        open={expanded}
-        onClose={() => setExpanded(false)}
-        title="Health Distribution"
-        size="md"
-        zIndex="z-[300]"
-      >
+      <Dialog open={expanded} onClose={() => setExpanded(false)} title="Health Distribution" size="md" zIndex="z-[300]">
         <Bars d={distribution} tall />
       </Dialog>
     </>

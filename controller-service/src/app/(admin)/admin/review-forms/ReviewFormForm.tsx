@@ -311,7 +311,9 @@ export default function ReviewFormForm({
           <EditorToolbar
             autosaveStatus={'idle' as AutosaveStatus}
             sessionStatus={edit.status}
-            onSave={async () => { await edit.save() }}
+            onSave={async () => {
+              await edit.save()
+            }}
             onCancel={edit.cancel}
             cancelHref={ap('/admin/review-forms')}
             hideSave={true}

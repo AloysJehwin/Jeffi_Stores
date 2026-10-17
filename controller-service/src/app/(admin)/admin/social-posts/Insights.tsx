@@ -52,19 +52,31 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
   useEffect(() => {
     setD(null)
     setError(null)
-    api(`/api/admin/social/insights?days=${days}`).then(r => (r.ok ? setD(r.data) : setError(r.data.error || 'Could not load insights')))
+    api(`/api/admin/social/insights?days=${days}`).then(r =>
+      r.ok ? setD(r.data) : setError(r.data.error || 'Could not load insights')
+    )
   }, [days, tick])
 
   async function sync() {
     setSyncing(true)
     setBanner(null)
-    const r = await api<{ insights: { networks: Record<string, number | string> }; inbox: { networks: Record<string, number | string> } }>('/api/admin/social/sync', {
+    const r = await api<{
+      insights: { networks: Record<string, number | string> }
+      inbox: { networks: Record<string, number | string> }
+    }>('/api/admin/social/sync', {
       method: 'POST',
     })
     setSyncing(false)
     if (!r.ok) return setBanner({ ok: false, text: r.data.error || 'Refresh failed' })
-    const errors = [...Object.entries(r.data.insights?.networks ?? {}), ...Object.entries(r.data.inbox?.networks ?? {})].filter(([, v]) => typeof v === 'string')
-    setBanner(errors.length ? { ok: false, text: `Refreshed with problems: ${errors.map(([k, v]) => `${k}: ${v}`).join('; ')}` } : { ok: true, text: 'Metrics and inbox refreshed.' })
+    const errors = [
+      ...Object.entries(r.data.insights?.networks ?? {}),
+      ...Object.entries(r.data.inbox?.networks ?? {}),
+    ].filter(([, v]) => typeof v === 'string')
+    setBanner(
+      errors.length
+        ? { ok: false, text: `Refreshed with problems: ${errors.map(([k, v]) => `${k}: ${v}`).join('; ')}` }
+        : { ok: true, text: 'Metrics and inbox refreshed.' }
+    )
     setTick(t => t + 1)
     onSynced()
   }
@@ -86,7 +98,8 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
         </div>
         {canWrite && (
           <button type="button" className={btnGhost} disabled={syncing} onClick={sync}>
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} /> {syncing ? 'Refreshing...' : 'Refresh now'}
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />{' '}
+            {syncing ? 'Refreshing...' : 'Refresh now'}
           </button>
         )}
       </div>
@@ -105,7 +118,8 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
             <Kpi label="Revenue" value={money(d.totals.revenue)} sub={`${count(d.totals.orders)} orders`} highlight />
           </KpiGrid>
           <p className="text-xs text-foreground-muted">
-            Orders and revenue come from your own orders whose UTM campaign is social_ plus the post (or its group of networks), so a post sent to several networks is counted once.
+            Orders and revenue come from your own orders whose UTM campaign is social_ plus the post (or its group of
+            networks), so a post sent to several networks is counted once.
           </p>
           <Section title="By network">
             <Table
@@ -115,9 +129,21 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
               cols={[
                 { key: 'n', label: 'Network', render: r => r.network },
                 { key: 'posts', label: 'Posts', num: true, render: r => count(r.posts), sort: r => r.posts },
-                { key: 'imp', label: 'Impressions', num: true, render: r => count(r.impressions), sort: r => r.impressions },
+                {
+                  key: 'imp',
+                  label: 'Impressions',
+                  num: true,
+                  render: r => count(r.impressions),
+                  sort: r => r.impressions,
+                },
                 { key: 'reach', label: 'Reach', num: true, render: r => count(r.reach), sort: r => r.reach },
-                { key: 'eng', label: 'Engagement', num: true, render: r => count(r.engagement), sort: r => r.engagement },
+                {
+                  key: 'eng',
+                  label: 'Engagement',
+                  num: true,
+                  render: r => count(r.engagement),
+                  sort: r => r.engagement,
+                },
                 { key: 'clicks', label: 'Clicks', num: true, render: r => count(r.clicks), sort: r => r.clicks },
               ]}
             />
@@ -137,7 +163,12 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
                       <p className="text-xs text-foreground-muted">
                         {label(r.platform)} - {when(r.scheduled_at)}
                         {r.permalink && (
-                          <a href={r.permalink} target="_blank" rel="noopener noreferrer" className="ml-1 text-accent-500 hover:underline">
+                          <a
+                            href={r.permalink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="ml-1 text-accent-500 hover:underline"
+                          >
                             view
                           </a>
                         )}
@@ -145,8 +176,20 @@ export default function Insights({ onSynced }: { onSynced: () => void }) {
                     </div>
                   ),
                 },
-                { key: 'imp', label: 'Impressions', num: true, render: r => count(r.impressions), sort: r => r.impressions ?? 0 },
-                { key: 'eng', label: 'Engagement', num: true, render: r => count(r.engagement), sort: r => r.engagement },
+                {
+                  key: 'imp',
+                  label: 'Impressions',
+                  num: true,
+                  render: r => count(r.impressions),
+                  sort: r => r.impressions ?? 0,
+                },
+                {
+                  key: 'eng',
+                  label: 'Engagement',
+                  num: true,
+                  render: r => count(r.engagement),
+                  sort: r => r.engagement,
+                },
                 { key: 'clicks', label: 'Clicks', num: true, render: r => count(r.clicks), sort: r => r.clicks ?? 0 },
                 { key: 'orders', label: 'Orders', num: true, render: r => count(r.orders), sort: r => r.orders },
                 { key: 'rev', label: 'Revenue', num: true, render: r => money(r.revenue), sort: r => r.revenue },

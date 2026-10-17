@@ -27,10 +27,7 @@ function NoteRow({ n }: { n: NoteEntry }) {
     <div className="border-l-2 border-accent-500 pl-3 py-1">
       <p className="text-sm text-foreground whitespace-pre-wrap break-words line-clamp-3">{n.body}</p>
       <p className="text-[10px] text-foreground-muted mt-1">
-        <Link
-          href={ap(`/admin/customers/${n.userId}/view`)}
-          className="text-accent-500 hover:underline"
-        >
+        <Link href={ap(`/admin/customers/${n.userId}/view`)} className="text-accent-500 hover:underline">
           {n.customerName}
         </Link>
         {' · '}
@@ -51,9 +48,7 @@ export default function RecentNotesCard({ items }: { items: NoteEntry[] }) {
     <>
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5 lg:col-span-2">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
-            Recent Internal Notes
-          </h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Recent Internal Notes</h2>
           {hasMore && (
             <button onClick={() => setOpen(true)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
               View all ({items.length}) →
@@ -90,10 +85,10 @@ export default function RecentNotesCard({ items }: { items: NoteEntry[] }) {
         zIndex="z-[300]"
       >
         <div className="space-y-3">
-                {items.map((n, i) => (
-                  <NoteRow key={i} n={n} />
-                ))}
-              </div>
+          {items.map((n, i) => (
+            <NoteRow key={i} n={n} />
+          ))}
+        </div>
       </Dialog>
     </>
   )
