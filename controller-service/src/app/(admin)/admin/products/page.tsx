@@ -138,6 +138,78 @@ async function ProductsStats() {
             <Kpi label="Categories" value={categoryCount.toLocaleString('en-IN')} />
             <Kpi label="Inactive" value={(totalCount - activeCount).toLocaleString('en-IN')} />
           </KpiGrid>
+          {pendingDraftsCount > 0 && (
+            <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
+              <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
+                <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
+                  <svg
+                    className="w-4 h-4 transition-transform group-open:rotate-90"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  Pending Drafts ({pendingDraftsCount})
+                </span>
+                <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
+              </summary>
+              <div className="border-t border-amber-500/30 overflow-hidden">
+                <div className="max-h-72 overflow-y-auto divide-y divide-amber-500/20">
+                  {/* Create-drafts: brand-new products not yet on the live list. Publish activates them. */}
+                  {createDrafts.map(d =>
+                    canWrite ? (
+                      <DraftRowActions
+                        key={`new-${d.id}`}
+                        entityId={d.id}
+                        name={d.name}
+                        subtitle={`${d.sku} — new product, not yet published`}
+                        updatedAt={d.created_at}
+                        editHref={ap(`/admin/products/${d.id}/edit`, host)}
+                        publishPath={`/api/admin/products/${d.id}/publish`}
+                        publishConfirm={`Publish "${d.name}" to the live product list?`}
+                        discardPath={`/api/admin/products/${d.id}/draft`}
+                        discardConfirm={`Delete the draft product "${d.name}"? This cannot be undone.`}
+                        entityLabel="product"
+                      />
+                    ) : (
+                      <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
+                        <p className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">
+                          {d.sku}
+                          {d.sku && <CopySku sku={d.sku} />}
+                        </p>
+                        <span className="text-xs text-foreground-muted">new</span>
+                      </div>
+                    )
+                  )}
+                  {pendingDrafts.map(d =>
+                    canWrite ? (
+                      <DraftRowActions
+                        key={d.product_id}
+                        entityId={d.product_id}
+                        name={d.name}
+                        subtitle={d.sku}
+                        updatedAt={d.updated_at}
+                        editHref={ap(`/admin/products/${d.product_id}/edit`, host)}
+                        publishPath={`/api/admin/products/${d.product_id}/publish`}
+                        discardPath={`/api/admin/products/${d.product_id}/draft`}
+                        entityLabel="product"
+                      />
+                    ) : (
+                      <div key={d.product_id} className="px-4 py-2.5 flex items-center gap-2">
+                        <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
+                        <p className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">
+                          {d.sku}
+                          {d.sku && <CopySku sku={d.sku} />}
+                        </p>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            </details>
+          )}
         </div>
         <ProductBreakdownChart
           byCategory={stats.byCategory}
@@ -146,78 +218,6 @@ async function ProductsStats() {
           byInventoryValue={stats.byInventoryValue}
         />
       </div>
-      {pendingDraftsCount > 0 && (
-        <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
-          <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
-            <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
-              <svg
-                className="w-4 h-4 transition-transform group-open:rotate-90"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-              Pending Drafts ({pendingDraftsCount})
-            </span>
-            <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
-          </summary>
-          <div className="border-t border-amber-500/30 overflow-hidden">
-            <div className="divide-y divide-amber-500/20">
-              {/* Create-drafts: brand-new products not yet on the live list. Publish activates them. */}
-              {createDrafts.map(d =>
-                canWrite ? (
-                  <DraftRowActions
-                    key={`new-${d.id}`}
-                    entityId={d.id}
-                    name={d.name}
-                    subtitle={`${d.sku} — new product, not yet published`}
-                    updatedAt={d.created_at}
-                    editHref={ap(`/admin/products/${d.id}/edit`, host)}
-                    publishPath={`/api/admin/products/${d.id}/publish`}
-                    publishConfirm={`Publish "${d.name}" to the live product list?`}
-                    discardPath={`/api/admin/products/${d.id}/draft`}
-                    discardConfirm={`Delete the draft product "${d.name}"? This cannot be undone.`}
-                    entityLabel="product"
-                  />
-                ) : (
-                  <div key={`new-${d.id}`} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
-                    <p className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">
-                      {d.sku}
-                      {d.sku && <CopySku sku={d.sku} />}
-                    </p>
-                    <span className="text-xs text-foreground-muted">new</span>
-                  </div>
-                )
-              )}
-              {pendingDrafts.map(d =>
-                canWrite ? (
-                  <DraftRowActions
-                    key={d.product_id}
-                    entityId={d.product_id}
-                    name={d.name}
-                    subtitle={d.sku}
-                    updatedAt={d.updated_at}
-                    editHref={ap(`/admin/products/${d.product_id}/edit`, host)}
-                    publishPath={`/api/admin/products/${d.product_id}/publish`}
-                    discardPath={`/api/admin/products/${d.product_id}/draft`}
-                    entityLabel="product"
-                  />
-                ) : (
-                  <div key={d.product_id} className="px-4 py-2.5 flex items-center gap-2">
-                    <p className="text-sm font-medium text-foreground truncate">{d.name}</p>
-                    <p className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">
-                      {d.sku}
-                      {d.sku && <CopySku sku={d.sku} />}
-                    </p>
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        </details>
-      )}
     </div>
   )
 }
