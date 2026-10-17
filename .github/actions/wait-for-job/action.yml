@@ -1,0 +1,31 @@
+name: Wait for job
+description: Waits until another job of this run finishes, and fails unless it succeeded. Lets two stages sit side by side in the graph while one still runs after the other.
+inputs:
+  job:
+    description: The other job's display name in this run
+    required: true
+  timeout-minutes:
+    description: Give up after this long
+    default: '60'
+runs:
+  using: composite
+  steps:
+    - name: Wait for ${{ inputs.job }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        JOB: ${{ inputs.job }}
+        LIMIT: ${{ inputs.timeout-minutes }}
+      run: |
+        set -euo pipefail
+        url="repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs"
+        end=$(( $(date +%s) + LIMIT * 60 ))
+        while :; do
+          state=$(gh api --paginate "$url" --jq ".jobs[] | select(.name == env.JOB) | \"\(.status) \(.conclusion // \"\")\"")
+          case "$state" in
+            "completed success") echo "$JOB succeeded"; exit 0 ;;
+            completed*) echo "::error::$JOB finished as ${state#completed }"; exit 1 ;;
+          esac
+          [ "$(date +%s)" -lt "$end" ] || { echo "::error::Timed out waiting for $JOB"; exit 1; }
+          echo "$JOB: ${state:-not started}"; sleep 15
+        done
