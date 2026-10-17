@@ -1,18 +1,48 @@
 #!/bin/bash
-# After a rollout: the live /api/health must report <sha>, then every platform and store host's status code.
-# --dry-run reports what is live without failing on the commit.
-# Usage: smoke.sh <sha> [--dry-run]
+# After a rollout, prove it is serving. Scope (default both):
+#   flagship  /api/health reports <sha>, and the platform hosts answer without a 5xx
+#   tenants   every running store's /api/health answers and reports <sha> (suspended stores are skipped)
+# Any host that does not answer (000) or answers 5xx fails the stage. --dry-run reports what is live and
+# never fails.
+# Usage: smoke.sh <sha> [flagship|tenants] [--dry-run]
 source "$(dirname "$0")/../db/lib.sh"
 SHA=${1:?image sha}
+SCOPE=all
+for a in "${@:2}"; do case $a in flagship|tenants) SCOPE=$a ;; esac; done
 k8s_tunnel
-health=$(curl -s --max-time 15 https://jeffistores.in/api/health)
-echo "   $health"
-if ! echo "$health" | grep -q "\"commit\":\"$SHA\""; then
-  $DRY_RUN && echo "   live commit is not $SHA yet (dry run)" || { echo "   live commit is not $SHA" >&2; exit 1; }
+bad=0
+fail() { echo "   FAIL $*" >&2; bad=1; }
+
+check() { # check <url> [require-commit]
+  local body code
+  body=$(curl -s --max-time 15 -w '\n%{http_code}' "$1" || true)
+  code=${body##*$'\n'}; body=${body%$'\n'*}
+  printf '   %s %s\n' "$code" "$1"
+  case $code in 000|5??) fail "$1 answered $code" ;; esac
+  if [ -n "${2:-}" ] && ! echo "$body" | grep -q "\"commit\":\"$SHA\""; then fail "$1 is not at $SHA"; fi
+}
+
+if [ "$SCOPE" != tenants ]; then
+  say "Flagship"
+  check https://jeffistores.in/api/health commit
+  for u in https://jeffistores.in/ https://business.jeffistores.in/ https://ecom.jeffistores.in/ https://public.jeffistores.in/healthz; do check "$u"; done
 fi
-URLS="https://jeffistores.in/ https://business.jeffistores.in/ https://ecom.jeffistores.in/ https://public.jeffistores.in/healthz"
-for ns in $(kubectl get ns -l jeffi.io/tier=tenant -o jsonpath='{.items[*].metadata.name}'); do
-  host=$(kubectl -n "$ns" get ingressroute controller -o jsonpath='{.spec.routes[0].match}' 2>/dev/null | sed -E 's/^Host\(`([^`]+)`.*/\1/')
-  [ -n "$host" ] && URLS="$URLS https://$host/api/health"
-done
-for u in $URLS; do printf '   %s %s\n' "$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$u")" "$u"; done
+
+if [ "$SCOPE" != flagship ]; then
+  say "Tenants"
+  n=0
+  for ns in $(kubectl get ns -l jeffi.io/tier=tenant -o jsonpath='{.items[*].metadata.name}'); do
+    host=$(kubectl -n "$ns" get ingressroute controller -o jsonpath='{.spec.routes[0].match}' 2>/dev/null | sed -E 's/^Host\(`([^`]+)`.*/\1/')
+    [ -n "$host" ] || continue
+    # A suspended store has its controller scaled to 0 and is expected not to answer.
+    [ "$(kubectl -n "$ns" get deploy -l jeffi.io/service=controller -o jsonpath='{.items[0].spec.replicas}' 2>/dev/null)" = 0 ] && { echo "   skip $host (suspended)"; continue; }
+    n=$((n + 1))
+    check "https://$host/api/health" commit
+  done
+  echo "   $n store(s) checked"
+fi
+
+if [ "$bad" = 1 ]; then
+  if $DRY_RUN; then echo "   (dry run: not failing)"; else exit 1; fi
+fi
+echo "   OK"
