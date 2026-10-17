@@ -6,6 +6,7 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { NOTE_TAGS, type CustomerNote } from '@/lib/shared/customer-notes-shared'
 import NoteAttachments from './NoteAttachments'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 interface CustomerNotesProps {
   customerId: string
@@ -36,8 +37,8 @@ export default function CustomerNotes({
   const [shared, setShared] = useState(false)
   const [files, setFiles] = useState<File[]>([])
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [info, setInfo] = useState('')
+  const toast = useActionToast()
+  const setError = (text: string) => void (text && toast.error(text))
   const fileRef = useRef<HTMLInputElement>(null)
 
   const listUrl = () => {
@@ -59,8 +60,6 @@ export default function CustomerNotes({
   async function add() {
     if (!title.trim() && !body.trim() && files.length === 0) return
     setBusy(true)
-    setError('')
-    setInfo('')
     try {
       const fd = new FormData()
       fd.set('title', title.trim())
@@ -78,7 +77,7 @@ export default function CustomerNotes({
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to save note')
       if (Array.isArray(data.warnings) && data.warnings.length)
-        setInfo(`Saved, but some files were skipped: ${data.warnings.join('; ')}`)
+        toast.warning(`Saved, but some files were skipped: ${data.warnings.join('; ')}`)
       setTitle('')
       setBody('')
       setTags([])
@@ -144,7 +143,7 @@ export default function CustomerNotes({
       setError(data.error || 'Failed to create task')
       return
     }
-    setInfo('Task created from note.')
+    toast.success('Task created from note.')
     router.refresh()
   }
 
@@ -215,8 +214,6 @@ export default function CustomerNotes({
               {busy ? 'Saving…' : 'Add Note'}
             </button>
           </div>
-          {error && <p className="text-xs text-red-600">{error}</p>}
-          {info && <p className="text-xs text-foreground-muted">{info}</p>}
         </div>
       )}
 

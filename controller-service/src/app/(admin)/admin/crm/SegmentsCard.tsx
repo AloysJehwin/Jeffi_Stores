@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useHasScope } from '@/contexts/AdminScopesContext'
-import { createPortal } from 'react-dom'
+import { Dialog } from '@/components/admin/kit'
 import Link from 'next/link'
 import CrmMailerPanel from './CrmMailerPanel'
 import { ap } from '@/lib/shared/admin-path'
@@ -91,33 +91,15 @@ function SegmentModal({ segment, onClose }: ModalProps) {
       .finally(() => setLoading(false))
   }
 
-  if (typeof document === 'undefined') return null
-
-  return createPortal(
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/50" />
-      <div
-        className="relative bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-[95vw] max-w-[1400px] h-[90dvh] flex flex-col overflow-hidden"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-border-default">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">{segment.label}</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">
-              {segment.count.toLocaleString('en-IN')} customers in segment
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors"
-            aria-label="Close"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
+  return (
+    <Dialog
+      open
+      onClose={onClose}
+      title={segment.label}
+      description={`${segment.count.toLocaleString('en-IN')} customers in segment`}
+      size="full"
+      zIndex="z-[300]"
+    >
         <div className="flex flex-1 min-h-0 flex-col overflow-y-auto divide-y divide-border-default md:flex-row md:overflow-hidden md:divide-y-0 md:divide-x">
           {/* Left: customer list */}
           <div className={`flex flex-col bg-surface-secondary/30 ${canMail ? 'shrink-0 md:w-2/5' : 'flex-1'}`}>
@@ -163,9 +145,7 @@ function SegmentModal({ segment, onClose }: ModalProps) {
             </div>
           )}
         </div>
-      </div>
-    </div>,
-    document.body
+    </Dialog>
   )
 }
 
