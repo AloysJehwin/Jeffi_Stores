@@ -29,7 +29,7 @@ function Row({ c, large }: { c: DropEntry; large?: boolean }) {
           {' · '}Now at {c.score}/100
         </p>
       </div>
-      <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 shrink-0 ml-2">
+      <span className="px-1.5 py-0.5 text-[10px] font-bold rounded bg-red-500/10 text-red-700 dark:text-red-400 shrink-0 ml-2">
         ▼ {Math.abs(c.delta)}
       </span>
     </Link>
@@ -46,7 +46,7 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
     <>
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Biggest Drops (7d)</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Biggest Drops (7d)</h2>
           {hasMore && (
             <button onClick={() => setOpen(true)} className="text-xs text-accent-500 hover:text-accent-600 font-medium">
               View all ({items.length}) →
@@ -80,7 +80,7 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
             onClick={() => setOpen(false)}
           >
             <div
-              className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-[95vw] max-w-[1400px] h-[90vh] flex flex-col"
+              className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl w-[95vw] max-w-[1400px] h-[90dvh] flex flex-col"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0 border-b border-border-default">
@@ -100,10 +100,10 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
                   </svg>
                 </button>
               </div>
-              <div className="flex flex-1 min-h-0 divide-x divide-border-default">
-                <div className={`flex flex-col bg-surface-secondary/30 ${canMail ? 'w-2/5 shrink-0' : 'flex-1'}`}>
+              <div className="flex flex-1 min-h-0 flex-col overflow-y-auto divide-y divide-border-default md:flex-row md:overflow-hidden md:divide-y-0 md:divide-x">
+                <div className={`flex flex-col bg-surface-secondary/30 ${canMail ? 'shrink-0 md:w-2/5' : 'flex-1'}`}>
                   <div className="px-6 pt-4 pb-2 shrink-0 border-b border-border-default">
-                    <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Customers</h3>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Customers</h3>
                   </div>
                   <div className="overflow-y-auto flex-1 px-6 py-4 divide-y divide-border-default">
                     {items.map(c => (
@@ -114,7 +114,7 @@ export default function BiggestDropsCard({ items }: { items: DropEntry[] }) {
                 {canMail && (
                   <div className="flex flex-col flex-1 min-w-0">
                     <div className="flex items-center justify-between px-6 pt-4 pb-2 shrink-0">
-                      <h3 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">
                         Send message
                       </h3>
                       <Link

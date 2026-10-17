@@ -157,15 +157,15 @@ export default function ScenariosListClient() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="font-semibold text-foreground text-lg">{s.name}</h3>
-                    <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-surface-secondary text-foreground">
                       {s.kind}
                     </span>
                     {s.type === 'custom' ? (
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-purple-500/10 text-purple-700 dark:text-purple-400">
                         Custom
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-500/10 text-blue-700 dark:text-blue-400">
                         Built-in
                       </span>
                     )}
@@ -173,8 +173,8 @@ export default function ScenariosListClient() {
                       <span
                         className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
                           s.enabled
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                            : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                            ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                            : 'bg-surface-secondary text-foreground-muted'
                         }`}
                       >
                         {s.enabled ? 'Active' : 'Paused'}
@@ -195,7 +195,7 @@ export default function ScenariosListClient() {
                         disabled={busy === s.kind}
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${
                           s.enabled
-                            ? 'bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200'
+                            ? 'bg-surface-secondary hover:bg-border-default text-foreground'
                             : 'bg-green-500 hover:bg-green-600 text-white'
                         }`}
                       >
@@ -223,7 +223,7 @@ export default function ScenariosListClient() {
                         type="button"
                         onClick={() => remove(s)}
                         disabled={busy === s.kind}
-                        className="px-3 h-control-sm text-xs font-semibold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 rounded-lg transition-all disabled:opacity-50"
+                        className="px-3 h-control-sm text-xs font-semibold text-red-600 hover:bg-red-500/5 dark:text-red-400 rounded-lg transition-all disabled:opacity-50"
                       >
                         Delete
                       </button>
@@ -292,11 +292,11 @@ export default function ScenariosListClient() {
                         href={ap(`/admin/campaigns/${c.kind}`)}
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                           c.enabled
-                            ? 'bg-green-50 hover:bg-green-100 text-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/40 dark:text-green-300'
-                            : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300'
+                            ? 'bg-green-500/5 hover:bg-green-500/10 text-green-700 dark:text-green-400'
+                            : 'bg-surface-secondary hover:bg-surface-secondary text-foreground-muted'
                         }`}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${c.enabled ? 'bg-green-500' : 'bg-zinc-400'}`} />
+                        <span className={`w-1.5 h-1.5 rounded-full ${c.enabled ? 'bg-green-500' : 'bg-border-default'}`} />
                         {c.name}
                       </Link>
                     ))}
@@ -313,7 +313,7 @@ export default function ScenariosListClient() {
                     const def = s.param_schema[k]
                     return (
                       <div key={k} className="py-0.5">
-                        <span className="text-accent-600 dark:text-accent-400">{k}</span>
+                        <span className="text-accent-500">{k}</span>
                         <span className="text-foreground-muted"> = </span>
                         <span>{String(v)}</span>
                         {def?.label && <span className="text-foreground-muted"> &nbsp;// {def.label}</span>}

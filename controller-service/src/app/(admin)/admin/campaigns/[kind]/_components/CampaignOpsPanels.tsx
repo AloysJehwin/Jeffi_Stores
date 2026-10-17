@@ -103,15 +103,15 @@ function maskNumber(num: string): string {
 }
 
 function sendStatus(s: RecentSend): { label: string; color: string } {
-  if (s.bounced_at) return { label: 'Bounced', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' }
+  if (s.bounced_at) return { label: 'Bounced', color: 'bg-red-500/10 text-red-700 dark:text-red-400' }
   if (s.unsubscribed_at)
-    return { label: 'Unsub', color: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' }
+    return { label: 'Unsub', color: 'bg-surface-secondary text-foreground' }
   if (s.converted_at)
-    return { label: 'Converted', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' }
+    return { label: 'Converted', color: 'bg-green-500/10 text-green-700 dark:text-green-400' }
   if (s.clicked_at)
-    return { label: 'Clicked', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' }
-  if (s.opened_at) return { label: 'Opened', color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' }
-  return { label: 'Sent', color: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300' }
+    return { label: 'Clicked', color: 'bg-blue-500/10 text-blue-700 dark:text-blue-400' }
+  if (s.opened_at) return { label: 'Opened', color: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400' }
+  return { label: 'Sent', color: 'bg-surface-secondary text-foreground-muted' }
 }
 
 /**
@@ -207,7 +207,7 @@ export function EligibleRecipientsPanel({ kind }: { kind: string }) {
                   <p className="text-sm text-foreground truncate">
                     {r.user_name || r.user_email || <span className="text-foreground-muted italic">No user</span>}
                     {r.marketing_opt_out && (
-                      <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                      <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-surface-secondary text-foreground-muted">
                         opted out
                       </span>
                     )}
@@ -238,10 +238,10 @@ export function EligibleRecipientsPanel({ kind }: { kind: string }) {
             {suppressed.map((r, i) => {
               const reasonColor =
                 r.reason === 'cooldown' || r.reason === 'recent_send'
-                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                  ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
                   : r.reason === 'opted_out'
-                    ? 'bg-zinc-200 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300'
-                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                    ? 'bg-surface-secondary text-foreground'
+                    : 'bg-red-500/10 text-red-700 dark:text-red-400'
               const reasonLabel =
                 r.reason === 'cooldown'
                   ? 'Cooldown'
@@ -363,14 +363,14 @@ export function RecentSendsPanel({
                 <button
                   disabled={sendsOffset === 0 || sendsLoading}
                   onClick={() => loadSendsPage(Math.max(0, sendsOffset - SENDS_LIMIT))}
-                  className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                  className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
                 >
                   Previous
                 </button>
                 <button
                   disabled={sendsOffset + SENDS_LIMIT >= sendsTotal || sendsLoading}
                   onClick={() => loadSendsPage(sendsOffset + SENDS_LIMIT)}
-                  className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                  className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
                 >
                   Next
                 </button>
@@ -428,8 +428,8 @@ export function WhatsAppLogPanel({ kind, logs }: { kind: string; logs: WhatsAppL
                     <span
                       className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
                         sent
-                          ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
-                          : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                          ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                          : 'bg-red-500/10 text-red-700 dark:text-red-400'
                       }`}
                       title={!sent && w.error ? w.error : undefined}
                     >
@@ -449,14 +449,14 @@ export function WhatsAppLogPanel({ kind, logs }: { kind: string; logs: WhatsAppL
                 <button
                   disabled={waPage === 0}
                   onClick={() => setWaPage(p => Math.max(0, p - 1))}
-                  className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                  className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
                 >
                   Previous
                 </button>
                 <button
                   disabled={(waPage + 1) * WA_LIMIT >= logs.length}
                   onClick={() => setWaPage(p => p + 1)}
-                  className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+                  className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
                 >
                   Next
                 </button>

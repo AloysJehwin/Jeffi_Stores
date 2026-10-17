@@ -19,10 +19,10 @@ const NO_STATS: ReferralStats = {
 
 const STATUS: Record<ReferralStatus, { label: string; className: string }> = {
   joined: { label: 'Joined', className: 'bg-surface-secondary text-foreground-secondary' },
-  rewarded: { label: 'Rewarded', className: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
-  reversed: { label: 'Taken back', className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
+  rewarded: { label: 'Rewarded', className: 'bg-green-500/10 text-green-700 dark:text-green-400' },
+  reversed: { label: 'Taken back', className: 'bg-amber-500/10 text-amber-700 dark:text-amber-400' },
   capped: { label: 'Yearly limit', className: 'bg-surface-secondary text-foreground-secondary' },
-  rejected: { label: 'Rejected', className: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
+  rejected: { label: 'Rejected', className: 'bg-red-500/10 text-red-700 dark:text-red-400' },
 }
 
 const REJECT_REASON: Record<string, string> = {
@@ -91,7 +91,7 @@ export default async function ReferralProgram({ host, query }: { host: string; q
         <span className="font-medium text-foreground">{campaign?.enabled ? 'on' : 'off'}</span>.{' '}
         <Link
           href={ap('/admin/campaigns/referral_invite', host)}
-          className="text-accent-600 hover:text-accent-700 dark:text-accent-400"
+          className="text-accent-600 hover:text-accent-700"
         >
           Open the campaign
         </Link>
@@ -99,9 +99,9 @@ export default async function ReferralProgram({ host, query }: { host: string; q
 
       <ReferralSettingsForm initial={settings} />
 
-      <div className="bg-surface-elevated rounded-lg border border-border-default">
+      <div className="bg-surface-elevated rounded-xl border border-border-default">
         <div className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-border-default">
-          <h3 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Referrals</h3>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-foreground">Referrals</h3>
           <form method="get" action={basePath} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="tab" value="referrals" />
             <input

@@ -470,7 +470,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               sm
             />
             {selectedCoupon && (
-              <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-1">
+              <p className="text-[10px] text-accent-500 mt-1">
                 This coupon will be injected as {'{couponCode}'} in the template for all recipients.
               </p>
             )}
@@ -581,7 +581,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                   key={m}
                   type="button"
                   onClick={() => setForm(f => (f ? { ...f, template_mode: m } : f))}
-                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                  className={`h-full px-3 rounded-md text-xs font-semibold transition-colors ${
                     form.template_mode === m
                       ? 'bg-accent-500 text-white'
                       : 'text-foreground-muted hover:text-foreground'
@@ -698,7 +698,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
           <h3 className="text-sm font-semibold text-foreground-muted uppercase tracking-widest mb-3">Preview</h3>
           {tplWarning && (
-            <div className="mb-3 p-2.5 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+            <div className="mb-3 p-2.5 rounded-lg border border-amber-500/40 bg-amber-500/5 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2">
               <span className="font-semibold">Warning:</span>
               <span>{tplWarning}</span>
             </div>
@@ -719,7 +719,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
           {campaignSupportsWhatsApp(kind) && !!form.parameters?.whatsappEnabled && form.wa_template_slug && (
             <div className="mt-5">
-              <p className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-2">
+              <p className="text-sm font-semibold uppercase tracking-wide text-foreground mb-2">
                 WhatsApp preview
               </p>
               <WhatsAppPreview value={{ slug: form.wa_template_slug, variables: form.wa_variables }} vars={previewVars} />
@@ -762,7 +762,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               {currentScenario
                 ? `${currentScenario.name} — ${currentScenario.description}`
                 : form.scenario_kind || 'Built-in'}
-              <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 align-middle">
+              <span className="ml-2 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-surface-secondary text-foreground align-middle">
                 Locked
               </span>
             </div>
@@ -880,12 +880,12 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
       <RequireWrite scope="campaigns:write">
         <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 mt-2 border-t border-border-default bg-surface-elevated/95 backdrop-blur px-4 sm:px-6 py-3">
           {hasDraft && (
-            <div className="mb-2 flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
-              <p className="text-xs text-amber-800 dark:text-amber-300 flex-1">Draft pending — changes not live yet.</p>
+            <div className="mb-2 flex items-center gap-3 px-3 py-2 rounded-lg bg-amber-500/5 border border-amber-500/40">
+              <p className="text-xs text-amber-700 dark:text-amber-400 flex-1">Draft pending — changes not live yet.</p>
               <button
                 type="button"
                 onClick={discardDraft}
-                className="h-control-sm inline-flex items-center px-2.5 rounded-md border border-amber-300 dark:border-amber-700 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40"
+                className="h-control-sm inline-flex items-center px-2.5 rounded-md border border-amber-500/40 text-xs font-semibold text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
               >
                 Discard
               </button>

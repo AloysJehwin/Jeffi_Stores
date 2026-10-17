@@ -2,15 +2,12 @@ import { Suspense } from 'react'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
 import { queryMany, queryCount } from '@/lib/shared/db'
-import AdminFilters from '@/components/admin/AdminFilters'
-import Pagination from '@/components/admin/Pagination'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import ReviewFormTableRow from '@/components/admin/ReviewFormTableRow'
-import ReviewFormsMobileList from './_components/ReviewFormsMobileList'
+import ReviewFormsTable, { type FormRow } from './_components/ReviewFormsTable'
+import { DataToolbar, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { formsHostForHost } from '@/lib/tenant-registry'
-import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import { resolveListTab } from '@/lib/overviews/marketing'
 import OverviewTabs from '../coupons/_components/OverviewTabs'
 import ReviewFormsOverview from './_components/ReviewFormsOverview'
@@ -59,15 +56,8 @@ export default async function ReviewFormsPage({
   const tab = resolveListTab(sp, ['search', 'page'])
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Review Forms</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">
-            Shareable forms that reward customers for Google reviews
-          </p>
-        </div>
-      </div>
+    <PageBody>
+      <PageHeader title="Review Forms" description="Shareable forms that reward customers for Google reviews" />
 
       <OverviewTabs
         basePath={ap('/admin/review-forms', host)}
@@ -87,7 +77,7 @@ export default async function ReviewFormsPage({
         </Suspense>
       ) : (
         <>
-          <AdminFilters filters={[]} searchPlaceholder="Search by title or slug..." suggestType="review_forms" />
+          <DataToolbar search={{ placeholder: 'Search by title or slug...', param: 'search', suggestType: 'review_forms' }} />
 
           <Suspense fallback={null}>
             <ReviewFormsDraftsBanner host={host} />
@@ -96,7 +86,7 @@ export default async function ReviewFormsPage({
           <ReviewFormsListSection searchParams={searchParams} host={host} />
         </>
       )}
-    </div>
+    </PageBody>
   )
 }
 
@@ -120,9 +110,9 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
   if (pendingDraftsCount === 0) return null
 
   return (
-    <details className="mb-6 group">
-      <summary className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg cursor-pointer list-none flex items-center justify-between px-4 py-2.5 group-open:rounded-b-none">
-        <span className="flex items-center gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+    <details className="group rounded-xl border border-amber-500/40 bg-amber-500/5">
+      <summary className="cursor-pointer list-none flex flex-wrap items-center justify-between gap-2 px-4 h-11">
+        <span className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
           <svg
             className="w-4 h-4 transition-transform group-open:rotate-90"
             fill="none"
@@ -133,10 +123,10 @@ async function ReviewFormsDraftsBanner({ host }: { host: string }) {
           </svg>
           Pending Drafts ({pendingDraftsCount})
         </span>
-        <span className="text-xs text-amber-600 dark:text-amber-400">Not yet published to the live list</span>
+        <span className="text-xs text-foreground-muted">Not yet published to the live list</span>
       </summary>
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-t-0 border-amber-300 dark:border-amber-700 rounded-b-lg overflow-hidden">
-        <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+      <div className="border-t border-amber-500/30 overflow-hidden">
+        <div className="divide-y divide-amber-500/20">
           {/* Create-drafts: brand-new forms not yet on the live list. Publish activates them. */}
           {createDrafts.map(d => (
             <DraftRowActions
@@ -184,7 +174,7 @@ async function ReviewFormsListSection({
   const key = JSON.stringify(resolvedSearchParams)
 
   return (
-    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={7} />}>
+    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>
       <ReviewFormsListContent resolvedSearchParams={resolvedSearchParams} host={host} />
     </Suspense>
   )
@@ -201,14 +191,6 @@ async function ReviewFormsListContent({
   const { forms, total } = await getForms({ search: resolvedSearchParams.search, page })
   const formsBase = `https://${formsHostForHost(host)}`
 
-  const buildUrl = (p: number) => {
-    const params = new URLSearchParams({ tab: 'list' })
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (p > 1) params.set('page', String(p))
-    const qs = params.toString()
-    return ap(`/admin/review-forms${qs ? `?${qs}` : ''}`, host)
-  }
-
   const currentListUrl = (() => {
     const params = new URLSearchParams({ tab: 'list' })
     if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
@@ -218,57 +200,14 @@ async function ReviewFormsListContent({
   })()
 
   return (
-    <>
-      <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mt-4">
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary">
-              <tr>
-                {['Title', 'Template', 'Shareable Link', 'Coupon', 'Submissions', 'Status', 'Actions'].map(h => (
-                  <th
-                    key={h}
-                    className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {(forms as FormRow[]).map(f => (
-                <ReviewFormTableRow key={f.id} form={f} backUrl={currentListUrl} formsBase={formsBase} />
-              ))}
-              {forms.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-foreground-muted">
-                    No review forms yet. Create your first one!
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="md:hidden p-4">
-          {forms.length > 0 ? (
-            <ReviewFormsMobileList forms={forms as FormRow[]} backUrl={currentListUrl} formsBase={formsBase} />
-          ) : (
-            <p className="text-center text-foreground-muted text-sm">No review forms yet.</p>
-          )}
-        </div>
-      </div>
-
-      <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-    </>
+    <ReviewFormsTable
+      forms={forms as FormRow[]}
+      total={total}
+      page={page}
+      pageSize={PAGE_SIZE}
+      search={resolvedSearchParams.search}
+      backUrl={currentListUrl}
+      formsBase={formsBase}
+    />
   )
-}
-
-interface FormRow {
-  id: string
-  title: string
-  slug: string
-  template_type: 'google_review' | 'product_feedback' | 'testimonial'
-  coupon_code: string | null
-  submissions_count: number
-  is_active: boolean
 }

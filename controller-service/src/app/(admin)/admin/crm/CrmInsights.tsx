@@ -97,7 +97,7 @@ export default function CrmInsights({
               disabled={loading}
               className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${
                 range === r.key
-                  ? 'bg-accent-500 text-white shadow-sm'
+                  ? 'bg-accent-500 text-white'
                   : 'text-foreground-secondary hover:text-foreground'
               }`}
             >

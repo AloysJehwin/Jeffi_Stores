@@ -17,22 +17,22 @@ interface HealthBreakdown {
 }
 
 const RISK_LABEL: Record<string, { label: string; color: string }> = {
-  healthy: { label: 'Healthy', color: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' },
+  healthy: { label: 'Healthy', color: 'bg-green-500/10 text-green-700 dark:text-green-400' },
   rising_concern: {
     label: 'Rising concern',
-    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+    color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   },
-  high: { label: 'High risk', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+  high: { label: 'High risk', color: 'bg-red-500/10 text-red-700 dark:text-red-400' },
 }
 
 function scoreColor(score: number) {
   if (score >= 70) return { ring: 'stroke-green-500', text: 'text-green-600 dark:text-green-400' }
-  if (score >= 40) return { ring: 'stroke-yellow-500', text: 'text-yellow-600 dark:text-yellow-400' }
+  if (score >= 40) return { ring: 'stroke-yellow-500', text: 'text-amber-600 dark:text-amber-400' }
   return { ring: 'stroke-red-500', text: 'text-red-600 dark:text-red-400' }
 }
 
 function Bar({ label, value, weight }: { label: string; value: number; weight: number }) {
-  const color = value >= 70 ? 'bg-green-500' : value >= 40 ? 'bg-yellow-500' : 'bg-red-500'
+  const color = value >= 70 ? 'bg-green-500' : value >= 40 ? 'bg-amber-500' : 'bg-red-500'
   return (
     <div>
       <div className="flex items-center justify-between text-xs">
@@ -78,7 +78,7 @@ export default function HealthScoreCard({
   if (!health) {
     return (
       <div>
-        <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">Health Score</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground mb-3">Health Score</h2>
         <p className="text-sm text-foreground-muted">No score computed yet.</p>
         <RequireWrite scope="customers:write">
           <button
@@ -110,7 +110,7 @@ export default function HealthScoreCard({
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Health Score</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">Health Score</h2>
         <RequireWrite scope="customers:write">
           <button
             type="button"

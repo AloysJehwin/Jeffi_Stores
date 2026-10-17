@@ -10,6 +10,7 @@ import { useHasScope } from '@/contexts/AdminScopesContext'
 import MobileListCard from '@/components/admin/mobile/MobileListCard'
 import MobileDetailSheet from '@/components/admin/mobile/MobileDetailSheet'
 import MobileActionSheet, { type MobileAction } from '@/components/admin/mobile/MobileActionSheet'
+import { StatusBadge, ACTIVE_STATUS, badgeCls } from '@/components/admin/kit'
 
 interface CouponRow {
   id: string
@@ -91,28 +92,20 @@ export default function CouponsMobileList({ coupons, backUrl }: Props) {
   }
 
   return (
-    <div className="divide-y divide-border-default">
+    <div className="space-y-2">
       {coupons.map(c => (
-        <div key={c.id} className="py-3 first:pt-0 last:pb-0">
+        <div key={c.id}>
           <MobileListCard ariaLabel={`Open ${c.code}`} onTap={() => setSelected(c)}>
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <div className="font-mono font-bold text-accent-500 truncate">{c.code}</div>
                 {c.generated_for_campaign && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 mt-1 text-[10px] font-medium rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 w-fit">
+                  <span className={`${badgeCls('blue')} mt-1 w-fit`}>
                     {c.generated_for_campaign}
                   </span>
                 )}
               </div>
-              <span
-                className={`flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${
-                  c.is_active
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                    : 'bg-surface-secondary text-foreground'
-                }`}
-              >
-                {c.is_active ? 'Active' : 'Inactive'}
-              </span>
+              <StatusBadge status={String(c.is_active)} map={ACTIVE_STATUS} />
             </div>
             {c.description && <p className="text-sm text-foreground-secondary mt-2 line-clamp-2">{c.description}</p>}
             <div className="text-xs text-foreground-muted mt-1">
@@ -132,7 +125,7 @@ export default function CouponsMobileList({ coupons, backUrl }: Props) {
           <button
             type="button"
             onClick={() => setActionsOpen(true)}
-            className="w-full bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold py-3 rounded-lg transition-colors"
+            className="control-md w-full bg-accent-500 font-semibold text-white hover:bg-accent-600"
           >
             Actions
           </button>
@@ -141,17 +134,9 @@ export default function CouponsMobileList({ coupons, backUrl }: Props) {
         {selected && (
           <div className="p-5 space-y-4">
             <div className="flex flex-wrap gap-2">
-              <span
-                className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
-                  selected.is_active
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                    : 'bg-surface-secondary text-foreground-muted'
-                }`}
-              >
-                {selected.is_active ? 'Active' : 'Inactive'}
-              </span>
+              <StatusBadge status={String(selected.is_active)} map={ACTIVE_STATUS} />
               {selected.generated_for_campaign && (
-                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                <span className={badgeCls('blue')}>
                   {selected.generated_for_campaign}
                 </span>
               )}

@@ -18,6 +18,7 @@ import {
 } from './_components/campaign-presentation'
 import CampaignsMobileList from './_components/CampaignsMobileList'
 import RowActions from '@/components/admin/RowActions'
+import { EmptyState } from '@/components/admin/kit'
 
 export default function CampaignsListClient() {
   const { showToast } = useToast()
@@ -171,7 +172,7 @@ export default function CampaignsListClient() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search campaigns..."
-            className="w-full pl-9 pr-8 h-control text-sm bg-surface-elevated border border-border-default rounded-lg text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40 focus:border-accent-500 transition-colors"
+            className="field-md w-full border border-border-default bg-surface-elevated pl-9 pr-8 text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40"
           />
           {search && (
             <button
@@ -188,12 +189,12 @@ export default function CampaignsListClient() {
         {/* Filter groups — side-by-side on their own row; each sized to content */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Status filter */}
-          <div className="flex items-center gap-1 bg-surface-elevated border border-border-default rounded-lg p-1 w-fit">
+          <div className="flex h-control w-fit items-center gap-1 rounded-lg border border-border-default bg-surface-elevated p-0.5">
             {(['all', 'active', 'paused'] as const).map(s => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1 rounded-md text-xs font-semibold capitalize transition-colors ${statusFilter === s ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+                className={`h-full px-3 rounded-md text-xs font-semibold capitalize transition-colors ${statusFilter === s ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
               >
                 {s}
               </button>
@@ -201,10 +202,10 @@ export default function CampaignsListClient() {
           </div>
 
           {/* Channel filter */}
-          <div className="flex items-center gap-1 bg-surface-elevated border border-border-default rounded-lg p-1 w-fit">
+          <div className="flex h-control w-fit items-center gap-1 rounded-lg border border-border-default bg-surface-elevated p-0.5">
             <button
               onClick={() => setChannelFilter('all')}
-              className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${channelFilter === 'all' ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+              className={`h-full px-3 rounded-md text-xs font-semibold transition-colors ${channelFilter === 'all' ? 'bg-accent-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
             >
               All
             </button>
@@ -212,7 +213,7 @@ export default function CampaignsListClient() {
               onClick={() => setChannelFilter('email')}
               aria-label="Email campaigns"
               title="Email"
-              className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold transition-colors ${channelFilter === 'email' ? 'bg-blue-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+              className={`inline-flex items-center gap-1 h-full px-3 rounded-md text-xs font-semibold transition-colors ${channelFilter === 'email' ? 'bg-blue-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <rect x="2" y="4" width="20" height="16" rx="2" />
@@ -224,7 +225,7 @@ export default function CampaignsListClient() {
               onClick={() => setChannelFilter('whatsapp')}
               aria-label="WhatsApp campaigns"
               title="WhatsApp"
-              className={`inline-flex items-center gap-1 px-3 py-1 rounded-md text-xs font-semibold transition-colors ${channelFilter === 'whatsapp' ? 'bg-green-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
+              className={`inline-flex items-center gap-1 h-full px-3 rounded-md text-xs font-semibold transition-colors ${channelFilter === 'whatsapp' ? 'bg-green-500 text-white' : 'text-foreground-muted hover:text-foreground'}`}
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
@@ -254,21 +255,21 @@ export default function CampaignsListClient() {
         const pendingDrafts = campaigns.filter(c => c.kind !== 'broadcast' && c.draft_fields != null)
         if (!pendingDrafts.length) return null
         return (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+          <div className="overflow-hidden rounded-xl border border-amber-500/40 bg-amber-500/5">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-500/40">
+              <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">
                 Pending Drafts ({pendingDrafts.length})
               </p>
-              <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
+              <p className="text-xs text-foreground-muted">Unpublished edits — click to open</p>
             </div>
-            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+            <div className="divide-y divide-amber-500/20">
               {pendingDrafts.map(d => (
                 <div
                   key={d.kind}
-                  className="flex items-center justify-between px-4 py-2.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                  className="flex items-center justify-between px-4 py-2.5 hover:bg-amber-500/10 transition-colors"
                 >
                   <Link href={ap(`/admin/campaigns/${d.kind}/edit`)} className="flex-1 min-w-0 mr-4">
-                    <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{d.name}</p>
+                    <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{d.name}</p>
                   </Link>
                   <div className="flex items-center gap-2 shrink-0">
                     <RequireWrite scope="campaigns:write">
@@ -276,7 +277,7 @@ export default function CampaignsListClient() {
                         type="button"
                         onClick={() => publishDraft(d)}
                         disabled={busy === d.kind}
-                        className="px-2.5 h-control-sm text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50"
+                        className="control-sm bg-green-600 font-semibold text-white hover:bg-green-700 disabled:opacity-50"
                       >
                         Publish
                       </button>
@@ -284,7 +285,7 @@ export default function CampaignsListClient() {
                         type="button"
                         onClick={() => discardDraft(d)}
                         disabled={busy === d.kind}
-                        className="px-2.5 h-control-sm text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors disabled:opacity-50"
+                        className="control-sm border border-amber-500/40 font-semibold text-amber-700 hover:bg-amber-500/10 disabled:opacity-50 dark:text-amber-400"
                       >
                         {busy === d.kind ? '…' : 'Discard'}
                       </button>
@@ -299,7 +300,7 @@ export default function CampaignsListClient() {
 
       {/* Campaign cards */}
       {filtered.length === 0 ? (
-        <div className="py-12 text-center text-foreground-muted text-sm">No campaigns match your filters.</div>
+        <EmptyState title="No campaigns match your filters." />
       ) : (
         <>
           {/* Mobile: compact rows → detail + action sheets (matches the other admin list pages) */}
@@ -323,7 +324,7 @@ export default function CampaignsListClient() {
                       {c.name}
                     </Link>
                     <span
-                      className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${c.enabled ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}
+                      className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${c.enabled ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-surface-secondary text-foreground-muted '}`}
                     >
                       {c.enabled ? 'Active' : 'Paused'}
                     </span>
@@ -331,12 +332,12 @@ export default function CampaignsListClient() {
                       <ChannelChip key={ch} channel={ch} />
                     ))}
                     {c.draft_fields != null && (
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
                         Draft pending
                       </span>
                     )}
                     {c.discount_percent > 0 && (
-                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                      <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
                         {c.discount_percent}% off
                       </span>
                     )}
@@ -402,7 +403,7 @@ export default function CampaignsListClient() {
                 setOffset(o)
                 load(o)
               }}
-              className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
             >
               Previous
             </button>
@@ -413,7 +414,7 @@ export default function CampaignsListClient() {
                 setOffset(o)
                 load(o)
               }}
-              className="px-3 h-control-sm rounded-lg bg-surface-secondary hover:bg-border-default text-xs font-medium disabled:opacity-40 transition-colors"
+              className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40"
             >
               Next
             </button>

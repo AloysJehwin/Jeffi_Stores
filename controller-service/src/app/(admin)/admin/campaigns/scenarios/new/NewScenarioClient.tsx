@@ -179,7 +179,7 @@ export default function NewScenarioClient() {
                       ? 'bg-green-500 text-white'
                       : active
                         ? 'bg-accent-500 text-white'
-                        : 'bg-zinc-200 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-400'
+                        : 'bg-surface-secondary text-foreground-muted'
                   }`}
                 >
                   {done ? <Check className="w-3.5 h-3.5" /> : idx + 1}
@@ -295,8 +295,8 @@ export default function NewScenarioClient() {
             <div
               className={`p-3 rounded-lg text-xs ${
                 validationOk
-                  ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800'
-                  : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800'
+                  ? 'bg-green-500/5 text-green-700 dark:text-green-400 border border-green-500/40'
+                  : 'bg-red-500/5 text-red-700 dark:text-red-400 border border-red-500/40'
               }`}
             >
               <p className="font-semibold mb-1 inline-flex items-center gap-1">
@@ -343,8 +343,8 @@ export default function NewScenarioClient() {
                 <div
                   className={`mt-2 p-2 rounded text-[11px] ${
                     productValidation.ok
-                      ? 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300'
-                      : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300'
+                      ? 'bg-green-500/5 text-green-700 dark:text-green-400'
+                      : 'bg-red-500/5 text-red-700 dark:text-red-400'
                   }`}
                 >
                   {productValidation.ok ? (

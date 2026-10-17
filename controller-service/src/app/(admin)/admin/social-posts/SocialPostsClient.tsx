@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/shared/admin-path'
 import { ChannelAlerts, JobRuns } from '@/components/admin/channels/ChannelPanels'
-import { Banner, Tabs, api } from '@/components/admin/channels/ui'
+import { Tabs, api } from '@/components/admin/channels/ui'
+import { useActionToast } from '@/components/admin/kit'
 import Calendar from './Calendar'
 import Composer from './Composer'
 import Approvals from './Approvals'
@@ -28,7 +29,8 @@ export default function SocialPostsClient({ canWrite, canApprove }: { canWrite: 
   const [tab, setTabState] = useState<Tab>(tabParam && TAB_IDS.includes(tabParam) ? tabParam : 'calendar')
   const [networks, setNetworks] = useState<NetworkInfo[] | null>(null)
   const [allPosts, setAllPosts] = useState<Post[] | null>(null)
-  const [banner, setBanner] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setBanner = useCallback((b: { ok: boolean; text: string } | null) => b && toast.result(b), [toast])
   const [autoPick, setAutoPick] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const reload = useCallback(() => setReloadKey(k => k + 1), [])
@@ -56,7 +58,7 @@ export default function SocialPostsClient({ canWrite, canApprove }: { canWrite: 
     const url = new URL(window.location.href)
     ;['connected', 'error', 'pick', 'network'].forEach(k => url.searchParams.delete(k))
     window.history.replaceState(null, '', url.toString())
-  }, [sp])
+  }, [sp, setBanner])
 
   function setTab(next: Tab) {
     setTabState(next)
@@ -82,7 +84,6 @@ export default function SocialPostsClient({ canWrite, canApprove }: { canWrite: 
   return (
     <div className="space-y-4">
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
-      {banner && <Banner ok={banner.ok}>{banner.text}</Banner>}
       {tab === 'calendar' && <Calendar reloadKey={reloadKey} />}
       {tab === 'compose' && (
         <Composer

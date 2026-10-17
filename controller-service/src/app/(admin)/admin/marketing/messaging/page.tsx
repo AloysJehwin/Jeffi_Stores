@@ -1,17 +1,12 @@
 import { Suspense } from 'react'
 import { Plus } from 'lucide-react'
 import { TabAction } from '@/components/admin/channels/ui'
-import Link from 'next/link'
 import { queryMany, queryCount } from '@/lib/shared/db'
-import Pagination from '@/components/admin/Pagination'
-import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
-import MailerRowActions from '@/components/admin/MailerRowActions'
-import AdminFilters from '@/components/admin/AdminFilters'
-import ResponsiveList from '@/components/admin/ResponsiveList'
+import { DataToolbar, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
+import { TONE_CLS } from '@/components/admin/kit/tones'
+import MessagingTable, { type Campaign } from './_components/MessagingTable'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
-import MailerMobileList from './_components/MailerMobileList'
 import MessagingOverview from './_components/MessagingOverview'
 import OverviewTabs from '../../coupons/_components/OverviewTabs'
 import { resolveListTab } from '@/lib/overviews/marketing'
@@ -29,37 +24,14 @@ const TEMPLATE_LABELS: Record<string, string> = {
   custom: 'Custom',
 }
 
-const channelLabel = (
-  c: { template_key: string; channels?: Record<string, { slug: string }> | null },
-  labels: Record<string, string>
-) =>
-  c.template_key === 'library'
-    ? Object.entries(c.channels ?? {})
-        .map(([k, v]) => `${k === 'sms' ? 'SMS' : k === 'whatsapp' ? 'WhatsApp' : 'Email'}: ${v.slug}`)
-        .join(' · ') || 'No channels'
-    : labels[c.template_key] || c.template_key
-
 const STATUS_STYLES: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  scheduled: 'bg-blue-100 text-blue-700',
-  sending: 'bg-yellow-100 text-yellow-700',
-  sent: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-600',
+  draft: TONE_CLS.muted,
+  scheduled: TONE_CLS.blue,
+  sending: TONE_CLS.amber,
+  sent: TONE_CLS.green,
+  failed: TONE_CLS.red,
 }
 
-interface Campaign {
-  id: string
-  title: string
-  template_key: string
-  channels?: Record<string, { slug: string }> | null
-  subject: string
-  audience_type: string
-  recipient_count: number | null
-  status: string
-  scheduled_at: string | null
-  sent_at: string | null
-  created_at: string
-}
 
 export default async function MailerPage({
   searchParams,
@@ -70,15 +42,8 @@ export default async function MailerPage({
   const sp = await searchParams
   const tab = resolveListTab(sp, ['page', 'search'])
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Messaging</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">
-            Send email, SMS and WhatsApp messages to your customers
-          </p>
-        </div>
-      </div>
+    <PageBody>
+      <PageHeader title="Messaging" description="Send email, SMS and WhatsApp messages to your customers" />
 
       <OverviewTabs
         basePath={ap('/admin/marketing/messaging', host)}
@@ -98,11 +63,11 @@ export default async function MailerPage({
         </Suspense>
       ) : (
         <>
-          <AdminFilters filters={[]} searchPlaceholder="Search by title or subject..." />
+          <DataToolbar search={{ placeholder: 'Search by title or subject...', param: 'search' }} />
           <MailerListSection searchParams={searchParams} />
         </>
       )}
-    </div>
+    </PageBody>
   )
 }
 
@@ -113,7 +78,7 @@ async function MailerListSection({ searchParams }: { searchParams: Promise<{ pag
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={7} />}>
+    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={6} />}>
       <MailerListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )
@@ -158,13 +123,6 @@ async function MailerListContent({
     migrationPending = true
   }
 
-  const buildUrl = (p: number) => {
-    const qs = new URLSearchParams({ tab: 'list' })
-    if (search) qs.set('search', search)
-    if (p > 1) qs.set('page', String(p))
-    return ap(`/admin/marketing/messaging?${qs}`, host)
-  }
-
   const currentListUrl = (() => {
     const params = new URLSearchParams({ tab: 'list' })
     if (search) params.set('search', search)
@@ -174,13 +132,13 @@ async function MailerListContent({
 
   if (migrationPending) {
     return (
-      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6 max-w-xl">
-        <h2 className="font-semibold text-amber-800 dark:text-amber-300 mb-2">Database migration required</h2>
-        <p className="text-sm text-amber-700 dark:text-amber-400 mb-3">
-          The <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">email_campaigns</code> table
+      <div className="max-w-xl rounded-xl border border-amber-500/40 bg-amber-500/5 p-5">
+        <h2 className="font-semibold text-amber-700 dark:text-amber-400 mb-2">Database migration required</h2>
+        <p className="text-sm text-foreground mb-3">
+          The <code className="font-mono bg-amber-500/10 px-1 rounded">email_campaigns</code> table
           does not exist yet. It is defined in the schema file below and is created by the schema pipeline:
         </p>
-        <pre className="bg-amber-100 dark:bg-amber-900/40 rounded-lg px-4 py-3 text-xs font-mono text-amber-900 dark:text-amber-200 overflow-x-auto">
+        <pre className="bg-amber-500/10 rounded-lg px-4 py-3 text-xs font-mono text-amber-700 dark:text-amber-400 overflow-x-auto">
           database/marketing.sql
         </pre>
       </div>
@@ -188,102 +146,16 @@ async function MailerListContent({
   }
 
   return (
-    <ResponsiveList
-      items={campaigns}
-      getKey={c => c.id}
-      minWidth="none"
-      emptyState={
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
-          No campaigns yet.{' '}
-          <span className="hidden md:contents">
-            <Link href={ap('/admin/marketing/messaging/new', host)} className="text-accent-500 hover:underline">
-              Create your first one.
-            </Link>
-          </span>
-        </div>
-      }
-      pagination={<Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />}
-      mobileList={
-        <MailerMobileList
-          campaigns={campaigns}
-          templateLabels={TEMPLATE_LABELS}
-          statusStyles={STATUS_STYLES}
-          currentListUrl={currentListUrl}
-          host={host}
-        />
-      }
-      renderCard={() => null}
-      tableHead={
-        <>
-          {['Title', 'Template', 'Audience', 'Recipients', 'Status', 'Date', 'Actions'].map(h => (
-            <th
-              key={h}
-              className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider"
-            >
-              {h}
-            </th>
-          ))}
-        </>
-      }
-      tableBody={
-        <tbody className="text-sm divide-y divide-border-default">
-          {campaigns.map(c => (
-            <tr key={c.id} className="hover:bg-surface-secondary/50 transition-colors">
-              <td className="px-4 py-3">
-                <Link
-                  href={ap(
-                    c.status === 'draft'
-                      ? `/admin/marketing/messaging/new?draftId=${c.id}`
-                      : `/admin/marketing/messaging/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`,
-                    host
-                  )}
-                  className="font-medium text-foreground hover:text-accent-500 transition-colors"
-                >
-                  {c.title}
-                </Link>
-                <p className="text-xs text-foreground-muted truncate max-w-[200px]">{c.subject}</p>
-              </td>
-              <td className="px-4 py-3 text-foreground-secondary">{channelLabel(c, TEMPLATE_LABELS)}</td>
-              <td className="px-4 py-3 capitalize text-foreground-secondary">{c.audience_type.replace('_', ' ')}</td>
-              <td className="px-4 py-3 text-foreground-secondary">{c.recipient_count ?? '—'}</td>
-              <td className="px-4 py-3">
-                <span
-                  className={`text-xs px-2 py-1 rounded-full font-medium capitalize ${STATUS_STYLES[c.status] || 'bg-gray-100 text-gray-600'}`}
-                >
-                  {c.status}
-                </span>
-              </td>
-              <td className="px-4 py-3 text-foreground-secondary text-xs">
-                {c.status === 'scheduled' && c.scheduled_at
-                  ? `Scheduled ${new Date(c.scheduled_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Kolkata' })}`
-                  : c.sent_at
-                    ? new Date(c.sent_at).toLocaleString('en-IN', {
-                        dateStyle: 'medium',
-                        timeStyle: 'short',
-                        timeZone: 'Asia/Kolkata',
-                      })
-                    : new Date(c.created_at).toLocaleDateString('en-IN')}
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  {(c.status === 'draft' || c.status === 'scheduled') && (
-                    <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />
-                  )}
-                  <MailerRowActions
-                    id={c.id}
-                    title={c.title}
-                    viewHref={ap(
-                      `/admin/marketing/messaging/${c.id}/view?back=${encodeURIComponent(currentListUrl)}`,
-                      host
-                    )}
-                    canDelete={c.status !== 'sending'}
-                  />
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      }
+    <MessagingTable
+      campaigns={campaigns}
+      total={total}
+      page={page}
+      pageSize={PAGE_SIZE}
+      search={search}
+      host={host}
+      currentListUrl={currentListUrl}
+      templateLabels={TEMPLATE_LABELS}
+      statusStyles={STATUS_STYLES}
     />
   )
 }

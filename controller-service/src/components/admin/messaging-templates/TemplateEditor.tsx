@@ -547,9 +547,9 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium text-foreground mr-auto">Meta approval</span>
                   <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${
-                    value.approval_status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                    : value.approval_status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                    : value.approval_status === 'pending' || value.approval_status === 'received' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                    value.approval_status === 'approved' ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                    : value.approval_status === 'rejected' ? 'bg-red-500/10 text-red-700 dark:text-red-400'
+                    : value.approval_status === 'pending' || value.approval_status === 'received' ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
                     : 'bg-surface-secondary text-foreground-muted'
                   }`}>{value.approval_status === 'received' ? 'pending' : value.approval_status || 'unsubmitted'}</span>
                   <button type="button" disabled={submitting || !value.slug} className={`${TOOL} text-xs`} onClick={onSubmitForApproval}>
@@ -560,15 +560,15 @@ export default function TemplateEditor({ value, apiBase, assetsBase, shortLinksB
                   </button>
                 </div>
                 {value.needs_resubmission && (
-                  <p className="text-xs text-yellow-700 dark:text-yellow-300">You have saved changes Meta hasn&apos;t reviewed. Customers still receive the approved version until you submit and it&apos;s approved.</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400">You have saved changes Meta hasn&apos;t reviewed. Customers still receive the approved version until you submit and it&apos;s approved.</p>
                 )}
                 {(value.approval_status === 'pending' || value.approval_status === 'received') && (
                   <p className="text-xs text-foreground-muted">Waiting for Meta — checked automatically every 10 minutes. Customers receive the previously approved version meanwhile.</p>
                 )}
                 {value.approval_status === 'rejected' && (value.approval_reason && !/unknown/i.test(value.approval_reason) ? (
-                  <p className="text-xs text-red-700 dark:text-red-300"><b>Rejected by Meta:</b> {value.approval_reason}. Edit the text and submit again.</p>
+                  <p className="text-xs text-red-700 dark:text-red-400"><b>Rejected by Meta:</b> {value.approval_reason}. Edit the text and submit again.</p>
                 ) : (
-                  <div className="text-xs text-red-700 dark:text-red-300">
+                  <div className="text-xs text-red-700 dark:text-red-400">
                     <p><b>Rejected by Meta</b> without a specific reason. Fix this and submit again:</p>
                     <ul className="mt-1 list-disc pl-4 space-y-0.5">
                       {rejectionHints(value.body ?? '', value.blocks as WaBlocks, value.meta_category).map(h => <li key={h}>{h}</li>)}

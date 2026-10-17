@@ -1,15 +1,9 @@
 import { Suspense } from 'react'
 import { getCustomers, getCustomerStats, getCustomerSegments, getCustomerChannelMix } from '@/lib/queries'
-import AdminFilters from '@/components/admin/AdminFilters'
-import Pagination from '@/components/admin/Pagination'
-import CustomersTableRows from '@/components/admin/CustomersTableRows'
-import CustomersMobileList from './_components/CustomersMobileList'
-import SortableHeader from '@/components/admin/SortableHeader'
-import { sortOptions } from '@/components/admin/sortOptions'
+import CustomersTable from './_components/CustomersTable'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
-import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
-import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import { DataToolbar, Kpi, KpiGrid, PageBody, PageHeader, TableSkeleton } from '@/components/admin/kit'
 import CustomerEngagementChart from '@/components/admin/CustomerEngagementChart'
 import CustomersOverview from './_components/CustomersOverview'
 import OverviewTabs from '../coupons/_components/OverviewTabs'
@@ -30,36 +24,14 @@ async function CustomersStats() {
   ])
 
   return (
-    <div className="animate-fade-in">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:h-56">
-        {/* Left: Total Customers + the 4 customer stats as tiles */}
-        <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white">
-          <div>
-            <p className="text-white/80 text-sm">Total Customers</p>
-            <p className="text-3xl sm:text-4xl font-bold mt-1">{stats.total.toLocaleString('en-IN')}</p>
-          </div>
-          <div className="grid grid-cols-4 gap-2 sm:gap-3 mt-4">
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{stats.total}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Total</p>
-            </div>
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{stats.active}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Active</p>
-            </div>
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{stats.inactive}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Inactive</p>
-            </div>
-            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
-              <p className="text-lg sm:text-2xl font-bold leading-none">{stats.flagged}</p>
-              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Flagged</p>
-            </div>
-          </div>
-        </div>
-        {/* Right: customer engagement chart */}
-        <CustomerEngagementChart segments={segments} channelMix={channelMix} />
-      </div>
+    <div className="animate-fade-in space-y-4">
+      <KpiGrid>
+        <Kpi label="Total customers" value={stats.total.toLocaleString('en-IN')} highlight />
+        <Kpi label="Active" value={stats.active.toLocaleString('en-IN')} />
+        <Kpi label="Inactive" value={stats.inactive.toLocaleString('en-IN')} />
+        <Kpi label="Flagged" value={stats.flagged.toLocaleString('en-IN')} />
+      </KpiGrid>
+      <CustomerEngagementChart segments={segments} channelMix={channelMix} />
     </div>
   )
 }
@@ -71,11 +43,8 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
   const tab = resolveListTab(sp, LIST_KEYS)
   const host = await getHost()
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Customers</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">View and manage customer accounts</p>
-      </div>
+    <PageBody>
+      <PageHeader title="Customers" description="View and manage customer accounts" />
 
       <OverviewTabs basePath={ap('/admin/customers', host)} active={tab} sp={sp} listLabel="Customers" />
 
@@ -85,11 +54,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         </Suspense>
       ) : (
         <>
-          <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
+          <Suspense fallback={<KpiRowSkeleton />}>
             <CustomersStats />
           </Suspense>
 
-          <AdminFilters
+          <DataToolbar
+            search={{ placeholder: 'Search by name, email or phone...', param: 'search', suggestType: 'customers' }}
             filters={[
               {
                 name: 'status',
@@ -126,14 +96,21 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
                 ],
               },
             ]}
-            searchPlaceholder="Search by name, email or phone..."
-            suggestType="customers"
-            searchParam="search"
           />
 
           <CustomersListSection searchParams={searchParams} />
         </>
       )}
+    </PageBody>
+  )
+}
+
+function KpiRowSkeleton() {
+  return (
+    <div className="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6 animate-pulse">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-[84px] rounded-xl border border-border-default bg-surface-elevated" />
+      ))}
     </div>
   )
 }
@@ -145,14 +122,13 @@ async function CustomersListSection({ searchParams }: { searchParams: Promise<SP
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
-    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
+    <Suspense key={key} fallback={<TableSkeleton rows={8} cols={7} />}>
       <CustomersListContent resolvedSearchParams={resolvedSearchParams} />
     </Suspense>
   )
 }
 
 async function CustomersListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
-  const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
@@ -169,111 +145,23 @@ async function CustomersListContent({ resolvedSearchParams }: { resolvedSearchPa
     dir,
   })
 
-  const buildUrl = (p: number) => {
-    const params = new URLSearchParams({ tab: 'list' })
-    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (resolvedSearchParams.segment) params.set('segment', resolvedSearchParams.segment)
-    if (resolvedSearchParams.tag) params.set('tag', resolvedSearchParams.tag)
-    if (resolvedSearchParams.health) params.set('health', resolvedSearchParams.health)
-    if (sort) params.set('sort', sort)
-    if (dir) params.set('dir', dir)
-    if (p > 1) params.set('page', String(p))
-    const qs = params.toString()
-    return ap(`/admin/customers${qs ? `?${qs}` : ''}`, host)
+  const query = {
+    status: resolvedSearchParams.status,
+    search: resolvedSearchParams.search,
+    segment: resolvedSearchParams.segment,
+    tag: resolvedSearchParams.tag,
+    health: resolvedSearchParams.health,
+    sort,
+    dir,
   }
 
   const currentListUrl = (() => {
     const params = new URLSearchParams({ tab: 'list' })
-    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (resolvedSearchParams.segment) params.set('segment', resolvedSearchParams.segment)
-    if (resolvedSearchParams.tag) params.set('tag', resolvedSearchParams.tag)
-    if (resolvedSearchParams.health) params.set('health', resolvedSearchParams.health)
-    if (sort) params.set('sort', sort)
-    if (dir) params.set('dir', dir)
+    for (const k of ['status', 'search', 'segment', 'tag', 'health', 'sort', 'dir'] as const) if (query[k]) params.set(k, query[k]!)
     if (page > 1) params.set('page', String(page))
     const qs = params.toString()
     return `/admin/customers${qs ? `?${qs}` : ''}`
   })()
 
-  return (
-    <>
-      <CustomersMobileList
-        customers={customers ?? []}
-        backUrl={currentListUrl}
-        pagination={<Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />}
-      />
-
-      <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border-default">
-            <thead className="bg-surface-secondary">
-              <tr>
-                <SortableHeader
-                  label="Name"
-                  column="name"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Email"
-                  column="email"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Phone"
-                  column="phone"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Joined"
-                  column="joined"
-                  options={sortOptions('date')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Orders"
-                  column="orders"
-                  options={sortOptions('number')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Health"
-                  column="health"
-                  options={sortOptions('number')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <SortableHeader
-                  label="Status"
-                  column="status"
-                  options={sortOptions('text')}
-                  currentSort={sort}
-                  currentDir={dir}
-                />
-                <th className="px-6 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              <CustomersTableRows customers={customers ?? []} backUrl={currentListUrl} />
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="hidden md:block px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
-        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-      </div>
-    </>
-  )
+  return <CustomersTable customers={customers ?? []} total={total} page={page} pageSize={PAGE_SIZE} query={query} backUrl={currentListUrl} />
 }

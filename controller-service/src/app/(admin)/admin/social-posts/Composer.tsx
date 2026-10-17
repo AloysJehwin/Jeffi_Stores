@@ -14,6 +14,7 @@ import Toggle from '@/components/ui/Toggle'
 import { useToast } from '@/contexts/ToastContext'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { productUrl } from '@/lib/social/product-url'
+import { useActionToast } from '@/components/admin/kit'
 import { Banner, Section, api, btnGhost, btnPrimary, inputCls } from '@/components/admin/channels/ui'
 import {
   PLATFORMS,
@@ -77,7 +78,8 @@ export default function Composer({
   const [suggested, setSuggested] = useState<string[]>([])
   const [suggesting, setSuggesting] = useState(false)
   const [submitting, setSubmitting] = useState<'post' | 'draft' | null>(null)
-  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const setResult = (b: { ok: boolean; text: string } | null) => void (b && toast.result(b))
 
   const netOf = (p: Platform) => networks?.find(n => n.network === PLATFORM_NETWORK[p])
   const connected = (p: Platform) => netOf(p)?.status === 'connected'
@@ -243,7 +245,6 @@ export default function Composer({
 
   return (
     <div className="space-y-4">
-      {result && <Banner ok={result.ok}>{result.text}</Banner>}
       {!canApprove && <Banner ok>Posts you create wait for someone with approval rights before they publish.</Banner>}
 
       <Section title="Networks">

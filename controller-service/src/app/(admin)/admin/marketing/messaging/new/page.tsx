@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, AlertTriangle, Mail, MessageSquare, MessageCircle, Sparkles, Loader2, Pencil, Save } from 'lucide-react'
+import { AlertTriangle, Mail, MessageSquare, MessageCircle, Sparkles, Loader2, Pencil, Save } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import Pagination from '@/components/admin/Pagination'
 import DateTimePicker from '@/components/ui/DateTimePicker'
@@ -21,6 +21,7 @@ import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import EditorToolbar from '@/components/admin/EditorToolbar'
 import { useEditSession } from '@/hooks/useEditSession'
 import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
+import { BackLink, fieldInputCls } from '@/components/admin/kit'
 
 type Channel = 'email' | 'sms' | 'whatsapp'
 type Channels = Partial<Record<Channel, { slug: string; vars?: Record<string, string>; subject?: string; media_url?: string; button_url?: string }>>
@@ -65,9 +66,8 @@ const namedVars = (...texts: Array<string | null | undefined>) =>
   [...new Set(texts.flatMap(t => [...(t ?? '').matchAll(VAR_RE)].map(m => m[1])))].filter(v => !AUTO.test(v) && !/^\d+$/.test(v))
 const humanize = (v: string) => v.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^\w/, c => c.toUpperCase())
 
-const inputClass =
-  'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
-const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
+const inputClass = fieldInputCls
+const labelClass = 'block text-xs font-medium text-foreground-secondary mb-1.5'
 const btnSecondary =
   'px-5 h-control bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm disabled:opacity-50'
 const btnPrimary =
@@ -106,7 +106,7 @@ export default function NewMessagePage() {
   const [previewHtml, setPreviewHtml] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
+  const setError = (text: string) => void (text && showToast(text, 'error'))
   const [reviewForms, setReviewForms] = useState<ReviewFormOption[]>([])
   const [audienceRecipients, setAudienceRecipients] = useState<Recipient[]>([])
   const [audienceCount, setAudienceCount] = useState<number | null>(null)
@@ -118,7 +118,7 @@ export default function NewMessagePage() {
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [scenarioPrompt, setScenarioPrompt] = useState('')
   const [scenarioLoading, setScenarioLoading] = useState(false)
-  const [scenarioError, setScenarioError] = useState<string | null>(null)
+  const setScenarioError = (text: string | null) => void (text && showToast(text, 'error'))
   const canUseAi = useCanUseAi('mailer:write')
 
   const [draftId, setDraftId] = useState<string | null>(null)
@@ -456,10 +456,10 @@ export default function NewMessagePage() {
     <MobileEditBlock>
     <div className="p-4 sm:p-6">
       {showRestoreBanner && (
-        <div className="mb-4 flex items-center justify-between gap-4 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg">
+        <div className="mb-4 flex items-center justify-between gap-4 px-4 py-3 bg-amber-500/5 border border-amber-500/40 rounded-lg">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-            <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+            <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
               You have an unsaved draft — want to continue where you left off?
             </span>
           </div>
@@ -472,7 +472,7 @@ export default function NewMessagePage() {
             </button>
             <button
               onClick={discardDraft}
-              className="px-3 h-control-sm text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 rounded-md transition-colors"
+              className="px-3 h-control-sm text-xs font-semibold bg-surface border border-amber-500/40 dark:border-amber-600 text-amber-700 dark:text-amber-400 rounded-md transition-colors"
             >
               Discard
             </button>
@@ -480,13 +480,11 @@ export default function NewMessagePage() {
         </div>
       )}
 
-      <div className="flex items-center gap-3 mb-6">
-        <Link href={ap('/admin/marketing/messaging')} className="text-foreground-muted hover:text-foreground transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">New message</h1>
-          <p className="text-sm text-foreground-secondary mt-0.5">
+      <div className="flex flex-wrap items-end gap-3 mb-6">
+        <div className="flex-1 min-w-0 space-y-1.5">
+          <BackLink href={ap('/admin/marketing/messaging')} label="Messaging" />
+          <h1 className="text-2xl font-bold text-foreground">New message</h1>
+          <p className="text-sm text-foreground-muted mt-0.5">
             Step {step} of 3 · {['Channels & templates', 'Content', 'Audience & schedule'][step - 1]}
           </p>
         </div>
@@ -513,7 +511,7 @@ export default function NewMessagePage() {
         <div className="max-w-3xl space-y-4">
           <p className="text-sm text-foreground-secondary">
             Pick one or more channels and a template for each from your{' '}
-            <Link href={ap('/admin/marketing/messaging-templates')} className="text-accent-600 hover:underline">Templates</Link> library.
+            <Link href={ap('/admin/marketing/messaging-templates')} className="text-accent-500 hover:underline">Templates</Link> library.
           </p>
           {CHANNELS.map(c => {
             const on = !!channels[c.key]
@@ -556,10 +554,10 @@ export default function NewMessagePage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
           <div className="space-y-5">
             {canUseAi && channels.email && (
-              <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-4 space-y-3">
+              <div className="bg-violet-500/5 border border-violet-500/40 rounded-lg p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-violet-500 shrink-0" />
-                  <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">Write a new email with AI</p>
+                  <p className="text-sm font-semibold text-violet-700 dark:text-violet-400">Write a new email with AI</p>
                 </div>
                 <textarea
                   value={scenarioPrompt}
@@ -580,7 +578,6 @@ export default function NewMessagePage() {
                       {scenarioLoading ? 'Generating…' : 'Generate email'}
                     </button>
                   </RequireWrite>
-                  {scenarioError && <span className="text-xs text-red-500">{scenarioError}</span>}
                 </div>
               </div>
             )}
@@ -644,7 +641,7 @@ export default function NewMessagePage() {
             {channels.whatsapp && waP && (
               <WaParamsForm params={waP} vars={waVars} setVars={setWaVars} mediaUrl={waMedia} setMediaUrl={setWaMedia} linkUrl={waLink} setLinkUrl={setWaLink} inputClass={inputClass} />
             )}
-            {waProblem && <p className="text-xs text-yellow-700 dark:text-yellow-300">{waProblem}</p>}
+            {waProblem && <p className="text-xs text-amber-700 dark:text-amber-400">{waProblem}</p>}
 
             <div className="flex flex-wrap gap-2">
               {active.filter(k => k !== 'whatsapp').map(k => (
@@ -698,7 +695,7 @@ export default function NewMessagePage() {
                     <Loader2 className="w-4 h-4 animate-spin" /> Rendering…
                   </div>
                 ) : previewHtml ? (
-                  <iframe srcDoc={previewHtml} className="w-full h-[600px] bg-white" title="Email preview" />
+                  <iframe srcDoc={previewHtml} className="w-full h-[600px] bg-surface-elevated" title="Email preview" />
                 ) : (
                   <div className="flex items-center justify-center h-[520px] text-foreground-muted text-sm">Pick an email template to preview</div>
                 )}
@@ -782,7 +779,6 @@ export default function NewMessagePage() {
               <DateTimePicker value={scheduledAt} onChange={setScheduledAt} className="w-full" placeholder="Leave blank to send now" />
             </div>
             <p className="text-xs text-foreground-muted">Customers who opted out of marketing are never messaged.</p>
-            {error && <p className="text-sm text-red-600">{error}</p>}
             <div className="flex flex-wrap gap-3 pt-2">
               <button type="button" onClick={() => setStep(2)} className={btnSecondary}>Back</button>
               <RequireWrite scope="mailer:write">
@@ -826,14 +822,14 @@ export default function NewMessagePage() {
                   {audienceRecipients.slice((recipientPage - 1) * 25, recipientPage * 25).map((r, i) => (
                     <div key={i} className="flex items-center gap-3 px-4 py-2.5">
                       <div className="w-7 h-7 rounded-full bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
-                        <span className="text-xs font-semibold text-accent-600 dark:text-accent-400">{(r.first_name?.[0] || r.email[0]).toUpperCase()}</span>
+                        <span className="text-xs font-semibold text-accent-500">{(r.first_name?.[0] || r.email[0]).toUpperCase()}</span>
                       </div>
                       <div className="min-w-0 flex-1">
                         {r.first_name && <p className="text-sm font-medium text-foreground truncate">{r.first_name}</p>}
                         <p className="text-xs text-foreground-muted truncate">{r.email}</p>
                       </div>
                       {(channels.sms || channels.whatsapp) && (
-                        <span className={`text-[10px] ${r.phone ? 'text-foreground-muted' : 'text-yellow-700 dark:text-yellow-300'}`}>
+                        <span className={`text-[10px] ${r.phone ? 'text-foreground-muted' : 'text-amber-700 dark:text-amber-400'}`}>
                           {r.phone || 'no phone'}
                         </span>
                       )}

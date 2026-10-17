@@ -141,14 +141,13 @@ function ManualCredentials({ info, onDone }: { info: NetworkInfo; onDone: (saved
   const { showToast } = useToast()
   const [f, setF] = useState({ accessToken: '', refreshToken: '', clientId: '', clientSecret: '', targetId: '', targetName: '' })
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const setError = (text: string) => showToast(text, 'error')
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF(p => ({ ...p, [k]: e.target.value }))
   const target = targetField(info.network)
   const pairBroken = !!f.clientId.trim() !== !!f.clientSecret.trim()
 
   async function save() {
     setSaving(true)
-    setError(null)
     try {
       const r = await api<{ warning?: string }>(`/api/admin/social/networks/${info.network}/manual`, { method: 'POST', json: f })
       if (!r.ok) return setError(r.data.error || 'Could not save')
@@ -197,7 +196,6 @@ function ManualCredentials({ info, onDone }: { info: NetworkInfo; onDone: (saved
         </label>
       </div>
       {pairBroken && <p className="text-xs text-red-500">Enter both the Client ID and the Client Secret, or neither.</p>}
-      {error && <p className="text-sm text-red-500">{error}</p>}
       <div className="flex gap-2">
         <button type="button" className={btnPrimary} disabled={saving || !f.accessToken.trim() || !f.targetId.trim() || pairBroken} onClick={save}>
           {saving ? 'Saving...' : 'Save'}

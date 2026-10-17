@@ -126,7 +126,7 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
                 <td className="px-4 py-3 text-foreground-secondary">{u.email}</td>
                 <td className="px-4 py-3">
                   {u.times_used > 0 ? (
-                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
+                    <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-500/10 text-green-700 dark:text-green-400">
                       {u.times_used}x used
                     </span>
                   ) : (

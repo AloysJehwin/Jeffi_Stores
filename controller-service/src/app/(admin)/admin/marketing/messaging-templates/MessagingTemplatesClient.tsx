@@ -6,6 +6,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { Plus } from 'lucide-react'
 import { Tabs, TabAction } from '@/components/admin/channels/ui'
 import TemplateEditor, { toEditorTemplate, type Channel, type EditorTemplate } from '@/components/admin/messaging-templates/TemplateEditor'
+import { PageHeader, fieldInputCls } from '@/components/admin/kit'
 
 const CHANNELS: Channel[] = ['email', 'sms', 'whatsapp']
 const CHANNEL_LABEL: Record<Channel, string> = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' }
@@ -134,18 +135,13 @@ export default function MessagingTemplatesClient() {
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
   }, [filtered])
 
-  const INPUT = 'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
+  const INPUT = fieldInputCls
   const counts = useMemo(() => ({ tenant: items.filter(i => i.source === 'tenant').length, platform: items.filter(i => i.source !== 'tenant').length }), [items])
 
   return (
     <div className="p-4 sm:p-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Templates</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">
-            Standard email / SMS / WhatsApp bodies ship with every store. Edit one to customise it for this tenant, or add your own.
-          </p>
-        </div>
+      <div className="mb-5">
+        <PageHeader title="Templates" description="Standard email / SMS / WhatsApp bodies ship with every store. Edit one to customise it for this tenant, or add your own." />
       </div>
 
       <div className="mb-5">
@@ -221,9 +217,9 @@ export default function MessagingTemplatesClient() {
                             <code className="truncate">{it.slug}</code>
                             {it.channel === 'whatsapp' && it.approval_status && (
                               <span className={`px-1.5 rounded text-[10px] font-medium ${
-                                it.approval_status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                                : it.approval_status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                                : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                                it.approval_status === 'approved' ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                                : it.approval_status === 'rejected' ? 'bg-red-500/10 text-red-700 dark:text-red-400'
+                                : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
                               }`}>{it.approval_status}</span>
                             )}
                           </div>
@@ -257,7 +253,7 @@ export default function MessagingTemplatesClient() {
               </div>
               {!selected.id && (
                 <div className="mb-5">
-                  <label className="block text-sm font-semibold text-foreground-secondary uppercase tracking-wide mb-1.5">Slug</label>
+                  <label className="block text-sm font-semibold uppercase tracking-wide text-foreground mb-1.5">Slug</label>
                   <input className={INPUT} placeholder="e.g. order/confirmed" value={selected.slug} onChange={e => setSelected({ ...selected, slug: e.target.value })} />
                   <p className="text-xs text-foreground-muted mt-1">Stable key the store code sends by. Lowercase, use / to group.</p>
                 </div>

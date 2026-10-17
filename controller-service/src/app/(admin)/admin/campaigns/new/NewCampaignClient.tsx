@@ -334,7 +334,7 @@ export default function NewCampaignClient() {
               sm
             />
             {selectedCoupon && (
-              <p className="text-[10px] text-accent-600 dark:text-accent-400 mt-1">
+              <p className="text-[10px] text-accent-500 mt-1">
                 This coupon will be injected as {'{couponCode}'} in the template for all recipients.
               </p>
             )}

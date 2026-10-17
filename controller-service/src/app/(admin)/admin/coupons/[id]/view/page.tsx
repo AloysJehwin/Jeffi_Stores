@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import type { ReactNode } from 'react'
+import { Badge, Card, DetailHeader, EmptyState, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ACTIVE_STATUS, badgeCls } from '@/components/admin/kit'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
@@ -129,273 +129,135 @@ export default async function CouponViewPage({
   const totalDiscount = usageRows.reduce((s, r) => s + Number(r.discount_amount), 0)
   const eligibleCount = isCampaign ? parseInt(campaignSentCount?.count || '0') : eligibleUsers.length
 
+  const day = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  const thead = 'border-y border-border-default bg-surface-secondary/50 text-xs text-foreground-muted'
+  const row = 'border-b border-border-default/60 last:border-0 hover:bg-surface-secondary/40'
+
   return (
-    <div className="p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link
-            href={ap(backUrl, host)}
-            className="text-foreground-muted hover:text-foreground transition-colors flex-shrink-0"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold font-mono text-secondary-500 dark:text-foreground">{coupon.code}</h1>
-              <span
-                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full ${coupon.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'}`}
-              >
-                {coupon.is_active ? 'Active' : 'Inactive'}
-              </span>
-              {isExpired && (
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-                  Expired
-                </span>
-              )}
-              {coupon.generated_for_campaign && (
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                  {coupon.generated_for_campaign}
-                </span>
-              )}
-              {hasDraft && (
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-                  Draft pending
-                </span>
-              )}
-            </div>
-            {coupon.description && <p className="text-sm text-foreground-secondary mt-1">{coupon.description}</p>}
-            <p className="text-xs text-foreground-muted mt-0.5">
-              Created{' '}
-              {new Date(coupon.created_at).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              })}
-            </p>
-          </div>
-        </div>
-        <Link
-          href={ap(`/admin/coupons/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
-          className="flex-shrink-0 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors"
-        >
-          {hasDraft ? 'Edit Draft' : 'Edit'}
-        </Link>
-      </div>
-
-      {/* Stats strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <p className="text-xs text-foreground-secondary">Times Used</p>
-          <p className="text-2xl font-bold text-foreground mt-1">
-            {coupon.times_used}
-            {coupon.usage_limit ? (
-              <span className="text-sm font-normal text-foreground-muted">/{coupon.usage_limit}</span>
-            ) : (
-              ''
-            )}
-          </p>
-        </div>
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <p className="text-xs text-foreground-secondary">Total Discount Given</p>
-          <p className="text-2xl font-bold text-foreground mt-1">
-            ₹{totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-          </p>
-        </div>
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <p className="text-xs text-foreground-secondary">Eligible Users</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{eligibleCount > 0 ? eligibleCount : 'All'}</p>
-        </div>
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4">
-          <p className="text-xs text-foreground-secondary">Discount</p>
-          <p className="text-2xl font-bold text-accent-500 mt-1">
-            {coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : `₹${coupon.discount_value}`}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: details */}
-        <div className="space-y-6">
-          <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
-            <div className="px-5 py-3 border-b border-border-default bg-surface-secondary">
-              <h2 className="text-sm font-semibold text-foreground">Coupon Details</h2>
-            </div>
-            <div className="px-5 divide-y divide-border-default">
-              {[
-                [
-                  'Type',
-                  <span key="type" className="capitalize">
-                    {coupon.discount_type}
-                  </span>,
-                ],
-                [
-                  'Value',
-                  coupon.discount_type === 'percentage'
-                    ? `${coupon.discount_value}% off`
-                    : `₹${coupon.discount_value} off`,
-                ],
-                ['Min Purchase', coupon.min_purchase_amount ? `₹${coupon.min_purchase_amount}` : '—'],
-                ['Max Discount', coupon.max_discount_amount ? `₹${coupon.max_discount_amount}` : '—'],
-                ['Usage Limit', coupon.usage_limit ? `${coupon.usage_limit} total` : 'Unlimited'],
-                [
-                  'Per-User Limit',
-                  coupon.usage_limit_per_user ? `${coupon.usage_limit_per_user} per user` : 'Unlimited',
-                ],
-                ['Valid From', coupon.valid_from ? new Date(coupon.valid_from).toLocaleString('en-IN') : '—'],
-                [
-                  'Valid Until',
-                  coupon.valid_until ? (
-                    <span key="valid" className={isExpired ? 'text-red-500' : ''}>
-                      {new Date(coupon.valid_until).toLocaleString('en-IN')}
-                    </span>
-                  ) : (
-                    '—'
-                  ),
-                ],
-                ['Auto Generated', coupon.auto_generated ? 'Yes' : 'No'],
-                ['Source', coupon.generated_for_campaign || (isPersonal ? 'Personal' : 'Manual')],
-              ].map(([label, value], i) => (
-                <div key={i} className="flex items-center justify-between py-2.5 gap-4">
-                  <span className="text-sm text-foreground-secondary flex-shrink-0">{label}</span>
-                  <span className="text-sm text-foreground font-medium text-right">{value as ReactNode}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: usage + eligible */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Usage history */}
-          <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
-            <div className="px-5 py-3 border-b border-border-default bg-surface-secondary flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground">Usage History</h2>
-              <span className="text-xs text-foreground-muted">
-                {usageRows.length} redemption{usageRows.length !== 1 ? 's' : ''}
-              </span>
-            </div>
+    <EntityPage
+      header={
+        <DetailHeader
+          back={{ href: ap(backUrl, host), label: 'Coupons' }}
+          title={<span className="font-mono">{coupon.code}</span>}
+          status={
+            <>
+              <StatusBadge status={String(coupon.is_active)} map={ACTIVE_STATUS} />
+              {isExpired && <Badge tone="amber">Expired</Badge>}
+              {coupon.generated_for_campaign && <Badge tone="blue">{coupon.generated_for_campaign}</Badge>}
+              {hasDraft && <Badge tone="amber">Draft pending</Badge>}
+            </>
+          }
+          subtitle={coupon.description || undefined}
+          identifiers={[{ label: 'Created', value: day(coupon.created_at) }]}
+          actions={
+            <Link href={ap(`/admin/coupons/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)} className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600">
+              {hasDraft ? 'Edit Draft' : 'Edit'}
+            </Link>
+          }
+        />
+      }
+      kpis={
+        <KpiGrid>
+          <Kpi label="Times used" value={`${coupon.times_used}${coupon.usage_limit ? `/${coupon.usage_limit}` : ''}`} />
+          <Kpi label="Total discount given" value={`₹${totalDiscount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`} />
+          <Kpi label="Eligible users" value={eligibleCount > 0 ? String(eligibleCount) : 'All'} />
+          <Kpi label="Discount" value={coupon.discount_type === 'percentage' ? `${coupon.discount_value}%` : `₹${coupon.discount_value}`} highlight />
+        </KpiGrid>
+      }
+      aside={
+        <Card title="Coupon details">
+          <Fields cols={1}>
+            <Field label="Type" value={<span className="capitalize">{coupon.discount_type}</span>} />
+            <Field label="Value" value={coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : `₹${coupon.discount_value} off`} />
+            <Field label="Min Purchase" value={coupon.min_purchase_amount ? `₹${coupon.min_purchase_amount}` : null} />
+            <Field label="Max Discount" value={coupon.max_discount_amount ? `₹${coupon.max_discount_amount}` : null} />
+            <Field label="Usage Limit" value={coupon.usage_limit ? `${coupon.usage_limit} total` : 'Unlimited'} />
+            <Field label="Per-User Limit" value={coupon.usage_limit_per_user ? `${coupon.usage_limit_per_user} per user` : 'Unlimited'} />
+            <Field label="Valid From" value={coupon.valid_from ? new Date(coupon.valid_from).toLocaleString('en-IN') : null} />
+            <Field label="Valid Until" value={coupon.valid_until ? <span className={isExpired ? 'text-red-500' : ''}>{new Date(coupon.valid_until).toLocaleString('en-IN')}</span> : null} />
+            <Field label="Auto Generated" value={coupon.auto_generated ? 'Yes' : 'No'} />
+            <Field label="Source" value={coupon.generated_for_campaign || (isPersonal ? 'Personal' : 'Manual')} />
+          </Fields>
+        </Card>
+      }
+      main={
+        <>
+          <Card title="Usage history" hint={`${usageRows.length} redemption${usageRows.length !== 1 ? 's' : ''}`} flush>
             {usageRows.length === 0 ? (
-              <p className="px-5 py-6 text-sm text-foreground-muted text-center">No one has used this coupon yet.</p>
+              <EmptyState bare title="No one has used this coupon yet." />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-surface-secondary/50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">User</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Order</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Discount</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Date</th>
+                  <thead>
+                    <tr className={thead}>
+                      <th className="px-5 py-2.5 text-left font-medium">User</th>
+                      <th className="px-3 py-2.5 text-left font-medium">Order</th>
+                      <th className="px-3 py-2.5 text-right font-medium">Discount</th>
+                      <th className="px-5 py-2.5 text-left font-medium">Date</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border-default">
+                  <tbody>
                     {usageRows.map(r => (
-                      <tr key={r.id} className="hover:bg-surface-secondary/40">
-                        <td className="px-4 py-2.5">
+                      <tr key={r.id} className={row}>
+                        <td className="px-5 py-2.5">
                           <p className="font-medium text-foreground">{r.user_name || '—'}</p>
                           <p className="text-xs text-foreground-muted">{r.user_email || '—'}</p>
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-3 py-2.5">
                           {r.order_id ? (
-                            <Link
-                              href={ap(`/admin/orders/${r.order_id}`, host)}
-                              className="text-accent-500 hover:underline font-mono text-xs"
-                            >
+                            <Link href={ap(`/admin/orders/${r.order_id}`, host)} className="font-mono text-xs text-accent-500 hover:underline">
                               #{r.order_display_id || r.order_id.slice(0, 8)}
                             </Link>
                           ) : (
                             '—'
                           )}
                         </td>
-                        <td className="px-4 py-2.5 font-semibold text-green-600">
-                          ₹{Number(r.discount_amount).toLocaleString('en-IN')}
-                        </td>
-                        <td className="px-4 py-2.5 text-foreground-muted text-xs">
-                          {new Date(r.created_at).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </td>
+                        <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-green-600 dark:text-green-400">₹{Number(r.discount_amount).toLocaleString('en-IN')}</td>
+                        <td className="px-5 py-2.5 text-xs text-foreground-muted">{day(r.created_at)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
-          </div>
+          </Card>
 
-          {/* Eligible users */}
-          <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
-            <div className="px-5 py-3 border-b border-border-default bg-surface-secondary flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-foreground">
-                  {isPersonal
-                    ? 'Assigned To'
-                    : isCampaign
-                      ? 'Campaign Recipients'
-                      : eligibleUsers.length > 0
-                        ? 'Eligible Users'
-                        : 'Eligible Users'}
-                </h2>
-                <p className="text-xs text-foreground-muted mt-0.5">
-                  {isPersonal
-                    ? 'This coupon is personal'
-                    : isCampaign
-                      ? `${eligibleCount} users received this campaign`
-                      : eligibleUsers.length > 0
-                        ? `${eligibleUsers.length} users granted via mailer`
-                        : 'All active users can redeem'}
-                </p>
-              </div>
-              {eligibleUsers.length > 0 && (
-                <span className="text-xs text-foreground-muted">
-                  {eligibleUsers.length} user{eligibleUsers.length !== 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
+          <Card
+            title={isPersonal ? 'Assigned To' : isCampaign ? 'Campaign Recipients' : 'Eligible Users'}
+            hint={
+              isPersonal
+                ? 'This coupon is personal'
+                : isCampaign
+                  ? `${eligibleCount} users received this campaign`
+                  : eligibleUsers.length > 0
+                    ? `${eligibleUsers.length} users granted via mailer`
+                    : 'All active users can redeem'
+            }
+            action={eligibleUsers.length > 0 && <span className="text-xs text-foreground-muted">{eligibleUsers.length} user{eligibleUsers.length !== 1 ? 's' : ''}</span>}
+            flush
+          >
             {eligibleUsers.length === 0 && !isCampaign ? (
-              <p className="px-5 py-6 text-sm text-foreground-muted text-center">
-                {isPersonal ? 'No user assigned.' : 'Open to all active users.'}
-              </p>
+              <EmptyState bare title={isPersonal ? 'No user assigned.' : 'Open to all active users.'} />
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-surface-secondary/50">
-                    <tr>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">User</th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">
-                        {isCampaign ? 'Sent At' : 'Added At'}
-                      </th>
-                      <th className="px-4 py-2 text-left text-xs font-semibold text-foreground-secondary">Used</th>
+                  <thead>
+                    <tr className={thead}>
+                      <th className="px-5 py-2.5 text-left font-medium">User</th>
+                      <th className="px-3 py-2.5 text-left font-medium">{isCampaign ? 'Sent At' : 'Added At'}</th>
+                      <th className="px-5 py-2.5 text-left font-medium">Used</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border-default">
+                  <tbody>
                     {eligibleUsers.map(u => (
-                      <tr key={u.user_id} className="hover:bg-surface-secondary/40">
-                        <td className="px-4 py-2.5">
-                          <p className="font-medium text-foreground">
-                            {[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}
-                          </p>
+                      <tr key={u.user_id} className={row}>
+                        <td className="px-5 py-2.5">
+                          <p className="font-medium text-foreground">{[u.first_name, u.last_name].filter(Boolean).join(' ') || '—'}</p>
                           <p className="text-xs text-foreground-muted">{u.email}</p>
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-foreground-muted">
-                          {new Date(u.added_at).toLocaleDateString('en-IN', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric',
-                          })}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {u.times_used > 0 ? (
-                            <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">
-                              {u.times_used}×
-                            </span>
-                          ) : (
-                            <span className="text-xs text-foreground-muted">Not yet</span>
-                          )}
+                        <td className="px-3 py-2.5 text-xs text-foreground-muted">{day(u.added_at)}</td>
+                        <td className="px-5 py-2.5">
+                          {u.times_used > 0 ? <span className={badgeCls('green')}>{u.times_used}×</span> : <span className="text-xs text-foreground-muted">Not yet</span>}
                         </td>
                       </tr>
                     ))}
@@ -403,9 +265,9 @@ export default async function CouponViewPage({
                 </table>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    </div>
+          </Card>
+        </>
+      }
+    />
   )
 }

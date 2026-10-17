@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation'
 import { queryOne, queryMany, query } from '@/lib/shared/db'
-import Link from 'next/link'
 import ReviewFormForm from '../../ReviewFormForm'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
+import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import { discardReviewFormDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -76,37 +76,34 @@ export default async function EditReviewFormPage({
 
   return (
     <MobileEditBlock>
-    <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </Link>
-        <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">
-          {isCreateDraft ? 'Edit Draft Form' : isDraft ? 'Edit Draft' : 'Edit Review Form'}
-        </h1>
-      </div>
-
+      <FormPage
+        header={
+          <PageHeader
+            back={{ href: ap(backUrl, host), label: 'Review Forms' }}
+            title={isCreateDraft ? 'Edit Draft Form' : isDraft ? 'Edit Draft' : 'Edit Review Form'}
+            badges={(isDraft || isCreateDraft) && <Badge tone="amber">Draft</Badge>}
+          />
+        }
+      >
       {isCreateDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">New form — draft</p>
-          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">New form — draft</p>
+          <p className="text-xs text-foreground-muted mt-0.5">
             This form is not on the live list yet. Save keeps it a draft; Publish makes it live.
           </p>
         </div>
       )}
 
       {isDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Draft pending</p>
+            <p className="text-xs text-foreground-muted mt-0.5">
               Changes are saved to draft. The live form stays unchanged until you publish.
             </p>
           </div>
           <form action={discardReviewFormDraft.bind(null, id)}>
-            <button type="submit" className="text-xs text-amber-600 hover:underline ml-4">
+            <button type="submit" className="control-sm border border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10">
               Discard draft
             </button>
           </form>
@@ -130,7 +127,7 @@ export default async function EditReviewFormPage({
           custom_fields: df.custom_fields ?? form.custom_fields ?? [],
         }}
       />
-    </div>
+      </FormPage>
     </MobileEditBlock>
   )
 }

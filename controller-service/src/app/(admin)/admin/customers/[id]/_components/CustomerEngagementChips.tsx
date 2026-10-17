@@ -111,7 +111,7 @@ function SupportChatChip({ customerId, autoOpen }: { customerId: string; autoOpe
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex flex-col items-start gap-2 px-4 py-3 rounded-xl border border-border-default bg-surface-secondary hover:bg-surface-primary hover:border-border-strong hover:shadow-sm transition-all group w-full"
+        className="flex flex-col items-start gap-2 px-4 py-3 rounded-xl border border-border-default bg-surface-secondary hover:bg-surface-primary hover:border-border-strong hover: transition-all group w-full"
       >
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
@@ -163,7 +163,7 @@ function WhatsAppChip({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex flex-col items-start gap-2 px-4 py-3 rounded-xl border border-border-default bg-surface-secondary hover:bg-surface-primary hover:border-border-strong hover:shadow-sm transition-all group w-full"
+        className="flex flex-col items-start gap-2 px-4 py-3 rounded-xl border border-border-default bg-surface-secondary hover:bg-surface-primary hover:border-border-strong hover: transition-all group w-full"
       >
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">

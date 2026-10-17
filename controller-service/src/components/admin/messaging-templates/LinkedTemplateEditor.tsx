@@ -75,7 +75,7 @@ export default function LinkedTemplateEditor({
   return (
     <div className="space-y-2">
       {usedBy.length > 0 && (
-        <p className="text-[11px] text-yellow-700 dark:text-yellow-300">
+        <p className="text-[11px] text-amber-700 dark:text-amber-400">
           Also used by {usedBy.slice(0, 3).join(', ')}{usedBy.length > 3 ? ` and ${usedBy.length - 3} more` : ''} — saving changes them too.
         </p>
       )}
