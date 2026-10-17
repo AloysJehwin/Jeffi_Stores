@@ -188,7 +188,7 @@ export default function ProductsTableClient({
           <div className="flex-shrink-0 h-10 w-10">
             <ProductImage thumbnailUrl={thumb(product)} altText={product.name} />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 overflow-hidden">
             <HoverCard
               trigger={
                 <Link
