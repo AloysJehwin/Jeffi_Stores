@@ -85,7 +85,7 @@ async function BusinessRFQsStats() {
   ]
 
   return (
-    <div className="animate-fade-in grid grid-cols-1 gap-4 xl:grid-cols-3">
+    <div className="animate-fade-in grid grid-cols-1 gap-4 xl:grid-cols-3 lg:min-h-56">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:col-span-2">
         {tiles.map((t, i) => (
           <Kpi key={t.label} label={t.label} value={t.value.toLocaleString('en-IN')} highlight={i === 0} />
