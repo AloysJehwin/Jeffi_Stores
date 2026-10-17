@@ -1615,7 +1615,8 @@ function StockTab({ view }: { view: StockView }) {
               </div>
               <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
+                  {/* Below md: price, GST % and incl.-GST value are hidden so quantity, value and Adjust fit on a phone. */}
+                  <table className="w-full text-sm max-md:[&>*>tr>:nth-child(6)]:hidden max-md:[&>*>tr>:nth-child(7)]:hidden max-md:[&>*>tr>:nth-child(9)]:hidden">
                     <thead className="bg-surface-secondary border-b border-border-default">
                       <tr>
                         <SortableHeader

@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/shared/admin-path'
+import { EmptyState, ListSkeleton } from '@/components/admin/kit/states'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 interface AdminOption {
   id: string
@@ -57,7 +59,7 @@ const SEGMENT_COLORS: Record<string, string> = {
   support: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
   customers: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
   security: 'bg-red-500/10 text-red-500',
-  manual: 'bg-zinc-100 text-zinc-600 dark:text-zinc-400',
+  manual: 'bg-surface-secondary text-foreground-muted',
 }
 
 const KIND_SEGMENT: Record<string, string> = {
@@ -148,18 +150,20 @@ function AssignSelect({
 }) {
   const [saving, setSaving] = useState(false)
   const canWrite = useCanWrite('tasks:write')
+  const toast = useActionToast()
 
   const options = [{ value: '', label: 'Unassigned' }, ...admins.map(a => ({ value: a.id, label: adminLabel(a) }))]
 
   async function onChange(adminId: string) {
     setSaving(true)
     try {
-      await fetch(`/api/admin/customers/${task.user_id}/tasks/${task.id}`, {
+      const res = await fetch(`/api/admin/customers/${task.user_id}/tasks/${task.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ assigned_to: adminId || null }),
       })
+      toast.result({ ok: res.ok }, { success: 'Task reassigned', error: 'Could not reassign the task' })
       onReassigned()
     } finally {
       setSaving(false)
@@ -213,6 +217,7 @@ export default function AdminTasksClient() {
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const toast = useActionToast()
 
   const [admins, setAdmins] = useState<AdminOption[]>([])
   const [suggestions, setSuggestions] = useState<Suggestion[]>([])
@@ -306,12 +311,14 @@ export default function AdminTasksClient() {
   async function complete(t: TaskRow) {
     setBusy(true)
     try {
-      await fetch(`/api/admin/customers/${t.user_id}/tasks/${t.id}`, {
+      const res = await fetch(`/api/admin/customers/${t.user_id}/tasks/${t.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ status: t.status === 'completed' ? 'pending' : 'completed' }),
       })
+      if (res.ok) toast.success(t.status === 'completed' ? 'Task reopened' : 'Task completed')
+      else toast.error('Could not update the task')
       await load(page)
       router.refresh()
     } finally {
@@ -365,12 +372,12 @@ export default function AdminTasksClient() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2 justify-between">
-        <div className="flex items-center gap-1.5 bg-surface-elevated border border-border-default rounded-lg p-1">
+        <div className="flex h-control items-center gap-0.5 bg-surface-elevated border border-border-default rounded-lg p-0.5">
           {(['mine', 'unassigned', 'all'] as const).map(s => (
             <button
               key={s}
               onClick={() => setScope(s)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              className={`h-full px-3 rounded-md text-xs font-semibold transition-all ${
                 scope === s
                   ? 'bg-accent-500 text-white shadow-sm'
                   : 'text-foreground-secondary hover:text-foreground hover:bg-surface-secondary'
@@ -380,16 +387,16 @@ export default function AdminTasksClient() {
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-1.5 bg-surface-elevated border border-border-default rounded-lg p-1">
+        <div className="flex h-control items-center gap-0.5 bg-surface-elevated border border-border-default rounded-lg p-0.5">
           {[
-            { key: 'open', label: 'Open', active: 'bg-secondary-500 text-white' },
+            { key: 'open', label: 'Open', active: 'bg-accent-500 text-white' },
             { key: 'overdue', label: 'Overdue', active: 'bg-red-500 text-white' },
             { key: 'completed', label: 'Completed (30d)', active: 'bg-green-600 text-white' },
           ].map(s => (
             <button
               key={s.key}
               onClick={() => setStatus(s.key as any)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              className={`h-full px-3 rounded-md text-xs font-semibold transition-all ${
                 status === s.key
                   ? s.active + ' shadow-sm'
                   : 'text-foreground-secondary hover:text-foreground hover:bg-surface-secondary'
@@ -418,7 +425,7 @@ export default function AdminTasksClient() {
           ))}
         </div>
 
-        <div className="flex items-center gap-1.5 ml-auto">
+        <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto">
           <AdminSelect
             value={priority}
             options={PRIORITY_OPTIONS}
@@ -429,7 +436,7 @@ export default function AdminTasksClient() {
             sm
           />
 
-          <div className="relative">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
             <svg
               className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground-muted pointer-events-none"
               fill="none"
@@ -459,7 +466,7 @@ export default function AdminTasksClient() {
                   setSearch('')
                 }
               }}
-              className="pl-7 pr-7 h-control-sm text-xs rounded-lg border border-border-default bg-surface-elevated text-foreground placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40 w-56"
+              className="field-md pl-7 pr-7 text-xs border border-border-default bg-surface-elevated text-foreground placeholder-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/40 w-full sm:w-56"
             />
             {search && (
               <button
@@ -518,37 +525,24 @@ export default function AdminTasksClient() {
       )}
 
       {loading ? (
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center text-foreground-muted text-sm animate-pulse">
-          Loading…
-        </div>
+        <ListSkeleton header={false} kpis={0} rows={6} cols={3} />
       ) : tasks.length === 0 ? (
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-12 text-center">
-          <svg
-            className="w-10 h-10 mx-auto mb-3 text-foreground-muted/40"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-            />
-          </svg>
-          <p className="text-foreground-muted text-sm">
-            {search
+        <EmptyState
+          title={
+            search
               ? `No tasks matching "${search}"`
               : status === 'completed'
                 ? 'No tasks completed in the last 30 days.'
-                : 'No tasks here. Nice and clean.'}
-          </p>
-          {search && (
-            <button onClick={() => setSearch('')} className="mt-2 text-xs text-accent-500 hover:text-accent-600">
-              Clear search
-            </button>
-          )}
-        </div>
+                : 'No tasks here. Nice and clean.'
+          }
+          actionNode={
+            search ? (
+              <button onClick={() => setSearch('')} className="text-xs text-accent-500 hover:text-accent-600">
+                Clear search
+              </button>
+            ) : undefined
+          }
+        />
       ) : (
         <div className="space-y-4">
           {BUCKETS.map(
@@ -557,7 +551,7 @@ export default function AdminTasksClient() {
               grouped[b].length > 0 && (
                 <div key={b} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
                   <div
-                    className={`px-5 py-3 border-b border-border-default flex items-center justify-between ${
+                    className={`px-4 sm:px-5 py-3 border-b border-border-default flex items-center justify-between ${
                       b === 'Overdue'
                         ? 'bg-red-500/5'
                         : b === 'Today'
@@ -586,19 +580,21 @@ export default function AdminTasksClient() {
                       return (
                         <div
                           key={t.id}
-                          className="px-5 py-3 flex items-start gap-3 hover:bg-surface-secondary/50 transition-colors"
+                          className="px-4 sm:px-5 py-3 flex items-start gap-2 sm:gap-3 hover:bg-surface-secondary/50 transition-colors"
                         >
+                          {/* 32px tap area around the 16px box so it is easy to hit on a phone. */}
                           <button
                             type="button"
                             onClick={() => complete(t)}
                             disabled={busy || !canWrite}
-                            className={`mt-0.5 w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
-                              completed
-                                ? 'bg-green-500 border-green-500'
-                                : 'border-border-secondary hover:border-accent-500'
-                            } ${!canWrite ? 'cursor-default' : ''}`}
+                            className={`group -m-2 p-2 shrink-0 ${!canWrite ? 'cursor-default' : ''}`}
                             aria-label={completed ? 'Mark incomplete' : 'Mark complete'}
                           >
+                            <span
+                              className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                                completed ? 'bg-green-500 border-green-500' : 'border-border-secondary group-hover:border-accent-500'
+                              }`}
+                            >
                             {completed && (
                               <svg
                                 className="w-3 h-3 text-white"
@@ -610,6 +606,7 @@ export default function AdminTasksClient() {
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                               </svg>
                             )}
+                            </span>
                           </button>
 
                           <div className="flex-1 min-w-0">

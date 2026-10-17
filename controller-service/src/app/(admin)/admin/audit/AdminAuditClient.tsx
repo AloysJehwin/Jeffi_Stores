@@ -46,6 +46,8 @@ import {
 import AdminSelect from '@/components/admin/AdminSelect'
 import IconButton from '@/components/ui/IconButton'
 import { Tabs } from '@/components/admin/channels/ui'
+import { EmptyState } from '@/components/admin/kit/states'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 interface AuditEvent {
   id: string
@@ -130,6 +132,7 @@ interface CronJob {
 type PageTab = 'audit' | 'mail_log' | 'sms_log' | 'whatsapp_log' | 'cron'
 
 export default function AdminAuditClient() {
+  const toast = useActionToast()
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -361,12 +364,13 @@ export default function AdminAuditClient() {
   async function toggleCronJob(jobId: string, enabled: boolean) {
     setCronTogglingId(jobId)
     try {
-      await fetch('/api/admin/cron/config', {
+      const res = await fetch('/api/admin/cron/config', {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId, enabled }),
       })
+      toast.result({ ok: res.ok }, { success: enabled ? 'Job enabled' : 'Job disabled', error: 'Could not update the job' })
       setCronJobs(prev => prev.map(j => (j.id === jobId ? { ...j, enabled } : j)))
     } finally {
       setCronTogglingId(null)
@@ -376,12 +380,13 @@ export default function AdminAuditClient() {
   async function triggerCronJob(jobId: string) {
     setCronTriggeringId(jobId)
     try {
-      await fetch('/api/admin/cron/trigger', {
+      const res = await fetch('/api/admin/cron/trigger', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId }),
       })
+      toast.result({ ok: res.ok }, { success: 'Job triggered', error: 'Could not trigger the job' })
       await loadCronJobs()
     } finally {
       setCronTriggeringId(null)
@@ -497,7 +502,7 @@ export default function AdminAuditClient() {
         className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${
           isSystem
             ? 'bg-surface-secondary text-foreground-muted border-border-default'
-            : 'bg-accent-500/5 text-accent-700 dark:text-accent-300 border-accent-200 dark:border-accent-700'
+            : 'bg-accent-500/5 text-accent-500 border-accent-500/30'
         }`}
       >
         {isSystem ? <Settings className="w-2.5 h-2.5 shrink-0" /> : <User className="w-2.5 h-2.5 shrink-0" />}
@@ -737,7 +742,7 @@ export default function AdminAuditClient() {
               placeholder="Search by recipient or subject..."
               value={mailQuery}
               onChange={e => setMailQuery(e.target.value)}
-              className="text-sm px-3 h-control-sm rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+              className="field-md text-sm border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
             />
             <AdminSelect
               value={mailKind}
@@ -779,7 +784,7 @@ export default function AdminAuditClient() {
               ))}
             </div>
           ) : mailRows.length === 0 ? (
-            <p className="text-sm text-foreground-muted italic">No emails found.</p>
+            <EmptyState title="No emails found." />
           ) : (
             <div className="space-y-2">
               {mailRows.map(row => {
@@ -966,7 +971,7 @@ export default function AdminAuditClient() {
               placeholder="Search by number or message..."
               value={smsQuery}
               onChange={e => setSmsQuery(e.target.value)}
-              className="text-sm px-3 h-control-sm rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+              className="field-md text-sm border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
             />
             <AdminSelect
               value={smsKind}
@@ -1001,7 +1006,7 @@ export default function AdminAuditClient() {
               ))}
             </div>
           ) : smsRows.length === 0 ? (
-            <p className="text-sm text-foreground-muted italic">No SMS messages found.</p>
+            <EmptyState title="No SMS messages found." />
           ) : (
             <div className="space-y-2">
               {smsRows.map(row => {
@@ -1160,7 +1165,7 @@ export default function AdminAuditClient() {
               placeholder="Search by number or message..."
               value={waQuery}
               onChange={e => setWaQuery(e.target.value)}
-              className="text-sm px-3 h-control-sm rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+              className="field-md text-sm border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
             />
             <AdminSelect
               value={waKind}
@@ -1195,7 +1200,7 @@ export default function AdminAuditClient() {
               ))}
             </div>
           ) : waRows.length === 0 ? (
-            <p className="text-sm text-foreground-muted italic">No WhatsApp messages found.</p>
+            <EmptyState title="No WhatsApp messages found." />
           ) : (
             <div className="space-y-2">
               {waRows.map(row => {
@@ -1407,7 +1412,7 @@ export default function AdminAuditClient() {
                           type="button"
                           disabled={cronTriggeringId === job.id}
                           onClick={() => triggerCronJob(job.id)}
-                          className="flex items-center gap-1.5 px-3 h-control-sm rounded text-xs font-semibold bg-surface-secondary text-foreground-muted hover:bg-accent-500/10 hover:text-accent-700 dark:hover:text-accent-300 disabled:opacity-50 transition-colors"
+                          className="flex items-center gap-1.5 px-3 h-control-sm rounded text-xs font-semibold bg-surface-secondary text-foreground-muted hover:bg-accent-500/10 hover:text-accent-500 disabled:opacity-50 transition-colors"
                         >
                           {cronTriggeringId === job.id ? (
                             <RefreshCw className="w-3 h-3 animate-spin" />
@@ -1429,10 +1434,10 @@ export default function AdminAuditClient() {
                           type="button"
                           disabled={cronTogglingId === job.id}
                           onClick={() => toggleCronJob(job.id, !job.enabled)}
-                          className={`px-4 py-1.5 rounded text-xs font-semibold transition-colors disabled:opacity-50 ${
+                          className={`px-4 h-control-sm rounded text-xs font-semibold transition-colors disabled:opacity-50 ${
                             job.enabled
-                              ? 'bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300'
-                              : 'bg-surface-secondary text-foreground-muted hover:bg-green-500/10 hover:text-green-700 dark:hover:text-green-300'
+                              ? 'bg-green-500/10 text-green-700 dark:text-green-400 hover:bg-red-500/10 hover:text-red-500'
+                              : 'bg-surface-secondary text-foreground-muted hover:bg-green-500/10 hover:text-green-600'
                           }`}
                         >
                           {cronTogglingId === job.id ? '...' : job.enabled ? 'Enabled' : 'Disabled'}
