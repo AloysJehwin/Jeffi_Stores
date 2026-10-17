@@ -17,6 +17,7 @@ import {
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
+import { startCouponDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -164,12 +165,24 @@ export default async function CouponViewPage({
           subtitle={coupon.description || undefined}
           identifiers={[{ label: 'Created', value: day(coupon.created_at) }]}
           actions={
-            <Link
-              href={ap(`/admin/coupons/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
-              className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
-            >
-              {hasDraft ? 'Edit Draft' : 'Edit'}
-            </Link>
+            hasDraft ? (
+              <Link
+                href={ap(`/admin/coupons/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
+                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+              >
+                Edit Draft
+              </Link>
+            ) : (
+              <form action={startCouponDraft.bind(null, id)}>
+                <input type="hidden" name="_back" value={backUrl} />
+                <button
+                  type="submit"
+                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+                >
+                  Edit
+                </button>
+              </form>
+            )
           }
         />
       }

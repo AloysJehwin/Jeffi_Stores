@@ -4,7 +4,7 @@ import { getHost } from '@/lib/tenancy/get-host'
 import { getAllCategories } from '@/lib/queries'
 import { queryOne } from '@/lib/shared/db'
 import CategoryForm from '@/components/admin/CategoryForm'
-import { Badge, DraftActionNotice, FormPage, PageHeader } from '@/components/admin/kit'
+import { Badge, FormPage, PageHeader } from '@/components/admin/kit'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { updateCategory } from './actions'
 
@@ -60,16 +60,13 @@ export default async function EditCategoryPage({
         />
       }
     >
-      {(isDraft || isCreateDraft) && (
-        <DraftActionNotice action={isDraft ? updateCategory.bind(null, id) : undefined} />
-      )}
-
       <CategoryForm
         categories={categories || []}
         category={categoryForForm}
         action={updateCategory.bind(null, id)}
         backUrl={backUrl}
         isDraft={isDraft || isCreateDraft}
+        discardAction={isDraft ? updateCategory.bind(null, id) : undefined}
       />
     </FormPage>
     </MobileEditBlock>

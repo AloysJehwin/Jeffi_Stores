@@ -61,6 +61,8 @@ interface ReviewFormFormProps {
   coupons: Coupon[]
   formId?: string
   backUrl?: string
+  /** Server action to discard the draft (no args). */
+  discardAction?: () => Promise<void>
   defaultValues?: {
     title?: string
     slug?: string
@@ -94,6 +96,7 @@ export default function ReviewFormForm({
   coupons,
   formId,
   backUrl,
+  discardAction,
   defaultValues: d = {},
 }: ReviewFormFormProps) {
   const router = useRouter()
@@ -314,6 +317,7 @@ export default function ReviewFormForm({
             onCancel={edit.cancel}
             cancelHref={ap('/admin/review-forms')}
             draft={isDraft || isCreateDraft}
+            discard={isDraft && discardAction ? () => { void discardAction() } : undefined}
           />
         </div>
       )}
