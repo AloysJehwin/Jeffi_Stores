@@ -33,7 +33,7 @@ export default function SupplierMobileDetailBody({ supplier }: Props) {
         <span
           className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
             supplier.is_active
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+              ? 'bg-green-500/10 text-green-700 dark:text-green-400'
               : 'bg-surface-secondary text-foreground-muted'
           }`}
         >

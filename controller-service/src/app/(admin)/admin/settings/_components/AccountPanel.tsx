@@ -40,7 +40,7 @@ export default async function AccountPanel() {
   return (
     <>
       <SettingsHub active="account" />
-      <div className="p-4 sm:p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-5">
         {/* ── Account ─────────────────────────────────────────────── */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
@@ -83,7 +83,7 @@ export default async function AccountPanel() {
                   <p className="text-foreground-muted text-xs mb-1.5">Scopes</p>
                   <div className="flex flex-wrap gap-1.5">
                     {isSuperAdmin ? (
-                      <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">
+                      <span className="px-2 py-0.5 bg-purple-500/10 text-purple-700 dark:text-purple-400 rounded-full text-xs font-medium">
                         All Access
                       </span>
                     ) : (adminInfo.scopes || []).length > 0 ? (

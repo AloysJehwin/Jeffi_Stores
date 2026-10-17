@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { createPortal } from 'react-dom'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
@@ -12,6 +11,7 @@ import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { ap } from '@/lib/shared/admin-path'
 import { formatINR as formatINRBase } from '@/lib/shared/format'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { Dialog } from '@/components/admin/kit/dialog'
 import MobileEditBlock from '@/components/admin/MobileEditBlock'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
@@ -47,7 +47,7 @@ const inputCls =
   'w-full px-3 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 const btnPrimary =
-  'control-sm border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 font-medium transition-colors disabled:opacity-50'
+  'control-sm border border-transparent bg-accent-500 hover:bg-accent-600 text-white font-medium transition-colors disabled:opacity-50'
 const btnSecondary =
   'control-sm border border-border-default bg-surface hover:bg-surface-secondary text-foreground font-medium transition-colors'
 
@@ -816,7 +816,7 @@ export default function NewPOPage() {
               <div className="flex items-center gap-3">
                 {scanMsg && (
                   <span
-                    className={`text-xs font-medium px-2 py-0.5 rounded ${scanMsg.kind === 'ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}
+                    className={`text-xs font-medium px-2 py-0.5 rounded ${scanMsg.kind === 'ok' ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-500'}`}
                   >
                     {scanMsg.text}
                   </span>
@@ -827,7 +827,7 @@ export default function NewPOPage() {
                   title={
                     scanEnabled ? 'Barcode scanning on — scan SKU/lot/serial to add a line' : 'Barcode scanning off'
                   }
-                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${scanEnabled ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-400' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${scanEnabled ? 'border-secondary-500 bg-surface-secondary text-foreground-secondary' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -843,7 +843,7 @@ export default function NewPOPage() {
                   type="button"
                   disabled={!form.supplier_id}
                   onClick={() => setLineItems(items => [...items, newPOLineItem()])}
-                  className="flex items-center gap-1 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1 text-xs text-foreground-secondary font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -897,7 +897,7 @@ export default function NewPOPage() {
                             <button
                               type="button"
                               onClick={() => clearProduct(it.id)}
-                              className="shrink-0 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 transition-colors"
+                              className="shrink-0 text-xs text-foreground-secondary font-semibold hover:text-secondary-600 transition-colors"
                             >
                               Change
                             </button>
@@ -927,7 +927,7 @@ export default function NewPOPage() {
                                       return n
                                     })
                                   }}
-                                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${mode === m ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900 shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}
+                                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${mode === m ? 'bg-accent-500 text-white shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}
                                 >
                                   {m === 'name'
                                     ? 'Name'
@@ -1009,16 +1009,16 @@ export default function NewPOPage() {
                                   type="button"
                                   disabled={!categoryIds[it.id]}
                                   onClick={() => openPicker(it.id, categoryIds[it.id] ?? '')}
-                                  className="px-3 h-control-sm bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+                                  className="px-3 h-control-sm bg-secondary-500 hover:bg-secondary-600 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
                                 >
                                   Select Product
                                 </button>
                               </div>
                             )}
                             {mode === 'scanner' && (
-                              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20">
+                              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-secondary-500 bg-surface-secondary">
                                 <svg
-                                  className="w-4 h-4 shrink-0 text-secondary-600 dark:text-secondary-400"
+                                  className="w-4 h-4 shrink-0 text-foreground-secondary"
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
@@ -1154,7 +1154,7 @@ export default function NewPOPage() {
                                     <p className="mt-1 text-xs text-foreground-muted">
                                       1 {it.purchase_unit} = {factor} {poLineBaseLabel(it)}
                                       {qty > 0 && (
-                                        <span className="ml-1 text-secondary-500 dark:text-secondary-300">
+                                        <span className="ml-1 text-foreground-secondary">
                                           → {(qty * factor).toLocaleString('en-IN')} {poLineBaseLabel(it)} total
                                         </span>
                                       )}
@@ -1194,7 +1194,7 @@ export default function NewPOPage() {
                                       items.map(r => (r.id !== it.id ? r : { ...r, gst_inclusive: !r.gst_inclusive }))
                                     )
                                   }
-                                  className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${it.gst_inclusive ? 'bg-secondary-500 dark:bg-secondary-400' : 'bg-border-default'}`}
+                                  className={`relative inline-flex h-4 w-7 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${it.gst_inclusive ? 'bg-accent-500' : 'bg-border-default'}`}
                                   role="switch"
                                   aria-checked={it.gst_inclusive}
                                 >
@@ -1221,7 +1221,7 @@ export default function NewPOPage() {
                                     <div className="text-foreground-muted mb-0.5">
                                       Per {poLineBaseLabel(it)} (ex-GST)
                                     </div>
-                                    <div className="font-semibold text-secondary-600 dark:text-secondary-300">
+                                    <div className="font-semibold text-foreground-secondary">
                                       ₹{fmtINR2(perPc)}
                                     </div>
                                   </div>
@@ -1243,7 +1243,7 @@ export default function NewPOPage() {
                   <button
                     type="button"
                     onClick={() => setLineItems([...lineItems, newPOLineItem()])}
-                    className="mt-3 w-full flex items-center justify-center gap-1.5 h-control-sm rounded-lg border border-dashed border-border-default text-xs font-semibold text-secondary-500 dark:text-secondary-300 hover:bg-surface-secondary hover:border-secondary-400 transition-colors"
+                    className="mt-3 w-full flex items-center justify-center gap-1.5 h-control-sm rounded-lg border border-dashed border-border-default text-xs font-semibold text-foreground-secondary hover:bg-surface-secondary hover:border-secondary-400 transition-colors"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1287,7 +1287,7 @@ export default function NewPOPage() {
           </div>
 
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+            <div className="bg-red-500/5 border border-red-500/40 rounded-lg p-3 text-sm text-red-600 dark:text-red-400">
               {error}
             </div>
           )}
@@ -1306,28 +1306,8 @@ export default function NewPOPage() {
           </div>
         </form>
 
-        {pickerOpen &&
-          typeof document !== 'undefined' &&
-          createPortal(
-            <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/50">
-              <div className="bg-surface-elevated border border-border-default rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">Select Product</h3>
-                    <p className="text-xs text-foreground-muted mt-0.5">
-                      {categories.find(c => c.id === pickerCatId)?.name || 'All products'}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPickerOpen(false)}
-                    className="p-1.5 text-foreground-secondary hover:text-foreground transition-colors rounded-lg hover:bg-surface-secondary"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+        <Dialog open={pickerOpen} onClose={() => setPickerOpen(false)} title="Select Product" description={categories.find(c => c.id === pickerCatId)?.name || 'All products'} size="lg" zIndex="z-[300]">
+          <div className="-m-5 flex min-h-0 flex-col">
                 <div className="px-5 py-3 border-b border-border-default shrink-0">
                   <input
                     type="text"
@@ -1416,10 +1396,8 @@ export default function NewPOPage() {
                     })()
                   )}
                 </div>
-              </div>
-            </div>,
-            document.body
-          )}
+          </div>
+        </Dialog>
       </div>
     </MobileEditBlock>
   )

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { api, Badge, type Tone } from '@/components/admin/channels/ui'
+import { api, Badge, type Tone } from '@/components/admin/kit/core'
 
 export interface RowResult {
   row: number

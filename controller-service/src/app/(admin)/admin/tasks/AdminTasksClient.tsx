@@ -37,10 +37,10 @@ interface TaskRow {
 }
 
 const PRIORITY_BADGE: Record<string, string> = {
-  urgent: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
-  medium: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  low: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
+  urgent: 'bg-red-500/10 text-red-600 dark:text-red-400',
+  high: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  medium: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  low: 'bg-surface-secondary text-foreground-muted',
 }
 
 const SEGMENTS = [
@@ -53,11 +53,11 @@ const SEGMENTS = [
 ]
 
 const SEGMENT_COLORS: Record<string, string> = {
-  orders: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  support: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  customers: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-  security: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-  manual: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
+  orders: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  support: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
+  customers: 'bg-teal-500/10 text-teal-700 dark:text-teal-400',
+  security: 'bg-red-500/10 text-red-500',
+  manual: 'bg-zinc-100 text-zinc-600 dark:text-zinc-400',
 }
 
 const KIND_SEGMENT: Record<string, string> = {
@@ -344,9 +344,9 @@ export default function AdminTasksClient() {
     const due = new Date(d)
     due.setHours(0, 0, 0, 0)
     const diff = Math.round((due.getTime() - today.getTime()) / 86400000)
-    if (diff < 0) return { text: `${Math.abs(diff)}d overdue`, color: 'text-red-600 dark:text-red-400 font-semibold' }
-    if (diff === 0) return { text: 'Due today', color: 'text-orange-600 dark:text-orange-400 font-semibold' }
-    if (diff === 1) return { text: 'Due tomorrow', color: 'text-orange-500 dark:text-orange-400' }
+    if (diff < 0) return { text: `${Math.abs(diff)}d overdue`, color: 'text-red-500 font-semibold' }
+    if (diff === 0) return { text: 'Due today', color: 'text-amber-600 dark:text-amber-400 font-semibold' }
+    if (diff === 1) return { text: 'Due tomorrow', color: 'text-amber-500 dark:text-amber-400' }
     if (diff <= 7) return { text: `Due in ${diff}d`, color: 'text-foreground-secondary' }
     return { text: due.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }), color: 'text-foreground-muted' }
   }
@@ -409,7 +409,7 @@ export default function AdminTasksClient() {
               onClick={() => setSegment(seg.key)}
               className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all border ${
                 segment === seg.key
-                  ? 'border-accent-500 bg-accent-500/10 text-accent-600 dark:text-accent-400'
+                  ? 'border-accent-500 bg-accent-500/10 text-accent-500'
                   : 'border-border-default text-foreground-muted hover:text-foreground hover:border-border-secondary'
               }`}
             >
@@ -493,8 +493,8 @@ export default function AdminTasksClient() {
                     <span
                       className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold ${
                         s.type === 'task'
-                          ? 'bg-accent-500/15 text-accent-600 dark:text-accent-400'
-                          : 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300'
+                          ? 'bg-accent-500/15 text-accent-500'
+                          : 'bg-teal-500/10 text-teal-700 dark:text-teal-400'
                       }`}
                     >
                       {s.type === 'task' ? 'T' : 'C'}
@@ -559,18 +559,18 @@ export default function AdminTasksClient() {
                   <div
                     className={`px-5 py-3 border-b border-border-default flex items-center justify-between ${
                       b === 'Overdue'
-                        ? 'bg-red-50 dark:bg-red-900/20'
+                        ? 'bg-red-500/5'
                         : b === 'Today'
-                          ? 'bg-orange-50 dark:bg-orange-900/20'
+                          ? 'bg-amber-500/5 '
                           : ''
                     }`}
                   >
                     <h2
                       className={`font-semibold text-sm ${
                         b === 'Overdue'
-                          ? 'text-red-700 dark:text-red-300'
+                          ? 'text-red-600 dark:text-red-400'
                           : b === 'Today'
-                            ? 'text-orange-700 dark:text-orange-300'
+                            ? 'text-amber-700 dark:text-amber-400'
                             : 'text-foreground'
                       }`}
                     >
@@ -628,7 +628,7 @@ export default function AdminTasksClient() {
                                   </span>
                                 )}
                                 {t.auto_created && (
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-semibold rounded bg-violet-500/10 text-violet-700 dark:text-violet-400">
                                     <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
                                       <path
                                         fillRule="evenodd"

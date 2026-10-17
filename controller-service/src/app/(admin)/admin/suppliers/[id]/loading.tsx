@@ -1,5 +1,9 @@
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import { DetailSkeleton } from '@/components/admin/kit/states'
 
 export default function Loading() {
-  return <AdminSkeleton variant="detail" />
+  return (
+    <div className="p-4 sm:p-6">
+      <DetailSkeleton />
+    </div>
+  )
 }

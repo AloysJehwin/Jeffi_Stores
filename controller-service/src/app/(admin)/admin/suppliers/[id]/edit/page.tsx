@@ -15,7 +15,7 @@ import type { AutosaveStatus } from '@/hooks/useAutosaveDraft'
 const inputCls = ADMIN_INPUT_CLASS
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 const btnPrimary =
-  'control-md border border-transparent bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 font-medium transition-colors disabled:opacity-50'
+  'control-md border border-transparent bg-accent-500 hover:bg-accent-600 text-white font-medium transition-colors disabled:opacity-50'
 const btnSecondary =
   'control-md border border-border-default bg-surface hover:bg-surface-secondary text-foreground font-medium transition-colors'
 
@@ -236,9 +236,9 @@ export default function EditSupplierPage() {
       </div>
 
       {hasDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
+        <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
+            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Draft pending</p>
             <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
               Changes are saved to draft. The live supplier stays unchanged until you publish.
             </p>
@@ -404,7 +404,7 @@ export default function EditSupplierPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-700 dark:text-red-300">
+          <div className="bg-red-500/5 border border-red-500/40 rounded-lg p-3 text-sm text-red-600 dark:text-red-400">
             {error}
           </div>
         )}

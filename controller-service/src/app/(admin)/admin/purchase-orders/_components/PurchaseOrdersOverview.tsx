@@ -155,7 +155,7 @@ export default function PurchaseOrdersOverview() {
                             {p.last_grn ? ` · last delivery ${p.last_grn}` : ''}
                           </span>
                           <span className="mt-1 block h-1.5 rounded-full bg-surface-secondary overflow-hidden">
-                            <span className="block h-full bg-yellow-500 rounded-full" style={{ width: `${pct}%` }} />
+                            <span className="block h-full bg-amber-500 rounded-full" style={{ width: `${pct}%` }} />
                           </span>
                         </Link>
                       </li>

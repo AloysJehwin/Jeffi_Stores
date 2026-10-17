@@ -5,6 +5,7 @@ import { CheckCircle, XCircle, Loader2, Code, Mail, Sparkles } from 'lucide-reac
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { PageHeader } from '@/components/admin/kit/layout'
 
 interface ProposedTool {
   id: string
@@ -93,11 +94,8 @@ export default function ProposedToolsPage() {
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-accent-500" />
-          <h1 className="text-xl font-bold text-foreground">Proposed Tools</h1>
-        </div>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <PageHeader title="Proposed Tools" media={<Sparkles className="w-5 h-5 text-accent-500" />} />
         <AdminSelect
           value={statusFilter}
           onChange={v => setStatusFilter(v as any)}
@@ -149,10 +147,10 @@ export default function ProposedToolsPage() {
               <span
                 className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
                   item.status === 'proposed'
-                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+                    ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
                     : item.status === 'approved'
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200'
+                      ? 'bg-green-500/10 text-green-700 dark:text-green-400'
+                      : 'bg-red-500/10 text-red-600 dark:text-red-400'
                 }`}
               >
                 {item.status}
@@ -199,7 +197,7 @@ export default function ProposedToolsPage() {
             )}
 
             {item.rejection_reason && (
-              <p className="text-[11px] text-red-700 dark:text-red-300 mb-2">Rejection: {item.rejection_reason}</p>
+              <p className="text-[11px] text-red-600 dark:text-red-400 mb-2">Rejection: {item.rejection_reason}</p>
             )}
 
             {item.status === 'proposed' && (

@@ -1,5 +1,6 @@
 import { headers } from 'next/headers'
-import { TabLinks } from '@/components/admin/channels/ui'
+import { TabLinks } from '@/components/admin/kit/core'
+import { PageHeader } from '@/components/admin/kit/layout'
 import { settingsHubHref, visibleSettingsHubTabs, type SettingsHubTabId } from '@/lib/admin/settings-hub'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
@@ -25,8 +26,8 @@ export default async function SettingsHub({
     href: ap(settingsHubHref(t.id, role, scopes), host),
   }))
   return (
-    <div className="px-4 sm:px-6 pt-4 sm:pt-6 space-y-3">
-      <h1 className="text-2xl font-bold text-foreground">Settings</h1>
+    <div className="px-4 sm:px-6 pt-4 sm:pt-6 space-y-5">
+      <PageHeader title="Settings" description="Your account, team, service accounts and the audit log" />
       <TabLinks tabs={tabs} value={active} actions={actions} />
     </div>
   )

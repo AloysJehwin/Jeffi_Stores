@@ -1157,7 +1157,7 @@ export default function AdminAgentPage() {
                                       `Use ${picker.choice_kind} id ${opt.id} (${opt.label}) for the previous request.`
                                     )
                                   }}
-                                  className="w-full text-left px-3 py-1.5 rounded-md hover:bg-accent-100 dark:hover:bg-accent-900/30 transition-colors"
+                                  className="w-full text-left px-3 py-1.5 rounded-md hover:bg-accent-500/10 transition-colors"
                                 >
                                   <p className="text-sm font-medium text-foreground">{opt.label}</p>
                                   {opt.sublabel && <p className="text-[11px] text-foreground-muted">{opt.sublabel}</p>}
@@ -1173,9 +1173,9 @@ export default function AdminAgentPage() {
                         {turn.proposedActions.map(action => (
                           <div
                             key={action.id}
-                            className="rounded-lg border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 p-3"
+                            className="rounded-lg border-2 border-amber-500/40 bg-amber-500/5 p-3"
                           >
-                            <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2">
+                            <p className="text-xs font-semibold text-amber-900 dark:text-amber-400 mb-2">
                               Pending approval — {action.kind}
                             </p>
                             <p className="text-xs text-foreground mb-3">{action.confirmation}</p>
@@ -1203,7 +1203,7 @@ export default function AdminAgentPage() {
                               </p>
                             )}
                             {action.status === 'approved' && (
-                              <p className="text-xs text-green-700 dark:text-green-300 flex items-center gap-1.5">
+                              <p className="text-xs text-green-700 dark:text-green-400 flex items-center gap-1.5">
                                 <CheckCircle className="w-3 h-3" /> Executed
                               </p>
                             )}
@@ -1213,7 +1213,7 @@ export default function AdminAgentPage() {
                               </p>
                             )}
                             {action.status === 'failed' && (
-                              <p className="text-xs text-red-700 dark:text-red-300">
+                              <p className="text-xs text-red-600 dark:text-red-400">
                                 Failed: {action.error || 'unknown'}
                               </p>
                             )}
@@ -1309,7 +1309,7 @@ export default function AdminAgentPage() {
               }}
               className="w-full text-left px-3 py-2.5 rounded-lg border border-border-default hover:border-accent-500 hover:bg-surface-secondary transition-colors"
             >
-              <p className="text-sm font-mono text-accent-600 dark:text-accent-400">{cmd.example}</p>
+              <p className="text-sm font-mono text-accent-500">{cmd.example}</p>
               <p className="text-xs text-foreground-muted mt-0.5">{cmd.description}</p>
             </button>
           ))}
@@ -1329,7 +1329,7 @@ export default function AdminAgentPage() {
         <div className="flex-1 overflow-y-auto p-4 space-y-6">
           <p className="text-xs text-foreground-muted">
             Click any tool to send a prompt.{' '}
-            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700">
+            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/40">
               action
             </span>{' '}
             tools require your approval before executing.
@@ -1354,7 +1354,7 @@ export default function AdminAgentPage() {
                         {t.label}
                       </p>
                       {t.mutating && (
-                        <span className="shrink-0 inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 mt-0.5">
+                        <span className="shrink-0 inline-block px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/40 mt-0.5">
                           action
                         </span>
                       )}

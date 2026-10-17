@@ -4,7 +4,8 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react'
 import { ArrowDown, ArrowUp, Plus, X } from 'lucide-react'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import Select from '@/components/ui/Select'
-import { Badge, Banner, TabAction, Table, Tabs, api, btnGhost, btnPrimary, when } from '@/components/admin/channels/ui'
+import { Badge, Banner, TabAction, Table, Tabs, api, btnGhost, btnPrimary, when } from '@/components/admin/kit/core'
+import { useActionToast } from '@/components/admin/kit/toast'
 import { SectionCard } from './controls'
 
 // Flagship Site Controls only (platform owner): the provider policy every store follows, plus per-store overrides.
@@ -43,13 +44,14 @@ export default function ProvidersCard() {
   const canWrite = useCanWrite('settings:write')
   const [data, setData] = useState<Data | null>(null)
   const [tab, setTab] = useState<Tab>('default')
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useActionToast()
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
 
   async function load() {
     const { ok, data } = await api<Data>('/api/admin/settings/providers')
     if (ok) setData(data)
-    else setMsg({ ok: false, text: data.error || 'Could not load provider settings' })
+    else setLoadError(data.error || 'Could not load provider settings')
   }
   useEffect(() => {
     load()
@@ -57,7 +59,7 @@ export default function ProvidersCard() {
 
   async function save(tenantId: string | null, key: Key, value: unknown) {
     const { ok, data: d } = await api('/api/admin/settings/providers', { method: 'PUT', json: { tenantId, key, value } })
-    setMsg(ok ? { ok: true, text: `${KEY_LABEL[key]} saved` } : { ok: false, text: d.error || 'Save failed' })
+    toast.result({ ok, text: ok ? `${KEY_LABEL[key]} saved` : d.error || 'Save failed' })
     if (ok) await load()
     return ok
   }
@@ -65,7 +67,7 @@ export default function ProvidersCard() {
   async function clear(tenantId: string | null, key: Key) {
     const qs = new URLSearchParams({ key, ...(tenantId ? { tenantId } : {}) })
     const { ok, data: d } = await api(`/api/admin/settings/providers?${qs}`, { method: 'DELETE' })
-    setMsg(ok ? { ok: true, text: `${KEY_LABEL[key]} reset` } : { ok: false, text: d.error || 'Reset failed' })
+    toast.result({ ok, text: ok ? `${KEY_LABEL[key]} reset` : d.error || 'Reset failed' })
     if (ok) await load()
   }
 
@@ -89,7 +91,7 @@ export default function ProvidersCard() {
           canWrite && tab === 'overrides' ? <TabAction icon={<Plus className="w-4 h-4" />} label="Add override" onClick={() => setAdding(a => !a)} /> : undefined
         }
       />
-      {msg && <Banner ok={msg.ok}>{msg.text}</Banner>}
+      {loadError && !data && <Banner ok={false}>{loadError}</Banner>}
       {!data ? (
         <p className="text-sm text-foreground-muted">Loading...</p>
       ) : tab === 'default' ? (

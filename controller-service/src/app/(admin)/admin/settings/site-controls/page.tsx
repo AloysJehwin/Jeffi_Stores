@@ -31,6 +31,7 @@ import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/auth/shortcut-scopes'
 import { getLoyaltySettings } from '@/lib/loyalty/settings'
 import { getProviderPolicy } from '@/lib/providers/policy'
 import { getReferralSettings } from '@/lib/referrals/settings'
+import { PageHeader } from '@/components/admin/kit/layout'
 
 const providerLabel = (p: string) => (p === 'aws' ? 'AWS' : 'Twilio')
 
@@ -141,14 +142,11 @@ export default async function SiteControlsPage() {
   const isMac = /mac/i.test(uaHeader) && !/iphone|ipad/i.test(uaHeader)
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Site Controls</h1>
-        <p className="text-sm text-foreground-muted mt-0.5">
-          One place to control your store — branding, contact info, feature toggles, delivery rules and storefront
-          content. Changes take effect within 30 seconds.
-        </p>
-      </div>
+    <div className="p-4 sm:p-6 space-y-5">
+      <PageHeader
+        title="Site Controls"
+        description="One place to control your store: branding, contact info, feature toggles, delivery rules and storefront content. Changes take effect within 30 seconds."
+      />
 
       <Suspense fallback={null}>
         <SiteControlsTabs
