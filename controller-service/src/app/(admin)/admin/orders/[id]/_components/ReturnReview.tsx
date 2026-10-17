@@ -7,6 +7,10 @@ import { ap } from '@/lib/shared/admin-path'
 import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { fmtQty } from '@/lib/shared/number-display'
+import { AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { useActionToast } from '@/components/admin/kit/toast'
+import { NumberInput, TextArea, TextInput } from '@/components/admin/kit/form'
+import { Field, Fields } from '@/components/admin/kit/layout'
 
 interface ReturnRequest {
   id: string
@@ -51,11 +55,10 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
   const canWrite = useCanWrite('returns:write')
   const [adminNotes, setAdminNotes] = useState('')
   const [returnTrackingNumber, setReturnTrackingNumber] = useState('')
+  const toast = useActionToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Inline only for validation and the variant-pick prompt; responses are toasts.
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
-  const [refundFailed, setRefundFailed] = useState(false)
-  const [stockWarning, setStockWarning] = useState<string | null>(null)
   // Replacement variant picker: when the original variant/sub-variant of a
   // replacement item no longer exists, the process API returns 409 with the list of
   // items needing a pick (+ the product's active grains). We render dropdowns and
@@ -71,17 +74,17 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
     returnRequest.rvp_delivery_charge != null ? String(returnRequest.rvp_delivery_charge) : ''
   )
   const [rvpChargeSaving, setRvpChargeSaving] = useState(false)
-  const [rvpChargeMsg, setRvpChargeMsg] = useState<string | null>(null)
+  const [rvpChargeError, setRvpChargeError] = useState<string | null>(null)
   const router = useRouter()
 
   async function handleSaveRvpCharge() {
     const amount = Number(rvpCharge)
     if (!(amount >= 0) || !Number.isFinite(amount)) {
-      setRvpChargeMsg('Enter a valid amount.')
+      setRvpChargeError('Enter a valid amount.')
       return
     }
     setRvpChargeSaving(true)
-    setRvpChargeMsg(null)
+    setRvpChargeError(null)
     try {
       const res = await fetch(`/api/admin/returns/${returnRequest.id}/rvp-charge`, {
         method: 'POST',
@@ -90,10 +93,11 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data.error || 'Failed to save charge')
-      setRvpChargeMsg(data.walletWarning ? `Saved. ${data.walletWarning}` : 'Charge saved.')
+      if (data.walletWarning) toast.warning(`Saved. ${data.walletWarning}`)
+      else toast.success('Charge saved.')
       router.refresh()
     } catch (e: any) {
-      setRvpChargeMsg(e.message)
+      toast.error(e.message)
     } finally {
       setRvpChargeSaving(false)
     }
@@ -115,7 +119,6 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
   async function handleCreateRVP() {
     setIsSubmitting(true)
     setError(null)
-    setSuccess(null)
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/create-rvp-shipment`, {
         method: 'POST',
@@ -124,10 +127,10 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
-      setSuccess(`RVP shipment created. AWB: ${data.awb}`)
+      toast.success(`RVP shipment created. AWB: ${data.awb}`)
       router.refresh()
     } catch (err: any) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setIsSubmitting(false)
     }
@@ -144,9 +147,6 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
 
     setIsSubmitting(true)
     setError(null)
-    setSuccess(null)
-    setRefundFailed(false)
-    setStockWarning(null)
 
     try {
       const response = await fetch(`/api/orders/${orderId}/return-review`, {
@@ -177,41 +177,40 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       setPickSelections({})
 
       if (action === 'process' && Array.isArray(data.stockWarnings) && data.stockWarnings.length > 0) {
-        setStockWarning(
+        toast.warning(
           `Stock was NOT restored for ${data.stockWarnings.length} item(s) — the variant/sub-variant no longer exists or is inactive. The return was still processed.`
         )
       }
 
       if (action === 'process' && data.refundFailed) {
-        setRefundFailed(true)
-        setSuccess(
+        toast.warning(
           'Return marked as resolved. Note: Razorpay refund could not be initiated automatically — please issue it manually.'
         )
       } else if (action === 'approve') {
-        setSuccess('Return request approved. Customer notified.')
+        toast.success('Return request approved. Customer notified.')
       } else if (action === 'reject') {
-        setSuccess('Return request rejected. Customer notified.')
+        toast.success('Return request rejected. Customer notified.')
       } else if (action === 'mark_received') {
-        setSuccess('Item marked as received. Customer notified.')
+        toast.success('Item marked as received. Customer notified.')
       } else if (action === 'process') {
         if (data.replacementOrderNumber) {
-          setSuccess(`Replacement order #${data.replacementOrderNumber} created. Customer notified.`)
+          toast.success(`Replacement order #${data.replacementOrderNumber} created. Customer notified.`)
         } else if (typeof data.netRefund === 'number' && data.netRefund <= 0 && Number(data.charge) > 0) {
-          setSuccess(
+          toast.success(
             `No refund issued — the ₹${Number(data.charge).toFixed(0)} return charge covers the ₹${Number(data.grossRefund).toFixed(0)} returnable amount. The item was accepted and restocked.`
           )
         } else if (typeof data.netRefund === 'number' && Number(data.charge) > 0) {
-          setSuccess(
+          toast.success(
             `Refund of ₹${Number(data.netRefund).toFixed(0)} processed (₹${Number(data.grossRefund).toFixed(0)} less ₹${Number(data.charge).toFixed(0)} return charge). Customer notified.`
           )
         } else {
-          setSuccess('Refund processed. Customer notified.')
+          toast.success('Refund processed. Customer notified.')
         }
       }
 
       router.refresh()
     } catch (err: any) {
-      setError(err.message)
+      toast.error(err.message)
     } finally {
       setIsSubmitting(false)
     }
@@ -238,26 +237,10 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
 
   return (
     <div className="space-y-4">
-      {error && (
-        <div className="p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div
-          className={`p-3 border rounded-lg text-sm ${refundFailed ? 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300' : 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'}`}
-        >
-          {success}
-        </div>
-      )}
-      {stockWarning && (
-        <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-300 text-sm">
-          ⚠ {stockWarning}
-        </div>
-      )}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {variantPick && variantPick.length > 0 && canWrite && (
-        <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg space-y-3">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Choose replacement variant(s)</p>
+        <div className="space-y-3 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+          <p className="text-sm font-semibold text-amber-600 dark:text-amber-400">Choose replacement variant(s)</p>
           {variantPick.map((it: any) => (
             <div key={it.order_item_id} className="space-y-1">
               <p className="text-xs text-foreground-muted">
@@ -281,33 +264,19 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
             type="button"
             onClick={confirmVariantPick}
             disabled={isSubmitting}
-            className="px-4 h-control text-sm font-medium text-white bg-accent-500 hover:bg-accent-600 rounded-lg disabled:opacity-50"
+            className="control-md bg-accent-500 font-medium text-white hover:bg-accent-600 disabled:opacity-50"
           >
             Confirm replacement with selected variant(s)
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <span className="text-foreground-secondary">Type</span>
-          <p className="font-medium text-foreground capitalize">{type}</p>
-        </div>
-        <div>
-          <span className="text-foreground-secondary">Reason</span>
-          <p className="font-medium text-foreground">{REASON_LABELS[reason] || reason}</p>
-        </div>
-        <div>
-          <span className="text-foreground-secondary">Requested</span>
-          <p className="font-medium text-foreground">
-            {new Date(returnRequest.created_at).toLocaleDateString('en-IN')}
-          </p>
-        </div>
-        <div>
-          <span className="text-foreground-secondary">Status</span>
-          <p className="font-medium text-foreground capitalize">{status.replace(/_/g, ' ')}</p>
-        </div>
-      </div>
+      <Fields>
+        <Field label="Type" value={<span className="font-medium capitalize">{type}</span>} />
+        <Field label="Reason" value={<span className="font-medium">{REASON_LABELS[reason] || reason}</span>} />
+        <Field label="Requested" value={<span className="font-medium">{new Date(returnRequest.created_at).toLocaleDateString('en-IN')}</span>} />
+        <Field label="Status" value={<span className="font-medium capitalize">{status.replace(/_/g, ' ')}</span>} />
+      </Fields>
 
       {returnRequest.items && returnRequest.items.length > 0 && (
         <div>
@@ -376,23 +345,17 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       {status === 'pending_approval' && canWrite && (
         <div className="space-y-3 pt-2 border-t border-border-default">
           <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1">
+            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
               Admin notes (required for rejection, optional for approval)
             </label>
-            <textarea
-              value={adminNotes}
-              onChange={e => setAdminNotes(e.target.value)}
-              rows={3}
-              placeholder="Notes visible to customer..."
-              className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm resize-none"
-            />
+            <TextArea value={adminNotes} onChange={e => setAdminNotes(e.target.value)} rows={3} placeholder="Notes visible to customer..." className="resize-none" />
           </div>
           <div className="flex gap-3">
             <button
               type="button"
               onClick={() => submit('approve')}
               disabled={isSubmitting}
-              className="flex-1 px-4 h-control bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+              className="control-md flex-1 justify-center bg-green-600 hover:bg-green-700 font-semibold text-white disabled:opacity-50"
             >
               {isSubmitting ? 'Processing...' : 'Approve Return'}
             </button>
@@ -400,7 +363,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
               type="button"
               onClick={() => submit('reject')}
               disabled={isSubmitting}
-              className="flex-1 px-4 h-control bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+              className="control-md flex-1 justify-center bg-red-600 hover:bg-red-700 font-semibold text-white disabled:opacity-50"
             >
               {isSubmitting ? 'Processing...' : 'Reject Return'}
             </button>
@@ -413,30 +376,22 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
           <div className="pb-1">
             {returnRequest.rvp_awb_number ? (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm px-3 py-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <div className="flex items-center gap-2 rounded-lg border border-border-default bg-surface px-3 py-2 text-sm">
                   <span className="text-foreground-secondary">RVP AWB:</span>
                   <span className="font-mono font-medium text-foreground">{returnRequest.rvp_awb_number}</span>
                 </div>
                 {canWrite && (
                   <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-1">
+                    <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                       Reverse delivery charge (Rs)
                     </label>
                     <div className="flex items-stretch gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={rvpCharge}
-                        onChange={e => setRvpCharge(e.target.value)}
-                        placeholder="e.g. 80"
-                        className="flex-1 px-3 h-control border border-border-secondary rounded-lg bg-surface text-foreground text-sm"
-                      />
+                      <NumberInput min="0" step="0.01" value={rvpCharge} onChange={e => setRvpCharge(e.target.value)} placeholder="e.g. 80" className="flex-1" />
                       <button
                         type="button"
                         onClick={handleSaveRvpCharge}
                         disabled={rvpChargeSaving}
-                        className="px-4 h-control bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                        className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
                       >
                         {rvpChargeSaving ? 'Saving...' : 'Save charge'}
                       </button>
@@ -444,7 +399,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                     <p className="mt-1 text-xs text-foreground-muted">
                       Charged to the tenant wallet for the reverse pickup. Re-saving updates the amount.
                     </p>
-                    {rvpChargeMsg && <p className="mt-1 text-xs text-foreground-secondary">{rvpChargeMsg}</p>}
+                    {rvpChargeError && <p className="mt-1 text-xs text-red-600 dark:text-red-400">{rvpChargeError}</p>}
                   </div>
                 )}
               </div>
@@ -454,7 +409,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                   type="button"
                   onClick={handleCreateRVP}
                   disabled={isSubmitting}
-                  className="flex-1 px-4 h-control bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                  className="control-md flex-1 justify-center bg-accent-500 hover:bg-accent-600 font-semibold text-white disabled:opacity-50"
                 >
                   {isSubmitting ? 'Creating...' : 'Create RVP Pickup (Delhivery QC)'}
                 </button>
@@ -469,22 +424,16 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
           {canWrite && (
             <>
               <div>
-                <label className="block text-sm font-medium text-foreground-secondary mb-1">
+                <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
                   Return tracking number (optional)
                 </label>
-                <input
-                  type="text"
-                  value={returnTrackingNumber}
-                  onChange={e => setReturnTrackingNumber(e.target.value)}
-                  placeholder="e.g. 123456789012"
-                  className="w-full px-3 h-control border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-                />
+                <TextInput value={returnTrackingNumber} onChange={e => setReturnTrackingNumber(e.target.value)} placeholder="e.g. 123456789012" />
               </div>
               <button
                 type="button"
                 onClick={() => submit('mark_received')}
                 disabled={isSubmitting}
-                className="w-full px-4 h-control bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                className="control-md w-full justify-center bg-accent-500 hover:bg-accent-600 font-semibold text-white disabled:opacity-50"
               >
                 {isSubmitting ? 'Processing...' : 'Mark Item as Received'}
               </button>
@@ -496,23 +445,11 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       {status === 'received' && (
         <div className="pt-2 border-t border-border-default space-y-4">
           {returnRequest.valuation_status !== 'approved' ? (
-            <div className="flex items-start gap-3 px-3 py-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <svg
-                className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                />
-              </svg>
+            <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
               <div>
-                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Valuation pending</p>
-                <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
+                <p className="text-sm font-medium text-foreground">Valuation pending</p>
+                <p className="mt-0.5 text-xs text-foreground-muted">
                   Complete the item valuation in the <strong>Returns page</strong> before processing the{' '}
                   {type === 'refund' ? 'refund' : 'replacement'}.
                 </p>
@@ -520,21 +457,9 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm">
-                <svg
-                  className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <span className="text-green-800 dark:text-green-300">
+              <div className="flex items-center gap-2 rounded-lg border border-green-500/40 bg-green-500/5 px-3 py-2 text-sm">
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-green-600" />
+                <span className="text-foreground">
                   Valuation complete — condition:{' '}
                   <strong className="capitalize">{returnRequest.valuation_condition}</strong>
                   {returnRequest.valuation_condition !== 'good' && (
@@ -553,7 +478,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                     type="button"
                     onClick={() => submit('process')}
                     disabled={isSubmitting}
-                    className="w-full px-4 h-control bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                    className="control-md w-full justify-center bg-accent-500 hover:bg-accent-600 font-semibold text-white disabled:opacity-50"
                   >
                     {isSubmitting ? 'Processing...' : type === 'refund' ? 'Process Refund' : 'Create Replacement Order'}
                   </button>

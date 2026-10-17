@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { PageBody, PageHeader } from '@/components/admin/kit'
 import { getSiteControls } from '@/lib/catalog/site-controls'
 import { ap } from '@/lib/shared/admin-path'
 import { resolveTenantId } from '@/lib/tenancy/tenant-context'
@@ -23,14 +23,8 @@ export default async function DelhiveryPage() {
   const [c, deliveryMode] = await Promise.all([getSiteControls(), resolveDeliveryMode()])
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
-      <div>
-        <Link href={ap('/admin/orders')} className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block">
-          ← Back to Orders
-        </Link>
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Delhivery</h1>
-        <p className="text-foreground-secondary mt-1">Shipments, deliveries, pickups and COD remittance</p>
-      </div>
+    <PageBody>
+      <PageHeader back={{ href: ap('/admin/orders'), label: 'Orders' }} title="Delhivery" description="Shipments, deliveries, pickups and COD remittance" />
 
       <Suspense fallback={null}>
         <DelhiveryTabs
@@ -48,6 +42,6 @@ export default async function DelhiveryPage() {
           }
         />
       </Suspense>
-    </div>
+    </PageBody>
   )
 }

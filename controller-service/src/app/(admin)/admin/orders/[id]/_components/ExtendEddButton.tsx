@@ -2,17 +2,17 @@
 import { useState } from 'react'
 import DatePicker from '@/components/ui/DatePicker'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useActionToast } from '@/components/admin/kit/toast'
 
 export default function ExtendEddButton({ orderId, currentEdd }: { orderId: string; currentEdd: string | null }) {
   const [open, setOpen] = useState(false)
   const [date, setDate] = useState(currentEdd ?? '')
+  const toast = useActionToast()
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   async function save() {
     if (!date) return
     setSaving(true)
-    setError('')
     try {
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
@@ -25,7 +25,7 @@ export default function ExtendEddButton({ orderId, currentEdd }: { orderId: stri
       }
       window.location.reload()
     } catch (e: any) {
-      setError(e.message)
+      toast.error(e.message)
       setSaving(false)
     }
   }
@@ -44,21 +44,17 @@ export default function ExtendEddButton({ orderId, currentEdd }: { orderId: stri
     <RequireWrite scope="orders:write">
       <div className="mt-3 flex flex-col gap-2">
         <DatePicker value={date} onChange={setDate} className="w-full" />
-        {error && <p className="text-xs text-red-500">{error}</p>}
         <div className="flex gap-2">
           <button
             onClick={save}
             disabled={!date || saving}
-            className="px-3 h-control-sm text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors"
+            className="control-sm bg-accent-500 font-semibold text-white hover:bg-accent-600 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
           <button
-            onClick={() => {
-              setOpen(false)
-              setError('')
-            }}
-            className="px-3 h-control-sm text-xs font-semibold rounded-lg bg-surface-secondary hover:bg-surface-secondary/70 text-foreground transition-colors"
+            onClick={() => setOpen(false)}
+            className="control-sm border border-border-default font-semibold text-foreground hover:bg-surface-secondary"
           >
             Cancel
           </button>
