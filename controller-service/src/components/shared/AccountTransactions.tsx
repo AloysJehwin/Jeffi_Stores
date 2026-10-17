@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { bp } from '@/lib/shared/business-path'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
+import { useInfiniteList, InfiniteFooter } from '@/components/admin/kit/infinite'
 
 interface Transaction {
   id: string
@@ -62,20 +63,32 @@ function getMethodLabel(method: string, gateway: string) {
 function AccountTransactions({ isBusiness }: { isBusiness: boolean }) {
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [loading, setLoading] = useState(true)
-  const [initialLoading, setInitialLoading] = useState(true)
-  const [page, setPage] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [pageSize, setPageSize] = useState(10)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterMethod, setFilterMethod] = useState<string>('all')
 
-  const portalHeader: Record<string, string> = isBusiness ? { 'X-Auth-Portal': 'business' } : {}
-  const portalFetch: RequestInit = isBusiness ? { credentials: 'include' } : {}
   const browsePath = isBusiness ? bp('/business/products') : '/products'
   const orderPath = (orderId: string) =>
     isBusiness ? bp(`/business/account/orders/${orderId}`) : `/account/orders/${orderId}`
+
+  // Accumulates pages client-side as the user scrolls; replaces the prev/next pager.
+  const list = useInfiniteList<Transaction>({
+    key: user ? `txns-${isBusiness ? 'b' : 'v'}-${user.id}` : null,
+    pageSize: 10,
+    fetchPage: async (p, signal) => {
+      const res = await fetch(`/api/transactions?page=${p}`, {
+        ...(isBusiness ? { credentials: 'include' } : {}),
+        headers: isBusiness ? { 'X-Auth-Portal': 'business' } : {},
+        signal,
+      })
+      if (!res.ok) throw new Error('Could not load transactions')
+      const data = await res.json()
+      return { rows: (data.transactions || []) as Transaction[], total: Number(data.total ?? 0) }
+    },
+    getKey: t => t.id,
+  })
+
+  const transactions = list.rows
+  const initialLoading = list.loading && transactions.length === 0
 
   const availableMethods = useMemo(() => {
     const set = new Set<string>()
@@ -98,32 +111,8 @@ function AccountTransactions({ isBusiness }: { isBusiness: boolean }) {
           ? bp('/business/signin?callbackUrl=/business/account/transactions')
           : '/login?redirect=/account/transactions'
       )
-      return
     }
-    if (user) {
-      fetchTransactions(page)
-    }
-  }, [user, authLoading, router, page])
-
-  const fetchTransactions = async (p: number) => {
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/transactions?page=${p}`, {
-        ...portalFetch,
-        headers: { ...portalHeader },
-      })
-      if (response.ok) {
-        const data = await response.json()
-        setTransactions(data.transactions || [])
-        setTotal(data.total || 0)
-        setPageSize(data.pageSize || 10)
-      }
-    } catch {
-    } finally {
-      setLoading(false)
-      setInitialLoading(false)
-    }
-  }
+  }, [user, authLoading, router, isBusiness])
 
   if (authLoading || initialLoading) {
     return (
@@ -194,7 +183,7 @@ function AccountTransactions({ isBusiness }: { isBusiness: boolean }) {
         )}
 
         <div>
-          {transactions.length === 0 && !loading ? (
+          {transactions.length === 0 && !list.loading ? (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
               <svg
                 className="w-16 h-16 text-foreground-muted mx-auto mb-4"
@@ -219,31 +208,6 @@ function AccountTransactions({ isBusiness }: { isBusiness: boolean }) {
               >
                 Browse Products
               </Link>
-            </div>
-          ) : loading ? (
-            <div className="space-y-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5 animate-pulse"
-                  style={{ animationDelay: `${i * 50}ms` }}
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div className="flex gap-2">
-                        <div className="h-5 w-20 bg-surface-secondary rounded-full" />
-                        <div className="h-5 w-24 bg-surface-secondary rounded-full" />
-                      </div>
-                      <div className="h-5 w-32 bg-surface-secondary rounded" />
-                      <div className="h-3 w-48 bg-surface-secondary rounded" />
-                    </div>
-                    <div className="space-y-1.5 sm:text-right flex-shrink-0">
-                      <div className="h-4 w-24 bg-surface-secondary rounded" />
-                      <div className="h-3 w-16 bg-surface-secondary rounded" />
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
           ) : (
             <div className="space-y-4">
@@ -306,35 +270,7 @@ function AccountTransactions({ isBusiness }: { isBusiness: boolean }) {
                 </div>
               ))}
 
-              {total > pageSize && (
-                <div className="flex items-center justify-between gap-2 pt-2">
-                  <p className="text-xs text-foreground-muted whitespace-nowrap">
-                    <span className="font-medium text-foreground">
-                      {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)}
-                    </span>{' '}
-                    of <span className="font-medium text-foreground">{total}</span> transactions
-                  </p>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
-                      disabled={page <= 1}
-                      className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                    >
-                      Prev
-                    </button>
-                    <span className="text-xs text-foreground-muted whitespace-nowrap">
-                      {page}/{Math.ceil(total / pageSize)}
-                    </span>
-                    <button
-                      onClick={() => setPage(p => p + 1)}
-                      disabled={page >= Math.ceil(total / pageSize)}
-                      className="px-3 py-1.5 text-xs font-medium border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              )}
+              <InfiniteFooter shown={transactions.length} control={list} noun="transactions" />
             </div>
           )}
         </div>
