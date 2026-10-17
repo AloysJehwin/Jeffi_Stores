@@ -3049,16 +3049,20 @@ export default function ProductForm({
   )
 
   // Sub-variant editor for one variant; shown in the Sub-variants tab.
+  // Each sub-variant renders as a Card that mirrors the Variants-tab card chrome:
+  // header row (name, SKU chip, stock badge, Edit/Remove) + body (main-row grid + grouped sections).
   const renderSubVariants = (
     variantPopupId: string,
     popupVariant: VariantRow,
     popupUnitKey: string,
     popupUnitInfo: UnitLoadedInfo | null
-  ) => (
+  ) => {
+    const svs = subVariantsMap[variantPopupId] || []
+    return (
     <>
     {popupVariant.sub_variant_type_on && (
-      <div>
-        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
               Sub-Variants{popupVariant.sub_variant_type ? ` (${popupVariant.sub_variant_type})` : ''}
@@ -3082,7 +3086,7 @@ export default function ProductForm({
           </p>
         </div>
         {variantPopupId.startsWith('temp-') && (
-          <div className="mb-3 rounded-lg border border-dashed border-amber-400/60 bg-amber-500/5 p-3 flex items-center justify-between gap-3">
+          <div className="rounded-lg border border-dashed border-amber-400/60 bg-amber-500/5 p-3 flex items-center justify-between gap-3">
             <p className="text-xs text-foreground-secondary">
               Save the product first to add sub-variants for this variant.
             </p>
@@ -3101,192 +3105,231 @@ export default function ProductForm({
             </button>
           </div>
         )}
-        {(subVariantsMap[variantPopupId] || []).length > 0 && (
-          <div className="mb-3 rounded-lg border border-border-default overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs whitespace-nowrap">
-                <thead className="bg-surface-secondary/60">
-                  <tr className="text-left text-foreground-muted">
-                    <th className="px-3 py-2 font-medium">Name</th>
-                    <th className="px-3 py-2 font-medium">
-                      MRP (Ex)
-                      {popupUnitKey && <span className="text-[10px] ml-1">/ {popupUnitKey}</span>}
-                    </th>
-                    <th className="px-3 py-2 font-medium">Disc %</th>
-                    <th className="px-3 py-2 font-medium">
-                      MRP (incl)
-                      {popupUnitKey && <span className="text-[10px] ml-1">/ {popupUnitKey}</span>}
-                    </th>
-                    <th className="px-3 py-2 font-medium">
-                      Price (incl)
-                      {popupUnitKey && <span className="text-[10px] ml-1">/ {popupUnitKey}</span>}
-                    </th>
-                    <th className="px-3 py-2 font-medium">
-                      Price (Ex)
-                      {popupUnitKey && <span className="text-[10px] ml-1">/ {popupUnitKey}</span>}
-                    </th>
-                    <th className="px-3 py-2 font-medium">Stock</th>
-                    <th className="px-3 py-2 font-medium">Shipping</th>
-                    <th className="px-3 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(subVariantsMap[variantPopupId] || []).map((sv: any) => {
-                    const isEditingSv = subVariantEditId === sv.id
-                    const stockCls =
-                      sv.stock_status === 'Out of Stock'
-                        ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                        : sv.stock_status === 'Low Stock'
-                          ? 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
-                          : 'bg-green-500/10 text-green-700 dark:text-green-400'
-                    const shippingParts = [
-                      sv.weight_grams != null && sv.weight_grams !== '' ? `${sv.weight_grams} g` : null,
-                      sv.package_type ? PACKAGE_TYPE_LABELS[sv.package_type] || sv.package_type : null,
-                    ].filter(Boolean)
-                    return (
-                      <React.Fragment key={sv.id}>
-                        <tr
-                          className={`border-t border-border-default ${isEditingSv ? 'bg-accent-500/5' : ''}`}
-                        >
-                          <td className="px-3 py-2">
-                            <div className="font-medium text-foreground">{sv.sub_variant_name}</div>
-                            {sv.sku && (
-                              <div className="font-mono text-[10px] text-foreground-muted">
-                                {sv.sku}
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            {sv.mrp_ex_gst != null ? `₹${paiseString(sv.mrp_ex_gst)}` : '—'}
-                          </td>
-                          <td className="px-3 py-2">{discountPct ? `${discountPct}%` : '—'}</td>
-                          <td className="px-3 py-2">
-                            {sv.mrp != null ? `₹${paiseString(sv.mrp)}` : '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            {sv.price != null ? `₹${paiseString(sv.price)}` : '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            {sv.price_ex_gst != null ? `₹${paiseString(sv.price_ex_gst)}` : '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            <span
-                              className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${stockCls}`}
-                            >
-                              {sv.stock_status || 'In Stock'}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-foreground-secondary">
-                            {shippingParts.length > 0 ? (
-                              shippingParts.join(' · ')
-                            ) : (
-                              <span className="italic text-foreground-muted">Inherit</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="flex items-center justify-end gap-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (isEditingSv) {
-                                    setSubVariantEditId(null)
-                                    setSubVariantEditDraft(null)
-                                  } else beginSubVariantEdit(sv)
-                                }}
-                                className="text-accent-500 hover:text-accent-600 text-xs font-medium leading-none"
-                              >
-                                {isEditingSv ? 'Close' : 'Edit'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setExpandedSvUnits(s => {
-                                    const n = new Set(s)
-                                    n.has(sv.id) ? n.delete(sv.id) : n.add(sv.id)
-                                    return n
-                                  })
-                                }
-                                className={`text-xs font-medium leading-none ${expandedSvUnits.has(sv.id) ? 'text-accent-600' : 'text-foreground-muted hover:text-accent-500'}`}
-                              >
-                                {hasInventory ? 'Units & Suppliers' : 'Units'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => deleteSubVariant(variantPopupId, sv.id)}
-                                className="text-red-400 hover:text-red-600 leading-none"
-                                aria-label="Remove sub-variant"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                        {isEditingSv && subVariantEditDraft && (
-                          <tr>
-                            <td
-                              colSpan={9}
-                              className="p-3 bg-surface-secondary/40 border-t border-border-default"
-                            >
-                              <SubVariantEditor
-                                mode="edit"
-                                value={subVariantEditDraft}
-                                onChange={next => setSubVariantEditDraft(next)}
-                                onSubmit={() => saveSubVariantEdit(variantPopupId, sv.id)}
-                                onCancel={() => {
-                                  setSubVariantEditId(null)
-                                  setSubVariantEditDraft(null)
-                                }}
-                                parentSku={popupVariant.sku || ''}
-                                discountPct={discountPct}
-                                gstRate={gstRate}
-                                unitKey={popupUnitKey}
-                                packageTypes={PACKAGE_TYPE_OPTIONS}
-                                inherited={inheritedShippingFor(popupVariant)}
-                              />
-                            </td>
-                          </tr>
-                        )}
-                        {expandedSvUnits.has(sv.id) &&
-                          productId &&
-                          !variantPopupId.startsWith('temp-') && (
-                            <tr>
-                              <td
-                                colSpan={9}
-                                className="px-3 pb-3 pt-3 bg-surface-secondary/50 border-t border-border-default"
-                              >
-                                <div className="space-y-3">
-                                  {hasInventory && (
-                                    <div className="rounded-lg border border-border-default bg-surface p-3">
-                                      <ProductSupplierList
-                                        suppliers={suppliers}
-                                        value={sv.product_suppliers || []}
-                                        onChange={rows =>
-                                          updateSubVariantSuppliers(variantPopupId, sv.id, rows)
-                                        }
-                                        note="Sub-variant level. The lowest price is highlighted; the star marks your preferred supplier."
-                                      />
-                                    </div>
-                                  )}
-                                  <UnitsManager
-                                    productId={productId}
-                                    variantId={variantPopupId}
-                                    subVariantId={sv.id}
-                                    basePrice={sv.price}
-                                    isDraft={isDraft}
-                                  />
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                      </React.Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+        {svs.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs text-foreground-muted">Jump to</span>
+            {svs.map((sv: any) => (
+              <button
+                key={sv.id}
+                type="button"
+                onClick={() =>
+                  document
+                    .querySelector(`[data-sub-variant-card="${sv.id}"]`)
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }
+                className="control-sm border border-border-default text-foreground-secondary hover:bg-surface-secondary hover:text-foreground"
+              >
+                {sv.sub_variant_name || sv.sku || 'Untitled sub-variant'}
+              </button>
+            ))}
           </div>
         )}
-        <div className="rounded-lg border border-dashed border-border-secondary p-3">
+        {svs.length > 0 && (
+          <div className="space-y-4">
+            {svs.map((sv: any, svIdx: number) => {
+              const isEditingSv = subVariantEditId === sv.id
+              const stockLabel = sv.stock_status || 'In Stock'
+              const stockTone: 'red' | 'amber' | 'green' =
+                stockLabel === 'Out of Stock'
+                  ? 'red'
+                  : stockLabel === 'Low Stock'
+                    ? 'amber'
+                    : 'green'
+              const shippingParts = [
+                sv.weight_grams != null && sv.weight_grams !== '' ? `${sv.weight_grams} g` : null,
+                sv.package_type ? PACKAGE_TYPE_LABELS[sv.package_type] || sv.package_type : null,
+              ].filter(Boolean)
+              return (
+                <div
+                  key={sv.id}
+                  data-sub-variant-card={sv.id}
+                  className="scroll-mt-24 rounded-xl border border-border-default bg-surface-elevated shadow-sm"
+                >
+                  <div className="flex flex-wrap items-center gap-2 rounded-t-xl border-b border-border-default bg-surface-secondary/40 px-4 py-2.5">
+                    <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+                      {sv.sub_variant_name || 'Untitled sub-variant'}
+                    </span>
+                    {sv.sku && (
+                      <span className="font-mono text-xs text-foreground-muted">{sv.sku}</span>
+                    )}
+                    <Badge tone={stockTone}>{stockLabel}</Badge>
+                    <span className="ml-auto text-xs tabular-nums text-foreground-muted">
+                      Sub-variant {svIdx + 1} of {svs.length}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isEditingSv) {
+                          setSubVariantEditId(null)
+                          setSubVariantEditDraft(null)
+                        } else beginSubVariantEdit(sv)
+                      }}
+                      className="text-accent-500 hover:text-accent-600 text-xs font-medium leading-none"
+                    >
+                      {isEditingSv ? 'Close' : 'Edit'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteSubVariant(variantPopupId, sv.id)}
+                      className="text-red-400 hover:text-red-600 p-1 rounded transition-colors"
+                      title="Remove"
+                      aria-label="Remove sub-variant"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {isEditingSv && subVariantEditDraft ? (
+                    <div className="p-4">
+                      <SubVariantEditor
+                        mode="edit"
+                        value={subVariantEditDraft}
+                        onChange={next => setSubVariantEditDraft(next)}
+                        onSubmit={() => saveSubVariantEdit(variantPopupId, sv.id)}
+                        onCancel={() => {
+                          setSubVariantEditId(null)
+                          setSubVariantEditDraft(null)
+                        }}
+                        parentSku={popupVariant.sku || ''}
+                        discountPct={discountPct}
+                        gstRate={gstRate}
+                        unitKey={popupUnitKey}
+                        packageTypes={PACKAGE_TYPE_OPTIONS}
+                        inherited={inheritedShippingFor(popupVariant)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-4 space-y-6">
+                      <div>
+                        <div className="flex items-baseline justify-between mb-3">
+                          <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+                            Pricing & Identifiers
+                          </p>
+                          <span className="text-[10px] text-foreground-muted">
+                            Per BASE unit{popupUnitKey ? ` (${popupUnitKey})` : ''}. Click Edit to change.
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-3">
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Name</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={sv.sub_variant_name || ''}
+                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">SKU</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={sv.sku || ''}
+                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">MRP (Ex. GST)</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={sv.mrp_ex_gst != null ? paiseString(sv.mrp_ex_gst) : ''}
+                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                              placeholder="—"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Disc %</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={discountPct || '0'}
+                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">MRP (incl)</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={sv.mrp != null ? paiseString(sv.mrp) : ''}
+                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                              placeholder="—"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Price (incl)</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={sv.price != null ? paiseString(sv.price) : ''}
+                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                              placeholder="—"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Price (Ex)</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={sv.price_ex_gst != null ? paiseString(sv.price_ex_gst) : ''}
+                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                              placeholder="—"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-foreground-secondary whitespace-nowrap">Stock Status</label>
+                            <input
+                              type="text"
+                              readOnly
+                              value={stockLabel}
+                              className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">
+                          Shipping
+                        </p>
+                        <p className="text-xs text-foreground-secondary">
+                          {shippingParts.length > 0 ? (
+                            shippingParts.join(' · ')
+                          ) : (
+                            <span className="italic text-foreground-muted">Inherited from variant / product</span>
+                          )}
+                        </p>
+                      </div>
+                      {hasInventory && productId && !variantPopupId.startsWith('temp-') && (
+                        <div>
+                          <ProductSupplierList
+                            suppliers={suppliers}
+                            value={sv.product_suppliers || []}
+                            onChange={rows =>
+                              updateSubVariantSuppliers(variantPopupId, sv.id, rows)
+                            }
+                            note="Sub-variant level. The lowest price is highlighted; the star marks your preferred supplier."
+                          />
+                        </div>
+                      )}
+                      {productId && !variantPopupId.startsWith('temp-') && (
+                        <div>
+                          <UnitsManager
+                            productId={productId}
+                            variantId={variantPopupId}
+                            subVariantId={sv.id}
+                            basePrice={sv.price}
+                            isDraft={isDraft}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <div className="rounded-xl border border-dashed border-border-secondary p-4">
           <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
             Add Sub-Variant
           </p>
@@ -3308,6 +3351,7 @@ export default function ProductForm({
     )}
     </>
   )
+  }
 
   return (
     <>
