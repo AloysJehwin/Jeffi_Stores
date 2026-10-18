@@ -1,12 +1,12 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Info } from 'lucide-react'
-import DraftEditButton from '@/components/admin/DraftEditButton'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/shared/admin-path'
 import { getHost } from '@/lib/tenancy/get-host'
 import { queryOne, queryMany } from '@/lib/shared/db'
 import { Card, DetailHeader, EntityPage, Field, Fields, Kpi, KpiGrid, StatusBadge, ACTIVE_STATUS, EmptyState, Badge } from '@/components/admin/kit'
+import { startBrandDraft } from './actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,14 +87,24 @@ export default async function BrandViewPageDetail({
           subtitle={brand.description || undefined}
           identifiers={[{ label: 'Created', value: created }]}
           actions={
-            <DraftEditButton
-              entity="brands"
-              id={id}
-              name={brand.name}
-              hasDraft={!!hasDraft}
-              backUrl={backUrl}
-              className="control-md bg-accent-500 hover:bg-accent-600 text-white font-semibold"
-            />
+            hasDraft ? (
+              <Link
+                href={ap(`/admin/brands/${id}/edit?back=${encodeURIComponent(backUrl)}`, host)}
+                className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+              >
+                Edit Draft
+              </Link>
+            ) : (
+              <form action={startBrandDraft.bind(null, id)}>
+                <input type="hidden" name="_back" value={backUrl} />
+                <button
+                  type="submit"
+                  className="control-md bg-accent-500 font-semibold text-white hover:bg-accent-600"
+                >
+                  Edit
+                </button>
+              </form>
+            )
           }
         />
       }
